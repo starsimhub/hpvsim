@@ -50,9 +50,30 @@ class PeopleMeta(sc.prettyobj):
         self.states = [
             'susceptible',
             'naive',
-            'exposed',
             'infectious',
             'recovered',
+        ]
+
+        # Genotype states -- these are ints
+        self.genotype_states = [
+            'infectious_genotype',
+            'recovered_genotype',
+        ]
+
+        # Genotype states -- these are ints, by genotype
+        self.by_genotype_states = [
+            'infectious_by_genotype',
+        ]
+
+        # Immune states, by variant
+        self.imm_states = [
+            'sus_imm',  # Float, by genotype
+        ]
+
+        # Immunity states, by genotype/vaccine
+        self.imm_by_source_states = [
+            'imm',  # Float, current immunity level
+            't_imm_event',  # Float, time since immunity event
         ]
 
         self.dates = [f'date_{state}' for state in self.states] # Convert each state into a date
@@ -63,10 +84,11 @@ class PeopleMeta(sc.prettyobj):
             'dur_disease',
         ]
 
-        self.all_states = self.person + self.states + self.dates + self.durs
+        self.all_states = self.person + self.states + self.genotype_states + self.by_genotype_states + self.imm_states + self.imm_by_source_states + self.dates + self.durs
 
         # Validate
-        self.state_types = ['person', 'states', 'dates', 'durs', 'all_states']
+        self.state_types = ['person', 'states', 'genotype_states', 'by_genotype_states', 'imm_states',
+                            'imm_by_source_states', 'dates', 'durs', 'all_states']
         for state_type in self.state_types:
             states = getattr(self, state_type)
             n_states        = len(states)
@@ -84,7 +106,6 @@ class PeopleMeta(sc.prettyobj):
 # A subset of the above states are used for results
 result_stocks = {
     'susceptible': 'Number susceptible',
-    'exposed':     'Number exposed',
     'infectious':  'Number infectious',
     'recovered':   'Number recovered',
 }
@@ -96,6 +117,15 @@ result_flows = {
     'infectious':   'infectious',
     'recoveries':   'recoveries',
 }
+
+# Parameters that can vary by variant
+genotype_pars = [
+    'rel_beta',
+    'rel_symp_prob',
+    'rel_severe_prob',
+    'rel_crit_prob',
+    'rel_death_prob',
+]
 
 
 # Define new and cumulative flows

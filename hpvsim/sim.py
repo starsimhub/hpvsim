@@ -12,6 +12,7 @@ from . import defaults as hpd
 from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
+from . import immunity as hpimm
 
 
 # Define the model
@@ -52,7 +53,9 @@ class Sim(hpb.BaseSim):
         self.t = 0  # The current time index
         self.validate_pars() # Ensure parameters have valid values
         self.set_seed() # Reset the random seed before the population is created
-        self.init_results() # After initializing the variant, create the results structure
+        self.init_genotypes() # Initialize the genotypes
+        self.init_immunity() # initialize information about immunity (if use_waning=True)
+        self.init_results() # After initializing the genotypes, create the results structure
         self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
@@ -135,6 +138,31 @@ class Sim(hpb.BaseSim):
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
 
+        return
+
+    def init_genotypes(self):
+        ''' Initialize the genotypes '''
+        if self._orig_pars and 'genotypes' in self._orig_pars:
+            self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
+
+        for i, genotype in enumerate(self['genotypes']):
+            if isinstance(genotype, hpimm.variant):
+                if not genotype.initialized:
+                    genotype.initialize(self)
+            else:  # pragma: no cover
+                errormsg = f'Variant {i} ({genotype}) is not a hp.genotype object; please create using cv.variant()'
+                raise TypeError(errormsg)
+
+        len_pars = len(self['genotype_pars'])
+        len_map = len(self['genotype_map'])
+        assert len_pars == len_map, f"genotype_pars and genotype_map must be the same length, but they're not: {len_pars} ≠ {len_map}"
+        self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
+
+        return
+
+    def init_immunity(self, create=False):
+        ''' Initialize immunity matrices '''
+        hpimm.init_immunity(self, create=create)
         return
 
 
