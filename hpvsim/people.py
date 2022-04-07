@@ -139,7 +139,6 @@ class People(hpb.BasePeople):
         return n_dissolved # Return the number of dissolved partnerships by layer
 
 
-    # def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispersion=None):
     def create_partnerships(self, t=None, n_new=None, pref_weight=100):
         ''' Create new partnerships '''
 
@@ -160,8 +159,8 @@ class People(hpb.BasePeople):
             # Add everything to a contacts dictionary
             new_pships[lkey]['f'] = new_pship_inds_f
             new_pships[lkey]['m'] = new_pship_inds_m
-            new_pships[lkey]['dur'] = hpu.sample(**self['pars']['dur_pship'][lkey])
-            new_pships[lkey]['start'] = t
+            new_pships[lkey]['dur'] = hpu.sample(**self['pars']['dur_pship'][lkey], size=n_new[lkey])
+            new_pships[lkey]['start'] = np.array([t*self['pars']['dt']]*n_new[lkey],dtype=hpd.default_float)
             new_pships[lkey]['end'] = new_pships[lkey]['start'] + new_pships[lkey]['dur']
 
         self.add_contacts(new_pships)
@@ -170,7 +169,6 @@ class People(hpb.BasePeople):
 
 
     #%% Methods for updating state
-
     def check_inds(self, current, date, filter_inds=None):
         ''' Return indices for which the current state is false and which meet the date criterion '''
         if filter_inds is None:

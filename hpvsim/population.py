@@ -228,9 +228,9 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, mappi
     m = [] # Initialize the male partners
 
     # Define indices; TODO fix or centralize this
-    all_inds = np.arange(len(sexes)) # TODO get this a better way
-    f_active_inds = np.intersect1d(mapping, f_inds)
-    inactive_inds = np.setdiff1d(all_inds, mapping)
+    all_inds        = np.arange(len(sexes)) # TODO get this a better way
+    f_active_inds   = np.intersect1d(mapping, f_inds)
+    inactive_inds   = np.setdiff1d(all_inds, mapping)
 
     # Precalculate contacts
     n_all_contacts  = int(sum(p_count[f_active_inds])) # Sum of partners for sexually active females
@@ -256,44 +256,4 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, mappi
     output['end'] = output['start'] + output['dur']
 
     return output
-
-
-# def create_partnerships(people, n_new=None, microstructure='random', **kwargs):
-#     '''
-#     Create partnerships for a People object 
-#     '''
-
-#     # Deal with debuts and participation rates
-#     is_active = people.ages>people.debuts               # Whether or not people have ever been sexually active
-#     active_inds = hpu.true(people.ages>people.debuts)   # Indices of sexually experienced people
-#     n_active = sum(is_active)                           # Number of sexually experienced people
-
-#     # n_new gives us the number of partnerships to create. Distribute these 
-#     # using a weighting function that measures the difference between each
-#     # person's preferred number of partners and their current number, for 
-#     # all sexually active people
-#     # Do this next bit by layer. Consider how to make it tractable with the find_contacts - store separately?
-#     current_partners = hpu.find_contacts()
-#     desired_partners = people.partners
-#     difference = max(desired_partners - current_partners,0)
-#     weightings = difference/sum(difference)
-#     new_p1 = hpu.choose_w(weightings,n_new) # Indices of people to assign to new partnerships
-
-#     # Precalculate contacts
-#     n_all_contacts  = int(pop_size*n*overshoot) # The overshoot is used so we won't run out of contacts if the Poisson draws happen to be higher than the expected value
-#     all_contacts    = hpu.choose_r(max_n=pop_size, n=n_all_contacts) # Choose people at random
-
-
-#     if microstructure == 'random':
-#         contacts = dict()
-#         for lkey,n in people.partners.items():
-#             n_active_layer = n_active*pars['layer_probs'][lkey]
-#             active_inds_layer = hpu.binomial_filter(pars['layer_probs'][lkey], mapping)
-#             durations = pars['dur_pship'][lkey]
-#             contacts[lkey] = make_random_contacts(n_active_layer, n, durations, mapping=active_inds_layer, **kwargs)
-#     else: # pragma: no cover
-#         errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
-#         raise NotImplementedError(errormsg)
-#     return contacts
- 
 
