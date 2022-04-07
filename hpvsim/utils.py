@@ -313,7 +313,7 @@ def n_poisson(rate, n):
 
 def n_neg_binomial(rate, dispersion, n, step=1): # Numba not used due to incompatible implementation
     '''
-    An array of negative binomial trials. See hpcv.sample() for more explanation.
+    An array of negative binomial trials. See hp.sample() for more explanation.
 
     Args:
         rate (float): the rate of the process (mean, same as Poisson)

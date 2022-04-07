@@ -102,7 +102,7 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships; TODO make this a distribution
     )
 
-    # Specify defaults for basic sexual network
+    # Specify defaults for basic sexual network with regular and casual partners
     layer_defaults['basic'] = dict(
         partners    = dict(r=1, c=2),       # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
         acts        = dict(r=100, c=50),    # Default number of sexual acts per year; TODO make this a distribution

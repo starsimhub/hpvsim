@@ -186,13 +186,13 @@ class Sim(hpb.BaseSim):
 
     def init_people(self, popdict=None, init_infections=False, reset=False, verbose=None, **kwargs):
         '''
-        Create the people.
+        Create the people and the network.
 
         Use ``init_infections=False`` for creating a fresh People object for use
         in future simulations
 
         Args:
-            popdict         (any):  pre-generated people of various formats
+            popdict         (any):  pre-generated people of various formats.
             init_infections (bool): whether to initialize infections (default false when called directly)
             reset           (bool): whether to regenerate the people even if they already exist
             verbose         (int):  detail to print

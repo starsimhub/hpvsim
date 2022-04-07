@@ -13,6 +13,8 @@ from . import utils as hpu
 from . import misc as hpm
 from . import defaults as hpd
 #from . import parameters as cvpar
+obj_get = object.__getattribute__ # Alias the default getattribute method
+obj_set = object.__setattr__
 
 # # Specify all externally visible classes this file defines
 # __all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', 'Contacts', 'Layer']
@@ -878,6 +880,22 @@ class BasePeople(FlexPretty):
     whereas this class exists to handle the less interesting implementation details.
     '''
 
+    def __init__(self):
+        ''' Initialize essential attributes used for filtering '''
+        obj_set(self, '_keys', []) # Since getattribute is overwritten
+        obj_set(self, '_inds', None)
+        return
+
+
+    def __len__(self):
+        ''' Length of people (unfiltered?) '''
+        try:
+            return len(self.uid)
+        except Exception as E:
+            print(f'Warning: could not get length of People (could not get self.uid: {E})')
+            return 0
+
+
     def set_pars(self, pars=None):
         '''
         Re-link the parameters stored in the people object to the sim containing it,
@@ -998,7 +1016,7 @@ class BasePeople(FlexPretty):
             If the key is an integer, alias `people.person()` to return a `Person` instance
         '''
         try:
-            return self.__dict__[key]
+            return self.__getattribute__(key) # Key difference here compare to covasim, which allows filtering to work
         except: # pragma: no cover
             if isinstance(key, int):
                 return self.person(key)
@@ -1016,9 +1034,38 @@ class BasePeople(FlexPretty):
         return
 
 
-    def __len__(self):
-        ''' This is just a scalar, but validate() and _resize_arrays() make sure it's right '''
-        return int(self.pars['pop_size'])
+    def _is_filtered(self, attr):
+        ''' Determine if a given attribute is filtered (e.g. people.age is, people.inds isn't) '''
+        is_filtered = (self._inds is not None and attr in self._keys)
+        return is_filtered
+
+
+    def __getattribute__(self, attr):
+        ''' For array quantities, handle filtering '''
+        output  = obj_get(self, attr)
+        if attr[0] == '_': # Short-circuit for built-in methods to save time
+            return output
+        else:
+            try: # Unclear why this fails, but sometimes it does during initialization/pickling
+                keys = obj_get(self, '_keys')
+            except:
+                keys = []
+            if attr not in keys:
+                return output
+            else:
+                if self._is_filtered(attr):
+                    output = output[self.inds]
+        return output
+
+
+    def __setattr__(self, attr, value):
+        ''' Ditto '''
+        if self._is_filtered(attr):
+            array = obj_get(self, attr)
+            array[self.inds] = value
+        else:   # If not initialized, rely on the default behavior
+            obj_set(self, attr, value)
+        return
 
 
     def __iter__(self):
@@ -1072,6 +1119,15 @@ class BasePeople(FlexPretty):
         return string
 
 
+    def keys(self):
+        ''' Returns keys for all properties of the people object '''
+        try: # Unclear wy this fails, but sometimes it does during initialization/pickling
+            keys = obj_get(self, '_keys')[:]
+        except:
+            keys = []
+        return keys
+
+
     def set(self, key, value, die=True):
         ''' Ensure sizes and dtypes match '''
         current = self[key]
@@ -1093,6 +1149,99 @@ class BasePeople(FlexPretty):
                 arr[:,k] = self[ky]
             return arr
 
+
+    #%% Filtering methods
+    def filter(self, criteria=None, inds=None):
+        '''
+        Store indices to allow for easy filtering of the People object.
+        Adapted from FPsim
+        Args:
+            criteria (array): a boolean array for the filtering critria
+            inds (array): alternatively, explicitly filter by these indices
+        Returns:
+            A filtered People object, which works just like a normal People object
+            except only operates on a subset of indices.
+        Examples:
+        active_people = people.filter(people.age > people.debut) # People object containing sexually active people 
+        '''
+
+        # Create a new People object with the same properties as the original
+        filtered = object.__new__(self.__class__) # Create a new People instance
+        BasePeople.__init__(filtered) # Perform essential initialization
+        filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
+
+        # Perform the filtering
+        if criteria is None: # No filtering: reset
+            filtered._inds = None
+            if inds is not None: # Unless indices are supplied directly, in which case use them
+                filtered._inds = inds
+        else: # Main use case: perform filtering
+            if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
+                new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
+            elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
+                new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
+            else:
+                errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
+                raise ValueError(errormsg)
+            if filtered.inds is None: # Not yet filtered: use the indices directly
+                filtered._inds = new_inds
+            else: # Already filtered: map them back onto the original People indices
+                filtered._inds = filtered.inds[new_inds]
+
+        return filtered
+
+
+    def unfilter(self):
+        '''
+        An easy way of unfiltering the People object, returning the original.
+        '''
+        unfiltered = self.filter(criteria=None)
+        return unfiltered
+
+
+    @property
+    def inds(self):
+        ''' Alias to self._inds to prevent accidental overwrite & increase speed '''
+        return self._inds
+
+    @property
+    def len_inds(self):
+        ''' Alias to len(self) '''
+        if self._inds is not None:
+            return len(self._inds)
+        else:
+            return len(self)
+
+    @property
+    def is_female(self):
+        ''' Boolean array of everyone female '''
+        return self.sex == 0
+
+    @property
+    def is_male(self):
+        ''' Boolean array of everyone male '''
+        return self.sex == 1
+
+    @property
+    def int_age(self):
+        ''' Return ages as an integer '''
+        return np.array(self.age, dtype=np.int64)
+
+    @property
+    def round_age(self):
+        ''' Rounds age up to the next highest integer'''
+        return np.array(np.ceil(self.age))
+
+    @property
+    def dt_age(self):
+        ''' Return ages rounded to the nearest whole timestep '''
+        dt = self['pars']['dt']
+        return np.round(self.age*1/dt) / (1/dt)
+
+    @property
+    def is_active(self):
+        ''' Boolean array of everyone sexually active i.e. past debut '''
+        return self.age>self.debut
 
     def true(self, key):
         ''' Return indices matching the condition '''
@@ -1157,7 +1306,7 @@ class BasePeople(FlexPretty):
     def layer_keys(self):
         ''' Get the available contact keys -- try contacts first, then beta_layer '''
         try:
-            keys = list(self.contacts.keys())
+            keys = list(self.partners.keys())
         except: # If not fully initialized
             try:
                 keys = list(self.pars['beta_layer'].keys())
@@ -1363,7 +1512,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
                 new_contacts = {}
                 new_contacts[lkey] = contacts
             else:
-                if 'p1' in contacts: # Avoid the mistake of passing a single layer
+                if 'f' in contacts: # Avoid the mistake of passing a single layer
                     errormsg = 'To supply a single layer as a dict, you must supply an lkey as well'
                     raise ValueError(errormsg)
                 new_contacts = contacts # Main use case
@@ -1380,7 +1529,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
 
         # Ensure the columns are right and add values if supplied
         for lkey, new_layer in new_contacts.items():
-            n = len(new_layer['p1'])
+            n = len(new_layer['f'])
             if 'beta' not in new_layer.keys() or len(new_layer['beta']) != n:
                 if beta is None:
                     beta = 1.0
@@ -1414,15 +1563,15 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
         # Initialize the new contacts
         new_contacts = Contacts(layer_keys=lkeys)
         for lkey in lkeys:
-            new_contacts[lkey]['p1']    = [] # Person 1 of the contact pair
-            new_contacts[lkey]['p2']    = [] # Person 2 of the contact pair
+            new_contacts[lkey]['f']    = [] # Female in the pair
+            new_contacts[lkey]['m']    = [] # Male in the pair
 
         # Populate the new contacts
         for p,cdict in enumerate(contacts):
             for lkey,p_contacts in cdict.items():
                 n = len(p_contacts) # Number of contacts
-                new_contacts[lkey]['p1'].extend([p]*n) # e.g. [4, 4, 4, 4]
-                new_contacts[lkey]['p2'].extend(p_contacts) # e.g. [243, 4538, 7,19]
+                new_contacts[lkey]['f'].extend([p]*n) # e.g. [4, 4, 4, 4]
+                new_contacts[lkey]['m'].extend(p_contacts) # e.g. [243, 4538, 7,19]
 
         # Turn into a dataframe
         for lkey in lkeys:
@@ -1437,13 +1586,13 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
     @staticmethod
     def remove_duplicates(df):
         ''' Sort the dataframe and remove duplicates -- note, not extensively tested '''
-        p1 = df[['p1', 'p2']].values.min(1) # Reassign p1 to be the lower-valued of the two contacts
-        p2 = df[['p1', 'p2']].values.max(1) # Reassign p2 to be the higher-valued of the two contacts
-        df['p1'] = p1
-        df['p2'] = p2
-        df.sort_values(['p1', 'p2'], inplace=True) # Sort by p1, then by p2
-        df.drop_duplicates(['p1', 'p2'], inplace=True) # Remove duplicates
-        df = df[df['p1'] != df['p2']] # Remove self connections
+        f = df[['f', 'm']].values.min(1) # Reassign p1 to be the lower-valued of the two contacts
+        m = df[['f', 'm']].values.max(1) # Reassign p2 to be the higher-valued of the two contacts
+        df['f'] = f
+        df['m'] = m
+        df.sort_values(['f', 'm'], inplace=True) # Sort by p1, then by p2
+        df.drop_duplicates(['f', 'm'], inplace=True) # Remove duplicates
+        df = df[df['f'] != df['m']] # Remove self connections
         df.reset_index(inplace=True, drop=True)
         return df
 
@@ -1453,11 +1602,12 @@ class Person(sc.prettyobj):
     Class for a single person. Note: this is largely deprecated since sim.people
     is now based on arrays rather than being a list of people.
     '''
-    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, contacts=None):
+    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, partners=None, current_partners=None):
         self.uid         = uid # This person's unique identifier
         self.age         = hpd.default_float(age) # Age of the person (in years)
         self.sex         = hpd.default_int(sex) # Female (0) or male (1)
-        self.contacts    = contacts # Contacts
+        self.partners    = partners # Preferred number of partners
+        self.current_partners    = partners # Number of current partners
         self.debut       = hpd.default_float(debut) # Age of sexual debut
         # self.infected = [] #: Record the UIDs of all people this person infected
         # self.infected_by = None #: Store the UID of the person who caused the infection. If None but person is infected, then it was an externally seeded infection
@@ -1634,14 +1784,14 @@ class Layer(FlexDict):
 
     def __init__(self, *args, label=None, **kwargs):
         self.meta = {
-            'p1':    hpd.default_int,   # Person 1
-            'p2':    hpd.default_int,   # Person 2
+            'f':     hpd.default_int,   # Female
+            'm':     hpd.default_int,   # Male
             'beta':  hpd.default_float, # Default transmissibility for this contact type
             'dur':   hpd.default_float, # Duration of partnership
             'start': hpd.default_int, # Date of partnership start
             'end':   hpd.default_float, # Date of partnership end
         }
-        self.basekey = 'p1' # Assign a base key for calculating lengths and performing other operations
+        self.basekey = 'f' # Assign a base key for calculating lengths and performing other operations
         self.label = label
 
         # Handle args
@@ -1675,7 +1825,7 @@ class Layer(FlexDict):
         namestr = self.__class__.__name__
         labelstr = f'"{self.label}"' if self.label else '<no label>'
         keys_str = ', '.join(self.keys())
-        output = f'{namestr}({labelstr}, {keys_str})\n' # e.g. Layer("h", p1, p2, beta)
+        output = f'{namestr}({labelstr}, {keys_str})\n' # e.g. Layer("r", f, m, beta)
         output += self.to_df().__repr__()
         return output
 
@@ -1690,18 +1840,18 @@ class Layer(FlexDict):
         Returns: True if person index appears in any interactions
 
         """
-        return (item in self['p1']) or (item in self['p2'])
+        return (item in self['f']) or (item in self['m'])
 
     @property
     def members(self):
         """
         Return sorted array of all members
         """
-        return np.unique([self['p1'], self['p2']])
+        return np.unique([self['f'], self['m']])
 
 
     def meta_keys(self):
-        ''' Return the keys for the layer's meta information -- i.e., p1, p2, beta, any others '''
+        ''' Return the keys for the layer's meta information -- i.e., f, m, beta, any others '''
         return self.meta.keys()
 
 
@@ -1746,7 +1896,7 @@ class Layer(FlexDict):
         Append contacts to the current layer.
 
         Args:
-            contacts (dict): a dictionary of arrays with keys p1,p2,beta, as returned from layer.pop_inds()
+            contacts (dict): a dictionary of arrays with keys f,m,beta, as returned from layer.pop_inds()
         '''
         for key in self.keys():
             new_arr = contacts[key]
@@ -1785,7 +1935,7 @@ class Layer(FlexDict):
             nx.draw(G)
         '''
         import networkx as nx
-        data = [np.array(self[k], dtype=dtype).tolist() for k,dtype in [('p1', int), ('p2', int), ('beta', float)]]
+        data = [np.array(self[k], dtype=dtype).tolist() for k,dtype in [('f', int), ('m', int), ('beta', float)]]
         G = nx.DiGraph()
         G.add_weighted_edges_from(zip(*data), weight='beta')
         nx.set_edge_attributes(G, self.label, name='layer')
@@ -1825,7 +1975,7 @@ class Layer(FlexDict):
             inds = np.array(inds, dtype=np.int64)
 
         # Find the contacts
-        contact_inds = hpu.find_contacts(self['p1'], self['p2'], inds)
+        contact_inds = hpu.find_contacts(self['f'], self['m'], inds)
         if as_array:
             contact_inds = np.fromiter(contact_inds, dtype=hpd.default_int)
             contact_inds.sort()  # Sorting ensures that the results are reproducible for a given seed as well as being identical to previous versions of Covasim
@@ -1857,8 +2007,8 @@ class Layer(FlexDict):
         inds = hpu.choose(n_contacts, n_new)
 
         # Create the contacts, not skipping self-connections
-        self['p1'][inds]   = np.array(hpu.choose_r(max_n=pop_size, n=n_new), dtype=hpd.default_int) # Choose with replacement
-        self['p2'][inds]   = np.array(hpu.choose_r(max_n=pop_size, n=n_new), dtype=hpd.default_int)
+        self['f'][inds]   = np.array(hpu.choose_r(max_n=pop_size, n=n_new), dtype=hpd.default_int) # Choose with replacement
+        self['m'][inds]   = np.array(hpu.choose_r(max_n=pop_size, n=n_new), dtype=hpd.default_int)
         self['beta'][inds] = np.ones(n_new, dtype=hpd.default_float)
         return
 

@@ -20,4 +20,7 @@ if __name__ == '__main__':
     print(sim.label)
     sim.run()
 
+    # active_people = sim.people.filter(sim.people.age>sim.people.debut)
+
+
 
