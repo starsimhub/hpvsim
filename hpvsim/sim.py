@@ -121,7 +121,7 @@ class Sim(hpb.BaseSim):
         self.tvec          = np.arange(self.npts)
         
         # Handle population data
-        network_choices = ['random']
+        network_choices = ['random', 'basic']
         choice = self['network']
         if choice and choice not in network_choices: # pragma: no cover
             choicestr = ', '.join(network_choices)
@@ -186,13 +186,13 @@ class Sim(hpb.BaseSim):
 
     def init_people(self, popdict=None, init_infections=False, reset=False, verbose=None, **kwargs):
         '''
-        Create the people.
+        Create the people and the network.
 
         Use ``init_infections=False`` for creating a fresh People object for use
         in future simulations
 
         Args:
-            popdict         (any):  pre-generated people of various formats
+            popdict         (any):  pre-generated people of various formats.
             init_infections (bool): whether to initialize infections (default false when called directly)
             reset           (bool): whether to regenerate the people even if they already exist
             verbose         (int):  detail to print
@@ -213,7 +213,8 @@ class Sim(hpb.BaseSim):
             self.load_population(init_people=False)
 
         # Actually make the people
-        self.people = hppop.make_people(self, reset=reset, verbose=verbose, **kwargs)
+        microstructure = self['network']
+        self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
 
@@ -233,8 +234,8 @@ class Sim(hpb.BaseSim):
         people   = self.people # Shorten this for later use
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
-        # people.update_states_pre(t=t) # Update the state of everyone and count the flows
-        # contacts = people.update_contacts() # Compute new contacts
+
+        sus = people.susceptible
 
         # Tidy up
         self.t += 1

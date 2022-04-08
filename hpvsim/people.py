@@ -44,6 +44,9 @@ class People(hpb.BasePeople):
     '''
 
     def __init__(self, pars, strict=True, **kwargs):
+        
+        # Initialize the BasePeople, which also sets things up for filtering  
+        super().__init__()
 
         # Handle pars and population size
         self.set_pars(pars)
@@ -84,9 +87,13 @@ class People(hpb.BasePeople):
         # Although we have called init(), we still need to call initialize()
         self.initialized = False
 
-        # Handle contacts, if supplied (note: they usually are)
+        # Handle partners and contacts
+        if 'partners' in kwargs:
+            self.partners = kwargs.pop('partners') # Store the desired concurrency
+        if 'current_partners' in kwargs:
+            self.current_partners = kwargs.pop('current_partners') # Store current actual number - updated each step though
         if 'contacts' in kwargs:
-            self.add_contacts(kwargs.pop('contacts'))
+            self.add_contacts(kwargs.pop('contacts')) # Also updated each step
 
         # Handle all other values, e.g. age
         for key,value in kwargs.items():
@@ -115,42 +122,54 @@ class People(hpb.BasePeople):
     #%% Methods for updating partnerships
     def dissolve_partnerships(self, t=None):
         ''' Dissolve partnerships '''
+
         self.t = t # Update time; TODO move this somewhere more central
         n_dissolved = dict()
+
         for lkey in self.layer_keys():
-            dissolve_inds = hpu.true(self.t*self.pars['dt']>self.contacts[lkey]['end'])
-            _ = self.contacts[lkey].pop_inds(dissolve_inds)
+            dissolve_inds = hpu.true(self.t*self.pars['dt']>self.contacts[lkey]['end']) # Get the partnerships due to end
+            dissolved = self.contacts[lkey].pop_inds(dissolve_inds) # Remove them from the contacts list
+
+            # Update current number of partners
+            unique, counts = np.unique(np.concatenate([dissolved['f'],dissolved['m']]), return_counts=True)
+            self.current_partners[lkey][unique] -= counts
             n_dissolved[lkey] = len(dissolve_inds)
+
         return n_dissolved # Return the number of dissolved partnerships by layer
 
 
-    def create_partnerships(self, t=None, n_new=None):
+    def create_partnerships(self, t=None, n_new=None, pref_weight=100):
         ''' Create new partnerships '''
 
-        # # Extract people who are not currently partnered
-        # if t>0: 
+        new_pships = dict()
+        for lkey in self.layer_keys():
+            new_pships[lkey] = dict()
+            
+            # Define probabilities of entering new partnerships
+            new_pship_probs                     = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship
+            new_pship_probs[~self.is_active]    *= 0 # Blank out people not yet active
+            underpartnered                      = hpu.true(self.current_partners[lkey]<self.partners[lkey]) # Indices of those who have fewer partners than desired
+            new_pship_probs[underpartnered]     *= pref_weight # Increase weight for those who are underpartnerned
 
-        #     # Figure out who will start a new partnership
-        #     active_inds = hpu.true(self.age>self.debut) # Only consider people past debut
-        #     new_partnerships = dict()
+            # Draw female and male partners separately
+            new_pship_inds_f    = hpu.choose_w(probs=new_pship_probs*self.is_female, n=n_new[lkey], unique=True)
+            new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male, n=n_new[lkey], unique=True)
+            new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
+            self.current_partners[lkey][new_pship_inds] += 1
 
-        #     for lkey in self.layer_keys():
-        #         [len(self.contacts[lkey].find_contacts(ind)) for ind in range(len(self))]
-        #         import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
-        #         active_inds_layer = hpu.binomial_filter(pars['layer_probs'][lkey], active_inds)
-        #         durations = pars['dur_pship'][lkey]
-        #         contacts[lkey] = make_random_contacts(n_active_layer, n, durations, mapping=active_inds_layer, **kwargs)
+            # Add everything to a contacts dictionary
+            new_pships[lkey]['f'] = new_pship_inds_f
+            new_pships[lkey]['m'] = new_pship_inds_m
+            new_pships[lkey]['dur'] = hpu.sample(**self['pars']['dur_pship'][lkey], size=n_new[lkey])
+            new_pships[lkey]['start'] = np.array([t*self['pars']['dt']]*n_new[lkey],dtype=hpd.default_float)
+            new_pships[lkey]['end'] = new_pships[lkey]['start'] + new_pships[lkey]['dur']
 
-
-        #     for lkey in self.layer_keys():
-        #         new_partnerships = hppop.make_random_contacts(pop_size=len(self), n=n_new, durations=None, mapping=None)
-        #         self.add_contacts(new_partnerships)
-
+        self.add_contacts(new_pships)
+            
         return
 
 
     #%% Methods for updating state
-
     def check_inds(self, current, date, filter_inds=None):
         ''' Return indices for which the current state is false and which meet the date criterion '''
         if filter_inds is None:
