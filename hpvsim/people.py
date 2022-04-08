@@ -90,9 +90,10 @@ class People(hpb.BasePeople):
         # Handle partners and contacts
         if 'partners' in kwargs:
             self.partners = kwargs.pop('partners') # Store the desired concurrency
-            self.current_partners = sc.dcp(self.partners) # Assume actual is the same as desired initially
+        if 'current_partners' in kwargs:
+            self.current_partners = kwargs.pop('current_partners') # Store current actual number - updated each step though
         if 'contacts' in kwargs:
-            self.add_contacts(kwargs.pop('contacts'))
+            self.add_contacts(kwargs.pop('contacts')) # Also updated each step
 
         # Handle all other values, e.g. age
         for key,value in kwargs.items():
@@ -126,16 +127,14 @@ class People(hpb.BasePeople):
         n_dissolved = dict()
 
         for lkey in self.layer_keys():
-            dissolve_inds = hpu.true(self.t*self.pars['dt']>self.contacts[lkey]['end'])
-            dissolved = self.contacts[lkey].pop_inds(dissolve_inds)
+            dissolve_inds = hpu.true(self.t*self.pars['dt']>self.contacts[lkey]['end']) # Get the partnerships due to end
+            dissolved = self.contacts[lkey].pop_inds(dissolve_inds) # Remove them from the contacts list
 
             # Update current number of partners
-            for sex in ['f','m']:
-                unique, counts = np.unique(dissolved[sex], return_counts=True)
-                self.current_partners[lkey][unique] -= counts
-
+            unique, counts = np.unique(np.concatenate([dissolved['f'],dissolved['m']]), return_counts=True)
+            self.current_partners[lkey][unique] -= counts
             n_dissolved[lkey] = len(dissolve_inds)
-        
+
         return n_dissolved # Return the number of dissolved partnerships by layer
 
 
@@ -147,14 +146,16 @@ class People(hpb.BasePeople):
             new_pships[lkey] = dict()
             
             # Define probabilities of entering new partnerships
-            new_pship_probs = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship
-            new_pship_probs[~self.is_active]*= 0 # Blank out people not yet active
-            underpartnered_inds = hpu.true(self.current_partners[lkey]<self.partners[lkey]) # Indices of those who have fewer partners than desired
-            new_pship_probs[underpartnered_inds] *= pref_weight # Increase weight for those who are underpartnerned
+            new_pship_probs                     = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship
+            new_pship_probs[~self.is_active]    *= 0 # Blank out people not yet active
+            underpartnered                      = hpu.true(self.current_partners[lkey]<self.partners[lkey]) # Indices of those who have fewer partners than desired
+            new_pship_probs[underpartnered]     *= pref_weight # Increase weight for those who are underpartnerned
 
             # Draw female and male partners separately
-            new_pship_inds_f = hpu.choose_w(probs=new_pship_probs*self.is_female, n=n_new[lkey], unique=True)
-            new_pship_inds_m = hpu.choose_w(probs=new_pship_probs*self.is_male, n=n_new[lkey], unique=True)
+            new_pship_inds_f    = hpu.choose_w(probs=new_pship_probs*self.is_female, n=n_new[lkey], unique=True)
+            new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male, n=n_new[lkey], unique=True)
+            new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
+            self.current_partners[lkey][new_pship_inds] += 1
 
             # Add everything to a contacts dictionary
             new_pships[lkey]['f'] = new_pship_inds_f

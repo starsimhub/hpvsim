@@ -88,27 +88,28 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['debut'] = debuts
         popdict['partners'] = partners
 
-        # Create the contacts; TODO should this be in a separate function?
+        # Create the contacts
         is_active = ages>debuts                 # Whether or not people have ever been sexually active
         active_inds = hpu.true(ages>debuts)     # Indices of sexually experienced people
-        n_active = sum(is_active)               # Number of sexually experienced people
-
+ 
         if microstructure == 'random':
             contacts = dict()
+            current_partners = dict()
             for lkey,n in sim['partners'].items():
                 active_inds_layer = hpu.binomial_filter(sim['layer_probs'][lkey], active_inds)
                 durations = sim['dur_pship'][lkey]
-                contacts[lkey] = make_random_contacts(p_count=partners[lkey], sexes=sexes, n=n, durations=durations, mapping=active_inds_layer, **kwargs)
+                contacts[lkey], current_partners[lkey] = make_random_contacts(p_count=partners[lkey], sexes=sexes, n=n, durations=durations, mapping=active_inds_layer, **kwargs)
         else: # pragma: no cover
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
             raise NotImplementedError(errormsg)
 
         popdict['contacts']   = contacts
+        popdict['current_partners']   = current_partners
         popdict['layer_keys'] = list(partners.keys())
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
-    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts']) # List for storing the people
+    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
 
     sc.printv(f'Created {pop_size} people, average age {people.age.mean():0.2f} years', 2, verbose)
 
@@ -117,7 +118,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
 def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispersion=None):
     '''
-    Assign each person a number of concurrent partners (either desired or actual)
+    Assign each person a preferred number of concurrent partners for each layer
     Args:
         pop_size    (int)   : number of people
         layer_keys  (list)  : list of layers
@@ -150,7 +151,6 @@ def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispe
         else:
             p_count = np.full(pop_size, n, dtype=hpd.default_int)
 
-#        p_count = np.array((p_count/2.0).round(), dtype=hpd.default_int)
         partners[lkey] = p_count
         
     return partners
@@ -223,12 +223,13 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, mappi
     '''
 
     # Initialize
-    f_inds = hpu.false(sexes)
     f = [] # Initialize the female partners
     m = [] # Initialize the male partners
 
     # Define indices; TODO fix or centralize this
-    all_inds        = np.arange(len(sexes)) # TODO get this a better way
+    pop_size        = len(sexes)
+    f_inds          = hpu.false(sexes)
+    all_inds        = np.arange(pop_size) 
     f_active_inds   = np.intersect1d(mapping, f_inds)
     inactive_inds   = np.setdiff1d(all_inds, mapping)
 
@@ -248,6 +249,11 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, mappi
         f.extend([p]*n_contacts)
         m.extend(these_contacts)
 
+    # Count how many contacts there actually are: will be different for males, should be the same for females
+    unique, count = np.unique(np.concatenate([np.array(m),np.array(f)]),return_counts=True)
+    actual_p_count = np.full(pop_size, 0, dtype=hpd.default_int)
+    actual_p_count[unique] = count
+
     # Tidy up and add durations and start dates
     output = _tidy_edgelist(m, f)
     n_partnerships = len(output['m'])
@@ -255,5 +261,5 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, mappi
     output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
     output['end'] = output['start'] + output['dur']
 
-    return output
+    return output, actual_p_count
 

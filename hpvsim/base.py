@@ -1603,12 +1603,12 @@ class Person(sc.prettyobj):
     is now based on arrays rather than being a list of people.
     '''
     def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, partners=None, current_partners=None):
-        self.uid         = uid # This person's unique identifier
-        self.age         = hpd.default_float(age) # Age of the person (in years)
-        self.sex         = hpd.default_int(sex) # Female (0) or male (1)
-        self.partners    = partners # Preferred number of partners
-        self.current_partners    = partners # Number of current partners
-        self.debut       = hpd.default_float(debut) # Age of sexual debut
+        self.uid                = uid # This person's unique identifier
+        self.age                = hpd.default_float(age) # Age of the person (in years)
+        self.sex                = hpd.default_int(sex) # Female (0) or male (1)
+        self.partners           = partners # Preferred number of partners
+        self.current_partners   = current_partners # Number of current partners
+        self.debut              = hpd.default_float(debut) # Age of sexual debut
         # self.infected = [] #: Record the UIDs of all people this person infected
         # self.infected_by = None #: Store the UID of the person who caused the infection. If None but person is infected, then it was an externally seeded infection
         return
@@ -1876,6 +1876,21 @@ class Layer(FlexDict):
         return
 
 
+    def get_inds(self, inds, remove=False):
+        '''
+        Get the specified indices from the edgelist and return them as a dict.
+
+        Args:
+            inds (int, array, slice): the indices to be removed
+        '''
+        output = {}
+        for key in self.meta_keys():
+            output[key] = self[key][inds] # Copy to the output object
+            if remove:
+                self[key] = np.delete(self[key], inds) # Remove from the original
+        return output
+
+
     def pop_inds(self, inds):
         '''
         "Pop" the specified indices from the edgelist and return them as a dict.
@@ -1884,11 +1899,7 @@ class Layer(FlexDict):
         Args:
             inds (int, array, slice): the indices to be removed
         '''
-        output = {}
-        for key in self.meta_keys():
-            output[key] = self[key][inds] # Copy to the output object
-            self[key] = np.delete(self[key], inds) # Remove from the original
-        return output
+        return self.get_inds(inds, remove=True)
 
 
     def append(self, contacts):

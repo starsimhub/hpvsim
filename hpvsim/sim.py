@@ -233,8 +233,8 @@ class Sim(hpb.BaseSim):
         people   = self.people # Shorten this for later use
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
-        # people.update_states_pre(t=t) # Update the state of everyone and count the flows
-        # contacts = people.update_contacts() # Compute new contacts
+
+        sus = people.susceptible
 
         # Tidy up
         self.t += 1
