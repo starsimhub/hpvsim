@@ -51,9 +51,9 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
 
     # Basic disease transmission parameters
     pars['debut']           = dict(dist='normal', par1=15.5, par2=1.5) # Age of sexual debut; TODO separate for M/F?
-    pars['age_diff']        = None  # Age difference in partnerships
-    pars['nonactive_by_age']= nonactive_by_age
-    pars['nonactive']       = None # Set below
+    # pars['age_diff']        = None  # Age difference in partnerships
+    # pars['nonactive_by_age']= nonactive_by_age
+    # pars['nonactive']       = None # Set below
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=0.45, step=0.01) # Distribution to draw individual level transmissibility
     pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
 
@@ -107,7 +107,8 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         partners    = dict(r=1, c=2),       # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
         acts        = dict(r=100, c=50),    # Default number of sexual acts per year; TODO make this a distribution
         layer_probs = dict(r=0.7, c=0.4),   # Default proportion of the population in each layer
-        dur_pship   = dict(r=10, c=2),      # Default duration of partnerships; TODO make this a distribution
+        dur_pship   = dict(r=dict(dist='normal_pos', par1=10,par2=3),
+                           c=dict(dist='normal_pos', par1=2, par2=1)),
     )
 
     # Choose the parameter defaults based on the population type, and get the layer keys

@@ -12,7 +12,7 @@ import datetime as dt
 from . import utils as hpu
 from . import misc as hpm
 from . import defaults as hpd
-#from . import parameters as cvpar
+from . import parameters as hppar
 obj_get = object.__getattribute__ # Alias the default getattribute method
 obj_set = object.__setattr__
 
@@ -270,9 +270,9 @@ class BaseSim(ParsObj):
                 if key1 in pars:
                     pars[key2] = pars.pop(key1)
 
-            # # Handle other special parameters
-            # if pars.get('pop_type'):
-            #     cvpar.reset_layer_pars(pars, force=False)
+            # Handle other special parameters
+            if pars.get('network'):
+                hppar.reset_layer_pars(pars, force=False)
             # if pars.get('prog_by_age'):
             #     pars['prognoses'] = cvpar.get_prognoses(by_age=pars['prog_by_age'], version=self._default_ver) # Reset prognoses
 

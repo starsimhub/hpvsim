@@ -20,7 +20,7 @@ from . import people as hpppl
 
 
 def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
-                sex_ratio=0.5, dispersion=None, microstructure='random', **kwargs):
+                sex_ratio=0.5, dispersion=None, microstructure=None, **kwargs):
     '''
     Make the people for the simulation.
 
@@ -89,10 +89,8 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['partners'] = partners
 
         # Create the contacts
-        is_active = ages>debuts                 # Whether or not people have ever been sexually active
         active_inds = hpu.true(ages>debuts)     # Indices of sexually experienced people
- 
-        if microstructure == 'random':
+        if microstructure in ['random', 'basic']:
             contacts = dict()
             current_partners = dict()
             for lkey,n in sim['partners'].items():

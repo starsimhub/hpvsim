@@ -121,7 +121,7 @@ class Sim(hpb.BaseSim):
         self.tvec          = np.arange(self.npts)
         
         # Handle population data
-        network_choices = ['random']
+        network_choices = ['random', 'basic']
         choice = self['network']
         if choice and choice not in network_choices: # pragma: no cover
             choicestr = ', '.join(network_choices)
@@ -213,7 +213,8 @@ class Sim(hpb.BaseSim):
             self.load_population(init_people=False)
 
         # Actually make the people
-        self.people = hppop.make_people(self, reset=reset, verbose=verbose, **kwargs)
+        microstructure = self['network']
+        self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
 
