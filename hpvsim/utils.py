@@ -33,6 +33,44 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
+@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:], nbfloat[:]), cache=cache, parallel=rand_parallel)
+def compute_infections(beta,     f,        m,        layer_betas,  rel_trans,  rel_sus): # pragma: no cover
+    '''
+    Compute who infects whom
+
+    The heaviest step of the model -- figure out who gets infected on this timestep.
+    Cannot be easily parallelized since random numbers are used. Loops over contacts
+    in both directions (i.e., targets become sources).
+
+    Args:
+        beta: overall transmissibility
+        f: female in the pair
+        m: male in the pair
+        layer_betas: per-contact transmissibilities
+        rel_trans: the source's relative transmissibility
+        rel_sus: the target's relative susceptibility
+    '''
+    slist = np.empty(0, dtype=nbint)
+    tlist = np.empty(0, dtype=nbint)
+    pairs = [[f,m], [m,f]]
+    for sources,targets in pairs:
+        source_trans     = rel_trans[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
+        inf_inds         = source_trans.nonzero()[0] # Infectious indices -- remove noninfectious people
+        betas            = beta * layer_betas[inf_inds] * source_trans[inf_inds] * rel_sus[targets[inf_inds]] # Calculate the raw transmission probabilities
+        nonzero_inds     = betas.nonzero()[0] # Find nonzero entries
+        nonzero_inf_inds = inf_inds[nonzero_inds] # Map onto original indices
+        nonzero_betas    = betas[nonzero_inds] # Remove zero entries from beta
+        nonzero_sources  = sources[nonzero_inf_inds] # Remove zero entries from the sources
+        nonzero_targets  = targets[nonzero_inf_inds] # Remove zero entries from the targets
+        transmissions    = (np.random.random(len(nonzero_betas)) < nonzero_betas).nonzero()[0] # Compute the actual infections!
+        source_inds      = nonzero_sources[transmissions]
+        target_inds      = nonzero_targets[transmissions] # Filter the targets on the actual infections
+        slist = np.concatenate((slist, source_inds), axis=0)
+        tlist = np.concatenate((tlist, target_inds), axis=0)
+    return slist, tlist
+
+
+
 @nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
 def find_contacts(p1, p2, inds): # pragma: no cover
     """
