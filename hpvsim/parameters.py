@@ -57,6 +57,9 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=0.45, step=0.01) # Distribution to draw individual level transmissibility
     pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
 
+    # Genotype parameters
+    pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
+
     # Duration parameters
     pars['dur'] = {}
     pars['dur']['exp2inf']  = dict(dist='lognormal_int', par1=1.1, par2=0.9)    # Duration from exposed to infectious

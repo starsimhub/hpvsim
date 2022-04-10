@@ -228,14 +228,59 @@ class Sim(hpb.BaseSim):
         if self.complete:
             raise AlreadyRunError('Simulation already complete (call sim.initialize() to re-run)')
 
+        # Shorten key variables
         t = self.t
+        ng = self['n_genotypes']
+        people = self.people
+        prel_trans = people.rel_trans
+        prel_sus = people.rel_sus
 
-        # Perform initial operations
-        people   = self.people # Shorten this for later use
+        # Update partnerships
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
+        contacts = people.contacts
 
+        # Loop over genotypes and infect people
         sus = people.susceptible
+
+        # Iterate through n_variants to calculate infections
+        for genotype in range(ng):
+
+            # Deal with variant parameters
+            rel_beta = self['rel_beta']
+            if genotype:
+                genotype_label = self.pars['genotype_map'][genotype]
+                rel_beta *= self['variant_pars'][genotype_label]['rel_beta']
+            beta = hpd.default_float(self['beta'] * rel_beta)
+
+            for lkey, layer in contacts.items():
+                f = layer['f']
+                m = layer['m']
+                betas = layer['beta']
+
+                # Compute relative transmission and susceptibility
+                inf_variant = people.infectious * (people.infectious_genotype == genotype) 
+                sus_imm = people.sus_imm[genotype,:]
+                beta_layer  = hpd.default_float(self['beta_layer'][lkey])
+                rel_trans, rel_sus = hpu.compute_trans_sus(prel_trans, prel_sus, inf_variant, sus, beta_layer, viral_load, symp, diag, sus_imm)
+
+                # Calculate actual transmission
+                source_inds, target_inds = hpu.compute_infections(beta, f, m, betas, rel_trans, rel_sus)  # Calculate transmission
+                people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
+
+        # Update counts for this time step: stocks
+        for key in hpd.result_stocks.keys():
+            self.results[f'n_{key}'][t] = people.count(key)
+        for key in hpd.result_stocks_by_genotype.keys():
+            for variant in range(ng):
+                self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
+
+        # Update counts for this time step: flows
+        for key,count in people.flows.items():
+            self.results[key][t] += count
+        for key,count in people.flows_genotype.items():
+            for variant in range(ng):
+                self.results['genotype'][key][genotype][t] += count[genotype]
 
         # Tidy up
         self.t += 1
