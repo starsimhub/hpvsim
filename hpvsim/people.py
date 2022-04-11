@@ -209,7 +209,6 @@ class People(hpb.BasePeople):
 
 
     #%% Methods to make events occur (infection and diagnosis)
-
     def make_naive(self, inds, reset_vx=False):
         '''
         Make a set of people naive. This is used during dynamic resampling.

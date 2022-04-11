@@ -34,21 +34,18 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 #%% The core functions 
 
 #@nb.njit(        (nbfloat[:], nbbool[:], nbfloat   ), cache=cache, parallel=safe_parallel)
-def compute_trans(rel_trans,  inf,       beta_layer, whole_acts, frac_acts): # pragma: no cover
-    ''' Calculate relative transmissibility '''
-    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+def compute_foi_frac(rel_trans, beta, inf, condoms, eff_condoms, frac_acts): # pragma: no cover
+    ''' Compute probability of each person transmitting'''
+    foi = inf * frac_acts * (beta * rel_trans) * (1 - condoms*eff_condoms) # Calculate transmissibility
+    return foi
 
-    # thisforceinfsex = 1 - fracacts[t] * thistrans[t] * protection[t] * allprev[pop2]
-    # if wholeacts[t]>0: thisforceinfsex *= np.power(1 - thistrans[t] * protection[t] * allprev[pop2], int(wholeacts[t]))
-
-
-
-    rel_trans = rel_trans * inf * beta_layer # Calculate transmissibility
-    return rel_trans
-
-
-@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:], nbfloat[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(beta,     f,        m,        layer_betas,  rel_trans,  rel_sus): # pragma: no cover
+def compute_foi_whole(rel_trans, beta, inf, condoms, eff_condoms, n): # pragma: no cover
+    ''' Compute probability of each infected person transmitting the infection over n acts'''
+    foi = inf * (1 - np.power(1 - (beta * rel_trans) * (1 - condoms*eff_condoms), n))
+    return foi
+    
+#@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
+def compute_infections(foi, f, m): # pragma: no cover
     '''
     Compute who infects whom
 
@@ -57,20 +54,20 @@ def compute_infections(beta,     f,        m,        layer_betas,  rel_trans,  r
     in both directions (i.e., targets become sources).
 
     Args:
-        beta: overall transmissibility
+        beta: transmission probabilities
         f: female in the pair
         m: male in the pair
-        layer_betas: per-contact transmissibilities
-        rel_trans: the source's relative transmissibility
-        rel_sus: the target's relative susceptibility
     '''
-    slist = np.empty(0, dtype=nbint)
-    tlist = np.empty(0, dtype=nbint)
+    # slist = np.empty(0, dtype=nbint)
+    # tlist = np.empty(0, dtype=nbint)
+    slist = np.empty(0, dtype=hpd.default_int)
+    tlist = np.empty(0, dtype=hpd.default_int)
     pairs = [[f,m], [m,f]]
+
     for sources,targets in pairs:
-        source_trans     = rel_trans[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
+        source_trans     = foi[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
         inf_inds         = source_trans.nonzero()[0] # Infectious indices -- remove noninfectious people
-        betas            = beta * layer_betas[inf_inds] * source_trans[inf_inds] * rel_sus[targets[inf_inds]] # Calculate the raw transmission probabilities
+        betas            = source_trans[inf_inds] # Calculate the raw transmission probabilities
         nonzero_inds     = betas.nonzero()[0] # Find nonzero entries
         nonzero_inf_inds = inf_inds[nonzero_inds] # Map onto original indices
         nonzero_betas    = betas[nonzero_inds] # Remove zero entries from beta

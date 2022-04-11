@@ -238,7 +238,6 @@ class Sim(hpb.BaseSim):
             # Create the seed infections
             if self['pop_infected']:
                 inds = hpu.choose(self['pop_size'], self['pop_infected'])
-                import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
                 self.people.infect(inds=inds, layer='seed_infection') # Not counted by results since flows are re-initialized during the step
 
         elif verbose:
@@ -260,6 +259,7 @@ class Sim(hpb.BaseSim):
         ng = self['n_genotypes']
         acts = self['acts']
         condoms = self['condoms']
+        eff_condoms = self['eff_condoms']
         rel_beta = self['rel_beta']
         people = self.people
         prel_trans = people.rel_trans
@@ -271,6 +271,7 @@ class Sim(hpb.BaseSim):
 
         # Loop over genotypes and infect people
         sus = people.susceptible
+        inf = people.infectious
 
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
@@ -280,6 +281,7 @@ class Sim(hpb.BaseSim):
             #     genotype_label = self.pars['genotype_map'][genotype]
             #     rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
             beta = hpd.default_float(self['beta'] * rel_beta)
+            foi_frac, foi_whole = 1, 1
 
             for lkey, layer in contacts.items():
                 f = layer['f']
@@ -292,26 +294,27 @@ class Sim(hpb.BaseSim):
                 # inf_genotype = people.infectious * (people.infectious_genotype == genotype) 
                 # sus_imm = people.sus_imm[genotype,:]
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
-                inf = people.infectious
-                rel_trans = hpu.compute_trans(prel_trans, inf, condom, eff_condom, whole_acts, frac_acts)
 
-                # Calculate actual transmission
-                source_inds, target_inds = hpu.compute_infections(beta, f, m, betas, rel_trans)  # Calculate transmission
+                # Compute transmissibility and infections
+                if whole_acts>0:    foi_whole = hpu.compute_foi_whole(prel_trans, beta, inf, condoms[lkey], eff_condoms, whole_acts)
+                if frac_acts>0:     foi_frac  = hpu.compute_foi_frac( prel_trans, beta, inf, condoms[lkey], eff_condoms, frac_acts)
+                foi = foi_whole * foi_frac
+                source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
         # Update counts for this time step: stocks
         for key in hpd.result_stocks.keys():
             self.results[f'n_{key}'][t] = people.count(key)
-        for key in hpd.result_stocks_by_genotype.keys():
-            for variant in range(ng):
-                self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
+        # for key in hpd.result_stocks_by_genotype.keys():
+        #     for variant in range(ng):
+        #         self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
 
         # Update counts for this time step: flows
         for key,count in people.flows.items():
             self.results[key][t] += count
-        for key,count in people.flows_genotype.items():
-            for variant in range(ng):
-                self.results['genotype'][key][genotype][t] += count[genotype]
+        # for key,count in people.flows_genotype.items():
+        #     for variant in range(ng):
+        #         self.results['genotype'][key][genotype][t] += count[genotype]
 
         # Tidy up
         self.t += 1

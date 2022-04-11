@@ -81,7 +81,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
 
 
 # Define which parameters need to be specified as a dictionary by layer -- define here so it's available at the module level for sim.py
-layer_pars = ['partners', 'acts', 'layer_probs', 'dur_pship']
+layer_pars = ['partners', 'acts', 'layer_probs', 'dur_pship', 'condoms']
 
 
 def reset_layer_pars(pars, layer_keys=None, force=False):
@@ -102,9 +102,10 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     # Specify defaults for random -- layer 'a' for 'all'
     layer_defaults['random'] = dict(
         partners    = dict(a=1),    # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
-        acts        = dict(a=100),  # Default number of sexual acts per year; TODO make this a distribution
+        acts        = dict(a=104),  # Default number of sexual acts per year; TODO make this a distribution
         layer_probs = dict(a=1.0),  # Default proportion of the population in each layer
         dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships; TODO make this a distribution
+        condoms     = dict(a=0.25),  # Default proportion of acts in which condoms are used
     )
 
     # Specify defaults for basic sexual network with regular and casual partners
@@ -114,6 +115,7 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         layer_probs = dict(r=0.7, c=0.4),   # Default proportion of the population in each layer
         dur_pship   = dict(r=dict(dist='normal_pos', par1=10,par2=3),
                            c=dict(dist='normal_pos', par1=2, par2=1)),
+        condoms     = dict(r=0.01, c=0.8),  # Default proportion of acts in which condoms are used
     )
 
     # Choose the parameter defaults based on the population type, and get the layer keys
