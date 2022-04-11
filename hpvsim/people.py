@@ -182,36 +182,7 @@ class People(hpb.BasePeople):
         return inds
 
 
-    def check_infectious(self):
-        ''' Check if they become infectious '''
-        inds = self.check_inds(self.infectious, self.date_infectious, filter_inds=self.is_exp)
-        self.infectious[inds] = True
-        self.infectious_variant[inds] = self.exposed_variant[inds]
-        return len(inds)
-
-
-    def check_symptomatic(self):
-        ''' Check for new progressions to symptomatic '''
-        inds = self.check_inds(self.symptomatic, self.date_symptomatic, filter_inds=self.is_exp)
-        self.symptomatic[inds] = True
-        return len(inds)
-
-
-    def check_severe(self):
-        ''' Check for new progressions to severe '''
-        inds = self.check_inds(self.severe, self.date_severe, filter_inds=self.is_exp)
-        self.severe[inds] = True
-        return len(inds)
-
-
-    def check_critical(self):
-        ''' Check for new progressions to critical '''
-        inds = self.check_inds(self.critical, self.date_critical, filter_inds=self.is_exp)
-        self.critical[inds] = True
-        return len(inds)
-
-
-    def check_recovery(self, inds=None, filter_inds='is_exp'):
+    def check_recovery(self, inds=None, filter_inds='is_inf'):
         '''
         Check for recovery.
 
@@ -220,55 +191,21 @@ class People(hpb.BasePeople):
         '''
 
         # Handle more flexible options for setting indices
-        if filter_inds == 'is_exp':
-            filter_inds = self.is_exp
+        if filter_inds == 'is_inf':
+            filter_inds = self.is_inf
         if inds is None:
             inds = self.check_inds(self.recovered, self.date_recovered, filter_inds=filter_inds)
 
         # Now reset all disease states
-        self.exposed[inds]          = False
         self.infectious[inds]       = False
-        self.symptomatic[inds]      = False
-        self.severe[inds]           = False
-        self.critical[inds]         = False
         self.recovered[inds]        = True
-        self.recovered_variant[inds] = self.exposed_variant[inds]
-        self.infectious_variant[inds] = np.nan
-        self.exposed_variant[inds]    = np.nan
-        self.exposed_by_variant[:, inds] = False
-        self.infectious_by_variant[:, inds] = False
-
-
-        # Handle immunity aspects
-        if self.pars['use_waning']:
-
-            # Reset additional states
-            self.susceptible[inds] = True
-            self.diagnosed[inds]   = False # Reset their diagnosis state because they might be reinfected
+        # self.recovered_genotype[inds] = self.infectious_genotype[inds]
+        # self.infectious_genotype[inds] = np.nan
+        # self.exposed_genotype[inds]    = np.nan
+        # self.exposed_by_genotype[:, inds] = False
+        # self.infectious_by_genotype[:, inds] = False
 
         return len(inds)
-
-
-    def check_death(self):
-        ''' Check whether or not this person died on this timestep  '''
-        inds = self.check_inds(self.dead, self.date_dead, filter_inds=self.is_exp)
-        self.dead[inds]             = True
-        diag_inds = inds[self.diagnosed[inds]] # Check whether the person was diagnosed before dying
-        self.known_dead[diag_inds]  = True
-        self.susceptible[inds]      = False
-        self.exposed[inds]          = False
-        self.infectious[inds]       = False
-        self.symptomatic[inds]      = False
-        self.severe[inds]           = False
-        self.critical[inds]         = False
-        self.known_contact[inds]    = False
-        self.quarantined[inds]      = False
-        self.recovered[inds]        = False
-        self.infectious_variant[inds] = np.nan
-        self.exposed_variant[inds]    = np.nan
-        self.recovered_variant[inds]  = np.nan
-        return len(inds), len(diag_inds)
-
 
 
     #%% Methods to make events occur (infection and diagnosis)
@@ -364,9 +301,10 @@ class People(hpb.BasePeople):
         durpars      = self.pars['dur']
 
         # Update states, variant info, and flows
-        self.susceptible[inds]    = False
-        self.naive[inds]          = False
-        self.recovered[inds]      = False
+        self.susceptible[inds]  = False
+        self.naive[inds]        = False
+        self.infectious[inds]   = True
+        self.recovered[inds]    = False
         self.flows['new_infections']   += len(inds)
 
         # # Record transmissions

@@ -238,6 +238,7 @@ class Sim(hpb.BaseSim):
             # Create the seed infections
             if self['pop_infected']:
                 inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
                 self.people.infect(inds=inds, layer='seed_infection') # Not counted by results since flows are re-initialized during the step
 
         elif verbose:
@@ -292,7 +293,6 @@ class Sim(hpb.BaseSim):
                 # sus_imm = people.sus_imm[genotype,:]
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
                 inf = people.infectious
-                import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
                 rel_trans = hpu.compute_trans(prel_trans, inf, condom, eff_condom, whole_acts, frac_acts)
 
                 # Calculate actual transmission
