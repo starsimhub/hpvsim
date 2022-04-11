@@ -28,42 +28,44 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     pars = {}
 
     # Population parameters
-    pars['pop_size']     = 20e3     # Number of agents
-    pars['pop_infected'] = 20       # Number of initial infections
-    pars['network']      = 'random' # What type of sexual network to use -- 'random', other options TBC
-    pars['location']     = None     # What location to load data from -- default Seattle
+    pars['pop_size']        = 20e3     # Number of agents
+    pars['pop_infected']    = 20       # Number of initial infections; TODO reconsider this
+    pars['network']         = 'random' # What type of sexual network to use -- 'random', 'basic', other options TBC
+    pars['location']        = None     # What location to load data from -- default Seattle
 
     # Simulation parameters
-    pars['start']       = 2015.         # Start of the simulation
-    pars['end']         = None          # End of the simulation
-    pars['n_years']     = 10.           # Number of years to run, if end isn't specified
-    pars['dt']          = 0.2           # Timestep (in years)
-    pars['rand_seed']   = 1             # Random seed, if None, don't reset
-    pars['verbose']     = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
+    pars['start']           = 2015.         # Start of the simulation
+    pars['end']             = None          # End of the simulation
+    pars['n_years']         = 10.           # Number of years to run, if end isn't specified
+    pars['dt']              = 0.2           # Timestep (in years)
+    pars['rand_seed']       = 1             # Random seed, if None, don't reset
+    pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
 
     # Network parameters, generally initialized after the population has been constructed
+    pars['debut']           = dict(dist='normal', par1=15.5, par2=1.5) # Age of sexual debut; TODO separate for M/F?
     pars['partners']        = None  # The number of concurrent sexual partners per layer
     pars['acts']            = None  # The number of sexual acts per layer per year
+    pars['condoms']         = None  # The proportion of acts in which condoms are used
     pars['layer_probs']     = None  # Proportion of the population in each layer
     pars['dur_pship']       = None  # Duration of partnerships in each layer
-    # pars['p_multi']         = None  # Probability of more than one simultaneous partnership
-    # pars['n_multi']         = None  # Number of simultaneous partnerships
+    # pars['age_diff']        = None  # Age difference in partnerships -- TODO consider how to use this
+    # pars['nonactive_by_age']= nonactive_by_age
+    # pars['nonactive']       = None 
 
     # Basic disease transmission parameters
-    pars['debut']           = dict(dist='normal', par1=15.5, par2=1.5) # Age of sexual debut; TODO separate for M/F?
-    # pars['age_diff']        = None  # Age difference in partnerships
-    # pars['nonactive_by_age']= nonactive_by_age
-    # pars['nonactive']       = None # Set below
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=0.45, step=0.01) # Distribution to draw individual level transmissibility
     pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
 
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
+    pars['rel_beta']    = 1.0 # Relative transmissibility varies by genotype (??)
 
     # Duration parameters
     pars['dur'] = {}
-    pars['dur']['exp2inf']  = dict(dist='lognormal_int', par1=1.1, par2=0.9)    # Duration from exposed to infectious
     pars['dur']['inf2rec']  = dict(dist='lognormal_int', par1=21.0, par2=10.0)  # Duration from infectious to recovered
+
+    # Efficacy of protection
+    pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
 
     # Events and interventions
     pars['interventions'] = []   # The interventions present in this simulation; populated by the user

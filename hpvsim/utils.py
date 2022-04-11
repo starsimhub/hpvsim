@@ -33,6 +33,20 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
+#@nb.njit(        (nbfloat[:], nbbool[:], nbfloat   ), cache=cache, parallel=safe_parallel)
+def compute_trans(rel_trans,  inf,       beta_layer, whole_acts, frac_acts): # pragma: no cover
+    ''' Calculate relative transmissibility '''
+    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+
+    # thisforceinfsex = 1 - fracacts[t] * thistrans[t] * protection[t] * allprev[pop2]
+    # if wholeacts[t]>0: thisforceinfsex *= np.power(1 - thistrans[t] * protection[t] * allprev[pop2], int(wholeacts[t]))
+
+
+
+    rel_trans = rel_trans * inf * beta_layer # Calculate transmissibility
+    return rel_trans
+
+
 @nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:], nbfloat[:]), cache=cache, parallel=rand_parallel)
 def compute_infections(beta,     f,        m,        layer_betas,  rel_trans,  rel_sus): # pragma: no cover
     '''

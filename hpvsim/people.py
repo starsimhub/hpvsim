@@ -115,6 +115,7 @@ class People(hpb.BasePeople):
         ''' Perform initializations '''
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
         self.set_pars(sim_pars) # Replace the saved parameters with this simulation's
+        self.rel_trans[:] = hpu.sample(**self.pars['beta_dist'], size=len(self)) # Default transmissibilities, with viral load drawn from a distribution
         self.initialized = True
         return
 
@@ -327,5 +328,57 @@ class People(hpb.BasePeople):
 
         return
 
+
+
+    def infect(self, inds, source=None, layer=None, genotype=0):
+        '''
+        Infect people and determine their eventual outcomes.
+        Method also deduplicates input arrays in case one agent is infected many times
+        and stores who infected whom in infection_log list.
+
+        Args:
+            inds     (array): array of people to infect
+            source   (array): source indices of the people who transmitted this infection (None if an importation or seed infection)
+            layer    (str):   contact layer this infection was transmitted on
+            genotype (int):   the genotype people are being infected by
+
+        Returns:
+            count (int): number of people infected
+        '''
+
+        if len(inds) == 0:
+            return 0
+
+        # Remove duplicates
+        inds, unique = np.unique(inds, return_index=True)
+        if source is not None:
+            source = source[unique]
+
+        # Keep only susceptibles
+        keep = self.susceptible[inds] # Unique indices in inds and source that are also susceptible
+        inds = inds[keep]
+        if source is not None:
+            source = source[keep]
+
+        n_infections = len(inds)
+        durpars      = self.pars['dur']
+
+        # Update states, variant info, and flows
+        self.susceptible[inds]    = False
+        self.naive[inds]          = False
+        self.recovered[inds]      = False
+        self.flows['new_infections']   += len(inds)
+
+        # # Record transmissions
+        # for i, target in enumerate(inds):
+        #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, variant=variant_label)
+        #     self.infection_log.append(entry)
+
+        # Set the dates of infection and recovery -- for now, just assume everyone recovers
+        self.date_infectious[inds] = self.t
+        dur_inf2rec = hpu.sample(**durpars['inf2rec'], size=len(inds))
+        self.date_recovered[inds] = self.date_infectious[inds] + dur_inf2rec  # Date they recover
+
+        return n_infections # For incrementing counters
 
 

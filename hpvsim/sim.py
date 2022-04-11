@@ -217,8 +217,33 @@ class Sim(hpb.BaseSim):
         self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
+        if init_infections:
+            self.init_infections(verbose=verbose)
 
         return self
+
+
+    def init_infections(self, verbose=None):
+        '''
+        Initialize prior immunity and seed infections.
+        Copied from Covasim. TODO: think of a better initialization strategy
+        '''
+
+        if verbose is None:
+            verbose = self['verbose']
+
+        # If anyone is non-naive, don't re-initialize
+        if self.people.count_not('naive') == 0: # Everyone is naive
+
+            # Create the seed infections
+            if self['pop_infected']:
+                inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                self.people.infect(inds=inds, layer='seed_infection') # Not counted by results since flows are re-initialized during the step
+
+        elif verbose:
+            print(f'People already initialized with {self.people.count_not("naive")} people non-naive and {self.people.count("exposed")} exposed; not reinitializing')
+
+        return
 
 
     def step(self):
@@ -229,11 +254,14 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation already complete (call sim.initialize() to re-run)')
 
         # Shorten key variables
+        dt = self['dt'] # Timestep; TODO centralize this somewhere
         t = self.t
         ng = self['n_genotypes']
+        acts = self['acts']
+        condoms = self['condoms']
+        rel_beta = self['rel_beta']
         people = self.people
         prel_trans = people.rel_trans
-        prel_sus = people.rel_sus
 
         # Update partnerships
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
@@ -243,29 +271,32 @@ class Sim(hpb.BaseSim):
         # Loop over genotypes and infect people
         sus = people.susceptible
 
-        # Iterate through n_variants to calculate infections
+        # Iterate through genotypes to calculate infections
         for genotype in range(ng):
 
-            # Deal with variant parameters
-            rel_beta = self['rel_beta']
-            if genotype:
-                genotype_label = self.pars['genotype_map'][genotype]
-                rel_beta *= self['variant_pars'][genotype_label]['rel_beta']
+            # Deal with genotype parameters
+            # if genotype:
+            #     genotype_label = self.pars['genotype_map'][genotype]
+            #     rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
             beta = hpd.default_float(self['beta'] * rel_beta)
 
             for lkey, layer in contacts.items():
                 f = layer['f']
                 m = layer['m']
                 betas = layer['beta']
+                frac_acts, whole_acts = np.modf(acts[lkey]*dt) # Get the number of acts per timestep for this layer
+                whole_acts = int(whole_acts)
 
                 # Compute relative transmission and susceptibility
-                inf_variant = people.infectious * (people.infectious_genotype == genotype) 
-                sus_imm = people.sus_imm[genotype,:]
-                beta_layer  = hpd.default_float(self['beta_layer'][lkey])
-                rel_trans, rel_sus = hpu.compute_trans_sus(prel_trans, prel_sus, inf_variant, sus, beta_layer, viral_load, symp, diag, sus_imm)
+                # inf_genotype = people.infectious * (people.infectious_genotype == genotype) 
+                # sus_imm = people.sus_imm[genotype,:]
+                # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
+                inf = people.infectious
+                import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+                rel_trans = hpu.compute_trans(prel_trans, inf, condom, eff_condom, whole_acts, frac_acts)
 
                 # Calculate actual transmission
-                source_inds, target_inds = hpu.compute_infections(beta, f, m, betas, rel_trans, rel_sus)  # Calculate transmission
+                source_inds, target_inds = hpu.compute_infections(beta, f, m, betas, rel_trans)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
         # Update counts for this time step: stocks
