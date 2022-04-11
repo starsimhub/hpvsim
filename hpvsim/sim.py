@@ -12,6 +12,7 @@ from . import defaults as hpd
 from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
+from .settings import options as hpo
 
 
 # Define the model
@@ -170,7 +171,6 @@ class Sim(hpb.BaseSim):
         self.results['n_imports']           = init_res('Number of imported infections', scale=True)
         self.results['n_alive']             = init_res('Number alive', scale=True)
         self.results['n_naive']             = init_res('Number never infected', scale=True)
-        self.results['n_preinfectious']     = init_res('Number preinfectious', scale=True, color=dcols.exposed)
         self.results['n_removed']           = init_res('Number removed', scale=True, color=dcols.recovered)
         self.results['prevalence']          = init_res('Prevalence', scale=False)
         self.results['incidence']           = init_res('Incidence', scale=False)
@@ -241,7 +241,7 @@ class Sim(hpb.BaseSim):
                 self.people.infect(inds=inds, layer='seed_infection') # Not counted by results since flows are re-initialized during the step
 
         elif verbose:
-            print(f'People already initialized with {self.people.count_not("naive")} people non-naive and {self.people.count("exposed")} exposed; not reinitializing')
+            print(f'People already initialized with {self.people.count_not("naive")} people non-naive and {self.people.count("infectious")} infectious; not reinitializing')
 
         return
 
@@ -264,7 +264,8 @@ class Sim(hpb.BaseSim):
         people = self.people
         prel_trans = people.rel_trans
 
-        # Update partnerships
+        # Update states and partnerships
+        people.update_states_pre(t=t)
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
         contacts = people.contacts
@@ -286,7 +287,6 @@ class Sim(hpb.BaseSim):
             for lkey, layer in contacts.items():
                 f = layer['f']
                 m = layer['m']
-                betas = layer['beta']
                 frac_acts, whole_acts = np.modf(acts[lkey]*dt) # Get the number of acts per timestep for this layer
                 whole_acts = int(whole_acts)
 
@@ -382,9 +382,137 @@ class Sim(hpb.BaseSim):
 
         # If simulation reached the end, finalize the results
         if self.complete:
+            self.finalize(verbose=verbose, restore_pars=restore_pars)
             sc.printv(f'Run finished after {elapsed:0.2f} s.\n', 1, verbose)
         return self
 
+
+    def finalize(self, verbose=None, restore_pars=True):
+        ''' Compute final results '''
+
+        if self.results_ready:
+            # Because the results are rescaled in-place, finalizing the sim cannot be run more than once or
+            # otherwise the scale factor will be applied multiple times
+            raise AlreadyRunError('Simulation has already been finalized')
+
+        # Calculate cumulative results
+        for key in hpd.result_flows.keys():
+            self.results[f'cum_{key}'][:] = np.cumsum(self.results[f'new_{key}'][:], axis=0)
+        for res in [self.results['cum_infections']]: # Include initially infected people
+            res.values += self['pop_infected']
+
+        # Final settings
+        self.results_ready = True # Set this first so self.summary() knows to print the results
+        self.t -= 1 # During the run, this keeps track of the next step; restore this be the final day of the sim
+
+        # Perform calculations on results
+        self.compute_results(verbose=verbose) # Calculate the rest of the results
+        self.results = sc.objdict(self.results) # Convert results to a odicts/objdict to allow e.g. sim.results.diagnoses
+
+        # Optionally print summary output
+        if verbose: # Verbose is any non-zero value
+            if verbose>0: # Verbose is any positive number
+                self.summarize() # Print medium-length summary of the sim
+            else:
+                self.brief() # Print brief summary of the sim
+
+        return
+
+
+    def compute_results(self, verbose=None):
+        ''' Perform final calculations on the results '''
+        self.compute_states()
+        return
+
+
+    def compute_states(self):
+        '''
+        Compute prevalence, incidence, and other states.
+        '''
+        res = self.results
+        self.results['n_alive'][:]         = self['pop_size'] # Number of people still alive. TODO: add vital dynamics
+        # self.results['n_naive'][:]         = self.scaled_pop_size - res['cum_deaths'][:] - res['n_recovered'][:] - res['n_exposed'][:] # Number of people naive
+        self.results['n_susceptible'][:]   = res['n_alive'][:] - res['n_infectious'][:] - res['cum_recoveries'][:] # Recalculate the number of susceptible people, not agents
+        # self.results['n_preinfectious'][:] = res['n_exposed'][:] - res['n_infectious'][:] # Calculate the number not yet infectious: exposed minus infectious
+        # self.results['n_removed'][:]       = count_recov*res['cum_recoveries'][:] + res['cum_deaths'][:] # Calculate the number removed: recovered + dead
+        self.results['prevalence'][:]      = res['n_infectious'][:]/res['n_alive'][:] # Calculate the prevalence
+        self.results['incidence'][:]       = res['new_infections'][:]/res['n_susceptible'][:] # Calculate the incidence
+        # self.results['frac_vaccinated'][:] = res['n_vaccinated'][:]/res['n_alive'][:] # Calculate the fraction vaccinated
+
+        return
+
+
+    def compute_summary(self, full=None, t=None, update=True, output=False, require_run=False):
+        '''
+        Compute the summary dict and string for the sim. Used internally; see
+        sim.summarize() for the user version.
+
+        Args:
+            full (bool): whether or not to print all results (by default, only cumulative)
+            t (int/str): day or date to compute summary for (by default, the last point)
+            update (bool): whether to update the stored sim.summary
+            output (bool): whether to return the summary
+            require_run (bool): whether to raise an exception if simulations have not been run yet
+        '''
+        if t is None:
+            t = -1
+
+        # Compute the summary
+        if require_run and not self.results_ready:
+            errormsg = 'Simulation not yet run'
+            raise RuntimeError(errormsg)
+
+        summary = sc.objdict()
+        for key in self.result_keys():
+            summary[key] = self.results[key][t]
+
+        # Update the stored state
+        if update:
+            self.summary = summary
+
+        # Optionally return
+        if output:
+            return summary
+        else:
+            return
+
+
+    def summarize(self, full=False, t=None, sep=None, output=False):
+        '''
+        Print a medium-length summary of the simulation, drawing from the last time
+        point in the simulation by default. Called by default at the end of a sim run.
+        See also sim.disp() (detailed output) and sim.brief() (short output).
+
+        Args:
+            full   (bool):    whether or not to print all results (by default, only cumulative)
+            t      (int/str): day or date to compute summary for (by default, the last point)
+            sep    (str):     thousands separator (default ',')
+            output (bool):    whether to return the summary instead of printing it
+
+        **Examples**::
+
+            sim = cv.Sim(label='Example sim', verbose=0) # Set to run silently
+            sim.run() # Run the sim
+            sim.summarize() # Print medium-length summary of the sim
+            sim.summarize(t=24, full=True) # Print a "slice" of all sim results on day 24
+        '''
+        # Compute the summary
+        summary = self.compute_summary(full=full, t=t, update=False, output=True)
+
+        # Construct the output string
+        if sep is None: sep = hpo.sep # Default separator
+        labelstr = f' "{self.label}"' if self.label else ''
+        string = f'Simulation{labelstr} summary:\n'
+        for key in self.result_keys():
+            if full or key.startswith('cum_'):
+                val = np.round(summary[key])
+                string += f'   {val:10,.0f} {self.results[key].name.lower()}\n'.replace(',', sep) # Use replace since it's more flexible
+
+        # Print or return string
+        if not output:
+            print(string)
+        else:
+            return string
 
 
     def plot(self, toplot=None):

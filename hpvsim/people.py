@@ -120,6 +120,21 @@ class People(hpb.BasePeople):
         return
 
 
+    def update_states_pre(self, t):
+        ''' Perform all state updates at the current timestep '''
+
+        # Initialize
+        self.t = t
+        self.is_inf = self.true('infectious') # For storing the interim values since used in every subsequent calculation
+
+        # Perform updates
+        self.init_flows()
+        self.flows['new_recoveries']    += self.check_recovery()
+        # Lots more to be added here
+
+        return
+
+
     #%% Methods for updating partnerships
     def dissolve_partnerships(self, t=None):
         ''' Dissolve partnerships '''
