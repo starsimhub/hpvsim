@@ -53,7 +53,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     # pars['nonactive']       = None 
 
     # Basic disease transmission parameters
-    pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=0.45, step=0.01) # Distribution to draw individual level transmissibility
+    pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility
     pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
 
     # Genotype parameters
@@ -62,7 +62,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
 
     # Duration parameters
     pars['dur'] = {}
-    pars['dur']['inf2rec']  = dict(dist='lognormal_int', par1=21.0, par2=10.0)  # Duration from infectious to recovered
+    pars['dur']['inf2rec']  = dict(dist='lognormal', par1=1.0, par2=1.0)  # Duration from infectious to recovered in YEARS
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data

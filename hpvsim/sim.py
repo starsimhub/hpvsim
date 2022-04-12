@@ -296,9 +296,9 @@ class Sim(hpb.BaseSim):
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
 
                 # Compute transmissibility and infections
-                if whole_acts>0:    foi_whole = hpu.compute_foi_whole(prel_trans, beta, inf, condoms[lkey], eff_condoms, whole_acts)
-                if frac_acts>0:     foi_frac  = hpu.compute_foi_frac( prel_trans, beta, inf, condoms[lkey], eff_condoms, frac_acts)
-                foi = foi_whole * foi_frac
+                # foi_whole = hpu.compute_foi_whole(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts)
+                # foi_frac  = hpu.compute_foi_frac( prel_trans, beta, condoms[lkey], eff_condoms, frac_acts)
+                foi = hpu.compute_foi( prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
                 source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 

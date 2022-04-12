@@ -129,7 +129,7 @@ class People(hpb.BasePeople):
 
         # Perform updates
         self.init_flows()
-        self.flows['new_recoveries']    += self.check_recovery()
+        self.flows['new_recoveries'] += self.check_recovery()
         # Lots more to be added here
 
         return
@@ -139,7 +139,6 @@ class People(hpb.BasePeople):
     def dissolve_partnerships(self, t=None):
         ''' Dissolve partnerships '''
 
-        self.t = t # Update time; TODO move this somewhere more central
         n_dissolved = dict()
 
         for lkey in self.layer_keys():
@@ -327,9 +326,11 @@ class People(hpb.BasePeople):
         #     self.infection_log.append(entry)
 
         # Set the dates of infection and recovery -- for now, just assume everyone recovers
+        dt = self.pars['dt']
         self.date_infectious[inds] = self.t
-        dur_inf2rec = hpu.sample(**durpars['inf2rec'], size=len(inds))
-        self.date_recovered[inds] = self.date_infectious[inds] + dur_inf2rec  # Date they recover
+        dur_inf2rec = hpu.sample(**durpars['inf2rec'], size=len(inds)) # Duration of infection in YEARS
+        self.date_recovered[inds] = self.date_infectious[inds] + np.ceil(dur_inf2rec/dt)  # Date they recover (interpreted as the timestep on which they recover)
+        self.dur_disease[inds] = dur_inf2rec
 
         return n_infections # For incrementing counters
 

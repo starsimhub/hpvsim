@@ -33,17 +33,33 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
-#@nb.njit(        (nbfloat[:], nbbool[:], nbfloat   ), cache=cache, parallel=safe_parallel)
-def compute_foi_frac(rel_trans, beta, inf, condoms, eff_condoms, frac_acts): # pragma: no cover
-    ''' Compute probability of each person transmitting'''
-    foi = inf * frac_acts * (beta * rel_trans) * (1 - condoms*eff_condoms) # Calculate transmissibility
+@nb.njit(           (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
+def compute_foi_frac(rel_trans,  beta,    condoms, eff_condoms, frac_acts): # pragma: no cover
+    ''' Compute probability of each person **NOT** transmitting over some fractional number of acts '''
+    foi_frac = 1 - frac_acts * (beta * rel_trans) * (1 - condoms*eff_condoms) # Calculate transmissibility
+    return foi_frac
+
+@nb.njit(            (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
+def compute_foi_whole(rel_trans,  beta,    condoms, eff_condoms, n): # pragma: no cover
+    ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
+    foi_whole = np.power(1 - (beta * rel_trans) * (1 - condoms*eff_condoms), n)
+    return foi_whole
+    
+# @nb.njit(      (nbfloat[:], nbfloat[:], nbbool[:]), cache=cache, parallel=safe_parallel)
+# def compute_foi(foi_frac,   foi_whole, inf):
+#     ''' Compute overall probability of infection'''
+#     foi = inf * (1 - (foi_whole*foi_frac))
+#     return foi
+
+@nb.njit(      (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
+def compute_foi(rel_trans,  beta,    condoms, eff_condoms, n,       frac_acts, inf): # pragma: no cover
+    ''' Compute overall probability of infection'''
+    foi_whole = compute_foi_whole(rel_trans, beta, condoms, eff_condoms, n)
+    foi_frac  = compute_foi_frac( rel_trans, beta, condoms, eff_condoms, frac_acts)
+    foi = inf * (1 - (foi_whole*foi_frac))
     return foi
 
-def compute_foi_whole(rel_trans, beta, inf, condoms, eff_condoms, n): # pragma: no cover
-    ''' Compute probability of each infected person transmitting the infection over n acts'''
-    foi = inf * (1 - np.power(1 - (beta * rel_trans) * (1 - condoms*eff_condoms), n))
-    return foi
-    
+
 #@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
 def compute_infections(foi, f, m): # pragma: no cover
     '''
@@ -442,7 +458,8 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
 
 __all__ += ['true',   'false',   'defined',   'undefined',
             'itrue',  'ifalse',  'idefined',  'iundefined',
-            'itruei', 'ifalsei', 'idefinedi', 'iundefinedi']
+            'itruei', 'ifalsei', 'idefinedi', 'iundefinedi',
+            'dtround']
 
 
 def true(arr):
@@ -621,3 +638,21 @@ def iundefinedi(arr, inds):
         inds = hp.iundefinedi(np.array([4,np.nan,0,np.nan,np.nan,4,7,4,np.nan]), inds=np.array([0,1,3,5]))
     '''
     return inds[np.isnan(arr[inds])]
+
+
+def dtround(arr, dt, ceil=True):
+    '''
+    Rounds the values in the array to the nearest timestep
+
+    Args:
+        arr (array): any array
+        dt  (float): float
+
+    **Example**::
+
+        dtround = hp.dtround(np.array([0.23,0.61,20.53,43.95,0.00,0.11,10.25])) # Returns array([0, 3, 4, 6])
+    '''
+    if ceil:
+        return np.ceil(arr * (1/dt)) / (1/dt)
+    else:
+        return np.round(arr * (1/dt)) / (1/dt)
