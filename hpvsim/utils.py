@@ -33,6 +33,65 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
+@nb.njit(           (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
+def compute_foi_frac(rel_trans,  beta,    condoms, eff_condoms, frac_acts): # pragma: no cover
+    ''' Compute probability of each person **NOT** transmitting over some fractional number of acts '''
+    foi_frac = 1 - frac_acts * (beta * rel_trans) * (1 - condoms*eff_condoms) # Calculate transmissibility
+    return foi_frac
+
+@nb.njit(            (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
+def compute_foi_whole(rel_trans,  beta,    condoms, eff_condoms, n): # pragma: no cover
+    ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
+    foi_whole = np.power(1 - (beta * rel_trans) * (1 - condoms*eff_condoms), n)
+    return foi_whole
+    
+@nb.njit(      (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
+def compute_foi(rel_trans,  beta,    condoms, eff_condoms, n,       frac_acts, inf): # pragma: no cover
+    ''' Compute overall probability of infection'''
+    foi_whole = compute_foi_whole(rel_trans, beta, condoms, eff_condoms, n)
+    foi_frac  = compute_foi_frac( rel_trans, beta, condoms, eff_condoms, frac_acts)
+    foi = inf * (1 - (foi_whole*foi_frac))
+    return foi
+
+
+#@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
+def compute_infections(foi, f, m): # pragma: no cover
+    '''
+    Compute who infects whom
+
+    The heaviest step of the model -- figure out who gets infected on this timestep.
+    Cannot be easily parallelized since random numbers are used. Loops over contacts
+    in both directions (i.e., targets become sources).
+
+    Args:
+        beta: transmission probabilities
+        f: female in the pair
+        m: male in the pair
+    '''
+    # slist = np.empty(0, dtype=nbint)
+    # tlist = np.empty(0, dtype=nbint)
+    slist = np.empty(0, dtype=hpd.default_int)
+    tlist = np.empty(0, dtype=hpd.default_int)
+    pairs = [[f,m], [m,f]]
+
+    for sources,targets in pairs:
+        source_trans     = foi[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
+        inf_inds         = source_trans.nonzero()[0] # Infectious indices -- remove noninfectious people
+        betas            = source_trans[inf_inds] # Calculate the raw transmission probabilities
+        nonzero_inds     = betas.nonzero()[0] # Find nonzero entries
+        nonzero_inf_inds = inf_inds[nonzero_inds] # Map onto original indices
+        nonzero_betas    = betas[nonzero_inds] # Remove zero entries from beta
+        nonzero_sources  = sources[nonzero_inf_inds] # Remove zero entries from the sources
+        nonzero_targets  = targets[nonzero_inf_inds] # Remove zero entries from the targets
+        transmissions    = (np.random.random(len(nonzero_betas)) < nonzero_betas).nonzero()[0] # Compute the actual infections!
+        source_inds      = nonzero_sources[transmissions]
+        target_inds      = nonzero_targets[transmissions] # Filter the targets on the actual infections
+        slist = np.concatenate((slist, source_inds), axis=0)
+        tlist = np.concatenate((tlist, target_inds), axis=0)
+    return slist, tlist
+
+
+
 @nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
 def find_contacts(p1, p2, inds): # pragma: no cover
     """
@@ -393,7 +452,8 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
 
 __all__ += ['true',   'false',   'defined',   'undefined',
             'itrue',  'ifalse',  'idefined',  'iundefined',
-            'itruei', 'ifalsei', 'idefinedi', 'iundefinedi']
+            'itruei', 'ifalsei', 'idefinedi', 'iundefinedi',
+            'dtround']
 
 
 def true(arr):
@@ -572,3 +632,21 @@ def iundefinedi(arr, inds):
         inds = hp.iundefinedi(np.array([4,np.nan,0,np.nan,np.nan,4,7,4,np.nan]), inds=np.array([0,1,3,5]))
     '''
     return inds[np.isnan(arr[inds])]
+
+
+def dtround(arr, dt, ceil=True):
+    '''
+    Rounds the values in the array to the nearest timestep
+
+    Args:
+        arr (array): any array
+        dt  (float): float
+
+    **Example**::
+
+        dtround = hp.dtround(np.array([0.23,0.61,20.53,43.95,0.00,0.11,10.25])) # Returns array([0, 3, 4, 6])
+    '''
+    if ceil:
+        return np.ceil(arr * (1/dt)) / (1/dt)
+    else:
+        return np.round(arr * (1/dt)) / (1/dt)

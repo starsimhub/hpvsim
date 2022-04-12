@@ -44,13 +44,13 @@ class PeopleMeta(sc.prettyobj):
             'age',              # Float
             'sex',              # Float
             'debut',            # Float
+            'rel_trans',        # Float
         ]
 
         # Set the states that a person can be in: these are all booleans per person -- used in people.py
         self.states = [
             'susceptible',
             'naive',
-            'exposed',
             'infectious',
             'recovered',
         ]
@@ -59,7 +59,7 @@ class PeopleMeta(sc.prettyobj):
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
-            'dur_exp2inf',
+            'dur_inf2rec',
             'dur_disease',
         ]
 
@@ -84,7 +84,6 @@ class PeopleMeta(sc.prettyobj):
 # A subset of the above states are used for results
 result_stocks = {
     'susceptible': 'Number susceptible',
-    'exposed':     'Number exposed',
     'infectious':  'Number infectious',
     'recovered':   'Number recovered',
 }
@@ -135,7 +134,6 @@ def get_default_colors():
     '''
     c = sc.objdict()
     c.susceptible           = '#4d771e'
-    c.exposed               = '#c78f65'
     c.infectious            = '#e45226'
     c.infections            = '#b62413'
     c.reinfections          = '#732e26'
