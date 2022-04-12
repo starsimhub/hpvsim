@@ -45,12 +45,6 @@ def compute_foi_whole(rel_trans,  beta,    condoms, eff_condoms, n): # pragma: n
     foi_whole = np.power(1 - (beta * rel_trans) * (1 - condoms*eff_condoms), n)
     return foi_whole
     
-# @nb.njit(      (nbfloat[:], nbfloat[:], nbbool[:]), cache=cache, parallel=safe_parallel)
-# def compute_foi(foi_frac,   foi_whole, inf):
-#     ''' Compute overall probability of infection'''
-#     foi = inf * (1 - (foi_whole*foi_frac))
-#     return foi
-
 @nb.njit(      (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
 def compute_foi(rel_trans,  beta,    condoms, eff_condoms, n,       frac_acts, inf): # pragma: no cover
     ''' Compute overall probability of infection'''

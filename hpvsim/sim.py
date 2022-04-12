@@ -296,8 +296,6 @@ class Sim(hpb.BaseSim):
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
 
                 # Compute transmissibility and infections
-                # foi_whole = hpu.compute_foi_whole(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts)
-                # foi_frac  = hpu.compute_foi_frac( prel_trans, beta, condoms[lkey], eff_condoms, frac_acts)
                 foi = hpu.compute_foi( prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
                 source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
@@ -442,13 +440,12 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def compute_summary(self, full=None, t=None, update=True, output=False, require_run=False):
+    def compute_summary(self, t=None, update=True, output=False, require_run=False):
         '''
         Compute the summary dict and string for the sim. Used internally; see
         sim.summarize() for the user version.
 
         Args:
-            full (bool): whether or not to print all results (by default, only cumulative)
             t (int/str): day or date to compute summary for (by default, the last point)
             update (bool): whether to update the stored sim.summary
             output (bool): whether to return the summary
