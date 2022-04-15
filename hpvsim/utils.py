@@ -103,7 +103,6 @@ def find_contacts(p1, p2, inds): # pragma: no cover
     """
     pairing_partners = set()
     inds = set(inds)
-    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
     for i in range(len(p1)):
         if p1[i] in inds:
             pairing_partners.add(p2[i])
@@ -180,8 +179,6 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     # Compute distribution parameters and draw samples
     # NB, if adding a new distribution, also add to choices above
     if   dist in ['unif', 'uniform']: samples = np.random.uniform(low=par1, high=par2, size=size, **kwargs)
-    elif dist in ['unif_step', 'uniform_step']:
-        samples = np.random.normal(loc=par1, scale=par2, size=size, **kwargs)
     elif dist in ['norm', 'normal']:  samples = np.random.normal(loc=par1, scale=par2, size=size, **kwargs)
     elif dist == 'normal_pos':        samples = np.abs(np.random.normal(loc=par1, scale=par2, size=size, **kwargs))
     elif dist == 'normal_int':        samples = np.round(np.abs(np.random.normal(loc=par1, scale=par2, size=size, **kwargs)))
@@ -456,7 +453,7 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
 __all__ += ['true',   'false',   'defined',   'undefined',
             'itrue',  'ifalse',  'idefined',  'iundefined',
             'itruei', 'ifalsei', 'idefinedi', 'iundefinedi',
-            'dtround', 'find_cutoff']
+            'dtround']
 
 
 def true(arr):
@@ -653,14 +650,4 @@ def dtround(arr, dt, ceil=True):
         return np.ceil(arr * (1/dt)) / (1/dt)
     else:
         return np.round(arr * (1/dt)) / (1/dt)
-
-
-def find_cutoff(age_cutoffs, age):
-    '''
-    Find which age bin each person belongs to -- e.g. with standard
-    age bins 0, 10, 20, etc., ages [5, 12, 4, 58] would be mapped to
-    indices [0, 1, 0, 5]. Age bins are not guaranteed to be uniform
-    width, which is why this can't be done as an array operation.
-    '''
-    return np.nonzero(age_cutoffs <= age)[0][-1]  # Index of the age bin to use
 
