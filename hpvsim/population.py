@@ -73,11 +73,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
 
-        # Set people's sexes and sexual behavior/characteristics
-        uids           = np.arange(pop_size, dtype=hpd.default_int)
-        sexes          = np.random.binomial(1, sex_ratio, pop_size)
-        debuts          = hpu.sample(**sim['debut'], size=pop_size)
-        partners        = partner_count(pop_size=pop_size, layer_keys=sim['partners'].keys(), means=sim['partners'].values(), dispersion=dispersion)
+        uids, sexes, debuts, partners = set_static(pop_size, pars=sim.pars, sex_ratio=sex_ratio, dispersion=dispersion)
 
         # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
@@ -146,9 +142,9 @@ def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispe
     if means is None:
         means = {k: np.zeros(pop_size) for k in layer_keys}
     else:
-         if len(means) != len(layer_keys):
-             errormsg = f'The list of means has length {len(means)}; this must be the same length as layer_keys ({len(layer_keys)}).'
-             raise ValueError(errormsg)
+        if len(means) != len(layer_keys):
+            errormsg = f'The list of means has length {len(means)}; this must be the same length as layer_keys ({len(layer_keys)}).'
+            raise ValueError(errormsg)
 
     # Now set the number of partners
     for lkey,n in zip(layer_keys, means):
@@ -163,6 +159,18 @@ def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispe
         partners[lkey] = p_count
         
     return partners
+
+
+def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5, dispersion=None):
+    '''
+    Set static population characteristics that do not change over time.
+    Can be used when adding new births, in which case the existing popsize can be given.
+    '''
+    uids           = np.arange(existing_n, existing_n+new_n, dtype=hpd.default_int)
+    sexes          = np.random.binomial(1, sex_ratio, new_n)
+    debuts         = hpu.sample(**pars['debut'], size=new_n)
+    partners       = partner_count(pop_size=new_n, layer_keys=pars['partners'].keys(), means=pars['partners'].values(), dispersion=dispersion)
+    return uids, sexes, debuts, partners
 
 
 def validate_popdict(popdict, pars, verbose=True):

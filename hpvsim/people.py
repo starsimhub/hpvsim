@@ -138,11 +138,12 @@ class People(hpb.BasePeople):
         self.init_flows() # Initialize flows for this timestep to zero
         self.increment_age() # Let people age by one time step
         self.flows['new_other_deaths'] += self.apply_death_rates() # Apply death rates 
-        self.flows['new_births'] += self.add_births() # Add births
+        self.flows['new_births'], new_people = self.add_births() # Add births
+
         self.flows['new_recoveries'] += self.check_recovery() 
         # Lots more to be added here
 
-        return
+        return new_people
 
 
     #%% Methods for updating partnerships
@@ -256,11 +257,15 @@ class People(hpb.BasePeople):
 
     def add_births(self):
         ''' Method to add births '''
-        import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
-        t = self.t
-        new_births = sc.smoothinterp(t+self.pars['start'], self.pars['birth_rates'][0], self.pars['birth_rates'][1])
+        this_birth_rate = sc.smoothinterp(self.t+self.pars['start'], self.pars['birth_rates'][0], self.pars['birth_rates'][1])*self.dt
+        new_births = round(this_birth_rate[0]*len(self)/1000) # Crude births per 1000
 
-        return len(new_births)
+        # Generate other characteristics of the new people
+        uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
+        new_people = People(pars=new_births, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
+
+        return new_births, new_people
+
 
     #%% Methods to make events occur (death, infection, others TBC)
     def make_naive(self, inds, reset_vx=False):
@@ -393,3 +398,5 @@ class People(hpb.BasePeople):
             
         return len(inds)
 
+
+# %%

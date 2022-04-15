@@ -88,7 +88,6 @@ result_stocks = {
     'infectious':  'Number infectious',
     'recovered':   'Number recovered',
     'other_dead':  'Number dead from other causes',
-    'births':      'Number born' # TODO think about this
 }
 
 # The types of result that are counted as flows -- used in sim.py; value is the label suffix

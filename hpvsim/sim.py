@@ -258,16 +258,17 @@ class Sim(hpb.BaseSim):
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         rel_beta = self['rel_beta']
-        people = self.people
-        prel_trans = people.rel_trans
 
         # Update states and partnerships
-        people.update_states_pre(t=t) # NB this also ages people and applies deaths
+        new_people = self.people.update_states_pre(t=t) # NB this also ages people and applies deaths
+        self.people = self.people + new_people
+        people = self.people
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
         contacts = people.contacts
 
         # Loop over genotypes and infect people
+        prel_trans = people.rel_trans
         sus = people.susceptible
         inf = people.infectious
 

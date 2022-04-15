@@ -1132,7 +1132,7 @@ class BasePeople(FlexPretty):
         current = self[key]
         value = np.array(value, dtype=self._dtypes[key]) # Ensure it's the right type
         if die and len(value) != len(current): # pragma: no cover
-            errormsg = f'Length of new array does not match current ({len(value)} vs. {len(current)})'
+            errormsg = f'Length of new array {key} does not match current ({len(value)} vs. {len(current)})'
             raise IndexError(errormsg)
         self[key] = value
         return
