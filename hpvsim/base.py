@@ -273,8 +273,7 @@ class BaseSim(ParsObj):
             # Handle other special parameters
             if pars.get('network'):
                 hppar.reset_layer_pars(pars, force=False)
-            # if pars.get('prog_by_age'):
-            #     pars['prognoses'] = cvpar.get_prognoses(by_age=pars['prog_by_age'], version=self._default_ver) # Reset prognoses
+            pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=pars['location']) # Set birth and death rates
 
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
@@ -1221,6 +1220,16 @@ class BasePeople(FlexPretty):
     def is_male(self):
         ''' Boolean array of everyone male '''
         return self.sex == 1
+
+    @property
+    def f_inds(self):
+        ''' Indices of everyone female '''
+        return self.true('is_female')
+
+    @property
+    def m_inds(self):
+        ''' Indices of everyone male '''
+        return self.true('is_male')
 
     @property
     def int_age(self):

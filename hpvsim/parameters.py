@@ -7,6 +7,7 @@ import sciris as sc
 from .settings import options as hpo # For setting global options
 from . import misc as hpm
 from . import defaults as hpd
+from .data import loaders as hpdata
 
 __all__ = ['make_pars', 'reset_layer_pars', 'get_prognoses']
 
@@ -32,6 +33,8 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     pars['pop_infected']    = 20       # Number of initial infections; TODO reconsider this
     pars['network']         = 'random' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None     # What location to load data from -- default Seattle
+    pars['death_rates']     = None     # Deaths from all other causes, loaded below 
+    pars['birth_rates']     = None     # Birth rates, loaded below 
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
@@ -149,3 +152,31 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         pars[pkey] = par # Save this parameter to the dictionary
 
     return
+
+
+def get_births_deaths(location=None, dt=None, start=None, end=None, verbose=1, by_sex=True, overall=False):
+    '''
+    Get mortality and fertility data by location if provided, or use default
+
+    Args:
+        location (str):  location; if none specified, use default value for XXX
+        by_sex   (bool): whether to get sex-specific death rates (default true)
+        overall  (bool): whether to get overall values ie not disaggregated by sex (default false)
+
+    Returns:
+        death_rates (dict): nested dictionary of death rates by sex (first level) and age (second level)
+    '''
+
+    birth_rates = hpd.default_birth_rates 
+    death_rates = hpd.default_death_rates
+    if location is not None:
+        if verbose:
+            print(f'Loading location-specific demographic data for "{location}"')
+        try:
+            death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+            birth_rates = hpdata.get_birth_rates(location=location)
+        except ValueError as E:
+            warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
+            hpm.warn(warnmsg)
+    
+    return birth_rates, death_rates

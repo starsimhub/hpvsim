@@ -20,7 +20,7 @@ from . import people as hpppl
 
 
 def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
-                sex_ratio=0.5, dispersion=None, microstructure=None, **kwargs):
+                sex_ratio=0.5, dt_round_age=True, dispersion=None, microstructure=None, **kwargs):
     '''
     Make the people for the simulation.
 
@@ -31,7 +31,9 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict  (any)  : if supplied, use this population dictionary instead of generating a new one; can be a dict or People object
         reset    (bool) : whether to force population creation even if self.popdict/self.people exists
         verbose  (bool) : level of detail to print
-        kwargs   (dict) : passed to make_randpop()
+        use_age_data (bool):
+        sex_ratio (bool):
+        dt_round_age (bool): whether to round people's ages to the nearest timestep (default true)
 
     Returns:
         people (People): people
@@ -41,6 +43,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     pop_size = int(sim['pop_size']) # Shorten
     if verbose is None:
         verbose = sim['verbose']
+    dt = sim['dt'] # Timestep
 
     # If a people object or popdict is supplied, use it
     if sim.people and not reset:
@@ -54,7 +57,10 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
         pop_size = int(sim['pop_size']) # Number of people
 
-        # Load age data and household demographics based on 2018 Seattle demographics by default, or country if available
+        # Load age data by country if available, or use defaults.
+        # Other demographic data like mortality and fertility are also available by
+        # country, but these are loaded directly into the sim since they are not 
+        # stored as part of the people.
         age_data = hpd.default_age_data
         location = sim['location']
         if location is not None:
@@ -67,18 +73,23 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
 
-        # Set people's sexes, ages, and sexual behavior/characteristics
+        # Set people's sexes and sexual behavior/characteristics
         uids           = np.arange(pop_size, dtype=hpd.default_int)
         sexes          = np.random.binomial(1, sex_ratio, pop_size)
+        debuts          = hpu.sample(**sim['debut'], size=pop_size)
+        partners        = partner_count(pop_size=pop_size, layer_keys=sim['partners'].keys(), means=sim['partners'].values(), dispersion=dispersion)
+
+        # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
         age_data_max   = age_data[:,1] + 1 # Since actually e.g. 69.999
         age_data_range = age_data_max - age_data_min
         age_data_prob   = age_data[:,2]
         age_data_prob   /= age_data_prob.sum() # Ensure it sums to 1
         age_bins        = hpu.n_multinomial(age_data_prob, pop_size) # Choose age bins
-        ages            = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
-        debuts          = hpu.sample(**sim['debut'], size=pop_size)
-        partners        = partner_count(pop_size=pop_size, layer_keys=sim['partners'].keys(), means=sim['partners'].values(), dispersion=dispersion)
+        if dt_round_age:
+            ages = age_data_min[age_bins] + np.random.randint(age_data_range[age_bins]/dt)*dt # Uniformly distribute within this age bin
+        else:
+            ages            = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
 
         # Store output
         popdict = {}

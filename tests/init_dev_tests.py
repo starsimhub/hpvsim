@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 def test_random():
     ''' Make the simplest possible sim with one kind of partnership '''
     from hpvsim.sim import Sim
-    pars = {'pop_size':20_000}
+    pars = {'pop_size':20_000, 'rand_seed':100, 'location':'Zimbabwe'}
     sim = Sim(pars=pars)
     sim.run()
     return sim
@@ -30,9 +30,6 @@ def test_basic():
 if __name__ == '__main__':
 
     sim0 = test_random()
-    sim1 = test_basic()
-    
-
-
+    # sim1 = test_basic()
 
 
