@@ -154,17 +154,19 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     return
 
 
-def get_births_deaths(location=None, dt=None, start=None, end=None, verbose=1, by_sex=True, overall=False):
+def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
     '''
     Get mortality and fertility data by location if provided, or use default
 
     Args:
         location (str):  location; if none specified, use default value for XXX
+        verbose (bool):  whether to print progress
         by_sex   (bool): whether to get sex-specific death rates (default true)
         overall  (bool): whether to get overall values ie not disaggregated by sex (default false)
 
     Returns:
         death_rates (dict): nested dictionary of death rates by sex (first level) and age (second level)
+        birth_rates (arr): array of crude birth rates by year
     '''
 
     birth_rates = hpd.default_birth_rates 
