@@ -92,7 +92,7 @@ def compute_infections(foi, f, m): # pragma: no cover
 
 
 
-# @nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
+@nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
 def find_contacts(p1, p2, inds): # pragma: no cover
     """
     Numba for Layer.find_contacts()
