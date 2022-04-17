@@ -62,23 +62,6 @@ class Sim(hpb.BaseSim):
         return self
 
 
-    def reset_layer_pars(self, layer_keys=None, force=False):
-        '''
-        Reset the parameters to match the population.
-
-        Args:
-            layer_keys (list): override the default layer keys (use stored keys by default)
-            force (bool): reset the parameters even if they already exist
-        '''
-        if layer_keys is None:
-            if self.people is not None: # If people exist
-                layer_keys = self.people.contacts.keys()
-            elif self.popdict is not None:
-                layer_keys = self.popdict['layer_keys']
-        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
-        return
-
-
     def validate_pars(self, validate_layers=True):
         '''
         Some parameters can take multiple types; this makes them consistent.
@@ -86,9 +69,6 @@ class Sim(hpb.BaseSim):
         Args:
             validate_layers (bool): whether to validate layer parameters as well via validate_layer_pars() -- usually yes, except during initialization
         '''
-
-        # Handle population size
-        pop_size   = self.pars.get('pop_size')
 
         # Handle types
         for key in ['pop_size', 'pop_infected']:
@@ -99,7 +79,7 @@ class Sim(hpb.BaseSim):
                 raise ValueError(errormsg) from E
 
         # Handle start
-        if self['start'] in [None, 0]: # Use default start day
+        if self['start'] in [None, 0]: # Use default start
             self['start'] = 2015
 
         # Handle end and n_years
@@ -121,7 +101,7 @@ class Sim(hpb.BaseSim):
         self.npts           = len(self.yearvec)
         self.tvec          = np.arange(self.npts)
         
-        # Handle population data
+        # Handle population network data
         network_choices = ['random', 'basic']
         choice = self['network']
         if choice and choice not in network_choices: # pragma: no cover
@@ -223,6 +203,23 @@ class Sim(hpb.BaseSim):
         return self
 
 
+    def reset_layer_pars(self, layer_keys=None, force=False):
+        '''
+        Reset the parameters to match the population.
+
+        Args:
+            layer_keys (list): override the default layer keys (use stored keys by default)
+            force (bool): reset the parameters even if they already exist
+        '''
+        if layer_keys is None:
+            if self.people is not None: # If people exist
+                layer_keys = self.people.contacts.keys()
+            elif self.popdict is not None:
+                layer_keys = self.popdict['layer_keys']
+        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
+        return
+
+
     def init_infections(self, verbose=None):
         '''
         Initialize prior immunity and seed infections.
@@ -261,16 +258,17 @@ class Sim(hpb.BaseSim):
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         rel_beta = self['rel_beta']
-        people = self.people
-        prel_trans = people.rel_trans
 
         # Update states and partnerships
-        people.update_states_pre(t=t)
+        new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
+        self.people = self.people + new_people # New births are added to the population
+        people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
-        contacts = people.contacts
+        contacts = people.contacts # Shorten
 
         # Loop over genotypes and infect people
+        prel_trans = people.rel_trans
         sus = people.susceptible
         inf = people.infectious
 
@@ -296,7 +294,7 @@ class Sim(hpb.BaseSim):
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
 
                 # Compute transmissibility and infections
-                foi = hpu.compute_foi( prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
+                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
                 source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
@@ -494,7 +492,7 @@ class Sim(hpb.BaseSim):
             sim.summarize(t=24, full=True) # Print a "slice" of all sim results on day 24
         '''
         # Compute the summary
-        summary = self.compute_summary(full=full, t=t, update=False, output=True)
+        summary = self.compute_summary(t=t, update=False, output=True)
 
         # Construct the output string
         if sep is None: sep = hpo.sep # Default separator

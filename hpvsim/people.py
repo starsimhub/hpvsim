@@ -111,6 +111,12 @@ class People(hpb.BasePeople):
         return
 
 
+    def increment_age(self):
+        ''' Let people age by one timestep '''
+        self.age += self.dt
+        return
+
+
     def initialize(self, sim_pars=None):
         ''' Perform initializations '''
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
@@ -125,14 +131,19 @@ class People(hpb.BasePeople):
 
         # Initialize
         self.t = t
+        self.dt = self.pars['dt']
         self.is_inf = self.true('infectious') # For storing the interim values since used in every subsequent calculation
 
         # Perform updates
-        self.init_flows()
-        self.flows['new_recoveries'] += self.check_recovery()
+        self.init_flows() # Initialize flows for this timestep to zero
+        self.increment_age() # Let people age by one time step
+        self.flows['new_other_deaths'] += self.apply_death_rates() # Apply death rates 
+        self.flows['new_births'], new_people = self.add_births() # Add births
+
+        self.flows['new_recoveries'] += self.check_recovery() 
         # Lots more to be added here
 
-        return
+        return new_people
 
 
     #%% Methods for updating partnerships
@@ -222,7 +233,41 @@ class People(hpb.BasePeople):
         return len(inds)
 
 
-    #%% Methods to make events occur (infection and diagnosis)
+    def apply_death_rates(self):
+        '''
+        Apply death rates to remove people from the population
+        NB people are not actually removed to avoid issues with indices
+        '''
+
+        # Get age-dependent death rates. TODO: careful with rates vs probabilities!
+        age_inds = np.digitize(self.age,self.pars['death_rates']['f'][:,0])-1
+        death_probs = np.full(len(self), np.nan, dtype=hpd.default_float)
+        death_probs[self.f_inds] = self.pars['death_rates']['f'][age_inds[self.f_inds],2]*self.dt
+        death_probs[self.m_inds] = self.pars['death_rates']['m'][age_inds[self.m_inds],2]*self.dt
+
+        # Get indices of people who die of other causes, removing anyone already dead
+        death_inds = hpu.true(hpu.binomial_arr(death_probs))
+        already_dead = self.other_dead[death_inds]
+        death_inds = death_inds[~already_dead]  # Unique indices in deaths that are not already dead
+
+        # Apply deaths
+        new_other_deaths = self.make_die_other(death_inds)
+        return new_other_deaths
+
+
+    def add_births(self):
+        ''' Method to add births '''
+        this_birth_rate = sc.smoothinterp(self.t+self.pars['start'], self.pars['birth_rates'][0], self.pars['birth_rates'][1])*self.dt
+        new_births = round(this_birth_rate[0]*len(self)/1000) # Crude births per 1000
+
+        # Generate other characteristics of the new people
+        uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
+        new_people = People(pars=new_births, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
+
+        return new_births, new_people
+
+
+    #%% Methods to make events occur (death, infection, others TBC)
     def make_naive(self, inds, reset_vx=False):
         '''
         Make a set of people naive. This is used during dynamic resampling.
@@ -335,3 +380,23 @@ class People(hpb.BasePeople):
         return n_infections # For incrementing counters
 
 
+    def make_die_other(self, inds):
+        ''' Make people die of all other causes (background mortality) '''
+
+        self.other_dead[inds] = True
+        self.susceptible[inds] = False
+        self.infectious[inds] = False
+        self.recovered[inds] = False
+
+        # Remove dead people from contact network by setting the end date of any partnership they're in to now
+        for contacts in self.contacts.values():
+            m_inds = np.nonzero(inds[:,None] == contacts['m'])[1]
+            f_inds = np.nonzero(inds[:,None] == contacts['f'])[1]
+            pships_to_end = contacts.pop_inds(np.concatenate([f_inds, m_inds]))
+            pships_to_end['end']*=0+self.t # Reset end date to now
+            contacts.append(pships_to_end)
+            
+        return len(inds)
+
+
+# %%
