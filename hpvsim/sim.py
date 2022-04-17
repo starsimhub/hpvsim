@@ -260,12 +260,12 @@ class Sim(hpb.BaseSim):
         rel_beta = self['rel_beta']
 
         # Update states and partnerships
-        new_people = self.people.update_states_pre(t=t) # NB this also ages people and applies deaths
-        self.people = self.people + new_people
-        people = self.people
+        new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
+        self.people = self.people + new_people # New births are added to the population
+        people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
-        contacts = people.contacts
+        contacts = people.contacts # Shorten
 
         # Loop over genotypes and infect people
         prel_trans = people.rel_trans
@@ -294,7 +294,7 @@ class Sim(hpb.BaseSim):
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
 
                 # Compute transmissibility and infections
-                foi = hpu.compute_foi( prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
+                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
                 source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 

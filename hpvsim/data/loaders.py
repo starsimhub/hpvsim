@@ -178,22 +178,25 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     '''
     # Load the raw data
     df = sc.load('data/age_specific_death_rates.obj')
+    age_groups = df['dim.AGEGROUP'].unique()
+    df = df.set_index(['dim.COUNTRY', 'dim.SEX', 'dim.AGEGROUP'])
+    dd = df.groupby(level=0).apply(lambda df: df.xs(df.name).to_dict()).to_dict()
+    raw_death_rates = map_entries(dd,location)[location]['Value']
+
     sex_keys = []
     if by_sex: sex_keys += ['Male','Female']
     if overall: sex_keys += ['Both sexes']
-    death_rates_df = df.loc[(df['dim.SEX'].isin(sex_keys)) & (df['dim.COUNTRY']==location)]
-
-    age_groups = death_rates_df['dim.AGEGROUP'].unique()
+    sex_key_map = {'Male':'m', 'Female':'f', 'Both sexes': 'tot'}
+ 
     max_age = 99
     result = dict()
-    sex_key_map = {'Male':'m', 'Female':'f', 'Both sexes': 'tot'}
 
     # Processing
     for sk in sex_keys:
         sk_out = sex_key_map[sk]
         result[sk_out] = []
         for age in age_groups:
-            this_death_rate = float(death_rates_df.loc[(death_rates_df['dim.SEX']==sk)&(df['dim.AGEGROUP']==age)].iloc[0]['Value'])
+            this_death_rate = float(raw_death_rates[(sk, age)])
             if age[2] == '+':
                 val = [int(age[:2]), max_age, this_death_rate]
             elif age[0] == '<':
@@ -218,8 +221,8 @@ def get_birth_rates(location=None):
         birth_rates (arr): years and crude birth rates
     '''
     # Load the raw data
-    d = sc.load('data/birth_rates.obj')
-    birth_rates, years = d[location], d['years']
+    birth_rate_data = sc.load('data/birth_rates.obj')
+    standardized = map_entries(birth_rate_data, location)
+    birth_rates, years = standardized[location], birth_rate_data['years']
     return np.array([years, birth_rates])
 
-    
