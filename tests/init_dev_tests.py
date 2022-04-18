@@ -33,6 +33,8 @@ if __name__ == '__main__':
     sim0 = test_random()
     sim1 = test_basic()
 
+    sim0.people.story(40)
+
     # # Check that population growth is about right
     # pop_growth = (sim0.results['n_alive'][1:]/sim0.results['n_alive'][:-1]-1)/sim0['dt']
 

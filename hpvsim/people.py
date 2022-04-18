@@ -459,13 +459,13 @@ class People(hpb.BasePeople):
             p = self[uid]
             sex = 'female' if p.sex == 0 else 'male'
 
-            intro = f'\nThis is the story of {uid}, a {p.age:.0f} year old {sex}'
-
+            intro  = f'\nThis is the story of {uid}, a {p.age:.0f} year old {sex}.'
+            intro += f'\n{uid} became sexually active at age {p.debut:f}.'
             if not p.susceptible:
-                if np.isnan(p.date_infected):
-                    print(f'{intro}, who had HPV.')
+                if ~np.isnan(p.date_infectious):
+                    print(f'\n{uid} contracted HPV on timestep {p.date_infectious} of the simulation.')
                 else:
-                    print(f'{intro}, who did not contract COVID.')
+                    print(f'\n{uid} did not contract HPV during the simulation.')
 
             total_contacts = 0
             no_contacts = []
@@ -507,8 +507,8 @@ class People(hpb.BasePeople):
             #         events.append((infection['date'],f'gave COVID to {infection["target"]} via the {llabel} layer ({x} secondary infections)'))
 
             if len(events):
-                for day, event in sorted(events, key=lambda x: x[0]):
-                    print(f'On day {day:.0f}, {uid} {event}')
+                for timestep, event in sorted(events, key=lambda x: x[0]):
+                    print(f'On timestep {timestep:.0f}, {uid} {event}')
             else:
                 print(f'Nothing happened to {uid} during the simulation.')
         return
