@@ -456,7 +456,7 @@ class Sim(hpb.BaseSim):
         Compute prevalence, incidence, and other states.
         '''
         res = self.results
-        self.results['n_alive'][:]         = self['pop_size'] # Number of people still alive. TODO: add vital dynamics
+        self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
         # self.results['n_naive'][:]         = self.scaled_pop_size - res['cum_deaths'][:] - res['n_recovered'][:] - res['n_exposed'][:] # Number of people naive
         self.results['n_susceptible'][:]   = res['n_alive'][:] - res['n_infectious'][:] - res['cum_recoveries'][:] # Recalculate the number of susceptible people, not agents
         # self.results['n_preinfectious'][:] = res['n_exposed'][:] - res['n_infectious'][:] # Calculate the number not yet infectious: exposed minus infectious

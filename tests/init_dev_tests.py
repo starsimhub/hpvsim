@@ -32,13 +32,15 @@ if __name__ == '__main__':
 
     sim0 = test_random()
     # sim1 = test_basic()
+    pop_growth = (sim0.results['n_alive'][1:]/sim0.results['n_alive'][:-1]-1)/sim0['dt']
 
-    snapshot = sim0['analyzers'][0]
-    people_2015 = snapshot.snapshots[0]
-    people_2020 = snapshot.snapshots[1]
+    # snapshot = sim0['analyzers'][0]
+    # people_2015 = snapshot.snapshots[0]
+    # people_2020 = snapshot.snapshots[1]
 
-    people_2015.plot()
-    people_2020.plot()
+    # people_2015.plot()
+    # people_2020.plot()
+
 
 
 
