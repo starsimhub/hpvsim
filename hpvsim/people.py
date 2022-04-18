@@ -460,12 +460,12 @@ class People(hpb.BasePeople):
             sex = 'female' if p.sex == 0 else 'male'
 
             intro  = f'\nThis is the story of {uid}, a {p.age:.0f} year old {sex}.'
-            intro += f'\n{uid} became sexually active at age {p.debut:f}.'
+            intro += f'\n{uid} became sexually active at age {p.debut:.0f}.'
             if not p.susceptible:
                 if ~np.isnan(p.date_infectious):
-                    print(f'\n{uid} contracted HPV on timestep {p.date_infectious} of the simulation.')
+                    print(f'{intro}\n{uid} contracted HPV on timestep {p.date_infectious} of the simulation.')
                 else:
-                    print(f'\n{uid} did not contract HPV during the simulation.')
+                    print(f'{intro}\n{uid} did not contract HPV during the simulation.')
 
             total_contacts = 0
             no_contacts = []
