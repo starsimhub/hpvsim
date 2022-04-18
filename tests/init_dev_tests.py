@@ -28,6 +28,22 @@ def test_basic():
     return sim
 
 
+def test_basic_hpv16():
+    ''' Make a sim with two kinds of partnership, regular and casual '''
+    from hpvsim.sim import Sim
+    from hpvsim.immunity import genotype
+
+    hpv16 = genotype('HPV16')
+    hpv18 = genotype('HPV18')
+    pars = {
+        'network': 'basic',
+        'genotypes': [hpv16, hpv18]
+    }
+    sim = Sim(pars=pars)
+    sim.run()
+    return sim
+
+
 if __name__ == '__main__':
 
     sim0 = test_random()

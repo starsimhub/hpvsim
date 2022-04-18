@@ -133,11 +133,11 @@ class Sim(hpb.BaseSim):
             self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
 
         for i, genotype in enumerate(self['genotypes']):
-            if isinstance(genotype, hpimm.variant):
+            if isinstance(genotype, hpimm.genotype):
                 if not genotype.initialized:
                     genotype.initialize(self)
             else:  # pragma: no cover
-                errormsg = f'Variant {i} ({genotype}) is not a hp.genotype object; please create using cv.variant()'
+                errormsg = f'Genotype {i} ({genotype}) is not a hp.genotype object; please create using cv.variant()'
                 raise TypeError(errormsg)
 
         len_pars = len(self['genotype_pars'])
@@ -189,6 +189,24 @@ class Sim(hpb.BaseSim):
         self.results['prevalence']          = init_res('Prevalence', scale=False)
         self.results['incidence']           = init_res('Incidence', scale=False)
         self.results['frac_vaccinated']     = init_res('Proportion vaccinated', scale=False)
+
+        # Handle genotypes
+        ng = self['n_genotypes']
+        self.results['genotype'] = {}
+        self.results['genotype']['prevalence_by_genotype'] = init_res('Prevalence by genotype', scale=False, n_genotypes=ng)
+        self.results['genotype']['incidence_by_genotype'] = init_res('Incidence by genotype', scale=False, n_genotypes=ng)
+        self.results['genotype']['r_eff_by_genotype'] = init_res('Effective reproduction number by genotype', scale=False,
+                                                               n_genotypes=ng)
+        self.results['genotype']['doubling_time_by_genotype'] = init_res('Doubling time by genotype', scale=False,
+                                                                       n_genotypes=ng)
+        for key, label in hpd.result_flows_by_genotype.items():
+            self.results['genotype'][f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key],
+                                                             n_genotypes=ng)  # Cumulative variables -- e.g. "Cumulative infections"
+        for key, label in hpd.result_flows_by_genotype.items():
+            self.results['genotype'][f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key],
+                                                             n_genotypes=ng)  # Flow variables -- e.g. "Number of new infections"
+        for key, label in hpd.result_stocks_by_genotype.items():
+            self.results['genotype'][f'n_{key}'] = init_res(label, color=dcols[key], n_genotypes=ng)
 
         # Populate the rest of the results
         self.results['year'] = self.yearvec
@@ -326,10 +344,10 @@ class Sim(hpb.BaseSim):
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
 
+
             # Deal with genotype parameters
-            # if genotype:
-            #     genotype_label = self.pars['genotype_map'][genotype]
-            #     rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
+            genotype_label = self.pars['genotype_map'][genotype]
+            rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
             beta = hpd.default_float(self['beta'] * rel_beta)
             foi_frac, foi_whole = 1, 1
 
@@ -366,6 +384,10 @@ class Sim(hpb.BaseSim):
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
+
+        has_imm = hpu.true(people.peak_imm.sum(axis=0))
+        if len(has_imm):
+            hpimm.update_immunity(people, inds=has_imm)
 
         # Tidy up
         self.t += 1

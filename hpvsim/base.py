@@ -134,7 +134,7 @@ class Result(object):
         print(r1.values)
     '''
 
-    def __init__(self, name=None, npts=None, scale=True, color=None):
+    def __init__(self, name=None, npts=None, scale=True, color=None, n_genotypes=0):
         self.name =  name  # Name of this result
         self.scale = scale # Whether or not to scale the result by the scale factor
         if color is None:
@@ -144,7 +144,10 @@ class Result(object):
             npts = 0
         npts = int(npts)
 
-        self.values = np.zeros(npts, dtype=hpd.result_float)
+        if n_genotypes > 0:
+            self.values = np.zeros((n_genotypes, npts), dtype=hpd.result_float)
+        else:
+            self.values = np.zeros(npts, dtype=hpd.result_float)
 
         self.low  = None
         self.high = None

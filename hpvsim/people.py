@@ -13,6 +13,7 @@ from . import defaults as hpd
 from . import base as hpb
 from . import population as hppop
 from . import plotting as hpplt
+from . import immunity as hpi
 
 
 __all__ = ['People']
@@ -76,6 +77,15 @@ class People(hpb.BasePeople):
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
             self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
+
+        # Set genotype states, which store info about which genotype a person is exposed to
+        for key in self.meta.genotype_states:
+            self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
+        for key in self.meta.by_genotype_states:
+            self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), False, dtype=bool)
+
+        for key in self.meta.imm_by_source_states:  # Everyone starts out with no immunity
+            self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
 
         # Store the dtypes used in a flat dict
         self._dtypes = {key:self[key].dtype for key in self.keys()} # Assign all to float by default
@@ -284,18 +294,16 @@ class People(hpb.BasePeople):
                 if (key != 'vaccinated') or reset_vx: # Don't necessarily reset vaccination
                     self[key][inds] = False
 
-        # Reset variant states
-        for key in self.meta.variant_states:
+        # Reset genotype states
+        for key in self.meta.genotype_states:
             self[key][inds] = np.nan
-        for key in self.meta.by_variant_states:
+        for key in self.meta.by_genotype_states:
             self[key][:, inds] = False
 
-        # Reset immunity and antibody states
+        # Reset immunity
         non_vx_inds = inds if reset_vx else inds[~self['vaccinated'][inds]]
-        for key in self.meta.imm_states:
+        for key in self.meta.imm_by_source_states:
             self[key][:, non_vx_inds] = 0
-        for key in self.meta.nab_states + self.meta.vacc_states:
-            self[key][non_vx_inds] = 0
 
         # Reset dates
         for key in self.meta.dates + self.meta.durs:
@@ -356,6 +364,8 @@ class People(hpb.BasePeople):
         if source is not None:
             source = source[keep]
 
+        genotype_label = self.pars['genotype_map'][genotype]
+
         n_infections = len(inds)
         durpars      = self.pars['dur']
 
@@ -377,6 +387,9 @@ class People(hpb.BasePeople):
         dur_inf2rec = hpu.sample(**durpars['inf2rec'], size=len(inds)) # Duration of infection in YEARS
         self.date_recovered[inds] = self.date_infectious[inds] + np.ceil(dur_inf2rec/dt)  # Date they recover (interpreted as the timestep on which they recover)
         self.dur_disease[inds] = dur_inf2rec
+
+        # Update immunity
+        hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
 
         return n_infections # For incrementing counters
 
