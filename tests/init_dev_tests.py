@@ -31,15 +31,18 @@ def test_basic():
 if __name__ == '__main__':
 
     sim0 = test_random()
-    # sim1 = test_basic()
-    pop_growth = (sim0.results['n_alive'][1:]/sim0.results['n_alive'][:-1]-1)/sim0['dt']
+    sim1 = test_basic()
 
+    # # Check that population growth is about right
+    # pop_growth = (sim0.results['n_alive'][1:]/sim0.results['n_alive'][:-1]-1)/sim0['dt']
+
+    # # Plot people
     # snapshot = sim0['analyzers'][0]
     # people_2015 = snapshot.snapshots[0]
     # people_2020 = snapshot.snapshots[1]
-
     # people_2015.plot()
     # people_2020.plot()
+
 
 
 
