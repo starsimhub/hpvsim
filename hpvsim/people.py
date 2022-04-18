@@ -12,6 +12,7 @@ from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
 from . import population as hppop
+from . import plotting as hpplt
 
 
 __all__ = ['People']
@@ -399,4 +400,116 @@ class People(hpb.BasePeople):
         return len(inds)
 
 
-# %%
+    #%% Analysis methods
+
+    def plot(self, *args, **kwargs):
+        '''
+        Plot statistics of the population -- age distribution, numbers of contacts,
+        and overall weight of contacts (number of contacts multiplied by beta per
+        layer).
+
+        Args:
+            bins      (arr)   : age bins to use (default, 0-100 in one-year bins)
+            width     (float) : bar width
+            font_size (float) : size of font
+            alpha     (float) : transparency of the plots
+            fig_args  (dict)  : passed to pl.figure()
+            axis_args (dict)  : passed to pl.subplots_adjust()
+            plot_args (dict)  : passed to pl.plot()
+            do_show   (bool)  : whether to show the plot
+            fig       (fig)   : handle of existing figure to plot into
+        '''
+        fig = hpplt.plot_people(people=self, *args, **kwargs)
+        return fig
+
+
+    def story(self, uid, *args):
+        '''
+        Print out a short history of events in the life of the specified individual.
+
+        Args:
+            uid (int/list): the person or people whose story is being regaled
+            args (list): these people will tell their stories too
+
+        **Example**::
+
+            sim = cv.Sim(pop_type='hybrid', verbose=0)
+            sim.run()
+            sim.people.story(12)
+            sim.people.story(795)
+        '''
+
+        def label_lkey(lkey):
+            ''' Friendly name for common layer keys '''
+            if lkey.lower() == 'a':
+                llabel = 'default contact'
+            if lkey.lower() == 'r':
+                llabel = 'regular'
+            elif lkey.lower() == 'c':
+                llabel = 'casual'
+            else:
+                llabel = f'"{lkey}"'
+            return llabel
+
+        uids = sc.promotetolist(uid)
+        uids.extend(args)
+
+        for uid in uids:
+
+            p = self[uid]
+            sex = 'female' if p.sex == 0 else 'male'
+
+            intro = f'\nThis is the story of {uid}, a {p.age:.0f} year old {sex}'
+
+            if not p.susceptible:
+                if np.isnan(p.date_infected):
+                    print(f'{intro}, who had HPV.')
+                else:
+                    print(f'{intro}, who did not contract COVID.')
+
+            total_contacts = 0
+            no_contacts = []
+            for lkey in p.contacts.keys():
+                llabel = label_lkey(lkey)
+                n_contacts = len(p.contacts[lkey])
+                total_contacts += n_contacts
+                if n_contacts:
+                    print(f'{uid} is connected to {n_contacts} people in the {llabel} layer')
+                else:
+                    no_contacts.append(llabel)
+            if len(no_contacts):
+                nc_string = ', '.join(no_contacts)
+                print(f'{uid} has no contacts in the {nc_string} layer(s)')
+            print(f'{uid} has {total_contacts} contacts in total')
+
+            events = []
+
+            dates = {
+                'date_recovered'      : 'recovered',
+            }
+
+            for attribute, message in dates.items():
+                date = getattr(p,attribute)
+                if not np.isnan(date):
+                    events.append((date, message))
+
+            # for infection in self.infection_log:
+            #     lkey = infection['layer']
+            #     llabel = label_lkey(lkey)
+            #     if infection['target'] == uid:
+            #         if lkey:
+            #             events.append((infection['date'], f'was infected with COVID by {infection["source"]} via the {llabel} layer'))
+            #         else:
+            #             events.append((infection['date'], 'was infected with COVID as a seed infection'))
+
+            #     if infection['source'] == uid:
+            #         x = len([a for a in self.infection_log if a['source'] == infection['target']])
+            #         events.append((infection['date'],f'gave COVID to {infection["target"]} via the {llabel} layer ({x} secondary infections)'))
+
+            if len(events):
+                for day, event in sorted(events, key=lambda x: x[0]):
+                    print(f'On day {day:.0f}, {uid} {event}')
+            else:
+                print(f'Nothing happened to {uid} during the simulation.')
+        return
+
