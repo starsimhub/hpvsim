@@ -29,7 +29,7 @@ def test_basic():
 
 
 def test_basic_hpv16():
-    ''' Make a sim with two kinds of partnership, regular and casual '''
+    ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
     from hpvsim.sim import Sim
     from hpvsim.immunity import genotype
 

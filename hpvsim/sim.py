@@ -339,7 +339,6 @@ class Sim(hpb.BaseSim):
         # Loop over genotypes and infect people
         prel_trans = people.rel_trans
         sus = people.susceptible
-        inf = people.infectious
 
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
@@ -358,12 +357,12 @@ class Sim(hpb.BaseSim):
                 whole_acts = int(whole_acts)
 
                 # Compute relative transmission and susceptibility
-                # inf_genotype = people.infectious * (people.infectious_genotype == genotype) 
+                inf_genotype = people.infectious * (people.infectious_genotype == genotype)
                 # sus_imm = people.sus_imm[genotype,:]
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
 
                 # Compute transmissibility and infections
-                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
+                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)#(foi_frac, foi_whole, inf)
                 source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
