@@ -12,6 +12,7 @@ from . import defaults as hpd
 from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
+from . import analysis as hpa
 from .settings import options as hpo
 
 
@@ -55,6 +56,7 @@ class Sim(hpb.BaseSim):
         self.set_seed() # Reset the random seed before the population is created
         self.init_results() # After initializing the variant, create the results structure
         self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
+        self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
         self.complete      = False
@@ -108,6 +110,10 @@ class Sim(hpb.BaseSim):
             choicestr = ', '.join(network_choices)
             errormsg = f'Population type "{choice}" not available; choices are: {choicestr}'
             raise ValueError(errormsg)
+
+        # Handle analyzers - TODO, interventions and genotypes will also go here
+        for key in ['analyzers']: # Ensure all of them are lists
+            self[key] = sc.dcp(sc.tolist(self[key], keepnone=False)) # All of these have initialize functions that run into issues if they're reused
 
         # Handle verbose
         if self['verbose'] == 'brief':
@@ -201,6 +207,23 @@ class Sim(hpb.BaseSim):
             self.init_infections(verbose=verbose)
 
         return self
+
+
+    def init_analyzers(self):
+        ''' Initialize the analyzers '''
+        if self._orig_pars and 'analyzers' in self._orig_pars:
+            self['analyzers'] = self._orig_pars.pop('analyzers') # Restore
+
+        for analyzer in self['analyzers']:
+            if isinstance(analyzer, hpa.Analyzer):
+                analyzer.initialize(self)
+        return
+
+
+    def finalize_analyzers(self):
+        for analyzer in self['analyzers']:
+            if isinstance(analyzer, hpa.Analyzer):
+                analyzer.finalize(self)
 
 
     def reset_layer_pars(self, layer_keys=None, force=False):
@@ -312,6 +335,10 @@ class Sim(hpb.BaseSim):
         #     for variant in range(ng):
         #         self.results['genotype'][key][genotype][t] += count[genotype]
 
+        # Apply analyzers
+        for i,analyzer in enumerate(self['analyzers']):
+            analyzer(self)
+
         # Tidy up
         self.t += 1
         if self.t == self.npts:
@@ -396,6 +423,9 @@ class Sim(hpb.BaseSim):
             self.results[f'cum_{key}'][:] = np.cumsum(self.results[f'new_{key}'][:], axis=0)
         for res in [self.results['cum_infections']]: # Include initially infected people
             res.values += self['pop_infected']
+
+        # Finalize analyzers - TODO, interventions will also be added here
+        self.finalize_analyzers()
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results
