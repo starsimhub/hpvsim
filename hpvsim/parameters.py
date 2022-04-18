@@ -51,7 +51,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     pars['condoms']         = None  # The proportion of acts in which condoms are used
     pars['layer_probs']     = None  # Proportion of the population in each layer
     pars['dur_pship']       = None  # Duration of partnerships in each layer
-    # pars['age_diff']        = None  # Age difference in partnerships -- TODO consider how to use this
+    pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships
     # pars['nonactive_by_age']= nonactive_by_age
     # pars['nonactive']       = None 
 

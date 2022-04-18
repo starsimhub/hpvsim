@@ -640,11 +640,12 @@ def dtround(arr, dt, ceil=True):
 
     Args:
         arr (array): any array
-        dt  (float): float
+        dt  (float): float, usually representing a timestep in years
 
     **Example**::
 
-        dtround = hp.dtround(np.array([0.23,0.61,20.53,43.95,0.00,0.11,10.25])) # Returns array([0, 3, 4, 6])
+        dtround = hp.dtround(np.array([0.23,0.61,20.53])) # Returns array([0.2, 0.6, 20.6])
+        dtround = hp.dtround(np.array([0.23,0.61,20.53]),ceil=True) # Returns array([0.4, 0.8, 20.6])
     '''
     if ceil:
         return np.ceil(arr * (1/dt)) / (1/dt)

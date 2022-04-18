@@ -353,72 +353,75 @@ class BaseSim(ParsObj):
     #         return np.array([])
 
 
-    # def day(self, day, *args):
-    #     '''
-    #     Convert a string, date/datetime object, or int to a day (int).
+    def get_t(self, dates, exact_match=False, return_date_format=None):
+        '''
+        Convert a string, date/datetime object, or int to a timepoint (int).
 
-    #     Args:
-    #         day (str, date, int, or list): convert any of these objects to a day relative to the simulation's start day
+        Args:
+            date (str, date, int, or list): convert any of these objects to a timepoint relative to the simulation's start day
+            exact_match             (bool): whether or not to demand an exact match to the requested date
+            return_date_format (None, str): if None, do not return dates; otherwise return them as strings or floats as requested
 
-    #     Returns:
-    #         days (int or str): the day(s) in simulation time
+        Returns:
+            t (int or str): the time point in the simulation cloesst to the requested date
 
-    #     **Example**::
+        **Examples**::
+            sim.get_t('2015-03-01') # Get the closest timepoint to the specified date
+            sim.get_t(2015) # Can use floats
+            sim.get_t('2015') # Can use strings
+            sim.get_t(['2015.5', '2016.5']) # List of strings, will match as close as possible
+            sim.get_t(['2015.5', '2016.5'], exact_match=True) # Raises an error since these dates aren't directly simulated
+        '''
 
-    #         sim.day('2020-04-05') # Returns 35
-    #     '''
-    #     return sc.day(day, *args, start_date=self['start_day'])
+        if sc.isstring(dates) or not sc.isiterable(dates):
+            dates = sc.promotetolist(dates)
 
+        tps = []
+        for date in dates:
+            if date in ['end', -1]: 
+                date = self['end']
 
-    # def date(self, ind, *args, dateformat=None, as_date=False):
-    #     '''
-    #     Convert one or more integer days of simulation time to a date/list of dates --
-    #     by default returns a string, or returns a datetime Date object if as_date is True.
-    #     See also cv.date(), which provides a partly overlapping set of date conversion
-    #     features.
+            # Try to convert from date-time format, and if this doesn't work,
+            # try to interpret it as a float, otherwise raise an error
+            try:
+                tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
+            except:
+                try:
+                    tp_raw  = float(date)
+                except:
+                    errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
+                    raise ValueError(errormsg)
 
-    #     Args:
-    #         ind (int, list, or array): the index day(s) in simulation time (NB: strings and date objects are accepted, and will be passed unchanged)
-    #         args (list): additional day(s)
-    #         dateformat (str): the format to return the date in
-    #         as_date (bool): whether to return as a datetime date instead of a string
+            # If the requested date is within the range of years covered by the sim,
+            # return the closest date
+            if (tp_raw >= self['start']) and (tp_raw <= self['end']):
+                if exact_match:
+                    tp_ind = sc.findinds(self.yearvec, tp_raw)
+                    if len(tp_ind)>0:
+                        tp = tp_ind[0]
+                    else:
+                        errormsg = f'The requested date {date} was not simulated; try exact_match=False to obtain the nearest date.'
+                        raise ValueError(errormsg)
+                else:
+                    tp = sc.findnearest(self.yearvec, tp_raw) # Get the nearest timestep to the requested one
+            else: 
+                errormsg = f'The requested date {date} must be within the simulation dates: {self["start"], self["end"]}.'
+                raise ValueError(errormsg)
 
-    #     Returns:
-    #         dates (str, Date, or list): the date(s) corresponding to the simulation day(s)
+            tps.append(tp)
 
-    #     **Examples**::
+        tps = np.sort(sc.promotetoarray(tps)) # Ensure they're an array and in order
 
-    #         sim = cv.Sim()
-    #         sim.date(34) # Returns '2020-04-04'
-    #         sim.date([34, 54]) # Returns ['2020-04-04', '2020-04-24']
-    #         sim.date([34, '2020-04-24']) # Returns ['2020-04-04', '2020-04-24']
-    #         sim.date(34, 54, as_date=True) # Returns [datetime.date(2020, 4, 4), datetime.date(2020, 4, 24)]
-    #     '''
-
-    #     # Handle inputs
-    #     if not isinstance(ind, list): # If it's a number, string, or dateobj, convert it to a list
-    #         ind = sc.promotetolist(ind)
-    #     ind.extend(args)
-    #     if dateformat is None:
-    #         dateformat = '%Y-%m-%d'
-
-    #     # Do the conversion
-    #     dates = []
-    #     for raw in ind:
-    #         if sc.isnumber(raw):
-    #             date_obj = sc.date(self['start_day'], as_date=True) + dt.timedelta(days=int(raw))
-    #         else:
-    #             date_obj = sc.date(raw, as_date=True)
-    #         if as_date:
-    #             dates.append(date_obj)
-    #         else:
-    #             dates.append(date_obj.strftime(dateformat))
-
-    #     # Return a string rather than a list if only one provided
-    #     if len(ind)==1:
-    #         dates = dates[0]
-
-    #     return dates
+        if return_date_format is not None:
+            if return_date_format is 'str':
+                return tps, np.array([str(self.yearvec[tp]) for tp in tps])
+            elif return_date_format is 'float':
+                return tps, self.yearvec[tps]
+            else:
+                errormsg = f'Could not understand what format to return the dates: requested {return_date_format}, options are str or float.'
+                raise ValueError(errormsg)
+        else:
+            return tps
 
 
     def result_keys(self, which='main'):
