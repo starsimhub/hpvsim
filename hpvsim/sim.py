@@ -12,6 +12,8 @@ from . import defaults as hpd
 from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
+from . import analysis as hpa
+from .settings import options as hpo
 from . import immunity as hpimm
 
 
@@ -57,28 +59,12 @@ class Sim(hpb.BaseSim):
         self.init_immunity() # initialize information about immunity (if use_waning=True)
         self.init_results() # After initializing the genotypes, create the results structure
         self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
+        self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
         self.complete      = False
         self.results_ready = False
         return self
-
-
-    def reset_layer_pars(self, layer_keys=None, force=False):
-        '''
-        Reset the parameters to match the population.
-
-        Args:
-            layer_keys (list): override the default layer keys (use stored keys by default)
-            force (bool): reset the parameters even if they already exist
-        '''
-        if layer_keys is None:
-            if self.people is not None: # If people exist
-                layer_keys = self.people.contacts.keys()
-            elif self.popdict is not None:
-                layer_keys = self.popdict['layer_keys']
-        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
-        return
 
 
     def validate_pars(self, validate_layers=True):
@@ -89,9 +75,6 @@ class Sim(hpb.BaseSim):
             validate_layers (bool): whether to validate layer parameters as well via validate_layer_pars() -- usually yes, except during initialization
         '''
 
-        # Handle population size
-        pop_size   = self.pars.get('pop_size')
-
         # Handle types
         for key in ['pop_size', 'pop_infected']:
             try:
@@ -101,7 +84,7 @@ class Sim(hpb.BaseSim):
                 raise ValueError(errormsg) from E
 
         # Handle start
-        if self['start'] in [None, 0]: # Use default start day
+        if self['start'] in [None, 0]: # Use default start
             self['start'] = 2015
 
         # Handle end and n_years
@@ -123,13 +106,17 @@ class Sim(hpb.BaseSim):
         self.npts           = len(self.yearvec)
         self.tvec          = np.arange(self.npts)
         
-        # Handle population data
-        network_choices = ['random']
+        # Handle population network data
+        network_choices = ['random', 'basic']
         choice = self['network']
         if choice and choice not in network_choices: # pragma: no cover
             choicestr = ', '.join(network_choices)
             errormsg = f'Population type "{choice}" not available; choices are: {choicestr}'
             raise ValueError(errormsg)
+
+        # Handle analyzers - TODO, interventions and genotypes will also go here
+        for key in ['analyzers']: # Ensure all of them are lists
+            self[key] = sc.dcp(sc.tolist(self[key], keepnone=False)) # All of these have initialize functions that run into issues if they're reused
 
         # Handle verbose
         if self['verbose'] == 'brief':
@@ -198,7 +185,6 @@ class Sim(hpb.BaseSim):
         self.results['n_imports']           = init_res('Number of imported infections', scale=True)
         self.results['n_alive']             = init_res('Number alive', scale=True)
         self.results['n_naive']             = init_res('Number never infected', scale=True)
-        self.results['n_preinfectious']     = init_res('Number preinfectious', scale=True, color=dcols.exposed)
         self.results['n_removed']           = init_res('Number removed', scale=True, color=dcols.recovered)
         self.results['prevalence']          = init_res('Prevalence', scale=False)
         self.results['incidence']           = init_res('Incidence', scale=False)
@@ -214,13 +200,13 @@ class Sim(hpb.BaseSim):
 
     def init_people(self, popdict=None, init_infections=False, reset=False, verbose=None, **kwargs):
         '''
-        Create the people.
+        Create the people and the network.
 
         Use ``init_infections=False`` for creating a fresh People object for use
         in future simulations
 
         Args:
-            popdict         (any):  pre-generated people of various formats
+            popdict         (any):  pre-generated people of various formats.
             init_infections (bool): whether to initialize infections (default false when called directly)
             reset           (bool): whether to regenerate the people even if they already exist
             verbose         (int):  detail to print
@@ -241,11 +227,71 @@ class Sim(hpb.BaseSim):
             self.load_population(init_people=False)
 
         # Actually make the people
-        self.people = hppop.make_people(self, reset=reset, verbose=verbose, **kwargs)
+        microstructure = self['network']
+        self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
+        if init_infections:
+            self.init_infections(verbose=verbose)
 
         return self
+
+
+    def init_analyzers(self):
+        ''' Initialize the analyzers '''
+        if self._orig_pars and 'analyzers' in self._orig_pars:
+            self['analyzers'] = self._orig_pars.pop('analyzers') # Restore
+
+        for analyzer in self['analyzers']:
+            if isinstance(analyzer, hpa.Analyzer):
+                analyzer.initialize(self)
+        return
+
+
+    def finalize_analyzers(self):
+        for analyzer in self['analyzers']:
+            if isinstance(analyzer, hpa.Analyzer):
+                analyzer.finalize(self)
+
+
+    def reset_layer_pars(self, layer_keys=None, force=False):
+        '''
+        Reset the parameters to match the population.
+
+        Args:
+            layer_keys (list): override the default layer keys (use stored keys by default)
+            force (bool): reset the parameters even if they already exist
+        '''
+        if layer_keys is None:
+            if self.people is not None: # If people exist
+                layer_keys = self.people.contacts.keys()
+            elif self.popdict is not None:
+                layer_keys = self.popdict['layer_keys']
+        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
+        return
+
+
+    def init_infections(self, verbose=None):
+        '''
+        Initialize prior immunity and seed infections.
+        Copied from Covasim. TODO: think of a better initialization strategy
+        '''
+
+        if verbose is None:
+            verbose = self['verbose']
+
+        # If anyone is non-naive, don't re-initialize
+        if self.people.count_not('naive') == 0: # Everyone is naive
+
+            # Create the seed infections
+            if self['pop_infected']:
+                inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                self.people.infect(inds=inds, layer='seed_infection') # Not counted by results since flows are re-initialized during the step
+
+        elif verbose:
+            print(f'People already initialized with {self.people.count_not("naive")} people non-naive and {self.people.count("infectious")} infectious; not reinitializing')
+
+        return
 
 
     def step(self):
@@ -255,14 +301,71 @@ class Sim(hpb.BaseSim):
         if self.complete:
             raise AlreadyRunError('Simulation already complete (call sim.initialize() to re-run)')
 
+        # Shorten key variables
+        dt = self['dt'] # Timestep; TODO centralize this somewhere
         t = self.t
+        ng = self['n_genotypes']
+        acts = self['acts']
+        condoms = self['condoms']
+        eff_condoms = self['eff_condoms']
+        rel_beta = self['rel_beta']
 
-        # Perform initial operations
-        people   = self.people # Shorten this for later use
+        # Update states and partnerships
+        new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
+        self.people = self.people + new_people # New births are added to the population
+        people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
-        # people.update_states_pre(t=t) # Update the state of everyone and count the flows
-        # contacts = people.update_contacts() # Compute new contacts
+        contacts = people.contacts # Shorten
+
+        # Loop over genotypes and infect people
+        prel_trans = people.rel_trans
+        sus = people.susceptible
+        inf = people.infectious
+
+        # Iterate through genotypes to calculate infections
+        for genotype in range(ng):
+
+            # Deal with genotype parameters
+            # if genotype:
+            #     genotype_label = self.pars['genotype_map'][genotype]
+            #     rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
+            beta = hpd.default_float(self['beta'] * rel_beta)
+            foi_frac, foi_whole = 1, 1
+
+            for lkey, layer in contacts.items():
+                f = layer['f']
+                m = layer['m']
+                frac_acts, whole_acts = np.modf(acts[lkey]*dt) # Get the number of acts per timestep for this layer
+                whole_acts = int(whole_acts)
+
+                # Compute relative transmission and susceptibility
+                # inf_genotype = people.infectious * (people.infectious_genotype == genotype) 
+                # sus_imm = people.sus_imm[genotype,:]
+                # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
+
+                # Compute transmissibility and infections
+                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
+                source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
+                people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
+
+        # Update counts for this time step: stocks
+        for key in hpd.result_stocks.keys():
+            self.results[f'n_{key}'][t] = people.count(key)
+        # for key in hpd.result_stocks_by_genotype.keys():
+        #     for variant in range(ng):
+        #         self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
+
+        # Update counts for this time step: flows
+        for key,count in people.flows.items():
+            self.results[key][t] += count
+        # for key,count in people.flows_genotype.items():
+        #     for variant in range(ng):
+        #         self.results['genotype'][key][genotype][t] += count[genotype]
+
+        # Apply analyzers
+        for i,analyzer in enumerate(self['analyzers']):
+            analyzer(self)
 
         # Tidy up
         self.t += 1
@@ -330,9 +433,139 @@ class Sim(hpb.BaseSim):
 
         # If simulation reached the end, finalize the results
         if self.complete:
+            self.finalize(verbose=verbose, restore_pars=restore_pars)
             sc.printv(f'Run finished after {elapsed:0.2f} s.\n', 1, verbose)
         return self
 
+
+    def finalize(self, verbose=None, restore_pars=True):
+        ''' Compute final results '''
+
+        if self.results_ready:
+            # Because the results are rescaled in-place, finalizing the sim cannot be run more than once or
+            # otherwise the scale factor will be applied multiple times
+            raise AlreadyRunError('Simulation has already been finalized')
+
+        # Calculate cumulative results
+        for key in hpd.result_flows.keys():
+            self.results[f'cum_{key}'][:] = np.cumsum(self.results[f'new_{key}'][:], axis=0)
+        for res in [self.results['cum_infections']]: # Include initially infected people
+            res.values += self['pop_infected']
+
+        # Finalize analyzers - TODO, interventions will also be added here
+        self.finalize_analyzers()
+
+        # Final settings
+        self.results_ready = True # Set this first so self.summary() knows to print the results
+        self.t -= 1 # During the run, this keeps track of the next step; restore this be the final day of the sim
+
+        # Perform calculations on results
+        self.compute_results(verbose=verbose) # Calculate the rest of the results
+        self.results = sc.objdict(self.results) # Convert results to a odicts/objdict to allow e.g. sim.results.diagnoses
+
+        # Optionally print summary output
+        if verbose: # Verbose is any non-zero value
+            if verbose>0: # Verbose is any positive number
+                self.summarize() # Print medium-length summary of the sim
+            else:
+                self.brief() # Print brief summary of the sim
+
+        return
+
+
+    def compute_results(self, verbose=None):
+        ''' Perform final calculations on the results '''
+        self.compute_states()
+        return
+
+
+    def compute_states(self):
+        '''
+        Compute prevalence, incidence, and other states.
+        '''
+        res = self.results
+        self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
+        # self.results['n_naive'][:]         = self.scaled_pop_size - res['cum_deaths'][:] - res['n_recovered'][:] - res['n_exposed'][:] # Number of people naive
+        self.results['n_susceptible'][:]   = res['n_alive'][:] - res['n_infectious'][:] - res['cum_recoveries'][:] # Recalculate the number of susceptible people, not agents
+        # self.results['n_preinfectious'][:] = res['n_exposed'][:] - res['n_infectious'][:] # Calculate the number not yet infectious: exposed minus infectious
+        # self.results['n_removed'][:]       = count_recov*res['cum_recoveries'][:] + res['cum_deaths'][:] # Calculate the number removed: recovered + dead
+        self.results['prevalence'][:]      = res['n_infectious'][:]/res['n_alive'][:] # Calculate the prevalence
+        self.results['incidence'][:]       = res['new_infections'][:]/res['n_susceptible'][:] # Calculate the incidence
+        # self.results['frac_vaccinated'][:] = res['n_vaccinated'][:]/res['n_alive'][:] # Calculate the fraction vaccinated
+
+        return
+
+
+    def compute_summary(self, t=None, update=True, output=False, require_run=False):
+        '''
+        Compute the summary dict and string for the sim. Used internally; see
+        sim.summarize() for the user version.
+
+        Args:
+            t (int/str): day or date to compute summary for (by default, the last point)
+            update (bool): whether to update the stored sim.summary
+            output (bool): whether to return the summary
+            require_run (bool): whether to raise an exception if simulations have not been run yet
+        '''
+        if t is None:
+            t = -1
+
+        # Compute the summary
+        if require_run and not self.results_ready:
+            errormsg = 'Simulation not yet run'
+            raise RuntimeError(errormsg)
+
+        summary = sc.objdict()
+        for key in self.result_keys():
+            summary[key] = self.results[key][t]
+
+        # Update the stored state
+        if update:
+            self.summary = summary
+
+        # Optionally return
+        if output:
+            return summary
+        else:
+            return
+
+
+    def summarize(self, full=False, t=None, sep=None, output=False):
+        '''
+        Print a medium-length summary of the simulation, drawing from the last time
+        point in the simulation by default. Called by default at the end of a sim run.
+        See also sim.disp() (detailed output) and sim.brief() (short output).
+
+        Args:
+            full   (bool):    whether or not to print all results (by default, only cumulative)
+            t      (int/str): day or date to compute summary for (by default, the last point)
+            sep    (str):     thousands separator (default ',')
+            output (bool):    whether to return the summary instead of printing it
+
+        **Examples**::
+
+            sim = cv.Sim(label='Example sim', verbose=0) # Set to run silently
+            sim.run() # Run the sim
+            sim.summarize() # Print medium-length summary of the sim
+            sim.summarize(t=24, full=True) # Print a "slice" of all sim results on day 24
+        '''
+        # Compute the summary
+        summary = self.compute_summary(t=t, update=False, output=True)
+
+        # Construct the output string
+        if sep is None: sep = hpo.sep # Default separator
+        labelstr = f' "{self.label}"' if self.label else ''
+        string = f'Simulation{labelstr} summary:\n'
+        for key in self.result_keys():
+            if full or key.startswith('cum_'):
+                val = np.round(summary[key])
+                string += f'   {val:10,.0f} {self.results[key].name.lower()}\n'.replace(',', sep) # Use replace since it's more flexible
+
+        # Print or return string
+        if not output:
+            print(string)
+        else:
+            return string
 
 
     def plot(self, toplot=None):

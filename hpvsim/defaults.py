@@ -44,6 +44,7 @@ class PeopleMeta(sc.prettyobj):
             'age',              # Float
             'sex',              # Float
             'debut',            # Float
+            'rel_trans',        # Float
         ]
 
         # Set the states that a person can be in: these are all booleans per person -- used in people.py
@@ -52,6 +53,7 @@ class PeopleMeta(sc.prettyobj):
             'naive',
             'infectious',
             'recovered',
+            'other_dead',  # Dead from all other causes
         ]
 
         # Genotype states -- these are ints
@@ -80,7 +82,7 @@ class PeopleMeta(sc.prettyobj):
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
-            'dur_exp2inf',
+            'dur_inf2rec',
             'dur_disease',
         ]
 
@@ -108,30 +110,21 @@ result_stocks = {
     'susceptible': 'Number susceptible',
     'infectious':  'Number infectious',
     'recovered':   'Number recovered',
+    'other_dead':  'Number dead from other causes',
 }
 
 # The types of result that are counted as flows -- used in sim.py; value is the label suffix
 result_flows = {
     'infections':   'infections',
-    'reinfections': 'reinfections',
-    'infectious':   'infectious',
     'recoveries':   'recoveries',
+    'other_deaths': 'deaths from other causes',
+    'births':       'births'
 }
-
-# Parameters that can vary by variant
-genotype_pars = [
-    'rel_beta',
-    'rel_symp_prob',
-    'rel_severe_prob',
-    'rel_crit_prob',
-    'rel_death_prob',
-]
 
 
 # Define new and cumulative flows
 new_result_flows = [f'new_{key}' for key in result_flows.keys()]
 cum_result_flows = [f'cum_{key}' for key in result_flows.keys()]
-
 
 # Default age data, based on Seattle 2018 census data -- used in population.py
 default_age_data = np.array([
@@ -157,6 +150,56 @@ default_age_data = np.array([
 ])
 
 
+default_death_rates = {
+    'm': np.array([
+        [0, 1, 5.99966600e-03],
+        [1, 4, 2.51593000e-04],
+        [5, 9, 1.35127000e-04],
+        [10, 14, 1.78153000e-04],
+        [15, 19, 6.61341000e-04],
+        [20, 24, 1.30016800e-03],
+        [25, 29, 1.63925500e-03],
+        [30, 34, 1.96618300e-03],
+        [35, 39, 2.28799200e-03],
+        [40, 44, 2.63302300e-03],
+        [45, 49, 3.66449800e-03],
+        [50, 54, 5.70753600e-03],
+        [55, 59, 9.46976600e-03],
+        [60, 64, 1.34425950e-02],
+        [65, 69, 1.83650650e-02],
+        [70, 74, 2.89760800e-02],
+        [75, 79, 4.17993600e-02],
+        [80, 84, 6.58443370e-02],
+        [85, 99, 1.47244865e-01]]),
+    'f': np.array([
+        [0, 1, 5.01953300e-03],
+        [1, 4, 2.01505000e-04],
+        [5, 9, 1.08226000e-04],
+        [10, 14, 1.25870000e-04],
+        [15, 19, 2.85938000e-04],
+        [20, 24, 4.81500000e-04],
+        [25, 29, 6.72314000e-04],
+        [30, 34, 9.84953000e-04],
+        [35, 39, 1.27814400e-03],
+        [40, 44, 1.61936000e-03],
+        [45, 49, 2.42485500e-03],
+        [50, 54, 3.86320600e-03],
+        [55, 59, 6.15726500e-03],
+        [60, 64, 8.21110500e-03],
+        [65, 69, 1.17604260e-02],
+        [70, 74, 1.86539200e-02],
+        [75, 79, 3.04550980e-02],
+        [80, 84, 5.16382510e-02],
+        [85, 99, 1.33729522e-01]])
+    }
+
+default_birth_rates = np.array([
+    [2015, 2016, 2017, 2018, 2019],
+    [12.4, 12.2, 11.8, 11.6, 11.4],
+])
+
+
+
 def get_default_colors():
     '''
     Specify plot colors -- used in sim.py.
@@ -165,13 +208,15 @@ def get_default_colors():
     '''
     c = sc.objdict()
     c.susceptible           = '#4d771e'
-    c.exposed               = '#c78f65'
     c.infectious            = '#e45226'
     c.infections            = '#b62413'
     c.reinfections          = '#732e26'
     c.recoveries            = '#9e1149'
     c.recovered             = c.recoveries
     c.default               = '#000000'
+    c.other_deaths          = '#000000'
+    c.other_dead            = c.other_deaths
+    c.births                = '#797ef6'
     return c
 
 
@@ -180,7 +225,6 @@ overview_plots = [
     'cum_infections',
     'new_infections',
     'n_infectious',
-    'r_eff',
 ]
 
 

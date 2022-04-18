@@ -7,6 +7,7 @@ import sciris as sc
 from .settings import options as hpo # For setting global options
 from . import misc as hpm
 from . import defaults as hpd
+from .data import loaders as hpdata
 
 __all__ = ['make_pars', 'reset_layer_pars', 'get_prognoses']
 
@@ -28,33 +29,34 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     pars = {}
 
     # Population parameters
-    pars['pop_size']     = 20e3     # Number of agents
-    pars['pop_infected'] = 20       # Number of initial infections
-    pars['network']      = 'random' # What type of sexual network to use -- 'random', other options TBC
-    pars['location']     = None     # What location to load data from -- default Seattle
+    pars['pop_size']        = 20e3     # Number of agents
+    pars['pop_infected']    = 20       # Number of initial infections; TODO reconsider this
+    pars['network']         = 'random' # What type of sexual network to use -- 'random', 'basic', other options TBC
+    pars['location']        = None     # What location to load data from -- default Seattle
+    pars['death_rates']     = None     # Deaths from all other causes, loaded below 
+    pars['birth_rates']     = None     # Birth rates, loaded below 
 
     # Simulation parameters
-    pars['start']       = 2015.         # Start of the simulation
-    pars['end']         = None          # End of the simulation
-    pars['n_years']     = 10.           # Number of years to run, if end isn't specified
-    pars['dt']          = 0.2           # Timestep (in years)
-    pars['rand_seed']   = 1             # Random seed, if None, don't reset
-    pars['verbose']     = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
+    pars['start']           = 2015.         # Start of the simulation
+    pars['end']             = None          # End of the simulation
+    pars['n_years']         = 10.           # Number of years to run, if end isn't specified
+    pars['dt']              = 0.2           # Timestep (in years)
+    pars['rand_seed']       = 1             # Random seed, if None, don't reset
+    pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
 
     # Network parameters, generally initialized after the population has been constructed
+    pars['debut']           = dict(dist='normal', par1=15.5, par2=1.5) # Age of sexual debut; TODO separate for M/F?
     pars['partners']        = None  # The number of concurrent sexual partners per layer
     pars['acts']            = None  # The number of sexual acts per layer per year
+    pars['condoms']         = None  # The proportion of acts in which condoms are used
     pars['layer_probs']     = None  # Proportion of the population in each layer
     pars['dur_pship']       = None  # Duration of partnerships in each layer
-    # pars['p_multi']         = None  # Probability of more than one simultaneous partnership
-    # pars['n_multi']         = None  # Number of simultaneous partnerships
+    pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships
+    # pars['nonactive_by_age']= nonactive_by_age
+    # pars['nonactive']       = None 
 
     # Basic disease transmission parameters
-    pars['debut']           = dict(dist='normal', par1=15.5, par2=1.5) # Age of sexual debut; TODO separate for M/F?
-    pars['age_diff']        = None  # Age difference in partnerships
-    pars['nonactive_by_age']= nonactive_by_age
-    pars['nonactive']       = None # Set below
-    pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=0.45, step=0.01) # Distribution to draw individual level transmissibility
+    pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility
     pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
     pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only HPV
 
@@ -74,9 +76,19 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
         if sp in pars.keys():
             pars['genotype_pars']['HPV16'][sp] = pars[sp]
 
+    # Genotype parameters
+    pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
+    pars['rel_beta']    = 1.0 # Relative transmissibility varies by genotype (??)
+
     # Duration parameters
     pars['dur'] = {}
-    pars['dur']['inf2rec']  = dict(dist='lognormal_int', par1=21.0, par2=10.0)  # Duration from infectious to recovered
+
+    pars['dur']['inf2rec']  = dict(dist='lognormal', par1=1.0, par2=1.0)  # Duration from infectious to recovered in YEARS
+
+    # Efficacy of protection
+    pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
+
+
 
     # Events and interventions
     pars['interventions'] = []   # The interventions present in this simulation; populated by the user
@@ -92,7 +104,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
 
 
 # Define which parameters need to be specified as a dictionary by layer -- define here so it's available at the module level for sim.py
-layer_pars = ['partners', 'acts', 'layer_probs', 'dur_pship']
+layer_pars = ['partners', 'acts', 'layer_probs', 'dur_pship', 'condoms']
 
 
 def reset_layer_pars(pars, layer_keys=None, force=False):
@@ -113,17 +125,20 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     # Specify defaults for random -- layer 'a' for 'all'
     layer_defaults['random'] = dict(
         partners    = dict(a=1),    # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
-        acts        = dict(a=100),  # Default number of sexual acts per year; TODO make this a distribution
+        acts        = dict(a=104),  # Default number of sexual acts per year; TODO make this a distribution
         layer_probs = dict(a=1.0),  # Default proportion of the population in each layer
         dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships; TODO make this a distribution
+        condoms     = dict(a=0.25),  # Default proportion of acts in which condoms are used
     )
 
-    # Specify defaults for basic sexual network
+    # Specify defaults for basic sexual network with regular and casual partners
     layer_defaults['basic'] = dict(
         partners    = dict(r=1, c=2),       # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
         acts        = dict(r=100, c=50),    # Default number of sexual acts per year; TODO make this a distribution
         layer_probs = dict(r=0.7, c=0.4),   # Default proportion of the population in each layer
-        dur_pship   = dict(r=10, c=2),      # Default duration of partnerships; TODO make this a distribution
+        dur_pship   = dict(r=dict(dist='normal_pos', par1=10,par2=3),
+                           c=dict(dist='normal_pos', par1=2, par2=1)),
+        condoms     = dict(r=0.01, c=0.8),  # Default proportion of acts in which condoms are used
     )
 
     # Choose the parameter defaults based on the population type, and get the layer keys
@@ -158,6 +173,37 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
 
     return
 
+
+
+def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
+    '''
+    Get mortality and fertility data by location if provided, or use default
+
+    Args:
+        location (str):  location; if none specified, use default value for XXX
+        verbose (bool):  whether to print progress
+        by_sex   (bool): whether to get sex-specific death rates (default true)
+        overall  (bool): whether to get overall values ie not disaggregated by sex (default false)
+
+    Returns:
+        death_rates (dict): nested dictionary of death rates by sex (first level) and age (second level)
+        birth_rates (arr): array of crude birth rates by year
+    '''
+
+    birth_rates = hpd.default_birth_rates 
+    death_rates = hpd.default_death_rates
+    if location is not None:
+        if verbose:
+            print(f'Loading location-specific demographic data for "{location}"')
+        try:
+            death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+            birth_rates = hpdata.get_birth_rates(location=location)
+        except ValueError as E:
+            warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
+            hpm.warn(warnmsg)
+    
+    return birth_rates, death_rates
+=======
 #%% Genotype/immunity parameters and functions
 
 def get_genotype_choices():
@@ -446,4 +492,5 @@ def get_cross_immunity(default=False, genotype=None):
     )
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='HPV16')
+
 

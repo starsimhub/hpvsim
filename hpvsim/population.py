@@ -3,6 +3,7 @@ Defines functions for making the population.
 '''
 
 #%% Imports
+from re import U
 import numpy as np # Needed for a few things not provided by pl
 import sciris as sc
 from . import utils as hpu
@@ -18,7 +19,8 @@ from . import people as hpppl
 # __all__ = ['make_people', 'make_randpop', 'make_random_contacts']
 
 
-def make_people(sim, popdict=None, die=True, reset=False, verbose=None, **kwargs):
+def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
+                sex_ratio=0.5, dt_round_age=True, dispersion=None, microstructure=None, **kwargs):
     '''
     Make the people for the simulation.
 
@@ -27,10 +29,11 @@ def make_people(sim, popdict=None, die=True, reset=False, verbose=None, **kwargs
     Args:
         sim      (Sim)  : the simulation object; population parameters are taken from the sim object
         popdict  (any)  : if supplied, use this population dictionary instead of generating a new one; can be a dict or People object
-        die      (bool) : whether or not to fail if synthetic populations are requested but not available
         reset    (bool) : whether to force population creation even if self.popdict/self.people exists
         verbose  (bool) : level of detail to print
-        kwargs   (dict) : passed to make_randpop()
+        use_age_data (bool):
+        sex_ratio (bool):
+        dt_round_age (bool): whether to round people's ages to the nearest timestep (default true)
 
     Returns:
         people (People): people
@@ -38,9 +41,9 @@ def make_people(sim, popdict=None, die=True, reset=False, verbose=None, **kwargs
 
     # Set inputs and defaults
     pop_size = int(sim['pop_size']) # Shorten
-    network = sim['network'] # Shorten
     if verbose is None:
         verbose = sim['verbose']
+    dt = sim['dt'] # Timestep
 
     # If a people object or popdict is supplied, use it
     if sim.people and not reset:
@@ -51,19 +54,123 @@ def make_people(sim, popdict=None, die=True, reset=False, verbose=None, **kwargs
         sim.popdict = None # Once loaded, remove
 
     if popdict is None:
-        if network in ['random', 'basic']:
-            popdict = make_randpop(sim, **kwargs) # Create a random network
+
+        pop_size = int(sim['pop_size']) # Number of people
+
+        # Load age data by country if available, or use defaults.
+        # Other demographic data like mortality and fertility are also available by
+        # country, but these are loaded directly into the sim since they are not 
+        # stored as part of the people.
+        age_data = hpd.default_age_data
+        location = sim['location']
+        if location is not None:
+            if sim['verbose']:
+                print(f'Loading location-specific data for "{location}"')
+            if use_age_data:
+                try:
+                    age_data = hpdata.get_age_distribution(location)
+                except ValueError as E:
+                    warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
+                    hpm.warn(warnmsg)
+
+        uids, sexes, debuts, partners = set_static(pop_size, pars=sim.pars, sex_ratio=sex_ratio, dispersion=dispersion)
+
+        # Set ages, rounding to nearest timestep if requested
+        age_data_min   = age_data[:,0]
+        age_data_max   = age_data[:,1] + 1 # Since actually e.g. 69.999
+        age_data_range = age_data_max - age_data_min
+        age_data_prob   = age_data[:,2]
+        age_data_prob   /= age_data_prob.sum() # Ensure it sums to 1
+        age_bins        = hpu.n_multinomial(age_data_prob, pop_size) # Choose age bins
+        if dt_round_age:
+            ages = age_data_min[age_bins] + np.random.randint(age_data_range[age_bins]/dt)*dt # Uniformly distribute within this age bin
+        else:
+            ages            = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
+
+        # Store output
+        popdict = {}
+        popdict['uid'] = uids
+        popdict['age'] = ages
+        popdict['sex'] = sexes
+        popdict['debut'] = debuts
+        popdict['partners'] = partners
+
+        # Create the contacts
+        active_inds = hpu.true(ages>debuts)     # Indices of sexually experienced people
+        if microstructure in ['random', 'basic']:
+            contacts = dict()
+            current_partners = dict()
+            for lkey,n in sim['partners'].items():
+                active_inds_layer = hpu.binomial_filter(sim['layer_probs'][lkey], active_inds)
+                durations = sim['dur_pship'][lkey]
+                contacts[lkey], current_partners[lkey] = make_random_contacts(p_count=partners[lkey], sexes=sexes, n=n, durations=durations, mapping=active_inds_layer, **kwargs)
         else: # pragma: no cover
-            errormsg = f'Population type "{network}" not found; choices are random and others TBC'
-            raise ValueError(errormsg)
+            errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
+            raise NotImplementedError(errormsg)
+
+        popdict['contacts']   = contacts
+        popdict['current_partners']   = current_partners
+        popdict['layer_keys'] = list(partners.keys())
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
-    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], contacts=popdict['contacts']) # List for storing the people
+    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
 
     sc.printv(f'Created {pop_size} people, average age {people.age.mean():0.2f} years', 2, verbose)
 
     return people
+
+
+def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispersion=None):
+    '''
+    Assign each person a preferred number of concurrent partners for each layer
+    Args:
+        pop_size    (int)   : number of people
+        layer_keys  (list)  : list of layers
+        means       (dict)  : dictionary keyed by layer_keys with mean number of partners per layer
+        sample      (bool)  : whether or not to sample the number of partners
+        dispersion  (any)   : if not None, will use negative binomial sampling
+
+    Returns:
+        p_count (dict): the number of partners per person per layer
+    '''
+
+    # Initialize output
+    partners = dict()
+
+    # If means haven't been supplied, set to zero
+    if means is None:
+        means = {k: np.zeros(pop_size) for k in layer_keys}
+    else:
+        if len(means) != len(layer_keys):
+            errormsg = f'The list of means has length {len(means)}; this must be the same length as layer_keys ({len(layer_keys)}).'
+            raise ValueError(errormsg)
+
+    # Now set the number of partners
+    for lkey,n in zip(layer_keys, means):
+        if sample:
+            if dispersion is None:
+                p_count = hpu.n_poisson(n, pop_size) + 1 # Draw the number of Poisson partners for this person. TEMP: add 1 to avoid zeros
+            else:
+                p_count = hpu.n_neg_binomial(rate=n, dispersion=dispersion, n=pop_size) + 1 # Or, from a negative binomial
+        else:
+            p_count = np.full(pop_size, n, dtype=hpd.default_int)
+
+        partners[lkey] = p_count
+        
+    return partners
+
+
+def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5, dispersion=None):
+    '''
+    Set static population characteristics that do not change over time.
+    Can be used when adding new births, in which case the existing popsize can be given.
+    '''
+    uids           = np.arange(existing_n, existing_n+new_n, dtype=hpd.default_int)
+    sexes          = np.random.binomial(1, sex_ratio, new_n)
+    debuts         = hpu.sample(**pars['debut'], size=new_n)
+    partners       = partner_count(pop_size=new_n, layer_keys=pars['partners'].keys(), means=pars['partners'].values(), dispersion=dispersion)
+    return uids, sexes, debuts, partners
 
 
 def validate_popdict(popdict, pars, verbose=True):
@@ -80,7 +187,7 @@ def validate_popdict(popdict, pars, verbose=True):
         raise TypeError(errormsg) from E
 
     # Check keys and lengths
-    required_keys = ['uid', 'age', 'sex']
+    required_keys = ['uid', 'age', 'sex', 'debut']
     popdict_keys = popdict.keys()
     pop_size = pars['pop_size']
     for key in required_keys:
@@ -99,151 +206,77 @@ def validate_popdict(popdict, pars, verbose=True):
             errormsg = f'Population not fully created: {isnan:,} NaNs found in {key}.'
             raise ValueError(errormsg)
 
-    if ('contacts' not in popdict_keys) and (not hasattr(popdict, 'contacts')) and verbose:
-        warnmsg = 'No contacts found. Please remember to add contacts before running the simulation.'
-        hpm.warn(warnmsg)
-
     return
 
 
-def make_randpop(pars, use_age_data=True, sex_ratio=0.5, microstructure='random', **kwargs):
-    '''
-    Make a random population, with contacts.
-
-    This function returns a "popdict" dictionary, which has the following (required) keys:
-
-        - uid: an array of (usually consecutive) integers of length N, uniquely identifying each agent
-        - age: an array of floats of length N, the age in years of each agent
-        - sex: an array of integers of length N (not currently used, so does not have to be binary)
-        - contacts: list of length N listing the contacts; see make_random_contacts() for details
-        - layer_keys: a list of strings representing the different contact layers in the population; see make_random_contacts() for details
-
-    Args:
-        pars (dict): the parameter dictionary or simulation object
-        use_age_data (bool): whether to use location-specific age data
-        use_household_data (bool): whether to use location-specific household size data
-        sex_ratio (float): proportion of the population that is male (not currently used)
-        microstructure (bool): whether or not to use the microstructuring algorithm to group contacts
-        kwargs (dict): passed to contact creation method (e.g., make_hybrid_contacts)
-
-    Returns:
-        popdict (dict): a dictionary representing the population, with the following keys for a population of N agents with M contacts between them:
-    '''
-
-    pop_size = int(pars['pop_size']) # Number of people
-
-    # Load age data and household demographics based on 2018 Seattle demographics by default, or country if available
-    age_data = hpd.default_age_data
-    location = pars['location']
-    if location is not None:
-        if pars['verbose']:
-            print(f'Loading location-specific data for "{location}"')
-        if use_age_data:
-            try:
-                age_data = hpdata.get_age_distribution(location)
-            except ValueError as E:
-                warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
-                hpm.warn(warnmsg)
-
-    # Handle sexes, ages, and sexual debuts
-    uids           = np.arange(pop_size, dtype=hpd.default_int)
-    sexes          = np.random.binomial(1, sex_ratio, pop_size)
-    age_data_min   = age_data[:,0]
-    age_data_max   = age_data[:,1] + 1 # Since actually e.g. 69.999
-    age_data_range = age_data_max - age_data_min
-    age_data_prob   = age_data[:,2]
-    age_data_prob   /= age_data_prob.sum() # Ensure it sums to 1
-    age_bins        = hpu.n_multinomial(age_data_prob, pop_size) # Choose age bins
-    ages            = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
-    debuts          = hpu.sample(**pars['debut'], size=pop_size)
-
-    # Store output
-    popdict = {}
-    popdict['uid'] = uids
-    popdict['age'] = ages
-    popdict['sex'] = sexes
-    popdict['debut'] = debuts
-
-    # Deal with debuts and participation rates
-    is_active = ages>debuts                 # Whether or not people have ever been sexually active
-    active_inds = hpu.true(ages>debuts)     # Indices of sexually experienced people
-    n_active = sum(is_active)               # Number of sexually experienced people
-
-    # Create the contacts
-    if microstructure == 'random':
-        contacts = dict()
-        for lkey,n in pars['partners'].items():
-            n_active_layer = n_active*pars['layer_probs'][lkey]
-            active_inds_layer = hpu.binomial_filter(pars['layer_probs'][lkey], active_inds)
-            durations = pars['dur_pship'][lkey]
-            contacts[lkey] = make_random_contacts(n_active_layer, n, durations, mapping=active_inds_layer, **kwargs)
-    else: # pragma: no cover
-        errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
-        raise NotImplementedError(errormsg)
-
-    popdict['contacts']   = contacts
-    popdict['layer_keys'] = list(pars['partners'].keys())
-
-    return popdict
-
-
-def _tidy_edgelist(p1, p2, mapping):
+def _tidy_edgelist(m, f, mapping=None):
     ''' Helper function to convert lists to arrays and optionally map arrays '''
-    p1 = np.array(p1, dtype=hpd.default_int)
-    p2 = np.array(p2, dtype=hpd.default_int)
+    m = np.array(m, dtype=hpd.default_int)
+    f = np.array(f, dtype=hpd.default_int)
     if mapping is not None:
         mapping = np.array(mapping, dtype=hpd.default_int)
-        p1 = mapping[p1]
-        p2 = mapping[p2]
-    output = dict(p1=p1, p2=p2)
+        m = mapping[m]
+        f = mapping[f]
+    output = dict(m=m, f=f)
     return output
 
 
-def make_random_contacts(pop_size, n, durations, overshoot=1.2, dispersion=None, mapping=None):
+def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, mapping=None):
     '''
-    Make random contacts for a single layer as an edgelist.
+    Make random contacts for a single layer as an edgelist. This will select sexually
+    active male partners for sexually active females with no additional age structure.
 
     Args:
-        pop_size   (int)   : number of agents to create contacts between (N)
-        n          (int) : the average number of contacts per person for this layer
-        overshoot  (float) : to avoid needing to take multiple Poisson draws
-        dispersion (float) : if not None, use a negative binomial distribution with this dispersion parameter instead of Poisson to make the contacts
-        mapping    (array) : optionally map the generated indices onto new indices
+        p_count     (arr)   : the number of contacts to add for each person
+        n_new       (int)   : number of agents to create contacts between (N)
+        n           (int)   : the average number of contacts per person for this layer
+        overshoot   (float) : to avoid needing to take multiple Poisson draws
+        dispersion  (float) : if not None, use a negative binomial distribution with this dispersion parameter instead of Poisson to make the contacts
+        mapping     (array) : optionally map the generated indices onto new indices
 
     Returns:
         Dictionary of two arrays defining UIDs of the edgelist (sources and targets)
 
     '''
 
-    # Preprocessing
-    pop_size = int(pop_size) # Number of people
-    p1 = [] # Initialize the "sources"
-    p2 = [] # Initialize the "targets"
+    # Initialize
+    f = [] # Initialize the female partners
+    m = [] # Initialize the male partners
+
+    # Define indices; TODO fix or centralize this
+    pop_size        = len(sexes)
+    f_inds          = hpu.false(sexes)
+    all_inds        = np.arange(pop_size) 
+    f_active_inds   = np.intersect1d(mapping, f_inds)
+    inactive_inds   = np.setdiff1d(all_inds, mapping)
 
     # Precalculate contacts
-    n_all_contacts  = int(pop_size*n*overshoot) # The overshoot is used so we won't run out of contacts if the Poisson draws happen to be higher than the expected value
-    all_contacts    = hpu.choose_r(max_n=pop_size, n=n_all_contacts) # Choose people at random
-    if dispersion is None:
-        p_count = hpu.n_poisson(n, pop_size) # Draw the number of Poisson contacts for this person
-    else:
-        p_count = hpu.n_neg_binomial(rate=n, dispersion=dispersion, n=pop_size) # Or, from a negative binomial
-    p_count = np.array((p_count/2.0).round(), dtype=hpd.default_int)
+    n_all_contacts  = int(sum(p_count[f_active_inds])) # Sum of partners for sexually active females
+    weighting       = sexes*p_count # Males are more likely to be selected if they have higher concurrency; females will not be selected
+    weighting[inactive_inds] = 0 # Exclude people not active
+    weighting       = weighting/sum(weighting) # Turn this into a probability
+    m_contacts      = hpu.choose_w(weighting, n_all_contacts, unique=False) # Select males
 
     # Make contacts
     count = 0
-    for p in range(pop_size):
+    for p in f_active_inds:
         n_contacts = p_count[p]
-        these_contacts = all_contacts[count:count+n_contacts] # Assign people
+        these_contacts = m_contacts[count:count+n_contacts] # Assign people
         count += n_contacts
-        p1.extend([p]*n_contacts)
-        p2.extend(these_contacts)
+        f.extend([p]*n_contacts)
+        m.extend(these_contacts)
+
+    # Count how many contacts there actually are: will be different for males, should be the same for females
+    unique, count = np.unique(np.concatenate([np.array(m),np.array(f)]),return_counts=True)
+    actual_p_count = np.full(pop_size, 0, dtype=hpd.default_int)
+    actual_p_count[unique] = count
 
     # Tidy up and add durations and start dates
-    output = _tidy_edgelist(p1, p2, mapping)
-    n_partnerships = len(output['p1'])
+    output = _tidy_edgelist(m, f)
+    n_partnerships = len(output['m'])
     output['dur'] = hpu.sample(**durations, size=n_partnerships)
     output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
     output['end'] = output['start'] + output['dur']
 
-    return output
+    return output, actual_p_count
 
