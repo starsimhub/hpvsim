@@ -57,7 +57,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
 
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility
-    pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']            = 0.15  # Per-act transmission probability; absolute value, calibrated
     pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only hpv
 
     # Parameters used to calculate immunity
@@ -83,7 +83,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     # Duration parameters
     pars['dur'] = {}
 
-    pars['dur']['inf2rec']  = dict(dist='lognormal', par1=1.0, par2=1.0)  # Duration from infectious to recovered in YEARS
+    pars['dur']['inf2rec']  = dict(dist='lognormal', par1=2.0, par2=5.0)  # Duration from infectious to recovered in YEARS
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
@@ -258,7 +258,7 @@ def get_genotype_pars(default=False, genotype=None):
         ),
 
         hpv18 = dict(
-            rel_beta        = 1.0, # Default values
+            rel_beta        = 0.8, # Default values
         ),
 
         hpv31=dict(
@@ -310,21 +310,21 @@ def get_cross_immunity(default=False, genotype=None):
 
         hpv16 = dict(
             hpv16  = 1.0, # Default for own-immunity
-            hpv18 = 0.5, # Assumption
-            hpv31  = 1.0, # Assumption
-            hpv33 = 1.0, # Assumption
-            hpv45 = 1.0, # Assumption
-            hpv52 = 1.0, # Assumption
-            hpv58 = 1.0, # Assumption
-            hpv6 = 1.0, # Assumption
-            hpv11 = 1.0, # Assumption
-            hpvlo = 1.0, # Assumption
-            hpvhi = 1.0, # Assumption
-            hpvhi5 = 1.0, # Assumption
+            hpv18 = 0, # Assumption
+            hpv31  = 0, # Assumption
+            hpv33 = 0, # Assumption
+            hpv45 = 0, # Assumption
+            hpv52 = 0, # Assumption
+            hpv58 = 0, # Assumption
+            hpv6 = 0, # Assumption
+            hpv11 = 0, # Assumption
+            hpvlo = 0, # Assumption
+            hpvhi = 0, # Assumption
+            hpvhi5 = 0, # Assumption
         ),
 
         hpv18 = dict(
-            hpv16=0.5,  # Default for own-immunity
+            hpv16=0,  # Default for own-immunity
             hpv18=1.0,  # Assumption
             hpv31=1.0,  # Assumption
             hpv33=1.0,  # Assumption

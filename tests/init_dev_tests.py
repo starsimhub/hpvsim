@@ -37,7 +37,8 @@ def test_genotypes():
     hpv18 = genotype('HPV18')
     pars = {
         'network': 'basic',
-        'genotypes': [hpv16, hpv18]
+        'genotypes': [hpv16, hpv18],
+        'dt': .1
     }
     sim = Sim(pars=pars)
     sim.run()
