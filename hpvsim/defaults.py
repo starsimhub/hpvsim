@@ -109,6 +109,10 @@ result_stocks = {
     'other_dead':  'Number dead from other causes',
 }
 
+result_stocks_by_genotype = {
+    'infectious_by_genotype': 'Number infectious by genotype',
+}
+
 # The types of result that are counted as flows -- used in sim.py; value is the label suffix
 result_flows = {
     'infections':   'infections',
@@ -220,6 +224,8 @@ def get_default_colors():
     c.susceptible           = '#4d771e'
     c.infectious            = '#e45226'
     c.infections            = '#b62413'
+    c.infectious_by_genotype = c.infectious
+    c.infections_by_genotype = '#b62413'
     c.reinfections          = '#732e26'
     c.recoveries            = '#9e1149'
     c.recovered             = c.recoveries

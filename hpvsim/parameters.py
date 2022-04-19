@@ -58,7 +58,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility
     pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
-    pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only HPV
+    pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only hpv
 
     # Parameters used to calculate immunity
     pars['imm_init'] = dict(dist='beta', par1=5, par2=1)  # beta distribution for initial level of immunity following infection clearance
@@ -70,11 +70,11 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     pars['immunity_map'] = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
 
     pars['genotypes'] = []  # Genotypes of the virus; populated by the user below
-    pars['genotype_map'] = {0: 'HPV16'}  # Reverse mapping from number to variant key
-    pars['genotype_pars'] = dict(HPV16={})  # Populated just below
+    pars['genotype_map'] = {0: 'hpv16'}  # Reverse mapping from number to variant key
+    pars['genotype_pars'] = dict(hpv16={})  # Populated just below
     for sp in hpd.genotype_pars:
         if sp in pars.keys():
-            pars['genotype_pars']['HPV16'][sp] = pars[sp]
+            pars['genotype_pars']['hpv16'][sp] = pars[sp]
 
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
@@ -210,18 +210,18 @@ def get_genotype_choices():
     '''
     # List of choices available
     choices = {
-        'HPV16':  ['HPV16', '16'],
-        'HPV18': ['HPV18', '18'],
-        'HPV6':  ['HPV6', '6'],
-        'HPV11': ['HPV11', '11'],
-        'HPV31': ['HPV31', '31'],
-        'HPV33': ['HPV33', '33'],
-        'HPV45': ['HPV45', '45'],
-        'HPV52': ['HPV52', '52'],
-        'HPV58': ['HPV58', '58'],
-        'HPVlo': ['HPVlo', 'low', 'low-risk'],
-        'HPVhi': ['HPVhi', 'high', 'high-risk'],
-        'HPVhi5': ['HPVhi', 'high', 'high-risk'],
+        'hpv16':  ['hpv16', '16'],
+        'hpv18': ['hpv18', '18'],
+        'hpv6':  ['hpv6', '6'],
+        'hpv11': ['hpv11', '11'],
+        'hpv31': ['hpv31', '31'],
+        'hpv33': ['hpv33', '33'],
+        'hpv45': ['hpv45', '45'],
+        'hpv52': ['hpv52', '52'],
+        'hpv58': ['hpv58', '58'],
+        'hpvlo': ['hpvlo', 'low', 'low-risk'],
+        'hpvhi': ['hpvhi', 'high', 'high-risk'],
+        'hpvhi5': ['hpvhi', 'high', 'high-risk'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -253,53 +253,53 @@ def get_genotype_pars(default=False, genotype=None):
     '''
     pars = dict(
 
-        HPV16 = dict(
+        hpv16 = dict(
             rel_beta        = 1.0, # Default values
         ),
 
-        HPV18 = dict(
+        hpv18 = dict(
             rel_beta        = 1.0, # Default values
         ),
 
-        HPV31=dict(
+        hpv31=dict(
             rel_beta=1.0,  # Default values
         ),
 
-        HPV33=dict(
+        hpv33=dict(
             rel_beta=1.0,  # Default values
         ),
 
-        HPV45=dict(
+        hpv45=dict(
             rel_beta=1.0,  # Default values
         ),
 
-        HPV52=dict(
+        hpv52=dict(
             rel_beta=1.0,  # Default values
         ),
 
-        HPV6=dict(
+        hpv6=dict(
             rel_beta=1.0,  # Default values
         ),
 
-        HPV11=dict(
+        hpv11=dict(
             rel_beta=1.0,  # Default values
         ),
 
-        HPVlo=dict(
+        hpvlo=dict(
             rel_beta=1.0,  # Default values
         ),
 
-        HPVhi=dict(
+        hpvhi=dict(
             rel_beta=1.0,  # Default values
         ),
 
-        HPVhi5=dict(
+        hpvhi5=dict(
             rel_beta=1.0,  # Default values
         ),
 
     )
 
-    return _get_from_pars(pars, default, key=genotype, defaultkey='HPV16')
+    return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
 
 def get_cross_immunity(default=False, genotype=None):
@@ -308,187 +308,187 @@ def get_cross_immunity(default=False, genotype=None):
     '''
     pars = dict(
 
-        HPV16 = dict(
-            HPV16  = 1.0, # Default for own-immunity
-            HPV18 = 1.0, # Assumption
-            HPV31  = 1.0, # Assumption
-            HPV33 = 1.0, # Assumption
-            HPV45 = 1.0, # Assumption
-            HPV52 = 1.0, # Assumption
-            HPV58 = 1.0, # Assumption
-            HPV6 = 1.0, # Assumption
-            HPV11 = 1.0, # Assumption
-            HPVlo = 1.0, # Assumption
-            HPVhi = 1.0, # Assumption
-            HPVhi5 = 1.0, # Assumption
+        hpv16 = dict(
+            hpv16  = 1.0, # Default for own-immunity
+            hpv18 = 1.0, # Assumption
+            hpv31  = 1.0, # Assumption
+            hpv33 = 1.0, # Assumption
+            hpv45 = 1.0, # Assumption
+            hpv52 = 1.0, # Assumption
+            hpv58 = 1.0, # Assumption
+            hpv6 = 1.0, # Assumption
+            hpv11 = 1.0, # Assumption
+            hpvlo = 1.0, # Assumption
+            hpvhi = 1.0, # Assumption
+            hpvhi5 = 1.0, # Assumption
         ),
 
-        HPV18 = dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpv18 = dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPV31=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpv31=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPV33=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpv33=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPV45=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpv45=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPV52=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpv52=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPV58=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpv58=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPV6=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpv6=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPV11=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpv11=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPVlo=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpvlo=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPVhi=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpvhi=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
 
-        HPVhi5=dict(
-            HPV16=1.0,  # Default for own-immunity
-            HPV18=1.0,  # Assumption
-            HPV31=1.0,  # Assumption
-            HPV33=1.0,  # Assumption
-            HPV45=1.0,  # Assumption
-            HPV52=1.0,  # Assumption
-            HPV58=1.0,  # Assumption
-            HPV6=1.0,  # Assumption
-            HPV11=1.0,  # Assumption
-            HPVlo=1.0,  # Assumption
-            HPVhi=1.0,  # Assumption
-            HPVhi5=1.0,  # Assumption
+        hpvhi5=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=1.0,  # Assumption
+            hpv31=1.0,  # Assumption
+            hpv33=1.0,  # Assumption
+            hpv45=1.0,  # Assumption
+            hpv52=1.0,  # Assumption
+            hpv58=1.0,  # Assumption
+            hpv6=1.0,  # Assumption
+            hpv11=1.0,  # Assumption
+            hpvlo=1.0,  # Assumption
+            hpvhi=1.0,  # Assumption
+            hpvhi5=1.0,  # Assumption
         ),
     )
 
-    return _get_from_pars(pars, default, key=genotype, defaultkey='HPV16')
+    return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
 

@@ -302,9 +302,17 @@ class Sim(hpb.BaseSim):
         if self.people.count_not('naive') == 0: # Everyone is naive
 
             # Create the seed infections
-            if self['pop_infected']:
-                inds = hpu.choose(self['pop_size'], self['pop_infected'])
-                self.people.infect(inds=inds, layer='seed_infection') # Not counted by results since flows are re-initialized during the step
+            if sc.isnumber(self['pop_infected']): # assume equal init infections for all circulating genotypes
+                for genotype_ind in range(self['n_genotypes']):
+                    inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                    self.people.infect(inds=inds, layer='seed_infection',
+                                       genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
+            elif isinstance(self['pop_infected'], dict):
+                genotypes = list(self['genotype_map'].values())
+                for genotype, pop_infected in self['pop_infected'].items():
+                    genotype_ind = genotypes.index(genotype)
+                    inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                    self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind) # Not counted by results since flows are re-initialized during the step
 
         elif verbose:
             print(f'People already initialized with {self.people.count_not("naive")} people non-naive and {self.people.count("infectious")} infectious; not reinitializing')

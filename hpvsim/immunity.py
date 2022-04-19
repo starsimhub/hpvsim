@@ -155,7 +155,7 @@ def update_immunity(people, inds):
     '''
     t_since_boost = people.t-people.t_imm_event[:,inds].astype(hpd.default_int)
     # create n_imm_source x len(inds) array for imm_kin
-    imm_kin = np.ones((people.pars['n_genotypes']+ len(people.pars['vaccine_map']), len(inds)))
+    imm_kin = np.ones((people.pars['n_genotypes'], len(inds)))
 
     for i, imm_source in enumerate(t_since_boost):
         for j, time in enumerate(imm_source):

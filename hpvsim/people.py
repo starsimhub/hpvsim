@@ -237,8 +237,6 @@ class People(hpb.BasePeople):
         self.recovered[inds]        = True
         self.recovered_genotype[inds] = self.infectious_genotype[inds]
         self.infectious_genotype[inds] = np.nan
-        self.exposed_genotype[inds]    = np.nan
-        self.exposed_by_genotype[:, inds] = False
         self.infectious_by_genotype[:, inds] = False
 
         return len(inds)
@@ -273,7 +271,11 @@ class People(hpb.BasePeople):
 
         # Generate other characteristics of the new people
         uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
-        new_people = People(pars=new_births, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
+        pars = {
+            'pop_size': new_births,
+            'n_genotypes': self.pars['n_genotypes']
+        }
+        new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
 
         return new_births, new_people
 
@@ -373,6 +375,8 @@ class People(hpb.BasePeople):
         self.susceptible[inds]  = False
         self.naive[inds]        = False
         self.infectious[inds]   = True
+        self.infectious_genotype[inds] = genotype
+        self.infectious_by_genotype[genotype, inds] = True
         self.recovered[inds]    = False
         self.flows['new_infections']   += len(inds)
 

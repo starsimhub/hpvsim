@@ -28,7 +28,7 @@ def test_basic():
     return sim
 
 
-def test_basic_hpv16():
+def test_genotypes():
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
     from hpvsim.sim import Sim
     from hpvsim.immunity import genotype
@@ -46,10 +46,11 @@ def test_basic_hpv16():
 
 if __name__ == '__main__':
 
-    sim0 = test_random()
-    sim1 = test_basic()
+    # sim0 = test_random()
+    # sim1 = test_basic()
+    sim2 = test_genotypes()
 
-    sim0.people.story(40)
+    # sim0.people.story(40)
 
     # # Check that population growth is about right
     # pop_growth = (sim0.results['n_alive'][1:]/sim0.results['n_alive'][:-1]-1)/sim0['dt']

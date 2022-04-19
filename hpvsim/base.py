@@ -436,11 +436,11 @@ class BaseSim(ParsObj):
 
         '''
         keys = []
-        choices = ['main', 'variant', 'all']
+        choices = ['main', 'genotype', 'all']
         if which in ['main', 'all']:
             keys += [key for key,res in self.results.items() if isinstance(res, Result) and key != 'pop_nabs_by_source']
-        if which in ['variant', 'all'] and 'variant' in self.results:
-            keys += [key for key,res in self.results['variant'].items() if isinstance(res, Result)]
+        if which in ['variant', 'all'] and 'genotype' in self.results:
+            keys += [key for key,res in self.results['genotype'].items() if isinstance(res, Result)]
         if which not in choices: # pragma: no cover
             errormsg = f'Choice "which" not available; choices are: {sc.strjoin(choices)}'
             raise ValueError(errormsg)
