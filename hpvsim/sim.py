@@ -370,7 +370,7 @@ class Sim(hpb.BaseSim):
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
 
                 # Compute transmissibility and infections
-                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)#(foi_frac, foi_whole, inf)
+                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)#(foi_frac, foi_whole, inf) TODO how to factor in immunity/susceptibility here?
                 source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
