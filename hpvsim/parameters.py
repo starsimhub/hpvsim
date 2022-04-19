@@ -61,7 +61,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only HPV
 
     # Parameters used to calculate immunity
-    pars['imm_init'] = dict(dist='normal', par1=0, par2=2)  # beta distribution for initial level of immunity following infection clearance
+    pars['imm_init'] = dict(dist='beta', par1=5, par2=1)  # beta distribution for initial level of immunity following infection clearance
     pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=10),
                              vaccine=dict(form='exp_decay', init_val=1, half_life=10))
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
@@ -208,7 +208,7 @@ def get_genotype_choices():
     '''
     Define valid genotype names
     '''
-    # List of choices currently available
+    # List of choices available
     choices = {
         'HPV16':  ['HPV16', '16'],
         'HPV18': ['HPV18', '18'],

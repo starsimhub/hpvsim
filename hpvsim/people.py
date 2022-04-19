@@ -69,7 +69,7 @@ class People(hpb.BasePeople):
             else:
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
 
-        # Set health states -- only susceptible is true by default -- booleans except exposed by variant which should return the variant that ind is exposed to
+        # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
             val = (key in ['susceptible', 'naive']) # Default value is True for susceptible and naive, false otherwise
             self[key] = np.full(self.pars['pop_size'], val, dtype=bool)
@@ -235,11 +235,11 @@ class People(hpb.BasePeople):
         # Now reset all disease states
         self.infectious[inds]       = False
         self.recovered[inds]        = True
-        # self.recovered_genotype[inds] = self.infectious_genotype[inds]
-        # self.infectious_genotype[inds] = np.nan
-        # self.exposed_genotype[inds]    = np.nan
-        # self.exposed_by_genotype[:, inds] = False
-        # self.infectious_by_genotype[:, inds] = False
+        self.recovered_genotype[inds] = self.infectious_genotype[inds]
+        self.infectious_genotype[inds] = np.nan
+        self.exposed_genotype[inds]    = np.nan
+        self.exposed_by_genotype[:, inds] = False
+        self.infectious_by_genotype[:, inds] = False
 
         return len(inds)
 
@@ -369,7 +369,7 @@ class People(hpb.BasePeople):
         n_infections = len(inds)
         durpars      = self.pars['dur']
 
-        # Update states, variant info, and flows
+        # Update states, genotype info, and flows
         self.susceptible[inds]  = False
         self.naive[inds]        = False
         self.infectious[inds]   = True
@@ -378,7 +378,7 @@ class People(hpb.BasePeople):
 
         # # Record transmissions
         # for i, target in enumerate(inds):
-        #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, variant=variant_label)
+        #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, genotype=genotype_label)
         #     self.infection_log.append(entry)
 
         # Set the dates of infection and recovery -- for now, just assume everyone recovers

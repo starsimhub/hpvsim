@@ -145,6 +145,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source):
     if len(no_prior_imm_inds):
         people.peak_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
 
+    people.t_imm_event[imm_source, inds] = people.t
     return
 
 
