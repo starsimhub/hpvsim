@@ -41,6 +41,15 @@ def test_genotypes():
     }
     sim = Sim(pars=pars)
     sim.run()
+
+    fig, ax = pl.subplots(2, 1, figsize=(8, 12))
+    timevec = sim.results['year']
+    ax[0].plot(timevec, sim.results['n_alive'].values)
+    for i, genotype in sim['genotype_map'].items():
+        ax[1].plot(timevec, sim.results['genotype']['new_infections_by_genotype'].values[i,:], label=genotype)
+    ax[1].legend()
+
+    fig.show()
     return sim
 
 

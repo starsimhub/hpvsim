@@ -127,7 +127,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
 
     # If it matches a result key, convert to a list
     reskeys = sim.result_keys('main')
-    varkeys = sim.result_keys('variant')
+    varkeys = sim.result_keys('genotype')
     allkeys = reskeys + varkeys
     if to_plot in allkeys:
         to_plot = sc.tolist(to_plot)
@@ -143,12 +143,12 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
         invalid = sc.autolist()
         for reskey in to_plot_list:
             if reskey in allkeys:
-                name = sim.results[reskey].name if reskey in reskeys else sim.results['variant'][reskey].name
+                name = sim.results[reskey].name if reskey in reskeys else sim.results['genotype'][reskey].name
                 to_plot[name] = [reskey] # Use the result name as the key and the reskey as the value
             else:
                 invalid += reskey
         if len(invalid):
-            errormsg = f'The following key(s) are invalid:\n{sc.strjoin(invalid)}\n\nValid main keys are:\n{sc.strjoin(reskeys)}\n\nValid variant keys are:\n{sc.strjoin(varkeys)}'
+            errormsg = f'The following key(s) are invalid:\n{sc.strjoin(invalid)}\n\nValid main keys are:\n{sc.strjoin(reskeys)}\n\nValid genotype keys are:\n{sc.strjoin(varkeys)}'
             raise sc.KeyNotFoundError(errormsg)
 
     to_plot = sc.odict(sc.dcp(to_plot)) # In case it's supplied as a dict
@@ -383,27 +383,27 @@ def set_line_options(input_args, reskey, resnum, default):
 #     # Do the plotting
 #     with hpo.with_style(args.style):
 #         fig, figs = create_figs(args, sep_figs, fig, ax)
-#         variant_keys = sim.result_keys('variant')
+#         genotype_keys = sim.result_keys('genotype')
 #         for pnum,title,keylabels in to_plot.enumitems():
 #             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
 #             for resnum,reskey in enumerate(keylabels):
 #                 res_t = sim.results['date']
-#                 if reskey in variant_keys:
-#                     res = sim.results['variant'][reskey]
-#                     ns = sim['n_variants']
-#                     variant_colors = sc.gridcolors(ns)
-#                     for variant in range(ns):
+#                 if reskey in genotype_keys:
+#                     res = sim.results['genotype'][reskey]
+#                     ns = sim['n_genotypes']
+#                     genotype_colors = sc.gridcolors(ns)
+#                     for genotype in range(ns):
 #                         # Colors and labels
-#                         v_color = variant_colors[variant]
-#                         v_label = 'wild type' if variant == 0 else sim['variants'][variant-1].label
+#                         v_color = genotype_colors[genotype]
+#                         v_label = 'wild type' if genotype == 0 else sim['genotypes'][genotype-1].label
 #                         color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
 #                         label = set_line_options(labels, reskey, resnum, '')  # Choose the label
 #                         if label: label += f' - {v_label}'
 #                         else:     label = v_label
 #                         # Plotting
 #                         if res.low is not None and res.high is not None:
-#                             ax.fill_between(res_t, res.low[variant,:], res.high[variant,:], color=color, **args.fill)  # Create the uncertainty bound
-#                         ax.plot(res_t, res.values[variant,:], label=label, **args.plot, c=color)  # Actually plot the sim!
+#                             ax.fill_between(res_t, res.low[genotype,:], res.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
+#                         ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Actually plot the sim!
 #                 else:
 #                     res = sim.results[reskey]
 #                     color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
@@ -447,15 +447,15 @@ def set_line_options(input_args, reskey, resnum, default):
 #                 resdata = scens.results[reskey]
 #                 for snum,scenkey,scendata in resdata.enumitems():
 #                     sim = scens.sims[scenkey][0] # Pull out the first sim in the list for this scenario
-#                     variant_keys = sim.result_keys('variant')
-#                     if reskey in variant_keys:
-#                         ns = sim['n_variants']
-#                         variant_colors = sc.gridcolors(ns)
-#                         for variant in range(ns):
-#                             res_y = scendata.best[variant,:]
-#                             color = variant_colors[variant]  # Choose the color
-#                             label = 'wild type' if variant == 0 else sim['variants'][variant - 1].label
-#                             ax.fill_between(res_t, scendata.low[variant,:], scendata.high[variant,:], color=color, **args.fill)  # Create the uncertainty bound
+#                     genotype_keys = sim.result_keys('genotype')
+#                     if reskey in genotype_keys:
+#                         ns = sim['n_genotypes']
+#                         genotype_colors = sc.gridcolors(ns)
+#                         for genotype in range(ns):
+#                             res_y = scendata.best[genotype,:]
+#                             color = genotype_colors[genotype]  # Choose the color
+#                             label = 'wild type' if genotype == 0 else sim['genotypes'][genotype - 1].label
+#                             ax.fill_between(res_t, scendata.low[genotype,:], scendata.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
 #                             ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
 #                             if args.show['data']:
 #                                 plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data

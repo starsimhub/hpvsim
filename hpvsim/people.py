@@ -153,7 +153,6 @@ class People(hpb.BasePeople):
         self.increment_age() # Let people age by one time step
         self.flows['new_other_deaths'] += self.apply_death_rates() # Apply death rates 
         self.flows['new_births'], new_people = self.add_births() # Add births
-
         self.flows['new_recoveries'] += self.check_recovery() 
         # Lots more to be added here
 
@@ -382,6 +381,7 @@ class People(hpb.BasePeople):
         self.infectious_by_genotype[genotype, inds] = True
         self.recovered[inds]    = False
         self.flows['new_infections']   += len(inds)
+        self.flows_genotype['new_infections_by_genotype'][genotype] += len(inds)
 
         # # Record transmissions
         # for i, target in enumerate(inds):

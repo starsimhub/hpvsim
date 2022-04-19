@@ -123,7 +123,6 @@ result_flows = {
 
 result_flows_by_genotype = {
     'infections_by_genotype':  'infections by genotype',
-    'infectious_by_genotype':  'infectious by genotype',
 }
 
 
