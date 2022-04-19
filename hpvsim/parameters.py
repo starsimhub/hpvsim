@@ -310,7 +310,7 @@ def get_cross_immunity(default=False, genotype=None):
 
         hpv16 = dict(
             hpv16  = 1.0, # Default for own-immunity
-            hpv18 = 1.0, # Assumption
+            hpv18 = 0.5, # Assumption
             hpv31  = 1.0, # Assumption
             hpv33 = 1.0, # Assumption
             hpv45 = 1.0, # Assumption
@@ -324,7 +324,7 @@ def get_cross_immunity(default=False, genotype=None):
         ),
 
         hpv18 = dict(
-            hpv16=1.0,  # Default for own-immunity
+            hpv16=0.5,  # Default for own-immunity
             hpv18=1.0,  # Assumption
             hpv31=1.0,  # Assumption
             hpv33=1.0,  # Assumption

@@ -67,6 +67,11 @@ class PeopleMeta(sc.prettyobj):
             'infectious_by_genotype',
         ]
 
+        # Immune states, by genotype
+        self.imm_states = [
+            'sus_imm',  # Float, by genotype
+        ]
+
         # Immunity states, by genotype/vaccine
         self.imm_by_source_states = [
             'peak_imm', # Float, peak level of immunity
@@ -82,10 +87,11 @@ class PeopleMeta(sc.prettyobj):
             'dur_disease',
         ]
 
-        self.all_states = self.person + self.states + self.genotype_states + self.by_genotype_states + self.imm_by_source_states + self.dates + self.durs
+        self.all_states = self.person + self.states + self.genotype_states + self.by_genotype_states + self.imm_states + \
+                          self.imm_by_source_states + self.dates + self.durs
 
         # Validate
-        self.state_types = ['person', 'states', 'genotype_states', 'by_genotype_states',
+        self.state_types = ['person', 'states', 'genotype_states', 'by_genotype_states', 'imm_states',
                             'imm_by_source_states', 'dates', 'durs', 'all_states']
         for state_type in self.state_types:
             states = getattr(self, state_type)

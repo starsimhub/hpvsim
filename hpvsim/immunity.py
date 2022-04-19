@@ -145,6 +145,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source):
     if len(no_prior_imm_inds):
         people.peak_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
 
+    people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
     people.t_imm_event[imm_source, inds] = people.t
     return
 
@@ -164,6 +165,30 @@ def update_immunity(people, inds):
     people.imm[:,inds] += imm_kin*people.peak_imm[:,inds]
     people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
     people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
+    return
+
+
+def check_immunity(people, genotype):
+    '''
+    Calculate people's immunity on this timestep from prior infections + vaccination. Calculates effective immunity by
+    weighting individuals immunity by source.
+
+    There are two fundamental sources of immunity:
+
+           (1) prior exposure: degree of protection depends on genotype
+           (2) vaccination: degree of protection depends on genotype, vaccine, and time since vaccination
+
+    '''
+
+    # Handle parameters and indices
+    pars = people.pars
+    immunity = pars['immunity'][genotype,:] # cross-immunity/own-immunity scalars to be applied to immunity level
+    current_imm = sc.dcp(people.imm)
+
+    current_imm *= immunity[:, None]
+    current_imm = current_imm.sum(axis=0)
+    people.sus_imm[genotype,:] = current_imm
+
     return
 
 

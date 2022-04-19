@@ -83,7 +83,8 @@ class People(hpb.BasePeople):
             self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
         for key in self.meta.by_genotype_states:
             self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), False, dtype=bool)
-
+        for key in self.meta.imm_states:  # Everyone starts out with no immunity
+            self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
         for key in self.meta.imm_by_source_states:  # Everyone starts out with no immunity
             self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
 

@@ -33,19 +33,19 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
-@nb.njit(           (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
+# @nb.njit(           (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
 def compute_foi_frac(rel_trans,  beta,    condoms, eff_condoms, frac_acts): # pragma: no cover
     ''' Compute probability of each person **NOT** transmitting over some fractional number of acts '''
     foi_frac = 1 - frac_acts * (beta * rel_trans) * (1 - condoms*eff_condoms) # Calculate transmissibility
     return foi_frac
 
-@nb.njit(            (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
+# @nb.njit(            (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
 def compute_foi_whole(rel_trans,  beta,    condoms, eff_condoms, n): # pragma: no cover
     ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
     foi_whole = np.power(1 - (beta * rel_trans) * (1 - condoms*eff_condoms), n)
     return foi_whole
     
-@nb.njit(      (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
+# @nb.njit(      (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
 def compute_foi(rel_trans,  beta,    condoms, eff_condoms, n,       frac_acts, inf): # pragma: no cover
     ''' Compute overall probability of infection'''
     foi_whole = compute_foi_whole(rel_trans, beta, condoms, eff_condoms, n)
@@ -55,7 +55,7 @@ def compute_foi(rel_trans,  beta,    condoms, eff_condoms, n,       frac_acts, i
 
 
 #@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi, f, m): # pragma: no cover
+def compute_infections(foi, f, m, sus_imm): # pragma: no cover
     '''
     Compute who infects whom
 
@@ -67,6 +67,7 @@ def compute_infections(foi, f, m): # pragma: no cover
         beta: transmission probabilities
         f: female in the pair
         m: male in the pair
+        sus_imm: immunity to this genotype
     '''
     # slist = np.empty(0, dtype=nbint)
     # tlist = np.empty(0, dtype=nbint)
@@ -83,7 +84,9 @@ def compute_infections(foi, f, m): # pragma: no cover
         nonzero_betas    = betas[nonzero_inds] # Remove zero entries from beta
         nonzero_sources  = sources[nonzero_inf_inds] # Remove zero entries from the sources
         nonzero_targets  = targets[nonzero_inf_inds] # Remove zero entries from the targets
-        transmissions    = (np.random.random(len(nonzero_betas)) < nonzero_betas).nonzero()[0] # Compute the actual infections!
+        sus_targets      = sus_imm[nonzero_targets]
+        trans_probs      = nonzero_betas * (1-sus_targets)
+        transmissions    = (np.random.random(len(nonzero_betas)) < trans_probs).nonzero()[0] # Compute the actual infections!
         source_inds      = nonzero_sources[transmissions]
         target_inds      = nonzero_targets[transmissions] # Filter the targets on the actual infections
         slist = np.concatenate((slist, source_inds), axis=0)
