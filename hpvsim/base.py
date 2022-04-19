@@ -431,15 +431,15 @@ class BaseSim(ParsObj):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
-        If which is 'main', return only the main results keys. If 'variant', return
-        only variant keys. If 'all', return all keys.
+        If which is 'main', return only the main results keys. If 'genotype', return
+        only genotype keys. If 'all', return all keys.
 
         '''
         keys = []
         choices = ['main', 'genotype', 'all']
         if which in ['main', 'all']:
             keys += [key for key,res in self.results.items() if isinstance(res, Result) and key != 'pop_nabs_by_source']
-        if which in ['variant', 'all'] and 'genotype' in self.results:
+        if which in ['genotype', 'all'] and 'genotype' in self.results:
             keys += [key for key,res in self.results['genotype'].items() if isinstance(res, Result)]
         if which not in choices: # pragma: no cover
             errormsg = f'Choice "which" not available; choices are: {sc.strjoin(choices)}'
@@ -616,7 +616,7 @@ class BaseSim(ParsObj):
             An sc.Spreadsheet with an Excel file, or writes the file to disk
         '''
         if skip_pars is None:
-            skip_pars = ['variant_map', 'vaccine_map'] # These include non-string keys so fail at sc.flattendict()
+            skip_pars = ['genotype_map', 'vaccine_map'] # These include non-string keys so fail at sc.flattendict()
 
         # Export results
         result_df = self.to_df(date_index=True)
@@ -1286,9 +1286,9 @@ class BasePeople(FlexPretty):
         return np.count_nonzero(self[key])
 
 
-    def count_by_variant(self, key, variant):
+    def count_by_genotype(self, key, genotype):
         ''' Count the number of people for a given key '''
-        return np.count_nonzero(self[key][variant,:])
+        return np.count_nonzero(self[key][genotype,:])
 
 
     def count_not(self, key):

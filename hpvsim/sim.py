@@ -137,7 +137,7 @@ class Sim(hpb.BaseSim):
                 if not genotype.initialized:
                     genotype.initialize(self)
             else:  # pragma: no cover
-                errormsg = f'Genotype {i} ({genotype}) is not a hp.genotype object; please create using cv.variant()'
+                errormsg = f'Genotype {i} ({genotype}) is not a hp.genotype object; please create using cv.genotype()'
                 raise TypeError(errormsg)
 
         len_pars = len(self['genotype_pars'])
@@ -377,16 +377,16 @@ class Sim(hpb.BaseSim):
         # Update counts for this time step: stocks
         for key in hpd.result_stocks.keys():
             self.results[f'n_{key}'][t] = people.count(key)
-        # for key in hpd.result_stocks_by_genotype.keys():
-        #     for variant in range(ng):
-        #         self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
+        for key in hpd.result_stocks_by_genotype.keys():
+            for genotype in range(ng):
+                self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
 
         # Update counts for this time step: flows
         for key,count in people.flows.items():
             self.results[key][t] += count
-        # for key,count in people.flows_genotype.items():
-        #     for variant in range(ng):
-        #         self.results['genotype'][key][genotype][t] += count[genotype]
+        for key,count in people.flows_genotype.items():
+            for genotype in range(ng):
+                self.results['genotype'][key][genotype][t] += count[genotype]
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):

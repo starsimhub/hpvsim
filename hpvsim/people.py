@@ -119,6 +119,9 @@ class People(hpb.BasePeople):
     def init_flows(self):
         ''' Initialize flows to be zero '''
         self.flows = {key:0 for key in hpd.new_result_flows}
+        self.flows_genotype = {}
+        for key in hpd.new_result_flows_by_genotype:
+            self.flows_genotype[key] = np.zeros(self.pars['n_genotypes'], dtype=hpd.default_float)
         return
 
 
