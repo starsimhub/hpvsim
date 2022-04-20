@@ -352,23 +352,28 @@ class Sim(hpb.BaseSim):
             hpimm.check_immunity(people, genotype)
 
             # Deal with genotype parameters
-            genotype_label = self.pars['genotype_map'][genotype]
-            rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
-            beta = hpd.default_float(self['beta'] * rel_beta)
+            genotype_label  = self.pars['genotype_map'][genotype]
+            rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
+            beta            = hpd.default_float(self['beta'] * rel_beta)
+            inf_genotype    = people.infectious * (people.infectious_genotype == genotype)
+            sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
 
+            # Get indices of males and females infected with this genotype
+            f_inf = hpu.true(inf_genotype * people.is_female)
+            m_inf = hpu.true(inf_genotype * people.is_male)
+
+            # Loop over layers
             for lkey, layer in contacts.items():
                 f = layer['f']
                 m = layer['m']
+
+                # Get the number of acts in this timestep for this partnership type
                 frac_acts, whole_acts = np.modf(layer['acts']*dt) # Get the number of acts per timestep for this layer
                 whole_acts = whole_acts.astype(int)
 
-                # Compute relative transmission and susceptibility
-                inf_genotype = people.infectious * (people.infectious_genotype == genotype)
-                sus_imm = people.sus_imm[genotype,:]
-
                 # Compute transmissibility and infections
                 foi = hpu.compute_foi(beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)#(foi_frac, foi_whole, inf) TODO how to factor in immunity/susceptibility here?
-                source_inds, target_inds = hpu.compute_infections(foi, f, m, sus_imm)  # Calculate transmission
+                source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f, m, sus_imm)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
         # Update counts for this time step: stocks
