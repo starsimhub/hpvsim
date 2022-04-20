@@ -1767,9 +1767,9 @@ class Layer(FlexDict):
     as part of the population creation.
 
     Args:
-        p1 (array): an array of N connections, representing people on one side of the connection
-        p2 (array): an array of people on the other side of the connection
-        beta (array): an array of weights for each connection
+        f (array): an array of N connections, representing people on one side of the connection
+        m (array): an array of people on the other side of the connection
+        acts (array): an array of number of acts per timestep for each connection
         dur (array): duration of the connection
         start (array): start time of the connection
         end (array): end time of the connection
@@ -1801,7 +1801,7 @@ class Layer(FlexDict):
         self.meta = {
             'f':     hpd.default_int,   # Female
             'm':     hpd.default_int,   # Male
-            'beta':  hpd.default_float, # Default transmissibility for this contact type
+            'acts':  hpd.default_float, # Default transmissibility for this contact type
             'dur':   hpd.default_float, # Duration of partnership
             'start': hpd.default_int, # Date of partnership start
             'end':   hpd.default_float, # Date of partnership end
@@ -1820,8 +1820,8 @@ class Layer(FlexDict):
         for key,value in kwargs.items():
             self[key] = np.array(value, dtype=self.meta.get(key))
 
-        # Set beta if not provided
-        key = 'beta'
+        # Set acts if not provided
+        key = 'acts'
         if key not in kwargs.keys():
             self[key] = np.ones(len(self), dtype=self.meta[key])
 

@@ -33,23 +33,23 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
-@nb.njit(           (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
-def compute_foi_frac(rel_trans,  beta,    condoms, eff_condoms, frac_acts): # pragma: no cover
+# @nb.njit(           (nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
+def compute_foi_frac(beta,    condoms, eff_condoms, frac_acts): 
     ''' Compute probability of each person **NOT** transmitting over some fractional number of acts '''
-    foi_frac = 1 - frac_acts * (beta * rel_trans) * (1 - condoms*eff_condoms) # Calculate transmissibility
+    foi_frac = 1 - frac_acts * beta * (1 - condoms*eff_condoms) 
     return foi_frac
 
-@nb.njit(            (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
-def compute_foi_whole(rel_trans,  beta,    condoms, eff_condoms, n): # pragma: no cover
+# @nb.njit(            (nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
+def compute_foi_whole(beta,    condoms, eff_condoms, n): 
     ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
-    foi_whole = np.power(1 - (beta * rel_trans) * (1 - condoms*eff_condoms), n)
+    foi_whole = np.power(1 - beta * (1 - condoms*eff_condoms), n)
     return foi_whole
     
-@nb.njit(      (nbfloat[:], nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
-def compute_foi(rel_trans,  beta,    condoms, eff_condoms, n,       frac_acts, inf): # pragma: no cover
+# @nb.njit(      (nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
+def compute_foi(beta,    condoms, eff_condoms, n,       frac_acts, inf):
     ''' Compute overall probability of infection'''
-    foi_whole = compute_foi_whole(rel_trans, beta, condoms, eff_condoms, n)
-    foi_frac  = compute_foi_frac( rel_trans, beta, condoms, eff_condoms, frac_acts)
+    foi_whole = compute_foi_whole(beta, condoms, eff_condoms, n)
+    foi_frac  = compute_foi_frac(beta, condoms, eff_condoms, frac_acts)
     foi = inf * (1 - (foi_whole*foi_frac))
     return foi
 

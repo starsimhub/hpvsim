@@ -122,7 +122,6 @@ class People(hpb.BasePeople):
         ''' Perform initializations '''
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
         self.set_pars(sim_pars) # Replace the saved parameters with this simulation's
-        self.rel_trans[:] = hpu.sample(**self.pars['beta_dist'], size=len(self)) # Default transmissibilities, with viral load drawn from a distribution
         self.initialized = True
         return
 
@@ -185,11 +184,12 @@ class People(hpb.BasePeople):
             self.current_partners[lkey][new_pship_inds] += 1
 
             # Add everything to a contacts dictionary
-            new_pships[lkey]['f'] = new_pship_inds_f
-            new_pships[lkey]['m'] = new_pship_inds_m
-            new_pships[lkey]['dur'] = hpu.sample(**self['pars']['dur_pship'][lkey], size=n_new[lkey])
-            new_pships[lkey]['start'] = np.array([t*self['pars']['dt']]*n_new[lkey],dtype=hpd.default_float)
-            new_pships[lkey]['end'] = new_pships[lkey]['start'] + new_pships[lkey]['dur']
+            new_pships[lkey]['f']       = new_pship_inds_f
+            new_pships[lkey]['m']       = new_pship_inds_m
+            new_pships[lkey]['dur']     = hpu.sample(**self['pars']['dur_pship'][lkey], size=n_new[lkey])
+            new_pships[lkey]['start']   = np.array([t*self['pars']['dt']]*n_new[lkey],dtype=hpd.default_float)
+            new_pships[lkey]['end']     = new_pships[lkey]['start'] + new_pships[lkey]['dur']
+            new_pships[lkey]['acts']    = hpu.sample(**self['pars']['acts'][lkey], size=n_new[lkey]) # Acts per year for this pair, assumed constant over the duration of the partnership (TODO: EMOD uses a decay factor for this, consider?)
 
         self.add_contacts(new_pships)
             

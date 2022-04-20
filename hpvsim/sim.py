@@ -277,7 +277,6 @@ class Sim(hpb.BaseSim):
         dt = self['dt'] # Timestep; TODO centralize this somewhere
         t = self.t
         ng = self['n_genotypes']
-        acts = self['acts']
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         rel_beta = self['rel_beta']
@@ -291,7 +290,6 @@ class Sim(hpb.BaseSim):
         contacts = people.contacts # Shorten
 
         # Loop over genotypes and infect people
-        prel_trans = people.rel_trans
         sus = people.susceptible
         inf = people.infectious
 
@@ -303,13 +301,12 @@ class Sim(hpb.BaseSim):
             #     genotype_label = self.pars['genotype_map'][genotype]
             #     rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
             beta = hpd.default_float(self['beta'] * rel_beta)
-            foi_frac, foi_whole = 1, 1
 
             for lkey, layer in contacts.items():
                 f = layer['f']
                 m = layer['m']
-                frac_acts, whole_acts = np.modf(acts[lkey]*dt) # Get the number of acts per timestep for this layer
-                whole_acts = int(whole_acts)
+                frac_acts, whole_acts = np.modf(layer['acts']*dt) # Get the number of acts per timestep for this layer
+                whole_acts = whole_acts.astype(int)
 
                 # Compute relative transmission and susceptibility
                 # inf_genotype = people.infectious * (people.infectious_genotype == genotype) 
@@ -317,7 +314,10 @@ class Sim(hpb.BaseSim):
                 # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
 
                 # Compute transmissibility and infections
-                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
+                import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+
+
+                foi = hpu.compute_foi(beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
                 source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 

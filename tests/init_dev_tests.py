@@ -31,7 +31,7 @@ def test_basic():
 if __name__ == '__main__':
 
     sim0 = test_random()
-    sim1 = test_basic()
+    # sim1 = test_basic()
 
     sim0.people.story(40)
 
@@ -44,7 +44,6 @@ if __name__ == '__main__':
     # people_2020 = snapshot.snapshots[1]
     # people_2015.plot()
     # people_2020.plot()
-
 
 
 

@@ -103,7 +103,8 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             for lkey,n in sim['partners'].items():
                 active_inds_layer = hpu.binomial_filter(sim['layer_probs'][lkey], active_inds)
                 durations = sim['dur_pship'][lkey]
-                contacts[lkey], current_partners[lkey] = make_random_contacts(p_count=partners[lkey], sexes=sexes, n=n, durations=durations, mapping=active_inds_layer, **kwargs)
+                acts = sim['acts'][lkey]
+                contacts[lkey], current_partners[lkey] = make_random_contacts(p_count=partners[lkey], sexes=sexes, n=n, durations=durations, acts=acts, mapping=active_inds_layer, **kwargs)
         else: # pragma: no cover
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
             raise NotImplementedError(errormsg)
@@ -166,11 +167,13 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5, dispersion=None):
     Set static population characteristics that do not change over time.
     Can be used when adding new births, in which case the existing popsize can be given.
     '''
-    uids           = np.arange(existing_n, existing_n+new_n, dtype=hpd.default_int)
-    sexes          = np.random.binomial(1, sex_ratio, new_n)
-    debuts         = hpu.sample(**pars['debut'], size=new_n)
-    partners       = partner_count(pop_size=new_n, layer_keys=pars['partners'].keys(), means=pars['partners'].values(), dispersion=dispersion)
-    return uids, sexes, debuts, partners
+    uid             = np.arange(existing_n, existing_n+new_n, dtype=hpd.default_int)
+    sex             = np.random.binomial(1, sex_ratio, new_n)
+    debut           = np.full(new_n, np.nan, dtype=hpd.default_float)
+    debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
+    debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
+    partners        = partner_count(pop_size=new_n, layer_keys=pars['partners'].keys(), means=pars['partners'].values(), dispersion=dispersion)
+    return uid, sex, debut, partners
 
 
 def validate_popdict(popdict, pars, verbose=True):
@@ -221,7 +224,7 @@ def _tidy_edgelist(m, f, mapping=None):
     return output
 
 
-def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, mapping=None):
+def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, acts=None, mapping=None):
     '''
     Make random contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females with no additional age structure.
@@ -275,8 +278,11 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, mappi
     output = _tidy_edgelist(m, f)
     n_partnerships = len(output['m'])
     output['dur'] = hpu.sample(**durations, size=n_partnerships)
+    output['acts'] = hpu.sample(**acts, size=n_partnerships)
     output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
     output['end'] = output['start'] + output['dur']
 
     return output, actual_p_count
 
+
+# %%
