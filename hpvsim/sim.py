@@ -14,6 +14,7 @@ from . import population as hppop
 from . import parameters as hppar
 from . import analysis as hpa
 from .settings import options as hpo
+from . import immunity as hpimm
 
 
 # Define the model
@@ -54,7 +55,9 @@ class Sim(hpb.BaseSim):
         self.t = 0  # The current time index
         self.validate_pars() # Ensure parameters have valid values
         self.set_seed() # Reset the random seed before the population is created
-        self.init_results() # After initializing the variant, create the results structure
+        self.init_genotypes() # Initialize the genotypes
+        self.init_immunity() # initialize information about immunity (if use_waning=True)
+        self.init_results() # After initializing the genotypes, create the results structure
         self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
         self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
@@ -124,6 +127,31 @@ class Sim(hpb.BaseSim):
 
         return
 
+    def init_genotypes(self):
+        ''' Initialize the genotypes '''
+        if self._orig_pars and 'genotypes' in self._orig_pars:
+            self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
+
+        for i, genotype in enumerate(self['genotypes']):
+            if isinstance(genotype, hpimm.genotype):
+                if not genotype.initialized:
+                    genotype.initialize(self)
+            else:  # pragma: no cover
+                errormsg = f'Genotype {i} ({genotype}) is not a hp.genotype object; please create using cv.genotype()'
+                raise TypeError(errormsg)
+
+        len_pars = len(self['genotype_pars'])
+        len_map = len(self['genotype_map'])
+        assert len_pars == len_map, f"genotype_pars and genotype_map must be the same length, but they're not: {len_pars} ≠ {len_map}"
+        self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
+
+        return
+
+    def init_immunity(self, create=False):
+        ''' Initialize immunity matrices '''
+        hpimm.init_immunity(self, create=create)
+        return
+
 
     def init_results(self):
         '''
@@ -161,6 +189,24 @@ class Sim(hpb.BaseSim):
         self.results['prevalence']          = init_res('Prevalence', scale=False)
         self.results['incidence']           = init_res('Incidence', scale=False)
         self.results['frac_vaccinated']     = init_res('Proportion vaccinated', scale=False)
+
+        # Handle genotypes
+        ng = self['n_genotypes']
+        self.results['genotype'] = {}
+        self.results['genotype']['prevalence_by_genotype'] = init_res('Prevalence by genotype', scale=False, n_genotypes=ng)
+        self.results['genotype']['incidence_by_genotype'] = init_res('Incidence by genotype', scale=False, n_genotypes=ng)
+        self.results['genotype']['r_eff_by_genotype'] = init_res('Effective reproduction number by genotype', scale=False,
+                                                               n_genotypes=ng)
+        self.results['genotype']['doubling_time_by_genotype'] = init_res('Doubling time by genotype', scale=False,
+                                                                       n_genotypes=ng)
+        for key, label in hpd.result_flows_by_genotype.items():
+            self.results['genotype'][f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key],
+                                                             n_genotypes=ng)  # Cumulative variables -- e.g. "Cumulative infections"
+        for key, label in hpd.result_flows_by_genotype.items():
+            self.results['genotype'][f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key],
+                                                             n_genotypes=ng)  # Flow variables -- e.g. "Number of new infections"
+        for key, label in hpd.result_stocks_by_genotype.items():
+            self.results['genotype'][f'n_{key}'] = init_res(label, color=dcols[key], n_genotypes=ng)
 
         # Populate the rest of the results
         self.results['year'] = self.yearvec
@@ -256,9 +302,17 @@ class Sim(hpb.BaseSim):
         if self.people.count_not('naive') == 0: # Everyone is naive
 
             # Create the seed infections
-            if self['pop_infected']:
-                inds = hpu.choose(self['pop_size'], self['pop_infected'])
-                self.people.infect(inds=inds, layer='seed_infection') # Not counted by results since flows are re-initialized during the step
+            if sc.isnumber(self['pop_infected']): # assume equal init infections for all circulating genotypes
+                for genotype_ind in range(self['n_genotypes']):
+                    inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                    self.people.infect(inds=inds, layer='seed_infection',
+                                       genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
+            elif isinstance(self['pop_infected'], dict):
+                genotypes = list(self['genotype_map'].values())
+                for genotype, pop_infected in self['pop_infected'].items():
+                    genotype_ind = genotypes.index(genotype)
+                    inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                    self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind) # Not counted by results since flows are re-initialized during the step
 
         elif verbose:
             print(f'People already initialized with {self.people.count_not("naive")} people non-naive and {self.people.count("infectious")} infectious; not reinitializing')
@@ -293,15 +347,15 @@ class Sim(hpb.BaseSim):
         # Loop over genotypes and infect people
         prel_trans = people.rel_trans
         sus = people.susceptible
-        inf = people.infectious
 
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
 
+            hpimm.check_immunity(people, genotype)
+
             # Deal with genotype parameters
-            # if genotype:
-            #     genotype_label = self.pars['genotype_map'][genotype]
-            #     rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
+            genotype_label = self.pars['genotype_map'][genotype]
+            rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
             beta = hpd.default_float(self['beta'] * rel_beta)
             foi_frac, foi_whole = 1, 1
 
@@ -312,32 +366,35 @@ class Sim(hpb.BaseSim):
                 whole_acts = int(whole_acts)
 
                 # Compute relative transmission and susceptibility
-                # inf_genotype = people.infectious * (people.infectious_genotype == genotype) 
-                # sus_imm = people.sus_imm[genotype,:]
-                # rel_trans, rel_sus = hpu.compute_trans_sus(inf_genotype, sus, beta_layer, viral_load, symp, diag, sus_imm)
+                inf_genotype = people.infectious * (people.infectious_genotype == genotype)
+                sus_imm = people.sus_imm[genotype,:]
 
                 # Compute transmissibility and infections
-                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf)#(foi_frac, foi_whole, inf)
-                source_inds, target_inds = hpu.compute_infections(foi, f, m)  # Calculate transmission
+                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)#(foi_frac, foi_whole, inf) TODO how to factor in immunity/susceptibility here?
+                source_inds, target_inds = hpu.compute_infections(foi, f, m, sus_imm)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
         # Update counts for this time step: stocks
         for key in hpd.result_stocks.keys():
             self.results[f'n_{key}'][t] = people.count(key)
-        # for key in hpd.result_stocks_by_genotype.keys():
-        #     for variant in range(ng):
-        #         self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
+        for key in hpd.result_stocks_by_genotype.keys():
+            for genotype in range(ng):
+                self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
 
         # Update counts for this time step: flows
         for key,count in people.flows.items():
             self.results[key][t] += count
-        # for key,count in people.flows_genotype.items():
-        #     for variant in range(ng):
-        #         self.results['genotype'][key][genotype][t] += count[genotype]
+        for key,count in people.flows_genotype.items():
+            for genotype in range(ng):
+                self.results['genotype'][key][genotype][t] += count[genotype]
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
+
+        has_imm = hpu.true(people.peak_imm.sum(axis=0))
+        if len(has_imm):
+            hpimm.update_immunity(people, inds=has_imm)
 
         # Tidy up
         self.t += 1
