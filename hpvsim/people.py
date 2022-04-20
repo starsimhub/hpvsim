@@ -13,6 +13,7 @@ from . import defaults as hpd
 from . import base as hpb
 from . import population as hppop
 from . import plotting as hpplt
+from . import immunity as hpi
 
 
 __all__ = ['People']
@@ -68,7 +69,7 @@ class People(hpb.BasePeople):
             else:
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
 
-        # Set health states -- only susceptible is true by default -- booleans except exposed by variant which should return the variant that ind is exposed to
+        # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
             val = (key in ['susceptible', 'naive']) # Default value is True for susceptible and naive, false otherwise
             self[key] = np.full(self.pars['pop_size'], val, dtype=bool)
@@ -76,6 +77,16 @@ class People(hpb.BasePeople):
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
             self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
+
+        # Set genotype states, which store info about which genotype a person is exposed to
+        for key in self.meta.genotype_states:
+            self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
+        for key in self.meta.by_genotype_states:
+            self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), False, dtype=bool)
+        for key in self.meta.imm_states:  # Everyone starts out with no immunity
+            self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
+        for key in self.meta.imm_by_source_states:  # Everyone starts out with no immunity
+            self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
 
         # Store the dtypes used in a flat dict
         self._dtypes = {key:self[key].dtype for key in self.keys()} # Assign all to float by default
@@ -109,6 +120,9 @@ class People(hpb.BasePeople):
     def init_flows(self):
         ''' Initialize flows to be zero '''
         self.flows = {key:0 for key in hpd.new_result_flows}
+        self.flows_genotype = {}
+        for key in hpd.new_result_flows_by_genotype:
+            self.flows_genotype[key] = np.zeros(self.pars['n_genotypes'], dtype=hpd.default_float)
         return
 
 
@@ -139,7 +153,6 @@ class People(hpb.BasePeople):
         self.increment_age() # Let people age by one time step
         self.flows['new_other_deaths'] += self.apply_death_rates() # Apply death rates 
         self.flows['new_births'], new_people = self.add_births() # Add births
-
         self.flows['new_recoveries'] += self.check_recovery() 
         # Lots more to be added here
 
@@ -225,11 +238,9 @@ class People(hpb.BasePeople):
         # Now reset all disease states
         self.infectious[inds]       = False
         self.recovered[inds]        = True
-        # self.recovered_genotype[inds] = self.infectious_genotype[inds]
-        # self.infectious_genotype[inds] = np.nan
-        # self.exposed_genotype[inds]    = np.nan
-        # self.exposed_by_genotype[:, inds] = False
-        # self.infectious_by_genotype[:, inds] = False
+        self.recovered_genotype[inds] = self.infectious_genotype[inds]
+        self.infectious_genotype[inds] = np.nan
+        self.infectious_by_genotype[:, inds] = False
 
         return len(inds)
 
@@ -263,7 +274,11 @@ class People(hpb.BasePeople):
 
         # Generate other characteristics of the new people
         uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
-        new_people = People(pars=new_births, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
+        pars = {
+            'pop_size': new_births,
+            'n_genotypes': self.pars['n_genotypes']
+        }
+        new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
 
         return new_births, new_people
 
@@ -284,18 +299,16 @@ class People(hpb.BasePeople):
                 if (key != 'vaccinated') or reset_vx: # Don't necessarily reset vaccination
                     self[key][inds] = False
 
-        # Reset variant states
-        for key in self.meta.variant_states:
+        # Reset genotype states
+        for key in self.meta.genotype_states:
             self[key][inds] = np.nan
-        for key in self.meta.by_variant_states:
+        for key in self.meta.by_genotype_states:
             self[key][:, inds] = False
 
-        # Reset immunity and antibody states
+        # Reset immunity
         non_vx_inds = inds if reset_vx else inds[~self['vaccinated'][inds]]
-        for key in self.meta.imm_states:
+        for key in self.meta.imm_by_source_states:
             self[key][:, non_vx_inds] = 0
-        for key in self.meta.nab_states + self.meta.vacc_states:
-            self[key][non_vx_inds] = 0
 
         # Reset dates
         for key in self.meta.dates + self.meta.durs:
@@ -356,19 +369,24 @@ class People(hpb.BasePeople):
         if source is not None:
             source = source[keep]
 
+        genotype_label = self.pars['genotype_map'][genotype]
+
         n_infections = len(inds)
         durpars      = self.pars['dur']
 
-        # Update states, variant info, and flows
+        # Update states, genotype info, and flows
         self.susceptible[inds]  = False
         self.naive[inds]        = False
         self.infectious[inds]   = True
+        self.infectious_genotype[inds] = genotype
+        self.infectious_by_genotype[genotype, inds] = True
         self.recovered[inds]    = False
         self.flows['new_infections']   += len(inds)
+        self.flows_genotype['new_infections_by_genotype'][genotype] += len(inds)
 
         # # Record transmissions
         # for i, target in enumerate(inds):
-        #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, variant=variant_label)
+        #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, genotype=genotype_label)
         #     self.infection_log.append(entry)
 
         # Set the dates of infection and recovery -- for now, just assume everyone recovers
@@ -377,6 +395,9 @@ class People(hpb.BasePeople):
         dur_inf2rec = hpu.sample(**durpars['inf2rec'], size=len(inds)) # Duration of infection in YEARS
         self.date_recovered[inds] = self.date_infectious[inds] + np.ceil(dur_inf2rec/dt)  # Date they recover (interpreted as the timestep on which they recover)
         self.dur_disease[inds] = dur_inf2rec
+
+        # Update immunity
+        hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
 
         return n_infections # For incrementing counters
 

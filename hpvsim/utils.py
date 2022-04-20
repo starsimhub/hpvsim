@@ -55,7 +55,7 @@ def compute_foi(beta,    condoms, eff_condoms, n,       frac_acts, inf):
 
 
 #@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi, f, m): # pragma: no cover
+def compute_infections(foi, f, m, sus_imm): # pragma: no cover
     '''
     Compute who infects whom
 
@@ -67,6 +67,7 @@ def compute_infections(foi, f, m): # pragma: no cover
         beta: transmission probabilities
         f: female in the pair
         m: male in the pair
+        sus_imm: immunity to this genotype
     '''
     # slist = np.empty(0, dtype=nbint)
     # tlist = np.empty(0, dtype=nbint)
@@ -83,7 +84,9 @@ def compute_infections(foi, f, m): # pragma: no cover
         nonzero_betas    = betas[nonzero_inds] # Remove zero entries from beta
         nonzero_sources  = sources[nonzero_inf_inds] # Remove zero entries from the sources
         nonzero_targets  = targets[nonzero_inf_inds] # Remove zero entries from the targets
-        transmissions    = (np.random.random(len(nonzero_betas)) < nonzero_betas).nonzero()[0] # Compute the actual infections!
+        sus_targets      = sus_imm[nonzero_targets]
+        trans_probs      = nonzero_betas * (1-sus_targets)
+        transmissions    = (np.random.random(len(nonzero_betas)) < trans_probs).nonzero()[0] # Compute the actual infections!
         source_inds      = nonzero_sources[transmissions]
         target_inds      = nonzero_targets[transmissions] # Filter the targets on the actual infections
         slist = np.concatenate((slist, source_inds), axis=0)
@@ -130,6 +133,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     - 'lognormal_int' : lognormal distribution with mean=par1 and std=par2, returns only integer values
     - 'poisson'       : Poisson distribution with rate=par1 (par2 is not used); mean and variance are equal to par1
     - 'neg_binomial'  : negative binomial distribution with mean=par1 and k=par2; converges to Poisson with k=∞
+    - 'beta'          : beta distribution with alpha=par1 and beta=par2;
 
     Args:
         dist (str):   the distribution to sample from
@@ -170,6 +174,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
         'lognormal_int',
         'poisson',
         'neg_binomial',
+        'beta',
     ]
 
     # Ensure it's an integer
@@ -184,6 +189,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     elif dist == 'normal_int':        samples = np.round(np.abs(np.random.normal(loc=par1, scale=par2, size=size, **kwargs)))
     elif dist == 'poisson':           samples = n_poisson(rate=par1, n=size, **kwargs) # Use Numba version below for speed
     elif dist == 'neg_binomial':      samples = n_neg_binomial(rate=par1, dispersion=par2, n=size, **kwargs) # Use custom version below
+    elif dist == 'beta':              samples = np.random.beta(a=par1, b=par2, size=size, **kwargs)
     elif dist in ['lognorm', 'lognormal', 'lognorm_int', 'lognormal_int']:
         if par1>0:
             mean  = np.log(par1**2 / np.sqrt(par2**2 + par1**2)) # Computes the mean of the underlying normal distribution
