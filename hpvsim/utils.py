@@ -72,22 +72,27 @@ def compute_infections(foi, f_inf, m_inf, f, m, sus_imm): # pragma: no cover
     '''
     # slist = np.empty(0, dtype=nbint)
     # tlist = np.empty(0, dtype=nbint)
+
     slist = np.empty(0, dtype=hpd.default_int)
     tlist = np.empty(0, dtype=hpd.default_int)
+    pairs = [[f,m], [m,f]]
 
-    # Get the indices of partnerships that involve people infected with this genotype
-    # TODO: speed comparison of this method vs the previous covasim method
-    orig_indices_m = m.argsort()
-    orig_indices_f = f.argsort()
-    m_inf_pships = orig_indices_m[np.searchsorted(m[orig_indices_m], m_inf)]
-    f_inf_pships = orig_indices_f[np.searchsorted(f[orig_indices_f], f_inf)]
-    pairs = [[m_inf_pships, f[m_inf_pships]], [f_inf_pships, m[f_inf_pships]]]
+    # import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
 
     for sources,targets in pairs:
-        betas            = foi[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
-        transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Compute the actual infections!
-        source_inds      = sources[transmissions]
-        target_inds      = targets[transmissions] # Filter the targets on the actual infections
+        source_trans     = foi[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
+        inf_inds         = source_trans.nonzero()[0] # Infectious indices -- remove noninfectious people
+        betas            = source_trans[inf_inds] # Calculate the raw transmission probabilities
+        nonzero_inds     = betas.nonzero()[0] # Find nonzero entries
+        nonzero_inf_inds = inf_inds[nonzero_inds] # Map onto original indices
+        nonzero_betas    = betas[nonzero_inds] # Remove zero entries from beta
+        nonzero_sources  = sources[nonzero_inf_inds] # Remove zero entries from the sources
+        nonzero_targets  = targets[nonzero_inf_inds] # Remove zero entries from the targets
+        sus_targets      = sus_imm[nonzero_targets]
+        trans_probs      = nonzero_betas * (1-sus_targets)
+        transmissions    = (np.random.random(len(nonzero_betas)) < trans_probs).nonzero()[0] # Compute the actual infections!
+        source_inds      = nonzero_sources[transmissions]
+        target_inds      = nonzero_targets[transmissions] # Filter the targets on the actual infections
         slist = np.concatenate((slist, source_inds), axis=0)
         tlist = np.concatenate((tlist, target_inds), axis=0)
     return slist, tlist

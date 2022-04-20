@@ -372,7 +372,7 @@ class Sim(hpb.BaseSim):
                 whole_acts = whole_acts.astype(int)
 
                 # Compute transmissibility and infections
-                foi = hpu.compute_foi(beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)#(foi_frac, foi_whole, inf) TODO how to factor in immunity/susceptibility here?
+                foi = hpu.compute_foi(beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)# TODO how to factor in immunity/susceptibility here?
                 source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f, m, sus_imm)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
