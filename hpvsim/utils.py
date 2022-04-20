@@ -33,30 +33,27 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
-# @nb.njit(           (nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
-def compute_foi_frac(beta,    condoms, eff_condoms, frac_acts): 
+@nb.njit(           (nbfloat, nbfloat,           nbfloat[:]  ), cache=cache, parallel=safe_parallel)
+def compute_foi_frac(beta,    effective_condoms, frac_acts): 
     ''' Compute probability of each person **NOT** transmitting over some fractional number of acts '''
-    foi_frac = 1 - frac_acts * beta * (1 - condoms*eff_condoms) 
+    foi_frac = 1 - frac_acts * beta * (1 - effective_condoms) 
     return foi_frac
 
-# @nb.njit(            (nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
-def compute_foi_whole(beta,    condoms, eff_condoms, n): 
+@nb.njit(            (nbfloat, nbfloat,           nbint[:]   ), cache=cache, parallel=safe_parallel)
+def compute_foi_whole(beta,    effective_condoms, n): 
     ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
-    foi_whole = np.power(1 - beta * (1 - condoms*eff_condoms), n)
+    foi_whole = np.power(1 - beta * (1 - effective_condoms), n)
     return foi_whole
     
-# @nb.njit(      (nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
-def compute_foi(beta,    condoms, eff_condoms, n,       frac_acts, inf):
+@nb.njit(      (nbfloat[:], nbfloat[:], ), cache=cache, parallel=safe_parallel)
+def compute_foi(foi_whole,  foi_frac):
     ''' Compute overall probability of infection'''
-    foi_whole = compute_foi_whole(beta, condoms, eff_condoms, n)
-    foi_frac  = compute_foi_frac(beta, condoms, eff_condoms, frac_acts)
     foi = 1 - (foi_whole*foi_frac)
     return foi
 
 
-
-#@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi, f_inf, m_inf, f, m, sus_imm): # pragma: no cover
+# @nb.njit(             (nbfloat[:],  nbint[:], nbint[:], nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
+def compute_infections(foi,         f_inf,    m_inf,    f,        m): 
     '''
     Compute who infects whom
 
@@ -76,11 +73,9 @@ def compute_infections(foi, f_inf, m_inf, f, m, sus_imm): # pragma: no cover
     tlist = np.empty(0, dtype=hpd.default_int)
 
     # Get the indices of partnerships that involve people infected with this genotype
-    # TODO: speed comparison of this method vs the previous covasim method
-    orig_indices_m = m.argsort()
-    orig_indices_f = f.argsort()
-    m_inf_pships = orig_indices_m[np.searchsorted(m[orig_indices_m], m_inf)]
-    f_inf_pships = orig_indices_f[np.searchsorted(f[orig_indices_f], f_inf)]
+    # TODO: this method is much too slow, will need to go back to the old method
+    m_inf_pships = np.nonzero(m_inf[:,None] == m)[1]
+    f_inf_pships = np.nonzero(f_inf[:,None] == f)[1]
     pairs = [[m_inf_pships, f[m_inf_pships]], [f_inf_pships, m[f_inf_pships]]]
 
     for sources,targets in pairs:
