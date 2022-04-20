@@ -366,14 +366,18 @@ class Sim(hpb.BaseSim):
             for lkey, layer in contacts.items():
                 f = layer['f']
                 m = layer['m']
+                effective_condoms = hpd.default_float(condoms[lkey]*eff_condoms)
 
                 # Get the number of acts in this timestep for this partnership type
                 frac_acts, whole_acts = np.modf(layer['acts']*dt) # Get the number of acts per timestep for this layer
-                whole_acts = whole_acts.astype(int)
+                whole_acts = whole_acts.astype(hpd.default_int)
 
                 # Compute transmissibility and infections
-                foi = hpu.compute_foi(beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)# TODO how to factor in immunity/susceptibility here?
-                source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f, m, sus_imm)  # Calculate transmission
+                foi_whole = hpu.compute_foi_whole(beta, effective_condoms, whole_acts)
+                foi_frac  = hpu.compute_foi_frac(beta, effective_condoms, frac_acts)
+                foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
+
+                source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
         # Update counts for this time step: stocks

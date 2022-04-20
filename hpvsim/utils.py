@@ -33,30 +33,27 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
-# @nb.njit(           (nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
-def compute_foi_frac(beta,    condoms, eff_condoms, frac_acts): 
+@nb.njit(           (nbfloat, nbfloat,           nbfloat[:]  ), cache=cache, parallel=safe_parallel)
+def compute_foi_frac(beta,    effective_condoms, frac_acts): 
     ''' Compute probability of each person **NOT** transmitting over some fractional number of acts '''
-    foi_frac = 1 - frac_acts * beta * (1 - condoms*eff_condoms) 
+    foi_frac = 1 - frac_acts * beta * (1 - effective_condoms) 
     return foi_frac
 
-# @nb.njit(            (nbfloat, nbfloat, nbfloat,     nbfloat   ), cache=cache, parallel=safe_parallel)
-def compute_foi_whole(beta,    condoms, eff_condoms, n): 
+@nb.njit(            (nbfloat, nbfloat,           nbint[:]   ), cache=cache, parallel=safe_parallel)
+def compute_foi_whole(beta,    effective_condoms, n): 
     ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
-    foi_whole = np.power(1 - beta * (1 - condoms*eff_condoms), n)
+    foi_whole = np.power(1 - beta * (1 - effective_condoms), n)
     return foi_whole
     
-# @nb.njit(      (nbfloat, nbfloat, nbfloat,     nbfloat, nbfloat,   nbbool[:]), cache=cache, parallel=safe_parallel)
-def compute_foi(beta,    condoms, eff_condoms, n,       frac_acts, inf):
+@nb.njit(      (nbfloat[:], nbfloat[:], ), cache=cache, parallel=safe_parallel)
+def compute_foi(foi_whole,  foi_frac):
     ''' Compute overall probability of infection'''
-    foi_whole = compute_foi_whole(beta, condoms, eff_condoms, n)
-    foi_frac  = compute_foi_frac(beta, condoms, eff_condoms, frac_acts)
     foi = 1 - (foi_whole*foi_frac)
     return foi
 
 
-
-#@nb.njit(             (nbfloat,  nbint[:], nbint[:], nbfloat[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi, f_inf, m_inf, f, m, sus_imm): # pragma: no cover
+# @nb.njit(             (nbfloat[:],  nbint[:], nbint[:], nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
+def compute_infections(foi,         f_inf,    m_inf,    f,        m): 
     '''
     Compute who infects whom
 
@@ -72,27 +69,20 @@ def compute_infections(foi, f_inf, m_inf, f, m, sus_imm): # pragma: no cover
     '''
     # slist = np.empty(0, dtype=nbint)
     # tlist = np.empty(0, dtype=nbint)
-
     slist = np.empty(0, dtype=hpd.default_int)
     tlist = np.empty(0, dtype=hpd.default_int)
-    pairs = [[f,m], [m,f]]
 
-    # import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+    # Get the indices of partnerships that involve people infected with this genotype
+    # TODO: this method is much too slow, will need to go back to the old method
+    m_inf_pships = np.nonzero(m_inf[:,None] == m)[1]
+    f_inf_pships = np.nonzero(f_inf[:,None] == f)[1]
+    pairs = [[m_inf_pships, f[m_inf_pships]], [f_inf_pships, m[f_inf_pships]]]
 
     for sources,targets in pairs:
-        source_trans     = foi[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
-        inf_inds         = source_trans.nonzero()[0] # Infectious indices -- remove noninfectious people
-        betas            = source_trans[inf_inds] # Calculate the raw transmission probabilities
-        nonzero_inds     = betas.nonzero()[0] # Find nonzero entries
-        nonzero_inf_inds = inf_inds[nonzero_inds] # Map onto original indices
-        nonzero_betas    = betas[nonzero_inds] # Remove zero entries from beta
-        nonzero_sources  = sources[nonzero_inf_inds] # Remove zero entries from the sources
-        nonzero_targets  = targets[nonzero_inf_inds] # Remove zero entries from the targets
-        sus_targets      = sus_imm[nonzero_targets]
-        trans_probs      = nonzero_betas * (1-sus_targets)
-        transmissions    = (np.random.random(len(nonzero_betas)) < trans_probs).nonzero()[0] # Compute the actual infections!
-        source_inds      = nonzero_sources[transmissions]
-        target_inds      = nonzero_targets[transmissions] # Filter the targets on the actual infections
+        betas            = foi[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
+        transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Compute the actual infections!
+        source_inds      = sources[transmissions]
+        target_inds      = targets[transmissions] # Filter the targets on the actual infections
         slist = np.concatenate((slist, source_inds), axis=0)
         tlist = np.concatenate((tlist, target_inds), axis=0)
     return slist, tlist
