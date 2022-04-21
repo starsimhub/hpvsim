@@ -328,7 +328,7 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation already complete (call sim.initialize() to re-run)')
 
         # Shorten key variables
-        dt = self['dt'] # Timestep; TODO centralize this somewhere
+        dt = self['dt'] # Timestep
         t = self.t
         ng = self['n_genotypes']
         condoms = self['condoms']
@@ -341,20 +341,18 @@ class Sim(hpb.BaseSim):
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
+
         contacts = people.contacts # Shorten
+        sus_inds = hpu.true(people.susceptible) # Get indices of susceptible people
 
-        # Get indices of 'discordant' partnerships
-        sus_inds = people.susceptible.nonzero()[0]
-
-        # Loop over layers to get indices of discordant partnerships
+        # Loop over layers to get indices of discordant partnerships and precalculate acts 
         f_sus_pships, m_sus_pships, whole_acts, frac_acts, effective_condoms = [], [], [], [], []
         for lkey, layer in contacts.items():
             f = layer['f']
             m = layer['m']
             f_sus_pships.append(hpu.isin(f, sus_inds)) # Indices of partnerships in which the female is susceptible
-            m_sus_pships.append(hpu.isin(m, sus_inds)) # and vice versa
-            # Get the number of acts in this timestep for this partnership type
-            fa, wa = np.modf(layer['acts']*dt) # Get the number of acts per timestep for this layer
+            m_sus_pships.append(hpu.isin(m, sus_inds)) # ...and vice versa
+            fa, wa = np.modf(layer['acts']*dt) # Get the number of acts per timestep for this partnership type
             wa = wa.astype(hpd.default_int)
             whole_acts.append(wa)
             frac_acts.append(fa)
@@ -387,10 +385,10 @@ class Sim(hpb.BaseSim):
                 foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
                 
                 # Compute transmissions
-                source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f_sus_pships[ln], m_sus_pships[ln], f, m)  # Calculate transmission
+                source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f_sus_pships[ln], m_sus_pships[ln], f, m, sus_imm)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
-                ln +=1
+                ln += 1
 
         # Update counts for this time step: stocks
         for key in hpd.result_stocks.keys():

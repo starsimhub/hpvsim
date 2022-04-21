@@ -71,9 +71,8 @@ def isin(arr, vals):
             result[i] = True
     return result.reshape(shape)
 
-
 # @nb.njit(             (nbfloat[:],  nbbool[:],    nbbool[:],    nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m):
+def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m, sus_imm):
     '''
     Compute who infects whom
 
@@ -102,7 +101,7 @@ def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m):
 
     # Loop over partnerships that involve people infected with this genotype
     for sources,targets in pairs:
-        betas            = foi[sources] # Pull out the transmissibility associated with this partnership
+        betas            = foi[sources]*(1-sus_imm[targets]) # Pull out the transmissibility associated with this partnership
         transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
         source_inds      = sources[transmissions] # TODO: this is wrong currently
         target_inds      = targets[transmissions] # Extract indices of those who got infected
