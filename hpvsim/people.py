@@ -384,7 +384,7 @@ class People(hpb.BasePeople):
         self.flows['new_infections']   += len(inds)
         self.flows_genotype['new_infections_by_genotype'][genotype] += len(inds)
 
-        # # Record transmissions
+        # # Record transmissions. TODO: this works, but slows does runtime by a LOT
         # for i, target in enumerate(inds):
         #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, genotype=genotype_label)
         #     self.infection_log.append(entry)

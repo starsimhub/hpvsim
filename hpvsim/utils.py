@@ -98,17 +98,16 @@ def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m, sus_
     # Indices of discordant partnerships
     f_source_pships = isin(f, f_inf) * m_sus_pships # Female has an infection, male is susceptible...
     m_source_pships = isin(m, m_inf) * f_sus_pships # ... and vice versa
-
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
     m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
-    pairs = [[f_source_inds, m[f_source_inds]], [m_source_inds, f[m_source_inds]]]
+    discordant_pairs = [[f_source_inds, f, m], [m_source_inds, m, f]]
 
-    # Loop over partnerships that involve people infected with this genotype
-    for sources,targets in pairs:
-        betas            = foi[sources]*(1-sus_imm[targets]) # Pull out the transmissibility associated with this partnership
+    # Loop over partnerships that involve one person infected with this genotype and one susceptible person
+    for pship_inds, sources, targets in discordant_pairs:
+        betas            = foi[pship_inds]*(1-sus_imm[targets[pship_inds]]) # Pull out the transmissibility associated with this partnership
         transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
-        source_inds      = sources[transmissions] # TODO: this is wrong currently
-        target_inds      = targets[transmissions] # Extract indices of those who got infected
+        source_inds      = sources[pship_inds][transmissions] # Extract indices of those who passed on an infection
+        target_inds      = targets[pship_inds][transmissions] # Extract indices of those who got infected
         slist = np.concatenate((slist, source_inds), axis=0)
         tlist = np.concatenate((tlist, target_inds), axis=0)
     return slist, tlist

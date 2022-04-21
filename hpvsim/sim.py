@@ -387,7 +387,6 @@ class Sim(hpb.BaseSim):
                 # Compute transmissions
                 source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f_sus_pships[ln], m_sus_pships[ln], f, m, sus_imm)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
-
                 ln += 1
 
         # Update counts for this time step: stocks
