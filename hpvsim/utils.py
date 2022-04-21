@@ -71,6 +71,10 @@ def isin(arr, vals):
             result[i] = True
     return result.reshape(shape)
 
+def findinds(arr, vals):
+    ''' Finds indices of vals in arr, accounting for repeats '''
+    return true(isin(arr,vals))
+
 # @nb.njit(             (nbfloat[:],  nbbool[:],    nbbool[:],    nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
 def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m, sus_imm):
     '''

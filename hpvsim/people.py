@@ -412,8 +412,8 @@ class People(hpb.BasePeople):
 
         # Remove dead people from contact network by setting the end date of any partnership they're in to now
         for contacts in self.contacts.values():
-            m_inds = hpu.true(hpu.isin(contacts['m'], inds))
-            f_inds = hpu.true(hpu.isin(contacts['f'], inds))
+            m_inds = hpu.findinds(contacts['m'], inds)
+            f_inds = hpu.findinds(contacts['f'], inds)
             pships_to_end = contacts.pop_inds(np.concatenate([f_inds, m_inds]))
             pships_to_end['end']*=0+self.t # Reset end date to now
             contacts.append(pships_to_end)
