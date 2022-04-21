@@ -154,14 +154,10 @@ def update_immunity(people, inds):
     '''
     Step immunity levels forward in time
     '''
-    t_since_boost = people.t-people.t_imm_event[:,inds].astype(hpd.default_int)
-    # create n_imm_source x len(inds) array for imm_kin
-    imm_kin = np.ones((people.pars['n_genotypes'], len(inds)))
+    t_since_boost = people.t - people.t_imm_event[:,inds].astype(hpd.default_int)
+    imm_kin = people.pars['imm_kin'][:,t_since_boost[:,:]][0] # Get people's current level of immunity
 
-    for i, imm_source in enumerate(t_since_boost):
-        for j, time in enumerate(imm_source):
-            imm_kin[i,j] = people.pars['imm_kin'][i, time]
-
+    # Set immunity relative to peak
     people.imm[:,inds] += imm_kin*people.peak_imm[:,inds]
     people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
     people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
