@@ -105,7 +105,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 durations = sim['dur_pship'][lkey]
                 acts = sim['acts'][lkey]
                 contacts[lkey], current_partners[lkey] = make_random_contacts(p_count=partners[lkey], sexes=sexes, n=n, durations=durations, acts=acts, mapping=active_inds_layer, **kwargs)
-        else: # pragma: no cover
+        else: 
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
             raise NotImplementedError(errormsg)
 
@@ -281,6 +281,8 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, acts=
     output['acts'] = hpu.sample(**acts, size=n_partnerships)
     output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
     output['end'] = output['start'] + output['dur']
+
+    # TODO: count the number of acts for each person
 
     return output, actual_p_count
 

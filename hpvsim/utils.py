@@ -53,7 +53,7 @@ def compute_foi(foi_whole,  foi_frac):
 
 
 # @nb.njit(             (nbfloat[:],  nbint[:], nbint[:], nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi,         f_inf,    m_inf,    f,        m): 
+def compute_infections(foi, pairs):#        f_inf,    m_inf,    f,        m): 
     '''
     Compute who infects whom
 
@@ -74,9 +74,10 @@ def compute_infections(foi,         f_inf,    m_inf,    f,        m):
 
     # Get the indices of partnerships that involve people infected with this genotype
     # TODO: this method is much too slow, will need to go back to the old method
-    m_inf_pships = np.nonzero(m_inf[:,None] == m)[1]
-    f_inf_pships = np.nonzero(f_inf[:,None] == f)[1]
-    pairs = [[m_inf_pships, f[m_inf_pships]], [f_inf_pships, m[f_inf_pships]]]
+    # m_inf_pships = np.nonzero(m_inf[:,None] == m)[1]
+    # f_inf_pships = np.nonzero(f_inf[:,None] == f)[1]
+    # pairs = [[m_inf_pships, f[m_inf_pships]], [f_inf_pships, m[f_inf_pships]]]
+    # pairs = [[m, f], [f, m]]
 
     for sources,targets in pairs:
         betas            = foi[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)

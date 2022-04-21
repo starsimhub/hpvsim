@@ -377,7 +377,19 @@ class Sim(hpb.BaseSim):
                 foi_frac  = hpu.compute_foi_frac(beta, effective_condoms, frac_acts)
                 foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
-                source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f, m)  # Calculate transmission
+                m_inf_pships = hpu.true(np.in1d(m, m_inf))
+                f_inf_pships = hpu.true(np.in1d(f, f_inf))
+                # import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+                # idx_m = np.searchsorted(m_inf, m) # Get indices of occurrences of first column in num_list
+                # idx_f = np.searchsorted(f_inf, f) # Get indices of occurrences of first column in num_list
+                # idx_m[idx_m==len(m_inf)] = 0 
+                # idx_f[idx_f==len(f_inf)] = 0 
+                # m_inf_pships = hpu.true(m == m_inf[idx_m])
+                # f_inf_pships = hpu.true(f == f_inf[idx_f])
+
+                pairs = [[m_inf_pships, f[m_inf_pships]], [f_inf_pships, m[f_inf_pships]]]
+
+                source_inds, target_inds = hpu.compute_infections(foi, pairs)#f_inf, m_inf, f, m)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
 
         # Update counts for this time step: stocks
