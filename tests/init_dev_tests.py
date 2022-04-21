@@ -61,21 +61,6 @@ if __name__ == '__main__':
     # sim1 = test_basic() # NOT WORKING
     sim2 = test_genotypes()
 
-    # # Check that population growth is about right
-    # pop_growth = (sim0.results['n_alive'][1:]/sim0.results['n_alive'][:-1]-1)/sim0['dt']
-
-    # # Plot people
-    # snapshot = sim0['analyzers'][0]
-    # people_2015 = snapshot.snapshots[0]
-    # people_2020 = snapshot.snapshots[1]
-    # people_2015.plot()
-    # people_2020.plot()
-
-
-
-
-
-
 
 
 

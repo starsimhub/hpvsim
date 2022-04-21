@@ -45,15 +45,35 @@ def compute_foi_whole(beta,    effective_condoms, n):
     foi_whole = np.power(1 - beta * (1 - effective_condoms), n)
     return foi_whole
     
-@nb.njit(      (nbfloat[:], nbfloat[:], ), cache=cache, parallel=safe_parallel)
+@nb.njit(      (nbfloat[:], nbfloat[:] ), cache=cache, parallel=safe_parallel)
 def compute_foi(foi_whole,  foi_frac):
     ''' Compute overall probability of infection'''
     foi = 1 - (foi_whole*foi_frac)
     return foi
 
+@nb.njit(      (nbbool[:], nbbool[:]), cache=cache, parallel=safe_parallel)
+def get_sources(inf,       sex):
+    ''' Get indices of sources, i.e. people with current infections '''
+    f_inf = (inf * ~sex).nonzero()[0]
+    m_inf = (inf * sex).nonzero()[0]
+    return f_inf, m_inf
 
-# @nb.njit(             (nbfloat[:],  nbint[:], nbint[:], nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi, pairs):#        f_inf,    m_inf,    f,        m): 
+@nb.jit(parallel=safe_parallel)
+def isin(arr, vals):
+    ''' Finds indices of vals in arr. Like np.isin() but faster '''
+    shape = arr.shape
+    arr = arr.ravel()
+    n = len(arr)
+    result = np.full(n, False)
+    set_vals = set(vals)
+    for i in nb.prange(n): 
+        if arr[i] in set_vals:
+            result[i] = True
+    return result.reshape(shape)
+
+
+# @nb.njit(             (nbfloat[:],  nbbool[:],    nbbool[:],    nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
+def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m):
     '''
     Compute who infects whom
 
@@ -62,7 +82,7 @@ def compute_infections(foi, pairs):#        f_inf,    m_inf,    f,        m):
     in both directions (i.e., targets become sources).
 
     Args:
-        beta: transmission probabilities
+        foi: transmission probabilities associated with each partnership
         f: female in the pair
         m: male in the pair
         sus_imm: immunity to this genotype
@@ -72,18 +92,20 @@ def compute_infections(foi, pairs):#        f_inf,    m_inf,    f,        m):
     slist = np.empty(0, dtype=hpd.default_int)
     tlist = np.empty(0, dtype=hpd.default_int)
 
-    # Get the indices of partnerships that involve people infected with this genotype
-    # TODO: this method is much too slow, will need to go back to the old method
-    # m_inf_pships = np.nonzero(m_inf[:,None] == m)[1]
-    # f_inf_pships = np.nonzero(f_inf[:,None] == f)[1]
-    # pairs = [[m_inf_pships, f[m_inf_pships]], [f_inf_pships, m[f_inf_pships]]]
-    # pairs = [[m, f], [f, m]]
+    # Indices of discordant partnerships
+    f_source_pships = isin(f, f_inf) * m_sus_pships # Female has an infection, male is susceptible...
+    m_source_pships = isin(m, m_inf) * f_sus_pships # ... and vice versa
 
+    f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
+    m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
+    pairs = [[f_source_inds, m[f_source_inds]], [m_source_inds, f[m_source_inds]]]
+
+    # Loop over partnerships that involve people infected with this genotype
     for sources,targets in pairs:
-        betas            = foi[sources] # Pull out the transmissibility of the sources (0 for non-infectious people)
-        transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Compute the actual infections!
-        source_inds      = sources[transmissions]
-        target_inds      = targets[transmissions] # Filter the targets on the actual infections
+        betas            = foi[sources] # Pull out the transmissibility associated with this partnership
+        transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
+        source_inds      = sources[transmissions] # TODO: this is wrong currently
+        target_inds      = targets[transmissions] # Extract indices of those who got infected
         slist = np.concatenate((slist, source_inds), axis=0)
         tlist = np.concatenate((tlist, target_inds), axis=0)
     return slist, tlist
