@@ -239,6 +239,7 @@ class People(hpb.BasePeople):
         self.infectious[inds]       = False
         self.recovered[inds]        = True
         self.recovered_genotype[inds] = self.infectious_genotype[inds]
+        self.susceptible[inds] = True
         self.infectious_genotype[inds] = np.nan
         self.infectious_by_genotype[:, inds] = False
 
