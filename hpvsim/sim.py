@@ -328,10 +328,9 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation already complete (call sim.initialize() to re-run)')
 
         # Shorten key variables
-        dt = self['dt'] # Timestep; TODO centralize this somewhere
+        dt = self['dt'] # Timestep
         t = self.t
         ng = self['n_genotypes']
-        acts = self['acts']
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         rel_beta = self['rel_beta']
@@ -342,11 +341,22 @@ class Sim(hpb.BaseSim):
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
-        contacts = people.contacts # Shorten
 
-        # Loop over genotypes and infect people
-        prel_trans = people.rel_trans
-        sus = people.susceptible
+        contacts = people.contacts # Shorten
+        sus_inds = hpu.true(people.susceptible) # Get indices of susceptible people
+
+        # Loop over layers to get indices of discordant partnerships and precalculate acts 
+        f_sus_pships, m_sus_pships, whole_acts, frac_acts, effective_condoms = [], [], [], [], []
+        for lkey, layer in contacts.items():
+            f = layer['f']
+            m = layer['m']
+            f_sus_pships.append(hpu.isin(f, sus_inds)) # Indices of partnerships in which the female is susceptible
+            m_sus_pships.append(hpu.isin(m, sus_inds)) # ...and vice versa
+            fa, wa = np.modf(layer['acts']*dt) # Get the number of acts per timestep for this partnership type
+            wa = wa.astype(hpd.default_int)
+            whole_acts.append(wa)
+            frac_acts.append(fa)
+            effective_condoms.append(hpd.default_float(condoms[lkey]*eff_condoms))
 
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
@@ -354,25 +364,30 @@ class Sim(hpb.BaseSim):
             hpimm.check_immunity(people, genotype)
 
             # Deal with genotype parameters
-            genotype_label = self.pars['genotype_map'][genotype]
-            rel_beta *= self['genotype_pars'][genotype_label]['rel_beta']
-            beta = hpd.default_float(self['beta'] * rel_beta)
-            foi_frac, foi_whole = 1, 1
+            genotype_label  = self.pars['genotype_map'][genotype]
+            rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
+            beta            = hpd.default_float(self['beta'] * rel_beta)
+            inf_genotype    = people.infectious_genotype == genotype
+            sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
 
+            # Get indices of males and females infected with this genotype
+            f_inf, m_inf = hpu.get_sources(inf_genotype, people.sex.astype(bool))
+
+            # Loop over layers
+            ln = 0 # Layer number
             for lkey, layer in contacts.items():
                 f = layer['f']
                 m = layer['m']
-                frac_acts, whole_acts = np.modf(acts[lkey]*dt) # Get the number of acts per timestep for this layer
-                whole_acts = int(whole_acts)
 
-                # Compute relative transmission and susceptibility
-                inf_genotype = people.infectious * (people.infectious_genotype == genotype)
-                sus_imm = people.sus_imm[genotype,:]
-
-                # Compute transmissibility and infections
-                foi = hpu.compute_foi(prel_trans, beta, condoms[lkey], eff_condoms, whole_acts, frac_acts, inf_genotype)#(foi_frac, foi_whole, inf) TODO how to factor in immunity/susceptibility here?
-                source_inds, target_inds = hpu.compute_infections(foi, f, m, sus_imm)  # Calculate transmission
+                # Compute transmissibility for each partnership
+                foi_whole = hpu.compute_foi_whole(beta, effective_condoms[ln], whole_acts[ln])
+                foi_frac  = hpu.compute_foi_frac(beta, effective_condoms[ln], frac_acts[ln])
+                foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
+                
+                # Compute transmissions
+                source_inds, target_inds = hpu.compute_infections(foi, f_inf, m_inf, f_sus_pships[ln], m_sus_pships[ln], f, m, sus_imm)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
+                ln += 1
 
         # Update counts for this time step: stocks
         for key in hpd.result_stocks.keys():

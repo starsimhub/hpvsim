@@ -136,7 +136,6 @@ class People(hpb.BasePeople):
         ''' Perform initializations '''
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
         self.set_pars(sim_pars) # Replace the saved parameters with this simulation's
-        self.rel_trans[:] = hpu.sample(**self.pars['beta_dist'], size=len(self)) # Default transmissibilities, with viral load drawn from a distribution
         self.initialized = True
         return
 
@@ -198,11 +197,12 @@ class People(hpb.BasePeople):
             self.current_partners[lkey][new_pship_inds] += 1
 
             # Add everything to a contacts dictionary
-            new_pships[lkey]['f'] = new_pship_inds_f
-            new_pships[lkey]['m'] = new_pship_inds_m
-            new_pships[lkey]['dur'] = hpu.sample(**self['pars']['dur_pship'][lkey], size=n_new[lkey])
-            new_pships[lkey]['start'] = np.array([t*self['pars']['dt']]*n_new[lkey],dtype=hpd.default_float)
-            new_pships[lkey]['end'] = new_pships[lkey]['start'] + new_pships[lkey]['dur']
+            new_pships[lkey]['f']       = new_pship_inds_f
+            new_pships[lkey]['m']       = new_pship_inds_m
+            new_pships[lkey]['dur']     = hpu.sample(**self['pars']['dur_pship'][lkey], size=n_new[lkey])
+            new_pships[lkey]['start']   = np.array([t*self['pars']['dt']]*n_new[lkey],dtype=hpd.default_float)
+            new_pships[lkey]['end']     = new_pships[lkey]['start'] + new_pships[lkey]['dur']
+            new_pships[lkey]['acts']    = hpu.sample(**self['pars']['acts'][lkey], size=n_new[lkey]) # Acts per year for this pair, assumed constant over the duration of the partnership (TODO: EMOD uses a decay factor for this, consider?)
 
         self.add_contacts(new_pships)
             
@@ -384,7 +384,7 @@ class People(hpb.BasePeople):
         self.flows['new_infections']   += len(inds)
         self.flows_genotype['new_infections_by_genotype'][genotype] += len(inds)
 
-        # # Record transmissions
+        # # Record transmissions. TODO: this works, but slows does runtime by a LOT
         # for i, target in enumerate(inds):
         #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, genotype=genotype_label)
         #     self.infection_log.append(entry)
@@ -412,8 +412,8 @@ class People(hpb.BasePeople):
 
         # Remove dead people from contact network by setting the end date of any partnership they're in to now
         for contacts in self.contacts.values():
-            m_inds = np.nonzero(inds[:,None] == contacts['m'])[1]
-            f_inds = np.nonzero(inds[:,None] == contacts['f'])[1]
+            m_inds = hpu.findinds(contacts['m'], inds)
+            f_inds = hpu.findinds(contacts['f'], inds)
             pships_to_end = contacts.pop_inds(np.concatenate([f_inds, m_inds]))
             pships_to_end['end']*=0+self.t # Reset end date to now
             contacts.append(pships_to_end)

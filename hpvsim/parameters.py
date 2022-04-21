@@ -45,7 +45,8 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
 
     # Network parameters, generally initialized after the population has been constructed
-    pars['debut']           = dict(dist='normal', par1=15.5, par2=1.5) # Age of sexual debut; TODO separate for M/F?
+    pars['debut']           = dict(f=dict(dist='normal', par1=18.6, par2=2.1), # Location-specific data should be used here if possible
+                                   m=dict(dist='normal', par1=19.6, par2=1.8))
     pars['partners']        = None  # The number of concurrent sexual partners per layer
     pars['acts']            = None  # The number of sexual acts per layer per year
     pars['condoms']         = None  # The proportion of acts in which condoms are used
@@ -123,16 +124,17 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     # Specify defaults for random -- layer 'a' for 'all'
     layer_defaults['random'] = dict(
         partners    = dict(a=1),    # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
-        acts        = dict(a=104),  # Default number of sexual acts per year; TODO make this a distribution
+        acts        = dict(a=dict(dist='neg_binomial', par1=100,par2=50)),  # Default number of sexual acts per year
         layer_probs = dict(a=1.0),  # Default proportion of the population in each layer
-        dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships; TODO make this a distribution
+        dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships
         condoms     = dict(a=0.25),  # Default proportion of acts in which condoms are used
     )
 
     # Specify defaults for basic sexual network with regular and casual partners
     layer_defaults['basic'] = dict(
         partners    = dict(r=1, c=2),       # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
-        acts        = dict(r=100, c=50),    # Default number of sexual acts per year; TODO make this a distribution
+        acts        = dict(r=dict(dist='neg_binomial', par1=80, par2=40),
+                           c=dict(dist='neg_binomial', par1=10, par2=5)),
         layer_probs = dict(r=0.7, c=0.4),   # Default proportion of the population in each layer
         dur_pship   = dict(r=dict(dist='normal_pos', par1=10,par2=3),
                            c=dict(dist='normal_pos', par1=2, par2=1)),
