@@ -97,7 +97,7 @@ class Sim(hpb.BaseSim):
             if self['n_years']:
                 self['end'] = self['start'] + self['n_years']
             else:
-                errormsg = f'You must supply one of n_years and end_day."'
+                errormsg = f'You must supply one of n_years and end."'
                 raise ValueError(errormsg)
         
         # Construct other things that keep track of time
