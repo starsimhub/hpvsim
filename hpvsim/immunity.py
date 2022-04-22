@@ -97,9 +97,11 @@ def init_immunity(sim, create=False):
 
         # Next, overwrite these defaults with any known immunity values about specific genotypes
         default_cross_immunity = hppar.get_cross_immunity()
+        imm_decay = sc.dcp(sim['imm_decay']['infection'])
+        imm_decay['half_life'] /= sim['dt']
         for i in range(ng):
             sim['immunity_map'][i] = 'infection'
-            sim['imm_kin'][i, :] = precompute_waning(length=sim.npts, pars=sim['imm_decay']['infection'])
+            sim['imm_kin'][i, :] = precompute_waning(length=sim.npts, pars=imm_decay)
             label_i = sim['genotype_map'][i]
             for j in range(ng):
                 label_j = sim['genotype_map'][j]
