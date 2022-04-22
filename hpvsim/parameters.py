@@ -97,8 +97,6 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
     reset_layer_pars(pars)
-    if set_prognoses: # If not set here, gets set when the population is initialized
-        pars['prognoses'] = get_prognoses() # Default to age-specific prognoses
 
     return pars
 
