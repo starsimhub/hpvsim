@@ -12,7 +12,7 @@ from .data import loaders as hpdata
 __all__ = ['make_pars', 'reset_layer_pars', 'get_prognoses']
 
 
-def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwargs):
+def make_pars(version=None, nonactive_by_age=False, **kwargs):
     '''
     Create the parameters for the simulation. Typically, this function is used
     internally rather than called by the user; e.g. typical use would be to do
@@ -83,8 +83,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Duration parameters
     pars['dur'] = {}
-
-    pars['dur']['inf']  = dict(dist='lognormal', par1=1.0, par2=1.0)  # Duration of infection in YEARS
+    pars['dur']['inf2rec'] = dict(dist='lognormal', par1=2.0, par2=5.0) # Duration from infectious to recovered in YEARS
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
@@ -174,46 +173,6 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         pars[pkey] = par # Save this parameter to the dictionary
 
     return
-
-
-def get_prognoses():
-    '''
-    Return the default parameter values for prognoses
-
-    The prognosis probabilities are conditional given the previous disease state.
-
-    Returns:
-        prog_pars (dict): the dictionary of prognosis probabilities
-    '''
-
-    prognoses = dict(
-        duration_cutoff   = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
-        CIN_probs         = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Overall probability of developing pre-cancer
-        cancer_probs      = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Overall probability of developing cancer
-        death_probs       = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Overall probability of dying from cancer
-        )
-    prognoses = relative_prognoses(prognoses) # Convert to conditional probabilities
-
-    # Check that lengths match
-    expected_len = len(prognoses['age_cutoffs'])
-    for key,val in prognoses.items():
-        this_len = len(prognoses[key])
-        if this_len != expected_len: # pragma: no cover
-            errormsg = f'Lengths mismatch in prognoses: {expected_len} duration bins specified, but key "{key}" has {this_len} entries'
-            raise ValueError(errormsg)
-
-    return prognoses
-
-
-def relative_prognoses(prognoses):
-    '''
-    Convenience function to revert absolute prognoses into relative (conditional)
-    ones. Internally, HPVsim uses relative prognoses.
-    '''
-    out = sc.dcp(prognoses)
-    out['cancer_probs']  /= out['CIN_probs']   # Conditional probability of developing cancer, given getting CIN
-    out['death_probs']   /= out['cancer_probs'] # Conditional probability of dying from cancer, given getting cancer
-    return out
 
 
 def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):

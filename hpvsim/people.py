@@ -393,7 +393,7 @@ class People(hpb.BasePeople):
         # Set the dates of infection and recovery -- for now, just assume everyone recovers
         dt = self.pars['dt']
         self.date_infectious[inds] = self.t
-        dur_inf2rec = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
+        dur_inf2rec = hpu.sample(**durpars['inf2rec'], size=len(inds)) # Duration of infection in YEARS
         self.date_recovered[inds] = self.date_infectious[inds] + np.ceil(dur_inf2rec/dt)  # Date they recover (interpreted as the timestep on which they recover)
         self.dur_disease[inds] = dur_inf2rec
 

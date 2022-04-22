@@ -11,7 +11,7 @@ from . import misc as hpm
 # from . import base as cvb
 from . import data as hpdata
 from . import defaults as hpd
-from . import parameters as hppar
+# from . import parameters as cvpar
 from . import people as hpppl
 
 
@@ -112,10 +112,6 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['contacts']   = contacts
         popdict['current_partners']   = current_partners
         popdict['layer_keys'] = list(partners.keys())
-
-    # Ensure prognoses are set
-    if sim['prognoses'] is None:
-        sim['prognoses'] = hppar.get_prognoses(sim['prog_by_age'], version=sim._default_ver)
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)

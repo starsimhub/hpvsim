@@ -52,26 +52,19 @@ class PeopleMeta(sc.prettyobj):
             'susceptible',
             'naive',
             'infectious',
-            'precancer',
-            'cancer',
             'recovered',
-            'dead_cancer', # Dead from cancer
             'other_dead',  # Dead from all other causes
         ]
 
         # Genotype states -- these are ints
         self.genotype_states = [
             'infectious_genotype',
-            'precancer_genotype',
-            'cancer_genotype',
             'recovered_genotype',
         ]
 
         # Genotype states -- these are ints, by genotype
         self.by_genotype_states = [
             'infectious_by_genotype',
-            'precancer_by_genotype',
-            'cancer_by_genotype'
         ]
 
         # Immune states, by genotype
@@ -118,34 +111,24 @@ class PeopleMeta(sc.prettyobj):
 result_stocks = {
     'susceptible': 'Number susceptible',
     'infectious':  'Number infectious',
-    'precancer':   'Number pre-cancerous',
-    'cancer':      'Number cervical cancer',
     'recovered':   'Number recovered',
-    'dead_cancer': 'Number dead from cervical cancer',
     'other_dead':  'Number dead from other causes',
 }
 
 result_stocks_by_genotype = {
     'infectious_by_genotype': 'Number infectious by genotype',
-    'precancer_by_genotype' : 'Number precancerous by genotype',
-    'cancer_by_genotype'    : 'Number cervical cancer by genotype'
 }
 
 # The types of result that are counted as flows -- used in sim.py; value is the label suffix
 result_flows = {
     'infections':   'infections',
-    'precancers':   'pre-cancers',
-    'cancers':      'cancers',
     'recoveries':   'recoveries',
-    'cancer_deaths': 'deaths from cervical cancer',
     'other_deaths': 'deaths from other causes',
     'births':       'births'
 }
 
 result_flows_by_genotype = {
     'infections_by_genotype':  'infections by genotype',
-    'precancers_by_genotype' :  'precancers by genotype',
-    'cancers_by_genotype'    :  'cervical cancers by genotype'
 }
 
 
@@ -246,23 +229,13 @@ def get_default_colors():
     c.susceptible           = '#4d771e'
     c.infectious            = '#e45226'
     c.infections            = '#b62413'
-    c.precancer             = c.default
-    c.cancers               = c.default
-    c.precancers            = c.default
-    c.cancer                = c.default
     c.infectious_by_genotype = c.infectious
     c.infections_by_genotype = '#b62413'
-    c.precancer_by_genotype  = c.default
-    c.cancer_by_genotype    = c.default
-    c.precancers_by_genotype = c.default
-    c.cancers_by_genotype = c.default
     c.reinfections          = '#732e26'
     c.recoveries            = '#9e1149'
     c.recovered             = c.recoveries
     c.default               = '#000000'
     c.other_deaths          = '#000000'
-    c.cancer_deaths         = c.default
-    c.dead_cancer           = c.default
     c.other_dead            = c.other_deaths
     c.births                = '#797ef6'
     return c
