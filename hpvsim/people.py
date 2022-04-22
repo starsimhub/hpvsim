@@ -248,9 +248,14 @@ class People(hpb.BasePeople):
         return len(inds)
 
     def check_cancer(self, genotype):
-        ''' Check for new progressions to cancer '''
+        '''
+        Check for new progressions to cancer
+        Once an individual has cancer they are no longer susceptible to new HPV infections or CINs and no longer infectious
+        '''
         inds = self.check_inds(self.cancer_by_genotype[genotype,:], self.date_cancer_by_genotype[genotype,:], filter_inds=self.is_CIN)
         self.cancer_by_genotype[genotype, inds] = True
+        self.susceptible_by_genotype[:, inds] = False
+        self.infectious_by_genotype[:, inds] = False
         return len(inds)
 
     def check_hpv_clearance(self, genotype):
