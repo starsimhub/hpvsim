@@ -83,7 +83,6 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
 
     # Duration parameters
     pars['dur'] = {}
-
     pars['dur']['inf2rec']  = dict(dist='lognormal', par1=2.0, par2=5.0)  # Duration from infectious to recovered in YEARS
 
     # Efficacy of protection

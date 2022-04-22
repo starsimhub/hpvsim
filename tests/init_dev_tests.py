@@ -55,11 +55,45 @@ def test_genotypes():
     return sim
 
 
+def test_interventions():
+    ''' Template to develop tests for interventions'''
+    from hpvsim.sim import Sim
+    from hpvsim.immunity import genotype
+    import hpvsim.interventions as hpint
+
+    hpv16 = genotype('HPV16')
+    hpv18 = genotype('HPV18')
+    pars = {
+        'network': 'basic',
+        'genotypes': [hpv16, hpv18],
+    }
+
+    # Model an intervention to increase condom use
+    condom_int = hpint.dynamic_pars(
+        condoms=dict(timepoints=10, vals={'c': 0.9}))  # Increase condom use among casual partners to 90%
+
+    # Model an intervention to increase the age of sexual debut
+    debut_int = hpint.dynamic_pars(
+        {'debut': {
+            'timepoints': '2020',
+            'vals': dict(f=dict(dist='normal', par1=20, par2=2.1), # Increase mean age of sexual debut
+                         m=dict(dist='normal', par1=19.6,par2=1.8))
+        }
+        }
+    )
+
+    sim = Sim(pars=pars, interventions=[condom_int, debut_int])
+    sim.run()
+    return sim
+
+
 if __name__ == '__main__':
 
     # sim0 = test_random() # NOT WORKING
     # sim1 = test_basic() # NOT WORKING
-    sim2 = test_genotypes()
+    # sim2 = test_genotypes()
+
+    sim = test_interventions()
 
 
 
