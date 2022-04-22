@@ -253,12 +253,7 @@ class People(hpb.BasePeople):
         '''
 
         # Get age-dependent death rates. TODO: careful with rates vs probabilities!
-        try: age_inds = np.digitize(self.age,self.pars['death_rates']['f'][:,0])-1
-        except:
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
+        age_inds = np.digitize(self.age,self.pars['death_rates']['f'][:,0])-1
         death_probs = np.full(len(self), np.nan, dtype=hpd.default_float)
         death_probs[self.f_inds] = self.pars['death_rates']['f'][age_inds[self.f_inds],2]*self.dt
         death_probs[self.m_inds] = self.pars['death_rates']['m'][age_inds[self.m_inds],2]*self.dt
@@ -399,10 +394,6 @@ class People(hpb.BasePeople):
         dt = self.pars['dt']
         self.date_infectious[inds] = self.t
         dur_inf2rec = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
-
-        # Using these durations, derive the probability of recovery vs progression
-
-
         self.date_recovered[inds] = self.date_infectious[inds] + np.ceil(dur_inf2rec/dt)  # Date they recover (interpreted as the timestep on which they recover)
         self.dur_disease[inds] = dur_inf2rec
 
