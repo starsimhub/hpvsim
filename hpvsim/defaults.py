@@ -54,7 +54,6 @@ class PeopleMeta(sc.prettyobj):
             'infectious',
             'precancer',
             'cancer',
-            'recovered',
             'dead_cancer', # Dead from cancer
             'other_dead',  # Dead from all other causes
         ]
@@ -64,11 +63,11 @@ class PeopleMeta(sc.prettyobj):
             'infectious_genotype',
             'precancer_genotype',
             'cancer_genotype',
-            'recovered_genotype',
         ]
 
         # Genotype states -- these are ints, by genotype
         self.by_genotype_states = [
+            'susceptible_by_genotype',
             'infectious_by_genotype',
             'precancer_by_genotype',
             'cancer_by_genotype'
@@ -87,10 +86,13 @@ class PeopleMeta(sc.prettyobj):
         ]
 
         self.dates = [f'date_{state}' for state in self.states] # Convert each state into a date
+        self.dates += ['date_HPV_clearance', 'date_CIN_clearance']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
-            'dur_inf2rec',
+            'dur_inf', # duration with HPV infection
+            'dur_hpv2cin',
+            'dur_cin2cancer',
             'dur_disease',
         ]
 
@@ -120,7 +122,6 @@ result_stocks = {
     'infectious':  'Number infectious',
     'precancer':   'Number pre-cancerous',
     'cancer':      'Number cervical cancer',
-    'recovered':   'Number recovered',
     'dead_cancer': 'Number dead from cervical cancer',
     'other_dead':  'Number dead from other causes',
 }
@@ -136,7 +137,6 @@ result_flows = {
     'infections':   'infections',
     'precancers':   'pre-cancers',
     'cancers':      'cancers',
-    'recoveries':   'recoveries',
     'cancer_deaths': 'deaths from cervical cancer',
     'other_deaths': 'deaths from other causes',
     'births':       'births'
@@ -243,6 +243,7 @@ def get_default_colors():
     NB, includes duplicates since stocks and flows are named differently.
     '''
     c = sc.objdict()
+    c.default               = '#000000'
     c.susceptible           = '#4d771e'
     c.infectious            = '#e45226'
     c.infections            = '#b62413'
@@ -257,9 +258,6 @@ def get_default_colors():
     c.precancers_by_genotype = c.default
     c.cancers_by_genotype = c.default
     c.reinfections          = '#732e26'
-    c.recoveries            = '#9e1149'
-    c.recovered             = c.recoveries
-    c.default               = '#000000'
     c.other_deaths          = '#000000'
     c.cancer_deaths         = c.default
     c.dead_cancer           = c.default

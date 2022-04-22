@@ -61,6 +61,12 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['beta']            = 0.15  # Per-act transmission probability; absolute value, calibrated
     pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only hpv
 
+    # Probabilities of disease progression
+    pars['rel_CIN_prob'] = 1.0  # Scale factor for proportion of CIN cases
+    pars['rel_cancer_prob'] = 1.0  # Scale factor for proportion of CIN that develop into cancer
+    pars['rel_death_prob'] = 1.0  # Scale factor for proportion of cancer cases that result in death
+    pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
+
     # Parameters used to calculate immunity
     pars['imm_init'] = dict(dist='beta', par1=5, par2=1)  # beta distribution for initial level of immunity following infection clearance
     pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=10),
@@ -85,6 +91,9 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['dur'] = {}
 
     pars['dur']['inf']  = dict(dist='lognormal', par1=1.0, par2=1.0)  # Duration of infection in YEARS
+    pars['dur']['cin']  = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN in YEARS
+    pars['dur']['hpv2cin']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of infection before developing CIN in YEARS
+    pars['dur']['cin2cancer']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of CIN before developing cancer in YEARS
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
@@ -99,7 +108,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars.update(kwargs)
     reset_layer_pars(pars)
     if set_prognoses: # If not set here, gets set when the population is initialized
-        pars['prognoses'] = get_prognoses() # Default to age-specific prognoses
+        pars['prognoses'] = get_prognoses() # Default to duration-specific prognoses
 
     return pars
 
@@ -187,15 +196,14 @@ def get_prognoses():
     '''
 
     prognoses = dict(
-        duration_cutoff   = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
-        CIN_probs         = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Overall probability of developing pre-cancer
-        cancer_probs      = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Overall probability of developing cancer
-        death_probs       = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Overall probability of dying from cancer
+        duration_cutoffs  = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
+        CIN_probs         = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Conditional probability of developing pre-cancer given HPV infection
+        cancer_probs      = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Conditional probability of developing cancer given CIN
+        death_probs       = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
         )
-    prognoses = relative_prognoses(prognoses) # Convert to conditional probabilities
 
     # Check that lengths match
-    expected_len = len(prognoses['age_cutoffs'])
+    expected_len = len(prognoses['duration_cutoffs'])
     for key,val in prognoses.items():
         this_len = len(prognoses[key])
         if this_len != expected_len: # pragma: no cover
@@ -203,17 +211,6 @@ def get_prognoses():
             raise ValueError(errormsg)
 
     return prognoses
-
-
-def relative_prognoses(prognoses):
-    '''
-    Convenience function to revert absolute prognoses into relative (conditional)
-    ones. Internally, HPVsim uses relative prognoses.
-    '''
-    out = sc.dcp(prognoses)
-    out['cancer_probs']  /= out['CIN_probs']   # Conditional probability of developing cancer, given getting CIN
-    out['death_probs']   /= out['cancer_probs'] # Conditional probability of dying from cancer, given getting cancer
-    return out
 
 
 def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
@@ -298,46 +295,79 @@ def get_genotype_pars(default=False, genotype=None):
 
         hpv16 = dict(
             rel_beta        = 1.0, # Default values
+            rel_CIN_prob    = 1.0,
+            rel_cancer_prob = 1.0,
+            rel_death_prob  = 1.0
         ),
 
         hpv18 = dict(
             rel_beta        = 0.8, # Default values
+            rel_CIN_prob    = 0.9,
+            rel_cancer_prob = 1.0,
+            rel_death_prob  = 1.0
         ),
 
         hpv31=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpv33=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpv45=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpv52=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpv6=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=0,
+            rel_cancer_prob=0,
+            rel_death_prob=0
         ),
 
         hpv11=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=0,
+            rel_cancer_prob=0,
+            rel_death_prob=0
         ),
 
         hpvlo=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=0,
+            rel_cancer_prob=0,
+            rel_death_prob=0
         ),
 
         hpvhi=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpvhi5=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
     )

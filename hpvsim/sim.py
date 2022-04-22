@@ -185,7 +185,7 @@ class Sim(hpb.BaseSim):
         self.results['n_imports']           = init_res('Number of imported infections', scale=True)
         self.results['n_alive']             = init_res('Number alive', scale=True)
         self.results['n_naive']             = init_res('Number never infected', scale=True)
-        self.results['n_removed']           = init_res('Number removed', scale=True, color=dcols.recovered)
+        # self.results['n_removed']           = init_res('Number removed', scale=True, color=dcols.recovered)
         self.results['prevalence']          = init_res('Prevalence', scale=False)
         self.results['incidence']           = init_res('Incidence', scale=False)
         self.results['frac_vaccinated']     = init_res('Proportion vaccinated', scale=False)
@@ -530,7 +530,7 @@ class Sim(hpb.BaseSim):
         res = self.results
         self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
         # self.results['n_naive'][:]         = self.scaled_pop_size - res['cum_deaths'][:] - res['n_recovered'][:] - res['n_exposed'][:] # Number of people naive
-        self.results['n_susceptible'][:]   = res['n_alive'][:] - res['n_infectious'][:] - res['cum_recoveries'][:] # Recalculate the number of susceptible people, not agents
+        # self.results['n_susceptible'][:]   = res['n_alive'][:] - res['n_infectious'][:] - res['cum_recoveries'][:] # Recalculate the number of susceptible people, not agents
         # self.results['n_preinfectious'][:] = res['n_exposed'][:] - res['n_infectious'][:] # Calculate the number not yet infectious: exposed minus infectious
         # self.results['n_removed'][:]       = count_recov*res['cum_recoveries'][:] + res['cum_deaths'][:] # Calculate the number removed: recovered + dead
         self.results['prevalence'][:]      = res['n_infectious'][:]/res['n_alive'][:] # Calculate the prevalence

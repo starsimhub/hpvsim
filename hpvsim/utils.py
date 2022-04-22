@@ -478,7 +478,7 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
 __all__ += ['true',   'false',   'defined',   'undefined',
             'itrue',  'ifalse',  'idefined',  'iundefined',
             'itruei', 'ifalsei', 'idefinedi', 'iundefinedi',
-            'dtround']
+            'dtround', 'find_cutoff']
 
 
 def true(arr):
@@ -677,3 +677,9 @@ def dtround(arr, dt, ceil=True):
     else:
         return np.round(arr * (1/dt)) / (1/dt)
 
+
+def find_cutoff(duration_cutoffs, duration):
+    '''
+    Find which duration bin each ind belongs to.
+    '''
+    return np.nonzero(duration_cutoffs <= duration)[0][-1]  # Index of the duration bin to use

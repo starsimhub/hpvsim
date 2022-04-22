@@ -147,14 +147,17 @@ class People(hpb.BasePeople):
         self.t = t
         self.dt = self.pars['dt']
         self.is_inf = self.true('infectious') # For storing the interim values since used in every subsequent calculation
+        self.is_CIN = self.true('precancer')  # For storing the interim values since used in every subsequent calculation
 
         # Perform updates
         self.init_flows() # Initialize flows for this timestep to zero
         self.increment_age() # Let people age by one time step
+        self.flows['new_precancers'] += self.check_CIN()
+        self.flows['new_cancers'] += self.check_cancer()
         self.flows['new_other_deaths'] += self.apply_death_rates() # Apply death rates 
         self.flows['new_births'], new_people = self.add_births() # Add births
-        self.flows['new_recoveries'] += self.check_recovery() 
-        # Lots more to be added here
+        self.check_HPV_clearance()
+        self.check_CIN_clearance()
 
         return new_people
 
@@ -221,30 +224,56 @@ class People(hpb.BasePeople):
         return inds
 
 
-    def check_recovery(self, inds=None, filter_inds='is_inf'):
-        '''
-        Check for recovery.
+    def check_inds_true(self, current, date, filter_inds=None):
+        ''' Return indices for which the current state is true and which meet the date criterion '''
+        if filter_inds is None:
+            current_inds = hpu.true(current)
+        else:
+            current_inds = hpu.itruei(current, filter_inds)
+        has_date = hpu.idefinedi(date, current_inds)
+        inds     = hpu.itrue(self.t >= date[has_date], has_date)
+        return inds
 
-        More complex than other functions to allow for recovery to be manually imposed
-        for a specified set of indices.
+    def check_CIN(self):
+        ''' Check for new progressions to CIN '''
+        inds = self.check_inds(self.precancer, self.date_precancer, filter_inds=self.is_inf)
+        self.precancer[inds] = True
+        return len(inds)
+
+    def check_cancer(self):
+        ''' Check for new progressions to cancer '''
+        inds = self.check_inds(self.cancer, self.date_cancer, filter_inds=self.is_CIN)
+        self.precancer[inds] = True
+        return len(inds)
+
+    def check_HPV_clearance(self):
+        '''
+        Check for HPV clearance.
         '''
 
-        # Handle more flexible options for setting indices
-        if filter_inds == 'is_inf':
-            filter_inds = self.is_inf
-        if inds is None:
-            inds = self.check_inds(self.recovered, self.date_recovered, filter_inds=filter_inds)
+        inds = self.check_inds_true(self.infectious, self.date_HPV_clearance, filter_inds=self.is_inf)
 
         # Now reset all disease states
-        self.infectious[inds]       = False
-        self.recovered[inds]        = True
-        self.recovered_genotype[inds] = self.infectious_genotype[inds]
+        self.infectious[inds]  = False
         self.susceptible[inds] = True
         self.infectious_genotype[inds] = np.nan
         self.infectious_by_genotype[:, inds] = False
 
-        return len(inds)
+        return
 
+    def check_CIN_clearance(self):
+        '''
+        Check for CIN clearance.
+        '''
+
+        inds = self.check_inds_true(self.precancer, self.date_CIN_clearance, filter_inds=self.is_CIN)
+
+        # Now reset all disease states
+        self.precancer[inds]       = False
+        self.precancer_genotype[inds] = np.nan
+        self.precancer_by_genotype[:, inds] = False
+
+        return
 
     def apply_death_rates(self):
         '''
@@ -266,7 +295,6 @@ class People(hpb.BasePeople):
         # Apply deaths
         new_other_deaths = self.make_die_other(death_inds)
         return new_other_deaths
-
 
     def add_births(self):
         ''' Method to add births '''
@@ -370,7 +398,13 @@ class People(hpb.BasePeople):
         if source is not None:
             source = source[keep]
 
+        # Deal with genotype parameters
+        genotype_keys = ['rel_CIN_prob', 'rel_cancer_prob', 'rel_death_prob']
+        infect_pars = {k:self.pars[k] for k in genotype_keys}
         genotype_label = self.pars['genotype_map'][genotype]
+        if genotype:
+            for k in genotype_keys:
+                infect_pars[k] *= self.pars['genotype_pars'][genotype_label][k]
 
         n_infections = len(inds)
         durpars      = self.pars['dur']
@@ -381,7 +415,6 @@ class People(hpb.BasePeople):
         self.infectious[inds]   = True
         self.infectious_genotype[inds] = genotype
         self.infectious_by_genotype[genotype, inds] = True
-        self.recovered[inds]    = False
         self.flows['new_infections']   += len(inds)
         self.flows_genotype['new_infections_by_genotype'][genotype] += len(inds)
 
@@ -390,12 +423,49 @@ class People(hpb.BasePeople):
         #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, genotype=genotype_label)
         #     self.infection_log.append(entry)
 
+        # Reset all other dates
+        for key in ['date_precancer', 'date_cancer', 'date_HPV_clearance', 'date_CIN_clearance']:
+            self[key][inds] = np.nan
+
         # Set the dates of infection and recovery -- for now, just assume everyone recovers
         dt = self.pars['dt']
         self.date_infectious[inds] = self.t
-        dur_inf2rec = hpu.sample(**durpars['inf2rec'], size=len(inds)) # Duration of infection in YEARS
-        self.date_recovered[inds] = self.date_infectious[inds] + np.ceil(dur_inf2rec/dt)  # Date they recover (interpreted as the timestep on which they recover)
-        self.dur_disease[inds] = dur_inf2rec
+        dur_inf = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
+        self.date_HPV_clearance[inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+        inf_female = inds[hpu.true(self.is_female[inds])]
+        dur_inf_female = dur_inf[hpu.true(self.is_female[inds])]
+        dur_inds = np.fromiter((hpu.find_cutoff(self.pars['prognoses']['duration_cutoffs'], this_dur) for this_dur in dur_inf_female),
+            dtype=hpd.default_int, count=len(dur_inf_female))  # Convert durations to indices
+
+        # Use prognosis probabilities to determine what happens (only women can progress to CIN)
+        CIN_probs = infect_pars['rel_CIN_prob']* self.pars['prognoses']['CIN_probs'][dur_inds]
+        is_CIN = hpu.binomial_arr(CIN_probs)
+        CIN_inds = inf_female[is_CIN]
+        no_CIN_inds = inf_female[~is_CIN]
+        self.flows_genotype['new_precancers_by_genotype'][genotype] += len(CIN_inds)
+
+        # Case 1: HPV without progression to CIN
+
+        # Case 2: HPV with progression to CIN
+        n_CIN_inds = len(CIN_inds)
+        self.dur_hpv2cin[CIN_inds] = hpu.sample(**durpars['hpv2cin'],size=n_CIN_inds)  # Store how long this person took to develop CIN
+        self.date_precancer[CIN_inds] = self.t + np.ceil(self.dur_hpv2cin[CIN_inds]/dt)  # Date they develop CIN
+        dur_CIN = hpu.sample(**durpars['cin'], size=n_CIN_inds)  # Duration of infection in YEARS
+        dur_inds = np.fromiter(
+            (hpu.find_cutoff(self.pars['prognoses']['duration_cutoffs'], this_dur) for this_dur in dur_CIN),
+            dtype=hpd.default_int, count=len(dur_CIN))  # Convert durations to indices
+
+        cancer_probs = infect_pars['rel_cancer_prob'] * self.pars['prognoses']['cancer_probs'][dur_inds]  # Probability of these people developing cancer
+        is_cancer = hpu.binomial_arr(cancer_probs)  # See if they develop cancer
+        cancer_inds = CIN_inds[is_cancer]
+        no_cancer_inds = CIN_inds[~is_cancer]  # No cancer
+        self.flows_genotype['new_cancers_by_genotype'][genotype] += len(cancer_inds)
+
+        # Case 2.1: CIN with no progression to cancer
+        self.date_CIN_clearance[no_cancer_inds] = self.date_precancer[no_cancer_inds] + np.ceil(dur_CIN[~is_cancer]/dt)  # Date they clear CIN
+
+        # Case 2.2: CIN with progression to cancer
+        self.date_cancer[cancer_inds] = self.date_precancer[cancer_inds] + np.ceil(dur_CIN[is_cancer]/dt) # Date they get cancer
 
         # Update immunity
         hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
@@ -409,7 +479,6 @@ class People(hpb.BasePeople):
         self.other_dead[inds] = True
         self.susceptible[inds] = False
         self.infectious[inds] = False
-        self.recovered[inds] = False
 
         # Remove dead people from contact network by setting the end date of any partnership they're in to now
         for contacts in self.contacts.values():
@@ -507,7 +576,7 @@ class People(hpb.BasePeople):
             events = []
 
             dates = {
-                'date_recovered'      : 'recovered',
+                'date_HPV_clearance'      : 'HPV cleared',
             }
 
             for attribute, message in dates.items():
