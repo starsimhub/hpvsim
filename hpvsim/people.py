@@ -73,12 +73,12 @@ class People(hpb.BasePeople):
         for key in self.meta.states:
             self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
 
-        # Set dates and durations -- both floats
-        for key in self.meta.dates + self.meta.durs:
+        # Set dates floats
+        for key in self.meta.dates:
             self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
 
-        # Set dates by genotype -- both floats
-        for key in self.meta.dates_by_genotype:
+        # Set dates and durations by genotype -- both floats
+        for key in self.meta.dates_by_genotype + self.meta.durs:
             self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
 
         # Set genotype states, which store info about which genotype a person is exposed to
@@ -340,12 +340,12 @@ class People(hpb.BasePeople):
             self[key][:, inds] = 0
 
         # Reset dates
-        for key in self.meta.dates + self.meta.durs:
+        for key in self.meta.dates:
             # if (key != 'date_vaccinated') or reset_vx: # Don't necessarily reset vaccination
             #     self[key][inds] = np.nan
             self[key][inds] = np.nan
 
-        for key in self.meta.dates_by_genotype:
+        for key in self.meta.dates_by_genotype + self.meta.durs:
             self[key][:, inds] = np.nan
 
         return
@@ -404,13 +404,14 @@ class People(hpb.BasePeople):
 
         # Reset all other dates
         for key in ['date_precancer_by_genotype', 'date_cancer_by_genotype', 'date_HPV_clearance_by_genotype', 'date_CIN_clearance_by_genotype']:
-            self[key][genotype][inds] = np.nan
+            self[key][genotype, inds] = np.nan
 
         # Set the dates of infection and recovery -- for now, just assume everyone recovers
         dt = self.pars['dt']
         self.date_infectious_by_genotype[genotype][inds] = self.t
         dur_inf = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
-        self.date_HPV_clearance_by_genotype[genotype][inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+        self.dur_inf[genotype, inds] = dur_inf
+        self.date_HPV_clearance_by_genotype[genotype, inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
         inf_female = inds[hpu.true(self.is_female[inds])]
         dur_inf_female = dur_inf[hpu.true(self.is_female[inds])]
         dur_inds = np.fromiter((hpu.find_cutoff(self.pars['prognoses']['duration_cutoffs'], this_dur) for this_dur in dur_inf_female),
@@ -427,8 +428,8 @@ class People(hpb.BasePeople):
 
         # Case 2: HPV with progression to CIN
         n_CIN_inds = len(CIN_inds)
-        self.dur_hpv2cin[CIN_inds] = hpu.sample(**durpars['hpv2cin'],size=n_CIN_inds)  # Store how long this person took to develop CIN
-        self.date_precancer_by_genotype[genotype][CIN_inds] = self.t + np.ceil(self.dur_hpv2cin[CIN_inds]/dt)  # Date they develop CIN
+        self.dur_hpv2cin[genotype, CIN_inds] = hpu.sample(**durpars['hpv2cin'],size=n_CIN_inds)  # Store how long this person took to develop CIN
+        self.date_precancer_by_genotype[genotype, CIN_inds] = self.t + np.ceil(self.dur_hpv2cin[genotype, CIN_inds]/dt)  # Date they develop CIN
         dur_CIN = hpu.sample(**durpars['cin'], size=n_CIN_inds)  # Duration of infection in YEARS
         dur_inds = np.fromiter(
             (hpu.find_cutoff(self.pars['prognoses']['duration_cutoffs'], this_dur) for this_dur in dur_CIN),
@@ -441,10 +442,11 @@ class People(hpb.BasePeople):
         self.flows_genotype['new_cancers_by_genotype'][genotype] += len(cancer_inds)
 
         # Case 2.1: CIN with no progression to cancer
-        self.date_CIN_clearance_by_genotype[genotype][no_cancer_inds] = self.date_precancer_by_genotype[genotype][no_cancer_inds] + np.ceil(dur_CIN[~is_cancer]/dt)  # Date they clear CIN
+        self.date_CIN_clearance_by_genotype[genotype, no_cancer_inds] = self.date_precancer_by_genotype[genotype, no_cancer_inds] + np.ceil(dur_CIN[~is_cancer]/dt)  # Date they clear CIN
 
         # Case 2.2: CIN with progression to cancer
-        self.date_cancer_by_genotype[genotype][cancer_inds] = self.date_precancer_by_genotype[genotype][cancer_inds] + np.ceil(dur_CIN[is_cancer]/dt) # Date they get cancer
+        self.dur_cin2cancer[genotype, cancer_inds] = dur_CIN[is_cancer]
+        self.date_cancer_by_genotype[genotype, cancer_inds] = self.date_precancer_by_genotype[genotype, cancer_inds] + np.ceil(dur_CIN[is_cancer]/dt) # Date they get cancer
 
         # Update immunity
         hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
