@@ -177,7 +177,12 @@ def get_death_rates(location=None, by_sex=True, overall=False):
         death_rates (dict): death rates by age and sex
     '''
     # Load the raw data
-    df = sc.load('data/age_specific_death_rates.obj')
+    try:
+        df = sc.load('../data/age_specific_death_rates.obj')
+    except ValueError as E:
+        errormsg = f'Could not locate datafile with age-specific death rates by country. Please run data/get_death_data.py first.'
+        raise ValueError(errormsg)
+
     age_groups = df['dim.AGEGROUP'].unique()
     df = df.set_index(['dim.COUNTRY', 'dim.SEX', 'dim.AGEGROUP'])
     dd = df.groupby(level=0).apply(lambda df: df.xs(df.name).to_dict()).to_dict()
@@ -221,7 +226,12 @@ def get_birth_rates(location=None):
         birth_rates (arr): years and crude birth rates
     '''
     # Load the raw data
-    birth_rate_data = sc.load('data/birth_rates.obj')
+    try:
+        birth_rate_data = sc.load('../data/birth_rates.obj')
+    except ValueError as E:
+        errormsg = f'Could not locate datafile with birth rates by country. Please run data/get_birth_data.py first.'
+        raise ValueError(errormsg)
+
     standardized = map_entries(birth_rate_data, location)
     birth_rates, years = standardized[location], birth_rate_data['years']
     return np.array([years, birth_rates])

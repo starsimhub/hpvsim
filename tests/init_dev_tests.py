@@ -40,7 +40,7 @@ def test_genotypes():
         'genotypes': [hpv16, hpv18],
         'dt': .1
     }
-    sim = Sim(pars=pars)
+    sim = Sim(pars=pars, location='zimbabwe')
     sim.run()
 
     fig, ax = pl.subplots(2, 1, figsize=(8, 12))
