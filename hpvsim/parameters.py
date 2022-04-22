@@ -197,9 +197,9 @@ def get_prognoses():
 
     prognoses = dict(
         duration_cutoffs  = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
-        CIN_probs         = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Conditional probability of developing pre-cancer given HPV infection
-        cancer_probs      = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Conditional probability of developing cancer given CIN
-        death_probs       = np.array([0.0005,  0.00165,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
+        CIN_probs         = np.array([0.0015,  0.01655,    0.05080,    0.20655,    0.70]),   # Conditional probability of developing pre-cancer given HPV infection
+        cancer_probs      = np.array([0.0055,  0.01655,    0.02080,    0.20655,    0.70]),   # Conditional probability of developing cancer given CIN
+        death_probs       = np.array([0.0015,  0.00655,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
         )
 
     # Check that lengths match
@@ -302,9 +302,9 @@ def get_genotype_pars(default=False, genotype=None):
 
         hpv18 = dict(
             rel_beta        = 0.8, # Default values
-            rel_CIN_prob    = 0.9,
-            rel_cancer_prob = 1.0,
-            rel_death_prob  = 1.0
+            rel_CIN_prob    = 0.8,
+            rel_cancer_prob = 0.8,
+            rel_death_prob  = 0.8
         ),
 
         hpv31=dict(

@@ -184,17 +184,13 @@ class Sim(hpb.BaseSim):
         # Other variables
         self.results['n_imports']           = init_res('Number of imported infections', scale=True)
         self.results['n_alive']             = init_res('Number alive', scale=True)
-        # self.results['n_naive']             = init_res('Number never infected', scale=True)
-        # self.results['n_removed']           = init_res('Number removed', scale=True, color=dcols.recovered)
-        self.results['prevalence']          = init_res('Prevalence', scale=False)
-        self.results['incidence']           = init_res('Incidence', scale=False)
-        self.results['frac_vaccinated']     = init_res('Proportion vaccinated', scale=False)
 
         # Handle genotypes
         ng = self['n_genotypes']
         self.results['genotype'] = {}
-        self.results['genotype']['prevalence_by_genotype'] = init_res('Prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['genotype']['incidence_by_genotype'] = init_res('Incidence by genotype', scale=False, n_genotypes=ng)
+        self.results['genotype']['hpv_prevalence_by_genotype'] = init_res('HPV prevalence by genotype', scale=False, n_genotypes=ng)
+        self.results['genotype']['hpv_incidence_by_genotype'] = init_res('HPV incidence by genotype', scale=False, n_genotypes=ng)
+        self.results['genotype']['cin_prevalence_by_genotype'] = init_res('CIN prevalence by genotype', scale=False, n_genotypes=ng)
         self.results['genotype']['r_eff_by_genotype'] = init_res('Effective reproduction number by genotype', scale=False,
                                                                n_genotypes=ng)
         self.results['genotype']['doubling_time_by_genotype'] = init_res('Doubling time by genotype', scale=False,
@@ -330,16 +326,14 @@ class Sim(hpb.BaseSim):
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
         self.people = self.people + new_people # New births are added to the population
         new_partner_count = hppop.partner_count(pop_size=len(new_people), layer_keys=self.pars['partners'].keys(), means=self.pars['partners'].values())
-        for type, partners in self.people.current_partners.items(): # append current_partners arrays
+        for type, partners in self.people.current_partners.items(): # append current_partners/partners arrays
             new_partner_list = np.full(len(new_people), 0, dtype=hpd.default_int)
             self.people.current_partners[type] = np.append(partners, new_partner_list)
             self.people.partners[type] = np.append(self.people.partners[type], new_partner_count[type])
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
-
         contacts = people.contacts # Shorten
-
 
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
@@ -527,14 +521,9 @@ class Sim(hpb.BaseSim):
         '''
         res = self.results
         self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
-        # self.results['n_naive'][:]         = self.scaled_pop_size - res['cum_deaths'][:] - res['n_recovered'][:] - res['n_exposed'][:] # Number of people naive
-        # self.results['n_susceptible'][:]   = res['n_alive'][:] - res['n_infectious'][:] - res['cum_recoveries'][:] # Recalculate the number of susceptible people, not agents
-        # self.results['n_preinfectious'][:] = res['n_exposed'][:] - res['n_infectious'][:] # Calculate the number not yet infectious: exposed minus infectious
-        # self.results['n_removed'][:]       = count_recov*res['cum_recoveries'][:] + res['cum_deaths'][:] # Calculate the number removed: recovered + dead
-        # self.results['prevalence'][:]      = res['n_infectious'][:]/res['n_alive'][:] # Calculate the prevalence
-        # self.results['incidence'][:]       = res['new_infections'][:]/res['n_susceptible'][:] # Calculate the incidence
-        # self.results['frac_vaccinated'][:] = res['n_vaccinated'][:]/res['n_alive'][:] # Calculate the fraction vaccinated
-
+        self.results['genotype']['hpv_incidence_by_genotype'][:] = np.einsum('ji,ji->ji', res['genotype']['new_infections_by_genotype'][:],1 / res['genotype']['n_susceptible_by_genotype'][:])  # Calculate the incidence
+        self.results['genotype']['hpv_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['genotype']['n_infectious_by_genotype'][:], 1 / res['n_alive'][:])
+        self.results['genotype']['cin_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['genotype']['n_precancer_by_genotype'][:], 1 / res['n_alive'][:])
         return
 
 
