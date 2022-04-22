@@ -15,6 +15,7 @@ from . import parameters as hppar
 from . import analysis as hpa
 from .settings import options as hpo
 from . import immunity as hpimm
+from . import interventions as cvi
 
 
 # Define the model
@@ -59,6 +60,7 @@ class Sim(hpb.BaseSim):
         self.init_immunity() # initialize information about immunity (if use_waning=True)
         self.init_results() # After initializing the genotypes, create the results structure
         self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
+        self.init_interventions()  # Initialize the interventions...
         self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
@@ -115,7 +117,7 @@ class Sim(hpb.BaseSim):
             raise ValueError(errormsg)
 
         # Handle analyzers - TODO, interventions and genotypes will also go here
-        for key in ['analyzers']: # Ensure all of them are lists
+        for key in ['interventions', 'analyzers']: # Ensure all of them are lists
             self[key] = sc.dcp(sc.tolist(self[key], keepnone=False)) # All of these have initialize functions that run into issues if they're reused
 
         # Handle verbose
@@ -255,6 +257,25 @@ class Sim(hpb.BaseSim):
         return self
 
 
+    def init_interventions(self):
+        ''' Initialize and validate the interventions '''
+
+        # Initialization
+        if self._orig_pars and 'interventions' in self._orig_pars:
+            self['interventions'] = self._orig_pars.pop('interventions') # Restore
+
+        for i,intervention in enumerate(self['interventions']):
+            if isinstance(intervention, cvi.Intervention):
+                intervention.initialize(self)
+        return
+
+
+    def finalize_interventions(self):
+        for intervention in self['interventions']:
+            if isinstance(intervention, hpi.Intervention):
+                intervention.finalize(self)
+
+
     def init_analyzers(self):
         ''' Initialize the analyzers '''
         if self._orig_pars and 'analyzers' in self._orig_pars:
@@ -341,6 +362,10 @@ class Sim(hpb.BaseSim):
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
+
+        # Apply interventions
+        for i,intervention in enumerate(self['interventions']):
+            intervention(self) # If it's a function, call it directly
 
         contacts = people.contacts # Shorten
         sus_inds = hpu.true(people.susceptible) # Get indices of susceptible people

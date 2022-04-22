@@ -8,7 +8,7 @@ import sciris as sc
 # import pandas as pd
 # import scipy as sp
 # import pylab as pl
-# import inspect
+import inspect
 # import datetime as dt
 # from . import misc as cvm
 # from . import utils as cvu
@@ -17,6 +17,43 @@ import sciris as sc
 from . import parameters as hppar
 # from . import immunity as cvi
 # from collections import defaultdict
+
+
+#%% Helper functions
+
+def find_day(arr, t=None, interv=None, sim=None, which='first'):
+    '''
+    Helper function to find if the current simulation time matches any day in the
+    intervention. Although usually never more than one index is returned, it is
+    returned as a list for the sake of easy iteration.
+
+    Args:
+        arr (list/function): list of timepoints in the intervention, or a boolean array; or a function that returns these
+        t (int): current simulation time (can be None if a boolean array is used)
+        which (str): what to return: 'first', 'last', or 'all' indices
+        interv (intervention): the intervention object (usually self); only used if arr is callable
+        sim (sim): the simulation object; only used if arr is callable
+
+    Returns:
+        inds (list): list of matching timepoints; length zero or one unless which is 'all'
+
+    New in version 2.1.2: arr can be a function with arguments interv and sim.
+    '''
+    if callable(arr):
+        arr = arr(interv, sim)
+        arr = sc.promotetoarray(arr)
+    all_inds = sc.findinds(arr=arr, val=t)
+    if len(all_inds) == 0 or which == 'all':
+        inds = all_inds
+    elif which == 'first':
+        inds = [all_inds[0]]
+    elif which == 'last':
+        inds = [all_inds[-1]]
+    else: # pragma: no cover
+        errormsg = f'Argument "which" must be "first", "last", or "all", not "{which}"'
+        raise ValueError(errormsg)
+    return inds
+
 
 
 #%% Generic intervention classes
@@ -40,7 +77,7 @@ class Intervention:
         self.show_label = show_label # Do not show the label by default
         self.do_plot = do_plot if do_plot is not None else True # Plot the intervention, including if None
         self.line_args = sc.mergedicts(dict(linestyle='--', c='#aaa', lw=1.0), line_args) # Do not set alpha by default due to the issue of overlapping interventions
-        self.days = [] # The start and end days of the intervention
+        self.timepoints = [] # The start and end timepoints of the intervention
         self.initialized = False # Whether or not it has been initialized
         self.finalized = False # Whether or not it has been initialized
         return
@@ -149,14 +186,14 @@ class Intervention:
         '''
         Plot the intervention
 
-        This can be used to do things like add vertical lines on days when
+        This can be used to do things like add vertical lines at timepoints when
         interventions take place. Can be disabled by setting self.do_plot=False.
 
         Note 1: you can modify the plotting style via the ``line_args`` argument when
         creating the intervention.
 
-        Note 2: By default, the intervention is plotted at the days stored in self.days.
-        However, if there is a self.plot_days attribute, this will be used instead.
+        Note 2: By default, the intervention is plotted at the timepoints stored in self.timepoints.
+        However, if there is a self.plot_timepoints attribute, this will be used instead.
 
         Args:
             sim: the Sim instance
@@ -170,21 +207,21 @@ class Intervention:
         if self.do_plot or self.do_plot is None:
             if ax is None:
                 ax = pl.gca()
-            if hasattr(self, 'plot_days'):
-                days = self.plot_days
+            if hasattr(self, 'plot_timepoints'):
+                timepoints = self.plot_timepoints
             else:
-                days = self.days
-            if sc.isiterable(days):
+                timepoints = self.timepoints
+            if sc.isiterable(timepoints):
                 label_shown = False # Don't show the label more than once
-                for day in days:
-                    if sc.isnumber(day):
+                for timepoint in timepoints:
+                    if sc.isnumber(timepoint):
                         if self.show_label and not label_shown: # Choose whether to include the label in the legend
                             label = self.label
                             label_shown = True
                         else:
                             label = None
-                        date = sc.date(sim.date(day))
-                        ax.axvline(date, label=label, **line_args)
+                        # date = sc.date(sim.date(day))
+                        # ax.axvline(date, label=label, **line_args)
         return
 
 
@@ -227,7 +264,6 @@ class dynamic_pars(Intervention):
         kwargs (dict): passed to Intervention()
 
     **Examples**::
-
         interv = cv.dynamic_pars(condoms=dict(timepoints=10, vals={'c':0.9})) # Increase condom use amount casual partners to 90%
         interv = cv.dynamic_pars({'beta':{'timepoints':[10, 15], 'vals':[0.005, 0.015]}, # At timepoint 10, reduce beta, then increase it again
                                   'debut':{'timepoints':10, 'vals':dict(f=dict(dist='normal', par1=20, par2=2.1), m=dict(dist='normal', par1=19.6, par2=1.8))}}) # Increase mean age of sexual debut
@@ -252,25 +288,47 @@ class dynamic_pars(Intervention):
                 if subkey not in pars[parkey].keys(): # pragma: no cover
                     errormsg = f'Parameter {parkey} is missing subkey {subkey}'
                     raise sc.KeyNotFoundError(errormsg)
-                if sc.isnumber(pars[parkey][subkey]): # Allow scalar values or dicts, but leave everything else unchanged
+                if sc.isnumber(pars[parkey][subkey]):
                     pars[parkey][subkey] = sc.promotetoarray(pars[parkey][subkey])
-            timepoints = pars[parkey]['timepoints']
-            vals = pars[parkey]['vals']
-            if sc.isiterable(timepoints):
-                len_timepoints = len(timepoints)
-                len_vals = len(vals)
-                if len_timepoints != len_vals: # pragma: no cover
-                    raise ValueError(f'Length of timepoints ({len_timepoints}) does not match length of values ({len_vals}) for parameter {parkey}')
+                else:
+                    pars[parkey][subkey] = sc.promotetolist(pars[parkey][subkey])
+            # timepoints = pars[parkey]['timepoints']
+            # vals = pars[parkey]['vals']
+            # if sc.isiterable(timepoints):
+            #     len_timepoints = len(timepoints)
+            #     len_vals = len(vals)
+            #     if len_timepoints != len_vals:
+            #         raise ValueError(f'Length of timepoints ({len_timepoints}) does not match length of values ({len_vals}) for parameter {parkey}')
         self.pars = pars
+
+        return
+
+    def initialize(self, sim):
+        ''' Initialize with a sim '''
+        for parkey in self.pars.keys():
+            try: # First try to interpret the timepoints as dates
+                tps = sim.get_t(self.pars[parkey]['timepoints'])  # Translate input to timepoints
+            except:
+                tps = []
+                # See if it's in the time vector
+                for tp in self.pars[parkey]['timepoints']:
+                    if tp in sim.tvec:
+                        tps.append(tp)
+                    else: # Give up
+                        errormsg = f'Could not parse timepoints provided for {parkey}.'
+                        raise ValueError(errormsg)
+            self.pars[parkey]['processed_timepoints'] = sc.promotetoarray(tps)
+        self.initialized = True
         return
 
 
     def apply(self, sim):
-        ''' Loop over the parameters, and then loop over the days, applying them if any are found '''
+        ''' Loop over the parameters, and then loop over the timepoints, applying them if any are found '''
         t = sim.t
         for parkey,parval in self.pars.items():
-            if t in parval['timepoints']: # TODO: make this more robust
+            if t in parval['processed_timepoints']: # TODO: make this more robust
                 self.timepoints.append(t)
+                ind = sc.findinds(parval['processed_timepoints'], t)[0]
                 val = parval['vals'][ind]
                 if isinstance(val, dict):
                     sim[parkey].update(val) # Set the parameter if a nested dict
