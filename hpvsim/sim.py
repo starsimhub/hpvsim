@@ -184,7 +184,7 @@ class Sim(hpb.BaseSim):
         # Other variables
         self.results['n_imports']           = init_res('Number of imported infections', scale=True)
         self.results['n_alive']             = init_res('Number alive', scale=True)
-        self.results['n_naive']             = init_res('Number never infected', scale=True)
+        # self.results['n_naive']             = init_res('Number never infected', scale=True)
         # self.results['n_removed']           = init_res('Number removed', scale=True, color=dcols.recovered)
         self.results['prevalence']          = init_res('Prevalence', scale=False)
         self.results['incidence']           = init_res('Incidence', scale=False)
@@ -250,7 +250,7 @@ class Sim(hpb.BaseSim):
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_infections:
-            self.init_infections(verbose=verbose)
+            self.init_infections()
 
         return self
 
@@ -289,33 +289,24 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_infections(self, verbose=None):
+    def init_infections(self):
         '''
         Initialize prior immunity and seed infections.
         Copied from Covasim. TODO: think of a better initialization strategy
         '''
 
-        if verbose is None:
-            verbose = self['verbose']
-
-        # If anyone is non-naive, don't re-initialize
-        if self.people.count_not('naive') == 0: # Everyone is naive
-
-            # Create the seed infections
-            if sc.isnumber(self['pop_infected']): # assume equal init infections for all circulating genotypes
-                for genotype_ind in range(self['n_genotypes']):
-                    inds = hpu.choose(self['pop_size'], self['pop_infected'])
-                    self.people.infect(inds=inds, layer='seed_infection',
+        # Create the seed infections
+        if sc.isnumber(self['pop_infected']): # assume equal init infections for all circulating genotypes
+            for genotype_ind in range(self['n_genotypes']):
+                inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                self.people.infect(inds=inds, layer='seed_infection',
                                        genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
-            elif isinstance(self['pop_infected'], dict):
-                genotypes = list(self['genotype_map'].values())
-                for genotype, pop_infected in self['pop_infected'].items():
-                    genotype_ind = genotypes.index(genotype)
-                    inds = hpu.choose(self['pop_size'], self['pop_infected'])
-                    self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind) # Not counted by results since flows are re-initialized during the step
-
-        elif verbose:
-            print(f'People already initialized with {self.people.count_not("naive")} people non-naive and {self.people.count("infectious")} infectious; not reinitializing')
+        elif isinstance(self['pop_infected'], dict):
+            genotypes = list(self['genotype_map'].values())
+            for genotype, pop_infected in self['pop_infected'].items():
+                genotype_ind = genotypes.index(genotype)
+                inds = hpu.choose(self['pop_size'], self['pop_infected'])
+                self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind) # Not counted by results since flows are re-initialized during the step
 
         return
 
@@ -343,23 +334,25 @@ class Sim(hpb.BaseSim):
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
 
         contacts = people.contacts # Shorten
-        sus_inds = hpu.true(people.susceptible) # Get indices of susceptible people
 
-        # Loop over layers to get indices of discordant partnerships and precalculate acts 
-        f_sus_pships, m_sus_pships, whole_acts, frac_acts, effective_condoms = [], [], [], [], []
-        for lkey, layer in contacts.items():
-            f = layer['f']
-            m = layer['m']
-            f_sus_pships.append(hpu.isin(f, sus_inds)) # Indices of partnerships in which the female is susceptible
-            m_sus_pships.append(hpu.isin(m, sus_inds)) # ...and vice versa
-            fa, wa = np.modf(layer['acts']*dt) # Get the number of acts per timestep for this partnership type
-            wa = wa.astype(hpd.default_int)
-            whole_acts.append(wa)
-            frac_acts.append(fa)
-            effective_condoms.append(hpd.default_float(condoms[lkey]*eff_condoms))
 
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
+
+            sus_inds = hpu.true(people.susceptible_by_genotype[genotype,:])  # Get indices of susceptible people
+
+            # Loop over layers to get indices of discordant partnerships and precalculate acts
+            f_sus_pships, m_sus_pships, whole_acts, frac_acts, effective_condoms = [], [], [], [], []
+            for lkey, layer in contacts.items():
+                f = layer['f']
+                m = layer['m']
+                f_sus_pships.append(hpu.isin(f, sus_inds))  # Indices of partnerships in which the female is susceptible
+                m_sus_pships.append(hpu.isin(m, sus_inds))  # ...and vice versa
+                fa, wa = np.modf(layer['acts'] * dt)  # Get the number of acts per timestep for this partnership type
+                wa = wa.astype(hpd.default_int)
+                whole_acts.append(wa)
+                frac_acts.append(fa)
+                effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
 
             hpimm.check_immunity(people, genotype)
 
@@ -367,7 +360,7 @@ class Sim(hpb.BaseSim):
             genotype_label  = self.pars['genotype_map'][genotype]
             rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
             beta            = hpd.default_float(self['beta'] * rel_beta)
-            inf_genotype    = people.infectious_genotype == genotype
+            inf_genotype = people.infectious_by_genotype[genotype, :]
             sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
 
             # Get indices of males and females infected with this genotype
@@ -533,8 +526,8 @@ class Sim(hpb.BaseSim):
         # self.results['n_susceptible'][:]   = res['n_alive'][:] - res['n_infectious'][:] - res['cum_recoveries'][:] # Recalculate the number of susceptible people, not agents
         # self.results['n_preinfectious'][:] = res['n_exposed'][:] - res['n_infectious'][:] # Calculate the number not yet infectious: exposed minus infectious
         # self.results['n_removed'][:]       = count_recov*res['cum_recoveries'][:] + res['cum_deaths'][:] # Calculate the number removed: recovered + dead
-        self.results['prevalence'][:]      = res['n_infectious'][:]/res['n_alive'][:] # Calculate the prevalence
-        self.results['incidence'][:]       = res['new_infections'][:]/res['n_susceptible'][:] # Calculate the incidence
+        # self.results['prevalence'][:]      = res['n_infectious'][:]/res['n_alive'][:] # Calculate the prevalence
+        # self.results['incidence'][:]       = res['new_infections'][:]/res['n_susceptible'][:] # Calculate the incidence
         # self.results['frac_vaccinated'][:] = res['n_vaccinated'][:]/res['n_alive'][:] # Calculate the fraction vaccinated
 
         return

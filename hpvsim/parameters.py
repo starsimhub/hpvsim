@@ -58,7 +58,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility
-    pars['beta']            = 0.15  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']            = 0.35  # Per-act transmission probability; absolute value, calibrated
     pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only hpv
 
     # Probabilities of disease progression
@@ -69,8 +69,8 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Parameters used to calculate immunity
     pars['imm_init'] = dict(dist='beta', par1=5, par2=1)  # beta distribution for initial level of immunity following infection clearance
-    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=10),
-                             vaccine=dict(form='exp_decay', init_val=1, half_life=10))
+    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=5), # decay rate, with half life in YEARS
+                             vaccine=dict(form='exp_decay', init_val=1, half_life=20)) # decay rate, with half life in YEARS
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
     pars['imm_boost'] = 1.5  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity'] = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py

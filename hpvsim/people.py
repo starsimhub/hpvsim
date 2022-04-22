@@ -71,18 +71,22 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            val = (key in ['susceptible', 'naive']) # Default value is True for susceptible and naive, false otherwise
-            self[key] = np.full(self.pars['pop_size'], val, dtype=bool)
+            self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
             self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
 
+        # Set dates by genotype -- both floats
+        for key in self.meta.dates_by_genotype:
+            self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
+
         # Set genotype states, which store info about which genotype a person is exposed to
-        for key in self.meta.genotype_states:
-            self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
         for key in self.meta.by_genotype_states:
-            self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), False, dtype=bool)
+            if key == 'susceptible_by_genotype':
+                self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), True, dtype=bool)
+            else:
+                self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), False, dtype=bool)
         for key in self.meta.imm_states:  # Everyone starts out with no immunity
             self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
         for key in self.meta.imm_by_source_states:  # Everyone starts out with no immunity
@@ -146,18 +150,22 @@ class People(hpb.BasePeople):
         # Initialize
         self.t = t
         self.dt = self.pars['dt']
-        self.is_inf = self.true('infectious') # For storing the interim values since used in every subsequent calculation
-        self.is_CIN = self.true('precancer')  # For storing the interim values since used in every subsequent calculation
 
-        # Perform updates
-        self.init_flows() # Initialize flows for this timestep to zero
-        self.increment_age() # Let people age by one time step
-        self.flows['new_precancers'] += self.check_CIN()
-        self.flows['new_cancers'] += self.check_cancer()
-        self.flows['new_other_deaths'] += self.apply_death_rates() # Apply death rates 
+        # Perform updates that are not genotype-specific
+        self.init_flows()  # Initialize flows for this timestep to zero
+        self.increment_age()  # Let people age by one time step
+        self.flows['new_other_deaths'] += self.apply_death_rates() # Apply death rates
         self.flows['new_births'], new_people = self.add_births() # Add births
-        self.check_HPV_clearance()
-        self.check_CIN_clearance()
+
+        # Perform updates that are genotype-specific
+        ng = self.pars['n_genotypes']
+        for genotype in range(ng):
+            self.is_inf = self.true_by_genotype('infectious_by_genotype', genotype) # For storing the interim values since used in every subsequent calculation
+            self.is_CIN = self.true_by_genotype('precancer_by_genotype', genotype)  # For storing the interim values since used in every subsequent calculation
+            self.flows_genotype['new_precancers_by_genotype'][genotype] += self.check_precancer(genotype)
+            self.flows_genotype['new_cancers_by_genotype'][genotype] += self.check_cancer(genotype)
+            self.check_hpv_clearance(genotype)
+            self.check_cin_clearance(genotype)
 
         return new_people
 
@@ -223,7 +231,6 @@ class People(hpb.BasePeople):
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
 
-
     def check_inds_true(self, current, date, filter_inds=None):
         ''' Return indices for which the current state is true and which meet the date criterion '''
         if filter_inds is None:
@@ -234,44 +241,40 @@ class People(hpb.BasePeople):
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
 
-    def check_CIN(self):
-        ''' Check for new progressions to CIN '''
-        inds = self.check_inds(self.precancer, self.date_precancer, filter_inds=self.is_inf)
-        self.precancer[inds] = True
+    def check_precancer(self, genotype):
+        ''' Check for new progressions to pre-cancer '''
+        inds = self.check_inds(self.precancer_by_genotype[genotype,:], self.date_precancer_by_genotype[genotype,:], filter_inds=self.is_inf)
+        self.precancer_by_genotype[genotype, inds] = True
         return len(inds)
 
-    def check_cancer(self):
+    def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
-        inds = self.check_inds(self.cancer, self.date_cancer, filter_inds=self.is_CIN)
-        self.precancer[inds] = True
+        inds = self.check_inds(self.cancer_by_genotype[genotype,:], self.date_cancer_by_genotype[genotype,:], filter_inds=self.is_CIN)
+        self.cancer_by_genotype[genotype, inds] = True
         return len(inds)
 
-    def check_HPV_clearance(self):
+    def check_hpv_clearance(self, genotype):
         '''
         Check for HPV clearance.
         '''
 
-        inds = self.check_inds_true(self.infectious, self.date_HPV_clearance, filter_inds=self.is_inf)
+        inds = self.check_inds_true(self.infectious_by_genotype[genotype,:], self.date_HPV_clearance_by_genotype[genotype,:], filter_inds=self.is_inf)
 
-        # Now reset all disease states
-        self.infectious[inds]  = False
-        self.susceptible[inds] = True
-        self.infectious_genotype[inds] = np.nan
-        self.infectious_by_genotype[:, inds] = False
+        # Now reset disease states
+        self.susceptible_by_genotype[genotype, inds] = True
+        self.infectious_by_genotype[genotype, inds] = False
 
         return
 
-    def check_CIN_clearance(self):
+    def check_cin_clearance(self, genotype):
         '''
         Check for CIN clearance.
         '''
 
-        inds = self.check_inds_true(self.precancer, self.date_CIN_clearance, filter_inds=self.is_CIN)
+        inds = self.check_inds_true(self.precancer_by_genotype[genotype,:], self.date_CIN_clearance_by_genotype[genotype,:], filter_inds=self.is_CIN)
 
-        # Now reset all disease states
-        self.precancer[inds]       = False
-        self.precancer_genotype[inds] = np.nan
-        self.precancer_by_genotype[:, inds] = False
+        # Now reset disease states
+        self.precancer_by_genotype[genotype, inds] = False
 
         return
 
@@ -322,51 +325,30 @@ class People(hpb.BasePeople):
             reset_vx (bool): whether to reset vaccine-derived immunity
         '''
         for key in self.meta.states:
-            if key in ['susceptible', 'naive']:
-                self[key][inds] = True
-            else:
-                if (key != 'vaccinated') or reset_vx: # Don't necessarily reset vaccination
-                    self[key][inds] = False
+            self[key][inds] = False
 
         # Reset genotype states
-        for key in self.meta.genotype_states:
-            self[key][inds] = np.nan
         for key in self.meta.by_genotype_states:
-            self[key][:, inds] = False
+            if key in ['susceptible_by_genotype']:
+                self[key][:, inds] = True
+            else:
+                self[key][:, inds] = False
 
         # Reset immunity
-        non_vx_inds = inds if reset_vx else inds[~self['vaccinated'][inds]]
+        # non_vx_inds = inds if reset_vx else inds[~self['vaccinated'][inds]]
         for key in self.meta.imm_by_source_states:
-            self[key][:, non_vx_inds] = 0
+            self[key][:, inds] = 0
 
         # Reset dates
         for key in self.meta.dates + self.meta.durs:
-            if (key != 'date_vaccinated') or reset_vx: # Don't necessarily reset vaccination
-                self[key][inds] = np.nan
+            # if (key != 'date_vaccinated') or reset_vx: # Don't necessarily reset vaccination
+            #     self[key][inds] = np.nan
+            self[key][inds] = np.nan
+
+        for key in self.meta.dates_by_genotype:
+            self[key][:, inds] = np.nan
 
         return
-
-
-    def make_nonnaive(self, inds, set_recovered=False, date_recovered=0):
-        '''
-        Make a set of people non-naive.
-
-        This can be done either by setting only susceptible and naive states,
-        or else by setting them as if they have been infected and recovered.
-        '''
-        self.make_naive(inds) # First make them naive and reset all other states
-
-        # Make them non-naive
-        for key in ['susceptible', 'naive']:
-            self[key][inds] = False
-
-        if set_recovered:
-            self.date_recovered[inds] = date_recovered # Reset date recovered
-            self.check_recovered(inds=inds, filter_inds=None) # Set recovered
-
-        return
-
-
 
     def infect(self, inds, source=None, layer=None, genotype=0):
         '''
@@ -393,7 +375,7 @@ class People(hpb.BasePeople):
             source = source[unique]
 
         # Keep only susceptibles
-        keep = self.susceptible[inds] # Unique indices in inds and source that are also susceptible
+        keep = self.susceptible_by_genotype[genotype, inds] # Unique indices in inds and source that are also susceptible
         inds = inds[keep]
         if source is not None:
             source = source[keep]
@@ -410,10 +392,7 @@ class People(hpb.BasePeople):
         durpars      = self.pars['dur']
 
         # Update states, genotype info, and flows
-        self.susceptible[inds]  = False
-        self.naive[inds]        = False
-        self.infectious[inds]   = True
-        self.infectious_genotype[inds] = genotype
+        self.susceptible_by_genotype[genotype, inds]  = False
         self.infectious_by_genotype[genotype, inds] = True
         self.flows['new_infections']   += len(inds)
         self.flows_genotype['new_infections_by_genotype'][genotype] += len(inds)
@@ -424,14 +403,14 @@ class People(hpb.BasePeople):
         #     self.infection_log.append(entry)
 
         # Reset all other dates
-        for key in ['date_precancer', 'date_cancer', 'date_HPV_clearance', 'date_CIN_clearance']:
-            self[key][inds] = np.nan
+        for key in ['date_precancer_by_genotype', 'date_cancer_by_genotype', 'date_HPV_clearance_by_genotype', 'date_CIN_clearance_by_genotype']:
+            self[key][genotype][inds] = np.nan
 
         # Set the dates of infection and recovery -- for now, just assume everyone recovers
         dt = self.pars['dt']
-        self.date_infectious[inds] = self.t
+        self.date_infectious_by_genotype[genotype][inds] = self.t
         dur_inf = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
-        self.date_HPV_clearance[inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+        self.date_HPV_clearance_by_genotype[genotype][inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
         inf_female = inds[hpu.true(self.is_female[inds])]
         dur_inf_female = dur_inf[hpu.true(self.is_female[inds])]
         dur_inds = np.fromiter((hpu.find_cutoff(self.pars['prognoses']['duration_cutoffs'], this_dur) for this_dur in dur_inf_female),
@@ -449,7 +428,7 @@ class People(hpb.BasePeople):
         # Case 2: HPV with progression to CIN
         n_CIN_inds = len(CIN_inds)
         self.dur_hpv2cin[CIN_inds] = hpu.sample(**durpars['hpv2cin'],size=n_CIN_inds)  # Store how long this person took to develop CIN
-        self.date_precancer[CIN_inds] = self.t + np.ceil(self.dur_hpv2cin[CIN_inds]/dt)  # Date they develop CIN
+        self.date_precancer_by_genotype[genotype][CIN_inds] = self.t + np.ceil(self.dur_hpv2cin[CIN_inds]/dt)  # Date they develop CIN
         dur_CIN = hpu.sample(**durpars['cin'], size=n_CIN_inds)  # Duration of infection in YEARS
         dur_inds = np.fromiter(
             (hpu.find_cutoff(self.pars['prognoses']['duration_cutoffs'], this_dur) for this_dur in dur_CIN),
@@ -462,10 +441,10 @@ class People(hpb.BasePeople):
         self.flows_genotype['new_cancers_by_genotype'][genotype] += len(cancer_inds)
 
         # Case 2.1: CIN with no progression to cancer
-        self.date_CIN_clearance[no_cancer_inds] = self.date_precancer[no_cancer_inds] + np.ceil(dur_CIN[~is_cancer]/dt)  # Date they clear CIN
+        self.date_CIN_clearance_by_genotype[genotype][no_cancer_inds] = self.date_precancer_by_genotype[genotype][no_cancer_inds] + np.ceil(dur_CIN[~is_cancer]/dt)  # Date they clear CIN
 
         # Case 2.2: CIN with progression to cancer
-        self.date_cancer[cancer_inds] = self.date_precancer[cancer_inds] + np.ceil(dur_CIN[is_cancer]/dt) # Date they get cancer
+        self.date_cancer_by_genotype[genotype][cancer_inds] = self.date_precancer_by_genotype[genotype][cancer_inds] + np.ceil(dur_CIN[is_cancer]/dt) # Date they get cancer
 
         # Update immunity
         hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
@@ -477,8 +456,8 @@ class People(hpb.BasePeople):
         ''' Make people die of all other causes (background mortality) '''
 
         self.other_dead[inds] = True
-        self.susceptible[inds] = False
-        self.infectious[inds] = False
+        self.susceptible_by_genotype[:, inds] = False
+        self.infectious_by_genotype[:, inds] = False
 
         # Remove dead people from contact network by setting the end date of any partnership they're in to now
         for contacts in self.contacts.values():

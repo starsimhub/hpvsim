@@ -49,20 +49,7 @@ class PeopleMeta(sc.prettyobj):
 
         # Set the states that a person can be in: these are all booleans per person -- used in people.py
         self.states = [
-            'susceptible',
-            'naive',
-            'infectious',
-            'precancer',
-            'cancer',
-            'dead_cancer', # Dead from cancer
             'other_dead',  # Dead from all other causes
-        ]
-
-        # Genotype states -- these are ints
-        self.genotype_states = [
-            'infectious_genotype',
-            'precancer_genotype',
-            'cancer_genotype',
         ]
 
         # Genotype states -- these are ints, by genotype
@@ -86,7 +73,9 @@ class PeopleMeta(sc.prettyobj):
         ]
 
         self.dates = [f'date_{state}' for state in self.states] # Convert each state into a date
-        self.dates += ['date_HPV_clearance', 'date_CIN_clearance']
+
+        self.dates_by_genotype = [f'date_{state}' for state in self.by_genotype_states]  # Convert each state into a date
+        self.dates_by_genotype += ['date_HPV_clearance_by_genotype', 'date_CIN_clearance_by_genotype']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
@@ -96,12 +85,12 @@ class PeopleMeta(sc.prettyobj):
             'dur_disease',
         ]
 
-        self.all_states = self.person + self.states + self.genotype_states + self.by_genotype_states + self.imm_states + \
-                          self.imm_by_source_states + self.dates + self.durs
+        self.all_states = self.person + self.states + self.by_genotype_states + self.imm_states + \
+                          self.imm_by_source_states + self.dates + self.dates_by_genotype + self.durs
 
         # Validate
-        self.state_types = ['person', 'states', 'genotype_states', 'by_genotype_states', 'imm_states',
-                            'imm_by_source_states', 'dates', 'durs', 'all_states']
+        self.state_types = ['person', 'states', 'by_genotype_states', 'imm_states',
+                            'imm_by_source_states', 'dates', 'dates_by_genotype', 'durs', 'all_states']
         for state_type in self.state_types:
             states = getattr(self, state_type)
             n_states        = len(states)
@@ -118,15 +107,12 @@ class PeopleMeta(sc.prettyobj):
 
 # A subset of the above states are used for results
 result_stocks = {
-    'susceptible': 'Number susceptible',
-    'infectious':  'Number infectious',
-    'precancer':   'Number pre-cancerous',
-    'cancer':      'Number cervical cancer',
-    'dead_cancer': 'Number dead from cervical cancer',
+
     'other_dead':  'Number dead from other causes',
 }
 
 result_stocks_by_genotype = {
+    'susceptible_by_genotype': 'Number susceptible by genotype',
     'infectious_by_genotype': 'Number infectious by genotype',
     'precancer_by_genotype' : 'Number precancerous by genotype',
     'cancer_by_genotype'    : 'Number cervical cancer by genotype'
@@ -134,10 +120,10 @@ result_stocks_by_genotype = {
 
 # The types of result that are counted as flows -- used in sim.py; value is the label suffix
 result_flows = {
-    'infections':   'infections',
-    'precancers':   'pre-cancers',
-    'cancers':      'cancers',
-    'cancer_deaths': 'deaths from cervical cancer',
+    'infections': 'infections',
+    'precancers': 'precancers',
+    'cancers': 'cancers',
+    'cancer_deaths': 'cancer deaths',
     'other_deaths': 'deaths from other causes',
     'births':       'births'
 }
@@ -159,7 +145,9 @@ cum_result_flows_by_genotype = [f'cum_{key}' for key in result_flows_by_genotype
 # Parameters that can vary by genotype (WIP)
 genotype_pars = [
     'rel_beta',
-
+    'rel_CIN_prob',
+    'rel_cancer_prob',
+    'rel_death_prob'
 ]
 
 # Default age data, based on Seattle 2018 census data -- used in population.py
@@ -244,14 +232,11 @@ def get_default_colors():
     '''
     c = sc.objdict()
     c.default               = '#000000'
-    c.susceptible           = '#4d771e'
-    c.infectious            = '#e45226'
     c.infections            = '#b62413'
-    c.precancer             = c.default
     c.cancers               = c.default
     c.precancers            = c.default
-    c.cancer                = c.default
-    c.infectious_by_genotype = c.infectious
+    c.susceptible_by_genotype = c.default
+    c.infectious_by_genotype = c.default
     c.infections_by_genotype = '#b62413'
     c.precancer_by_genotype  = c.default
     c.cancer_by_genotype    = c.default
