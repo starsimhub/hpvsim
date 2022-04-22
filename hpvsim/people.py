@@ -253,7 +253,12 @@ class People(hpb.BasePeople):
         '''
 
         # Get age-dependent death rates. TODO: careful with rates vs probabilities!
-        age_inds = np.digitize(self.age,self.pars['death_rates']['f'][:,0])-1
+        try: age_inds = np.digitize(self.age,self.pars['death_rates']['f'][:,0])-1
+        except:
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
         death_probs = np.full(len(self), np.nan, dtype=hpd.default_float)
         death_probs[self.f_inds] = self.pars['death_rates']['f'][age_inds[self.f_inds],2]*self.dt
         death_probs[self.m_inds] = self.pars['death_rates']['m'][age_inds[self.m_inds],2]*self.dt

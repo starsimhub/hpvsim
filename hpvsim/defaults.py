@@ -243,6 +243,7 @@ def get_default_colors():
     NB, includes duplicates since stocks and flows are named differently.
     '''
     c = sc.objdict()
+    c.default               = '#000000'
     c.susceptible           = '#4d771e'
     c.infectious            = '#e45226'
     c.infections            = '#b62413'
@@ -259,7 +260,6 @@ def get_default_colors():
     c.reinfections          = '#732e26'
     c.recoveries            = '#9e1149'
     c.recovered             = c.recoveries
-    c.default               = '#000000'
     c.other_deaths          = '#000000'
     c.cancer_deaths         = c.default
     c.dead_cancer           = c.default

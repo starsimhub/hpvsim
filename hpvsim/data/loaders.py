@@ -211,6 +211,7 @@ def get_death_rates(location=None, by_sex=True, overall=False):
                 val = [int(ages[0]), int(ages[1]), this_death_rate]
             result[sk_out].append(val)
         result[sk_out] = np.array(result[sk_out])
+        result[sk_out] = result[sk_out][result[sk_out][:, 0].argsort()]
 
     return result
 

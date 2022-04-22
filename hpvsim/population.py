@@ -115,7 +115,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
     # Ensure prognoses are set
     if sim['prognoses'] is None:
-        sim['prognoses'] = hppar.get_prognoses(sim['prog_by_age'], version=sim._default_ver)
+        sim['prognoses'] = hppar.get_prognoses()
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)

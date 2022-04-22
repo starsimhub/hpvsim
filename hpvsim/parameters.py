@@ -60,6 +60,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility
     pars['beta']            = 0.15  # Per-act transmission probability; absolute value, calibrated
     pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only hpv
+    pars['prognoses']       = None # Arrays of prognoses by age; this is populated later
 
     # Parameters used to calculate immunity
     pars['imm_init'] = dict(dist='beta', par1=5, par2=1)  # beta distribution for initial level of immunity following infection clearance
@@ -195,7 +196,7 @@ def get_prognoses():
     prognoses = relative_prognoses(prognoses) # Convert to conditional probabilities
 
     # Check that lengths match
-    expected_len = len(prognoses['age_cutoffs'])
+    expected_len = len(prognoses['duration_cutoff'])
     for key,val in prognoses.items():
         this_len = len(prognoses[key])
         if this_len != expected_len: # pragma: no cover
