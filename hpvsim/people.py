@@ -401,7 +401,7 @@ class People(hpb.BasePeople):
         # Update states, genotype info, and flows
         self.susceptible[genotype, inds]  = False
         self.infectious[genotype, inds] = True
-        self.aggregate_flows['new_total_infections']   += len(inds)
+        self.aggregate_flows['new_total_infections'] += len(inds)
         self.flows['new_infections'][genotype] += len(inds)
 
         # # Record transmissions. TODO: this works, but slows does runtime by a LOT
@@ -429,6 +429,7 @@ class People(hpb.BasePeople):
         CIN_inds = inf_female[is_CIN]
         no_CIN_inds = inf_female[~is_CIN]
         self.flows['new_precancers'][genotype] += len(CIN_inds)
+        self.aggregate_flows['new_total_precancers'] += len(CIN_inds)
 
         # Case 1: HPV without progression to CIN
 
@@ -444,6 +445,7 @@ class People(hpb.BasePeople):
         cancer_inds = CIN_inds[is_cancer]
         no_cancer_inds = CIN_inds[~is_cancer]  # No cancer
         self.flows['new_cancers'][genotype] += len(cancer_inds)
+        self.aggregate_flows['new_total_cancers'] += len(cancer_inds)
 
         # Case 2.1: CIN with no progression to cancer
         self.date_CIN_clearance[genotype, no_cancer_inds] = self.date_precancerous[genotype, no_cancer_inds] + np.ceil(dur_CIN[~is_cancer]/dt)  # Date they clear CIN

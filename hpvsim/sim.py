@@ -471,7 +471,8 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Calculate cumulative results
-        for key in hpd.result_flows.keys():
+        keys = list(hpd.result_flows.keys())+list(hpd.aggregate_result_flows.keys())
+        for key in keys:
             self.results[f'cum_{key}'][:] = np.cumsum(self.results[f'new_{key}'][:], axis=0)
         for res in [self.results['cum_infections']]: # Include initially infected people
             res.values += self['pop_infected']

@@ -967,19 +967,19 @@ class BasePeople(FlexPretty):
             errormsg = f'Parameters layers {layer_keys} are not consistent with contact layers {contact_layer_keys}'
             raise ValueError(errormsg)
 
-        # # Check that the length of each array is consistent
-        # expected_len = len(self)
-        # for key in self.keys():
-        #     if self[key].ndim == 1:
-        #         actual_len = len(self[key])
-        #     if actual_len != expected_len: # pragma: no cover
-        #         if die:
-        #             errormsg = f'Length of key "{key}" did not match population size ({actual_len} vs. {expected_len})'
-        #             raise IndexError(errormsg)
-        #         else:
-        #             if verbose:
-        #                 print(f'Resizing "{key}" from {actual_len} to {expected_len}')
-        #             self._resize_arrays(keys=key)
+        # Check that the length of each array is consistent
+        expected_len = len(self)
+        for key in self.keys():
+            if self[key].ndim == 1:
+                actual_len = len(self[key])
+            if actual_len != expected_len: # pragma: no cover
+                if die:
+                    errormsg = f'Length of key "{key}" did not match population size ({actual_len} vs. {expected_len})'
+                    raise IndexError(errormsg)
+                else:
+                    if verbose:
+                        print(f'Resizing "{key}" from {actual_len} to {expected_len}')
+                    self._resize_arrays(keys=key)
 
         # Check that the layers are valid
         for layer in self.contacts.values():
