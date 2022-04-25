@@ -1318,12 +1318,12 @@ class BasePeople(FlexPretty):
         return self.meta.durs[:]
 
     def layer_keys(self):
-        ''' Get the available contact keys -- try contacts first, then beta_layer '''
+        ''' Get the available contact keys -- try contacts first, then acts '''
         try:
-            keys = list(self.partners.keys())
+            keys = list(self.contacts.keys())
         except: # If not fully initialized
             try:
-                keys = list(self.pars['beta_layer'].keys())
+                keys = list(self.pars['acts'].keys())
             except:  # pragma: no cover # If not even partially initialized
                 keys = []
         return keys

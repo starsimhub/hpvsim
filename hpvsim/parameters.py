@@ -47,12 +47,13 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     # Network parameters, generally initialized after the population has been constructed
     pars['debut']           = dict(f=dict(dist='normal', par1=18.6, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=19.6, par2=1.8))
-    pars['partners']        = None  # The number of concurrent sexual partners per layer
-    pars['acts']            = None  # The number of sexual acts per layer per year
-    pars['condoms']         = None  # The proportion of acts in which condoms are used
-    pars['layer_probs']     = None  # Proportion of the population in each layer
-    pars['dur_pship']       = None  # Duration of partnerships in each layer
-    pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships
+    pars['partners']        = None  # The number of concurrent sexual partners for each partnership type
+    pars['acts']            = None  # The number of sexual acts for each partnership type per year
+    pars['condoms']         = None  # The proportion of acts in which condoms are used for each partnership type
+    pars['layer_probs']     = None  # Proportion of the population in each partnership type
+    pars['dur_pship']       = None  # Duration of partnerships in each partnership type
+    pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships - TODO
+    pars['n_partner_types'] = 1  # Number of partnership types - reset below
     # pars['nonactive_by_age']= nonactive_by_age
     # pars['nonactive']       = None 
 
@@ -181,6 +182,9 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         for lkey in par_layer_keys: # Loop over layers
             par[lkey] = par_dict.get(lkey, default_val) # Get the value for this layer if available, else use the default for random
         pars[pkey] = par # Save this parameter to the dictionary
+
+    # Finally, update the number of partnership types
+    pars['n_partner_types'] = len(par_layer_keys)
 
     return
 

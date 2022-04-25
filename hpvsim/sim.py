@@ -168,43 +168,36 @@ class Sim(hpb.BaseSim):
             output = hpb.Result(*args, **kwargs, npts=self.npts)
             return output
 
-        dcols = hpd.get_default_colors() # Get default colors
+        ng = self['n_genotypes']
+        dcols = hpd.get_default_colors(ng) # Get default colors
 
-        # Flows and cumulative flows
-        for key,label in hpd.result_flows.items():
+        # Aggregate flows and cumulative flows
+        for key,label in hpd.aggregate_result_flows.items():
             self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key])  # Cumulative variables -- e.g. "Cumulative infections"
 
-        for key,label in hpd.result_flows.items(): # Repeat to keep all the cumulative keys together
+        for key,label in hpd.aggregate_result_flows.items(): # Repeat to keep all the cumulative keys together
             self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
 
-        # Stock variables
-        for key,label in hpd.result_stocks.items():
+        # Aggregate stock variables
+        for key,label in hpd.aggregate_result_stocks.items():
             self.results[f'n_{key}'] = init_res(label, color=dcols[key])
 
-        # Other variables
-        self.results['n_imports']           = init_res('Number of imported infections', scale=True)
-        self.results['n_alive']             = init_res('Number alive', scale=True)
-
-        # Handle genotypes
-        ng = self['n_genotypes']
-        self.results['genotype'] = {}
-        self.results['genotype']['hpv_prevalence_by_genotype'] = init_res('HPV prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['genotype']['hpv_incidence_by_genotype'] = init_res('HPV incidence by genotype', scale=False, n_genotypes=ng)
-        self.results['genotype']['cin_prevalence_by_genotype'] = init_res('CIN prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['genotype']['r_eff_by_genotype'] = init_res('Effective reproduction number by genotype', scale=False,
-                                                               n_genotypes=ng)
-        self.results['genotype']['doubling_time_by_genotype'] = init_res('Doubling time by genotype', scale=False,
-                                                                       n_genotypes=ng)
-        for key, label in hpd.result_flows_by_genotype.items():
-            self.results['genotype'][f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key],
-                                                             n_genotypes=ng)  # Cumulative variables -- e.g. "Cumulative infections"
-        for key, label in hpd.result_flows_by_genotype.items():
-            self.results['genotype'][f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key],
-                                                             n_genotypes=ng)  # Flow variables -- e.g. "Number of new infections"
-        for key, label in hpd.result_stocks_by_genotype.items():
-            self.results['genotype'][f'n_{key}'] = init_res(label, color=dcols[key], n_genotypes=ng)
+        # Results by genotype
+        self.results['hpv_prevalence'] = init_res('HPV prevalence', scale=False, n_genotypes=ng)
+        self.results['hpv_incidence'] = init_res('HPV incidence', scale=False, n_genotypes=ng)
+        self.results['cin_prevalence'] = init_res('CIN prevalence', scale=False, n_genotypes=ng)
+        self.results['r_eff'] = init_res('Effective reproduction number', scale=False, n_genotypes=ng)
+        self.results['doubling_time'] = init_res('Doubling time', scale=False, n_genotypes=ng)
+        for key,label in hpd.result_flows.items():
+            self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key], n_genotypes=ng)  # Cumulative variables -- e.g. "Cumulative infections"
+        for key,label in hpd.result_flows.items(): # Repeat to keep all the cumulative keys together
+            self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key], n_genotypes=ng) # Flow variables -- e.g. "Number of new infections"
+        for key,label in hpd.result_stocks.items():
+            self.results[f'n_{key}'] = init_res(label, color=dcols[key], n_genotypes=ng)
 
         # Populate the rest of the results
+        # Other variables
+        self.results['n_alive'] = init_res('Number alive', scale=True)
         self.results['year'] = self.yearvec
         self.results['t']    = self.tvec
         self.results_ready   = False
@@ -325,11 +318,6 @@ class Sim(hpb.BaseSim):
         # Update states and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
         self.people = self.people + new_people # New births are added to the population
-        new_partner_count = hppop.partner_count(pop_size=len(new_people), layer_keys=self.pars['partners'].keys(), means=self.pars['partners'].values())
-        for type, partners in self.people.current_partners.items(): # append current_partners/partners arrays
-            new_partner_list = np.full(len(new_people), 0, dtype=hpd.default_int)
-            self.people.current_partners[type] = np.append(partners, new_partner_list)
-            self.people.partners[type] = np.append(self.people.partners[type], new_partner_count[type])
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
@@ -338,7 +326,7 @@ class Sim(hpb.BaseSim):
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
 
-            sus_inds = hpu.true(people.susceptible_by_genotype[genotype,:])  # Get indices of susceptible people
+            sus_inds = hpu.true(people.susceptible[genotype,:])  # Get indices of susceptible people
 
             # Loop over layers to get indices of discordant partnerships and precalculate acts
             f_sus_pships, m_sus_pships, whole_acts, frac_acts, effective_condoms = [], [], [], [], []
@@ -359,7 +347,7 @@ class Sim(hpb.BaseSim):
             genotype_label  = self.pars['genotype_map'][genotype]
             rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
             beta            = hpd.default_float(self['beta'] * rel_beta)
-            inf_genotype = people.infectious_by_genotype[genotype, :]
+            inf_genotype = people.infectious[genotype, :]
             sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
 
             # Get indices of males and females infected with this genotype
@@ -382,18 +370,18 @@ class Sim(hpb.BaseSim):
                 ln += 1
 
         # Update counts for this time step: stocks
+        # for key in hpd.aggregate_result_stocks.keys():
+        #     self.results[f'n_{key}'][t] = people.count(key)
         for key in hpd.result_stocks.keys():
-            self.results[f'n_{key}'][t] = people.count(key)
-        for key in hpd.result_stocks_by_genotype.keys():
             for genotype in range(ng):
-                self.results['genotype'][f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
+                self.results[f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
 
         # Update counts for this time step: flows
-        for key,count in people.flows.items():
+        for key,count in people.aggregate_flows.items():
             self.results[key][t] += count
-        for key,count in people.flows_genotype.items():
+        for key,count in people.flows.items():
             for genotype in range(ng):
-                self.results['genotype'][key][genotype][t] += count[genotype]
+                self.results[key][genotype][t] += count[genotype]
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
@@ -483,7 +471,8 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Calculate cumulative results
-        for key in hpd.result_flows.keys():
+        keys = list(hpd.result_flows.keys())+list(hpd.aggregate_result_flows.keys())
+        for key in keys:
             self.results[f'cum_{key}'][:] = np.cumsum(self.results[f'new_{key}'][:], axis=0)
         for res in [self.results['cum_infections']]: # Include initially infected people
             res.values += self['pop_infected']
@@ -521,9 +510,9 @@ class Sim(hpb.BaseSim):
         '''
         res = self.results
         self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
-        self.results['genotype']['hpv_incidence_by_genotype'][:] = np.einsum('ji,ji->ji', res['genotype']['new_infections_by_genotype'][:],1 / res['genotype']['n_susceptible_by_genotype'][:])  # Calculate the incidence
-        self.results['genotype']['hpv_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['genotype']['n_infectious_by_genotype'][:], 1 / res['n_alive'][:])
-        self.results['genotype']['cin_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['genotype']['n_precancer_by_genotype'][:], 1 / res['n_alive'][:])
+        self.results['hpv_incidence'][:] = np.einsum('ji,ji->ji', res['new_infections'][:],1 / res['n_susceptible'][:])  # Calculate the incidence
+        self.results['hpv_prevalence'][:] = np.einsum('ji,i->ji', res['n_infectious'][:], 1 / res['n_alive'][:])
+        self.results['cin_prevalence'][:] = np.einsum('ji,i->ji', res['n_precancerous'][:], 1 / res['n_alive'][:])
         return
 
 
@@ -588,7 +577,7 @@ class Sim(hpb.BaseSim):
         labelstr = f' "{self.label}"' if self.label else ''
         string = f'Simulation{labelstr} summary:\n'
         for key in self.result_keys():
-            if full or key.startswith('cum_'):
+            if full or key.startswith('cum_total'):
                 val = np.round(summary[key])
                 string += f'   {val:10,.0f} {self.results[key].name.lower()}\n'.replace(',', sep) # Use replace since it's more flexible
 
