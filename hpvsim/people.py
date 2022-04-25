@@ -419,8 +419,7 @@ class People(hpb.BasePeople):
         self.date_HPV_clearance_by_genotype[genotype, inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
         inf_female = inds[hpu.true(self.is_female[inds])]
         dur_inf_female = dur_inf[hpu.true(self.is_female[inds])]
-        dur_inds = np.fromiter((hpu.find_cutoff(self.pars['prognoses']['duration_cutoffs'], this_dur) for this_dur in dur_inf_female),
-            dtype=hpd.default_int, count=len(dur_inf_female))  # Convert durations to indices
+        dur_inds = np.digitize(dur_inf_female,self.pars['prognoses']['duration_cutoffs'])-1  # Convert durations to indices
 
         # Use prognosis probabilities to determine what happens (only women can progress to CIN)
         CIN_probs = infect_pars['rel_CIN_prob']* self.pars['prognoses']['CIN_probs'][dur_inds]
@@ -436,9 +435,7 @@ class People(hpb.BasePeople):
         self.dur_hpv2cin[genotype, CIN_inds] = hpu.sample(**durpars['hpv2cin'],size=n_CIN_inds)  # Store how long this person took to develop CIN
         self.date_precancer_by_genotype[genotype, CIN_inds] = self.t + np.ceil(self.dur_hpv2cin[genotype, CIN_inds]/dt)  # Date they develop CIN
         dur_CIN = hpu.sample(**durpars['cin'], size=n_CIN_inds)  # Duration of infection in YEARS
-        dur_inds = np.fromiter(
-            (hpu.find_cutoff(self.pars['prognoses']['duration_cutoffs'], this_dur) for this_dur in dur_CIN),
-            dtype=hpd.default_int, count=len(dur_CIN))  # Convert durations to indices
+        dur_inds = np.digitize(dur_CIN,self.pars['prognoses']['duration_cutoffs'])-1  # Convert durations to indices
 
         cancer_probs = infect_pars['rel_cancer_prob'] * self.pars['prognoses']['cancer_probs'][dur_inds]  # Probability of these people developing cancer
         is_cancer = hpu.binomial_arr(cancer_probs)  # See if they develop cancer

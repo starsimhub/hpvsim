@@ -325,11 +325,11 @@ class Sim(hpb.BaseSim):
         # Update states and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
         self.people = self.people + new_people # New births are added to the population
-        new_partner_count = hppop.partner_count(pop_size=len(new_people), layer_keys=self.pars['partners'].keys(), means=self.pars['partners'].values())
-        for type, partners in self.people.current_partners.items(): # append current_partners/partners arrays
-            new_partner_list = np.full(len(new_people), 0, dtype=hpd.default_int)
-            self.people.current_partners[type] = np.append(partners, new_partner_list)
-            self.people.partners[type] = np.append(self.people.partners[type], new_partner_count[type])
+        # new_partner_count = hppop.partner_count(pop_size=len(new_people), layer_keys=self.pars['partners'].keys(), means=self.pars['partners'].values())
+        # for type, partners in self.people.current_partners.items(): # append current_partners/partners arrays
+        #     new_partner_list = np.full(len(new_people), 0, dtype=hpd.default_int)
+        #     self.people.current_partners[type] = np.append(partners, new_partner_list)
+        #     self.people.partners[type] = np.append(self.people.partners[type], new_partner_count[type])
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)

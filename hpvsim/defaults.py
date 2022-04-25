@@ -107,7 +107,6 @@ class PeopleMeta(sc.prettyobj):
 
 # A subset of the above states are used for results
 result_stocks = {
-
     'other_dead':  'Number dead from other causes',
 }
 
