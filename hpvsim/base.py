@@ -967,19 +967,19 @@ class BasePeople(FlexPretty):
             errormsg = f'Parameters layers {layer_keys} are not consistent with contact layers {contact_layer_keys}'
             raise ValueError(errormsg)
 
-        # Check that the length of each array is consistent
-        expected_len = len(self)
-        for key in self.keys():
-            if self[key].ndim == 1:
-                actual_len = len(self[key])
-            if actual_len != expected_len: # pragma: no cover
-                if die:
-                    errormsg = f'Length of key "{key}" did not match population size ({actual_len} vs. {expected_len})'
-                    raise IndexError(errormsg)
-                else:
-                    if verbose:
-                        print(f'Resizing "{key}" from {actual_len} to {expected_len}')
-                    self._resize_arrays(keys=key)
+        # # Check that the length of each array is consistent
+        # expected_len = len(self)
+        # for key in self.keys():
+        #     if self[key].ndim == 1:
+        #         actual_len = len(self[key])
+        #     if actual_len != expected_len: # pragma: no cover
+        #         if die:
+        #             errormsg = f'Length of key "{key}" did not match population size ({actual_len} vs. {expected_len})'
+        #             raise IndexError(errormsg)
+        #         else:
+        #             if verbose:
+        #                 print(f'Resizing "{key}" from {actual_len} to {expected_len}')
+        #             self._resize_arrays(keys=key)
 
         # Check that the layers are valid
         for layer in self.contacts.values():
@@ -1318,12 +1318,12 @@ class BasePeople(FlexPretty):
         return self.meta.durs[:]
 
     def layer_keys(self):
-        ''' Get the available contact keys -- try contacts first, then beta_layer '''
+        ''' Get the available contact keys -- try contacts first, then acts '''
         try:
-            keys = list(self.partners.keys())
+            keys = list(self.contacts.keys())
         except: # If not fully initialized
             try:
-                keys = list(self.pars['beta_layer'].keys())
+                keys = list(self.pars['acts'].keys())
             except:  # pragma: no cover # If not even partially initialized
                 keys = []
         return keys

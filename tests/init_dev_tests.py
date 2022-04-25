@@ -63,6 +63,7 @@ def test_genotypes():
     return sim
 
 
+
 if __name__ == '__main__':
 
     # sim0 = test_random() # NOT WORKING
