@@ -285,17 +285,22 @@ class Sim(hpb.BaseSim):
         '''
 
         # Create the seed infections
+        ng = self['n_genotypes']
         if sc.isnumber(self['pop_infected']): # assume equal init infections for all circulating genotypes
-            for genotype_ind in range(self['n_genotypes']):
-                inds = hpu.choose(self['pop_size'], self['pop_infected'])
-                self.people.infect(inds=inds, layer='seed_infection',
-                                       genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
+            for genotype_ind in range(ng):
+                inds = hpu.choose(self['pop_size'], self['pop_infected']/ng)
+                self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
+                self.results['cum_infections'][genotype_ind,:] += len(inds)
+                self.results['cum_total_infections'][:] += len(inds)
+
         elif isinstance(self['pop_infected'], dict):
             genotypes = list(self['genotype_map'].values())
             for genotype, pop_infected in self['pop_infected'].items():
                 genotype_ind = genotypes.index(genotype)
                 inds = hpu.choose(self['pop_size'], self['pop_infected'])
                 self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind) # Not counted by results since flows are re-initialized during the step
+                self.results['cum_infections'][genotype_ind,:] += len(inds)
+                self.results['cum_total_infections'][:] += len(inds)
 
         return
 
@@ -471,14 +476,14 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Calculate cumulative results
-        keys = list(hpd.result_flows.keys())+list(hpd.aggregate_result_flows.keys())
-        for key in keys:
-            self.results[f'cum_{key}'][:] = np.cumsum(self.results[f'new_{key}'][:], axis=0)
-        for res in [self.results['cum_infections']]: # Include initially infected people
-            res.values += self['pop_infected']
+        for key in hpd.aggregate_result_flows.keys():
+            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=0)
+        for key in hpd.result_flows.keys():
+            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
 
-        # Finalize analyzers - TODO, interventions will also be added here
+        # Finalize analyzers and interventions
         self.finalize_analyzers()
+        # self.finalize_interventions()
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results

@@ -31,7 +31,7 @@ class genotype(sc.prettyobj):
 
     def __init__(self, genotype):
         self.index     = None # Index of the variant in the sim; set later
-        self.label     = None # Variant label (used as a dict key)
+        self.label     = None # Genotype label (used as a dict key)
         self.p         = None # This is where the parameters will be stored
         self.parse(genotype=genotype) #
         self.initialized = False
