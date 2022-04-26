@@ -280,7 +280,8 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
-
+            if 'init_prevalence' in pars and pars['init_prevalence'] is None:
+                pars['init_prevalence'] = hpd.default_hpv_prevalence
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 

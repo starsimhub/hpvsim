@@ -35,10 +35,11 @@ def test_genotypes():
 
     hpv16 = genotype('HPV16')
     hpv18 = genotype('HPV18')
+    hpvhi5 = genotype('hpvhi5')
     pars = {
         'pop_size': 50e3,
         'network': 'basic',
-        'genotypes': [hpv16, hpv18],
+        'genotypes': [hpv16, hpv18, hpvhi5],
         'dt': .1,
         'end': 2035
     }
@@ -67,8 +68,8 @@ def test_genotypes():
 if __name__ == '__main__':
 
     # sim0 = test_random() # NOT WORKING
-    sim1 = test_basic() # NOT WORKING
-    # sim2 = test_genotypes()
+    # sim1 = test_basic() # NOT WORKING
+    sim2 = test_genotypes()
 
 
 

@@ -30,7 +30,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Population parameters
     pars['pop_size']        = 20e3     # Number of agents
-    pars['init_prev']       = dict()    # Initial HPV prevalence by age and genotype
+    pars['init_prevalence'] = None     # Initial HPV prevalence by age (and genotype), loaded below
     pars['pop_infected']    = 100       # Number of initial infections; TODO reconsider this
     pars['network']         = 'random' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None     # What location to load data from -- default Seattle
@@ -91,7 +91,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     # Duration parameters
     pars['dur'] = {}
 
-    pars['dur']['inf']  = dict(dist='lognormal', par1=1.0, par2=1.0)  # Duration of infection in YEARS
+    pars['dur']['inf']  = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of infection in YEARS
     pars['dur']['cin']  = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN in YEARS
     pars['dur']['hpv2cin']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of infection before developing CIN in YEARS
     pars['dur']['cin2cancer']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of CIN before developing cancer in YEARS
@@ -248,6 +248,21 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
 
 #%% Genotype/immunity parameters and functions
 
+def get_hpv_prevalence():
+    '''
+    Get HPV prevalence data by age and genotype for initializing the sim
+
+    Args:
+        filename (str):  filename; if none specified, use default value for XXX
+
+    Returns:
+        hpv_prevalence (dict): nested dictionary of hpv prevalence by sex (first level),  age (second level), and genotype (third level)
+    '''
+
+    hpv_prevalence = hpd.default_hpv_prevalence
+
+    return hpv_prevalence
+
 def get_genotype_choices():
     '''
     Define valid genotype names
@@ -265,7 +280,7 @@ def get_genotype_choices():
         'hpv58': ['hpv58', '58'],
         'hpvlo': ['hpvlo', 'low', 'low-risk'],
         'hpvhi': ['hpvhi', 'high', 'high-risk'],
-        'hpvhi5': ['hpvhi', 'high', 'high-risk'],
+        'hpvhi5': ['hpvhi5', 'hpvhi', 'high', 'high-risk'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping

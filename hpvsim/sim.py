@@ -56,7 +56,7 @@ class Sim(hpb.BaseSim):
         self.validate_pars() # Ensure parameters have valid values
         self.set_seed() # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
-        self.init_immunity() # initialize information about immunity (if use_waning=True)
+        self.init_immunity() # initialize information about immunity
         self.init_results() # After initializing the genotypes, create the results structure
         self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
         self.init_analyzers()  # ...and the analyzers...
@@ -290,23 +290,38 @@ class Sim(hpb.BaseSim):
         Copied from Covasim. TODO: think of a better initialization strategy
         '''
 
-        # Create the seed infections
-        ng = self['n_genotypes']
-        if sc.isnumber(self['pop_infected']): # assume equal init infections for all circulating genotypes
-            for genotype_ind in range(ng):
-                inds = hpu.choose(self['pop_size'], self['pop_infected']/ng)
-                self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
-                self.results['cum_infections'][genotype_ind,:] += len(inds)
-                self.results['cum_total_infections'][:] += len(inds)
+        age_inds = np.digitize(self.people.age, self.pars['init_prevalence']['f'][:, 0]) - 1
+        hpv_probs = np.full(len(self.people), np.nan, dtype=hpd.default_float)
+        hpv_probs[self.people.f_inds] = self.pars['init_prevalence']['f'][age_inds[self.people.f_inds], 2]
+        hpv_probs[self.people.m_inds] = self.pars['init_prevalence']['m'][age_inds[self.people.m_inds], 2]
 
-        elif isinstance(self['pop_infected'], dict):
-            genotypes = list(self['genotype_map'].values())
-            for genotype, pop_infected in self['pop_infected'].items():
-                genotype_ind = genotypes.index(genotype)
-                inds = hpu.choose(self['pop_size'], self['pop_infected'])
-                self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind) # Not counted by results since flows are re-initialized during the step
-                self.results['cum_infections'][genotype_ind,:] += len(inds)
-                self.results['cum_total_infections'][:] += len(inds)
+        # Get indices of people who have HPV (for now, split evenly between genotypes)
+        ng = self['n_genotypes']
+
+        for genotype_ind in range(ng):
+            hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs/ng))
+            self.people.infect(inds=hpv_inds, layer='seed_infection',
+                               genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
+            self.results['cum_infections'][genotype_ind, :] += len(hpv_inds)
+            self.results['cum_total_infections'][:] += len(hpv_inds)
+
+        # Create the seed infections
+        # ng = self['n_genotypes']
+        # if sc.isnumber(self['pop_infected']): # assume equal init infections for all circulating genotypes
+        #     for genotype_ind in range(ng):
+        #         inds = hpu.choose(self['pop_size'], self['pop_infected']/ng)
+        #         self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
+        #         self.results['cum_infections'][genotype_ind,:] += len(inds)
+        #         self.results['cum_total_infections'][:] += len(inds)
+        #
+        # elif isinstance(self['pop_infected'], dict):
+        #     genotypes = list(self['genotype_map'].values())
+        #     for genotype, pop_infected in self['pop_infected'].items():
+        #         genotype_ind = genotypes.index(genotype)
+        #         inds = hpu.choose(self['pop_size'], self['pop_infected'])
+        #         self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind) # Not counted by results since flows are re-initialized during the step
+        #         self.results['cum_infections'][genotype_ind,:] += len(inds)
+        #         self.results['cum_total_infections'][:] += len(inds)
 
         return
 
