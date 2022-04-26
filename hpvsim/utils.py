@@ -42,7 +42,7 @@ def compute_foi_frac(beta,    effective_condoms, frac_acts):
 @nb.njit(            (nbfloat, nbfloat,           nbint[:]   ), cache=cache, parallel=safe_parallel)
 def compute_foi_whole(beta,    effective_condoms, n): 
     ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
-    foi_whole = np.power(1 - beta * (1 - effective_condoms), n)
+    foi_whole = (1 - beta * (1 - effective_condoms))**n
     return foi_whole
     
 @nb.njit(      (nbfloat[:], nbfloat[:] ), cache=cache, parallel=safe_parallel)
@@ -58,25 +58,25 @@ def get_sources(inf,       sex):
     m_inf = (inf * sex).nonzero()[0]
     return f_inf, m_inf
 
-@nb.jit(parallel=safe_parallel)
-def isin(arr, vals):
+@nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
+def isin( arr,      vals):
     ''' Finds indices of vals in arr. Like np.isin() but faster '''
-    shape = arr.shape
-    arr = arr.ravel()
     n = len(arr)
     result = np.full(n, False)
     set_vals = set(vals)
     for i in nb.prange(n): 
         if arr[i] in set_vals:
             result[i] = True
-    return result.reshape(shape)
+    return result
 
-def findinds(arr, vals):
+@nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
+def findinds(arr,       vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
-    return true(isin(arr,vals))
+    return isin(arr,vals).nonzero()[0]
 
-# @nb.njit(             (nbfloat[:],  nbbool[:],    nbbool[:],    nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m, sus_imm):
+
+# @nb.njit(             (nbfloat[:],  nb.int64[:],    nb.int64[:],    nb.int64[:],    nbint[:],   nbint[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
+def compute_infections(foi,         f_inf_inds,     m_inf_inds,     sus_inds,       f,          m,          sus_imm):
     '''
     Compute who infects whom
 
@@ -96,8 +96,8 @@ def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m, sus_
     tlist = np.empty(0, dtype=hpd.default_int)
 
     # Indices of discordant partnerships
-    f_source_pships = isin(f, f_inf) * m_sus_pships # Female has an infection, male is susceptible...
-    m_source_pships = isin(m, m_inf) * f_sus_pships # ... and vice versa
+    f_source_pships = isin(f, f_inf_inds) * isin(m, sus_inds) # Female has an infection, male is susceptible...
+    m_source_pships = isin(m, m_inf_inds) * isin(f, sus_inds) # ... and vice versa
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
     m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
     discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds]], [m_source_inds, m[m_source_inds], f[m_source_inds]]]

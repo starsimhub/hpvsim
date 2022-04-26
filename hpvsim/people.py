@@ -161,8 +161,8 @@ class People(hpb.BasePeople):
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
         for genotype in range(ng):
-            self.is_inf = self.true_by_genotype('infectious', genotype) # For storing the interim values since used in every subsequent calculation
-            self.is_CIN = self.true_by_genotype('precancerous', genotype)  # For storing the interim values since used in every subsequent calculation
+            # self.is_inf = self.true_by_genotype('infectious', genotype) # For storing the interim values since used in every subsequent calculation
+            # self.is_CIN = self.true_by_genotype('precancerous', genotype)  # For storing the interim values since used in every subsequent calculation
             self.flows['new_precancers'][genotype] += self.check_precancer(genotype)
             self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
             self.check_hpv_clearance(genotype)
@@ -244,7 +244,8 @@ class People(hpb.BasePeople):
 
     def check_precancer(self, genotype):
         ''' Check for new progressions to pre-cancer '''
-        inds = self.check_inds(self.precancerous[genotype,:], self.date_precancerous[genotype,:], filter_inds=self.is_inf)
+        filter_inds = self.true_by_genotype('infectious', genotype)
+        inds = self.check_inds(self.precancerous[genotype,:], self.date_precancerous[genotype,:], filter_inds=filter_inds)
         self.precancerous[genotype, inds] = True
         return len(inds)
 
@@ -253,7 +254,8 @@ class People(hpb.BasePeople):
         Check for new progressions to cancer
         Once an individual has cancer they are no longer susceptible to new HPV infections or CINs and no longer infectious
         '''
-        inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=self.is_CIN)
+        filter_inds = self.true_by_genotype('precancerous', genotype)
+        inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
         self.cancerous[genotype, inds] = True
         self.susceptible[:, inds] = False
         self.infectious[:, inds] = False
@@ -263,8 +265,8 @@ class People(hpb.BasePeople):
         '''
         Check for HPV clearance.
         '''
-
-        inds = self.check_inds_true(self.infectious[genotype,:], self.date_HPV_clearance[genotype,:], filter_inds=self.is_inf)
+        filter_inds = self.true_by_genotype('infectious', genotype)
+        inds = self.check_inds_true(self.infectious[genotype,:], self.date_HPV_clearance[genotype,:], filter_inds=filter_inds)
 
         # Now reset disease states
         self.susceptible[genotype, inds] = True
@@ -276,8 +278,8 @@ class People(hpb.BasePeople):
         '''
         Check for CIN clearance.
         '''
-
-        inds = self.check_inds_true(self.precancerous[genotype,:], self.date_CIN_clearance[genotype,:], filter_inds=self.is_CIN)
+        filter_inds = self.true_by_genotype('precancerous', genotype)
+        inds = self.check_inds_true(self.precancerous[genotype,:], self.date_CIN_clearance[genotype,:], filter_inds=filter_inds)
 
         # Now reset disease states
         self.precancerous[genotype, inds] = False
