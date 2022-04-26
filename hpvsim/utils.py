@@ -33,16 +33,16 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
-@nb.njit(           (nbfloat, nbfloat,           nbfloat[:]  ), cache=cache, parallel=safe_parallel)
+# @nb.njit(           (nbfloat, nbfloat,           nbfloat[:]  ), cache=cache, parallel=safe_parallel)
 def compute_foi_frac(beta,    effective_condoms, frac_acts): 
     ''' Compute probability of each person **NOT** transmitting over some fractional number of acts '''
-    foi_frac = 1 - frac_acts * beta * (1 - effective_condoms) 
+    foi_frac = 1 - frac_acts * beta[:,None] * (1 - effective_condoms)
     return foi_frac
 
-@nb.njit(            (nbfloat, nbfloat,           nbint[:]   ), cache=cache, parallel=safe_parallel)
+# @nb.njit(            (nbfloat[:], nbfloat,           nbint[:]   ), cache=cache, parallel=safe_parallel)
 def compute_foi_whole(beta,    effective_condoms, n): 
     ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
-    foi_whole = (1 - beta * (1 - effective_condoms))**n
+    foi_whole = (1 - beta[:,None] * (1 - effective_condoms))**n
     return foi_whole
     
 @nb.njit(      (nbfloat[:], nbfloat[:] ), cache=cache, parallel=safe_parallel)
@@ -60,14 +60,37 @@ def get_sources_targets(inf,        sus,        sex):
     m_inf = (inf * sex).nonzero()[0]
     return f_inf, m_inf, f_sus, m_sus
 
-@nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
-def isin( arr,      vals):
-    ''' Finds indices of vals in arr. Like np.isin() but faster '''
+@nb.njit(              (nbbool[:,:],    nbbool[:,:],    nbbool[:]), cache=cache, parallel=safe_parallel)
+def get_sources_targets2(inf,           sus,            sex):
+    ''' Get indices of sources, i.e. people with current infections '''
+    f_sus = (sus * ~sex).nonzero()
+    m_sus = (sus * sex).nonzero()
+    f_inf = (inf * ~sex).nonzero()
+    m_inf = (inf * sex).nonzero()
+    return f_inf, m_inf, f_sus, m_sus
+
+
+# @nb.njit((nbint[:], nb.int64[:], nbfloat[:]), cache=cache, parallel=safe_parallel)
+def isinvals(arr, search_inds, ref_vals):
+    ''' Find search_inds in arr. Like np.isin() but faster '''
     n = len(arr)
     result = np.full(n, False)
-    set_vals = set(vals)
+    result_vals = np.full(n, np.nan)
+    for i in nb.prange(n):
+        if arr[i] in search_inds:
+            ind = (arr[i]==search_inds).nonzero()[0]
+            result[i] = True
+            result_vals[i] = ref_vals[ind][0]
+    return result, result_vals
+
+@nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
+def isin( arr,      search_inds):
+    ''' Find search_inds in arr. Like np.isin() but faster '''
+    n = len(arr)
+    result = np.full(n, False)
+    set_search_inds = set(search_inds)
     for i in nb.prange(n): 
-        if arr[i] in set_vals:
+        if arr[i] in set_search_inds:
             result[i] = True
     return result
 
@@ -96,23 +119,30 @@ def compute_infections(foi,         f_inf_inds,     m_inf_inds,     f_sus_inds, 
     # tlist = np.empty(0, dtype=nbint)
     slist = np.empty(0, dtype=hpd.default_int)
     tlist = np.empty(0, dtype=hpd.default_int)
+    glist = np.empty(0, dtype=hpd.default_int)
 
     # Indices of discordant partnerships
-    f_source_pships = isin(f, f_inf_inds) * isin(m, m_sus_inds) # Female has an infection, male is susceptible...
-    m_source_pships = isin(m, m_inf_inds) * isin(f, f_sus_inds) # ... and vice versa
+    f_source_pships, f_genotypes = isinvals(f, f_inf_inds[1], f_inf_inds[0])
+    m_source_pships, m_genotypes = isinvals(m, m_inf_inds[1], m_inf_inds[0])
+    f_genotypes = f_genotypes[(~np.isnan(f_genotypes)).nonzero()].astype(hpd.default_int)
+    m_genotypes = f_genotypes[(~np.isnan(f_genotypes)).nonzero()].astype(hpd.default_int)
+    f_source_pships = f_source_pships * isin(m, m_sus_inds[1]) # Female has an infection, male is susceptible...
+    m_source_pships = m_source_pships * isin(f, f_sus_inds[1]) # ... and vice versa
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
     m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
-    discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds]], [m_source_inds, m[m_source_inds], f[m_source_inds]]]
+    discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_genotypes], [m_source_inds, m[m_source_inds], f[m_source_inds], m_genotypes]]
 
     # Loop over partnerships that involve one person infected with this genotype and one susceptible person
-    for pship_inds, sources, targets in discordant_pairs:
-        betas            = foi[pship_inds]*(1-sus_imm[targets]) # Pull out the transmissibility associated with this partnership
+    for pship_inds, sources, targets, genotypes in discordant_pairs:
+        betas            = foi[genotypes,pship_inds]*(1-sus_imm[genotypes,targets]) # Pull out the transmissibility associated with this partnership
         transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
         source_inds      = sources[transmissions] # Extract indices of those who passed on an infection
         target_inds      = targets[transmissions] # Extract indices of those who got infected
+        genotype_inds    = genotypes[transmissions] # Extract genotypes that have been transmitted
         slist = np.concatenate((slist, source_inds), axis=0)
         tlist = np.concatenate((tlist, target_inds), axis=0)
-    return slist, tlist
+        glist = np.concatenate((glist, genotype_inds), axis=0)
+    return slist, tlist, glist
 
 
 

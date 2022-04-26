@@ -318,7 +318,8 @@ class Sim(hpb.BaseSim):
         ng = self['n_genotypes']
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
-        rel_beta = self['rel_beta']
+        beta = self['beta']
+        gen_pars = self['genotype_pars']
 
         # Update states and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
@@ -343,19 +344,25 @@ class Sim(hpb.BaseSim):
             whole_acts.append(wa.astype(hpd.default_int))
             effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
 
+        gen_betas = np.array([g['rel_beta']*beta for g in gen_pars.values()], dtype=hpd.default_float)
+        inf = people.infectious
+        sus = people.susceptible
+        sus_imm = people.sus_imm
+        f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets2(inf, sus, people.sex.astype(bool))  # Males and females infected with this genotype
+
         # Iterate through genotypes to calculate infections
         for genotype in range(ng):
 
             # Deal with genotype parameters
-            genotype_label  = self.pars['genotype_map'][genotype]
-            rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
-            beta            = hpd.default_float(self['beta'] * rel_beta)
-            inf_genotype    = people.infectious[genotype, :]
-            sus_genotype    = people.susceptible[genotype, :]
-            sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
+            # genotype_label  = self.pars['genotype_map'][genotype]
+            # rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
+            # beta            = hpd.default_float(self['beta'] * rel_beta)
+            # inf_genotype    = people.infectious[genotype, :]
+            # sus_genotype    = people.susceptible[genotype, :]
+            # sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
 
             # Start constructing discordant pairs
-            f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf_genotype, sus_genotype, people.sex.astype(bool)) # Males and females infected with this genotype
+            # f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf_genotype, sus_genotype, people.sex.astype(bool)) # Males and females infected with this genotype
 
             # Loop over layers
             ln = 0 # Layer number
@@ -364,8 +371,8 @@ class Sim(hpb.BaseSim):
                 m = ms[ln]
 
                 # Compute transmissibility for each partnership
-                foi_whole = hpu.compute_foi_whole(beta, effective_condoms[ln], whole_acts[ln])
-                foi_frac  = hpu.compute_foi_frac(beta, effective_condoms[ln], frac_acts[ln])
+                foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln])
+                foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
                 foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
                 # Compute transmissions
