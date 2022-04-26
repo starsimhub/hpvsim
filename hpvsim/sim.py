@@ -322,7 +322,7 @@ class Sim(hpb.BaseSim):
 
         # Update states and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
-        self.people = self.people + new_people # New births are added to the population
+        self.people.addtoself(new_people) # New births are added to the population
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
