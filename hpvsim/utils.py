@@ -51,12 +51,14 @@ def compute_foi(foi_whole,  foi_frac):
     foi = 1 - (foi_whole*foi_frac)
     return foi
 
-@nb.njit(      (nbbool[:], nbbool[:]), cache=cache, parallel=safe_parallel)
-def get_sources(inf,       sex):
+@nb.njit(              (nbbool[:],  nbbool[:],  nbbool[:]), cache=cache, parallel=safe_parallel)
+def get_sources_targets(inf,        sus,        sex):
     ''' Get indices of sources, i.e. people with current infections '''
+    f_sus = (sus * ~sex).nonzero()[0]
+    m_sus = (sus * sex).nonzero()[0]
     f_inf = (inf * ~sex).nonzero()[0]
     m_inf = (inf * sex).nonzero()[0]
-    return f_inf, m_inf
+    return f_inf, m_inf, f_sus, m_sus
 
 @nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isin( arr,      vals):
@@ -76,7 +78,7 @@ def findinds(arr,       vals):
 
 
 # @nb.njit(             (nbfloat[:],  nb.int64[:],    nb.int64[:],    nb.int64[:],    nbint[:],   nbint[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi,         f_inf_inds,     m_inf_inds,     sus_inds,       f,          m,          sus_imm):
+def compute_infections(foi,         f_inf_inds,     m_inf_inds,     f_sus_inds, m_sus_inds,       f,          m,          sus_imm):
     '''
     Compute who infects whom
 
@@ -96,21 +98,11 @@ def compute_infections(foi,         f_inf_inds,     m_inf_inds,     sus_inds,   
     tlist = np.empty(0, dtype=hpd.default_int)
 
     # Indices of discordant partnerships
-    f_source_pships = isin(f, f_inf_inds) * isin(m, sus_inds) # Female has an infection, male is susceptible...
-    m_source_pships = isin(m, m_inf_inds) * isin(f, sus_inds) # ... and vice versa
+    f_source_pships = isin(f, f_inf_inds) * isin(m, m_sus_inds) # Female has an infection, male is susceptible...
+    m_source_pships = isin(m, m_inf_inds) * isin(f, f_sus_inds) # ... and vice versa
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
     m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
     discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds]], [m_source_inds, m[m_source_inds], f[m_source_inds]]]
-    import traceback;
-    traceback.print_exc();
-    import pdb;
-    pdb.set_trace()
-
-    if len(f_source_inds)>0 or len(m_source_inds)>0:
-        import traceback;
-        traceback.print_exc();
-        import pdb;
-        pdb.set_trace()
 
     # Loop over partnerships that involve one person infected with this genotype and one susceptible person
     for pship_inds, sources, targets in discordant_pairs:

@@ -355,14 +355,13 @@ class Sim(hpb.BaseSim):
             sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
 
             # Start constructing discordant pairs
-            sus_inds = hpu.true(people.susceptible[genotype,:])  # Get indices of susceptible people
-            f_inf_inds, m_inf_inds = hpu.get_sources(inf_genotype, people.sex.astype(bool)) # Males and females infected with this genotype
+            f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf_genotype, sus_genotype, people.sex.astype(bool)) # Males and females infected with this genotype
 
             # Loop over layers
             ln = 0 # Layer number
             for lkey, layer in contacts.items():
                 f = fs[ln]
-                m = fs[ln]
+                m = ms[ln]
 
                 # Compute transmissibility for each partnership
                 foi_whole = hpu.compute_foi_whole(beta, effective_condoms[ln], whole_acts[ln])
@@ -370,7 +369,7 @@ class Sim(hpb.BaseSim):
                 foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
                 # Compute transmissions
-                source_inds, target_inds = hpu.compute_infections(foi, f_inf_inds, m_inf_inds, sus_inds, f, m, sus_imm)  # Calculate transmission
+                source_inds, target_inds = hpu.compute_infections(foi, f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, sus_imm)  # Calculate transmission
                 people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
                 ln += 1
 
