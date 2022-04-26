@@ -101,6 +101,16 @@ def compute_infections(foi,         f_inf_inds,     m_inf_inds,     sus_inds,   
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
     m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
     discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds]], [m_source_inds, m[m_source_inds], f[m_source_inds]]]
+    import traceback;
+    traceback.print_exc();
+    import pdb;
+    pdb.set_trace()
+
+    if len(f_source_inds)>0 or len(m_source_inds)>0:
+        import traceback;
+        traceback.print_exc();
+        import pdb;
+        pdb.set_trace()
 
     # Loop over partnerships that involve one person infected with this genotype and one susceptible person
     for pship_inds, sources, targets in discordant_pairs:

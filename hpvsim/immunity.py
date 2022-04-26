@@ -158,10 +158,10 @@ def update_immunity(people, inds):
     '''
     t_since_boost = people.t - people.t_imm_event[:,inds].astype(hpd.default_int)
     imm_kin = people.pars['imm_kin'][:,t_since_boost[:,:]][0] # Get people's current level of immunity
-    people.imm[:,inds] += imm_kin*people.peak_imm[:,inds] # Set immunity relative to peak
 
-    # people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
-    # people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
+    people.imm[:,inds] += imm_kin*people.peak_imm[:,inds] # Set immunity relative to peak
+    people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
+    people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
 
     return
 

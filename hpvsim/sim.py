@@ -350,7 +350,8 @@ class Sim(hpb.BaseSim):
             genotype_label  = self.pars['genotype_map'][genotype]
             rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
             beta            = hpd.default_float(self['beta'] * rel_beta)
-            inf_genotype = people.infectious[genotype, :]
+            inf_genotype    = people.infectious[genotype, :]
+            sus_genotype    = people.susceptible[genotype, :]
             sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
 
             # Start constructing discordant pairs
