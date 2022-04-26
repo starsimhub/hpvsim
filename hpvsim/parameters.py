@@ -30,6 +30,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Population parameters
     pars['pop_size']        = 20e3     # Number of agents
+    pars['init_prev']       = dict()    # Initial HPV prevalence by age and genotype
     pars['pop_infected']    = 100       # Number of initial infections; TODO reconsider this
     pars['network']         = 'random' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None     # What location to load data from -- default Seattle
@@ -78,7 +79,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['immunity_map'] = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
 
     pars['genotypes'] = []  # Genotypes of the virus; populated by the user below
-    pars['genotype_map'] = {0: 'hpv16'}  # Reverse mapping from number to variant key
+    pars['genotype_map'] = {0: 'hpv16'}  # Reverse mapping from number to genotype key
     pars['genotype_pars'] = dict(hpv16={})  # Populated just below
     for sp in hpd.genotype_pars:
         if sp in pars.keys():
@@ -86,7 +87,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
-    pars['rel_beta']    = 1.0 # Relative transmissibility varies by genotype (??)
+    pars['rel_beta']    = 1.0 # Relative transmissibility varies by genotype
 
     # Duration parameters
     pars['dur'] = {}
