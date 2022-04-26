@@ -78,12 +78,11 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['immunity'] = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
     pars['immunity_map'] = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
 
+    # all genotype properties get populated by user in init_genotypes()
     pars['genotypes'] = []  # Genotypes of the virus; populated by the user below
-    pars['genotype_map'] = {0: 'hpv16'}  # Reverse mapping from number to genotype key
-    pars['genotype_pars'] = dict(hpv16={})  # Populated just below
-    for sp in hpd.genotype_pars:
-        if sp in pars.keys():
-            pars['genotype_pars']['hpv16'][sp] = pars[sp]
+    pars['genotype_map'] = dict()  # Reverse mapping from number to genotype key
+    pars['genotype_pars'] = dict()  # Populated just below
+
 
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population

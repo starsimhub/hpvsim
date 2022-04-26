@@ -140,6 +140,12 @@ class Sim(hpb.BaseSim):
                 errormsg = f'Genotype {i} ({genotype}) is not a hp.genotype object; please create using cv.genotype()'
                 raise TypeError(errormsg)
 
+        if not len(self['genotypes']):
+            print('No genotypes provided, will assume only simulating HPV 16 by default')
+            hpv16 = hpimm.genotype('hpv16')
+            hpv16.initialize(self)
+            self['genotypes'] = [hpv16]
+
         len_pars = len(self['genotype_pars'])
         len_map = len(self['genotype_map'])
         assert len_pars == len_map, f"genotype_pars and genotype_map must be the same length, but they're not: {len_pars} ≠ {len_map}"

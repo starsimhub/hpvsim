@@ -67,8 +67,8 @@ def test_genotypes():
 if __name__ == '__main__':
 
     # sim0 = test_random() # NOT WORKING
-    # sim1 = test_basic() # NOT WORKING
-    sim2 = test_genotypes()
+    sim1 = test_basic() # NOT WORKING
+    # sim2 = test_genotypes()
 
 
 
