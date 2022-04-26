@@ -1087,7 +1087,7 @@ class BasePeople(FlexPretty):
         newpeople = sc.dcp(self)
         keys = list(self.keys())
         for key in keys:
-            npval = self[key]
+            npval = newpeople[key]
             p2val = people2[key]
             if npval.ndim == 1:
                 newpeople.set(key, np.concatenate([npval, p2val], axis=0), die=False) # Allow size mismatch
