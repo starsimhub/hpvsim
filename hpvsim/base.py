@@ -1107,6 +1107,30 @@ class BasePeople(FlexPretty):
         return newpeople
 
 
+    def addtoself(self, people2):
+        ''' Combine two people arrays, avoiding dcp '''
+        keys = list(self.keys())
+        for key in keys:
+            npval = self[key]
+            p2val = people2[key]
+            if npval.ndim == 1:
+                self.set(key, np.concatenate([npval, p2val], axis=0), die=False) # Allow size mismatch
+            elif npval.ndim == 2:
+                self.set(key, np.concatenate([npval, p2val], axis=1), die=False)
+            else:
+                errormsg = f'Not sure how to combine arrays of {npval.ndim} dimensions for {key}'
+                raise NotImplementedError(errormsg)
+
+        # Validate
+        self.pars['pop_size'] += people2.pars['pop_size']
+        self.validate()
+
+        # Reassign UIDs so they're unique
+        self.set('uid', np.arange(len(self)))
+
+        return
+
+
     def __radd__(self, people2):
         ''' Allows sum() to work correctly '''
         if not people2: return self
