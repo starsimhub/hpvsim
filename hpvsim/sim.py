@@ -286,12 +286,16 @@ class Sim(hpb.BaseSim):
 
         # Create the seed infections
         ng = self['n_genotypes']
-        if sc.isnumber(self['pop_infected']): # assume equal init infections for all circulating genotypes
-            for genotype_ind in range(ng):
-                inds = hpu.choose(self['pop_size'], self['pop_infected']/ng)
-                self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
-                self.results['cum_infections'][genotype_ind,:] += len(inds)
-                self.results['cum_total_infections'][:] += len(inds)
+        pop_inf = self['pop_infected']
+        if sc.isnumber(pop_inf): # assume equal init infections for all circulating genotypes
+            inds = hpu.choose(self['pop_size'], pop_inf)
+            genotypes = np.random.randint(0, ng, pop_inf)
+            self.people.infect(inds=inds, genotypes=genotypes, layer='seed_infection')  # Not counted by results since flows are re-initialized during the step
+            # for genotype_ind in range(ng):
+            #     inds = hpu.choose(self['pop_size'], self['pop_infected']/ng)
+            #     self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
+            #     self.results['cum_infections'][genotype_ind,:] += len(inds)
+            #     self.results['cum_total_infections'][:] += len(inds)
 
         elif isinstance(self['pop_infected'], dict):
             genotypes = list(self['genotype_map'].values())
@@ -351,7 +355,7 @@ class Sim(hpb.BaseSim):
         f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets2(inf, sus, people.sex.astype(bool))  # Males and females infected with this genotype
 
         # Iterate through genotypes to calculate infections
-        for genotype in range(ng):
+        # for genotype in range(ng):
 
             # Deal with genotype parameters
             # genotype_label  = self.pars['genotype_map'][genotype]
@@ -364,21 +368,21 @@ class Sim(hpb.BaseSim):
             # Start constructing discordant pairs
             # f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf_genotype, sus_genotype, people.sex.astype(bool)) # Males and females infected with this genotype
 
-            # Loop over layers
-            ln = 0 # Layer number
-            for lkey, layer in contacts.items():
-                f = fs[ln]
-                m = ms[ln]
+        # Loop over layers
+        ln = 0 # Layer number
+        for lkey, layer in contacts.items():
+            f = fs[ln]
+            m = ms[ln]
 
-                # Compute transmissibility for each partnership
-                foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln])
-                foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
-                foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
+            # Compute transmissibility for each partnership
+            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln])
+            foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
+            foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
-                # Compute transmissions
-                source_inds, target_inds = hpu.compute_infections(foi, f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, sus_imm)  # Calculate transmission
-                people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
-                ln += 1
+            # Compute transmissions
+            source_inds, target_inds, genotype_inds = hpu.compute_infections(foi, f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, sus_imm)  # Calculate transmission
+            people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
+            ln += 1
 
         # Update counts for this time step: stocks
         # for key in hpd.aggregate_result_stocks.keys():

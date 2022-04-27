@@ -76,8 +76,9 @@ def isinvals(arr, search_inds, ref_vals):
     n = len(arr)
     result = np.full(n, False)
     result_vals = np.full(n, np.nan)
+    set_search_inds = set(search_inds)
     for i in nb.prange(n):
-        if arr[i] in search_inds:
+        if arr[i] in set_search_inds:
             ind = (arr[i]==search_inds).nonzero()[0]
             result[i] = True
             result_vals[i] = ref_vals[ind][0]
@@ -121,13 +122,17 @@ def compute_infections(foi,         f_inf_inds,     m_inf_inds,     f_sus_inds, 
     tlist = np.empty(0, dtype=hpd.default_int)
     glist = np.empty(0, dtype=hpd.default_int)
 
-    # Indices of discordant partnerships
-    f_source_pships, f_genotypes = isinvals(f, f_inf_inds[1], f_inf_inds[0])
-    m_source_pships, m_genotypes = isinvals(m, m_inf_inds[1], m_inf_inds[0])
-    f_genotypes = f_genotypes[(~np.isnan(f_genotypes)).nonzero()].astype(hpd.default_int)
-    m_genotypes = f_genotypes[(~np.isnan(f_genotypes)).nonzero()].astype(hpd.default_int)
-    f_source_pships = f_source_pships * isin(m, m_sus_inds[1]) # Female has an infection, male is susceptible...
-    m_source_pships = m_source_pships * isin(f, f_sus_inds[1]) # ... and vice versa
+    # Construct discordant partnerships
+    f_source_pships, f_genotypes = isinvals(f, f_inf_inds[1], f_inf_inds[0]) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
+    m_source_pships, m_genotypes = isinvals(m, m_inf_inds[1], m_inf_inds[0]) # ... same thing for males
+    f_sus_pships = isin(f, f_sus_inds[1]) # Pull out the indices of partnerships in which the female is susceptible
+    m_sus_pships = isin(m, m_sus_inds[1]) # ... and same for males
+
+    f_genotypes = f_genotypes[(~np.isnan(f_genotypes)*m_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
+    m_genotypes = m_genotypes[(~np.isnan(m_genotypes)*f_sus_pships).nonzero()[0]].astype(hpd.default_int) # ... and again for males
+
+    f_source_pships = f_source_pships * m_sus_pships # Remove partnerships where both partners have an infection with the same genotype
+    m_source_pships = m_source_pships * f_sus_pships # ... same thing for males
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
     m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
     discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_genotypes], [m_source_inds, m[m_source_inds], f[m_source_inds], m_genotypes]]
