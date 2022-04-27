@@ -51,17 +51,8 @@ def compute_foi(foi_whole,  foi_frac):
     foi = 1 - (foi_whole*foi_frac)
     return foi
 
-@nb.njit(              (nbbool[:],  nbbool[:],  nbbool[:]), cache=cache, parallel=safe_parallel)
-def get_sources_targets(inf,        sus,        sex):
-    ''' Get indices of sources, i.e. people with current infections '''
-    f_sus = (sus * ~sex).nonzero()[0]
-    m_sus = (sus * sex).nonzero()[0]
-    f_inf = (inf * ~sex).nonzero()[0]
-    m_inf = (inf * sex).nonzero()[0]
-    return f_inf, m_inf, f_sus, m_sus
-
 @nb.njit(              (nbbool[:,:],    nbbool[:,:],    nbbool[:]), cache=cache, parallel=safe_parallel)
-def get_sources_targets2(inf,           sus,            sex):
+def get_sources_targets(inf,           sus,            sex):
     ''' Get indices of sources, i.e. people with current infections '''
     f_sus = (sus * ~sex).nonzero()
     m_sus = (sus * sex).nonzero()
@@ -70,19 +61,24 @@ def get_sources_targets2(inf,           sus,            sex):
     return f_inf, m_inf, f_sus, m_sus
 
 
-# @nb.njit((nbint[:], nb.int64[:], nbfloat[:]), cache=cache, parallel=safe_parallel)
-def isinvals(arr, search_inds, ref_vals):
+@nb.njit(   (nbint[:], nb.int64[:], nb.int64[:], nbint[:]), cache=cache, parallel=safe_parallel)
+def isinvals2d(arr, search_inds1, search_inds2, ref_vals1):
     ''' Find search_inds in arr. Like np.isin() but faster '''
     n = len(arr)
-    result = np.full(n, False)
+    result1 = np.full(n, False)
+    result2 = np.full(n, False)
     result_vals = np.full(n, np.nan)
-    set_search_inds = set(search_inds)
+    
     for i in nb.prange(n):
-        if arr[i] in set_search_inds:
-            ind = (arr[i]==search_inds).nonzero()[0]
-            result[i] = True
-            result_vals[i] = ref_vals[ind][0]
-    return result, result_vals
+        if arr[i] in set_search_inds1:
+            # THIS NEXT LINE IS CRAZY SLOW
+            # ind = list(search_inds1).index(arr[i])
+            ind = 0
+            result1[i] = True
+            result_vals[i] = ref_vals1[ind]
+        if arr[i] in search_inds2:
+            result2[i] = True
+    return result1, result2, result_vals
 
 @nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isin( arr,      search_inds):
@@ -123,14 +119,10 @@ def compute_infections(foi,         f_inf_inds,     m_inf_inds,     f_sus_inds, 
     glist = np.empty(0, dtype=hpd.default_int)
 
     # Construct discordant partnerships
-    f_source_pships, f_genotypes = isinvals(f, f_inf_inds[1], f_inf_inds[0]) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    m_source_pships, m_genotypes = isinvals(m, m_inf_inds[1], m_inf_inds[0]) # ... same thing for males
-    f_sus_pships = isin(f, f_sus_inds[1]) # Pull out the indices of partnerships in which the female is susceptible
-    m_sus_pships = isin(m, m_sus_inds[1]) # ... and same for males
-
+    f_source_pships, f_sus_pships, f_genotypes = isinvals2d(f, f_inf_inds[1], f_sus_inds[1], f_inf_inds[0]) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
+    m_source_pships, m_sus_pships, m_genotypes = isinvals2d(m, m_inf_inds[1], m_sus_inds[1], m_inf_inds[0]) # ... same thing for males
     f_genotypes = f_genotypes[(~np.isnan(f_genotypes)*m_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
     m_genotypes = m_genotypes[(~np.isnan(m_genotypes)*f_sus_pships).nonzero()[0]].astype(hpd.default_int) # ... and again for males
-
     f_source_pships = f_source_pships * m_sus_pships # Remove partnerships where both partners have an infection with the same genotype
     m_source_pships = m_source_pships * f_sus_pships # ... same thing for males
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection

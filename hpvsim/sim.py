@@ -352,21 +352,7 @@ class Sim(hpb.BaseSim):
         inf = people.infectious
         sus = people.susceptible
         sus_imm = people.sus_imm
-        f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets2(inf, sus, people.sex.astype(bool))  # Males and females infected with this genotype
-
-        # Iterate through genotypes to calculate infections
-        # for genotype in range(ng):
-
-            # Deal with genotype parameters
-            # genotype_label  = self.pars['genotype_map'][genotype]
-            # rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
-            # beta            = hpd.default_float(self['beta'] * rel_beta)
-            # inf_genotype    = people.infectious[genotype, :]
-            # sus_genotype    = people.susceptible[genotype, :]
-            # sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
-
-            # Start constructing discordant pairs
-            # f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf_genotype, sus_genotype, people.sex.astype(bool)) # Males and females infected with this genotype
+        f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf, sus, people.sex.astype(bool))  # Males and females infected with this genotype
 
         # Loop over layers
         ln = 0 # Layer number

@@ -36,11 +36,11 @@ def test_genotypes():
     hpv16 = genotype('HPV16')
     hpv18 = genotype('HPV18')
     pars = {
-        'pop_size': 50e3,
+        'pop_size': 20e3,
         'network': 'basic',
         'genotypes': [hpv16, hpv18],
-        'dt': .1,
-        'end': 2035
+        'dt': .2,
+        'end': 2025
     }
     sim = Sim(pars=pars)
     sim.run()
