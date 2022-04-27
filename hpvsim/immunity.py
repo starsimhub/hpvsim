@@ -160,7 +160,7 @@ def update_immunity(people, inds):
     imm_kin = people.pars['imm_kin'][:,t_since_boost[:,:]][0] # Get people's current level of immunity
     people.imm[:,inds] += imm_kin*people.peak_imm[:,inds] # Set immunity relative to peak
     # TODO: can we get rid of the next two lines? They slow things down quite a bit
-    # people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
+    people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
     # people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
 
     return

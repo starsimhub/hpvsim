@@ -29,12 +29,12 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars = {}
 
     # Population parameters
-    pars['pop_size']        = 20e3     # Number of agents
-    pars['init_hpv_prevalence'] = None     # Initial HPV prevalence by age (and genotype), loaded below
-    pars['network']         = 'random' # What type of sexual network to use -- 'random', 'basic', other options TBC
-    pars['location']        = None     # What location to load data from -- default Seattle
-    pars['death_rates']     = None     # Deaths from all other causes, loaded below 
-    pars['birth_rates']     = None     # Birth rates, loaded below 
+    pars['pop_size']        = 20e3      # Number of agents
+    pars['init_hpv_prevalence'] = None  # Initial HPV prevalence by age (and genotype), loaded below
+    pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
+    pars['location']        = None      # What location to load data from -- default Seattle
+    pars['death_rates']     = None      # Deaths from all other causes, loaded below
+    pars['birth_rates']     = None      # Birth rates, loaded below
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
@@ -417,166 +417,167 @@ def get_cross_immunity(default=False, genotype=None):
         hpv18 = dict(
             hpv16=0,  # Default for own-immunity
             hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpv31=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
             hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpv33=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
             hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpv45=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
             hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpv52=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
             hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpv58=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
             hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpv6=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
             hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpv11=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
             hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpvlo=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
             hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpvhi=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
             hpvhi=1.0,  # Assumption
-            hpvhi5=1.0,  # Assumption
+            hpvhi5=0,  # Assumption
         ),
 
         hpvhi5=dict(
-            hpv16=1.0,  # Default for own-immunity
-            hpv18=1.0,  # Assumption
-            hpv31=1.0,  # Assumption
-            hpv33=1.0,  # Assumption
-            hpv45=1.0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=1.0,  # Assumption
-            hpv6=1.0,  # Assumption
-            hpv11=1.0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=1.0,  # Assumption
+            hpv16=0,  # Default for own-immunity
+            hpv18=0,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
             hpvhi5=1.0,  # Assumption
+
         ),
     )
 
