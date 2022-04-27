@@ -61,22 +61,23 @@ def get_sources_targets(inf,           sus,            sex):
     return f_inf, m_inf, f_sus, m_sus
 
 
-@nb.njit(   (nbint[:], nb.int64[:], nb.int64[:], nbint[:]), cache=cache, parallel=safe_parallel)
+@nb.njit(   (nbint[:], nb.int64[:], nb.int64[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isinvals2d(arr, search_inds1, search_inds2, ref_vals1):
     ''' Find search_inds in arr. Like np.isin() but faster '''
     n = len(arr)
     result1 = np.full(n, False)
     result2 = np.full(n, False)
     result_vals = np.full(n, np.nan)
-    
+    set_search_inds1 = set(search_inds1)
+    set_search_inds2 = set(search_inds2)
     for i in nb.prange(n):
         if arr[i] in set_search_inds1:
             # THIS NEXT LINE IS CRAZY SLOW
-            # ind = list(search_inds1).index(arr[i])
-            ind = 0
+            ind = list(search_inds1).index(arr[i])
+            # ind = 0
             result1[i] = True
             result_vals[i] = ref_vals1[ind]
-        if arr[i] in search_inds2:
+        if arr[i] in set_search_inds2:
             result2[i] = True
     return result1, result2, result_vals
 
