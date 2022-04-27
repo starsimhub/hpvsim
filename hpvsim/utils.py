@@ -73,8 +73,8 @@ def isinvals2d(arr, search_inds1, search_inds2, ref_vals1):
     for i in nb.prange(n):
         if arr[i] in set_search_inds1:
             # THIS NEXT LINE IS CRAZY SLOW
-            ind = list(search_inds1).index(arr[i])
-            # ind = 0
+            # ind = list(search_inds1).index(arr[i])
+            ind = 0 # TEMP >>>>>>>>>>>>
             result1[i] = True
             result_vals[i] = ref_vals1[ind]
         if arr[i] in set_search_inds2:

@@ -377,33 +377,15 @@ class People(hpb.BasePeople):
         if len(inds) == 0:
             return 0
 
-        # Remove duplicates
-        # inds, unique = np.unique(inds, return_index=True)
-
-        # Keep only susceptibles
-        # keep = self.susceptible[:, inds] # Unique indices in inds and source that are also susceptible
-        # inds = inds[keep]
-        # if source is not None:
-        #     source = source[keep]
-
         # Deal with genotype parameters
         ng              = self.pars['n_genotypes']
         genotype_keys   = ['rel_CIN_prob', 'rel_cancer_prob', 'rel_death_prob']
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
         infect_pars     = {k:self.pars[k] for k in genotype_keys}
-
-        # TEMP >>>>>>>>>>>>
-        genotype_label = self.pars['genotype_map'][1]
-        for k in genotype_keys:
-            infect_pars[k] *= self.pars['genotype_pars'][genotype_label][k]
-
         durpars         = self.pars['dur']
         progpars        = self.pars['prognoses']
-        # progprobs       = []
         progprobs       = [{k: self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys} for g in range(ng)]  # np.array([[self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys] for g in range(ng)])
-        # for g in range(ng):
-        #     progprobs.append({k:self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys}) #np.array([[self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys] for g in range(ng)])
 
         # Update states, genotype info, and flows
         n_infections = len(inds) # Count the total number of new infections
@@ -433,11 +415,6 @@ class People(hpb.BasePeople):
 
         # Use prognosis probabilities to determine what happens (only women can progress to CIN)
         for g in range(ng):
-            # if layer != 'seed_infection':
-            #     import traceback;
-            #     traceback.print_exc();
-            #     import pdb;
-            #     pdb.set_trace()
             inf_female = hpu.true((genotypes == g) * self.is_female[inds])
             dur_inf_female = dur_inf[inf_female]
             dur_inds = np.digitize(dur_inf_female, progpars['duration_cutoffs']) - 1  # Convert durations to indices
@@ -471,8 +448,8 @@ class People(hpb.BasePeople):
             self.dur_cin2cancer[g, cancer_inds] = dur_CIN[is_cancer]
             self.date_cancerous[g, cancer_inds] = self.date_precancerous[g, cancer_inds] + np.ceil(dur_CIN[is_cancer]/dt) # Date they get cancer
 
-        # Update immunity
-        # hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
+            # Update immunity - TODO, check this still works
+            hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=g)
 
         return n_infections # For incrementing counters
 
