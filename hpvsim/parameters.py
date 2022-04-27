@@ -30,8 +30,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Population parameters
     pars['pop_size']        = 20e3     # Number of agents
-    pars['init_prevalence'] = None     # Initial HPV prevalence by age (and genotype), loaded below
-    pars['pop_infected']    = 100       # Number of initial infections; TODO reconsider this
+    pars['init_hpv_prevalence'] = None     # Initial HPV prevalence by age (and genotype), loaded below
     pars['network']         = 'random' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None     # What location to load data from -- default Seattle
     pars['death_rates']     = None     # Deaths from all other causes, loaded below 

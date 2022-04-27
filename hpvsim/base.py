@@ -267,7 +267,6 @@ class BaseSim(ParsObj):
             # Define aliases
             mapping = dict(
                 n_agents = 'pop_size',
-                init_infected = 'pop_infected',
             )
             for key1,key2 in mapping.items():
                 if key1 in pars:
@@ -280,8 +279,8 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
-            if 'init_prevalence' in pars and pars['init_prevalence'] is None:
-                pars['init_prevalence'] = hpd.default_hpv_prevalence
+            if 'init_hpv_prevalence' in pars and pars['init_hpv_prevalence'] is None:
+                pars['init_hpv_prevalence'] = hpd.default_hpv_prevalence
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 
@@ -948,7 +947,7 @@ class BasePeople(FlexPretty):
         # Check that parameters match
         if sim_pars is not None:
             mismatches = {}
-            keys = ['pop_size', 'network', 'location', 'pop_infected'] # These are the keys used in generating the population
+            keys = ['pop_size', 'network', 'location'] # These are the keys used in generating the population
             for key in keys:
                 sim_v = sim_pars.get(key)
                 ppl_v = self.pars.get(key)

@@ -37,7 +37,7 @@ def test_genotypes():
     hpv18 = genotype('HPV18')
     hpvhi5 = genotype('hpvhi5')
     pars = {
-        'pop_size': 50e3,
+        'pop_size': 10e3,
         'network': 'basic',
         'genotypes': [hpv16, hpv18, hpvhi5],
         'dt': .1,
