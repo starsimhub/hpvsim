@@ -164,7 +164,8 @@ class People(hpb.BasePeople):
             # self.is_inf = self.true_by_genotype('infectious', genotype) # For storing the interim values since used in every subsequent calculation
             # self.is_CIN = self.true_by_genotype('precancerous', genotype)  # For storing the interim values since used in every subsequent calculation
             self.flows['new_precancers'][genotype] += self.check_precancer(genotype)
-            self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
+            if self.t * self.dt % 1 == 0:   # only check cancers every year
+                self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
             self.check_hpv_clearance(genotype)
             self.check_cin_clearance(genotype)
 
