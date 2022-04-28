@@ -5,13 +5,13 @@ import sciris as sc
 import pylab as pl
 import sys
 import os
-from hpvsim.sim import Sim
 
 # Add module to paths
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 # Create genotypes - used in all subsequent tests
+from hpvsim.sim import Sim
 from hpvsim.immunity import genotype
 hpv16 = genotype('HPV16')
 hpv18 = genotype('HPV18')
