@@ -42,7 +42,7 @@ def compute_foi_frac(beta,    effective_condoms, frac_acts):
 @nb.njit(            (nbfloat, nbfloat,           nbint[:]   ), cache=cache, parallel=safe_parallel)
 def compute_foi_whole(beta,    effective_condoms, n): 
     ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
-    foi_whole = np.power(1 - beta * (1 - effective_condoms), n)
+    foi_whole = (1 - beta * (1 - effective_condoms))**n
     return foi_whole
     
 @nb.njit(      (nbfloat[:], nbfloat[:] ), cache=cache, parallel=safe_parallel)
@@ -51,32 +51,34 @@ def compute_foi(foi_whole,  foi_frac):
     foi = 1 - (foi_whole*foi_frac)
     return foi
 
-@nb.njit(      (nbbool[:], nbbool[:]), cache=cache, parallel=safe_parallel)
-def get_sources(inf,       sex):
+@nb.njit(              (nbbool[:],  nbbool[:],  nbbool[:]), cache=cache, parallel=safe_parallel)
+def get_sources_targets(inf,        sus,        sex):
     ''' Get indices of sources, i.e. people with current infections '''
+    f_sus = (sus * ~sex).nonzero()[0]
+    m_sus = (sus * sex).nonzero()[0]
     f_inf = (inf * ~sex).nonzero()[0]
     m_inf = (inf * sex).nonzero()[0]
-    return f_inf, m_inf
+    return f_inf, m_inf, f_sus, m_sus
 
-@nb.jit(parallel=safe_parallel)
-def isin(arr, vals):
+@nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
+def isin( arr,      vals):
     ''' Finds indices of vals in arr. Like np.isin() but faster '''
-    shape = arr.shape
-    arr = arr.ravel()
     n = len(arr)
     result = np.full(n, False)
     set_vals = set(vals)
     for i in nb.prange(n): 
         if arr[i] in set_vals:
             result[i] = True
-    return result.reshape(shape)
+    return result
 
-def findinds(arr, vals):
+@nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
+def findinds(arr,       vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
-    return true(isin(arr,vals))
+    return isin(arr,vals).nonzero()[0]
 
-# @nb.njit(             (nbfloat[:],  nbbool[:],    nbbool[:],    nbint[:], nbint[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m, sus_imm):
+
+# @nb.njit(             (nbfloat[:],  nb.int64[:],    nb.int64[:],    nb.int64[:],    nbint[:],   nbint[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
+def compute_infections(foi,         f_inf_inds,     m_inf_inds,     f_sus_inds, m_sus_inds,       f,          m,          sus_imm):
     '''
     Compute who infects whom
 
@@ -96,8 +98,8 @@ def compute_infections(foi, f_inf, m_inf, f_sus_pships, m_sus_pships, f, m, sus_
     tlist = np.empty(0, dtype=hpd.default_int)
 
     # Indices of discordant partnerships
-    f_source_pships = isin(f, f_inf) * m_sus_pships # Female has an infection, male is susceptible...
-    m_source_pships = isin(m, m_inf) * f_sus_pships # ... and vice versa
+    f_source_pships = isin(f, f_inf_inds) * isin(m, m_sus_inds) # Female has an infection, male is susceptible...
+    m_source_pships = isin(m, m_inf_inds) * isin(f, f_sus_inds) # ... and vice versa
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
     m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
     discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds]], [m_source_inds, m[m_source_inds], f[m_source_inds]]]
@@ -478,7 +480,7 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
 __all__ += ['true',   'false',   'defined',   'undefined',
             'itrue',  'ifalse',  'idefined',  'iundefined',
             'itruei', 'ifalsei', 'idefinedi', 'iundefinedi',
-            'dtround']
+            'dtround', 'find_cutoff']
 
 
 def true(arr):
@@ -677,3 +679,9 @@ def dtround(arr, dt, ceil=True):
     else:
         return np.round(arr * (1/dt)) / (1/dt)
 
+
+def find_cutoff(duration_cutoffs, duration):
+    '''
+    Find which duration bin each ind belongs to.
+    '''
+    return np.nonzero(duration_cutoffs <= duration)[0][-1]  # Index of the duration bin to use

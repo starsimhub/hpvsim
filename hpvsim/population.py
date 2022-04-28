@@ -11,7 +11,7 @@ from . import misc as hpm
 # from . import base as cvb
 from . import data as hpdata
 from . import defaults as hpd
-# from . import parameters as cvpar
+from . import parameters as hppar
 from . import people as hpppl
 
 
@@ -99,19 +99,26 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         active_inds = hpu.true(ages>debuts)     # Indices of sexually experienced people
         if microstructure in ['random', 'basic']:
             contacts = dict()
-            current_partners = dict()
+            current_partners = []
+            lno = 0
             for lkey,n in sim['partners'].items():
                 active_inds_layer = hpu.binomial_filter(sim['layer_probs'][lkey], active_inds)
                 durations = sim['dur_pship'][lkey]
                 acts = sim['acts'][lkey]
-                contacts[lkey], current_partners[lkey] = make_random_contacts(p_count=partners[lkey], sexes=sexes, n=n, durations=durations, acts=acts, mapping=active_inds_layer, **kwargs)
+                contacts[lkey], cp = make_random_contacts(p_count=partners[lno], sexes=sexes, n=n, durations=durations, acts=acts, mapping=active_inds_layer, **kwargs)
+                current_partners.append(cp)
+                lno += 1
         else: 
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
             raise NotImplementedError(errormsg)
 
         popdict['contacts']   = contacts
-        popdict['current_partners']   = current_partners
-        popdict['layer_keys'] = list(partners.keys())
+        popdict['current_partners']   = np.array(current_partners)
+        popdict['layer_keys'] = list(sim['partners'].keys())
+
+    # Ensure prognoses are set
+    if sim['prognoses'] is None:
+        sim['prognoses'] = hppar.get_prognoses()
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
@@ -137,7 +144,7 @@ def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispe
     '''
 
     # Initialize output
-    partners = dict()
+    partners = []
 
     # If means haven't been supplied, set to zero
     if means is None:
@@ -157,9 +164,9 @@ def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispe
         else:
             p_count = np.full(pop_size, n, dtype=hpd.default_int)
 
-        partners[lkey] = p_count
+        partners.append(p_count)
         
-    return partners
+    return np.array(partners)
 
 
 def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5, dispersion=None):

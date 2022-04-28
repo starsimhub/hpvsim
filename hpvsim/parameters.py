@@ -12,7 +12,7 @@ from .data import loaders as hpdata
 __all__ = ['make_pars', 'reset_layer_pars', 'get_prognoses']
 
 
-def make_pars(version=None, nonactive_by_age=False, **kwargs):
+def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwargs):
     '''
     Create the parameters for the simulation. Typically, this function is used
     internally rather than called by the user; e.g. typical use would be to do
@@ -30,7 +30,7 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
 
     # Population parameters
     pars['pop_size']        = 20e3     # Number of agents
-    pars['pop_infected']    = 20       # Number of initial infections; TODO reconsider this
+    pars['pop_infected']    = 100       # Number of initial infections; TODO reconsider this
     pars['network']         = 'random' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None     # What location to load data from -- default Seattle
     pars['death_rates']     = None     # Deaths from all other causes, loaded below 
@@ -47,24 +47,31 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     # Network parameters, generally initialized after the population has been constructed
     pars['debut']           = dict(f=dict(dist='normal', par1=18.6, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=19.6, par2=1.8))
-    pars['partners']        = None  # The number of concurrent sexual partners per layer
-    pars['acts']            = None  # The number of sexual acts per layer per year
-    pars['condoms']         = None  # The proportion of acts in which condoms are used
-    pars['layer_probs']     = None  # Proportion of the population in each layer
-    pars['dur_pship']       = None  # Duration of partnerships in each layer
-    pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships
+    pars['partners']        = None  # The number of concurrent sexual partners for each partnership type
+    pars['acts']            = None  # The number of sexual acts for each partnership type per year
+    pars['condoms']         = None  # The proportion of acts in which condoms are used for each partnership type
+    pars['layer_probs']     = None  # Proportion of the population in each partnership type
+    pars['dur_pship']       = None  # Duration of partnerships in each partnership type
+    pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships - TODO
+    pars['n_partner_types'] = 1  # Number of partnership types - reset below
     # pars['nonactive_by_age']= nonactive_by_age
     # pars['nonactive']       = None 
 
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility
-    pars['beta']            = 0.15  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']            = 0.35  # Per-act transmission probability; absolute value, calibrated
     pars['n_genotypes'] = 1  # The number of genotypes circulating in the population. By default only hpv
+
+    # Probabilities of disease progression
+    pars['rel_CIN_prob'] = 1.0  # Scale factor for proportion of CIN cases
+    pars['rel_cancer_prob'] = 1.0  # Scale factor for proportion of CIN that develop into cancer
+    pars['rel_death_prob'] = 1.0  # Scale factor for proportion of cancer cases that result in death
+    pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
 
     # Parameters used to calculate immunity
     pars['imm_init'] = dict(dist='beta', par1=5, par2=1)  # beta distribution for initial level of immunity following infection clearance
-    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=10),
-                             vaccine=dict(form='exp_decay', init_val=1, half_life=10))
+    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=5), # decay rate, with half life in YEARS
+                             vaccine=dict(form='exp_decay', init_val=1, half_life=20)) # decay rate, with half life in YEARS
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
     pars['imm_boost'] = 1.5  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity'] = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
@@ -83,7 +90,10 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
 
     # Duration parameters
     pars['dur'] = {}
-    pars['dur']['inf2rec']  = dict(dist='lognormal', par1=2.0, par2=5.0)  # Duration from infectious to recovered in YEARS
+    pars['dur']['inf']  = dict(dist='lognormal', par1=1.0, par2=1.0)  # Duration of infection in YEARS
+    pars['dur']['cin']  = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN in YEARS
+    pars['dur']['hpv2cin']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of infection before developing CIN in YEARS
+    pars['dur']['cin2cancer']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of CIN before developing cancer in YEARS
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
@@ -97,6 +107,8 @@ def make_pars(version=None, nonactive_by_age=False, **kwargs):
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
     reset_layer_pars(pars)
+    if set_prognoses: # If not set here, gets set when the population is initialized
+        pars['prognoses'] = get_prognoses() # Default to duration-specific prognoses
 
     return pars
 
@@ -170,8 +182,38 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
             par[lkey] = par_dict.get(lkey, default_val) # Get the value for this layer if available, else use the default for random
         pars[pkey] = par # Save this parameter to the dictionary
 
+    # Finally, update the number of partnership types
+    pars['n_partner_types'] = len(par_layer_keys)
+
     return
 
+
+def get_prognoses():
+    '''
+    Return the default parameter values for prognoses
+
+    The prognosis probabilities are conditional given the previous disease state.
+
+    Returns:
+        prog_pars (dict): the dictionary of prognosis probabilities
+    '''
+
+    prognoses = dict(
+        duration_cutoffs  = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
+        CIN_probs         = np.array([0.0015,  0.01655,    0.05080,    0.20655,    0.70]),   # Conditional probability of developing pre-cancer given HPV infection
+        cancer_probs      = np.array([0.0055,  0.01655,    0.02080,    0.20655,    0.70]),   # Conditional probability of developing cancer given CIN
+        death_probs       = np.array([0.0015,  0.00655,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
+        )
+
+    # Check that lengths match
+    expected_len = len(prognoses['duration_cutoffs'])
+    for key,val in prognoses.items():
+        this_len = len(prognoses[key])
+        if this_len != expected_len: # pragma: no cover
+            errormsg = f'Lengths mismatch in prognoses: {expected_len} duration bins specified, but key "{key}" has {this_len} entries'
+            raise ValueError(errormsg)
+
+    return prognoses
 
 
 def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
@@ -256,46 +298,79 @@ def get_genotype_pars(default=False, genotype=None):
 
         hpv16 = dict(
             rel_beta        = 1.0, # Default values
+            rel_CIN_prob    = 1.0,
+            rel_cancer_prob = 1.0,
+            rel_death_prob  = 1.0
         ),
 
         hpv18 = dict(
             rel_beta        = 0.8, # Default values
+            rel_CIN_prob    = 0.8,
+            rel_cancer_prob = 0.8,
+            rel_death_prob  = 0.8
         ),
 
         hpv31=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpv33=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpv45=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpv52=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpv6=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=0,
+            rel_cancer_prob=0,
+            rel_death_prob=0
         ),
 
         hpv11=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=0,
+            rel_cancer_prob=0,
+            rel_death_prob=0
         ),
 
         hpvlo=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=0,
+            rel_cancer_prob=0,
+            rel_death_prob=0
         ),
 
         hpvhi=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
         hpvhi5=dict(
             rel_beta=1.0,  # Default values
+            rel_CIN_prob=1.0,
+            rel_cancer_prob=1.0,
+            rel_death_prob=1.0
         ),
 
     )
