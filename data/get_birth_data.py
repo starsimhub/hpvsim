@@ -9,6 +9,6 @@ d = dict()
 for country in birth_rates['Country'].unique():
     d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,2:]
 d['years'] = np.arange(2015,2020)
-sc.saveobj('data/birth_rates.obj',d)
+sc.saveobj('birth_rates.obj',d)
 
     

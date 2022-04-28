@@ -89,7 +89,6 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Duration parameters
     pars['dur'] = {}
-
     pars['dur']['inf']  = dict(dist='lognormal', par1=1.0, par2=1.0)  # Duration of infection in YEARS
     pars['dur']['cin']  = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN in YEARS
     pars['dur']['hpv2cin']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of infection before developing CIN in YEARS
