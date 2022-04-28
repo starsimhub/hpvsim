@@ -82,7 +82,6 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['genotype_map'] = dict()  # Reverse mapping from number to genotype key
     pars['genotype_pars'] = dict()  # Populated just below
 
-
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
     pars['rel_beta']    = 1.0 # Relative transmissibility varies by genotype
@@ -278,7 +277,7 @@ def get_genotype_choices():
         'hpv58': ['hpv58', '58'],
         'hpvlo': ['hpvlo', 'low', 'low-risk'],
         'hpvhi': ['hpvhi', 'high', 'high-risk'],
-        'hpvhi5': ['hpvhi5', 'hpvhi', 'high', 'high-risk'],
+        'hpvhi5': ['hpvhi5', 'high5'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
