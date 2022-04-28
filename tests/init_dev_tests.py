@@ -43,7 +43,7 @@ def test_genotypes():
         'dt': .1,
         'end': 2035
     }
-    sim = Sim(pars=pars, location='zimbabwe')
+    sim = Sim(pars=pars)
     sim.run()
 
     fig, ax = pl.subplots(2, 2, figsize=(10, 10))
@@ -52,14 +52,14 @@ def test_genotypes():
     for i, genotype in sim['genotype_map'].items():
         ax[0,0].plot(timevec, sim.results['hpv_incidence'].values[i,:], label=genotype)
         ax[0,1].plot(timevec, sim.results['hpv_prevalence'].values[i, :])
-        ax[1,0].plot(timevec, sim.results['new_precancers'].values[i,:])
-        ax[1,1].plot(timevec, sim.results['cin_prevalence'].values[i, :])
+        ax[1,0].plot(timevec, sim.results['new_CIN1s'].values[i,:])
+        ax[1,1].plot(timevec, sim.results['cin1_prevalence'].values[i, :])
 
     ax[0,0].legend()
     ax[0,0].set_title('HPV incidence by genotype')
     ax[0,1].set_title('HPV prevalence by genotype')
-    ax[1,0].set_title('New CIN by genotype')
-    ax[1,1].set_title('CIN prevalence by genotype')
+    ax[1,0].set_title('New CIN1s by genotype')
+    ax[1,1].set_title('CIN1 prevalence by genotype')
     fig.show()
     return sim
 
