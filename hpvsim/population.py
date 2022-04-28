@@ -11,7 +11,7 @@ from . import misc as hpm
 # from . import base as cvb
 from . import data as hpdata
 from . import defaults as hpd
-# from . import parameters as cvpar
+from . import parameters as hppar
 from . import people as hpppl
 
 
