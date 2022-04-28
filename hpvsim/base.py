@@ -1107,6 +1107,30 @@ class BasePeople(FlexPretty):
         return newpeople
 
 
+    def addtoself(self, people2):
+        ''' Combine two people arrays, avoiding dcp '''
+        keys = list(self.keys())
+        for key in keys:
+            npval = self[key]
+            p2val = people2[key]
+            if npval.ndim == 1:
+                self.set(key, np.concatenate([npval, p2val], axis=0), die=False) # Allow size mismatch
+            elif npval.ndim == 2:
+                self.set(key, np.concatenate([npval, p2val], axis=1), die=False)
+            else:
+                errormsg = f'Not sure how to combine arrays of {npval.ndim} dimensions for {key}'
+                raise NotImplementedError(errormsg)
+
+        # Validate
+        self.pars['pop_size'] += people2.pars['pop_size']
+        self.validate()
+
+        # Reassign UIDs so they're unique
+        self.set('uid', np.arange(len(self)))
+
+        return
+
+
     def __radd__(self, people2):
         ''' Allows sum() to work correctly '''
         if not people2: return self
@@ -1265,84 +1289,77 @@ class BasePeople(FlexPretty):
         ''' Return indices matching the condition '''
         return self[key].nonzero()[0]
 
+    def true_by_genotype(self, key, genotype):
+        ''' Return indices matching genotype-condition'''
+        return self[key][genotype,:].nonzero()[0]
+
+    def false_by_genotype(self, key, genotype):
+        ''' Return indices not matching genotype-condition'''
+        return (~self[key][genotype,:]).nonzero()[0]
 
     def false(self, key):
         ''' Return indices not matching the condition '''
         return (~self[key]).nonzero()[0]
 
-
     def defined(self, key):
         ''' Return indices of people who are not-nan '''
         return (~np.isnan(self[key])).nonzero()[0]
-
 
     def undefined(self, key):
         ''' Return indices of people who are nan '''
         return np.isnan(self[key]).nonzero()[0]
 
-
     def count(self, key):
         ''' Count the number of people for a given key '''
         return np.count_nonzero(self[key])
-
 
     def count_by_genotype(self, key, genotype):
         ''' Count the number of people for a given key '''
         return np.count_nonzero(self[key][genotype,:])
 
-
     def count_not(self, key):
         ''' Count the number of people who do not have a property for a given key '''
         return len(self[key]) - self.count(key)
-
 
     def keys(self):
         ''' Returns keys for all properties of the people object '''
         return self.meta.all_states[:]
 
-
     def person_keys(self):
         ''' Returns keys specific to a person (e.g., their age) '''
         return self.meta.person[:]
-
 
     def state_keys(self):
         ''' Returns keys for different states of a person (e.g., symptomatic) '''
         return self.meta.states[:]
 
-
     def date_keys(self):
         ''' Returns keys for different event dates (e.g., date a person became symptomatic) '''
         return self.meta.dates[:]
-
 
     def dur_keys(self):
         ''' Returns keys for different durations (e.g., the duration from exposed to infectious) '''
         return self.meta.durs[:]
 
-
     def layer_keys(self):
-        ''' Get the available contact keys -- try contacts first, then beta_layer '''
+        ''' Get the available contact keys -- try contacts first, then acts '''
         try:
-            keys = list(self.partners.keys())
+            keys = list(self.contacts.keys())
         except: # If not fully initialized
             try:
-                keys = list(self.pars['beta_layer'].keys())
+                keys = list(self.pars['acts'].keys())
             except:  # pragma: no cover # If not even partially initialized
                 keys = []
         return keys
-
 
     def indices(self):
         ''' The indices of each people array '''
         return np.arange(len(self))
 
-
     def to_df(self):
         ''' Convert to a Pandas dataframe '''
         df = pd.DataFrame.from_dict({key:self[key] for key in self.keys()})
         return df
-
 
     def to_arr(self):
         ''' Return as numpy array '''
@@ -1353,7 +1370,6 @@ class BasePeople(FlexPretty):
             else:
                 arr[:,k] = self[key]
         return arr
-
 
     def person(self, ind):
         ''' Method to create person from the people '''
@@ -1376,11 +1392,9 @@ class BasePeople(FlexPretty):
 
         return p
 
-
     def to_list(self):
         ''' Return all people as a list '''
         return list(self)
-
 
     def from_list(self, people, resize=True):
         ''' Convert a list of people back into a People object '''
@@ -1396,7 +1410,6 @@ class BasePeople(FlexPretty):
                 self[key][p] = getattr(person, key)
 
         return
-
 
     def to_graph(self): # pragma: no cover
         '''
@@ -1431,7 +1444,6 @@ class BasePeople(FlexPretty):
             edge['beta'] *= self.pars['beta_layer'][edge['layer']]
 
         return G
-
 
     def save(self, filename=None, force=False, **kwargs):
         '''
@@ -1503,8 +1515,6 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
             raise TypeError(errormsg)
         return people
 
-
-
     def init_contacts(self, reset=False):
         ''' Initialize the contacts dataframe with the correct columns and data types '''
 
@@ -1517,7 +1527,6 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
             for key,layer in contacts.items():
                 self.contacts[key] = layer
         return
-
 
     def add_contacts(self, contacts, lkey=None, beta=None):
         '''
@@ -1564,7 +1573,6 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
             self.contacts[lkey].validate()
 
         return
-
 
     def make_edgelist(self, contacts):
         '''
@@ -1687,7 +1695,6 @@ class Contacts(FlexDict):
             output += self[key].__repr__() + '\n'
         return output
 
-
     def __len__(self):
         ''' The length of the contacts is the length of all the layers '''
         output = 0
@@ -1697,7 +1704,6 @@ class Contacts(FlexDict):
             except: # pragma: no cover
                 pass
         return output
-
 
     def add_layer(self, **kwargs):
         '''
@@ -1721,7 +1727,6 @@ class Contacts(FlexDict):
             self[lkey] = layer
         return
 
-
     def pop_layer(self, *args):
         '''
         Remove the layer(s) from the contacts.
@@ -1736,7 +1741,6 @@ class Contacts(FlexDict):
         for lkey in args:
             self.pop(lkey)
         return
-
 
     def to_graph(self): # pragma: no cover
         '''
@@ -1830,13 +1834,11 @@ class Layer(FlexDict):
 
         return
 
-
     def __len__(self):
         try:
             return len(self[self.basekey])
         except: # pragma: no cover
             return 0
-
 
     def __repr__(self):
         ''' Convert to a dataframe for printing '''
@@ -1846,7 +1848,6 @@ class Layer(FlexDict):
         output = f'{namestr}({labelstr}, {keys_str})\n' # e.g. Layer("r", f, m, beta)
         output += self.to_df().__repr__()
         return output
-
 
     def __contains__(self, item):
         """
@@ -1867,11 +1868,9 @@ class Layer(FlexDict):
         """
         return np.unique([self['f'], self['m']])
 
-
     def meta_keys(self):
         ''' Return the keys for the layer's meta information -- i.e., f, m, beta, any others '''
         return self.meta.keys()
-
 
     def validate(self, force=True):
         '''
@@ -1893,7 +1892,6 @@ class Layer(FlexDict):
                 raise TypeError(errormsg)
         return
 
-
     def get_inds(self, inds, remove=False):
         '''
         Get the specified indices from the edgelist and return them as a dict.
@@ -1908,7 +1906,6 @@ class Layer(FlexDict):
                 self[key] = np.delete(self[key], inds) # Remove from the original
         return output
 
-
     def pop_inds(self, inds):
         '''
         "Pop" the specified indices from the edgelist and return them as a dict.
@@ -1918,7 +1915,6 @@ class Layer(FlexDict):
             inds (int, array, slice): the indices to be removed
         '''
         return self.get_inds(inds, remove=True)
-
 
     def append(self, contacts):
         '''
@@ -1936,12 +1932,10 @@ class Layer(FlexDict):
             self[key][n_curr:] = new_arr # Copy contacts into the layer
         return
 
-
     def to_df(self):
         ''' Convert to dataframe '''
         df = pd.DataFrame.from_dict(self)
         return df
-
 
     def from_df(self, df, keys=None):
         ''' Convert from a dataframe '''
@@ -1950,7 +1944,6 @@ class Layer(FlexDict):
         for key in keys:
             self[key] = df[key].to_numpy()
         return self
-
 
     def to_graph(self): # pragma: no cover
         '''
@@ -1969,7 +1962,6 @@ class Layer(FlexDict):
         G.add_weighted_edges_from(zip(*data), weight='beta')
         nx.set_edge_attributes(G, self.label, name='layer')
         return G
-
 
     def find_contacts(self, inds, as_array=True):
         """
@@ -2010,7 +2002,6 @@ class Layer(FlexDict):
             contact_inds.sort()  # Sorting ensures that the results are reproducible for a given seed as well as being identical to previous versions of Covasim
 
         return contact_inds
-
 
     def update(self, people, frac=1.0):
         '''

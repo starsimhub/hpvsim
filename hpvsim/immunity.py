@@ -31,7 +31,7 @@ class genotype(sc.prettyobj):
 
     def __init__(self, genotype):
         self.index     = None # Index of the variant in the sim; set later
-        self.label     = None # Variant label (used as a dict key)
+        self.label     = None # Genotype label (used as a dict key)
         self.p         = None # This is where the parameters will be stored
         self.parse(genotype=genotype) #
         self.initialized = False
@@ -97,9 +97,11 @@ def init_immunity(sim, create=False):
 
         # Next, overwrite these defaults with any known immunity values about specific genotypes
         default_cross_immunity = hppar.get_cross_immunity()
+        imm_decay = sc.dcp(sim['imm_decay']['infection'])
+        imm_decay['half_life'] /= sim['dt']
         for i in range(ng):
             sim['immunity_map'][i] = 'infection'
-            sim['imm_kin'][i, :] = precompute_waning(length=sim.npts, pars=sim['imm_decay']['infection'])
+            sim['imm_kin'][i, :] = precompute_waning(length=sim.npts, pars=imm_decay)
             label_i = sim['genotype_map'][i]
             for j in range(ng):
                 label_j = sim['genotype_map'][j]
@@ -156,35 +158,37 @@ def update_immunity(people, inds):
     '''
     t_since_boost = people.t - people.t_imm_event[:,inds].astype(hpd.default_int)
     imm_kin = people.pars['imm_kin'][:,t_since_boost[:,:]][0] # Get people's current level of immunity
+    people.imm[:,inds] += imm_kin*people.peak_imm[:,inds] # Set immunity relative to peak
+    # TODO: can we get rid of the next two lines? They slow things down quite a bit
+    # people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
+    # people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
 
-    # Set immunity relative to peak
-    people.imm[:,inds] += imm_kin*people.peak_imm[:,inds]
-    people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
-    people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
     return
 
 
-def check_immunity(people, genotype):
+def check_immunity(people):
     '''
-    Calculate people's immunity on this timestep from prior infections + vaccination. Calculates effective immunity by
-    weighting individuals immunity by source.
+    Calculate people's immunity on this timestep from prior infections.
+    As an example, suppose HPV16 and 18 are in the sim, and the cross-immunity matrix is:
+        pars['immunity'] = np.array([[1., 0.5],
+                                     [0.3, 1.]])
+    This indicates that people who've had HPV18 have 50% protection against getting 16, and
+    people who've had 16 have 30% protection against getting 18.
+    Now suppose we have 3 people, whose immunity levels are
+        people.imm = np.array([[0.9, 0.0, 0.0],
+                               [0.0, 0.7, 0.0]])
+    This indicates that person 1 has a prior HPV16 infection, person 2 has a prior HPV18
+    infection, and person 3 has no history of infection.
 
-    There are two fundamental sources of immunity:
-
-           (1) prior exposure: degree of protection depends on genotype
-           (2) vaccination: degree of protection depends on genotype, vaccine, and time since vaccination
+    In this function, we take the dot product of pars['immunity'] and people.imm to get:
+        people.sus_imm = np.array([[0.9 , 0.35, 0.  ],
+                                   [0.27, 0.7 , 0.  ]])
+    This indicates that the person 1 has high protection against reinfection with HPV16, and
+    some (30% of 90%) protection against infection with HPV18, and so on.
 
     '''
-
-    # Handle parameters and indices
-    pars = people.pars
-    immunity = pars['immunity'][genotype,:] # cross-immunity/own-immunity scalars to be applied to immunity level
-    current_imm = sc.dcp(people.imm)
-
-    current_imm *= immunity[:, None]
-    current_imm = current_imm.sum(axis=0)
-    people.sus_imm[genotype,:] = current_imm
-
+    immunity = people.pars['immunity'] # cross-immunity/own-immunity scalars to be applied to immunity level
+    people.sus_imm = np.dot(immunity,people.imm) # Dot product gives immunity to all genotypes
     return
 
 

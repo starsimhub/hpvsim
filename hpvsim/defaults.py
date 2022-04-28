@@ -8,6 +8,7 @@ TODO: review/merge this across the different *sims
 import numpy as np
 import numba as nb
 import sciris as sc
+import pylab as pl
 from .settings import options as hpo # To set options
 
 # Specify all externally visible functions this file defines -- other things are available as e.g. hp.defaults.default_int
@@ -44,27 +45,18 @@ class PeopleMeta(sc.prettyobj):
             'age',              # Float
             'sex',              # Float
             'debut',            # Float
-            'rel_trans',        # Float
+            'partners',         # Int by relationship type
+            'current_partners', # Int by relationship type
         ]
 
-        # Set the states that a person can be in: these are all booleans per person -- used in people.py
+        # Set the states that a person can be in, all booleans per person and per genotype except other_dead
         self.states = [
             'susceptible',
-            'naive',
             'infectious',
-            'recovered',
+            'precancerous',
+            'cancerous',
+            'dead_cancer',
             'other_dead',  # Dead from all other causes
-        ]
-
-        # Genotype states -- these are ints
-        self.genotype_states = [
-            'infectious_genotype',
-            'recovered_genotype',
-        ]
-
-        # Genotype states -- these are ints, by genotype
-        self.by_genotype_states = [
-            'infectious_by_genotype',
         ]
 
         # Immune states, by genotype
@@ -80,18 +72,21 @@ class PeopleMeta(sc.prettyobj):
         ]
 
         self.dates = [f'date_{state}' for state in self.states] # Convert each state into a date
+        self.dates += ['date_HPV_clearance', 'date_CIN_clearance']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
-            'dur_inf2rec',
+            'dur_inf', # duration with HPV infection
+            'dur_hpv2cin',
+            'dur_cin2cancer',
             'dur_disease',
         ]
 
-        self.all_states = self.person + self.states + self.genotype_states + self.by_genotype_states + self.imm_states + \
+        self.all_states = self.person + self.states + self.imm_states + \
                           self.imm_by_source_states + self.dates + self.durs
 
         # Validate
-        self.state_types = ['person', 'states', 'genotype_states', 'by_genotype_states', 'imm_states',
+        self.state_types = ['person', 'states', 'imm_states',
                             'imm_by_source_states', 'dates', 'durs', 'all_states']
         for state_type in self.state_types:
             states = getattr(self, state_type)
@@ -108,27 +103,35 @@ class PeopleMeta(sc.prettyobj):
 #%% Define other defaults
 
 # A subset of the above states are used for results
-result_stocks = {
-    'susceptible': 'Number susceptible',
-    'infectious':  'Number infectious',
-    'recovered':   'Number recovered',
+aggregate_result_stocks = {
+    'total_infectious': 'Total number infectious',
+    'total_precancerous' : 'Total number precancerous',
+    'total_cancerous'    : 'Total number with cervical cancer',
     'other_dead':  'Number dead from other causes',
 }
 
-result_stocks_by_genotype = {
-    'infectious_by_genotype': 'Number infectious by genotype',
+result_stocks = {
+    'susceptible': 'Number susceptible',
+    'infectious': 'Number infectious',
+    'precancerous' : 'Number precancerous',
+    'cancerous'    : 'Number with cervical cancer'
 }
 
 # The types of result that are counted as flows -- used in sim.py; value is the label suffix
 result_flows = {
-    'infections':   'infections',
-    'recoveries':   'recoveries',
-    'other_deaths': 'deaths from other causes',
-    'births':       'births'
+    'infections':  'infections',
+    'precancers' :  'precancers',
+    'cancers'    :  'cervical cancers',
+    'cancer_deaths': 'cancer deaths',
 }
 
-result_flows_by_genotype = {
-    'infections_by_genotype':  'infections by genotype',
+aggregate_result_flows = {
+    'total_infections': 'total infections',
+    'total_precancers': 'total precancers',
+    'total_cancers': 'total cancers',
+    'total_cancer_deaths': 'total cancer deaths',
+    'other_deaths': 'deaths from other causes',
+    'births':       'births'
 }
 
 
@@ -136,13 +139,15 @@ result_flows_by_genotype = {
 new_result_flows = [f'new_{key}' for key in result_flows.keys()]
 cum_result_flows = [f'cum_{key}' for key in result_flows.keys()]
 
-new_result_flows_by_genotype = [f'new_{key}' for key in result_flows_by_genotype.keys()]
-cum_result_flows_by_genotype = [f'cum_{key}' for key in result_flows_by_genotype.keys()]
+new_agg_result_flows = [f'new_{key}' for key in aggregate_result_flows.keys()]
+cum_agg_result_flows = [f'cum_{key}' for key in aggregate_result_flows.keys()]
 
 # Parameters that can vary by genotype (WIP)
 genotype_pars = [
     'rel_beta',
-
+    'rel_CIN_prob',
+    'rel_cancer_prob',
+    'rel_death_prob'
 ]
 
 # Default age data, based on Seattle 2018 census data -- used in population.py
@@ -219,25 +224,46 @@ default_birth_rates = np.array([
 
 
 
-def get_default_colors():
+def get_default_colors(n_genotypes=None):
     '''
     Specify plot colors -- used in sim.py.
-
     NB, includes duplicates since stocks and flows are named differently.
     '''
+
+    if n_genotypes is None:
+        n_genotypes = 1 # Set a default number of genotypes
+
     c = sc.objdict()
-    c.susceptible           = '#4d771e'
-    c.infectious            = '#e45226'
-    c.infections            = '#b62413'
-    c.infectious_by_genotype = c.infectious
-    c.infections_by_genotype = '#b62413'
-    c.reinfections          = '#732e26'
-    c.recoveries            = '#9e1149'
-    c.recovered             = c.recoveries
     c.default               = '#000000'
+
+    # Overall flows
+    c.total_infections      = pl.cm.GnBu(1)
+    c.total_precancers      = pl.cm.Oranges(1)
+    c.total_cancers         = pl.cm.Reds(1)
+    c.total_cancer_deaths   = pl.cm.Purples(1)
     c.other_deaths          = '#000000'
-    c.other_dead            = c.other_deaths
     c.births                = '#797ef6'
+
+    # Overall states
+    c.total_infectious      = c.total_infections
+    c.total_precancerous    = c.total_precancers
+    c.total_cancerous       = c.total_cancers
+    c.total_cancer_dead     = c.total_cancer_deaths
+
+    # All states are by genotype, except deaths from other causes
+    c.susceptible           = pl.cm.Greens(np.linspace(0.2, 0.8, n_genotypes))
+    c.infectious            = pl.cm.GnBu(np.linspace(0.2, 0.8, n_genotypes))
+    c.precancerous          = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
+    c.cancerous             = pl.cm.Reds(np.linspace(0.2, 0.8, n_genotypes))
+    c.dead_cancer           = pl.cm.Purples(np.linspace(0.2, 0.8, n_genotypes))
+    c.other_dead            = c.other_deaths
+
+    # Flows by genotype
+    c.infections            = c.infectious
+    c.precancers            = c.precancerous
+    c.cancers               = c.cancerous
+    c.cancer_deaths         = c.dead_cancer
+
     return c
 
 
