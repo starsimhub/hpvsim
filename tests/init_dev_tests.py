@@ -68,9 +68,45 @@ if __name__ == '__main__':
 
     # sim0 = test_random() # NOT WORKING
     # sim1 = test_basic() # NOT WORKING
-    sim2 = test_genotypes()
+    # sim2 = test_genotypes()
+
+    # @nb.jit(parallel=True)
+    # def isin(arr, vals):
+    #     n = len(arr)
+    #     result = np.full(n, False)
+    #     set_vals = set(vals)
+    #     for i in nb.prange(n):
+    #         if arr[i] in set_vals:
+    #             result[i] = True
+    #     return result
 
 
+    import numpy as np
+    import numba as nb
+
+    @nb.jit(parallel=True)
+    def isinvals_cheating(arr, vals):
+        n = len(arr)
+        result = np.full(n, False)
+        result_vals = np.full(n, np.nan)
+        set_vals = set(vals[0,:])
+        list_vals = list(vals[0,:])
+        for i in nb.prange(n):
+            if arr[i] in set_vals:
+                ind = 0 #list_vals.index(arr[i]) ## THIS LINE IS WAY TOO SLOW
+                result[i] = True
+                result_vals[i] = vals[1,ind]
+        return result, result_vals
 
 
+    N = int(1e5)
+    M = int(20e3)
+    num_arr = 100e3
+    num_vals = 20e3
+    num_types = 6
+    arr = np.random.randint(0, num_arr, N)
+    vals_col1 = np.random.randint(0, num_vals, M)
+    vals_col2 = np.random.randint(0, num_types, M)
+    vals = np.array([vals_col1, vals_col2])
 
+    result, result_vals = isinvals_cheating(arr,vals)
