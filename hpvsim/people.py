@@ -360,6 +360,7 @@ class People(hpb.BasePeople):
 
         return
 
+
     def infect(self, inds, source=None, layer=None, genotype=0):
         '''
         Infect people and determine their eventual outcomes.
