@@ -11,4 +11,4 @@ req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'}) # To av
 with urllib.request.urlopen(req) as req:
     data = json.loads(req.read().decode())
 df = json_normalize(data['fact'])
-sc.saveobj('data/age_specific_death_rates.obj',df)
+sc.saveobj('age_specific_death_rates.obj',df)

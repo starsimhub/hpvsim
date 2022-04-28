@@ -42,7 +42,7 @@ def test_genotypes():
         'dt': .1,
         'end': 2035
     }
-    sim = Sim(pars=pars)
+    sim = Sim(pars=pars, location='zimbabwe')
     sim.run()
 
     # fig, ax = pl.subplots(2, 2, figsize=(10, 10))
