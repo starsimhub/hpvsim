@@ -202,10 +202,10 @@ def get_prognoses():
 
     prognoses = dict(
         duration_cutoffs  = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
-        CIN1_probs        = np.array([0.0015,  0.01655,    0.05080,    0.20655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
-        CIN2_probs        = np.array([0.0015,  0.01655,    0.05080,    0.20655,    0.70]),   # Conditional probability of developing CIN2 given CIN1
-        CIN3_probs        = np.array([0.0015,  0.01655,    0.05080,    0.20655,    0.70]),   # Conditional probability of developing CIN3 given CIN2
-        cancer_probs      = np.array([0.0055,  0.01655,    0.02080,    0.20655,    0.70]),   # Conditional probability of developing cancer given CIN3
+        CIN1_probs        = np.array([0.015,  0.05655,    0.10800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
+        CIN2_probs        = np.array([0.015,  0.01655,    0.1080,    0.50655,    0.70]),   # Conditional probability of developing CIN2 given CIN1
+        CIN3_probs        = np.array([0.15,  0.655,    0.80,    0.855,    0.90]),   # Conditional probability of developing CIN3 given CIN2
+        cancer_probs      = np.array([0.0055,  0.0655,    0.2080,    0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
         death_probs       = np.array([0.0015,  0.00655,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
         )
 

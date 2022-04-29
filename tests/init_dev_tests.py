@@ -37,7 +37,7 @@ def test_genotypes():
     hpv18 = genotype('HPV18')
     hpvhi5 = genotype('hpvhi5')
     pars = {
-        'pop_size': 10e3,
+        'pop_size': 100e3,
         'network': 'basic',
         'genotypes': [hpv16, hpv18, hpvhi5],
         'dt': .1,
@@ -49,17 +49,20 @@ def test_genotypes():
     fig, ax = pl.subplots(2, 2, figsize=(10, 10))
     timevec = sim.results['year']
 
+    ax[0, 1].plot(timevec, sim.results['hpv_prevalence'].values)
+    ax[1, 0].plot(timevec, sim.results['cin1_prevalence'].values, label='CIN1')
+    ax[1, 0].plot(timevec, sim.results['cin2_prevalence'].values, label='CIN2')
+    ax[1, 0].plot(timevec, sim.results['cin3_prevalence'].values, label='CIN3')
+    ax[1,1].plot(timevec, sim.results['cum_total_cancers'].values)
     for i, genotype in sim['genotype_map'].items():
-        ax[0,0].plot(timevec, sim.results['hpv_incidence'].values[i,:], label=genotype)
-        ax[0,1].plot(timevec, sim.results['hpv_prevalence'].values[i, :])
-        ax[1,0].plot(timevec, sim.results['new_CIN1s'].values[i,:])
-        ax[1,1].plot(timevec, sim.results['cin1_prevalence'].values[i, :])
+        ax[0,0].plot(timevec, sim.results['hpv_incidence_by_genotype'].values[i,:], label=genotype)
 
     ax[0,0].legend()
+    ax[1,0].legend()
     ax[0,0].set_title('HPV incidence by genotype')
-    ax[0,1].set_title('HPV prevalence by genotype')
-    ax[1,0].set_title('New CIN1s by genotype')
-    ax[1,1].set_title('CIN1 prevalence by genotype')
+    ax[0,1].set_title('HPV prevalence')
+    ax[1,0].set_title('CIN prevalence')
+    ax[1,1].set_title('Cumulative cancers')
     fig.show()
     return sim
 

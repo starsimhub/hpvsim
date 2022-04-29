@@ -169,6 +169,7 @@ class People(hpb.BasePeople):
             self.flows['new_CINs'] += self.flows['new_CIN1s'][genotype]+self.flows['new_CIN2s'][genotype]+self.flows['new_CIN3s'][genotype]
             if self.t * self.dt % 1 == 0:   # only check cancers every year
                 self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
+                self.aggregate_flows['new_total_cancers'] += self.flows['new_cancers'][genotype]
             self.check_hpv_clearance(genotype)
             self.check_cin_clearance(genotype)
         self.aggregate_flows['new_total_CINs'] += self.flows['new_CINs'].sum()
@@ -275,6 +276,8 @@ class People(hpb.BasePeople):
         '''
         filter_inds = self.true_by_genotype('CIN3', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
+        if len(inds):
+            print('yay')
         self.cancerous[genotype, inds] = True
         self.susceptible[:, inds] = False
         self.infectious[:, inds] = False

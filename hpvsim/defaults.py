@@ -109,7 +109,9 @@ class PeopleMeta(sc.prettyobj):
 # A subset of the above states are used for results
 aggregate_result_stocks = {
     'total_infectious': 'Total number infectious',
-    'total_CIN' : 'Total number with CIN',
+    'total_CIN1' : 'Total number with CIN1',
+    'total_CIN2' : 'Total number with CIN2',
+    'total_CIN3' : 'Total number with CIN3',
     'total_cancerous'    : 'Total number with cervical cancer',
     'other_dead':  'Number dead from other causes',
 }
@@ -117,9 +119,9 @@ aggregate_result_stocks = {
 result_stocks = {
     'susceptible': 'Number susceptible',
     'infectious': 'Number infectious',
-    'CIN1' : 'Number CIN1',
-    'CIN2' : 'Number CIN2',
-    'CIN3' : 'Number CIN3',
+    'CIN1' : 'Number with CIN1',
+    'CIN2' : 'Number with CIN2',
+    'CIN3' : 'Number with CIN3',
     'cancerous'    : 'Number with cervical cancer'
 }
 
@@ -273,7 +275,9 @@ def get_default_colors(n_genotypes=None):
 
     # Overall states
     c.total_infectious      = c.total_infections
-    c.total_CIN             = c.total_CINs
+    c.total_CIN1            = c.total_CINs
+    c.total_CIN2            = c.total_CINs
+    c.total_CIN3            = c.total_CINs
     c.total_cancerous       = c.total_cancers
     c.total_cancer_dead     = c.total_cancer_deaths
 

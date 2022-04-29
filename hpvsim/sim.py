@@ -190,12 +190,18 @@ class Sim(hpb.BaseSim):
         for key,label in hpd.aggregate_result_stocks.items():
             self.results[f'n_{key}'] = init_res(label, color=dcols[key])
 
+        # Results in aggregate
+        self.results['hpv_prevalence'] = init_res('HPV prevalence', scale=False)
+        self.results['cin1_prevalence'] = init_res('CIN1 prevalence', scale=False)
+        self.results['cin2_prevalence'] = init_res('CIN2 prevalence', scale=False)
+        self.results['cin3_prevalence'] = init_res('CIN3 prevalence', scale=False)
+
         # Results by genotype
-        self.results['hpv_prevalence'] = init_res('HPV prevalence', scale=False, n_genotypes=ng)
-        self.results['hpv_incidence'] = init_res('HPV incidence', scale=False, n_genotypes=ng)
-        self.results['cin1_prevalence'] = init_res('CIN1 prevalence', scale=False, n_genotypes=ng)
-        self.results['cin2_prevalence'] = init_res('CIN2 prevalence', scale=False, n_genotypes=ng)
-        self.results['cin3_prevalence'] = init_res('CIN3 prevalence', scale=False, n_genotypes=ng)
+        self.results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence by genotype', scale=False, n_genotypes=ng)
+        self.results['hpv_incidence_by_genotype'] = init_res('HPV incidence by genotype', scale=False, n_genotypes=ng)
+        self.results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', scale=False, n_genotypes=ng)
+        self.results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', scale=False, n_genotypes=ng)
+        self.results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence by genotype', scale=False, n_genotypes=ng)
         self.results['r_eff'] = init_res('Effective reproduction number', scale=False, n_genotypes=ng)
         self.results['doubling_time'] = init_res('Doubling time', scale=False, n_genotypes=ng)
         for key,label in hpd.result_flows.items():
@@ -269,7 +275,7 @@ class Sim(hpb.BaseSim):
 
     def finalize_interventions(self):
         for intervention in self['interventions']:
-            if isinstance(intervention, hpi.Intervention):
+            if isinstance(intervention, hpimm.Intervention):
                 intervention.finalize(self)
 
 
@@ -404,11 +410,12 @@ class Sim(hpb.BaseSim):
                 ln += 1
 
         # Update counts for this time step: stocks
-        # for key in hpd.aggregate_result_stocks.keys():
-        #     self.results[f'n_{key}'][t] = people.count(key)
         for key in hpd.result_stocks.keys():
             for genotype in range(ng):
                 self.results[f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
+            aggregate_version = f'total_{key}'
+            if aggregate_version in hpd.aggregate_result_stocks.keys():
+                self.results[f'n_{aggregate_version}'][t] = self.results[f'n_{key}'][:, t].sum()
 
         # Update counts for this time step: flows
         for key,count in people.aggregate_flows.items():
@@ -544,11 +551,17 @@ class Sim(hpb.BaseSim):
         '''
         res = self.results
         self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
-        self.results['hpv_incidence'][:] = np.einsum('ji,ji->ji', res['new_infections'][:],1 / res['n_susceptible'][:])  # Calculate the incidence
-        self.results['hpv_prevalence'][:] = np.einsum('ji,i->ji', res['n_infectious'][:], 1 / res['n_alive'][:])
-        self.results['cin1_prevalence'][:] = np.einsum('ji,i->ji', res['n_CIN1'][:], 1 / res['n_alive'][:])
-        self.results['cin2_prevalence'][:] = np.einsum('ji,i->ji', res['n_CIN2'][:], 1 / res['n_alive'][:])
-        self.results['cin3_prevalence'][:] = np.einsum('ji,i->ji', res['n_CIN3'][:], 1 / res['n_alive'][:])
+        self.results['hpv_incidence_by_genotype'][:] = np.einsum('ji,ji->ji', res['new_infections'][:],1 / res['n_susceptible'][:])  # Calculate the incidence
+        self.results['hpv_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_infectious'][:], 1 / res['n_alive'][:])
+        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN1'][:], 1 / res['n_alive'][:])
+        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN2'][:], 1 / res['n_alive'][:])
+        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN3'][:], 1 / res['n_alive'][:])
+
+        self.results['hpv_prevalence'][:] = res['n_total_infectious'][:]/ res['n_alive'][:]
+        self.results['cin1_prevalence'][:] = res['n_total_CIN1'][:]/ res['n_alive'][:]
+        self.results['cin2_prevalence'][:] = res['n_total_CIN2'][:] / res['n_alive'][:]
+        self.results['cin3_prevalence'][:] = res['n_total_CIN3'][:] / res['n_alive'][:]
+
         return
 
 
