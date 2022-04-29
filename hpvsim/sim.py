@@ -57,7 +57,7 @@ class Sim(hpb.BaseSim):
         self.validate_pars() # Ensure parameters have valid values
         self.set_seed() # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
-        self.init_immunity() # initialize information about immunity (if use_waning=True)
+        self.init_immunity() # initialize information about immunity
         self.init_results() # After initializing the genotypes, create the results structure
         self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
         self.init_interventions()  # Initialize the interventions...
@@ -78,7 +78,7 @@ class Sim(hpb.BaseSim):
         '''
 
         # Handle types
-        for key in ['pop_size', 'pop_infected']:
+        for key in ['pop_size']:
             try:
                 self[key] = int(self[key])
             except Exception as E:
@@ -141,6 +141,12 @@ class Sim(hpb.BaseSim):
             else:  # pragma: no cover
                 errormsg = f'Genotype {i} ({genotype}) is not a hp.genotype object; please create using cv.genotype()'
                 raise TypeError(errormsg)
+
+        if not len(self['genotypes']):
+            print('No genotypes provided, will assume only simulating HPV 16 by default')
+            hpv16 = hpimm.genotype('hpv16')
+            hpv16.initialize(self)
+            self['genotypes'] = [hpv16]
 
         len_pars = len(self['genotype_pars'])
         len_map = len(self['genotype_map'])
@@ -301,31 +307,21 @@ class Sim(hpb.BaseSim):
 
     def init_infections(self):
         '''
-        Initialize prior immunity and seed infections.
-        Copied from Covasim. TODO: think of a better initialization strategy
+        Initialize prior immunity and seed infections
         '''
 
-        # Create the seed infections
-        ng = self['n_genotypes']
-        pop_inf = self['pop_infected']
-        if sc.isnumber(pop_inf): # assume equal init infections for all circulating genotypes
-            inds = hpu.choose(self['pop_size'], pop_inf)
-            genotypes = np.random.randint(0, ng, pop_inf)
-            self.people.infect(inds=inds, genotypes=genotypes, layer='seed_infection')  # Not counted by results since flows are re-initialized during the step
-            # for genotype_ind in range(ng):
-            #     inds = hpu.choose(self['pop_size'], self['pop_infected']/ng)
-            #     self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
-            #     self.results['cum_infections'][genotype_ind,:] += len(inds)
-            #     self.results['cum_total_infections'][:] += len(inds)
+        age_inds = np.digitize(self.people.age, self.pars['init_hpv_prevalence']['f'][:, 0]) - 1
+        hpv_probs = np.full(len(self.people), np.nan, dtype=hpd.default_float)
+        hpv_probs[self.people.f_inds] = self.pars['init_hpv_prevalence']['f'][age_inds[self.people.f_inds], 2]
+        hpv_probs[self.people.m_inds] = self.pars['init_hpv_prevalence']['m'][age_inds[self.people.m_inds], 2]
 
-        elif isinstance(self['pop_infected'], dict):
-            genotypes = list(self['genotype_map'].values())
-            for genotype, pop_infected in self['pop_infected'].items():
-                genotype_ind = genotypes.index(genotype)
-                inds = hpu.choose(self['pop_size'], self['pop_infected'])
-                self.people.infect(inds=inds, layer='seed_infection', genotype=genotype_ind) # Not counted by results since flows are re-initialized during the step
-                self.results['cum_infections'][genotype_ind,:] += len(inds)
-                self.results['cum_total_infections'][:] += len(inds)
+        # Get indices of people who have HPV (for now, split evenly between genotypes)
+        ng = self['n_genotypes']
+        hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
+        genotypes = np.random.randint(0, ng, len(hpv_inds))
+        new_infections = self.people.infect(inds=hpv_inds, genotypes=genotypes, layer='seed_infection')
+        self.results['cum_infections'].values = new_infections[:,None]
+        self.results['cum_total_infections'][:] += sum(new_infections)
 
         return
 
@@ -398,8 +394,8 @@ class Sim(hpb.BaseSim):
             ln += 1
 
         # Update counts for this time step: stocks
-        # for key in hpd.aggregate_result_stocks.keys():
-        #     self.results[f'n_{key}'][t] = people.count(key)
+        for key in hpd.aggregate_result_stocks.keys():
+            self.results[f'n_{key}'][t] = people.count(key)
         for key in hpd.result_stocks.keys():
             for genotype in range(ng):
                 self.results[f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)

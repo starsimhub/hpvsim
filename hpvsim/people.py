@@ -164,7 +164,8 @@ class People(hpb.BasePeople):
             # self.is_inf = self.true_by_genotype('infectious', genotype) # For storing the interim values since used in every subsequent calculation
             # self.is_CIN = self.true_by_genotype('precancerous', genotype)  # For storing the interim values since used in every subsequent calculation
             self.flows['new_precancers'][genotype] += self.check_precancer(genotype)
-            self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
+            if self.t * self.dt % 1 == 0:   # only check cancers every year
+                self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
             self.check_hpv_clearance(genotype)
             self.check_cin_clearance(genotype)
 
@@ -451,7 +452,7 @@ class People(hpb.BasePeople):
             # Update immunity - TODO, check this still works
             hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=g)
 
-        return n_infections # For incrementing counters
+        return new_infections # For incrementing counters
 
 
     def make_die_other(self, inds):
