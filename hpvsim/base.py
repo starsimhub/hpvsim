@@ -438,7 +438,7 @@ class BaseSim(ParsObj):
         keys = []
         choices = ['main', 'genotype', 'all']
         if which in ['main', 'all']:
-            keys += [key for key,res in self.results.items() if isinstance(res, Result) and key != 'pop_nabs_by_source']
+            keys += [key for key,res in self.results.items() if isinstance(res, Result)]
         if which in ['genotype', 'all'] and 'genotype' in self.results:
             keys += [key for key,res in self.results['genotype'].items() if isinstance(res, Result)]
         if which not in choices: # pragma: no cover

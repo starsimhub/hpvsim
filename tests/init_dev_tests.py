@@ -53,7 +53,7 @@ def test_genotypes():
     ax[1, 0].plot(timevec, sim.results['cin1_prevalence'].values, label='CIN1')
     ax[1, 0].plot(timevec, sim.results['cin2_prevalence'].values, label='CIN2')
     ax[1, 0].plot(timevec, sim.results['cin3_prevalence'].values, label='CIN3')
-    ax[1,1].plot(timevec, sim.results['cum_total_cancers'].values)
+    ax[1,1].plot(timevec, sim.results['cancer_incidence'].values)
     for i, genotype in sim['genotype_map'].items():
         ax[0,0].plot(timevec, sim.results['hpv_incidence_by_genotype'].values[i,:], label=genotype)
 
@@ -62,7 +62,7 @@ def test_genotypes():
     ax[0,0].set_title('HPV incidence by genotype')
     ax[0,1].set_title('HPV prevalence')
     ax[1,0].set_title('CIN prevalence')
-    ax[1,1].set_title('Cumulative cancers')
+    ax[1,1].set_title('Cancer incidence')
     fig.show()
     return sim
 

@@ -125,6 +125,9 @@ class People(hpb.BasePeople):
     def init_flows(self):
         ''' Initialize flows to be zero '''
         self.aggregate_flows = {key:0 for key in hpd.new_agg_result_flows}
+        self.aggregate_flows_by_sex = {}
+        for key in hpd.new_agg_result_flows_by_sex:
+            self.aggregate_flows_by_sex[key] = np.zeros(2, dtype=hpd.default_float)
         self.flows = {}
         for key in hpd.new_result_flows:
             self.flows[key] = np.zeros(self.pars['n_genotypes'], dtype=hpd.default_float)
@@ -155,8 +158,10 @@ class People(hpb.BasePeople):
         # Perform updates that are not genotype-specific
         self.init_flows()  # Initialize flows for this timestep to zero
         self.increment_age()  # Let people age by one time step
-        self.aggregate_flows['new_other_deaths'] += self.apply_death_rates() # Apply death rates
+        self.aggregate_flows['new_other_deaths'], self.aggregate_flows_by_sex['new_other_deaths_by_sex'][0], self.aggregate_flows_by_sex['new_other_deaths_by_sex'][1] = self.apply_death_rates() # Apply death rates
         self.aggregate_flows['new_births'], new_people = self.add_births() # Add births
+        self.aggregate_flows_by_sex['new_births_by_sex'][0] = len(hpu.true(new_people.is_female))
+        self.aggregate_flows_by_sex['new_births_by_sex'][1] = len(hpu.true(new_people.is_male))
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
@@ -334,9 +339,11 @@ class People(hpb.BasePeople):
         already_dead = self.other_dead[death_inds]
         death_inds = death_inds[~already_dead]  # Unique indices in deaths that are not already dead
 
+        deaths_female = len(hpu.true(self.is_female[death_inds]))
+        deaths_male = len(hpu.true(self.is_male[death_inds]))
         # Apply deaths
         new_other_deaths = self.make_die_other(death_inds)
-        return new_other_deaths
+        return new_other_deaths, deaths_female, deaths_male
 
     def add_births(self):
         ''' Method to add births '''
@@ -428,6 +435,11 @@ class People(hpb.BasePeople):
         self.infectious[genotype, inds] = True
         self.aggregate_flows['new_total_infections'] += len(inds)
         self.flows['new_infections'][genotype] += len(inds)
+
+        infs_female = len(hpu.true(self.is_female[inds]))
+        infs_male = len(hpu.true(self.is_male[inds]))
+        self.aggregate_flows_by_sex['new_total_infections_by_sex'][0] += infs_female
+        self.aggregate_flows_by_sex['new_total_infections_by_sex'][1] += infs_male
 
         # # Record transmissions. TODO: this works, but slows does runtime by a LOT
         # for i, target in enumerate(inds):

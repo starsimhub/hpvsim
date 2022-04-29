@@ -145,6 +145,12 @@ aggregate_result_flows = {
     'births':       'births'
 }
 
+aggregate_result_flows_by_sex = {
+    'total_infections_by_sex': 'total infections by sex',
+    'other_deaths_by_sex': 'deaths from other causes by sex',
+    'births_by_sex':       'births by sex'
+}
+
 
 # Define new and cumulative flows
 new_result_flows = [f'new_{key}' for key in result_flows.keys()]
@@ -152,6 +158,9 @@ cum_result_flows = [f'cum_{key}' for key in result_flows.keys()]
 
 new_agg_result_flows = [f'new_{key}' for key in aggregate_result_flows.keys()]
 cum_agg_result_flows = [f'cum_{key}' for key in aggregate_result_flows.keys()]
+
+new_agg_result_flows_by_sex = [f'new_{key}' for key in aggregate_result_flows_by_sex.keys()]
+cum_agg_result_flows_by_sex = [f'cum_{key}' for key in aggregate_result_flows_by_sex.keys()]
 
 # Parameters that can vary by genotype (WIP)
 genotype_pars = [

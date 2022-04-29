@@ -186,6 +186,13 @@ class Sim(hpb.BaseSim):
         for key,label in hpd.aggregate_result_flows.items(): # Repeat to keep all the cumulative keys together
             self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
 
+        for key,label in hpd.aggregate_result_flows_by_sex.items():
+            self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', n_genotypes=2)  # Cumulative variables -- e.g. "Cumulative infections"
+
+        for key,label in hpd.aggregate_result_flows_by_sex.items(): # Repeat to keep all the cumulative keys together
+            self.results[f'new_{key}'] = init_res(f'Number of new {label}', n_genotypes=2) # Flow variables -- e.g. "Number of new infections"
+
+
         # Aggregate stock variables
         for key,label in hpd.aggregate_result_stocks.items():
             self.results[f'n_{key}'] = init_res(label, color=dcols[key])
@@ -215,8 +222,10 @@ class Sim(hpb.BaseSim):
         # Populate the rest of the results
         # Other variables
         self.results['n_alive'] = init_res('Number alive', scale=True)
+        self.results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_genotypes=2)
         self.results['year'] = self.yearvec
         self.results['t']    = self.tvec
+        self.results['pop_size_by_sex'] = np.zeros(2, dtype=hpd.result_float)
         self.results_ready   = False
 
         return
@@ -254,6 +263,8 @@ class Sim(hpb.BaseSim):
         microstructure = self['network']
         self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
+        self.results['pop_size_by_sex'][0] = len(hpu.true(self.people.is_female))
+        self.results['pop_size_by_sex'][1] = len(hpu.true(self.people.is_male))
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_infections:
             self.init_infections()
@@ -425,6 +436,10 @@ class Sim(hpb.BaseSim):
             for genotype in range(ng):
                 self.results[key][genotype][t] += count[genotype]
 
+        for key,count in people.aggregate_flows_by_sex.items():
+            for sex in range(2):
+                self.results[key][sex][t] += count[sex]
+
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
@@ -517,6 +532,8 @@ class Sim(hpb.BaseSim):
             self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=0)
         for key in hpd.result_flows.keys():
             self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+        for key in hpd.aggregate_result_flows_by_sex.keys():
+            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
@@ -552,17 +569,19 @@ class Sim(hpb.BaseSim):
         '''
         res = self.results
         self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
+        self.results['n_alive_by_sex'][0,:]  = res['pop_size_by_sex'][0] + res['cum_births_by_sex'][0,:] - res['cum_other_deaths_by_sex'][0,:]
+        self.results['n_alive_by_sex'][0,:]  = res['pop_size_by_sex'][1] + res['cum_births_by_sex'][1,:] - res['cum_other_deaths_by_sex'][1,:]
         self.results['hpv_incidence_by_genotype'][:] = np.einsum('ji,ji->ji', res['new_infections'][:],1 / res['n_susceptible'][:])  # Calculate the incidence
         self.results['hpv_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_infectious'][:], 1 / res['n_alive'][:])
-        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN1'][:], 1 / res['n_alive'][:])
-        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN2'][:], 1 / res['n_alive'][:])
-        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN3'][:], 1 / res['n_alive'][:])
+        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN1'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN2'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN3'][:], 1 / res['n_alive_by_sex'][0,:])
 
         self.results['hpv_prevalence'][:] = res['n_total_infectious'][:]/ res['n_alive'][:]
-        self.results['cin1_prevalence'][:] = res['n_total_CIN1'][:]/ res['n_alive'][:]
-        self.results['cin2_prevalence'][:] = res['n_total_CIN2'][:] / res['n_alive'][:]
-        self.results['cin3_prevalence'][:] = res['n_total_CIN3'][:] / res['n_alive'][:]
-        self.results['cancer_incidence'][:] = res['new_total_cancers'][:]/(1-res['n_total_cancerous'][:])
+        self.results['cin1_prevalence'][:] = res['n_total_CIN1'][:]/ res['n_alive_by_sex'][0,:]
+        self.results['cin2_prevalence'][:] = res['n_total_CIN2'][:] / res['n_alive_by_sex'][0,:]
+        self.results['cin3_prevalence'][:] = res['n_total_CIN3'][:] / res['n_alive_by_sex'][0,:]
+        self.results['cancer_incidence'][:] = res['new_total_cancers'][:]/(res['n_alive_by_sex'][0,:]-res['n_total_cancerous'][:])
 
         return
 
@@ -628,7 +647,7 @@ class Sim(hpb.BaseSim):
         labelstr = f' "{self.label}"' if self.label else ''
         string = f'Simulation{labelstr} summary:\n'
         for key in self.result_keys():
-            if full or key.startswith('cum_total'):
+            if full or key.startswith('cum_total') and 'by_sex' not in key:
                 val = np.round(summary[key])
                 string += f'   {val:10,.0f} {self.results[key].name.lower()}\n'.replace(',', sep) # Use replace since it's more flexible
 
