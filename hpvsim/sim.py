@@ -417,8 +417,8 @@ class Sim(hpb.BaseSim):
             analyzer(self)
 
         has_imm = hpu.true(people.peak_imm.sum(axis=0))
-        # if len(has_imm):
-        #     hpimm.update_immunity(people, inds=has_imm)
+        if len(has_imm):
+            hpimm.update_immunity(people, inds=has_imm)
 
         # Tidy up
         self.t += 1
