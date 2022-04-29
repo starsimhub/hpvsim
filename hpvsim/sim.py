@@ -359,7 +359,7 @@ class Sim(hpb.BaseSim):
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
         hpimm.check_immunity(people)
 
-        # Precalculate aspects of transmission that don't depend on genotype: acts
+        # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
         for lkey, layer in contacts.items():
             fs.append(layer['f'])
@@ -389,7 +389,12 @@ class Sim(hpb.BaseSim):
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
             # Compute transmissions
-            source_inds, target_inds, genotype_inds = hpu.compute_infections(foi, f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, sus_imm, n_people)  # Calculate transmission
+            f_source_inds, f_genotypes, m_source_inds, m_genotypes = hpu.get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n_people)  # Calculate transmission
+            discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
+                                [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
+            for pship_inds, sources, targets, genotypes in discordant_pairs:
+                betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
+                source_inds, target_inds, genotype_inds = hpu.compute_infections(betas, sources, targets, genotypes)  # Calculate transmission
             people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
             ln += 1
 
@@ -412,8 +417,8 @@ class Sim(hpb.BaseSim):
             analyzer(self)
 
         has_imm = hpu.true(people.peak_imm.sum(axis=0))
-        if len(has_imm):
-            hpimm.update_immunity(people, inds=has_imm)
+        # if len(has_imm):
+        #     hpimm.update_immunity(people, inds=has_imm)
 
         # Tidy up
         self.t += 1

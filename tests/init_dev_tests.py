@@ -34,7 +34,7 @@ def test_basic(doplot=False):
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
 
     pars = {
-        'pop_size': 10e3,
+        'pop_size': 50e3,
         'network': 'basic',
         'genotypes': [hpv16, hpv18, hpvhi5],
         'dt': .1,

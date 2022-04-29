@@ -33,24 +33,6 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions 
 
-# @nb.njit(           (nbfloat, nbfloat,           nbfloat[:]  ), cache=cache, parallel=safe_parallel)
-def compute_foi_frac(beta,    effective_condoms, frac_acts): 
-    ''' Compute probability of each person **NOT** transmitting over some fractional number of acts '''
-    foi_frac = 1 - frac_acts * beta[:,None] * (1 - effective_condoms)
-    return foi_frac
-
-# @nb.njit(            (nbfloat[:], nbfloat,           nbint[:]   ), cache=cache, parallel=safe_parallel)
-def compute_foi_whole(beta,    effective_condoms, n): 
-    ''' Compute probability of each infected person **NOT** transmitting the infection over n acts'''
-    foi_whole = (1 - beta[:,None] * (1 - effective_condoms))**n
-    return foi_whole
-    
-@nb.njit(      (nbfloat[:], nbfloat[:] ), cache=cache, parallel=safe_parallel)
-def compute_foi(foi_whole,  foi_frac):
-    ''' Compute overall probability of infection'''
-    foi = 1 - (foi_whole*foi_frac)
-    return foi
-
 @nb.njit(              (nbbool[:,:],    nbbool[:,:],    nbbool[:]), cache=cache, parallel=safe_parallel)
 def get_sources_targets(inf,           sus,            sex):
     ''' Get indices of sources, i.e. people with current infections '''
@@ -62,13 +44,20 @@ def get_sources_targets(inf,           sus,            sex):
 
 
 @nb.njit(parallel=safe_parallel)
-def pair_lookup(contacts_array, people_inds, genotypes, n):
-    lookup = np.empty(n, hpd.default_float)
+def pair_lookup_vals(contacts_array, people_inds, genotypes, n):
+    lookup = np.empty(n, nbfloat)
     lookup.fill(np.nan)
     lookup[people_inds[::-1]] = genotypes[::-1]
     res_val = lookup[contacts_array]
-    return ~np.isnan(res_val), res_val
+    mask = ~np.isnan(res_val)
+    return mask, res_val
 
+@nb.njit(parallel=safe_parallel)
+def pair_lookup(contacts_array, people_inds, n):
+    lookup = np.full(n, False)
+    lookup[people_inds[::-1]] = True
+    res_val = lookup[contacts_array]
+    return res_val
 
 @nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isin( arr,      search_inds):
@@ -81,60 +70,51 @@ def isin( arr,      search_inds):
             result[i] = True
     return result
 
-
 @nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
 def findinds(arr,       vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
     return isin(arr,vals).nonzero()[0]
 
 
-# @nb.njit(             (nbfloat[:],  nb.int64[:],    nb.int64[:],    nb.int64[:],    nbint[:],   nbint[:],   nbfloat[:]), cache=cache, parallel=rand_parallel)
-def compute_infections(foi,         f_inf_inds,     m_inf_inds,     f_sus_inds, m_sus_inds,       f,          m,          sus_imm, n):
+@nb.njit()
+def get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n):
     '''
-    Compute who infects whom
-
-    The heaviest step of the model -- figure out who gets infected on this timestep.
-    Cannot be easily parallelized since random numbers are used. Loops over contacts
-    in both directions (i.e., targets become sources).
-
-    Args:
-        foi: transmission probabilities associated with each partnership
-        f: female in the pair
-        m: male in the pair
-        sus_imm: immunity to this genotype
+    Construct discordant partnerships
     '''
-    # slist = np.empty(0, dtype=nbint)
-    # tlist = np.empty(0, dtype=nbint)
-    slist = np.empty(0, dtype=hpd.default_int)
-    tlist = np.empty(0, dtype=hpd.default_int)
-    glist = np.empty(0, dtype=hpd.default_int)
-
-    # Construct discordant partnerships
-    f_source_pships, f_genotypes = pair_lookup(f, f_inf_inds[1], f_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    m_source_pships, m_genotypes = pair_lookup(m, m_inf_inds[1], m_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    f_sus_pships = isin(f, f_sus_inds[1]) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    m_sus_pships = isin(m, m_sus_inds[1]) # ... same thing for males
-
+    f_source_pships, f_genotypes = pair_lookup_vals(f, f_inf_inds[1], f_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
+    m_source_pships, m_genotypes = pair_lookup_vals(m, m_inf_inds[1], m_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
+    f_sus_pships = pair_lookup(f, f_sus_inds[1], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
+    m_sus_pships = pair_lookup(m, m_sus_inds[1], n) # ... same thing for males
     f_genotypes = f_genotypes[(~np.isnan(f_genotypes)*m_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
     m_genotypes = m_genotypes[(~np.isnan(m_genotypes)*f_sus_pships).nonzero()[0]].astype(hpd.default_int) # ... and again for males
     f_source_pships = f_source_pships * m_sus_pships # Remove partnerships where both partners have an infection with the same genotype
     m_source_pships = m_source_pships * f_sus_pships # ... same thing for males
     f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
     m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
-    discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_genotypes], [m_source_inds, m[m_source_inds], f[m_source_inds], m_genotypes]]
+    return f_source_inds, f_genotypes, m_source_inds, m_genotypes
 
-    # Loop over partnerships that involve one person infected with this genotype and one susceptible person
-    for pship_inds, sources, targets, genotypes in discordant_pairs:
-        betas            = foi[genotypes,pship_inds]*(1-sus_imm[genotypes,targets]) # Pull out the transmissibility associated with this partnership
-        transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
-        source_inds      = sources[transmissions] # Extract indices of those who passed on an infection
-        target_inds      = targets[transmissions] # Extract indices of those who got infected
-        genotype_inds    = genotypes[transmissions] # Extract genotypes that have been transmitted
-        slist = np.concatenate((slist, source_inds), axis=0)
-        tlist = np.concatenate((tlist, target_inds), axis=0)
-        glist = np.concatenate((glist, genotype_inds), axis=0)
+
+@nb.njit(             (nbfloat[:],  nbint[:],   nbint[:],   nbint[:]), cache=cache, parallel=safe_parallel)
+def compute_infections(betas,       sources,    targets,    genotypes):
+    '''
+    Compute who infects whom
+    '''
+    ints = nbint
+
+    slist = np.empty(0, dtype=ints)
+    tlist = np.empty(0, dtype=ints)
+    glist = np.empty(0, dtype=ints)
+
+    # Loop over partnerships that involve females infected with this genotype and susceptible males
+    transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
+    source_inds      = sources[transmissions] # Extract indices of those who passed on an infection
+    target_inds      = targets[transmissions] # Extract indices of those who got infected
+    genotype_inds    = genotypes[transmissions] # Extract genotypes that have been transmitted
+    slist = np.concatenate((slist, source_inds), axis=0)
+    tlist = np.concatenate((tlist, target_inds), axis=0)
+    glist = np.concatenate((glist, genotype_inds), axis=0)
+
     return slist, tlist, glist
-
 
 
 @nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
