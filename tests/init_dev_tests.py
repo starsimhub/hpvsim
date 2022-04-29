@@ -16,6 +16,11 @@ from hpvsim.immunity import genotype
 hpv16 = genotype('HPV16')
 hpv18 = genotype('HPV18')
 hpvhi5 = genotype('hpvhi5')
+hpv6 = genotype('hpv6')
+hpv11 = genotype('hpv11')
+hpv31 = genotype('hpv31')
+hpv33 = genotype('hpv33')
+
 
 def test_random():
     ''' Make the simplest possible sim with one kind of partnership '''
@@ -36,7 +41,7 @@ def test_basic(doplot=False):
     pars = {
         'pop_size': 50e3,
         'network': 'basic',
-        'genotypes': [hpv16, hpv18, hpvhi5],
+        'genotypes': [hpv16, hpv18, hpv6, hpv11, hpv31, hpv33],
         'dt': .1,
         'end': 2035
     }
