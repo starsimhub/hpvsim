@@ -393,7 +393,7 @@ class Sim(hpb.BaseSim):
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
             # Compute transmissions
-            source_inds, target_inds, genotype_inds = hpu.compute_infections2(foi, f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, sus_imm, n_people)  # Calculate transmission
+            source_inds, target_inds, genotype_inds = hpu.compute_infections(foi, f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, sus_imm, n_people)  # Calculate transmission
             people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
             ln += 1
 
