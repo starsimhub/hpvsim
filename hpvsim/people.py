@@ -171,7 +171,7 @@ class People(hpb.BasePeople):
                 self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
             self.check_hpv_clearance(genotype)
             self.check_cin_clearance(genotype)
-        self.aggregate_flows['new_total_CINs'] += self.flows['new_CIN1s'].sum()
+        self.aggregate_flows['new_total_CINs'] += self.flows['new_CINs'].sum()
 
         return new_people
 
