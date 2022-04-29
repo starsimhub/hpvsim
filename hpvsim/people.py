@@ -166,10 +166,12 @@ class People(hpb.BasePeople):
             self.flows['new_CIN1s'][genotype] += self.check_CIN1(genotype)
             self.flows['new_CIN2s'][genotype] += self.check_CIN2(genotype)
             self.flows['new_CIN3s'][genotype] += self.check_CIN3(genotype)
+            self.flows['new_CINs'] += self.flows['new_CIN1s'][genotype]+self.flows['new_CIN2s'][genotype]+self.flows['new_CIN3s'][genotype]
             if self.t * self.dt % 1 == 0:   # only check cancers every year
                 self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
             self.check_hpv_clearance(genotype)
             self.check_cin_clearance(genotype)
+        self.aggregate_flows['new_total_CINs'] += self.flows['new_CIN1s'].sum()
 
         return new_people
 

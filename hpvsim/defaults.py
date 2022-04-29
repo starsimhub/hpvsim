@@ -129,6 +129,7 @@ result_flows = {
     'CIN1s' :  'CIN1s',
     'CIN2s' :  'CIN2s',
     'CIN3s' :  'CIN3s',
+    'CINs'  :  'CINs',
     'cancers'    :  'cervical cancers',
     'cancer_deaths': 'cancer deaths',
 }
@@ -282,6 +283,7 @@ def get_default_colors(n_genotypes=None):
     c.CIN1                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
     c.CIN2                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
     c.CIN3                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
+    c.CINs                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
     c.cancerous             = pl.cm.Reds(np.linspace(0.2, 0.8, n_genotypes))
     c.dead_cancer           = pl.cm.Purples(np.linspace(0.2, 0.8, n_genotypes))
     c.other_dead            = c.other_deaths
