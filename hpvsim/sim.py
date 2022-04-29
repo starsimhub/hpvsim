@@ -320,7 +320,7 @@ class Sim(hpb.BaseSim):
         hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
         genotypes = np.random.randint(0, ng, len(hpv_inds))
         new_infections = self.people.infect(inds=hpv_inds, genotypes=genotypes, layer='seed_infection')
-        self.results['cum_infections'].values = new_infections[:,None]
+        self.results['cum_infections'].values += new_infections[:,None]
         self.results['cum_total_infections'][:] += sum(new_infections)
 
         return
@@ -394,8 +394,8 @@ class Sim(hpb.BaseSim):
             ln += 1
 
         # Update counts for this time step: stocks
-        for key in hpd.aggregate_result_stocks.keys():
-            self.results[f'n_{key}'][t] = people.count(key)
+        # for key in hpd.aggregate_result_stocks.keys():
+        #     self.results[f'n_{key}'][t] = people.count(key)
         for key in hpd.result_stocks.keys():
             for genotype in range(ng):
                 self.results[f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)

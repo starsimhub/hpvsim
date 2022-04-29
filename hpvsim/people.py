@@ -390,7 +390,7 @@ class People(hpb.BasePeople):
 
         # Update states, genotype info, and flows
         n_infections = len(inds) # Count the total number of new infections
-        new_infections = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)]) # Count the number by genotype
+        new_infections = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)], dtype=np.float64) # Count the number by genotype
         self.susceptible[genotypes, inds]  = False # Adjust states - set susceptible to false
         self.infectious[genotypes, inds] = True # Adjust states - set infectious to true
         self.aggregate_flows['new_total_infections'] += n_infections # Add the total count to the aggregate flow data
