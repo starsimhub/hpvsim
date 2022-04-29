@@ -195,6 +195,7 @@ class Sim(hpb.BaseSim):
         self.results['cin1_prevalence'] = init_res('CIN1 prevalence', scale=False)
         self.results['cin2_prevalence'] = init_res('CIN2 prevalence', scale=False)
         self.results['cin3_prevalence'] = init_res('CIN3 prevalence', scale=False)
+        self.results['cancer_incidence'] = init_res('Cancer incidence', scale=False)
 
         # Results by genotype
         self.results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence by genotype', scale=False, n_genotypes=ng)
@@ -561,6 +562,7 @@ class Sim(hpb.BaseSim):
         self.results['cin1_prevalence'][:] = res['n_total_CIN1'][:]/ res['n_alive'][:]
         self.results['cin2_prevalence'][:] = res['n_total_CIN2'][:] / res['n_alive'][:]
         self.results['cin3_prevalence'][:] = res['n_total_CIN3'][:] / res['n_alive'][:]
+        self.results['cancer_incidence'][:] = res['new_total_cancers'][:]/(1-res['n_total_cancerous'][:])
 
         return
 
