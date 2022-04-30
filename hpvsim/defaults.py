@@ -165,7 +165,9 @@ cum_agg_result_flows_by_sex = [f'cum_{key}' for key in aggregate_result_flows_by
 # Parameters that can vary by genotype (WIP)
 genotype_pars = [
     'rel_beta',
-    'rel_CIN_prob',
+    'rel_CIN1_prob',
+    'rel_CIN2_prob',
+    'rel_CIN3_prob',
     'rel_cancer_prob',
     'rel_death_prob'
 ]

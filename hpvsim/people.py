@@ -281,8 +281,6 @@ class People(hpb.BasePeople):
         '''
         filter_inds = self.true_by_genotype('CIN3', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
-        if len(inds):
-            print('yay')
         self.cancerous[genotype, inds] = True
         self.susceptible[:, inds] = False
         self.infectious[:, inds] = False

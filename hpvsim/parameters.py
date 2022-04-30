@@ -58,7 +58,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     # pars['nonactive']       = None 
 
     # Basic disease transmission parameters
-    pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility
+    pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility TODO does this get used? if not remove.
     pars['beta']            = 0.35  # Per-act transmission probability; absolute value, calibrated
 
     # Probabilities of disease progression
@@ -90,11 +90,11 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     # Duration parameters
     pars['dur'] = {}
     pars['dur']['inf']  = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of infection in YEARS
-    pars['dur']['cin1']  = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN1 in YEARS
+    pars['dur']['cin1']  = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of CIN1 in YEARS
     pars['dur']['cin2'] = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 in YEARS
-    pars['dur']['cin3'] = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN3 in YEARS
-    pars['dur']['hpv2cin1']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of infection before developing CIN in YEARS
-    pars['dur']['cin32cancer']  = dict(dist='lognormal', par1=5.0, par2=1.0)  # Duration of CIN3 before developing cancer in YEARS
+    pars['dur']['cin3'] = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 in YEARS
+    pars['dur']['hpv2cin1']  = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of infection before developing CIN in YEARS
+    pars['dur']['cin32cancer']  = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 before developing cancer in YEARS
 
 
     # Efficacy of protection
@@ -203,7 +203,7 @@ def get_prognoses():
     prognoses = dict(
         duration_cutoffs  = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
         CIN1_probs        = np.array([0.015,  0.05655,    0.10800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
-        CIN2_probs        = np.array([0.015,  0.01655,    0.1080,    0.50655,    0.70]),   # Conditional probability of developing CIN2 given CIN1
+        CIN2_probs        = np.array([0.015,  0.0655,    0.1080,    0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
         CIN3_probs        = np.array([0.15,  0.655,    0.80,    0.855,    0.90]),   # Conditional probability of developing CIN3 given CIN2
         cancer_probs      = np.array([0.0055,  0.0655,    0.2080,    0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
         death_probs       = np.array([0.0015,  0.00655,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
