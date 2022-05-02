@@ -571,9 +571,9 @@ class Sim(hpb.BaseSim):
         self.results['n_alive_by_sex'][0,:]  = res['pop_size_by_sex'][1] + res['cum_births_by_sex'][1,:] - res['cum_other_deaths_by_sex'][1,:]
         self.results['hpv_incidence_by_genotype'][:] = np.einsum('ji,ji->ji', res['new_infections'][:],1 / res['n_susceptible'][:])  # Calculate the incidence
         self.results['hpv_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_infectious'][:], 1 / res['n_alive'][:])
-        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN1'][:], 1 / res['n_alive_by_sex'][0,:])
-        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN2'][:], 1 / res['n_alive_by_sex'][0,:])
-        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN3'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin1'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin2'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin3'][:], 1 / res['n_alive_by_sex'][0,:])
 
         self.results['hpv_prevalence'][:] = res['n_total_infectious'][:]/ res['n_alive'][:]
         self.results['cin1_prevalence'][:] = res['n_total_CIN1'][:]/ res['n_alive_by_sex'][0,:]

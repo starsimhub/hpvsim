@@ -53,9 +53,9 @@ class PeopleMeta(sc.prettyobj):
         self.states = [
             'susceptible',
             'infectious',
-            'CIN1',
-            'CIN2',
-            'CIN3',
+            'cin1',
+            'cin2',
+            'cin3',
             'cancerous',
             'dead_cancer',
             'other_dead',  # Dead from all other causes
@@ -74,7 +74,7 @@ class PeopleMeta(sc.prettyobj):
         ]
 
         self.dates = [f'date_{state}' for state in self.states] # Convert each state into a date
-        self.dates += ['date_HPV_clearance', 'date_CIN1_clearance', 'date_CIN2_clearance', 'date_CIN3_clearance']
+        self.dates += ['date_hpv_clearance', 'date_cin1_clearance', 'date_cin2_clearance', 'date_cin3_clearance']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
@@ -109,9 +109,9 @@ class PeopleMeta(sc.prettyobj):
 # A subset of the above states are used for results
 aggregate_result_stocks = {
     'total_infectious': 'Total number infectious',
-    'total_CIN1' : 'Total number with CIN1',
-    'total_CIN2' : 'Total number with CIN2',
-    'total_CIN3' : 'Total number with CIN3',
+    'total_cin1' : 'Total number with cin1',
+    'total_cin2' : 'Total number with cin2',
+    'total_cin3' : 'Total number with cin3',
     'total_cancerous'    : 'Total number with cervical cancer',
     'other_dead':  'Number dead from other causes',
 }
@@ -119,26 +119,26 @@ aggregate_result_stocks = {
 result_stocks = {
     'susceptible': 'Number susceptible',
     'infectious': 'Number infectious',
-    'CIN1' : 'Number with CIN1',
-    'CIN2' : 'Number with CIN2',
-    'CIN3' : 'Number with CIN3',
+    'cin1' : 'Number with cin1',
+    'cin2' : 'Number with cin2',
+    'cin3' : 'Number with cin3',
     'cancerous'    : 'Number with cervical cancer'
 }
 
 # The types of result that are counted as flows -- used in sim.py; value is the label suffix
 result_flows = {
     'infections':  'infections',
-    'CIN1s' :  'CIN1s',
-    'CIN2s' :  'CIN2s',
-    'CIN3s' :  'CIN3s',
-    'CINs'  :  'CINs',
+    'cin1s' :  'cin1s',
+    'cin2s' :  'cin2s',
+    'cin3s' :  'cin3s',
+    'cins'  :  'cins',
     'cancers'    :  'cervical cancers',
     'cancer_deaths': 'cancer deaths',
 }
 
 aggregate_result_flows = {
     'total_infections': 'total infections',
-    'total_CINs': 'total CINs',
+    'total_cins': 'total cins',
     'total_cancers': 'total cancers',
     'total_cancer_deaths': 'total cancer deaths',
     'other_deaths': 'deaths from other causes',
@@ -165,9 +165,9 @@ cum_agg_result_flows_by_sex = [f'cum_{key}' for key in aggregate_result_flows_by
 # Parameters that can vary by genotype (WIP)
 genotype_pars = [
     'rel_beta',
-    'rel_CIN1_prob',
-    'rel_CIN2_prob',
-    'rel_CIN3_prob',
+    'rel_cin1_prob',
+    'rel_cin2_prob',
+    'rel_cin3_prob',
     'rel_cancer_prob',
     'rel_death_prob'
 ]
@@ -278,7 +278,7 @@ def get_default_colors(n_genotypes=None):
 
     # Overall flows
     c.total_infections      = pl.cm.GnBu(1)
-    c.total_CINs      = pl.cm.Oranges(1)
+    c.total_cins            = pl.cm.Oranges(1)
     c.total_cancers         = pl.cm.Reds(1)
     c.total_cancer_deaths   = pl.cm.Purples(1)
     c.other_deaths          = '#000000'
@@ -286,28 +286,28 @@ def get_default_colors(n_genotypes=None):
 
     # Overall states
     c.total_infectious      = c.total_infections
-    c.total_CIN1            = c.total_CINs
-    c.total_CIN2            = c.total_CINs
-    c.total_CIN3            = c.total_CINs
+    c.total_cin1            = c.total_cins
+    c.total_cin2            = c.total_cins
+    c.total_cin3            = c.total_cins
     c.total_cancerous       = c.total_cancers
     c.total_cancer_dead     = c.total_cancer_deaths
 
     # All states are by genotype, except deaths from other causes
     c.susceptible           = pl.cm.Greens(np.linspace(0.2, 0.8, n_genotypes))
     c.infectious            = pl.cm.GnBu(np.linspace(0.2, 0.8, n_genotypes))
-    c.CIN1                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
-    c.CIN2                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
-    c.CIN3                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
-    c.CINs                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
+    c.cin1                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
+    c.cin2                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
+    c.cin3                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
+    c.cins                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
     c.cancerous             = pl.cm.Reds(np.linspace(0.2, 0.8, n_genotypes))
     c.dead_cancer           = pl.cm.Purples(np.linspace(0.2, 0.8, n_genotypes))
     c.other_dead            = c.other_deaths
 
     # Flows by genotype
     c.infections            = c.infectious
-    c.CIN1s                  = c.CIN1
-    c.CIN2s                  = c.CIN2
-    c.CIN3s                  = c.CIN3
+    c.cin1s                  = c.cin1
+    c.cin2s                  = c.cin2
+    c.cin3s                  = c.cin3
     c.cancers               = c.cancerous
     c.cancer_deaths         = c.dead_cancer
 

@@ -39,59 +39,34 @@ def test_basic(doplot=False):
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
 
     pars = {
-<<<<<<< HEAD
-        'pop_size': 100e3,
-=======
         'pop_size': 50e3,
->>>>>>> redoing-infections
         'network': 'basic',
         'genotypes': [hpv16, hpv18, hpv6],#, hpv11, hpv31, hpv33],
         'dt': .1,
         'end': 2035
     }
-<<<<<<< HEAD
     sim = Sim(pars=pars)
-    sim.run()
-
-    fig, ax = pl.subplots(2, 2, figsize=(10, 10))
-    timevec = sim.results['year']
-
-    ax[0, 1].plot(timevec, sim.results['hpv_prevalence'].values)
-    ax[1, 0].plot(timevec, sim.results['cin1_prevalence'].values, label='CIN1')
-    ax[1, 0].plot(timevec, sim.results['cin2_prevalence'].values, label='CIN2')
-    ax[1, 0].plot(timevec, sim.results['cin3_prevalence'].values, label='CIN3')
-    ax[1,1].plot(timevec, sim.results['cancer_incidence'].values)
-    for i, genotype in sim['genotype_map'].items():
-        ax[0,0].plot(timevec, sim.results['hpv_incidence_by_genotype'].values[i,:], label=genotype)
-
-    ax[0,0].legend()
-    ax[1,0].legend()
-    ax[0,0].set_title('HPV incidence by genotype')
-    ax[0,1].set_title('HPV prevalence')
-    ax[1,0].set_title('CIN prevalence')
-    ax[1,1].set_title('Cancer incidence')
-    fig.show()
-=======
-    sim = Sim(pars=pars, location='zimbabwe', verbose=.1)
     sim.run()
 
     if doplot:
         fig, ax = pl.subplots(2, 2, figsize=(10, 10))
         timevec = sim.results['year']
 
+        ax[0, 1].plot(timevec, sim.results['hpv_prevalence'].values)
+        ax[1, 0].plot(timevec, sim.results['cin1_prevalence'].values, label='CIN1')
+        ax[1, 0].plot(timevec, sim.results['cin2_prevalence'].values, label='CIN2')
+        ax[1, 0].plot(timevec, sim.results['cin3_prevalence'].values, label='CIN3')
+        ax[1,1].plot(timevec, sim.results['cancer_incidence'].values)
         for i, genotype in sim['genotype_map'].items():
-            ax[0,0].plot(timevec, sim.results['genotype']['hpv_incidence_by_genotype'].values[i,:], label=genotype)
-            ax[0,1].plot(timevec, sim.results['genotype']['hpv_prevalence_by_genotype'].values[i, :])
-            ax[1,0].plot(timevec, sim.results['genotype']['new_precancers_by_genotype'].values[i,:])
-            ax[1,1].plot(timevec, sim.results['genotype']['cin_prevalence_by_genotype'].values[i, :])
+            ax[0,0].plot(timevec, sim.results['hpv_incidence_by_genotype'].values[i,:], label=genotype)
 
         ax[0,0].legend()
+        ax[1,0].legend()
         ax[0,0].set_title('HPV incidence by genotype')
-        ax[0,1].set_title('HPV prevalence by genotype')
-        ax[1,0].set_title('New CIN by genotype')
-        ax[1,1].set_title('CIN prevalence by genotype')
+        ax[0,1].set_title('HPV prevalence')
+        ax[1,0].set_title('CIN prevalence')
+        ax[1,1].set_title('Cancer incidence')
         fig.show()
->>>>>>> redoing-infections
     return sim
 
 
