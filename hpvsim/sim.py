@@ -342,6 +342,7 @@ class Sim(hpb.BaseSim):
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         rel_beta = self['rel_beta']
+        imm_kin_pars = self['imm_kin']
 
         # Update states and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
@@ -419,9 +420,9 @@ class Sim(hpb.BaseSim):
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
 
-        has_imm = hpu.true(people.peak_imm.sum(axis=0))
+        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
         if len(has_imm):
-            hpimm.update_immunity(people, inds=has_imm)
+            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
 
         # Tidy up
         self.t += 1

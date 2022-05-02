@@ -89,6 +89,11 @@ def init_immunity(sim, create=False):
     # If immunity values have been provided, process them
     if sim['immunity'] is None or create:
 
+        # Precompute waning - same for all genotypes
+        imm_decay = sc.dcp(sim['imm_decay']['infection'])
+        imm_decay['half_life'] /= sim['dt']
+        sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
+
         sim['immunity_map'] = dict()
         # Firstly, initialize immunity matrix with defaults. These are then overwitten with genotype-specific values below
         # Susceptibility matrix is of size sim['n_genotypes']*sim['n_genotypes']
@@ -96,10 +101,6 @@ def init_immunity(sim, create=False):
 
         # Next, overwrite these defaults with any known immunity values about specific genotypes
         default_cross_immunity = hppar.get_cross_immunity()
-        imm_decay = sc.dcp(sim['imm_decay']['infection'])
-        imm_decay['half_life'] /= sim['dt']
-        waning = precompute_waning(t=sim.tvec, pars=imm_decay)
-        sim['imm_kin'] = np.array([waning]*ng)
         for i in range(ng):
             sim['immunity_map'][i] = 'infection'
             label_i = sim['genotype_map'][i]
@@ -149,20 +150,6 @@ def update_peak_immunity(people, inds, imm_pars, imm_source):
 
     people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
     people.t_imm_event[imm_source, inds] = people.t
-    return
-
-
-def update_immunity(people, inds):
-    '''
-    Step immunity levels forward in time
-    '''
-    t_since_boost = people.t - people.t_imm_event[:,inds]
-    imm_kin = people.pars['imm_kin'][:,t_since_boost][0] # Get people's current level of immunity
-    people.imm[:,inds] += imm_kin*people.peak_imm[:,inds] # Set immunity relative to peak
-    # TODO: can we get rid of the next two lines? They slow things down quite a bit
-    # people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
-    # people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
-
     return
 
 
