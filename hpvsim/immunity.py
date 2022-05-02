@@ -138,17 +138,17 @@ def update_peak_immunity(people, inds, imm_pars, imm_source):
     no_prior_imm_inds = inds[~has_imm]
     prior_imm_inds = inds[has_imm]
 
-    if isinstance(imm_pars['imm_boost'], Iterable):
-        boost = imm_pars['imm_boost'][imm_source]
-    else:
-        boost = imm_pars['imm_boost']
-
-    people.peak_imm[imm_source, prior_imm_inds] *= boost
+    if len(prior_imm_inds):
+        if isinstance(imm_pars['imm_boost'], Iterable):
+            boost = imm_pars['imm_boost'][imm_source]
+        else:
+            boost = imm_pars['imm_boost']
+        people.peak_imm[imm_source, prior_imm_inds] *= boost
 
     if len(no_prior_imm_inds):
         people.peak_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
 
-    people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
+    # people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
     people.t_imm_event[imm_source, inds] = people.t
     return
 

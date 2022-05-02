@@ -124,7 +124,7 @@ def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    
     ss              = t_imm_event[:, inds].shape
     t_since_boost   = (t - t_imm_event[:,inds]).ravel()
     current_imm     = imm_kin[t_since_boost].reshape(ss) # Get people's current level of immunity
-    imm[:,inds]     += current_imm*peak_imm[:,inds] # Set immunity relative to peak
+    imm[:,inds]     = current_imm*peak_imm[:,inds] # Set immunity relative to peak
     return imm
 
 
