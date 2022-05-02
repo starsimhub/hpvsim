@@ -576,9 +576,9 @@ class Sim(hpb.BaseSim):
         self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin3'][:], 1 / res['n_alive_by_sex'][0,:])
 
         self.results['hpv_prevalence'][:] = res['n_total_infectious'][:]/ res['n_alive'][:]
-        self.results['cin1_prevalence'][:] = res['n_total_CIN1'][:]/ res['n_alive_by_sex'][0,:]
-        self.results['cin2_prevalence'][:] = res['n_total_CIN2'][:] / res['n_alive_by_sex'][0,:]
-        self.results['cin3_prevalence'][:] = res['n_total_CIN3'][:] / res['n_alive_by_sex'][0,:]
+        self.results['cin1_prevalence'][:] = res['n_total_cin1'][:]/ res['n_alive_by_sex'][0,:]
+        self.results['cin2_prevalence'][:] = res['n_total_cin2'][:] / res['n_alive_by_sex'][0,:]
+        self.results['cin3_prevalence'][:] = res['n_total_cin3'][:] / res['n_alive_by_sex'][0,:]
         self.results['cancer_incidence'][:] = res['new_total_cancers'][:]/(res['n_alive_by_sex'][0,:]-res['n_total_cancerous'][:])
 
         return
