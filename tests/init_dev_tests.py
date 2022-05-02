@@ -10,39 +10,46 @@ import os
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
+# Create genotypes - used in all subsequent tests
+from hpvsim.sim import Sim
+from hpvsim.immunity import genotype
+hpv16 = genotype('HPV16')
+hpv18 = genotype('HPV18')
+hpvhi5 = genotype('hpvhi5')
+hpv6 = genotype('hpv6')
+hpv11 = genotype('hpv11')
+hpv31 = genotype('hpv31')
+hpv33 = genotype('hpv33')
+
+
 def test_random():
     ''' Make the simplest possible sim with one kind of partnership '''
-    from hpvsim.sim import Sim
     from hpvsim.analysis import snapshot
-    pars = {'pop_size':20_000, 'rand_seed':100, 'location':'zimbabwe'}
+    pars = {'pop_size':20_000,
+            'rand_seed':100,
+            'location':'zimbabwe',
+            'genotypes': [hpv16, hpv18],
+            }
     sim = Sim(pars=pars, analyzers=snapshot('2015', '2020'))
     sim.run()
     return sim
 
-def test_basic():
-    ''' Make a sim with two kinds of partnership, regular and casual '''
-    from hpvsim.sim import Sim
-    pars = {'network':'basic'}
-    sim = Sim(pars=pars)
-    sim.run()
-    return sim
 
-
-def test_genotypes():
+def test_basic(doplot=False):
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
-    from hpvsim.sim import Sim
-    from hpvsim.immunity import genotype
 
-    hpv16 = genotype('HPV16')
-    hpv18 = genotype('HPV18')
-    hpvhi5 = genotype('hpvhi5')
     pars = {
+<<<<<<< HEAD
         'pop_size': 100e3,
+=======
+        'pop_size': 50e3,
+>>>>>>> redoing-infections
         'network': 'basic',
-        'genotypes': [hpv16, hpv18, hpvhi5],
+        'genotypes': [hpv16, hpv18, hpv6],#, hpv11, hpv31, hpv33],
         'dt': .1,
         'end': 2035
     }
+<<<<<<< HEAD
     sim = Sim(pars=pars)
     sim.run()
 
@@ -64,17 +71,34 @@ def test_genotypes():
     ax[1,0].set_title('CIN prevalence')
     ax[1,1].set_title('Cancer incidence')
     fig.show()
+=======
+    sim = Sim(pars=pars, location='zimbabwe', verbose=.1)
+    sim.run()
+
+    if doplot:
+        fig, ax = pl.subplots(2, 2, figsize=(10, 10))
+        timevec = sim.results['year']
+
+        for i, genotype in sim['genotype_map'].items():
+            ax[0,0].plot(timevec, sim.results['genotype']['hpv_incidence_by_genotype'].values[i,:], label=genotype)
+            ax[0,1].plot(timevec, sim.results['genotype']['hpv_prevalence_by_genotype'].values[i, :])
+            ax[1,0].plot(timevec, sim.results['genotype']['new_precancers_by_genotype'].values[i,:])
+            ax[1,1].plot(timevec, sim.results['genotype']['cin_prevalence_by_genotype'].values[i, :])
+
+        ax[0,0].legend()
+        ax[0,0].set_title('HPV incidence by genotype')
+        ax[0,1].set_title('HPV prevalence by genotype')
+        ax[1,0].set_title('New CIN by genotype')
+        ax[1,1].set_title('CIN prevalence by genotype')
+        fig.show()
+>>>>>>> redoing-infections
     return sim
 
 
 def test_interventions():
     ''' Template to develop tests for interventions'''
-    from hpvsim.sim import Sim
-    from hpvsim.immunity import genotype
     import hpvsim.interventions as hpint
 
-    hpv16 = genotype('HPV16')
-    hpv18 = genotype('HPV18')
     pars = {
         'network': 'basic',
         'genotypes': [hpv16, hpv18],
@@ -101,12 +125,6 @@ def test_interventions():
 
 if __name__ == '__main__':
 
-    # sim0 = test_random() # NOT WORKING
-    # sim1 = test_basic() # NOT WORKING
-    sim2 = test_genotypes()
-    # sim3 = test_interventions()
-
-
-
-
-
+    # sim0 = test_random()
+    sim1 = test_basic()
+    # sim2 = test_interventions()

@@ -70,7 +70,7 @@ class PeopleMeta(sc.prettyobj):
         self.imm_by_source_states = [
             'peak_imm', # Float, peak level of immunity
             'imm',  # Float, current immunity level
-            't_imm_event',  # Float, time since immunity event
+            't_imm_event',  # Int, time since immunity event
         ]
 
         self.dates = [f'date_{state}' for state in self.states] # Convert each state into a date

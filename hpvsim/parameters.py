@@ -85,7 +85,6 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
-    pars['rel_beta']    = 1.0 # Relative transmissibility varies by genotype
 
     # Duration parameters
     pars['dur'] = {}

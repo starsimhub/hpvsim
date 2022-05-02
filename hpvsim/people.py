@@ -91,7 +91,10 @@ class People(hpb.BasePeople):
         for key in self.meta.imm_states:  # Everyone starts out with no immunity
             self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
         for key in self.meta.imm_by_source_states:  # Everyone starts out with no immunity; TODO, reconsider this
-            self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
+            if key == 't_imm_event':
+                self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_int)
+            else:
+                self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
 
         # Store the dtypes used in a flat dict
         self._dtypes = {key:self[key].dtype for key in self.keys()} # Assign all to float by default
@@ -386,8 +389,7 @@ class People(hpb.BasePeople):
 
         return
 
-
-    def infect(self, inds, source=None, layer=None, genotype=0):
+    def infect(self, inds, genotypes=None, source=None, layer=None):
         '''
         Infect people and determine their eventual outcomes.
         Method also deduplicates input arrays in case one agent is infected many times
@@ -397,7 +399,6 @@ class People(hpb.BasePeople):
             inds     (array): array of people to infect
             source   (array): source indices of the people who transmitted this infection (None if an importation or seed infection)
             layer    (str):   contact layer this infection was transmitted on
-            genotype (int):   the genotype people are being infected by
 
         Returns:
             count (int): number of people infected
@@ -406,18 +407,8 @@ class People(hpb.BasePeople):
         if len(inds) == 0:
             return 0
 
-        # Remove duplicates
-        inds, unique = np.unique(inds, return_index=True)
-        if source is not None:
-            source = source[unique]
-
-        # Keep only susceptibles
-        keep = self.susceptible[genotype, inds] # Unique indices in inds and source that are also susceptible
-        inds = inds[keep]
-        if source is not None:
-            source = source[keep]
-
         # Deal with genotype parameters
+<<<<<<< HEAD
         genotype_keys = ['rel_CIN1_prob', 'rel_CIN2_prob', 'rel_CIN3_prob', 'rel_cancer_prob', 'rel_death_prob']
         infect_pars = {k:self.pars[k] for k in genotype_keys}
         genotype_label = self.pars['genotype_map'][genotype]
@@ -427,12 +418,28 @@ class People(hpb.BasePeople):
 
         n_infections = len(inds)
         durpars      = self.pars['dur']
+=======
+        ng              = self.pars['n_genotypes']
+        genotype_keys   = ['rel_CIN_prob', 'rel_cancer_prob', 'rel_death_prob']
+        genotype_pars   = self.pars['genotype_pars']
+        genotype_map    = self.pars['genotype_map']
+        infect_pars     = {k:self.pars[k] for k in genotype_keys}
+        durpars         = self.pars['dur']
+        progpars        = self.pars['prognoses']
+        progprobs       = [{k: self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys} for g in range(ng)]  # np.array([[self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys] for g in range(ng)])
+>>>>>>> redoing-infections
 
         # Update states, genotype info, and flows
-        self.susceptible[genotype, inds]  = False
-        self.infectious[genotype, inds] = True
-        self.aggregate_flows['new_total_infections'] += len(inds)
-        self.flows['new_infections'][genotype] += len(inds)
+        n_infections = len(inds) # Count the total number of new infections
+        new_infections = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)], dtype=np.float64) # Count the number by genotype
+        self.susceptible[genotypes, inds]  = False # Adjust states - set susceptible to false
+        self.infectious[genotypes, inds] = True # Adjust states - set infectious to true
+        self.aggregate_flows['new_total_infections'] += n_infections # Add the total count to the aggregate flow data
+        self.flows['new_infections'] += new_infections # Add the count by genotype to the flow data
+
+        # Reset all other dates
+        for key in ['date_precancerous', 'date_cancerous', 'date_HPV_clearance', 'date_CIN_clearance']:
+            self[key][genotypes, inds] = np.nan
 
         infs_female = len(hpu.true(self.is_female[inds]))
         infs_male = len(hpu.true(self.is_male[inds]))
@@ -444,21 +451,24 @@ class People(hpb.BasePeople):
         #     entry = dict(source=source[i] if source is not None else None, target=target, date=self.t, layer=layer, genotype=genotype_label)
         #     self.infection_log.append(entry)
 
+<<<<<<< HEAD
         # Reset all other dates
         for key in ['date_CIN1',  'date_CIN2',  'date_CIN3', 'date_HPV_clearance', 'date_CIN1_clearance',
                     'date_CIN2_clearance', 'date_CIN3_clearance']:
             self[key][genotype, inds] = np.nan
 
+=======
+>>>>>>> redoing-infections
         # Set the dates of infection and recovery -- for now, just assume everyone recovers
         dt = self.pars['dt']
-        self.date_infectious[genotype,inds] = self.t
+        self.date_infectious[genotypes,inds] = self.t
         dur_inf = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
-        self.dur_inf[genotype, inds] = dur_inf
-        self.date_HPV_clearance[genotype, inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
-        inf_female = inds[hpu.true(self.is_female[inds])]
-        dur_inf_female = dur_inf[hpu.true(self.is_female[inds])]
-        dur_inds = np.digitize(dur_inf_female,self.pars['prognoses']['duration_cutoffs'])-1  # Convert durations to indices
+        self.dur_inf[genotypes, inds] = dur_inf
+        self.date_HPV_clearance[genotypes, inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+        f_inds = hpu.true(self.is_female[inds])
+        inf_female = inds[f_inds]
 
+<<<<<<< HEAD
         # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
         CIN1_probs = infect_pars['rel_CIN1_prob']* self.pars['prognoses']['CIN1_probs'][dur_inds]
         is_CIN1 = hpu.binomial_arr(CIN1_probs)
@@ -524,6 +534,47 @@ class People(hpb.BasePeople):
         hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
 
         return n_infections # For incrementing counters
+=======
+        # Use prognosis probabilities to determine what happens (only women can progress to CIN)
+        for g in range(ng):
+            inf_female = hpu.true((genotypes == g) * self.is_female[inds])
+            dur_inf_female = dur_inf[inf_female]
+            dur_inds = np.digitize(dur_inf_female, progpars['duration_cutoffs']) - 1  # Convert durations to indices
+            CIN_probs = progprobs[g]['rel_CIN_prob'] * progpars['CIN_probs'][dur_inds]
+            is_CIN = hpu.binomial_arr(CIN_probs)
+            CIN_inds = inf_female[is_CIN]
+            no_CIN_inds = inf_female[~is_CIN]
+            self.flows['new_precancers'][g] += len(CIN_inds)
+            self.aggregate_flows['new_total_precancers'] += len(CIN_inds)
+
+            # Case 1: HPV without progression to CIN
+
+            # Case 2: HPV with progression to CIN
+            n_CIN_inds = len(CIN_inds)
+            self.dur_hpv2cin[g, CIN_inds] = hpu.sample(**durpars['hpv2cin'], size=n_CIN_inds)  # Store how long this person took to develop CIN
+            self.date_precancerous[g, CIN_inds] = self.t + np.ceil(self.dur_hpv2cin[g, CIN_inds]/dt)  # Date they develop CIN
+            dur_CIN = hpu.sample(**durpars['cin'], size=n_CIN_inds)  # Duration of infection in YEARS
+            dur_inds = np.digitize(dur_CIN,progpars['duration_cutoffs'])-1  # Convert durations to indices
+
+            cancer_probs = progprobs[g]['rel_cancer_prob'] * progpars['cancer_probs'][dur_inds]  # Probability of these people developing cancer
+            is_cancer = hpu.binomial_arr(cancer_probs)  # See if they develop cancer
+            cancer_inds = CIN_inds[is_cancer]
+            no_cancer_inds = CIN_inds[~is_cancer]  # No cancer
+            self.flows['new_cancers'][g] += len(cancer_inds)
+            self.aggregate_flows['new_total_cancers'] += len(cancer_inds)
+
+            # Case 2.1: CIN with no progression to cancer
+            self.date_CIN_clearance[g, no_cancer_inds] = self.date_precancerous[g, no_cancer_inds] + np.ceil(dur_CIN[~is_cancer]/dt)  # Date they clear CIN
+
+            # Case 2.2: CIN with progression to cancer
+            self.dur_cin2cancer[g, cancer_inds] = dur_CIN[is_cancer]
+            self.date_cancerous[g, cancer_inds] = self.date_precancerous[g, cancer_inds] + np.ceil(dur_CIN[is_cancer]/dt) # Date they get cancer
+
+            # Update immunity - TODO, check this still works
+            hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=g)
+
+        return new_infections # For incrementing counters
+>>>>>>> redoing-infections
 
 
     def make_die_other(self, inds):
