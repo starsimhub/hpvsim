@@ -62,9 +62,9 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['beta']            = 0.35  # Per-act transmission probability; absolute value, calibrated
 
     # Probabilities of disease progression
-    pars['rel_CIN1_prob'] = 1.0  # Scale factor for proportion of CIN cases
-    pars['rel_CIN2_prob'] = 1.0  # Scale factor for proportion of CIN cases
-    pars['rel_CIN3_prob'] = 1.0  # Scale factor for proportion of CIN cases
+    pars['rel_cin1_prob'] = 1.0  # Scale factor for proportion of CIN cases
+    pars['rel_cin2_prob'] = 1.0  # Scale factor for proportion of CIN cases
+    pars['rel_cin3_prob'] = 1.0  # Scale factor for proportion of CIN cases
     pars['rel_cancer_prob'] = 1.0  # Scale factor for proportion of CIN that develop into cancer
     pars['rel_death_prob'] = 1.0  # Scale factor for proportion of cancer cases that result in death
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
@@ -85,7 +85,6 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
-    pars['rel_beta']    = 1.0 # Relative transmissibility varies by genotype
 
     # Duration parameters
     pars['dur'] = {}
@@ -202,9 +201,9 @@ def get_prognoses():
 
     prognoses = dict(
         duration_cutoffs  = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
-        CIN1_probs        = np.array([0.015,  0.05655,    0.10800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
-        CIN2_probs        = np.array([0.015,  0.0655,    0.1080,    0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
-        CIN3_probs        = np.array([0.15,  0.655,    0.80,    0.855,    0.90]),   # Conditional probability of developing CIN3 given CIN2
+        cin1_probs        = np.array([0.015,  0.05655,    0.10800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
+        cin2_probs        = np.array([0.015,  0.0655,    0.1080,    0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
+        cin3_probs        = np.array([0.15,  0.655,    0.80,    0.855,    0.90]),   # Conditional probability of developing CIN3 given CIN2
         cancer_probs      = np.array([0.0055,  0.0655,    0.2080,    0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
         death_probs       = np.array([0.0015,  0.00655,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
         )
@@ -317,99 +316,99 @@ def get_genotype_pars(default=False, genotype=None):
 
         hpv16 = dict(
             rel_beta        = 1.0, # Default values
-            rel_CIN1_prob    = 1.0,
-            rel_CIN2_prob=1.0,
-            rel_CIN3_prob=1.0,
+            rel_cin1_prob    = 1.0,
+            rel_cin2_prob=1.0,
+            rel_cin3_prob=1.0,
             rel_cancer_prob = 1.0,
             rel_death_prob  = 1.0
         ),
 
         hpv18 = dict(
             rel_beta        = 0.8, # Default values
-            rel_CIN1_prob=1.0,
-            rel_CIN2_prob=1.0,
-            rel_CIN3_prob=1.0,
+            rel_cin1_prob=1.0,
+            rel_cin2_prob=1.0,
+            rel_cin3_prob=1.0,
             rel_cancer_prob = 0.8,
             rel_death_prob  = 0.8
         ),
 
         hpv31=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=1.0,
-            rel_CIN2_prob=1.0,
-            rel_CIN3_prob=1.0,
+            rel_cin1_prob=1.0,
+            rel_cin2_prob=1.0,
+            rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
             rel_death_prob=1.0
         ),
 
         hpv33=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=1.0,
-            rel_CIN2_prob=1.0,
-            rel_CIN3_prob=1.0,
+            rel_cin1_prob=1.0,
+            rel_cin2_prob=1.0,
+            rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
             rel_death_prob=1.0
         ),
 
         hpv45=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=1.0,
-            rel_CIN2_prob=1.0,
-            rel_CIN3_prob=1.0,
+            rel_cin1_prob=1.0,
+            rel_cin2_prob=1.0,
+            rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
             rel_death_prob=1.0
         ),
 
         hpv52=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=1.0,
-            rel_CIN2_prob=1.0,
-            rel_CIN3_prob=1.0,
+            rel_cin1_prob=1.0,
+            rel_cin2_prob=1.0,
+            rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
             rel_death_prob=1.0
         ),
 
         hpv6=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=0,
-            rel_CIN2_prob=0,
-            rel_CIN3_prob=0,
+            rel_cin1_prob=0,
+            rel_cin2_prob=0,
+            rel_cin3_prob=0,
             rel_cancer_prob=0,
             rel_death_prob=0
         ),
 
         hpv11=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=0,
-            rel_CIN2_prob=0,
-            rel_CIN3_prob=0,
+            rel_cin1_prob=0,
+            rel_cin2_prob=0,
+            rel_cin3_prob=0,
             rel_cancer_prob=0,
             rel_death_prob=0
         ),
 
         hpvlo=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=0,
-            rel_CIN2_prob=0,
-            rel_CIN3_prob=0,
+            rel_cin1_prob=0,
+            rel_cin2_prob=0,
+            rel_cin3_prob=0,
             rel_cancer_prob=0,
             rel_death_prob=0
         ),
 
         hpvhi=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=1.0,
-            rel_CIN2_prob=1.0,
-            rel_CIN3_prob=1.0,
+            rel_cin1_prob=1.0,
+            rel_cin2_prob=1.0,
+            rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
             rel_death_prob=1.0
         ),
 
         hpvhi5=dict(
             rel_beta=1.0,  # Default values
-            rel_CIN1_prob=1.0,
-            rel_CIN2_prob=1.0,
-            rel_CIN3_prob=1.0,
+            rel_cin1_prob=1.0,
+            rel_cin2_prob=1.0,
+            rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
             rel_death_prob=1.0
         ),

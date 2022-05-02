@@ -327,7 +327,7 @@ class Sim(hpb.BaseSim):
 
     def init_infections(self):
         '''
-        Initialize prior immunity and seed infections. TODO: think of a better initialization strategy
+        Initialize prior immunity and seed infections
         '''
 
         age_inds = np.digitize(self.people.age, self.pars['init_hpv_prevalence']['f'][:, 0]) - 1
@@ -337,13 +337,11 @@ class Sim(hpb.BaseSim):
 
         # Get indices of people who have HPV (for now, split evenly between genotypes)
         ng = self['n_genotypes']
-
-        for genotype_ind in range(ng):
-            hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs/ng))
-            self.people.infect(inds=hpv_inds, layer='seed_infection',
-                               genotype=genotype_ind)  # Not counted by results since flows are re-initialized during the step
-            self.results['cum_infections'][genotype_ind, :] += len(hpv_inds)
-            self.results['cum_total_infections'][:] += len(hpv_inds)
+        hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
+        genotypes = np.random.randint(0, ng, len(hpv_inds))
+        new_infections = self.people.infect(inds=hpv_inds, genotypes=genotypes, layer='seed_infection')
+        self.results['cum_infections'].values += new_infections[:,None]
+        self.results['cum_total_infections'][:] += sum(new_infections)
 
         return
 
@@ -361,7 +359,9 @@ class Sim(hpb.BaseSim):
         ng = self['n_genotypes']
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
-        rel_beta = self['rel_beta']
+        beta = self['beta']
+        gen_pars = self['genotype_pars']
+        imm_kin_pars = self['imm_kin']
 
         # Update states and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
@@ -369,6 +369,7 @@ class Sim(hpb.BaseSim):
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
+        n_people = len(people)
 
         # Apply interventions
         for i,intervention in enumerate(self['interventions']):
@@ -379,7 +380,7 @@ class Sim(hpb.BaseSim):
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
         hpimm.check_immunity(people)
 
-        # Precalculate aspects of transmission that don't depend on genotype: acts
+        # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
         for lkey, layer in contacts.items():
             fs.append(layer['f'])
@@ -391,35 +392,32 @@ class Sim(hpb.BaseSim):
             whole_acts.append(wa.astype(hpd.default_int))
             effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
 
-        # Iterate through genotypes to calculate infections
-        for genotype in range(ng):
+        gen_betas = np.array([g['rel_beta']*beta for g in gen_pars.values()], dtype=hpd.default_float)
+        inf = people.infectious
+        sus = people.susceptible
+        sus_imm = people.sus_imm
+        f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf, sus, people.sex.astype(bool))  # Males and females infected with this genotype
 
-            # Deal with genotype parameters
-            genotype_label  = self.pars['genotype_map'][genotype]
-            rel_beta        *= self['genotype_pars'][genotype_label]['rel_beta']
-            beta            = hpd.default_float(self['beta'] * rel_beta)
-            inf_genotype    = people.infectious[genotype, :]
-            sus_genotype    = people.susceptible[genotype, :]
-            sus_imm         = people.sus_imm[genotype,:] # Individual susceptibility depends on immunity by genotype
+        # Loop over layers
+        ln = 0 # Layer number
+        for lkey, layer in contacts.items():
+            f = fs[ln]
+            m = ms[ln]
 
-            # Start constructing discordant pairs
-            f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf_genotype, sus_genotype, people.sex.astype(bool)) # Males and females infected with this genotype
+            # Compute transmissibility for each partnership
+            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln])
+            foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
+            foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
-            # Loop over layers
-            ln = 0 # Layer number
-            for lkey, layer in contacts.items():
-                f = fs[ln]
-                m = ms[ln]
-
-                # Compute transmissibility for each partnership
-                foi_whole = hpu.compute_foi_whole(beta, effective_condoms[ln], whole_acts[ln])
-                foi_frac  = hpu.compute_foi_frac(beta, effective_condoms[ln], frac_acts[ln])
-                foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
-
-                # Compute transmissions
-                source_inds, target_inds = hpu.compute_infections(foi, f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, sus_imm)  # Calculate transmission
-                people.infect(inds=target_inds, source=source_inds, layer=lkey, genotype=genotype)  # Actually infect people
-                ln += 1
+            # Compute transmissions
+            f_source_inds, f_genotypes, m_source_inds, m_genotypes = hpu.get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n_people)  # Calculate transmission
+            discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
+                                [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
+            for pship_inds, sources, targets, genotypes in discordant_pairs:
+                betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
+                source_inds, target_inds, genotype_inds = hpu.compute_infections(betas, sources, targets, genotypes)  # Calculate transmission
+            people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
+            ln += 1
 
         # Update counts for this time step: stocks
         for key in hpd.result_stocks.keys():
@@ -444,9 +442,9 @@ class Sim(hpb.BaseSim):
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
 
-        has_imm = hpu.true(people.peak_imm.sum(axis=0))
+        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
         if len(has_imm):
-            hpimm.update_immunity(people, inds=has_imm)
+            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
 
         # Tidy up
         self.t += 1
@@ -573,14 +571,14 @@ class Sim(hpb.BaseSim):
         self.results['n_alive_by_sex'][0,:]  = res['pop_size_by_sex'][1] + res['cum_births_by_sex'][1,:] - res['cum_other_deaths_by_sex'][1,:]
         self.results['hpv_incidence_by_genotype'][:] = np.einsum('ji,ji->ji', res['new_infections'][:],1 / res['n_susceptible'][:])  # Calculate the incidence
         self.results['hpv_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_infectious'][:], 1 / res['n_alive'][:])
-        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN1'][:], 1 / res['n_alive_by_sex'][0,:])
-        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN2'][:], 1 / res['n_alive_by_sex'][0,:])
-        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_CIN3'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin1'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin2'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin3'][:], 1 / res['n_alive_by_sex'][0,:])
 
         self.results['hpv_prevalence'][:] = res['n_total_infectious'][:]/ res['n_alive'][:]
-        self.results['cin1_prevalence'][:] = res['n_total_CIN1'][:]/ res['n_alive_by_sex'][0,:]
-        self.results['cin2_prevalence'][:] = res['n_total_CIN2'][:] / res['n_alive_by_sex'][0,:]
-        self.results['cin3_prevalence'][:] = res['n_total_CIN3'][:] / res['n_alive_by_sex'][0,:]
+        self.results['cin1_prevalence'][:] = res['n_total_cin1'][:]/ res['n_alive_by_sex'][0,:]
+        self.results['cin2_prevalence'][:] = res['n_total_cin2'][:] / res['n_alive_by_sex'][0,:]
+        self.results['cin3_prevalence'][:] = res['n_total_cin3'][:] / res['n_alive_by_sex'][0,:]
         self.results['cancer_incidence'][:] = res['new_total_cancers'][:]/(res['n_alive_by_sex'][0,:]-res['n_total_cancerous'][:])
 
         return
