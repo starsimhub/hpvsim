@@ -89,7 +89,6 @@ def init_immunity(sim, create=False):
     # If immunity values have been provided, process them
     if sim['immunity'] is None or create:
 
-        sim['imm_kin'] = np.ones((ng, sim.npts))
         sim['immunity_map'] = dict()
         # Firstly, initialize immunity matrix with defaults. These are then overwitten with genotype-specific values below
         # Susceptibility matrix is of size sim['n_genotypes']*sim['n_genotypes']
@@ -99,9 +98,10 @@ def init_immunity(sim, create=False):
         default_cross_immunity = hppar.get_cross_immunity()
         imm_decay = sc.dcp(sim['imm_decay']['infection'])
         imm_decay['half_life'] /= sim['dt']
+        waning = precompute_waning(t=sim.tvec, pars=imm_decay)
+        sim['imm_kin'] = np.array([waning]*ng)
         for i in range(ng):
             sim['immunity_map'][i] = 'infection'
-            sim['imm_kin'][i, :] = precompute_waning(length=sim.npts, pars=imm_decay)
             label_i = sim['genotype_map'][i]
             for j in range(ng):
                 label_j = sim['genotype_map'][j]
@@ -156,11 +156,11 @@ def update_immunity(people, inds):
     '''
     Step immunity levels forward in time
     '''
-    t_since_boost = people.t - people.t_imm_event[:,inds].astype(hpd.default_int)
-    imm_kin = people.pars['imm_kin'][:,t_since_boost[:,:]][0] # Get people's current level of immunity
+    t_since_boost = people.t - people.t_imm_event[:,inds]
+    imm_kin = people.pars['imm_kin'][:,t_since_boost][0] # Get people's current level of immunity
     people.imm[:,inds] += imm_kin*people.peak_imm[:,inds] # Set immunity relative to peak
     # TODO: can we get rid of the next two lines? They slow things down quite a bit
-    people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
+    # people.imm[:,inds] = np.where(people.imm[:,inds]<0, 0, people.imm[:,inds]) # Make sure immunity doesn't drop below 0
     # people.imm[:,inds] = np.where([people.imm[:,inds] > people.peak_imm[:,inds]], people.peak_imm[:,inds], people.imm[:,inds]) # Make sure immunity doesn't exceed peak_imm
 
     return
@@ -196,7 +196,7 @@ def check_immunity(people):
 
 #%% Methods for computing waning
 
-def precompute_waning(length, pars=None):
+def precompute_waning(t, pars=None):
     '''
     Process functional form and parameters into values:
 
@@ -222,10 +222,10 @@ def precompute_waning(length, pars=None):
     # Process inputs
     if form is None or form == 'exp_decay':
         if pars['half_life'] is None: pars['half_life'] = np.nan
-        output = exp_decay(length, **pars)
+        output = exp_decay(t, **pars)
 
     elif callable(form):
-        output = form(length, **pars)
+        output = form(t, **pars)
 
     else:
         errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
@@ -234,22 +234,13 @@ def precompute_waning(length, pars=None):
     return output
 
 
-
-def exp_decay(length, init_val, half_life, delay=None):
+def exp_decay(t, init_val, half_life):
     '''
     Returns an array of length t with values for the immunity at each time step after recovery
     '''
-    length = length+1
     decay_rate = np.log(2) / half_life if ~np.isnan(half_life) else 0.
-    if delay is not None:
-        t = np.arange(length-delay, dtype=hpd.default_int)
-        growth = linear_growth(delay, init_val/delay)
-        decay = init_val * np.exp(-decay_rate * t)
-        result = np.concatenate([growth, decay], axis=None)
-    else:
-        t = np.arange(length, dtype=hpd.default_int)
-        result = init_val * np.exp(-decay_rate * t)
-    return np.diff(result)
+    result = init_val * np.exp(-decay_rate * t, dtype=hpd.default_float)
+    return result
 
 
 def linear_decay(length, init_val, slope):
