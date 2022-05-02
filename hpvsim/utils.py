@@ -116,6 +116,17 @@ def compute_infections(betas,       sources,    targets,    genotypes):
 
     return slist, tlist, glist
 
+@nb.njit(          (nbfloat[:,:],   nbint,  nbint[:,:],  nbint[:],  nbfloat[:], nbfloat[:,:]), cache=cache)
+def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    peak_imm):
+    '''
+    Step immunity levels forward in time
+    '''
+    ss              = t_imm_event[:, inds].shape
+    t_since_boost   = (t - t_imm_event[:,inds]).ravel()
+    current_imm     = imm_kin[t_since_boost].reshape(ss) # Get people's current level of immunity
+    imm[:,inds]     += current_imm*peak_imm[:,inds] # Set immunity relative to peak
+    return imm
+
 
 @nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
 def find_contacts(p1, p2, inds): # pragma: no cover
