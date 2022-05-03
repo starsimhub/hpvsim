@@ -13,6 +13,7 @@ from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
 from . import analysis as hpa
+from . import plotting as hpplt
 from .settings import options as hpo
 from . import immunity as hpimm
 from . import interventions as cvi
@@ -180,49 +181,50 @@ class Sim(hpb.BaseSim):
         dcols = hpd.get_default_colors(ng) # Get default colors
 
         # Aggregate flows and cumulative flows
-        for key,label in hpd.aggregate_result_flows.items():
-            self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key])  # Cumulative variables -- e.g. "Cumulative infections"
-
-        for key,label in hpd.aggregate_result_flows.items(): # Repeat to keep all the cumulative keys together
-            self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
-
-        for key,label in hpd.aggregate_result_flows_by_sex.items():
+        for key,label in hpd.result_flows.items():
+            self.results[f'cum_total_{key}'] = init_res(f'Cumulative {label}', color=dcols[f'total_{key}'])  # Cumulative variables -- e.g. "Cumulative infections"
+        for key,label in hpd.result_flows.items(): # Repeat to keep all the cumulative keys together
+            self.results[f'new_total_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
+        for key,label in hpd.results_by_sex.items():
             self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', n_genotypes=2)  # Cumulative variables -- e.g. "Cumulative infections"
-
-        for key,label in hpd.aggregate_result_flows_by_sex.items(): # Repeat to keep all the cumulative keys together
+        for key,label in hpd.results_by_sex.items(): # Retotal_keyspeat to keep all the cumulative keys together
             self.results[f'new_{key}'] = init_res(f'Number of new {label}', n_genotypes=2) # Flow variables -- e.g. "Number of new infections"
+        for key,label in hpd.result_stocks.items():
+            if key in dcols.keys(): color = dcols[key]
+            else:                   color = dcols['default']
+            self.results[f'n_total_{key}'] = init_res(label, color=color)
 
-
-        # Aggregate stock variables
-        for key,label in hpd.aggregate_result_stocks.items():
-            self.results[f'n_{key}'] = init_res(label, color=dcols[key])
-
-        # Results in aggregate
-        self.results['hpv_prevalence'] = init_res('HPV prevalence', scale=False)
-        self.results['cin1_prevalence'] = init_res('CIN1 prevalence', scale=False)
-        self.results['cin2_prevalence'] = init_res('CIN2 prevalence', scale=False)
-        self.results['cin3_prevalence'] = init_res('CIN3 prevalence', scale=False)
-        self.results['cancer_incidence'] = init_res('Cancer incidence', scale=False)
+        # More aggregate results
+        for key,label in hpd.agg_inci_prev_results.items():
+            self.results[key] = init_res(label, scale=False)
+        self.results['n_total_cin'] = init_res('Total number with CINs')
 
         # Results by genotype
-        self.results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['hpv_incidence_by_genotype'] = init_res('HPV incidence by genotype', scale=False, n_genotypes=ng)
-        self.results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['r_eff'] = init_res('Effective reproduction number', scale=False, n_genotypes=ng)
-        self.results['doubling_time'] = init_res('Doubling time', scale=False, n_genotypes=ng)
         for key,label in hpd.result_flows.items():
             self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key], n_genotypes=ng)  # Cumulative variables -- e.g. "Cumulative infections"
         for key,label in hpd.result_flows.items(): # Repeat to keep all the cumulative keys together
             self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key], n_genotypes=ng) # Flow variables -- e.g. "Number of new infections"
         for key,label in hpd.result_stocks.items():
-            self.results[f'n_{key}'] = init_res(label, color=dcols[key], n_genotypes=ng)
+            if key in dcols.keys(): color = dcols[key]
+            else:                   color = dcols['default']
+            self.results[f'n_{key}'] = init_res(label, color=color, n_genotypes=ng)
+        for key,label in hpd.inci_prev_results.items():
+            self.results[key] = init_res(label, n_genotypes=ng)
+
+        self.results['r_eff'] = init_res('Effective reproduction number', scale=False, n_genotypes=ng)
+        self.results['doubling_time'] = init_res('Doubling time', scale=False, n_genotypes=ng)
 
         # Populate the rest of the results
         # Other variables
+        for key,label in hpd.demographic_flows.items():
+            self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key])  # Cumulative variables -- e.g. "Cumulative infections"
+        for key,label in hpd.demographic_flows.items(): # Repeat to keep all the cumulative keys together
+            self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
+
+
         self.results['n_alive'] = init_res('Number alive', scale=True)
         self.results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_genotypes=2)
+        self.results['n_susceptible_by_sex'] = init_res('Number susceptible by sex', scale=True, n_genotypes=2)
         self.results['year'] = self.yearvec
         self.results['t']    = self.tvec
         self.results['pop_size_by_sex'] = np.zeros(2, dtype=hpd.result_float)
@@ -421,18 +423,22 @@ class Sim(hpb.BaseSim):
 
         # Update counts for this time step: stocks
         for key in hpd.result_stocks.keys():
-            for genotype in range(ng):
-                self.results[f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
-            aggregate_version = f'total_{key}'
-            if aggregate_version in hpd.aggregate_result_stocks.keys():
-                self.results[f'n_{aggregate_version}'][t] = self.results[f'n_{key}'][:, t].sum()
+            if key not in ['cin']: # This is a special case
+                for genotype in range(ng):
+                    self.results[f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
+                if key != 'susceptible':
+                    self.results[f'n_total_{key}'][t] = self.results[f'n_{key}'][:, t].sum()
+        # Do total CINs separately
+        for genotype in range(ng):
+            self.results[f'n_cin'][genotype, t] = self.results[f'n_cin1'][genotype, t] + self.results[f'n_cin2'][genotype, t] + self.results[f'n_cin3'][genotype, t]
+        self.results[f'n_total_cin'][t] = self.results[f'n_total_cin1'][t] + self.results[f'n_total_cin2'][t] + self.results[f'n_total_cin3'][t]
 
         # Update counts for this time step: flows
         for key,count in people.aggregate_flows.items():
             self.results[key][t] += count
         for key,count in people.flows.items():
-            for genotype in range(ng):
-                self.results[key][genotype][t] += count[genotype]
+                for genotype in range(ng):
+                    self.results[key][genotype][t] += count[genotype]
 
         for key,count in people.aggregate_flows_by_sex.items():
             for sex in range(2):
@@ -526,11 +532,10 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Calculate cumulative results
-        for key in hpd.aggregate_result_flows.keys():
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=0)
         for key in hpd.result_flows.keys():
+            self.results[f'cum_total_{key}'][:] += np.cumsum(self.results[f'new_total_{key}'][:], axis=0)
             self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
-        for key in hpd.aggregate_result_flows_by_sex.keys():
+        for key in hpd.results_by_sex.keys():
             self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
 
         # Finalize analyzers and interventions
@@ -566,20 +571,43 @@ class Sim(hpb.BaseSim):
         Compute prevalence, incidence, and other states.
         '''
         res = self.results
-        self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
-        self.results['n_alive_by_sex'][0,:]  = res['pop_size_by_sex'][0] + res['cum_births_by_sex'][0,:] - res['cum_other_deaths_by_sex'][0,:]
-        self.results['n_alive_by_sex'][0,:]  = res['pop_size_by_sex'][1] + res['cum_births_by_sex'][1,:] - res['cum_other_deaths_by_sex'][1,:]
-        self.results['hpv_incidence_by_genotype'][:] = np.einsum('ji,ji->ji', res['new_infections'][:],1 / res['n_susceptible'][:])  # Calculate the incidence
-        self.results['hpv_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_infectious'][:], 1 / res['n_alive'][:])
-        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin1'][:], 1 / res['n_alive_by_sex'][0,:])
-        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin2'][:], 1 / res['n_alive_by_sex'][0,:])
-        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin3'][:], 1 / res['n_alive_by_sex'][0,:])
+        self.results['n_alive'][:]              = self['pop_size'] - res['cum_other_deaths'][:] # Number of people still alive. NB, we substract deaths but do not add births, as these are already included in pop_size
+        self.results['n_alive_by_sex'][0,:]     = res['pop_size_by_sex'][0] - res['cum_other_deaths_by_sex'][0,:]
+        self.results['n_alive_by_sex'][1,:]     = res['pop_size_by_sex'][1] - res['cum_other_deaths_by_sex'][1,:]
 
-        self.results['hpv_prevalence'][:] = res['n_total_infectious'][:]/ res['n_alive'][:]
-        self.results['cin1_prevalence'][:] = res['n_total_cin1'][:]/ res['n_alive_by_sex'][0,:]
-        self.results['cin2_prevalence'][:] = res['n_total_cin2'][:] / res['n_alive_by_sex'][0,:]
-        self.results['cin3_prevalence'][:] = res['n_total_cin3'][:] / res['n_alive_by_sex'][0,:]
-        self.results['cancer_incidence'][:] = res['new_total_cancers'][:]/(res['n_alive_by_sex'][0,:]-res['n_total_cancerous'][:])
+        # Compute HPV incidence and prevalence
+        self.results['total_hpv_incidence'][:]  = res['new_total_infections'][:]/ res['n_susceptible'][:].sum(axis=0)
+        self.results['hpv_incidence'][:]        = res['new_infections'][:]/ res['n_susceptible'][:]
+        self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
+        self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
+
+        # Compute CIN and cancer prevalence
+        alive_females   = res['n_alive_by_sex'][0,:]
+        scale_factor    = 1e5 # Cancer and CIN incidence and prevalence are displayed as rates per 100k women
+        demoninator     = alive_females*scale_factor
+        self.results['total_cin1_prevalence'][:]    = res['n_total_cin1'][:] / demoninator
+        self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / demoninator
+        self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / demoninator
+        self.results['total_cin_prevalence'][:]     = res['n_total_cin'][:] / demoninator
+        self.results['total_cancer_prevalence'][:]  = res['n_total_cancerous'][:] / demoninator # Rates per 100,000 women
+        self.results['cin1_prevalence'][:]          = res['n_cin1'][:] / demoninator
+        self.results['cin2_prevalence'][:]          = res['n_cin2'][:] / demoninator
+        self.results['cin3_prevalence'][:]          = res['n_cin3'][:] / demoninator
+        self.results['cin_prevalence'][:]           = res['n_cin'][:] / demoninator
+        self.results['cancer_prevalence'][:]        = res['n_cancerous'][:] / demoninator # Rates per 100,000 women
+
+        # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
+        # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
+        self.results['total_cin1_incidence'][:]    = res['new_total_cin1'][:] / demoninator
+        self.results['total_cin2_incidence'][:]    = res['new_total_cin2'][:] / demoninator
+        self.results['total_cin3_incidence'][:]    = res['new_total_cin3'][:] / demoninator
+        self.results['total_cin_incidence'][:]     = res['new_total_cins'][:] / demoninator
+        self.results['total_cancer_incidence'][:]  = res['new_total_cancers'][:] / demoninator # Rates per 100,000 women
+        self.results['cin1_incidence'][:]          = res['new_cin1'][:] / demoninator
+        self.results['cin2_incidence'][:]          = res['new_cin2'][:] / demoninator
+        self.results['cin3_incidence'][:]          = res['new_cin3'][:] / demoninator
+        self.results['cin_incidence'][:]           = res['new_cins'][:] / demoninator
+        self.results['cancer_incidence'][:]        = res['new_cancers'][:] / demoninator # Rates per 100,000 women
 
         return
 
@@ -622,6 +650,7 @@ class Sim(hpb.BaseSim):
         '''
         Print a medium-length summary of the simulation, drawing from the last time
         point in the simulation by default. Called by default at the end of a sim run.
+        point in the simulation by default. Called by default at the end of a sim run.
         See also sim.disp() (detailed output) and sim.brief() (short output).
 
         Args:
@@ -656,10 +685,10 @@ class Sim(hpb.BaseSim):
             return string
 
 
-    def plot(self, toplot=None):
+    def plot(self, *args, **kwargs):
         ''' Plot the outputs of the model '''
-        pass
-
+        fig = hpplt.plot_sim(sim=self, *args, **kwargs)
+        return fig
 
 
 class AlreadyRunError(RuntimeError):

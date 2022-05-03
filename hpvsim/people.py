@@ -163,16 +163,14 @@ class People(hpb.BasePeople):
         self.increment_age()  # Let people age by one time step
         self.aggregate_flows['new_other_deaths'], self.aggregate_flows_by_sex['new_other_deaths_by_sex'][0], self.aggregate_flows_by_sex['new_other_deaths_by_sex'][1] = self.apply_death_rates() # Apply death rates
         self.aggregate_flows['new_births'], new_people = self.add_births() # Add births
-        self.aggregate_flows_by_sex['new_births_by_sex'][0] = len(hpu.true(new_people.is_female))
-        self.aggregate_flows_by_sex['new_births_by_sex'][1] = len(hpu.true(new_people.is_male))
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
         for genotype in range(ng):
-            self.flows['new_cin1s'][genotype] += self.check_cin1(genotype)
-            self.flows['new_cin2s'][genotype] += self.check_cin2(genotype)
-            self.flows['new_cin3s'][genotype] += self.check_cin3(genotype)
-            self.flows['new_cins'] += self.flows['new_cin1s'][genotype]+self.flows['new_cin2s'][genotype]+self.flows['new_cin3s'][genotype]
+            self.flows['new_cin1'][genotype] += self.check_cin1(genotype)
+            self.flows['new_cin2'][genotype] += self.check_cin2(genotype)
+            self.flows['new_cin3'][genotype] += self.check_cin3(genotype)
+            self.flows['new_cins'] += self.flows['new_cin1'][genotype]+self.flows['new_cin2'][genotype]+self.flows['new_cin3'][genotype]
             if self.t * self.dt % 1 == 0:   # only check cancers every year
                 self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
                 self.aggregate_flows['new_total_cancers'] += self.flows['new_cancers'][genotype]

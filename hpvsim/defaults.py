@@ -107,60 +107,67 @@ class PeopleMeta(sc.prettyobj):
 #%% Define other defaults
 
 # A subset of the above states are used for results
-aggregate_result_stocks = {
-    'total_infectious': 'Total number infectious',
-    'total_cin1' : 'Total number with cin1',
-    'total_cin2' : 'Total number with cin2',
-    'total_cin3' : 'Total number with cin3',
-    'total_cancerous'    : 'Total number with cervical cancer',
-    'other_dead':  'Number dead from other causes',
-}
 
 result_stocks = {
-    'susceptible': 'Number susceptible',
-    'infectious': 'Number infectious',
-    'cin1' : 'Number with cin1',
-    'cin2' : 'Number with cin2',
-    'cin3' : 'Number with cin3',
-    'cancerous'    : 'Number with cervical cancer'
+    'susceptible'   : 'Number susceptible',
+    'infectious'    : 'Number infectious',
+    'cin1'          : 'Number with CIN1',
+    'cin2'          : 'Number with CIN2',
+    'cin3'          : 'Number with CIN3',
+    'cin'           : 'Number with CINs',
+    'cancerous'     : 'Number with cervical cancer',
+    # 'dead'          : 'Number dead from cervical cancer',
 }
 
 # The types of result that are counted as flows -- used in sim.py; value is the label suffix
 result_flows = {
     'infections':  'infections',
-    'cin1s' :  'cin1s',
-    'cin2s' :  'cin2s',
-    'cin3s' :  'cin3s',
-    'cins'  :  'cins',
-    'cancers'    :  'cervical cancers',
+    'cin1'      :  'CIN1s',
+    'cin2'      :  'CIN2s',
+    'cin3'      :  'CIn3s',
+    'cins'      :  'CINs',
+    'cancers'   :  'cervical cancers',
     'cancer_deaths': 'cancer deaths',
 }
 
-aggregate_result_flows = {
-    'total_infections': 'total infections',
-    'total_cins': 'total cins',
-    'total_cancers': 'total cancers',
-    'total_cancer_deaths': 'total cancer deaths',
+# aggregate_result_flows = {
+#     'total_infections'  : 'total infections',
+#     'total_cins'        : 'total cins',
+#     'total_cancers'     : 'total cancers',
+#     'total_cancer_deaths': 'total cancer deaths',
+# }
+
+# These are separated out so that they don't get mixed in with the logic of determining which things are by genotype
+demographic_flows = {
     'other_deaths': 'deaths from other causes',
-    'births':       'births'
+    'births': 'births'
 }
 
-aggregate_result_flows_by_sex = {
-    'total_infections_by_sex': 'total infections by sex',
+# Some results are needed by sex
+results_by_sex = {
+    'total_infections_by_sex'   : 'total infections by sex',
+    # 'susceptible_by_sex'        : 'Number susceptible by sex',
     'other_deaths_by_sex': 'deaths from other causes by sex',
-    'births_by_sex':       'births by sex'
+    # 'births_by_sex':       'births by sex'
 }
 
+states = ['hpv', 'cin1', 'cin2', 'cin3', 'cin', 'cancer']
+labels = ['HPV', 'CIN1', 'CIN2', 'CIN3', 'CIN', 'Cancer']
+inci_prev_results = {s+'_'+which:l+' '+which for (s,l) in zip(states,labels) for which in ['incidence', 'prevalence']}
+agg_inci_prev_results = {'total_'+s+'_'+which:'Total '+l+' '+which for (s,l) in zip(states,labels) for which in ['incidence', 'prevalence']}
 
 # Define new and cumulative flows
 new_result_flows = [f'new_{key}' for key in result_flows.keys()]
 cum_result_flows = [f'cum_{key}' for key in result_flows.keys()]
 
-new_agg_result_flows = [f'new_{key}' for key in aggregate_result_flows.keys()]
-cum_agg_result_flows = [f'cum_{key}' for key in aggregate_result_flows.keys()]
+new_demographic_flows = [f'new_{key}' for key in demographic_flows.keys()]
+cum_demographic_flows = [f'cum_{key}' for key in demographic_flows.keys()]
 
-new_agg_result_flows_by_sex = [f'new_{key}' for key in aggregate_result_flows_by_sex.keys()]
-cum_agg_result_flows_by_sex = [f'cum_{key}' for key in aggregate_result_flows_by_sex.keys()]
+new_agg_result_flows = [f'new_total_{key}' for key in result_flows.keys()]
+cum_agg_result_flows = [f'cum_total_{key}' for key in result_flows.keys()]
+
+new_agg_result_flows_by_sex = [f'new_{key}' for key in results_by_sex.keys()]
+cum_agg_result_flows_by_sex = [f'cum_{key}' for key in results_by_sex.keys()]
 
 # Parameters that can vary by genotype (WIP)
 genotype_pars = [
@@ -278,7 +285,9 @@ def get_default_colors(n_genotypes=None):
 
     # Overall flows
     c.total_infections      = pl.cm.GnBu(1)
+    c.total_hpv_incidence   = pl.cm.GnBu(1)
     c.total_cins            = pl.cm.Oranges(1)
+    c.total_cin_incidence   = pl.cm.Oranges(1)
     c.total_cancers         = pl.cm.Reds(1)
     c.total_cancer_deaths   = pl.cm.Purples(1)
     c.other_deaths          = '#000000'
@@ -316,9 +325,9 @@ def get_default_colors(n_genotypes=None):
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
-    'cum_infections',
-    'new_infections',
-    'n_infectious',
+    'cum_total_infections',
+    'cum_total_cins',
+    'cum_total_cancers',
 ]
 
 
@@ -353,9 +362,17 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         if is_sim:
             plots = sc.odict({
-                'Total counts': [
-                    'cum_infections',
-                    'n_infectious',
+                'HPV incidence': [
+                    'total_hpv_incidence',
+                    'hpv_incidence',
+                ],
+                'CINs': [
+                    'total_cin_incidence',
+                    'cin_incidence',
+                    ],
+                'Cancers': [
+                    'total_cancer_incidence',
+                    'cancer_incidence',
                 ],
             })
 

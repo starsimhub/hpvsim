@@ -126,9 +126,9 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
         raise RuntimeError(errormsg)
 
     # If it matches a result key, convert to a list
-    reskeys = sim.result_keys('main')
-    varkeys = sim.result_keys('genotype')
-    allkeys = reskeys + varkeys
+    reskeys = sim.result_keys('total')
+    genkeys = sim.result_keys('genotype')
+    allkeys = reskeys + genkeys
     if to_plot in allkeys:
         to_plot = sc.tolist(to_plot)
 
@@ -368,60 +368,59 @@ def set_line_options(input_args, reskey, resnum, default):
 
 #%% Core plotting functions
 
-# def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
-#          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
-#          show_args=None, style_args=None, n_cols=None, grid=True, commaticks=True,
-#          setylim=True, log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False,
-#          fig=None, ax=None, **kwargs):
-#     ''' Plot the results of a single simulation -- see Sim.plot() for documentation '''
+def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
+         scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
+         show_args=None, style_args=None, n_cols=None, grid=True, commaticks=True,
+         setylim=True, log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False,
+         fig=None, ax=None, **kwargs):
+    ''' Plot the results of a single simulation -- see Sim.plot() for documentation '''
 
-#     # Handle inputs
-#     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
-#                        legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
-#     to_plot, n_cols, n_rows = handle_to_plot('sim', to_plot, n_cols, sim=sim)
+    # Handle inputs
+    args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
+                       legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
+    to_plot, n_cols, n_rows = handle_to_plot('sim', to_plot, n_cols, sim=sim)
 
-#     # Do the plotting
-#     with hpo.with_style(args.style):
-#         fig, figs = create_figs(args, sep_figs, fig, ax)
-#         genotype_keys = sim.result_keys('genotype')
-#         for pnum,title,keylabels in to_plot.enumitems():
-#             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
-#             for resnum,reskey in enumerate(keylabels):
-#                 res_t = sim.results['date']
-#                 if reskey in genotype_keys:
-#                     res = sim.results['genotype'][reskey]
-#                     ns = sim['n_genotypes']
-#                     genotype_colors = sc.gridcolors(ns)
-#                     for genotype in range(ns):
-#                         # Colors and labels
-#                         v_color = genotype_colors[genotype]
-#                         v_label = 'wild type' if genotype == 0 else sim['genotypes'][genotype-1].label
-#                         color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
-#                         label = set_line_options(labels, reskey, resnum, '')  # Choose the label
-#                         if label: label += f' - {v_label}'
-#                         else:     label = v_label
-#                         # Plotting
-#                         if res.low is not None and res.high is not None:
-#                             ax.fill_between(res_t, res.low[genotype,:], res.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
-#                         ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Actually plot the sim!
-#                 else:
-#                     res = sim.results[reskey]
-#                     color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
-#                     label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
-#                     if res.low is not None and res.high is not None:
-#                         ax.fill_between(res_t, res.low, res.high, color=color, **args.fill)  # Create the uncertainty bound
-#                     ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Actually plot the sim!
-#                 if args.show['data']:
-#                     plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
-#                 if args.show['ticks']:
-#                     reset_ticks(ax, sim, args.date, n_cols=n_cols) # Optionally reset tick marks (useful for e.g. plotting weeks/months)
-#             if args.show['interventions']:
-#                 plot_interventions(sim, ax) # Plot the interventions
-#             title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
+    # Do the plotting
+    with hpo.with_style(args.style):
+        fig, figs = create_figs(args, sep_figs, fig, ax)
+        total_keys = [k for k in sim.result_keys() if 'total' in k]
+        for pnum,title,keylabels in to_plot.enumitems():
+            ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
+            for resnum,reskey in enumerate(keylabels):
+                res_t = sim.results['year']
+                res = sim.results[reskey]
+                if reskey in total_keys:
+                    color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
+                    label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
+                    try: ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Plot result
+                    except:
+                        import traceback;
+                        traceback.print_exc();
+                        import pdb;
+                        pdb.set_trace()
+                else:
+                    ng = sim['n_genotypes']
+                    genotype_colors = sc.gridcolors(ng)
+                    for genotype in range(ng):
+                        # Colors and labels
+                        v_color = genotype_colors[genotype]
+                        v_label = sim['genotypes'][genotype].label
+                        color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
+                        label = set_line_options(labels, reskey, resnum, '')  # Choose the label
+                        if label: label += f' - {v_label}'
+                        else:     label = v_label
+                        ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result
+            #     if args.show['data']:
+            #         plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
+            #     if args.show['ticks']:
+            #         reset_ticks(ax, sim, args.date, n_cols=n_cols) # Optionally reset tick marks (useful for e.g. plotting weeks/months)
+            # if args.show['interventions']:
+            #     plot_interventions(sim, ax) # Plot the interventions
+            title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
-#         output = tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+        output = tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
 
-#     return output
+    return output
 
 
 # def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,

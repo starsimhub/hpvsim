@@ -427,20 +427,20 @@ class BaseSim(ParsObj):
             return tps
 
 
-    def result_keys(self, which='main'):
+    def result_keys(self, which='total'):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
-        If which is 'main', return only the main results keys. If 'genotype', return
-        only genotype keys. If 'all', return all keys.
+        If which is 'main', return only the main results keys. If 'variant', return
+        only variant keys. If 'all', return all keys.
 
         '''
         keys = []
-        choices = ['main', 'genotype', 'all']
-        if which in ['main', 'all']:
-            keys += [key for key,res in self.results.items() if isinstance(res, Result)]
-        if which in ['genotype', 'all'] and 'genotype' in self.results:
-            keys += [key for key,res in self.results['genotype'].items() if isinstance(res, Result)]
+        choices = ['total', 'genotype', 'all']
+        if which in ['total', 'all']:
+            keys += [k for k,res in self.results.items() if 'total' in k and isinstance(res, Result)]
+        if which in ['genotype', 'all']:
+            keys += [k for k,res in self.results.items() if 'total' not in k and isinstance(res, Result)]
         if which not in choices: # pragma: no cover
             errormsg = f'Choice "which" not available; choices are: {sc.strjoin(choices)}'
             raise ValueError(errormsg)
