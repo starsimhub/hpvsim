@@ -130,13 +130,6 @@ result_flows = {
     'cancer_deaths': 'cancer deaths',
 }
 
-# aggregate_result_flows = {
-#     'total_infections'  : 'total infections',
-#     'total_cins'        : 'total cins',
-#     'total_cancers'     : 'total cancers',
-#     'total_cancer_deaths': 'total cancer deaths',
-# }
-
 # These are separated out so that they don't get mixed in with the logic of determining which things are by genotype
 demographic_flows = {
     'other_deaths': 'deaths from other causes',
@@ -146,9 +139,7 @@ demographic_flows = {
 # Some results are needed by sex
 results_by_sex = {
     'total_infections_by_sex'   : 'total infections by sex',
-    # 'susceptible_by_sex'        : 'Number susceptible by sex',
     'other_deaths_by_sex': 'deaths from other causes by sex',
-    # 'births_by_sex':       'births by sex'
 }
 
 states = ['hpv', 'cin1', 'cin2', 'cin3', 'cin', 'cancer']
