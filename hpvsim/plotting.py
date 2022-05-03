@@ -143,7 +143,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
         invalid = sc.autolist()
         for reskey in to_plot_list:
             if reskey in allkeys:
-                name = sim.results[reskey].name if reskey in reskeys else sim.results['genotype'][reskey].name
+                name = sim.results[reskey].name
                 to_plot[name] = [reskey] # Use the result name as the key and the reskey as the value
             else:
                 invalid += reskey
