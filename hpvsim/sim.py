@@ -162,7 +162,7 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_results(self, frequency='dt'):
+    def init_results(self, frequency='annual'):
         '''
         Create the main results structure.
         We differentiate between flows, stocks, and cumulative results
@@ -210,7 +210,7 @@ class Sim(hpb.BaseSim):
         for key,label in hpd.result_flows.items():
             self.results[f'cum_total_{key}'] = init_res(f'Cumulative {label}', color=dcols[f'total_{key}'])  # Cumulative variables -- e.g. "Cumulative infections"
         for key,label in hpd.result_flows.items(): # Repeat to keep all the cumulative keys together
-            self.results[f'new_total_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
+            self.results[f'new_total_{key}'] = init_res(f'Number of new {label}', color=dcols[f'total_{key}']) # Flow variables -- e.g. "Number of new infections"
         for key,label in hpd.results_by_sex.items():
             self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', n_genotypes=2)  # Cumulative variables -- e.g. "Cumulative infections"
         for key,label in hpd.results_by_sex.items(): # Retotal_keyspeat to keep all the cumulative keys together
@@ -569,9 +569,9 @@ class Sim(hpb.BaseSim):
         # Calculate cumulative results
         for key in hpd.result_flows.keys():
             self.results[f'cum_total_{key}'][:] += np.cumsum(self.results[f'new_total_{key}'][:], axis=0)
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
         for key in hpd.results_by_sex.keys():
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()

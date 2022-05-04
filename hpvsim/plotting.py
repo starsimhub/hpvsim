@@ -392,21 +392,16 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                 if reskey in total_keys:
                     color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
                     label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
-                    try: ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Plot result
-                    except:
-                        import traceback;
-                        traceback.print_exc();
-                        import pdb;
-                        pdb.set_trace()
+                    ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Plot result
                 else:
                     ng = sim['n_genotypes']
                     genotype_colors = sc.gridcolors(ng)
                     for genotype in range(ng):
                         # Colors and labels
                         v_color = genotype_colors[genotype]
-                        v_label = sim['genotypes'][genotype].label
+                        v_label = sim['genotypes'][genotype].label.lower().replace('hpv','')
                         color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
-                        label = set_line_options(labels, reskey, resnum, '')  # Choose the label
+                        label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label: label += f' - {v_label}'
                         else:     label = v_label
                         ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result

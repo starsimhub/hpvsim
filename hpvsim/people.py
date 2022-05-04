@@ -181,14 +181,17 @@ class People(hpb.BasePeople):
             self.flows['new_cin2'][g]           += self.check_cin2(g)
             self.flows['new_cin3'][g]           += self.check_cin3(g)
             if t%self.resfreq==0:
-                self.flows['new_cins']          += self.flows['new_cin1'][g]+self.flows['new_cin2'][g]+self.flows['new_cin3'][g]
+                self.flows['new_cins'][g]       += self.flows['new_cin1'][g]+self.flows['new_cin2'][g]+self.flows['new_cin3'][g]
                 self.flows['new_cancers'][g]    += self.check_cancer(g)
             self.check_hpv_clearance(g)
             self.check_cin_clearance(g)
 
         # Create aggregate flows
-        self.aggregate_flows['new_total_cancers']   += self.flows['new_cancers'].sum()
+        self.aggregate_flows['new_total_cin1']      += self.flows['new_cin1'].sum()
+        self.aggregate_flows['new_total_cin2']      += self.flows['new_cin2'].sum()
+        self.aggregate_flows['new_total_cin3']      += self.flows['new_cin3'].sum()
         self.aggregate_flows['new_total_cins']      += self.flows['new_cins'].sum()
+        self.aggregate_flows['new_total_cancers']   += self.flows['new_cancers'].sum()
 
         return new_people
 
