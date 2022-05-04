@@ -162,7 +162,7 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_results(self, frequency='dt'):
+    def init_results(self, frequency='annual'):
         '''
         Create the main results structure.
         We differentiate between flows, stocks, and cumulative results
@@ -452,12 +452,6 @@ class Sim(hpb.BaseSim):
         # Index for results
         idx = int(t / self.resfreq)
 
-        # Update counts for this time step: stocks
-        for key in hpd.result_stocks.keys():
-            if key not in ['cin']:  # This is a special case
-                for genotype in range(ng):
-                    self.results[f'n_{key}'][genotype, idx] += people.count_by_genotype(key, genotype)
-
         # Update counts for this time step: flows
         for key,count in people.aggregate_flows.items():
             self.results[key][idx] += count
@@ -470,10 +464,19 @@ class Sim(hpb.BaseSim):
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
 
+        # # Update counts for this time step: stocks
+        # for key in hpd.result_stocks.keys():
+        #     if key not in ['cin']:  # This is a special case
+        #         for genotype in range(ng):
+        #             self.results[f'n_{key}'][genotype, idx] = people.count_by_genotype(key, genotype)
+
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
             # Create total stocks
             for key in hpd.result_stocks.keys():
+                if key not in ['cin']:  # This is a special case
+                    for genotype in range(ng):
+                        self.results[f'n_{key}'][genotype, idx] = people.count_by_genotype(key, genotype)
                 if key not in ['cin', 'susceptible']:  # This is a special case
                     self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
             # Do total CINs separately
