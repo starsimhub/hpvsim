@@ -275,7 +275,7 @@ def get_default_colors(n_genotypes=None):
     c.default               = '#000000'
 
     # Overall flows
-    c.total_infections      = pl.cm.GnBu(1)
+    c.total_infections      = c.default #pl.cm.GnBu(1)
     c.total_hpv_incidence   = pl.cm.GnBu(1)
     c.total_cins            = pl.cm.Oranges(1)
     c.total_cin_incidence   = pl.cm.Oranges(1)
@@ -353,18 +353,19 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         if is_sim:
             plots = sc.odict({
-                'HPV incidence': [
-                    'total_hpv_incidence',
-                    'hpv_incidence',
+                'HPV prevalence': [
+                    'total_hpv_prevalence',
+                    'hpv_prevalence',
                 ],
-                'CINs': [
+                'HPV infections': [
+                    'new_total_infections',
+                    'new_infections',
+                ],
+                'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
                     'cin_incidence',
-                    ],
-                'Cancers': [
                     'total_cancer_incidence',
-                    'cancer_incidence',
-                ],
+                    ],
             })
 
         else: # pragma: no cover

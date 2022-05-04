@@ -92,7 +92,7 @@ class Sim(hpb.BaseSim):
 
         # Handle end and n_years
         if self['end']:
-            self['n_years'] = self['end'] - self['start']
+            self['n_years'] = int(self['end'] - self['start'])
             if self['n_years'] <= 0:
                 errormsg = f"Number of years must be >0, but you supplied start={str(self['start'])} and end={str(self['end'])}, which gives n_years={self['n_years']}"
                 raise ValueError(errormsg)
@@ -162,7 +162,7 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_results(self):
+    def init_results(self, frequency='dt'):
         '''
         Create the main results structure.
         We differentiate between flows, stocks, and cumulative results
@@ -170,11 +170,37 @@ class Sim(hpb.BaseSim):
         The prefix "n" is used for stock variables, i.e. counting the total number in any given state (sus/inf/rec/etc) on any particular timestep
         The prefix "cum" is used for cumulative variables, i.e. counting the total number that have ever been in a given state at some point in the sim
         Note that, by definition, n_dead is the same as cum_deaths and n_recovered is the same as cum_recoveries, so we only define the cumulative versions
+        Arguments:
+            frequency (str or float): the frequency with which to save results: accepts 'annual', 'dt', or a float which is interpreted as a fraction of a year, e.g. 0.2 will save results every 0.2 years
         '''
 
+        # Handle frequency
+        if type(frequency)==str:
+            if frequency == 'annual':
+                resfreq = int(1/self['dt'])
+            elif frequency == 'dt':
+                resfreq = 1
+            else:
+                errormsg = f'Result frequency not understood: must be "annual", "dt" or a float, but you provided {frequency}.'
+                raise ValueError(errormsg)
+        elif type(frequency)==float:
+            if frequency<self['dt']:
+                errormsg = f'You requested results with frequency {frequency}, but this is smaller than the simulation timestep {self["dt"]}.'
+                raise ValueError(errormsg)
+            else:
+                resfreq = int(frequency/self['dt'])
+        self.resfreq = resfreq
+
+        # Construct the tvec that will be used with the results
+        points_to_use = np.arange(0,self.npts,self.resfreq)
+        res_yearvec = self.yearvec[points_to_use]
+        res_npts    = len(res_yearvec)
+        res_tvec    = np.arange(res_npts)
+
+        # Function to create results
         def init_res(*args, **kwargs):
             ''' Initialize a single result object '''
-            output = hpb.Result(*args, **kwargs, npts=self.npts)
+            output = hpb.Result(*args, **kwargs, npts=res_npts)
             return output
 
         ng = self['n_genotypes']
@@ -184,7 +210,7 @@ class Sim(hpb.BaseSim):
         for key,label in hpd.result_flows.items():
             self.results[f'cum_total_{key}'] = init_res(f'Cumulative {label}', color=dcols[f'total_{key}'])  # Cumulative variables -- e.g. "Cumulative infections"
         for key,label in hpd.result_flows.items(): # Repeat to keep all the cumulative keys together
-            self.results[f'new_total_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
+            self.results[f'new_total_{key}'] = init_res(f'Number of new {label}', color=dcols[f'total_{key}']) # Flow variables -- e.g. "Number of new infections"
         for key,label in hpd.results_by_sex.items():
             self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', n_genotypes=2)  # Cumulative variables -- e.g. "Cumulative infections"
         for key,label in hpd.results_by_sex.items(): # Retotal_keyspeat to keep all the cumulative keys together
@@ -215,20 +241,20 @@ class Sim(hpb.BaseSim):
         self.results['doubling_time'] = init_res('Doubling time', scale=False, n_genotypes=ng)
 
         # Populate the rest of the results
-        # Other variables
+        # Demographics
         for key,label in hpd.demographic_flows.items():
             self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key])  # Cumulative variables -- e.g. "Cumulative infections"
         for key,label in hpd.demographic_flows.items(): # Repeat to keep all the cumulative keys together
             self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
 
-
-        self.results['n_alive'] = init_res('Number alive', scale=True)
-        self.results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_genotypes=2)
-        self.results['n_susceptible_by_sex'] = init_res('Number susceptible by sex', scale=True, n_genotypes=2)
-        self.results['year'] = self.yearvec
-        self.results['t']    = self.tvec
+        # Other variables
+        self.results['n_alive']         = init_res('Number alive', scale=True)
+        self.results['n_alive_by_sex']  = init_res('Number alive by sex', scale=True, n_genotypes=2)
+        self.results['year']            = res_yearvec
+        self.results['t']               = res_tvec
         self.results['pop_size_by_sex'] = np.zeros(2, dtype=hpd.result_float)
-        self.results_ready   = False
+        self.results_ready              = False
+        # self.results['n_susceptible_by_sex'] = init_res('Number susceptible by sex', scale=True, n_genotypes=2)
 
         return
 
@@ -415,34 +441,45 @@ class Sim(hpb.BaseSim):
             f_source_inds, f_genotypes, m_source_inds, m_genotypes = hpu.get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n_people)  # Calculate transmission
             discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
                                 [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
+
             for pship_inds, sources, targets, genotypes in discordant_pairs:
                 betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
                 source_inds, target_inds, genotype_inds = hpu.compute_infections(betas, sources, targets, genotypes)  # Calculate transmission
-            people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
+                people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
+
             ln += 1
+
+        # Index for results
+        idx = int(t / self.resfreq)
 
         # Update counts for this time step: stocks
         for key in hpd.result_stocks.keys():
-            if key not in ['cin']: # This is a special case
+            if key not in ['cin']:  # This is a special case
                 for genotype in range(ng):
-                    self.results[f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
-                if key != 'susceptible':
-                    self.results[f'n_total_{key}'][t] = self.results[f'n_{key}'][:, t].sum()
-        # Do total CINs separately
-        for genotype in range(ng):
-            self.results[f'n_cin'][genotype, t] = self.results[f'n_cin1'][genotype, t] + self.results[f'n_cin2'][genotype, t] + self.results[f'n_cin3'][genotype, t]
-        self.results[f'n_total_cin'][t] = self.results[f'n_total_cin1'][t] + self.results[f'n_total_cin2'][t] + self.results[f'n_total_cin3'][t]
+                    self.results[f'n_{key}'][genotype, idx] += people.count_by_genotype(key, genotype)
 
         # Update counts for this time step: flows
         for key,count in people.aggregate_flows.items():
-            self.results[key][t] += count
+            self.results[key][idx] += count
+        for key,count in people.demographic_flows.items():
+            self.results[key][idx] += count
         for key,count in people.flows.items():
-                for genotype in range(ng):
-                    self.results[key][genotype][t] += count[genotype]
-
+            for genotype in range(ng):
+                self.results[key][genotype][idx] += count[genotype]
         for key,count in people.aggregate_flows_by_sex.items():
             for sex in range(2):
-                self.results[key][sex][t] += count[sex]
+                self.results[key][sex][idx] += count[sex]
+
+        # Make stock updates every nth step, where n is the frequency of result output
+        if t % self.resfreq == 0:
+            # Create total stocks
+            for key in hpd.result_stocks.keys():
+                if key not in ['cin', 'susceptible']:  # This is a special case
+                    self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
+            # Do total CINs separately
+            for genotype in range(ng):
+                self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
+            self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
@@ -520,6 +557,7 @@ class Sim(hpb.BaseSim):
         if self.complete:
             self.finalize(verbose=verbose, restore_pars=restore_pars)
             sc.printv(f'Run finished after {elapsed:0.2f} s.\n', 1, verbose)
+
         return self
 
 
@@ -534,9 +572,9 @@ class Sim(hpb.BaseSim):
         # Calculate cumulative results
         for key in hpd.result_flows.keys():
             self.results[f'cum_total_{key}'][:] += np.cumsum(self.results[f'new_total_{key}'][:], axis=0)
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
         for key in hpd.results_by_sex.keys():
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()

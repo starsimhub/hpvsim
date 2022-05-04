@@ -39,10 +39,11 @@ def test_basic(doplot=False):
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
 
     pars = {
-        'pop_size': 50e3,
+        'pop_size': 100e3,
+        'beta': 0.5,
         'network': 'basic',
-        'genotypes': [hpv16, hpv18],#, hpv6],#, hpv11, hpv31, hpv33],
-        'dt': .2,
+        'genotypes': [hpv16, hpv18, hpv6],#, hpv11, hpv31, hpv33],
+        'dt': .1,
         'end': 2035
     }
     sim = Sim(pars=pars)
@@ -102,5 +103,6 @@ if __name__ == '__main__':
 
     # sim0 = test_random()
     sim1 = test_basic()
+    to_plot = []
     sim1.plot()
     # sim2 = test_interventions()
