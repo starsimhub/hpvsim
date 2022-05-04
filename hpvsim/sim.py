@@ -464,12 +464,6 @@ class Sim(hpb.BaseSim):
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
 
-        # # Update counts for this time step: stocks
-        # for key in hpd.result_stocks.keys():
-        #     if key not in ['cin']:  # This is a special case
-        #         for genotype in range(ng):
-        #             self.results[f'n_{key}'][genotype, idx] = people.count_by_genotype(key, genotype)
-
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
             # Create total stocks
