@@ -46,7 +46,7 @@ def test_basic(doplot=False):
         'dt': .1,
         'end': 2035
     }
-    sim = Sim(pars=pars, analyzers=age_histogram())
+    sim = Sim(pars=pars) #, analyzers=age_histogram())
     sim.run()
 
     if doplot:

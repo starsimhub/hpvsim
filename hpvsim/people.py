@@ -11,7 +11,6 @@ from . import version as hpv
 from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
-from . import results as hpr
 from . import population as hppop
 from . import plotting as hpplt
 from . import immunity as hpi
@@ -130,10 +129,10 @@ class People(hpb.BasePeople):
         ''' Initialize flows to be zero '''
         ng = self.pars['n_genotypes']
         df = hpd.default_float
-        self.flows              = {f'new_{key}'         : np.zeros(ng, dtype=df) for key in hpr.flow_keys}
-        self.total_flows        = {f'new_total_{key}'   : 0 for key in hpr.flow_keys}
-        self.flows_by_sex       = {f'new_{key}'         : np.zeros(2, dtype=df) for key in hpr.by_sex_keys}
-        self.demographic_flows  = {f'new_{key}'         : 0 for key in hpr.dem_keys}
+        self.flows              = {f'new_{key}'         : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
+        self.total_flows        = {f'new_total_{key}'   : 0 for key in hpd.flow_keys}
+        self.flows_by_sex       = {f'new_{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
+        self.demographic_flows  = {f'new_{key}'         : 0 for key in hpd.dem_keys}
         return
 
 

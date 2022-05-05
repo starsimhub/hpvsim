@@ -10,7 +10,6 @@ from . import base as hpb
 from . import misc as hpm
 from . import defaults as hpd
 from . import utils as hpu
-from . import results as hpr
 from . import population as hppop
 from . import parameters as hppar
 from . import analysis as hpa
@@ -164,8 +163,89 @@ class Sim(hpb.BaseSim):
 
 
     def init_results(self, frequency='annual'):
-        ''' Messy function contained in its own file '''
-        self.results = hpr.init_results(self, frequency=frequency)
+        '''
+        Create the main results structure.
+        We differentiate between flows, stocks, and cumulative results
+        The prefix "new" is used for flow variables, i.e. counting new events (infections/deaths) on each timestep
+        The prefix "n" is used for stock variables, i.e. counting the total number in any given state (sus/inf/etc) on any particular timestep
+        The prefix "cum" is used for cumulative variables, i.e. counting the total number that have ever been in a given state at some point in the sim
+
+        Arguments:
+            sim         (hp.Sim)        : a sim
+            frequency   (str or float)  : the frequency with which to save results: accepts 'annual', 'dt', or a float which is interpreted as a fraction of a year, e.g. 0.2 will save results every 0.2 years
+        '''
+
+        # Handle frequency
+        if type(frequency) == str:
+            if frequency == 'annual':
+                resfreq = int(1 / self['dt'])
+            elif frequency == 'dt':
+                resfreq = 1
+            else:
+                errormsg = f'Result frequency not understood: must be "annual", "dt" or a float, but you provided {frequency}.'
+                raise ValueError(errormsg)
+        elif type(frequency) == float:
+            if frequency < self['dt']:
+                errormsg = f'You requested results with frequency {frequency}, but this is smaller than the simulation timestep {self["dt"]}.'
+                raise ValueError(errormsg)
+            else:
+                resfreq = int(frequency / self['dt'])
+        self.resfreq = resfreq
+
+        # Construct the tvec that will be used with the results
+        points_to_use = np.arange(0, self.npts, self.resfreq)
+        res_yearvec = self.yearvec[points_to_use]
+        res_npts = len(res_yearvec)
+        res_tvec = np.arange(res_npts)
+
+        # Function to create results
+        def init_res(*args, **kwargs):
+            ''' Initialize a single result object '''
+            output = hpb.Result(*args, **kwargs, npts=res_npts)
+            return output
+
+        ng = self['n_genotypes']
+        results = dict()
+
+        # Create new and cumulative flows
+        for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
+            for lkey,llab,cstride,g in zip(['_total',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+                for flow,name,cmap in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors):
+                    results[f'{key+lkey}_{flow}'] = init_res(f'{llab+lab.lower()} {name}', color=cmap(cstride), n_genotypes=g)
+
+        # Create stocks
+        for lkey,llabel,cstride,g in zip(['_total',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
+            for stock, name, cmap in zip(hpd.stock_keys, hpd.stock_names, hpd.stock_colors):
+                results[f'n{lkey}_{stock}'] = init_res(f'{llabel} {name}', color=cmap(cstride), n_genotypes=g)
+
+        # Create incidence and prevalence results
+        for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+            for var,name,cmap in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
+                for which in ['incidence', 'prevalence']:
+                    results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_genotypes=g)
+
+        # Create demographic flows
+        for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
+            for var, name, color in zip(hpd.dem_keys, hpd.dem_names, hpd.dem_colors):
+                results[f'{key}_{var}'] = init_res(f'{lab} {name}', color=color)
+
+        # Create results by sex
+        for key, lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
+            for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
+                results[f'{key}_{var}'] = init_res(f'{lab} {name}', color=color, n_genotypes=2)
+
+        # Other results
+        results['r_eff'] = init_res('Effective reproduction number', scale=False, n_genotypes=ng)
+        results['doubling_time'] = init_res('Doubling time', scale=False, n_genotypes=ng)
+        results['n_alive'] = init_res('Number alive', scale=True)
+        results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_genotypes=2)
+        results['pop_size_by_sex'] = np.zeros(2, dtype=hpd.result_float)
+
+        # Time vector
+        results['year'] = res_yearvec
+        results['t'] = res_tvec
+
+        self.results = results
         self.results_ready = False
         return
 
@@ -378,7 +458,7 @@ class Sim(hpb.BaseSim):
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
             # Create total stocks
-            for key in hpr.stock_keys:
+            for key in hpd.stock_keys:
                 if key not in ['cin']:  # This is a special case
                     for genotype in range(ng):
                         self.results[f'n_{key}'][genotype, idx] = people.count_by_genotype(key, genotype)
@@ -478,10 +558,10 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Calculate cumulative results
-        for key in hpr.flow_keys:
+        for key in hpd.flow_keys:
             self.results[f'cum_total_{key}'][:] += np.cumsum(self.results[f'new_total_{key}'][:], axis=0)
             self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
-        for key in hpr.by_sex_keys:
+        for key in hpd.by_sex_keys:
             self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
 
         # Finalize analyzers and interventions

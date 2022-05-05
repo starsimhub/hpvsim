@@ -103,9 +103,38 @@ class PeopleMeta(sc.prettyobj):
         return
 
 
+#%% Default result settings
 
-#%% Define other defaults
+# Flows: we count new and cumulative totals for each
+# All are stored (1) by genotype and (2) as the total across genotypes
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples]
 
+# Stocks: the number in each of the following states
+# All are stored (1) by genotype and (2) as the total across genotypes
+stock_keys   = ['susceptible', 'infectious',    'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
+stock_names  = ['susceptible', 'infectious',    'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
+stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+
+# Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
+# All are stored (1) by genotype and (2) as the total across genotypes
+inci_keys   = ['hpv',      'cin1',         'cin2',         'cin3',         'cin',          'cancer']
+inci_names  = ['HPV',      'CIN1',         'CIN2',         'CIN3',         'CIN',          'cancer']
+inci_colors = [pl.cm.GnBu, pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+
+# Demographics
+dem_keys    = ['births',    'other_deaths']
+dem_names   = ['births',    'other deaths']
+dem_colors  = ['#000000',   '#000000']
+
+# Results by sex
+by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
+by_sex_names   = ['total infections by sex',    'deaths from other causes by sex']
+by_sex_colors  = ['#000000',                    '#000000']
+
+
+#%%
 # Parameters that can vary by genotype (WIP)
 genotype_pars = [
     'rel_beta',
@@ -115,6 +144,8 @@ genotype_pars = [
     'rel_cancer_prob',
     'rel_death_prob'
 ]
+
+#%% Default data (age, death rates, birth dates, initial prevalence)
 
 # Default age data, based on Seattle 2018 census data -- used in population.py
 default_age_data = np.array([
@@ -208,7 +239,7 @@ default_hpv_prevalence = {
     }
 
 
-
+#%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
