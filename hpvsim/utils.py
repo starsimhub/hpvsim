@@ -83,7 +83,7 @@ def get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n
     '''
     f_source_pships, f_genotypes = pair_lookup_vals(f, f_inf_inds[1], f_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
     m_source_pships, m_genotypes = pair_lookup_vals(m, m_inf_inds[1], m_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    f_sus_pships = pair_lookup(f, f_sus_inds[1], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
+    f_sus_pships = pair_lookup(f, f_sus_inds[1], n) # Pull out the indices of partnerships in which the female is susceptible, as well as the genotypes
     m_sus_pships = pair_lookup(m, m_sus_inds[1], n) # ... same thing for males
     f_genotypes = f_genotypes[(~np.isnan(f_genotypes)*m_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
     m_genotypes = m_genotypes[(~np.isnan(m_genotypes)*f_sus_pships).nonzero()[0]].astype(hpd.default_int) # ... and again for males

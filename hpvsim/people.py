@@ -323,13 +323,11 @@ class People(hpb.BasePeople):
         self.cin1[genotype, inds] = False
 
         filter_inds = self.true_by_genotype('cin2', genotype)
-        inds = self.check_inds_true(self.cin2[genotype, :], self.date_cin2_clearance[genotype, :],
-                                    filter_inds=filter_inds)
+        inds = self.check_inds_true(self.cin2[genotype, :], self.date_cin2_clearance[genotype, :], filter_inds=filter_inds)
         self.cin2[genotype, inds] = False
 
         filter_inds = self.true_by_genotype('cin3', genotype)
-        inds = self.check_inds_true(self.cin3[genotype, :], self.date_cin3_clearance[genotype, :],
-                                    filter_inds=filter_inds)
+        inds = self.check_inds_true(self.cin3[genotype, :], self.date_cin3_clearance[genotype, :], filter_inds=filter_inds)
         self.cin3[genotype, inds] = False
 
         return
