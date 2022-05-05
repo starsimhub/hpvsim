@@ -302,6 +302,10 @@ class age_histogram(Analyzer):
 
     def apply(self, sim):
         for ind in sc.findinds(self.timepoints, sim.t):
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
             date = self.dates[ind] # Find the date for this index
             self.hists[date] = sc.objdict() # Initialize the dictionary
             age    = sim.people.age # Get the age distribution,since used heavily

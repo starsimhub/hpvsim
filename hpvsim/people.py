@@ -11,6 +11,7 @@ from . import version as hpv
 from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
+from . import results as hpr
 from . import population as hppop
 from . import plotting as hpplt
 from . import immunity as hpi
@@ -127,14 +128,12 @@ class People(hpb.BasePeople):
 
     def init_flows(self):
         ''' Initialize flows to be zero '''
-        self.aggregate_flows = {key:0 for key in hpd.new_agg_result_flows}
-        self.aggregate_flows_by_sex = {}
-        self.demographic_flows = {key:0 for key in hpd.new_demographic_flows}
-        for key in hpd.new_agg_result_flows_by_sex:
-            self.aggregate_flows_by_sex[key] = np.zeros(2, dtype=hpd.default_float)
-        self.flows = {}
-        for key in hpd.new_result_flows:
-            self.flows[key] = np.zeros(self.pars['n_genotypes'], dtype=hpd.default_float)
+        ng = self.pars['n_genotypes']
+        df = hpd.default_float
+        self.flows              = {f'new_{key}'         : np.zeros(ng, dtype=df) for key in hpr.flow_keys}
+        self.total_flows        = {f'new_total_{key}'   : 0 for key in hpr.flow_keys}
+        self.flows_by_sex       = {f'new_{key}'         : np.zeros(2, dtype=df) for key in hpr.by_sex_keys}
+        self.demographic_flows  = {f'new_{key}'         : 0 for key in hpr.dem_keys}
         return
 
 
@@ -167,8 +166,8 @@ class People(hpb.BasePeople):
         # Apply death rates from other causes
         new_other_deaths, deaths_female, deaths_male                = self.apply_death_rates()
         self.demographic_flows['new_other_deaths']                  += new_other_deaths
-        self.aggregate_flows_by_sex['new_other_deaths_by_sex'][0]   += deaths_female
-        self.aggregate_flows_by_sex['new_other_deaths_by_sex'][1]   += deaths_male
+        self.flows_by_sex['new_other_deaths_by_sex'][0]   += deaths_female
+        self.flows_by_sex['new_other_deaths_by_sex'][1]   += deaths_male
 
         # Add births
         new_births, new_people                  = self.add_births()
@@ -177,21 +176,21 @@ class People(hpb.BasePeople):
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
         for g in range(ng):
-            self.flows['new_cin1'][g]           += self.check_cin1(g)
-            self.flows['new_cin2'][g]           += self.check_cin2(g)
-            self.flows['new_cin3'][g]           += self.check_cin3(g)
+            self.flows['new_cin1s'][g]          += self.check_cin1(g)
+            self.flows['new_cin2s'][g]          += self.check_cin2(g)
+            self.flows['new_cin3s'][g]          += self.check_cin3(g)
             if t%self.resfreq==0:
-                self.flows['new_cins'][g]       += self.flows['new_cin1'][g]+self.flows['new_cin2'][g]+self.flows['new_cin3'][g]
+                self.flows['new_cins'][g]       += self.flows['new_cin1s'][g]+self.flows['new_cin2s'][g]+self.flows['new_cin3s'][g]
                 self.flows['new_cancers'][g]    += self.check_cancer(g)
             self.check_hpv_clearance(g)
             self.check_cin_clearance(g)
 
-        # Create aggregate flows
-        self.aggregate_flows['new_total_cin1']      += self.flows['new_cin1'].sum()
-        self.aggregate_flows['new_total_cin2']      += self.flows['new_cin2'].sum()
-        self.aggregate_flows['new_total_cin3']      += self.flows['new_cin3'].sum()
-        self.aggregate_flows['new_total_cins']      += self.flows['new_cins'].sum()
-        self.aggregate_flows['new_total_cancers']   += self.flows['new_cancers'].sum()
+        # Create total flows
+        self.total_flows['new_total_cin1s']     += self.flows['new_cin1s'].sum()
+        self.total_flows['new_total_cin2s']     += self.flows['new_cin2s'].sum()
+        self.total_flows['new_total_cin3s']     += self.flows['new_cin3s'].sum()
+        self.total_flows['new_total_cins']      += self.flows['new_cins'].sum()
+        self.total_flows['new_total_cancers']   += self.flows['new_cancers'].sum()
 
         return new_people
 
@@ -434,8 +433,8 @@ class People(hpb.BasePeople):
         new_infections          = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)], dtype=np.float64) # Count the number by genotype
         self.susceptible[genotypes, inds]   = False # Adjust states - set susceptible to false
         self.infectious[genotypes, inds]    = True # Adjust states - set infectious to true
-        self.aggregate_flows['new_total_infections']    += new_total_infections # Add the total count to the aggregate flow data
-        self.flows['new_infections']                    += new_infections # Add the count by genotype to the flow data
+        self.total_flows['new_total_infections']    += new_total_infections # Add the total count to the total flow data
+        self.flows['new_infections']                += new_infections # Add the count by genotype to the flow data
 
         # Reset all other dates
         for key in ['date_cin1', 'date_cin2', 'date_cin3', 'date_cancerous',
@@ -444,8 +443,8 @@ class People(hpb.BasePeople):
 
         infs_female = len(hpu.true(self.is_female[inds]))
         infs_male = len(hpu.true(self.is_male[inds]))
-        self.aggregate_flows_by_sex['new_total_infections_by_sex'][0] += infs_female
-        self.aggregate_flows_by_sex['new_total_infections_by_sex'][1] += infs_male
+        self.flows_by_sex['new_total_infections_by_sex'][0] += infs_female
+        self.flows_by_sex['new_total_infections_by_sex'][1] += infs_male
 
         # Set the dates of infection and recovery -- for now, just assume everyone recovers
         dt = self.pars['dt']
