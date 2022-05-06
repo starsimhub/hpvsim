@@ -210,19 +210,31 @@ class Sim(hpb.BaseSim):
         # Create new and cumulative flows
         for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
             for lkey,llab,cstride,g in zip(['_total',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
-                for flow,name,cmap in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors):
-                    results[f'{key+lkey}_{flow}'] = init_res(f'{llab+lab.lower()} {name}', color=cmap(cstride), n_genotypes=g)
+                for flow,name,cmap,by_age in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors, hpd.flow_by_age):
+                    results[f'{key+lkey}_{flow}'] = init_res(f'{llab+lab.lower()} {name}', color=cmap(cstride), n_rows=g)
+                    if by_age in ['both', 'genotype'] and lkey=='':
+                        results[f'{key}_{flow}_by_age'] = init_res(f'{lab} {name} by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                    if by_age in ['both', 'total'] and lkey=='_total':
+                        results[f'{key+lkey}_{flow}_by_age'] = init_res(f'{llab+lab.lower()} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
 
         # Create stocks
         for lkey,llabel,cstride,g in zip(['_total',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
-            for stock, name, cmap in zip(hpd.stock_keys, hpd.stock_names, hpd.stock_colors):
-                results[f'n{lkey}_{stock}'] = init_res(f'{llabel} {name}', color=cmap(cstride), n_genotypes=g)
+            for stock, name, cmap, by_age in zip(hpd.stock_keys, hpd.stock_names, hpd.stock_colors, hpd.stock_by_age):
+                results[f'n{lkey}_{stock}'] = init_res(f'{llabel} {name}', color=cmap(cstride), n_rows=g)
+                if by_age in ['both', 'genotype'] and lkey == '':
+                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                if by_age in ['both', 'total'] and lkey == '_total':
+                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
 
         # Create incidence and prevalence results
-        for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
-            for var,name,cmap in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
+        for lkey,llab,cstride,g in zip(['total_',''], ['total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+            for var,name,cmap,by_age in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors, hpd.inci_by_age):
                 for which in ['incidence', 'prevalence']:
-                    results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_genotypes=g)
+                    results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
+                    if by_age in ['both', 'genotype'] and lkey == '':
+                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                    if by_age in ['both', 'total'] and lkey == 'total_':
+                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
 
         # Create demographic flows
         for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
@@ -232,14 +244,13 @@ class Sim(hpb.BaseSim):
         # Create results by sex
         for key, lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
             for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
-                results[f'{key}_{var}'] = init_res(f'{lab} {name}', color=color, n_genotypes=2)
+                results[f'{key}_{var}'] = init_res(f'{lab} {name}', color=color, n_rows=2)
 
         # Other results
-        results['r_eff'] = init_res('Effective reproduction number', scale=False, n_genotypes=ng)
-        results['doubling_time'] = init_res('Doubling time', scale=False, n_genotypes=ng)
+        results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
+        results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
         results['n_alive'] = init_res('Number alive', scale=True)
-        results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_genotypes=2)
-        results['pop_size_by_sex'] = np.zeros(2, dtype=hpd.result_float)
+        results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_rows=2)
 
         # Time vector
         results['year'] = res_yearvec
@@ -282,8 +293,6 @@ class Sim(hpb.BaseSim):
         microstructure = self['network']
         self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
-        self.results['pop_size_by_sex'][0] = len(hpu.true(self.people.is_female))
-        self.results['pop_size_by_sex'][1] = len(hpu.true(self.people.is_male))
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_infections:
             self.init_infections()
@@ -386,6 +395,8 @@ class Sim(hpb.BaseSim):
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
         self.people.addtoself(new_people) # New births are added to the population
         people = self.people # Shorten
+        people.alive = ~people.dead_other
+        people.age_brackets = np.digitize(people.age, hpd.age_brackets)+1  # Store which age bucket people belong to, adding 1 so there are no zeros
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
         n_people = len(people)
@@ -440,6 +451,7 @@ class Sim(hpb.BaseSim):
 
             ln += 1
 
+
         # Index for results
         idx = int(t / self.resfreq)
 
@@ -455,8 +467,14 @@ class Sim(hpb.BaseSim):
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
 
+        # By-age flows
+        self.results['new_infections_by_age'][:,:,t] += people.flows_by_age['new_infections_by_age']
+        self.results['new_total_infections_by_age'][:, t] += people.total_flows_by_age['new_total_infections_by_age']
+        # self.results['new_total_cins_by_age'][:, t] += people.total_flows_by_age['new_total_cins_by_age']
+
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
+
             # Create total stocks
             for key in hpd.stock_keys:
                 if key not in ['cin']:  # This is a special case
@@ -468,6 +486,11 @@ class Sim(hpb.BaseSim):
             for genotype in range(ng):
                 self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
             self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
+
+            # Save number alive
+            self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
+            self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
+            self.results['n_alive_by_sex'][1,idx] = len((people.alive*people.is_male).nonzero()[0])
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
@@ -597,9 +620,6 @@ class Sim(hpb.BaseSim):
         Compute prevalence, incidence, and other states.
         '''
         res = self.results
-        self.results['n_alive'][:]              = self['pop_size'] - res['cum_other_deaths'][:] # Number of people still alive. NB, we substract deaths but do not add births, as these are already included in pop_size
-        self.results['n_alive_by_sex'][0,:]     = res['pop_size_by_sex'][0] - res['cum_other_deaths_by_sex'][0,:]
-        self.results['n_alive_by_sex'][1,:]     = res['pop_size_by_sex'][1] - res['cum_other_deaths_by_sex'][1,:]
 
         # Compute HPV incidence and prevalence
         self.results['total_hpv_incidence'][:]  = res['new_total_infections'][:]/ res['n_susceptible'][:].sum(axis=0)
@@ -609,31 +629,32 @@ class Sim(hpb.BaseSim):
 
         # Compute CIN and cancer prevalence
         alive_females   = res['n_alive_by_sex'][0,:]
-        scale_factor    = 1e5 # Cancer and CIN incidence and prevalence are displayed as rates per 100k women
-        demoninator     = alive_females*scale_factor
-        self.results['total_cin1_prevalence'][:]    = res['n_total_cin1'][:] / demoninator
-        self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / demoninator
-        self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / demoninator
-        self.results['total_cin_prevalence'][:]     = res['n_total_cin'][:] / demoninator
-        self.results['total_cancer_prevalence'][:]  = res['n_total_cancerous'][:] / demoninator # Rates per 100,000 women
-        self.results['cin1_prevalence'][:]          = res['n_cin1'][:] / demoninator
-        self.results['cin2_prevalence'][:]          = res['n_cin2'][:] / demoninator
-        self.results['cin3_prevalence'][:]          = res['n_cin3'][:] / demoninator
-        self.results['cin_prevalence'][:]           = res['n_cin'][:] / demoninator
-        self.results['cancer_prevalence'][:]        = res['n_cancerous'][:] / demoninator # Rates per 100,000 women
+        self.results['total_cin1_prevalence'][:]    = res['n_total_cin1'][:] / alive_females
+        self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / alive_females
+        self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / alive_females
+        self.results['total_cin_prevalence'][:]     = res['n_total_cin'][:] / alive_females
+        self.results['total_cancer_prevalence'][:]  = res['n_total_cancerous'][:] / alive_females
+        self.results['cin1_prevalence'][:]          = res['n_cin1'][:] / alive_females
+        self.results['cin2_prevalence'][:]          = res['n_cin2'][:] / alive_females
+        self.results['cin3_prevalence'][:]          = res['n_cin3'][:] / alive_females
+        self.results['cin_prevalence'][:]           = res['n_cin'][:] / alive_females
+        self.results['cancer_prevalence'][:]        = res['n_cancerous'][:] / alive_females
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
+        at_risk_females = alive_females - res['n_cancerous'].values.sum(axis=0)
+        scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
+        demoninator = at_risk_females * scale_factor
         self.results['total_cin1_incidence'][:]    = res['new_total_cin1s'][:] / demoninator
         self.results['total_cin2_incidence'][:]    = res['new_total_cin2s'][:] / demoninator
         self.results['total_cin3_incidence'][:]    = res['new_total_cin3s'][:] / demoninator
         self.results['total_cin_incidence'][:]     = res['new_total_cins'][:] / demoninator
-        self.results['total_cancer_incidence'][:]  = res['new_total_cancers'][:] / demoninator # Rates per 100,000 women
+        self.results['total_cancer_incidence'][:]  = res['new_total_cancers'][:] / demoninator
         self.results['cin1_incidence'][:]          = res['new_cin1s'][:] / demoninator
         self.results['cin2_incidence'][:]          = res['new_cin2s'][:] / demoninator
         self.results['cin3_incidence'][:]          = res['new_cin3s'][:] / demoninator
         self.results['cin_incidence'][:]           = res['new_cins'][:] / demoninator
-        self.results['cancer_incidence'][:]        = res['new_cancers'][:] / demoninator # Rates per 100,000 women
+        self.results['cancer_incidence'][:]        = res['new_cancers'][:] / demoninator
 
         return
 

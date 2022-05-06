@@ -216,7 +216,7 @@ class snapshot(Analyzer):
 
 
 
-class age_histogram(Analyzer):
+class age_analyzer(Analyzer):
     '''
     Calculate statistics across age bins, including histogram plotting functionality.
 
@@ -239,14 +239,13 @@ class age_histogram(Analyzer):
         agehist.plot()
     '''
 
-    def __init__(self, timepoints=None, states=None, edges=None, datafile=None, sim=None, die=True, **kwargs):
+    def __init__(self, timepoints=None, variables=None, edges=None, datafile=None, sim=None, die=True, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         self.timepoints= timepoints # To be converted to integer representations
         self.edges     = edges # Edges of age bins
-        self.states    = states # States to save
+        self.variables = variables # Which variables to save
         self.datafile  = datafile # Data file to load
         self.die       = die # Whether to raise an exception if dates are not found
-        self.bins      = None # Age bins, calculated from edges
         self.dates     = None # String representations of dates
         self.start     = None # Store the start date of the simulation
         self.data      = None # Store the loaded data
@@ -283,11 +282,11 @@ class age_histogram(Analyzer):
         self.bins = self.edges[:-1] # Don't include the last edge in the bins
 
         # Handle states
-        if self.states is None:
-            self.states = ['alive', 'other_dead']
-        self.states = sc.promotetolist(self.states)
-        for s,state in enumerate(self.states):
-            self.states[s] = state.replace('date_', '') # Allow keys starting with date_ as input, but strip it off here
+        if self.variables is None:
+            self.variables = ['total_hpv_prevalence', 'total_hpv_incidence', 'total_cin_incidence']
+        self.states = sc.promotetolist(self.variables)
+        for s,state in enumerate(self.variables):
+            self.variables[s] = state.replace('date_', '') # Allow keys starting with date_ as input, but strip it off here
 
         # Handle the data file
         if self.datafile is not None:
@@ -302,11 +301,23 @@ class age_histogram(Analyzer):
 
     def apply(self, sim):
         for ind in sc.findinds(self.timepoints, sim.t):
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
             date = self.dates[ind] # Find the date for this index
+
+            age_bucket_assigner = np.digitize(sim.people.age, self.age_buckets)  # Assign people to age buckets
+            age_buckets_inf     = age_bucket_assigner * sim.people['infectious'] # Age buckets for infected people
+            if self.by_genotype:
+                for g in sim['n_genotypes']:
+                    n_infectious = np.unique(age_buckets_inf[g,:], return_counts=True)[1][1:] # Get the number infected by genotype
+
+            else:
+                n_infectious = np.unique(age_buckets_inf, return_counts=True)[1][1:]  # Get the number infected overall
+
+
+            for ab in self.age_buckets:
+                gtypes = sim.people['infectious'][:,(age_bucket_assigner==ab).nonzero()[0]].nonzero()[0]
+                if self.by_genotype:
+                    hpv_incidence = n_infectious
+
             self.hists[date] = sc.objdict() # Initialize the dictionary
             age    = sim.people.age # Get the age distribution,since used heavily
             self.hists[date]['bins'] = self.bins # Copy here for convenience

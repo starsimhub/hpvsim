@@ -58,7 +58,7 @@ class PeopleMeta(sc.prettyobj):
             'cin3',
             'cancerous',
             'dead_cancer',
-            'other_dead',  # Dead from all other causes
+            'dead_other',  # Dead from all other causes
         ]
 
         # Immune states, by genotype
@@ -107,21 +107,31 @@ class PeopleMeta(sc.prettyobj):
 
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
+# the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
 flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths']
 flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths']
 flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples]
+flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total']
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
-stock_keys   = ['susceptible', 'infectious',    'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
-stock_names  = ['susceptible', 'infectious',    'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
+# the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
+stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
+stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+stock_by_age = [None,           'both',         None,           None,           None,           'total',        'total']
 
 # Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
-inci_keys   = ['hpv',      'cin1',         'cin2',         'cin3',         'cin',          'cancer']
-inci_names  = ['HPV',      'CIN1',         'CIN2',         'CIN3',         'CIN',          'cancer']
-inci_colors = [pl.cm.GnBu, pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',          'cancer']
+inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN',          'cancer']
+inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+inci_by_age = ['both',      None,           None,           None,           'total',        'total']
+
+# Results by age
+age_brackets    = np.array([15, 25, 45, 65, 100])  # TODO: consider how this will change once vaccination status is there
+n_age_brackets  = len(age_brackets)
+by_age_colors   = sc.gridcolors(n_age_brackets)
 
 # Demographics
 dem_keys    = ['births',    'other_deaths']

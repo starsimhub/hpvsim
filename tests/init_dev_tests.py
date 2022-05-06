@@ -38,7 +38,7 @@ def test_random():
 def test_basic(doplot=False):
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
 
-    from hpvsim.analysis import age_histogram
+    from hpvsim.analysis import age_analyzer
     pars = {
         'pop_size': 50e3,
         'network': 'basic',
@@ -46,7 +46,7 @@ def test_basic(doplot=False):
         'dt': .1,
         'end': 2035
     }
-    sim = Sim(pars=pars) #, analyzers=age_histogram())
+    sim = Sim(pars=pars, analyzers=age_analyzer())
     sim.run()
 
     if doplot:

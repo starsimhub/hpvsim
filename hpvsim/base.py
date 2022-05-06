@@ -134,7 +134,7 @@ class Result(object):
         print(r1.values)
     '''
 
-    def __init__(self, name=None, npts=None, scale=True, color=None, n_genotypes=0):
+    def __init__(self, name=None, npts=None, scale=True, color=None, n_rows=0, n_copies=0):
         self.name =  name  # Name of this result
         self.scale = scale # Whether or not to scale the result by the scale factor
         if color is None:
@@ -144,8 +144,10 @@ class Result(object):
             npts = 0
         npts = int(npts)
 
-        if n_genotypes > 0:
-            self.values = np.zeros((n_genotypes, npts), dtype=hpd.result_float)
+        if n_rows > 0:
+            self.values = np.zeros((n_rows, npts), dtype=hpd.result_float)
+            if n_copies > 0:
+                self.values = np.zeros((n_copies, n_rows, npts), dtype=hpd.result_float)
         else:
             self.values = np.zeros(npts, dtype=hpd.result_float)
 
@@ -431,16 +433,20 @@ class BaseSim(ParsObj):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
-        If which is 'main', return only the main results keys. If 'variant', return
-        only variant keys. If 'all', return all keys.
+        If which is 'main', return only the main results keys. If 'genotype', return
+        only genotype keys. If 'all', return all keys.
 
         '''
         keys = []
-        choices = ['total', 'genotype', 'all']
+        choices = ['total', 'genotype', 'all', 'by_age', 'by_sex']
         if which in ['total', 'all']:
             keys += [k for k,res in self.results.items() if 'total' in k and isinstance(res, Result)]
         if which in ['genotype', 'all']:
             keys += [k for k,res in self.results.items() if 'total' not in k and isinstance(res, Result)]
+        if which in ['by_age', 'all']:
+            keys += [k for k,res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
+        if which in ['by_sex', 'all']:
+            keys += [k for k,res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
         if which not in choices: # pragma: no cover
             errormsg = f'Choice "which" not available; choices are: {sc.strjoin(choices)}'
             raise ValueError(errormsg)

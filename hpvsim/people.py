@@ -73,7 +73,7 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key == 'other_dead': # everything else is by genotype
+            if key == 'dead_other': # everything else is by genotype
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
             elif key == 'susceptible':
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), True, dtype=bool)
@@ -129,10 +129,12 @@ class People(hpb.BasePeople):
         ''' Initialize flows to be zero '''
         ng = self.pars['n_genotypes']
         df = hpd.default_float
-        self.flows              = {f'new_{key}'         : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
-        self.total_flows        = {f'new_total_{key}'   : 0 for key in hpd.flow_keys}
-        self.flows_by_sex       = {f'new_{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
-        self.demographic_flows  = {f'new_{key}'         : 0 for key in hpd.dem_keys}
+        self.flows              = {f'new_{key}'                 : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
+        self.total_flows        = {f'new_total_{key}'           : 0 for key in hpd.flow_keys}
+        self.flows_by_sex       = {f'new_{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
+        self.demographic_flows  = {f'new_{key}'                 : 0 for key in hpd.dem_keys}
+        self.flows_by_age       = {f'new_{key}_by_age'          : np.zeros((hpd.n_age_brackets,ng), dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['genotype','both']}
+        self.total_flows_by_age = {f'new_total_{key}_by_age'    : np.zeros(hpd.n_age_brackets, dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['total','both']}
         return
 
 
@@ -163,10 +165,10 @@ class People(hpb.BasePeople):
         self.increment_age()  # Let people age by one time step
 
         # Apply death rates from other causes
-        new_other_deaths, deaths_female, deaths_male                = self.apply_death_rates()
-        self.demographic_flows['new_other_deaths']                  += new_other_deaths
-        self.flows_by_sex['new_other_deaths_by_sex'][0]   += deaths_female
-        self.flows_by_sex['new_other_deaths_by_sex'][1]   += deaths_male
+        new_other_deaths, deaths_female, deaths_male    = self.apply_death_rates()
+        self.demographic_flows['new_other_deaths']      += new_other_deaths
+        self.flows_by_sex['new_other_deaths_by_sex'][0] += deaths_female
+        self.flows_by_sex['new_other_deaths_by_sex'][1] += deaths_male
 
         # Add births
         new_births, new_people                  = self.add_births()
@@ -190,6 +192,13 @@ class People(hpb.BasePeople):
         self.total_flows['new_total_cin3s']     += self.flows['new_cin3s'].sum()
         self.total_flows['new_total_cins']      += self.flows['new_cins'].sum()
         self.total_flows['new_total_cancers']   += self.flows['new_cancers'].sum()
+
+        new_cin = (self.date_cin1==t)+(self.date_cin2==t)+(self.date_cin3==t)
+        age_inds, new_cins = np.unique(new_cin * self.age_brackets, return_counts=True)
+        self.total_flows_by_age['new_total_cins_by_age'][age_inds-1] += new_cins
+
+        age_inds, new_cancers = np.unique((self.date_cancerous==t) * self.age_brackets, return_counts=True)
+        self.total_flows_by_age['new_total_cancers_by_age'][age_inds-1] += new_cancers
 
         return new_people
 
@@ -321,13 +330,11 @@ class People(hpb.BasePeople):
         self.cin1[genotype, inds] = False
 
         filter_inds = self.true_by_genotype('cin2', genotype)
-        inds = self.check_inds_true(self.cin2[genotype, :], self.date_cin2_clearance[genotype, :],
-                                    filter_inds=filter_inds)
+        inds = self.check_inds_true(self.cin2[genotype, :], self.date_cin2_clearance[genotype, :], filter_inds=filter_inds)
         self.cin2[genotype, inds] = False
 
         filter_inds = self.true_by_genotype('cin3', genotype)
-        inds = self.check_inds_true(self.cin3[genotype, :], self.date_cin3_clearance[genotype, :],
-                                    filter_inds=filter_inds)
+        inds = self.check_inds_true(self.cin3[genotype, :], self.date_cin3_clearance[genotype, :], filter_inds=filter_inds)
         self.cin3[genotype, inds] = False
 
         return
@@ -347,7 +354,7 @@ class People(hpb.BasePeople):
 
         # Get indices of people who die of other causes, removing anyone already dead
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
-        already_dead = self.other_dead[death_inds]
+        already_dead = self.dead_other[death_inds]
         death_inds = death_inds[~already_dead]  # Unique indices in deaths that are not already dead
 
         deaths_female = len(hpu.true(self.is_female[death_inds]))
@@ -418,6 +425,8 @@ class People(hpb.BasePeople):
         if len(inds) == 0:
             return 0
 
+        dt = self.pars['dt']
+
         # Deal with genotype parameters
         ng              = self.pars['n_genotypes']
         genotype_keys   = ['rel_cin1_prob', 'rel_cin2_prob', 'rel_cin3_prob', 'rel_cancer_prob', 'rel_death_prob']
@@ -427,6 +436,12 @@ class People(hpb.BasePeople):
         progpars        = self.pars['prognoses']
         progprobs       = [{k: self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys} for g in range(ng)]  # np.array([[self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys] for g in range(ng)])
 
+        # Set all dates
+        self.date_infectious[genotypes,inds] = self.t
+        for key in ['date_cin1', 'date_cin2', 'date_cin3', 'date_cancerous',
+                    'date_hpv_clearance', 'date_cin1_clearance', 'date_cin2_clearance', 'date_cin3_clearance']:
+            self[key][genotypes, inds] = np.nan
+
         # Update states, genotype info, and flows
         new_total_infections    = len(inds) # Count the total number of new infections
         new_infections          = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)], dtype=np.float64) # Count the number by genotype
@@ -435,19 +450,17 @@ class People(hpb.BasePeople):
         self.total_flows['new_total_infections']    += new_total_infections # Add the total count to the total flow data
         self.flows['new_infections']                += new_infections # Add the count by genotype to the flow data
 
-        # Reset all other dates
-        for key in ['date_cin1', 'date_cin2', 'date_cin3', 'date_cancerous',
-                    'date_hpv_clearance', 'date_cin1_clearance', 'date_cin2_clearance', 'date_cin3_clearance']:
-            self[key][genotypes, inds] = np.nan
+        # Create by-age flows
+        for g in range(ng):
+            age_inds, infections = np.unique(self.age_brackets[inds[genotypes==g]],return_counts=True)
+            self.flows_by_age['new_infections_by_age'][age_inds-1,g] += infections
+        self.total_flows_by_age['new_total_infections_by_age'][age_inds-1] += np.unique(self.age_brackets[inds],return_counts=True)[1]
 
         infs_female = len(hpu.true(self.is_female[inds]))
         infs_male = len(hpu.true(self.is_male[inds]))
         self.flows_by_sex['new_total_infections_by_sex'][0] += infs_female
         self.flows_by_sex['new_total_infections_by_sex'][1] += infs_male
 
-        # Set the dates of infection and recovery -- for now, just assume everyone recovers
-        dt = self.pars['dt']
-        self.date_infectious[genotypes,inds] = self.t
         dur_inf = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
         self.dur_inf[genotypes, inds] = dur_inf
         self.date_hpv_clearance[genotypes, inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
@@ -526,7 +539,7 @@ class People(hpb.BasePeople):
     def make_die_other(self, inds):
         ''' Make people die of all other causes (background mortality) '''
 
-        self.other_dead[inds] = True
+        self.dead_other[inds] = True
         self.susceptible[:, inds] = False
         self.infectious[:, inds] = False
 
