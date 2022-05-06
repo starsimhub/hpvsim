@@ -103,6 +103,6 @@ if __name__ == '__main__':
 
     # sim0 = test_random()
     sim1 = test_basic()
-    to_plot = []
+    # to_plot = []
     sim1.plot()
     # sim2 = test_interventions()
