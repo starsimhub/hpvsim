@@ -195,10 +195,10 @@ class People(hpb.BasePeople):
 
         new_cin = (self.date_cin1==t)+(self.date_cin2==t)+(self.date_cin3==t)
         age_inds, new_cins = np.unique(new_cin * self.age_brackets, return_counts=True)
-        self.total_flows_by_age['new_total_cins_by_age'][age_inds-1] += new_cins
+        self.total_flows_by_age['new_total_cins_by_age'][age_inds[1:]-1] += new_cins[1:]
 
         age_inds, new_cancers = np.unique((self.date_cancerous==t) * self.age_brackets, return_counts=True)
-        self.total_flows_by_age['new_total_cancers_by_age'][age_inds-1] += new_cancers
+        self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
 
         return new_people
 
@@ -286,6 +286,7 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('cin1', genotype)
         inds = self.check_inds(self.cin2[genotype,:], self.date_cin2[genotype,:], filter_inds=filter_inds)
         self.cin2[genotype, inds] = True
+        self.cin1[genotype, inds] = False # No longer counted as CIN1
         return len(inds)
 
     def check_cin3(self, genotype):
@@ -293,6 +294,7 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('cin2', genotype)
         inds = self.check_inds(self.cin3[genotype,:], self.date_cin3[genotype,:], filter_inds=filter_inds)
         self.cin3[genotype, inds] = True
+        self.cin2[genotype, inds] = False # No longer counted as CIN2
         return len(inds)
 
     def check_cancer(self, genotype):
@@ -303,8 +305,11 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('cin3', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
         self.cancerous[genotype, inds] = True
-        self.susceptible[:, inds] = False
-        self.infectious[:, inds] = False
+        self.cin1[:, inds] = False # No longer counted as CIN1 for this genotype. TODO: should this be done for all genotypes?
+        self.cin2[:, inds] = False # No longer counted as CIN2
+        self.cin3[:, inds] = False # No longer counted as CIN3
+        self.susceptible[:, inds] = False # TODO: wouldn't this already be false?
+        self.infectious[:, inds] = False # TODO: consider how this will affect the totals
         return len(inds)
 
     def check_hpv_clearance(self, genotype):
@@ -454,37 +459,41 @@ class People(hpb.BasePeople):
         for g in range(ng):
             age_inds, infections = np.unique(self.age_brackets[inds[genotypes==g]],return_counts=True)
             self.flows_by_age['new_infections_by_age'][age_inds-1,g] += infections
-        self.total_flows_by_age['new_total_infections_by_age'][age_inds-1] += np.unique(self.age_brackets[inds],return_counts=True)[1]
+        total_age_inds, total_infections = np.unique(self.age_brackets[inds], return_counts=True)
+        self.total_flows_by_age['new_total_infections_by_age'][total_age_inds-1] += total_infections
 
+        # Create by-sex flows
         infs_female = len(hpu.true(self.is_female[inds]))
         infs_male = len(hpu.true(self.is_male[inds]))
         self.flows_by_sex['new_total_infections_by_sex'][0] += infs_female
         self.flows_by_sex['new_total_infections_by_sex'][1] += infs_male
 
-        dur_inf = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
-        self.dur_inf[genotypes, inds] = dur_inf
-        self.date_hpv_clearance[genotypes, inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+        # Determine the duration of the HPV infection
+        dur_inf = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in years. This is adjusted below for those who persist to CIN1
+        dur_inds = np.digitize(dur_inf, progpars['duration_cutoffs']) - 1  # Convert durations to indices
 
         # Use genotype-specific prognosis probabilities to determine what happens.
         # Only women can progress beyond infection.
         for g in range(ng):
-            inf_female = hpu.true((genotypes == g) * self.is_female[inds])
-            dur_inf_female = dur_inf[inf_female]
-            dur_inds = np.digitize(dur_inf_female, progpars['duration_cutoffs']) - 1  # Convert durations to indices
+            # inf_female = ((genotypes == g)*self.is_female[inds]).nonzero()
+            # f_g_inds = g_inds[self.is_female]
+            # inf_female = self.is_female[g_inds]
+            # dur_inf_female = dur_inf[inf_female]
+            # dur_inds = np.digitize(dur_inf_female, progpars['duration_cutoffs']) - 1  # Convert durations to indices
 
             # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
-            cin1_probs = progprobs[g]['rel_cin1_prob'] * progpars['cin1_probs'][dur_inds]
+            cin1_probs = progprobs[g]['rel_cin1_prob'] * progpars['cin1_probs'][dur_inds] * self.is_female[inds] * (genotypes==g)
             is_cin1 = hpu.binomial_arr(cin1_probs)
+            cin1_inds = inds[is_cin1]
 
-            # HPV with progression to CIN1
-            cin1_inds = inf_female[is_cin1]
-            n_cin1_inds = len(cin1_inds)
-            durs_hpv2cin1 = hpu.sample(**durpars['hpv2cin1'], size=len(cin1_inds))  # Store how long this person took to develop CIN1
-            self.dur_hpv2cin1[g, cin1_inds] = durs_hpv2cin1
-            self.date_cin1[g, cin1_inds] = self.t + np.ceil(durs_hpv2cin1 / dt)  # Date they develop CIN1
+            # For those who progress to CIN1, determine how long this takes
+            durs_hpv2cin1 = hpu.sample(**durpars['hpv_post_cin1'], size=len(cin1_inds))  # Store how long this person took to develop CIN1
+            self.dur_hpv2cin1[g, cin1_inds]  = durs_hpv2cin1 # Store the the length of post-CIN1 HPV persistance
+            dur_inf[hpu.true(is_cin1)]      += durs_hpv2cin1 # Add post-CIN1 HPV persistance time to the overall duration of infection
+            self.date_cin1[g, cin1_inds] = self.t + np.ceil(dur_inf[hpu.true(is_cin1)] / dt)  # Date they develop CIN1
 
             # Determine whether CIN1 clears or progresses to CIN2
-            dur_cin1 = hpu.sample(**durpars['cin1'], size=n_cin1_inds)  # Duration of infection in YEARS
+            dur_cin1 = hpu.sample(**durpars['cin1'], size=len(cin1_inds))  # Duration of infection in YEARS
             dur_cin1_inds = np.digitize(dur_cin1, progpars['duration_cutoffs']) - 1  # Convert durations to indices
             cin2_probs = progprobs[g]['rel_cin2_prob'] * progpars['cin2_probs'][dur_cin1_inds]
             is_cin2 = hpu.binomial_arr(cin2_probs)
@@ -532,6 +541,10 @@ class People(hpb.BasePeople):
 
             # Update immunity
             hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=g)
+
+        # Store the overal duration of infection and the date of HPV clearance
+        self.dur_inf[genotypes, inds] = dur_inf  # This is overwritten later to ensure infections that progress to CIN1 last longer than the length of time it takes to get to CIN1
+        self.date_hpv_clearance[genotypes, inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return new_infections # For incrementing counters
 

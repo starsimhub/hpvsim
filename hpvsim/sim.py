@@ -227,7 +227,7 @@ class Sim(hpb.BaseSim):
                     results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
 
         # Create incidence and prevalence results
-        for lkey,llab,cstride,g in zip(['total_',''], ['total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+        for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
             for var,name,cmap,by_age in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors, hpd.inci_by_age):
                 for which in ['incidence', 'prevalence']:
                     results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
@@ -368,8 +368,10 @@ class Sim(hpb.BaseSim):
         hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
         genotypes = np.random.randint(0, ng, len(hpv_inds))
         new_infections = self.people.infect(inds=hpv_inds, genotypes=genotypes, layer='seed_infection')
-        self.results['cum_infections'].values += new_infections[:,None]
-        self.results['cum_total_infections'][:] += sum(new_infections)
+        self.results['cum_infections'].values           += new_infections[:,None]
+        self.results['cum_total_infections'][:]         += sum(new_infections)
+        self.results['cum_infections_by_age'][:]        += self.people.flows_by_age['new_infections_by_age'][:,:,None]
+        self.results['cum_total_infections_by_age'][:]  += self.people.total_flows_by_age['new_total_infections_by_age'][:,None]
 
         return
 
@@ -391,7 +393,7 @@ class Sim(hpb.BaseSim):
         gen_pars = self['genotype_pars']
         imm_kin_pars = self['imm_kin']
 
-        # Update states and partnerships
+        # Update demographics and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
         self.people.addtoself(new_people) # New births are added to the population
         people = self.people # Shorten
@@ -468,24 +470,37 @@ class Sim(hpb.BaseSim):
                 self.results[key][sex][idx] += count[sex]
 
         # By-age flows
-        self.results['new_infections_by_age'][:,:,t] += people.flows_by_age['new_infections_by_age']
-        self.results['new_total_infections_by_age'][:, t] += people.total_flows_by_age['new_total_infections_by_age']
-        # self.results['new_total_cins_by_age'][:, t] += people.total_flows_by_age['new_total_cins_by_age']
+        self.results['new_infections_by_age'][:,:,idx] += people.flows_by_age['new_infections_by_age']
+        for key,count in people.total_flows_by_age.items():
+            self.results[key][:, idx] += count
 
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 
             # Create total stocks
-            for key in hpd.stock_keys:
+            for key,by_age in zip(hpd.stock_keys, hpd.stock_by_age):
                 if key not in ['cin']:  # This is a special case
-                    for genotype in range(ng):
-                        self.results[f'n_{key}'][genotype, idx] = people.count_by_genotype(key, genotype)
+                    if by_age is not None:
+                        count_age_brackets = people.age_brackets * people[key]  # Age buckets
+                    for g in range(ng):
+                        self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
+                        if by_age in ['both', 'genotype']:
+                            age_inds, n_by_age = np.unique(count_age_brackets[g, :], return_counts=True)  # Get the number infected by genotype
+                            self.results[f'n_{key}_by_age'][age_inds[1:]-1, g, idx] = n_by_age[1:]
                 if key not in ['cin', 'susceptible']:  # This is a special case
                     self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
+                    if by_age in ['both', 'total']:
+                        age_inds, n_by_age = np.unique(count_age_brackets, return_counts=True)  # Get the number infected
+                        self.results[f'n_total_{key}_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+
             # Do total CINs separately
             for genotype in range(ng):
                 self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
             self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
+
+            count_age_brackets_all = people.age_brackets * (people['cin1'] + people['cin2'] + people['cin3'])
+            age_inds, n_by_age = np.unique(count_age_brackets_all, return_counts=True)  # Get the number infected
+            self.results[f'n_total_cin_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
 
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
@@ -581,11 +596,16 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Calculate cumulative results
-        for key in hpd.flow_keys:
+        for key,by_age in zip(hpd.flow_keys, hpd.flow_by_age):
             self.results[f'cum_total_{key}'][:] += np.cumsum(self.results[f'new_total_{key}'][:], axis=0)
             self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+            if by_age in ['both', 'total']:
+                self.results[f'cum_total_{key}_by_age'][:] += np.cumsum(self.results[f'new_total_{key}_by_age'][:], axis=-1)
+            if by_age in ['both', 'genotype']:
+                self.results[f'cum_{key}_by_age'][:] += np.cumsum(self.results[f'new_{key}_by_age'][:], axis=-1)
+
         for key in hpd.by_sex_keys:
-            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=-1)
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
@@ -721,7 +741,7 @@ class Sim(hpb.BaseSim):
         labelstr = f' "{self.label}"' if self.label else ''
         string = f'Simulation{labelstr} summary:\n'
         for key in self.result_keys():
-            if full or key.startswith('cum_total') and 'by_sex' not in key:
+            if full or key.startswith('cum_total') and 'by_sex' not in key and 'by_age' not in key:
                 val = np.round(summary[key])
                 string += f'   {val:10,.0f} {self.results[key].name.lower()}\n'.replace(',', sep) # Use replace since it's more flexible
 

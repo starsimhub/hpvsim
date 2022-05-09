@@ -129,7 +129,7 @@ inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.c
 inci_by_age = ['both',      None,           None,           None,           'total',        'total']
 
 # Results by age
-age_brackets    = np.array([15, 25, 45, 65, 100])  # TODO: consider how this will change once vaccination status is there
+age_brackets    = np.array([15, 25, 45, 65, 150])  # TODO: consider how this will change once vaccination status is there
 n_age_brackets  = len(age_brackets)
 by_age_colors   = sc.gridcolors(n_age_brackets)
 

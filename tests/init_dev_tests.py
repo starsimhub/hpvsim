@@ -35,10 +35,9 @@ def test_random():
     return sim
 
 
-def test_basic(doplot=False):
+def test_basic(doplot=False, test_results=True):
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
 
-    from hpvsim.analysis import age_analyzer
     pars = {
         'pop_size': 50e3,
         'network': 'basic',
@@ -46,8 +45,23 @@ def test_basic(doplot=False):
         'dt': .1,
         'end': 2035
     }
-    sim = Sim(pars=pars, analyzers=age_analyzer())
+    sim = Sim(pars=pars)
     sim.run()
+
+    if test_results:
+
+        # Check that infections by age sum up the the correct totals
+        assert (sim.results['cum_total_infections'][:] - sim.results['cum_total_infections_by_age'][:].sum(axis=0)).sum()==0 # Check cumulative results by age are equal to cumulative results
+        assert (sim.results['new_total_infections'][:] - sim.results['new_total_infections_by_age'][:].sum(axis=0)).sum()==0 # Check new results by age are equal to new results
+
+        # Check that infections by genotype sum up the the correct totals
+        assert (sim.results['new_infections'][:].sum(axis=0)-sim.results['new_total_infections'][:]).sum()==0 # Check flows by genotype are equal to total flows
+        assert (sim.results['n_infectious'][:].sum(axis=0)-sim.results['n_total_infectious'][:]).sum()==0 # Check flows by genotype are equal to total flows
+
+        # Check that CINs by grade sum up the the correct totals
+        assert ~(sim.results['new_total_cin1s'][:] + sim.results['new_total_cin2s'][:] + sim.results['new_total_cin3s'][:] - sim.results['new_total_cins'][:]).all()
+        assert ~(sim.results['new_cin1s'][:] + sim.results['new_cin2s'][:] + sim.results['new_cin3s'][:] - sim.results['new_cins'][:]).all()
+
 
     if doplot:
         fig, ax = pl.subplots(2, 2, figsize=(10, 10))
@@ -97,6 +111,7 @@ def test_interventions():
     sim = Sim(pars=pars, interventions=[condom_int, debut_int])
     sim.run()
     return sim
+
 
 
 if __name__ == '__main__':

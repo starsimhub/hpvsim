@@ -92,7 +92,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['dur']['cin1']  = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of CIN1 in YEARS
     pars['dur']['cin2'] = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 in YEARS
     pars['dur']['cin3'] = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 in YEARS
-    pars['dur']['hpv2cin1']  = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of infection before developing CIN in YEARS
+    pars['dur']['hpv_post_cin1'] = dict(dist='lognormal', par1=1.0, par2=1.0)  # For those who progress to CIN1, the length of time that HPV persists after CIN1 develops
     pars['dur']['cin32cancer']  = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 before developing cancer in YEARS
 
 
