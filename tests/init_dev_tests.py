@@ -51,22 +51,36 @@ def test_basic(doplot=False, test_results=True):
     if test_results:
 
         # Check that infections by age sum up the the correct totals
-        assert (sim.results['cum_total_infections'][:] - sim.results['cum_total_infections_by_age'][:].sum(axis=0)).sum()==0 # Check cumulative results by age are equal to cumulative results
-        assert (sim.results['new_total_infections'][:] - sim.results['new_total_infections_by_age'][:].sum(axis=0)).sum()==0 # Check new results by age are equal to new results
+        assert (sim.results['cum_total_infections'][:] == sim.results['cum_total_infections_by_age'][:].sum(axis=0)).all() # Check cumulative results by age are equal to cumulative results
+        assert (sim.results['new_total_infections'][:] == sim.results['new_total_infections_by_age'][:].sum(axis=0)).all() # Check new results by age are equal to new results
 
         # Check that infections by genotype sum up the the correct totals
-        assert (sim.results['new_infections'][:].sum(axis=0)-sim.results['new_total_infections'][:]).sum()==0 # Check flows by genotype are equal to total flows
-        assert (sim.results['n_infectious'][:].sum(axis=0)-sim.results['n_total_infectious'][:]).sum()==0 # Check flows by genotype are equal to total flows
+        assert (sim.results['new_infections'][:].sum(axis=0)==sim.results['new_total_infections'][:]).all() # Check flows by genotype are equal to total flows
+        assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
         # Check that CINs by grade sum up the the correct totals
-        assert (sim.results['new_total_cin1s'][:] + sim.results['new_total_cin2s'][:] + sim.results['new_total_cin3s'][:] - sim.results['new_total_cins'][:]).sum()==0
-        assert (sim.results['new_cin1s'][:] + sim.results['new_cin2s'][:] + sim.results['new_cin3s'][:] - sim.results['new_cins'][:]).sum()==0
+        assert ((sim.results['new_total_cin1s'][:] + sim.results['new_total_cin2s'][:] + sim.results['new_total_cin3s'][:]) == sim.results['new_total_cins'][:]).all()
+        assert ((sim.results['new_cin1s'][:] + sim.results['new_cin2s'][:] + sim.results['new_cin3s'][:]) == sim.results['new_cins'][:]).all()
 
         # Check that cancers and CINs by age sum up the the correct totals
         # NOT WORKING ## assert (sim.results['new_total_cancers'][:] - sim.results['new_total_cancers_by_age'][:].sum(axis=0)).sum()==0
         # NOT WORKING ## assert (sim.results['new_total_cins'][:] - sim.results['new_total_cins_by_age'][:].sum(axis=0)).sum()==0
         # NOT WORKING ## assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) - sim.results['n_total_cin'][:]).sum()==0
-        assert (sim.results['n_total_cancerous_by_age'][:, :].sum(axis=0) - sim.results['n_total_cancerous'][:]).sum()==0
+        assert (sim.results['n_total_cancerous_by_age'][:, :].sum(axis=0) == sim.results['n_total_cancerous'][:]).all()
+
+        # Check that males don't have CINs or cancers
+        import hpvsim.utils as hpu
+        male_inds = sim.people.is_male.nonzero()[0]
+        males_with_cin = hpu.defined(sim.people.date_cin1[:,male_inds])
+        males_with_cancer = hpu.defined(sim.people.date_cancerous[:,male_inds])
+        assert len(males_with_cin)==0
+        assert len(males_with_cancer)==0
+
+        # Check that people younger than debut don't have HPV
+        virgin_inds = (~sim.people.is_active).nonzero()[0]
+        virgins_with_hpv = hpu.defined(sim.people.date_infectious[:,virgin_inds])
+        assert len(virgins_with_hpv)==0
+
 
 
     if doplot:
