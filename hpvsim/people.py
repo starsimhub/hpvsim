@@ -186,13 +186,6 @@ class People(hpb.BasePeople):
             self.check_hpv_clearance(g)
             self.check_cin_clearance(g)
 
-        # if t==6:
-        #     import traceback;
-        #     traceback.print_exc();
-        #     import pdb;
-        #     pdb.set_trace()
-
-
         # Create total flows
         self.total_flows['new_total_cin1s']     += self.flows['new_cin1s'].sum()
         self.total_flows['new_total_cin2s']     += self.flows['new_cin2s'].sum()
@@ -206,13 +199,6 @@ class People(hpb.BasePeople):
 
         age_inds, new_cancers = np.unique((self.date_cancerous==t) * self.age_brackets, return_counts=True)
         self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
-
-        if self.total_flows_by_age['new_total_cins_by_age'][:].sum(axis=0) != self.total_flows['new_total_cins']:
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
-
 
         return new_people
 
@@ -290,22 +276,10 @@ class People(hpb.BasePeople):
 
     def check_cin1(self, genotype):
         ''' Check for new progressions to CIN1 '''
-        # if self.t == 29:
-        #     import traceback;
-        #     traceback.print_exc();
-        #     import pdb;
-        #     pdb.set_trace()
         # Only include infectious females who haven't already cleared CIN1 or progressed to CIN2
         filters = self.infectious[genotype,:]*self.is_female*~(self.date_cin1_clearance[genotype,:]<self.t)*(self.date_cin2[genotype,:]>self.t)
         filter_inds = filters.nonzero()[0]
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
-
-        # if 29960 in inds:
-        #     import traceback;
-        #     traceback.print_exc();
-        #     import pdb;
-        #     pdb.set_trace()
-
         self.cin1[genotype, inds] = True
         return len(inds)
 
@@ -458,12 +432,6 @@ class People(hpb.BasePeople):
         if len(inds) == 0:
             return 0
 
-        # if self.t>=5 and 885 in inds:
-        #     import traceback;
-        #     traceback.print_exc();
-        #     import pdb;
-        #     pdb.set_trace()
-
         # Remove duplicates
         inds, unique = np.unique(inds, return_index=True)
         genotypes = genotypes[unique]
@@ -599,12 +567,6 @@ class People(hpb.BasePeople):
         # Store the overal duration of infection and the date of HPV clearance
         self.dur_inf[genotypes, inds] = dur_inf  # This is overwritten later to ensure infections that progress to CIN1 last longer than the length of time it takes to get to CIN1
         self.date_hpv_clearance[genotypes, inds] = self.date_infectious[genotypes, inds] + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
-
-        # if 3522 in inds and self.t>2:
-        #     import traceback;
-        #     traceback.print_exc();
-        #     import pdb;
-        #     pdb.set_trace()
 
         return new_infections # For incrementing counters
 
