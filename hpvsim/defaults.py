@@ -57,6 +57,7 @@ class PeopleMeta(sc.prettyobj):
             'cin2',
             'cin3',
             'cancerous',
+            'alive', # Save this as a state so we can record population sizes
             'dead_cancer',
             'dead_other',  # Dead from all other causes
         ]
@@ -73,7 +74,7 @@ class PeopleMeta(sc.prettyobj):
             't_imm_event',  # Int, time since immunity event
         ]
 
-        self.dates = [f'date_{state}' for state in self.states] # Convert each state into a date
+        self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
         self.dates += ['date_hpv_clearance', 'date_cin1_clearance', 'date_cin2_clearance', 'date_cin3_clearance']
 
         # Duration of different states: these are floats per person -- used in people.py

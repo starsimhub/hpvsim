@@ -73,8 +73,10 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key == 'dead_other': # everything else is by genotype
+            if key == 'dead_other': # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
+            elif key == 'alive':  # All true at the beginning
+                self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
             elif key == 'susceptible':
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), True, dtype=bool)
             else:

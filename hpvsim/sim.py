@@ -251,6 +251,8 @@ class Sim(hpb.BaseSim):
         results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
         results['n_alive'] = init_res('Number alive', scale=True)
         results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_rows=2)
+        results['n_alive_by_age'] = init_res('Number alive by age', scale=True, n_rows=hpd.n_age_brackets)
+        results['f_alive_by_age'] = init_res('Women alive by age', scale=True, n_rows=hpd.n_age_brackets)
 
         # Time vector
         results['year'] = res_yearvec
@@ -507,6 +509,17 @@ class Sim(hpb.BaseSim):
             self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
             self.results['n_alive_by_sex'][1,idx] = len((people.alive*people.is_male).nonzero()[0])
 
+            # Save number alive by age
+            count_age_brackets_alive = people.age_brackets * people.alive
+            age_inds, n_by_age = np.unique(count_age_brackets_alive, return_counts=True)  # Get the number infected
+            self.results[f'n_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+
+            # Save number of women alive by age
+            count_age_brackets_alive = people.age_brackets * people.alive * people.is_female
+            age_inds, n_by_age = np.unique(count_age_brackets_alive, return_counts=True)  # Get the number infected
+            self.results[f'f_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+
+
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
@@ -605,7 +618,10 @@ class Sim(hpb.BaseSim):
                 self.results[f'cum_{key}_by_age'][:] += np.cumsum(self.results[f'new_{key}_by_age'][:], axis=-1)
 
         for key in hpd.by_sex_keys:
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=-1)
+            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=-1)
+
+        self.results[f'cum_other_deaths'][:]    += np.cumsum(self.results[f'new_other_deaths'][:], axis=-1)
+        self.results[f'cum_births'][:]          += np.cumsum(self.results[f'new_births'][:], axis=-1)
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()

@@ -35,11 +35,12 @@ def test_random():
     return sim
 
 
-def test_basic(doplot=False, test_results=True):
+def test_basic(test_results=True):
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
 
+    pop_size = 50e3
     pars = {
-        'pop_size': 50e3,
+        'pop_size': pop_size,
         'network': 'basic',
         'genotypes': [hpv16, hpv18],#, hpv6],#, hpv11, hpv31, hpv33],
         'dt': .1,
@@ -63,10 +64,16 @@ def test_basic(doplot=False, test_results=True):
         assert ((sim.results['new_cin1s'][:] + sim.results['new_cin2s'][:] + sim.results['new_cin3s'][:]) == sim.results['new_cins'][:]).all()
 
         # Check that cancers and CINs by age sum up the the correct totals
-        # NOT WORKING ## assert (sim.results['new_total_cancers'][:] - sim.results['new_total_cancers_by_age'][:].sum(axis=0)).sum()==0
-        assert (sim.results['new_total_cins'][:] - sim.results['new_total_cins_by_age'][:].sum(axis=0)).sum()==0
-        assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) - sim.results['n_total_cin'][:]).sum()==0
+        assert (sim.results['new_total_cancers'][:] == sim.results['new_total_cancers_by_age'][:].sum(axis=0)).all()
+        assert (sim.results['new_total_cins'][:] == sim.results['new_total_cins_by_age'][:].sum(axis=0)).all()
+        assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) == sim.results['n_total_cin'][:]).all()
         assert (sim.results['n_total_cancerous_by_age'][:, :].sum(axis=0) == sim.results['n_total_cancerous'][:]).all()
+
+        # Check demographics
+        assert (sim.results['n_alive_by_age'][:].sum(axis=0) == sim.results['n_alive'][:]).all()
+        assert (sim.results['n_alive_by_sex'][0, :] == sim.results['f_alive_by_age'][:].sum(axis=0)).all()
+        assert (sim.results['n_alive'][-1]+sim.results['cum_other_deaths'][-1]==sim['pop_size'])
+        assert (sim['pop_size'] - sim.results['cum_births'][-1] == pop_size)
 
         # Check that males don't have CINs or cancers
         import hpvsim.utils as hpu
@@ -80,28 +87,6 @@ def test_basic(doplot=False, test_results=True):
         virgin_inds = (~sim.people.is_active).nonzero()[0]
         virgins_with_hpv = hpu.defined(sim.people.date_infectious[:,virgin_inds])
         assert len(virgins_with_hpv)==0
-
-
-
-    if doplot:
-        fig, ax = pl.subplots(2, 2, figsize=(10, 10))
-        timevec = sim.results['year']
-
-        ax[0, 1].plot(timevec, sim.results['hpv_prevalence'].values)
-        ax[1, 0].plot(timevec, sim.results['cin1_prevalence'].values, label='CIN1')
-        ax[1, 0].plot(timevec, sim.results['cin2_prevalence'].values, label='CIN2')
-        ax[1, 0].plot(timevec, sim.results['cin3_prevalence'].values, label='CIN3')
-        ax[1,1].plot(timevec, sim.results['cancer_incidence'].values)
-        for i, genotype in sim['genotype_map'].items():
-            ax[0,0].plot(timevec, sim.results['hpv_incidence_by_genotype'].values[i,:], label=genotype)
-
-        ax[0,0].legend()
-        ax[1,0].legend()
-        ax[0,0].set_title('HPV incidence by genotype')
-        ax[0,1].set_title('HPV prevalence')
-        ax[1,0].set_title('CIN prevalence')
-        ax[1,1].set_title('Cancer incidence')
-        fig.show()
     return sim
 
 
