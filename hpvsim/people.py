@@ -197,7 +197,8 @@ class People(hpb.BasePeople):
         age_inds, new_cins = np.unique(new_cin * self.age_brackets, return_counts=True)
         self.total_flows_by_age['new_total_cins_by_age'][age_inds[1:]-1] += new_cins[1:]
 
-        age_inds, new_cancers = np.unique((self.date_cancerous==t) * self.age_brackets, return_counts=True)
+        new_cancer = (self.date_cancerous==t)*self.cancerous
+        age_inds, new_cancers = np.unique(new_cancer * self.age_brackets, return_counts=True)
         self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
 
         return new_people
@@ -559,6 +560,8 @@ class People(hpb.BasePeople):
 
             # Case 2.2: CIN3 with progression to cancer
             self.dur_cin2cancer[g, cancer_inds] = dur_cin3[is_cancer]
+            excl_inds = hpu.true(self.date_cancerous[g, cancer_inds] < self.t) # Don't count cancers that were acquired before now
+            self.date_cancerous[g, cancer_inds[excl_inds]] = np.nan
             self.date_cancerous[g, cancer_inds] = np.fmin(self.date_cancerous[g, cancer_inds], self.date_cin3[g, cancer_inds] + np.ceil(dur_cin3[is_cancer] / dt)) # Date they get cancer - minimum of any previous date and the date from the current infection
 
             # Update immunity

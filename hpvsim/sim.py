@@ -648,7 +648,7 @@ class Sim(hpb.BaseSim):
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
 
         # Compute CIN and cancer prevalence
-        alive_females   = res['n_alive_by_sex'][0,:]
+        alive_females = res['n_alive_by_sex'][0,:]
         self.results['total_cin1_prevalence'][:]    = res['n_total_cin1'][:] / alive_females
         self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / alive_females
         self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / alive_females

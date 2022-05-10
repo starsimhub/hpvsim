@@ -64,8 +64,8 @@ def test_basic(doplot=False, test_results=True):
 
         # Check that cancers and CINs by age sum up the the correct totals
         # NOT WORKING ## assert (sim.results['new_total_cancers'][:] - sim.results['new_total_cancers_by_age'][:].sum(axis=0)).sum()==0
-        # NOT WORKING ## assert (sim.results['new_total_cins'][:] - sim.results['new_total_cins_by_age'][:].sum(axis=0)).sum()==0
-        # NOT WORKING ## assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) - sim.results['n_total_cin'][:]).sum()==0
+        assert (sim.results['new_total_cins'][:] - sim.results['new_total_cins_by_age'][:].sum(axis=0)).sum()==0
+        assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) - sim.results['n_total_cin'][:]).sum()==0
         assert (sim.results['n_total_cancerous_by_age'][:, :].sum(axis=0) == sim.results['n_total_cancerous'][:]).all()
 
         # Check that males don't have CINs or cancers
