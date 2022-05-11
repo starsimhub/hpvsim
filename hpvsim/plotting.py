@@ -384,6 +384,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
     with hpo.with_style(args.style):
         fig, figs = create_figs(args, sep_figs, fig, ax)
         total_keys = [k for k in sim.result_keys() if 'total' in k]
+        age_keys = sim.result_keys('by_age')
         for pnum,title,keylabels in to_plot.enumitems():
             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
             for resnum,reskey in enumerate(keylabels):
@@ -393,6 +394,20 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                     color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
                     label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                     ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Plot result
+                elif reskey in age_keys:
+                    n_ages = hpd.n_age_brackets # TODO: this should be taken from the sim, not defaults
+                    age_colors = sc.gridcolors(n_ages)
+                    for age in range(n_ages):
+                        # Colors and labels
+                        v_color = age_colors[age]
+                        v_label = hpd.age_labels[age] # TODO this should also come from the sim
+                        color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
+                        label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
+                        if label:
+                            label += f' - {v_label}'
+                        else:
+                            label = v_label
+                        ax.plot(res_t, res.values[age, :], label=label, **args.plot, c=color)  # Plot result
                 else:
                     ng = sim['n_genotypes']
                     # genotype_colors = sc.gridcolors(ng)

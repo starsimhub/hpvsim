@@ -489,7 +489,7 @@ class Sim(hpb.BaseSim):
                         if by_age in ['both', 'genotype']:
                             age_inds, n_by_age = np.unique(count_age_brackets[g, :], return_counts=True)  # Get the number infected by genotype
                             self.results[f'n_{key}_by_age'][age_inds[1:]-1, g, idx] = n_by_age[1:]
-                if key not in ['cin', 'susceptible']:  # This is a special case
+                if key not in ['cin']:  # This is a special case
                     self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
                     if by_age in ['both', 'total']:
                         age_inds, n_by_age = np.unique(count_age_brackets, return_counts=True)  # Get the number infected
@@ -691,6 +691,15 @@ class Sim(hpb.BaseSim):
         self.results['cin3_incidence'][:]          = res['new_cin3s'][:] / demoninator
         self.results['cin_incidence'][:]           = res['new_cins'][:] / demoninator
         self.results['cancer_incidence'][:]        = res['new_cancers'][:] / demoninator
+
+        # Finally, add results by age
+        self.results['total_hpv_prevalence_by_age'][:]      = res['n_total_infectious_by_age'][:] / self.results['n_alive_by_age'][:]
+        self.results['total_hpv_incidence_by_age'][:]       = res['new_total_infections_by_age'][:] / self.results['n_total_susceptible_by_age'][:]
+        cin_inci_denom = (self.results['f_alive_by_age'][:] - res['n_total_cancerous_by_age'][:])*1e5
+        self.results['total_cin_prevalence_by_age'][:]      = res['n_total_cin_by_age'][:] / cin_inci_denom
+        self.results['total_cancer_prevalence_by_age'][:]   = res['n_total_cancerous_by_age'][:] / cin_inci_denom
+        self.results['total_cin_incidence_by_age'][:]       = res['new_total_cins_by_age'][:] / cin_inci_denom
+        self.results['total_cancer_incidence_by_age'][:]    = res['new_total_cancers_by_age'][:] / cin_inci_denom
 
         return
 

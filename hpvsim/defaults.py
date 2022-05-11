@@ -120,7 +120,7 @@ flow_by_age = ['both',          None,           None,           None,           
 stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
 stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
-stock_by_age = [None,           'both',         None,           None,           None,           'total',        'total']
+stock_by_age = ['total',        'both',         None,           None,           None,           'total',        'total']
 
 # Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -131,6 +131,7 @@ inci_by_age = ['both',      None,           None,           None,           'tot
 
 # Results by age
 age_brackets    = np.array([15, 25, 45, 65, 150])  # TODO: consider how this will change once vaccination status is there
+age_labels      = ['0-14', '15-24', '25-44', '45-64', '65+']
 n_age_brackets  = len(age_brackets)
 by_age_colors   = sc.gridcolors(n_age_brackets)
 
@@ -295,9 +296,9 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'total_hpv_prevalence',
                     'hpv_prevalence',
                 ],
-                'HPV infections': [
-                    'new_total_infections',
-                    'new_infections',
+                'HPV incidence': [
+                    'total_hpv_incidence_by_age',
+                    # 'new_infections',
                 ],
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',

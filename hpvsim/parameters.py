@@ -95,7 +95,6 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['dur']['hpv_post_cin1'] = dict(dist='lognormal', par1=1.0, par2=1.0)  # For those who progress to CIN1, the length of time that HPV persists after CIN1 develops
     pars['dur']['cin32cancer']  = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 before developing cancer in YEARS
 
-
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
 
