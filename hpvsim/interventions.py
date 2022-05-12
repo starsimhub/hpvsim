@@ -15,6 +15,7 @@ import inspect
 # from . import base as cvb
 # from . import defaults as cvd
 from . import parameters as hppar
+from . import utils as hpu
 # from . import immunity as cvi
 # from collections import defaultdict
 
@@ -264,8 +265,8 @@ class dynamic_pars(Intervention):
         kwargs (dict): passed to Intervention()
 
     **Examples**::
-        interv = cv.dynamic_pars(condoms=dict(timepoints=10, vals={'c':0.9})) # Increase condom use amount casual partners to 90%
-        interv = cv.dynamic_pars({'beta':{'timepoints':[10, 15], 'vals':[0.005, 0.015]}, # At timepoint 10, reduce beta, then increase it again
+        interv = hp.dynamic_pars(condoms=dict(timepoints=10, vals={'c':0.9})) # Increase condom use amount casual partners to 90%
+        interv = hp.dynamic_pars({'beta':{'timepoints':[10, 15], 'vals':[0.005, 0.015]}, # At timepoint 10, reduce beta, then increase it again
                                   'debut':{'timepoints':10, 'vals':dict(f=dict(dist='normal', par1=20, par2=2.1), m=dict(dist='normal', par1=19.6, par2=1.8))}}) # Increase mean age of sexual debut
     '''
 
@@ -337,4 +338,153 @@ class dynamic_pars(Intervention):
         return
 
 
+
+class init_states(Intervention):
+    '''
+    An intervention to initialize people into disease states and confer historical immunity
+
+    Args:
+        init_hpv_prev (float/arr/dict): accepts a float, an array describing prevalence by age, or a dictionary keyed by sex with values that are floats or arrays by age.
+
+    **Examples**::
+        interv = cv.init_states(init_hpv_prev=0.08, init_cin_prev=0.01, init_cancer_prev=0.001)
+    '''
+
+    def __init__(self, init_hpv_prev=None, init_cin_prev=None, init_cancer_prev=None, age_brackets=None):
+
+        # Assign age brackets
+        if age_brackets is not None:
+            self.age_brackets = age_brackets
+        else:
+            self.age_brackets = np.array([150]) # Use an arbitrarily high upper age bracket
+        self.n_age_brackets = len(age_brackets)
+
+        # Assign the rest of the variables, including error checking on types and length
+        self.init_hpv_prev = self.validate(init_hpv_prev)
+        self.init_cin_prev = self.validate(init_cin_prev)
+        self.init_cancer_prev = self.validate(init_cancer_prev)
+
+        return
+
+
+    def validate(self, var, by_sex=False):
+        '''
+        Initial prevalence values can be supplied with different amounts of detail.
+        Here we flesh out any missing details so that the initial prev values are
+        by age and genotype.
+        '''
+
+        # Helper function to check that prevalence values are ok
+        def validate_arrays(vals):
+            if len(vals) not in [1, self.n_age_brackets]:
+                errormsg = f'The initial prevalence values must either be floats or arrays of length {self.n_age_brackets}, not length {len(vals)}.'
+                raise ValueError(errormsg)
+            if vals.any() < 0 or vals.any() > 1:
+                errormsg = f'The initial prevalence values must either between 0 and 1, not {vals}.'
+                raise ValueError(errormsg)
+
+        # If this variable is by sex, check types and construct a dictionary of arrays
+        if by_sex:
+            sex_keys = {'m', 'f'}
+
+            # If values have been provided, validate them
+            if var is not None:
+                if sc.checktype(var, dict):
+                    # If it's a dict, it needs to be keyed by sex
+                    if set(var.keys()) != sex_keys:
+                        errormsg = f'If supplying a dictionary of initial prevalence values to init_states, the keys must be "m" and "f", not {var.keys()}.'
+                        raise ValueError(errormsg)
+                    for sk, vals in var.items():
+                        var[sk] = sc.promotetoarray(vals)
+                elif sc.checktype(var, 'arraylike') or sc.isnumber(var):
+                    # If it's an array, assume these values apply to males and females
+                    var = {sk: sc.promotetoarray(var) for sk in sex_keys}
+                else:
+                    errormsg = f'Initial prevalence values of type {type(var)} not recognized, must be a dict with keys "m" and "f", an array, or a float.'
+                    raise ValueError(errormsg)
+
+                # Now validate the arrays
+                for sk, vals in var.items():
+                    validate_arrays(vals)
+
+            # If values haven't been supplied, assume zero
+            else:
+                var = {'f': np.array([0]), 'm': np.array([0])}
+
+        # If this variable is not by sex, check types and construct an array
+        else:
+            if sc.checktype(var, 'arraylike') or sc.isnumber(var):
+                var = validate_arrays(sc.promotetoarray(var))
+            else:
+                errormsg = f'Initial prevalence values of type {type(var)} not recognized, must be an array or a float.'
+                raise ValueError(errormsg)
+
+        return var
+
+
+    def apply(self, sim):
+        ''' Applying the intervention happens on the first simulation step '''
+        if sim.t != 0:
+            return
+
+        # Shorten key variables
+        ng = self['n_genotypes']
+        people = sim.people
+
+        # Error checking and validation
+        if sim['init_hpv_prev'] is not None:
+            errormsg = f'Cannot use the init_states intervention if init_hpv_prev is not None; here it is {sim["init_hpv_prev"]}.'
+            raise ValueError(errormsg)
+
+        # Assign people to age buckets
+        age_inds = np.digitize(people.age, self.age_brackets)
+
+        # Assign probabilities of having HPV to each age/sex group
+        hpv_probs = np.full(len(people), np.nan, dtype=hpd.default_float)
+        hpv_probs[people.f_inds] = self.init_hpv_prev['f'][age_inds[people.f_inds]]
+        hpv_probs[people.m_inds] = self.init_hpv_prev['m'][age_inds[people.m_inds]]
+
+        # Get indices of people who have HPV (for now, split evenly between genotypes)
+        hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
+        genotypes = np.random.randint(0, ng, len(hpv_inds))
+
+        # Figure of duration of infection and infect people
+        dur_inf = hpu.sample(**sim['dur']['inf'], size=hpv_inds)
+        t_imm_event = np.floor(np.random.uniform(-dur_inf,0) / sim['dt'])
+        _ = people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur_inf=dur_inf, layer='seed_infection')
+
+        # Check for anyone who's already got CIN and cancer
+        for g in range(ng):
+            _ = people.check_cin1(g)
+            _ = people.check_cin2(g)
+            _ = people.check_cin3(g)
+            _ = people.check_cancer(g)
+
+        # Assign probabilities of having CIN to each age/sex group
+        cin_probs = np.full(len(people), np.nan, dtype=hpd.default_float)
+        cin_probs[people.f_inds] = self.init_cin_prev[age_inds[people.f_inds]]
+        blank = hpu.true(people.cin1+people.cin2+people.cin3)
+        cin_probs[blank] = 0 # Blank out people who already have CINs
+
+        # Get indices of people who have HPV (for now, split evenly between genotypes)
+        cin_inds = hpu.true(hpu.binomial_arr(cin_probs))
+        genotypes = np.random.randint(0, ng, len(cin_inds))
+
+        # Figure of duration of infection and infect people
+        dur_inf = hpu.sample(**sim['dur']['inf'], size=hpv_inds)
+        t_imm_event = np.floor(np.random.uniform(-dur_inf,0) / sim['dt'])
+        _ = people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur_inf=dur_inf, layer='seed_infection')
+
+        ## OUTLINE
+
+        # Check that all the inds are female
+
+        # Check that the inds don't already have CIN or cancer
+
+        # Determine the distribution across CIN grades, based on their usual durations
+
+        # Draw samples from a distribution to determine how long ago CIN started
+
+        #
+        return
 

@@ -30,11 +30,16 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Population parameters
     pars['pop_size']        = 20e3      # Number of agents
-    pars['init_hpv_prevalence'] = None  # Initial HPV prevalence by age (and genotype), loaded below
     pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['death_rates']     = None      # Deaths from all other causes, loaded below
     pars['birth_rates']     = None      # Birth rates, loaded below
+
+    # Initialization parameters
+    pars['init_by_age']         = False     # Whether or not to initialize HPV, CIN, and cancer by age
+    pars['init_hpv_prev']       = 0.08      # Initial HPV prevalence
+    pars['init_cin_prev']       = 0.0012    # Initial CIN prevalence
+    pars['init_cancer_prev']    = 0.00012   # Initial cervical cancer prevalence
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
