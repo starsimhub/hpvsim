@@ -232,9 +232,9 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['cum_infections']
-                deaths = self.summary['cum_deaths']
-                results = f'{infections:n}⚙, {deaths:n}☠'
+                infections = self.summary['cum_total_infections']
+                cancers = self.summary['cum_total_cancers']
+                results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
 
@@ -281,8 +281,6 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
-            if 'init_hpv_prevalence' in pars and pars['init_hpv_prevalence'] is None:
-                pars['init_hpv_prevalence'] = hpd.default_hpv_prevalence
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 

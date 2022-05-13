@@ -13,7 +13,7 @@ import inspect
 # from . import misc as cvm
 # from . import utils as cvu
 # from . import base as cvb
-# from . import defaults as cvd
+from . import defaults as hpd
 from . import parameters as hppar
 from . import utils as hpu
 # from . import immunity as cvi
@@ -350,18 +350,18 @@ class init_states(Intervention):
         interv = cv.init_states(init_hpv_prev=0.08, init_cin_prev=0.01, init_cancer_prev=0.001)
     '''
 
-    def __init__(self, init_hpv_prev=None, init_cin_prev=None, init_cancer_prev=None, age_brackets=None):
+    def __init__(self, age_brackets=None, init_hpv_prev=None): # init_cin_prev=None, init_cancer_prev=None):
 
         # Assign age brackets
         if age_brackets is not None:
             self.age_brackets = age_brackets
         else:
             self.age_brackets = np.array([150]) # Use an arbitrarily high upper age bracket
-        self.n_age_brackets = len(age_brackets)
+        self.n_age_brackets = len(self.age_brackets)
 
         # Assign the rest of the variables, including error checking on types and length
-        self.init_hpv_prev = self.validate(init_hpv_prev)
-        self.init_cin_prev = self.validate(init_cin_prev)
+        self.init_hpv_prev = self.validate(init_hpv_prev, by_sex=True)
+        # self.init_cin_prev = self.validate(init_cin_prev)
         self.init_cancer_prev = self.validate(init_cancer_prev)
 
         return
@@ -428,7 +428,7 @@ class init_states(Intervention):
             return
 
         # Shorten key variables
-        ng = self['n_genotypes']
+        ng = sim['n_genotypes']
         people = sim.people
 
         # Error checking and validation
@@ -449,7 +449,7 @@ class init_states(Intervention):
         genotypes = np.random.randint(0, ng, len(hpv_inds))
 
         # Figure of duration of infection and infect people
-        dur_inf = hpu.sample(**sim['dur']['inf'], size=hpv_inds)
+        dur_inf = hpu.sample(**sim['dur']['inf'], size=len(hpv_inds))
         t_imm_event = np.floor(np.random.uniform(-dur_inf,0) / sim['dt'])
         _ = people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur_inf=dur_inf, layer='seed_infection')
 
@@ -460,31 +460,5 @@ class init_states(Intervention):
             _ = people.check_cin3(g)
             _ = people.check_cancer(g)
 
-        # Assign probabilities of having CIN to each age/sex group
-        cin_probs = np.full(len(people), np.nan, dtype=hpd.default_float)
-        cin_probs[people.f_inds] = self.init_cin_prev[age_inds[people.f_inds]]
-        blank = hpu.true(people.cin1+people.cin2+people.cin3)
-        cin_probs[blank] = 0 # Blank out people who already have CINs
-
-        # Get indices of people who have HPV (for now, split evenly between genotypes)
-        cin_inds = hpu.true(hpu.binomial_arr(cin_probs))
-        genotypes = np.random.randint(0, ng, len(cin_inds))
-
-        # Figure of duration of infection and infect people
-        dur_inf = hpu.sample(**sim['dur']['inf'], size=hpv_inds)
-        t_imm_event = np.floor(np.random.uniform(-dur_inf,0) / sim['dt'])
-        _ = people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur_inf=dur_inf, layer='seed_infection')
-
-        ## OUTLINE
-
-        # Check that all the inds are female
-
-        # Check that the inds don't already have CIN or cancer
-
-        # Determine the distribution across CIN grades, based on their usual durations
-
-        # Draw samples from a distribution to determine how long ago CIN started
-
-        #
         return
 

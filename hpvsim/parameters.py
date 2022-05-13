@@ -36,10 +36,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['birth_rates']     = None      # Birth rates, loaded below
 
     # Initialization parameters
-    pars['init_by_age']         = False     # Whether or not to initialize HPV, CIN, and cancer by age
-    pars['init_hpv_prev']       = 0.08      # Initial HPV prevalence
-    pars['init_cin_prev']       = 0.0012    # Initial CIN prevalence
-    pars['init_cancer_prev']    = 0.00012   # Initial cervical cancer prevalence
+    pars['init_hpv_prev']       = hpd.default_init_prev # Initial prevalence
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation

@@ -118,11 +118,29 @@ def test_interventions():
     return sim
 
 
+def test_init_states():
+    ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
+
+
+    pop_size = 50e3
+    pars = {
+        'pop_size': pop_size,
+        'init_hpv_prev': 0.08,
+        'network': 'basic',
+        'genotypes': [hpv16, hpv18],#, hpv6],#, hpv11, hpv31, hpv33],
+        'dt': .2,
+        'end': 2025
+    }
+    sim = Sim(pars=pars)
+    sim.run()
+
+    return sim
+
 
 if __name__ == '__main__':
 
     # sim0 = test_random()
-    sim1 = test_basic()
+    sim = test_init_states()
     # to_plot = []
-    sim1.plot()
+    # sim1.plot()
     # sim2 = test_interventions()
