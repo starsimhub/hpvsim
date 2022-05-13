@@ -16,7 +16,7 @@ from . import analysis as hpa
 from . import plotting as hpplt
 from .settings import options as hpo
 from . import immunity as hpimm
-from . import interventions as cvi
+from . import interventions as hpi
 
 
 # Define the model
@@ -70,6 +70,72 @@ class Sim(hpb.BaseSim):
         return self
 
 
+    def layer_keys(self):
+        '''
+        Attempt to retrieve the current layer keys.
+        '''
+        try:
+            keys = list(self['acts'].keys()) # Get keys from acts
+        except: # pragma: no cover
+            keys = []
+        return keys
+
+
+    def reset_layer_pars(self, layer_keys=None, force=False):
+        '''
+        Reset the parameters to match the population.
+
+        Args:
+            layer_keys (list): override the default layer keys (use stored keys by default)
+            force (bool): reset the parameters even if they already exist
+        '''
+        if layer_keys is None:
+            if self.people is not None: # If people exist
+                layer_keys = self.people.contacts.keys()
+            elif self.popdict is not None:
+                layer_keys = self.popdict['layer_keys']
+        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
+        return
+
+
+    def validate_layer_pars(self):
+        '''
+        Handle layer parameters, since they need to be validated after the population
+        creation, rather than before.
+        '''
+
+        # First, try to figure out what the layer keys should be and perform basic type checking
+        layer_keys = self.layer_keys()
+        layer_pars = hppar.layer_pars # The names of the parameters that are specified by layer
+        for lp in layer_pars:
+            val = self[lp]
+            if sc.isnumber(val): # It's a scalar instead of a dict, assume it's all contacts
+                self[lp] = {k:val for k in layer_keys}
+
+        # Handle key mismatches
+        for lp in layer_pars:
+            lp_keys = set(self.pars[lp].keys())
+            if not lp_keys == set(layer_keys):
+                errormsg = 'At least one layer parameter is inconsistent with the layer keys; all parameters must have the same keys:'
+                errormsg += f'\nsim.layer_keys() = {layer_keys}'
+                for lp2 in layer_pars: # Fail on first error, but re-loop to list all of them
+                    errormsg += f'\n{lp2} = ' + ', '.join(self.pars[lp2].keys())
+                raise sc.KeyNotFoundError(errormsg)
+
+        # Handle mismatches with the population
+        if self.people is not None:
+            pop_keys = set(self.people.contacts.keys())
+            if pop_keys != set(layer_keys): # pragma: no cover
+                if not len(pop_keys):
+                    errormsg = f'Your population does not have any layer keys, but your simulation does {layer_keys}. If you called cv.People() directly, you probably need cv.make_people() instead.'
+                    raise sc.KeyNotFoundError(errormsg)
+                else:
+                    errormsg = f'Please update your parameter keys {layer_keys} to match population keys {pop_keys}. You may find sim.reset_layer_pars() helpful.'
+                    raise sc.KeyNotFoundError(errormsg)
+
+        return
+
+
     def validate_pars(self, validate_layers=True):
         '''
         Some parameters can take multiple types; this makes them consistent.
@@ -120,10 +186,13 @@ class Sim(hpb.BaseSim):
         # Handle analyzers and interventions - TODO, genotypes will also go here
         for key in ['interventions', 'analyzers']: # Ensure all of them are lists
             self[key] = sc.dcp(sc.tolist(self[key], keepnone=False)) # All of these have initialize functions that run into issues if they're reused
+        for i,interv in enumerate(self['interventions']):
+            if isinstance(interv, dict): # It's a dictionary representation of an intervention
+                self['interventions'][i] = hpi.InterventionDict(**interv)
 
-        # # Optionally handle layer parameters
-        # if validate_layers:
-        #     self.validate_layer_pars()
+        # Optionally handle layer parameters
+        if validate_layers:
+            self.validate_layer_pars()
 
         # Handle verbose
         if self['verbose'] == 'brief':

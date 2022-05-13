@@ -56,33 +56,61 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     return sim
 
 
-def test_epi(do_plot=False, do_save=False): # If being run via pytest, turn off
+def test_epi():
     sc.heading('Test basic epi dynamics')
 
-    # Define parameters specific to this test
+    # Define baseline parameters and initialize sim
     base_pars = dict(n_years=10, dt=0.5)
-    pars0 = sc.mergedicts(base_pars, dict(beta=0.05))
-    pars1 = sc.mergedicts(base_pars, dict(beta=0.5))
+    sim = hps.Sim()
 
-    # Run the simulations and pull out the results
-    s0 = hps.Sim(pars0, label='Beta 0.05').run()
-    s1 = hps.Sim(pars1, label='Beta 0.5').run()
-    res0 = s0.summary
-    res1 = s1.summary
+    # Define the parameters to vary
+    vary_pars   = ['beta',        'acts',     'init_hpv_prev',    'rel_cin1_prob',    'condoms',  'debut'] # Parameters that are positively correlated with the expected number of infections/CINs/cancers
+    vary_vals   = [[0.05, 0.5],   [10,200],   [0.05,0.5],         [0.1, 2],           [0.1,0.9],  [15,25]] # Parameters that are positively correlated with the expected number of infections/CINs/cancers
+    vary_rels   = ['pos',         'pos',      'pos',              'pos',              'neg',      'neg'] # Parameters that are positively correlated with the expected number of infections/CINs/cancers
 
-    # Check results
-    for key in ['cum_total_infections', 'cum_total_cins', 'cum_total_cancers', 'n_total_infectious']:
-        v0 = res0[key]
-        v1 = res1[key]
-        print(f'Checking {key:20s} ... ', end='')
-        assert v0 <= v1, f'Expected {key} to be lower with low beta ({v0}) than high ({v1})'
-        print(f'✓ ({v0} <= {v1})')
+    # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
+    for vpar,vval,vrel in zip(vary_pars, vary_vals, vary_rels):
+        if vpar=='acts':
+            bp = sc.dcp(sim[vpar]['a'])
+            lo = {'a':{**bp, 'par1': vval[0]}}
+            hi = {'a':{**bp, 'par1': vval[1]}}
+        elif vpar=='condoms':
+            lo = {'a':vval[0]}
+            hi = {'a':vval[1]}
+        elif vpar=='debut':
+            bp = sc.dcp(sim[vpar]['f'])
+            lo = {sk:{**bp, 'par1':vval[0]} for sk in ['f','m']}
+            hi = {sk:{**bp, 'par1':vval[1]} for sk in ['f','m']}
+        else:
+            lo = vval[0]
+            hi = vval[1]
+
+        pars0 = sc.mergedicts(base_pars, {vpar:lo}) # Use lower parameter bound
+        pars1 = sc.mergedicts(base_pars, {vpar:hi}) # Use upper parameter bound
+
+        # Run the simulations and pull out the results
+        s0 = hps.Sim(pars0, label=f'{vpar} {vval[0]}').run()
+        s1 = hps.Sim(pars1, label=f'{vpar} {vval[1]}').run()
+        res0 = s0.summary
+        res1 = s1.summary
+
+        # Check results
+        for key in ['cum_total_infections', 'cum_total_cins', 'cum_total_cancers']:
+            v0 = res0[key]
+            v1 = res1[key]
+            print(f'Checking {key:20s} ... ', end='')
+            if vrel=='pos':
+                assert v0 <= v1, f'Expected {key} to be lower with {vpar}={lo} than with {vpar}={hi}, but {v0} > {v1})'
+                print(f'✓ ({v0} <= {v1})')
+            elif vrel=='neg':
+                assert v0 >= v1, f'Expected {key} to be higher with {vpar}={lo} than with {vpar}={hi}, but {v0} < {v1})'
+                print(f'✓ ({v0} => {v1})')
 
     return
 
 
-def test_sim_inputs():
-    sc.heading('Testing sim inputs')
+def test_flexible_inputs():
+    sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
     sim = hps.Sim(pop_size=100, label='test_label')
@@ -116,56 +144,80 @@ def test_sim_inputs():
     sim['init_hpv_prev'] = [0.08, 0.2] # Can't accept an array without age brackets
     with pytest.raises(ValueError):
         sim.initialize()
-    sim['init_hpv_prev'] = {'age_brackets': [15], 'tot': [0.05, 0.1]}
+    sim['init_hpv_prev'] = {'age_brackets': [15], 'tot': [0.05, 0.1]} # Array of age brackets sould be the same as array of prevalences
     with pytest.raises(ValueError):
         sim.initialize()
+
+    #The following formats are OK
     sim['init_hpv_prev'] = {'age_brackets': [15, 99], 'tot': [0.05, 0.1]}
     sim.initialize()
+    sim['init_hpv_prev'] = {'age_brackets': [15, 99], 'm': [0.05, 0.1], 'f': [0.05, 0.1]}
+    sim.initialize()
+
+    # Check layer pars are internally consistent
+    sim['condoms'] = {'invalid':30}
+    with pytest.raises(sc.KeyNotFoundError):
+        sim.validate_pars()
+    sim.reset_layer_pars() # Restore
+
+    # Check mismatch with population
+    for key in ['acts', 'condoms']:
+        sim[key] = {'invalid':1}
+    with pytest.raises(sc.KeyNotFoundError):
+        sim.validate_pars()
+    sim.reset_layer_pars() # Restore
+
+    return sim
+
+
+def test_result_consistency():
+    ''' Check that results by subgroup sum to the correct totals'''
+
+    # Create sim
+    sim = hps.Sim(pop_size=10e3, n_years=10, dt=0.5, label='test_results')
     sim.run()
 
-    # # Check layer pars are internally consistent
-    # sim['condoms'] = {'invalid':30}
-    # with pytest.raises(sc.KeyNotFoundError):
-    #     sim.validate_pars()
-    # sim.reset_layer_pars() # Restore
+    # Check that infections by age sum up the the correct totals
+    assert (sim.results['cum_total_infections'][:] == sim.results['cum_total_infections_by_age'][:].sum(axis=0)).all() # Check cumulative results by age are equal to cumulative results
+    assert (sim.results['new_total_infections'][:] == sim.results['new_total_infections_by_age'][:].sum(axis=0)).all() # Check new results by age are equal to new results
 
-    # # Check mismatch with population
-    # for key in ['acts', 'contacts', 'quar_factor']:
-    #     sim[key] = {'invalid':1}
-    # with pytest.raises(sc.KeyNotFoundError):
-    #     sim.validate_pars()
-    # sim.reset_layer_pars() # Restore
+    # Check that infections by genotype sum up the the correct totals
+    assert (sim.results['new_infections'][:].sum(axis=0)==sim.results['new_total_infections'][:]).all() # Check flows by genotype are equal to total flows
+    assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
-    # # Convert interventions dict to intervention
-    # sim['interventions'] = {'which': 'change_beta', 'pars': {'days': 10, 'changes': 0.5}}
-    # sim.validate_pars()
+    # Check that CINs by grade sum up the the correct totals
+    assert ((sim.results['new_total_cin1s'][:] + sim.results['new_total_cin2s'][:] + sim.results['new_total_cin3s'][:]) == sim.results['new_total_cins'][:]).all()
+    assert ((sim.results['new_cin1s'][:] + sim.results['new_cin2s'][:] + sim.results['new_cin3s'][:]) == sim.results['new_cins'][:]).all()
 
-    return
+    # Check that cancers and CINs by age sum up the the correct totals
+    assert (sim.results['new_total_cancers'][:] == sim.results['new_total_cancers_by_age'][:].sum(axis=0)).all()
+    assert (sim.results['new_total_cins'][:] == sim.results['new_total_cins_by_age'][:].sum(axis=0)).all()
+    assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) == sim.results['n_total_cin'][:]).all()
+    assert (sim.results['n_total_cancerous_by_age'][:, :].sum(axis=0) == sim.results['n_total_cancerous'][:]).all()
 
+    # Check demographics
+    assert (sim.results['n_alive_by_age'][:].sum(axis=0) == sim.results['n_alive'][:]).all()
+    assert (sim.results['n_alive_by_sex'][0, :] == sim.results['f_alive_by_age'][:].sum(axis=0)).all()
+    assert (sim.results['n_alive'][-1]+sim.results['cum_other_deaths'][-1]==sim['pop_size'])
+    assert (sim['pop_size'] - sim.results['cum_births'][-1] == pop_size)
 
+    # Check that males don't have CINs or cancers
+    import hpvsim.utils as hpu
+    male_inds = sim.people.is_male.nonzero()[0]
+    males_with_cin = hpu.defined(sim.people.date_cin1[:,male_inds])
+    males_with_cancer = hpu.defined(sim.people.date_cancerous[:,male_inds])
+    assert len(males_with_cin)==0
+    assert len(males_with_cancer)==0
 
-
-
-def test_init_conditions():
-    sc.heading('Test initial conditions')
-
-    # Define parameters specific to this test
-
-    # Run the simulations and pull out the results
-    s0 = hps.Sim(pars0, label='Beta 0.05').run()
-    s1 = hps.Sim(pars1, label='Beta 0.5').run()
-    res0 = s0.summary
-    res1 = s1.summary
-
-    # Check results
-    for key in ['cum_total_infections', 'cum_total_cins', 'cum_total_cancers', 'n_total_infectious']:
-        v0 = res0[key]
-        v1 = res1[key]
-        print(f'Checking {key:20s} ... ', end='')
-        assert v0 <= v1, f'Expected {key} to be lower with low beta ({v0}) than high ({v1})'
-        print(f'✓ ({v0} <= {v1})')
+    # Check that people younger than debut don't have HPV
+    virgin_inds = (~sim.people.is_active).nonzero()[0]
+    virgins_with_hpv = hpu.defined(sim.people.date_infectious[:,virgin_inds])
+    assert len(virgins_with_hpv)==0
 
     return
+
+
+
 
 
 
@@ -242,7 +294,8 @@ if __name__ == '__main__':
     # sim0 = test_microsim()
     # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
     # sim2 = test_epi()
-    sim3 = test_sim_inputs()
+    # sim3 = test_flexible_inputs()
+    sim4 = test_result_consistency()
     # json = test_fileio()
     # sim2 = test_sim_data(do_plot=do_plot)
     # sim3 = test_dynamic_resampling(do_plot=do_plot)
