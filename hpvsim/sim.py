@@ -121,6 +121,10 @@ class Sim(hpb.BaseSim):
         for key in ['interventions', 'analyzers']: # Ensure all of them are lists
             self[key] = sc.dcp(sc.tolist(self[key], keepnone=False)) # All of these have initialize functions that run into issues if they're reused
 
+        # # Optionally handle layer parameters
+        # if validate_layers:
+        #     self.validate_layer_pars()
+
         # Handle verbose
         if self['verbose'] == 'brief':
             self['verbose'] = -1
@@ -138,33 +142,44 @@ class Sim(hpb.BaseSim):
         by age and genotype. We also check the prevalence values are ok.
         '''
 
-        def validate_arrays(vals, n_age_brackets):
+        def validate_arrays(vals, n_age_brackets=None):
             ''' Little helper function to check prevalence values '''
-            if len(vals) not in [1, n_age_brackets]:
-                errormsg = f'The initial prevalence values must either be floats or arrays of length {self.n_age_brackets}, not length {len(vals)}.'
-                raise ValueError(errormsg)
+            if n_age_brackets is not None:
+                if len(vals) != n_age_brackets:
+                    errormsg = f'The initial prevalence values must either be the same length as the age brackets: {len(vals)} vs {n_age_brackets}.'
+                    raise ValueError(errormsg)
+            else:
+                if len(vals) != 1:
+                    errormsg = f'No age brackets were supplied, but more than one prevalence value was supplied ({len(vals)}). An array of prevalence values can only be supplied along with an array of corresponding age brackets.'
+                    raise ValueError(errormsg)
             if vals.any() < 0 or vals.any() > 1:
                 errormsg = f'The initial prevalence values must either between 0 and 1, not {vals}.'
                 raise ValueError(errormsg)
+
             return
 
         # If values have been provided, validate them
         sex_keys = {'m', 'f'}
         tot_keys = ['all', 'total', 'tot', 'average', 'avg']
+        n_age_brackets = None
 
         if init_hpv_prev is not None:
             if sc.checktype(init_hpv_prev, dict):
                 # Get age brackets if supplied
                 if 'age_brackets' in init_hpv_prev.keys():
                     age_brackets = init_hpv_prev.pop('age_brackets')
+                    n_age_brackets = len(age_brackets)
                 else:
                     age_brackets = np.array([150])
-                n_age_brackets = len(age_brackets)
 
                 # Handle the rest of the keys
-                if (init_hpv_prev.keys() != sex_keys) or (len(init_hpv_prev.keys())==1 and init_hpv_prev.keys()[0] not in tot_keys):
+                var_keys = list(init_hpv_prev.keys())
+                if (len(var_keys)==1 and var_keys[0] not in tot_keys) or (len(var_keys)>1 and set(var_keys) != sex_keys):
                     errormsg = f'Could not understand the initial prevalence provided: {init_hpv_prev}. If supplying a dictionary, please use "m" and "f" keys or "tot". '
                     raise ValueError(errormsg)
+                if len(var_keys) == 1:
+                    k = var_keys[0]
+                    init_hpv_prev = {sk: sc.promotetoarray(init_hpv_prev[k]) for sk in sex_keys}
 
                 # Now set the values
                 for k, vals in init_hpv_prev.items():
@@ -174,7 +189,6 @@ class Sim(hpb.BaseSim):
                 # If it's an array, assume these values apply to males and females
                 init_hpv_prev = {sk: sc.promotetoarray(init_hpv_prev) for sk in sex_keys}
                 age_brackets = np.array([150])
-                n_age_brackets = len(age_brackets)
 
             else:
                 errormsg = f'Initial prevalence values of type {type(var)} not recognized, must be a dict, an array, or a float.'
