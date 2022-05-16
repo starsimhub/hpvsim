@@ -23,7 +23,7 @@ hpv33 = genotype('hpv33')
 
 
 
-def test_basic(test_results=True):
+def test_basic(doplot=True):
     ''' Make a sim with two kinds of partnership, regular and casual and 2 HPV genotypes'''
 
     pop_size = 50e3
@@ -36,6 +36,7 @@ def test_basic(test_results=True):
     }
     sim = Sim(pars=pars)
     sim.run()
+    sim.plot()
     return sim
 
 
