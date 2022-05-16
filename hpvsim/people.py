@@ -203,6 +203,12 @@ class People(hpb.BasePeople):
         age_inds, new_cancers = np.unique(new_cancer * self.age_brackets, return_counts=True)
         self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
 
+        if self.total_flows['new_total_cins'] != self.total_flows_by_age['new_total_cins_by_age'].sum():
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
+
         return new_people
 
 
@@ -264,7 +270,7 @@ class People(hpb.BasePeople):
         else:
             not_current = hpu.ifalsei(current, filter_inds)
         has_date = hpu.idefinedi(date, not_current)
-        inds     = hpu.itrue(self.t >= date[has_date], has_date)
+        inds     = hpu.itrue(self.t == date[has_date], has_date)
         return inds
 
     def check_inds_true(self, current, date, filter_inds=None):
@@ -280,7 +286,7 @@ class People(hpb.BasePeople):
     def check_cin1(self, genotype):
         ''' Check for new progressions to CIN1 '''
         # Only include infectious females who haven't already cleared CIN1 or progressed to CIN2
-        filters = self.infectious[genotype,:]*self.is_female*~(self.date_cin1_clearance[genotype,:]<self.t)*(self.date_cin2[genotype,:]>self.t)
+        filters = self.infectious[genotype,:]*self.is_female*~(self.date_cin1_clearance[genotype,:]<=self.t)*(self.date_cin2[genotype,:]>=self.t)
         filter_inds = filters.nonzero()[0]
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
@@ -512,8 +518,8 @@ class People(hpb.BasePeople):
         # Only women can progress beyond infection.
         for g in range(ng):
 
-            # Apply filters so we only select females with this genotype who don't already have a CIN1 attributable to this genotype
-            filters     = self.is_female[inds] * (genotypes==g) * ~(self.cin1[g,inds])
+            # Apply filters so we only select females with this genotype who don't already have a CIN attributable to this genotype
+            filters     = self.is_female[inds] * (genotypes==g) * ~(self.cin1[g,inds]) * ~(self.cin2[g,inds]) * ~(self.cin3[g,inds])
             # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
             cin1_probs  = progprobs[g]['rel_cin1_prob'] * progpars['cin1_probs'][dur_inds] * filters
             is_cin1     = hpu.binomial_arr(cin1_probs)
@@ -538,7 +544,8 @@ class People(hpb.BasePeople):
             cin2_inds = cin1_inds[is_cin2]
 
             # CIN1 with no progression to CIN2
-            self.date_cin1_clearance[g, no_cin2_inds] = np.fmax(self.date_cin1_clearance[g, no_cin2_inds],self.date_cin1[g, no_cin2_inds] + np.ceil(dur_cin1[~is_cin2] / dt))  # Date they clear CIN1
+            self.date_cin1_clearance[g, no_cin2_inds]   = np.fmax(self.date_cin1_clearance[g, no_cin2_inds],self.date_cin1[g, no_cin2_inds] + np.ceil(dur_cin1[~is_cin2] / dt))  # Date they clear CIN1
+            self.date_cin1_clearance[g, cin2_inds]      = np.nan # For people who are going to advance, remove any previous CIN clearance date
 
             # CIN1 with progression to CIN2
             n_cin2_inds = len(cin2_inds)
@@ -556,7 +563,8 @@ class People(hpb.BasePeople):
             cin3_inds = cin2_inds[is_cin3]
 
             # CIN2 with no progression to CIN3
-            self.date_cin2_clearance[g, no_cin3_inds] = np.fmax(self.date_cin2_clearance[g, no_cin3_inds],self.date_cin2[g, no_cin3_inds] + np.ceil(dur_cin2[~is_cin3] / dt) ) # Date they clear CIN2
+            self.date_cin2_clearance[g, no_cin3_inds]   = np.fmax(self.date_cin2_clearance[g, no_cin3_inds],self.date_cin2[g, no_cin3_inds] + np.ceil(dur_cin2[~is_cin3] / dt) ) # Date they clear CIN2
+            self.date_cin2_clearance[g, cin3_inds]      = np.nan # For people who are going to advance, remove any previous CIN clearance date
 
             # Case 2.4: CIN2 with progression to CIN3
             n_cin3_inds = len(cin3_inds)
@@ -575,6 +583,7 @@ class People(hpb.BasePeople):
 
             # Case 2.1: CIN3 with no progression to cancer
             self.date_cin3_clearance[g, no_cancer_inds] = np.fmax(self.date_cin3_clearance[g, no_cancer_inds],self.date_cin3[g, no_cancer_inds] + np.ceil(dur_cin3[~is_cancer] / dt))  # Date they clear CIN3
+            self.date_cin3_clearance[g, cancer_inds]    = np.nan # For people who are going to advance, remove any previous CIN clearance date
 
             # Case 2.2: CIN3 with progression to cancer
             self.dur_cin2cancer[g, cancer_inds] = dur_cin3[is_cancer]

@@ -7,6 +7,7 @@ import os
 import pytest
 import sys
 import sciris as sc
+import numpy as np
 
 # Add module to paths and import hpvsim
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -64,9 +65,9 @@ def test_epi():
     sim = hps.Sim()
 
     # Define the parameters to vary
-    vary_pars   = ['beta',        'acts',     'init_hpv_prev',    'rel_cin1_prob',    'condoms',  'debut'] # Parameters that are positively correlated with the expected number of infections/CINs/cancers
-    vary_vals   = [[0.05, 0.5],   [10,200],   [0.05,0.5],         [0.1, 2],           [0.1,0.9],  [15,25]] # Parameters that are positively correlated with the expected number of infections/CINs/cancers
-    vary_rels   = ['pos',         'pos',      'pos',              'pos',              'neg',      'neg'] # Parameters that are positively correlated with the expected number of infections/CINs/cancers
+    vary_pars   = ['beta',        'acts',     'condoms',  'debut'] # Parameters
+    vary_vals   = [[0.05, 0.5],   [10,200],   [0.1,0.9],  [15,25]] # Values
+    vary_rels   = ['pos',         'pos',      'neg',      'neg'] # Expected association with infections
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel in zip(vary_pars, vary_vals, vary_rels):
@@ -95,7 +96,7 @@ def test_epi():
         res1 = s1.summary
 
         # Check results
-        for key in ['cum_total_infections', 'cum_total_cins', 'cum_total_cancers']:
+        for key in ['cum_total_infections']:
             v0 = res0[key]
             v1 = res1[key]
             print(f'Checking {key:20s} ... ', end='')
@@ -174,7 +175,8 @@ def test_result_consistency():
     ''' Check that results by subgroup sum to the correct totals'''
 
     # Create sim
-    sim = hps.Sim(pop_size=10e3, n_years=10, dt=0.5, label='test_results')
+    pop_size = 10e3
+    sim = hps.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
     sim.run()
 
     # Check that infections by age sum up the the correct totals
@@ -210,8 +212,8 @@ def test_result_consistency():
     assert len(males_with_cancer)==0
 
     # Check that people younger than debut don't have HPV
-    virgin_inds = (~sim.people.is_active).nonzero()[0]
-    virgins_with_hpv = hpu.defined(sim.people.date_infectious[:,virgin_inds])
+    virgin_inds = (~sim.people.is_active).nonzero()[-1]
+    virgins_with_hpv = (~np.isnan(sim.people.date_infectious[:,virgin_inds])).nonzero()[-1]
     assert len(virgins_with_hpv)==0
 
     return
@@ -224,8 +226,8 @@ def test_result_consistency():
 # def test_fileio():
 #     sc.heading('Test file saving')
 #
-#     json_path = 'test_covasim.json'
-#     xlsx_path = 'test_covasim.xlsx'
+#     json_path = 'test_hpvsim.json'
+#     xlsx_path = 'test_hpvsim.xlsx'
 #
 #     # Create and run the simulation
 #     sim = hps.Sim()
@@ -249,39 +251,6 @@ def test_result_consistency():
 #     return json
 
 
-# def test_sim_data(do_plot=False):
-#     sc.heading('Data test')
-#
-#     pars = dict(
-#         pop_size = 2000,
-#         start_day = '2020-02-25',
-#         )
-#
-#     # Create and run the simulation
-#     sim = cv.Sim(pars=pars, datafile=os.path.join(sc.thisdir(__file__), 'example_data.csv'))
-#     sim.run()
-#
-#     # Optionally plot
-#     if do_plot:
-#         sim.plot()
-#
-#     return sim
-
-
-# def test_dynamic_resampling(do_plot=False): # If being run via pytest, turn off
-#     sc.heading('Test dynamic resampling')
-#
-#     pop_size = 1000
-#     sim = cv.Sim(pop_size=pop_size, rescale=1, pop_scale=1000, n_days=180, rescale_factor=2)
-#     sim.run()
-#
-#     # Optionally plot
-#     if do_plot:
-#         sim.plot()
-#
-#     # Create and run a basic simulation
-#     assert sim.results['cum_infections'][-1] > pop_size  # infections at the end of sim should be much more than internal pop
-#     return sim
 
 
 
@@ -291,14 +260,12 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
-    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
-    # sim3 = test_flexible_inputs()
+    sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim2 = test_epi()
+    sim3 = test_flexible_inputs()
     sim4 = test_result_consistency()
-    # json = test_fileio()
-    # sim2 = test_sim_data(do_plot=do_plot)
-    # sim3 = test_dynamic_resampling(do_plot=do_plot)
+     # json = test_fileio()
 
     sc.toc(T)
     print('Done.')

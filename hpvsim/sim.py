@@ -509,15 +509,15 @@ class Sim(hpb.BaseSim):
 
         # Shorten key variables
         ng = self['n_genotypes']
-        people = self.people
 
         # Assign people to age buckets
-        age_inds = np.digitize(people.age, age_brackets)
+        age_inds = np.digitize(self.people.age, age_brackets)
 
         # Assign probabilities of having HPV to each age/sex group
-        hpv_probs = np.full(len(people), np.nan, dtype=hpd.default_float)
-        hpv_probs[people.f_inds] = init_hpv_prev['f'][age_inds[people.f_inds]]
-        hpv_probs[people.m_inds] = init_hpv_prev['m'][age_inds[people.m_inds]]
+        hpv_probs = np.full(len(self.people), np.nan, dtype=hpd.default_float)
+        hpv_probs[self.people.f_inds] = init_hpv_prev['f'][age_inds[self.people.f_inds]]
+        hpv_probs[self.people.m_inds] = init_hpv_prev['m'][age_inds[self.people.m_inds]]
+        hpv_probs[~self.people.is_active] = 0 # Blank out people who are not yet sexually active
 
         # Get indices of people who have HPV (for now, split evenly between genotypes)
         hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
@@ -526,13 +526,7 @@ class Sim(hpb.BaseSim):
         # Figure of duration of infection and infect people
         dur_inf = hpu.sample(**self['dur']['inf'], size=len(hpv_inds))
         t_imm_event = np.floor(np.random.uniform(-dur_inf, 0) / self['dt'])
-        new_infections = people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur_inf=dur_inf,
-                          layer='seed_infection')
-
-        self.results['cum_infections'].values           += new_infections[:,None]
-        self.results['cum_total_infections'][:]         += sum(new_infections)
-        self.results['cum_infections_by_age'][:]        += self.people.flows_by_age['new_infections_by_age'][:,:,None]
-        self.results['cum_total_infections_by_age'][:]  += self.people.total_flows_by_age['new_total_infections_by_age'][:,None]
+        _ = self.people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur_inf=dur_inf, layer='seed_infection')
 
         return
 
