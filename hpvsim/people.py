@@ -203,12 +203,6 @@ class People(hpb.BasePeople):
         age_inds, new_cancers = np.unique(new_cancer * self.age_brackets, return_counts=True)
         self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
 
-        if self.total_flows['new_total_cins'] != self.total_flows_by_age['new_total_cins_by_age'].sum():
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
-
         return new_people
 
 

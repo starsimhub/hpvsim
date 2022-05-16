@@ -59,7 +59,7 @@ def find_day(arr, t=None, interv=None, sim=None, which='first'):
 
 #%% Generic intervention classes
 
-__all__ = ['Intervention', 'InterventionDict']
+__all__ = ['Intervention']
 
 
 class Intervention:
