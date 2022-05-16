@@ -425,9 +425,12 @@ class People(hpb.BasePeople):
         and stores who infected whom in infection_log list.
 
         Args:
-            inds     (array): array of people to infect
-            source   (array): source indices of the people who transmitted this infection (None if an importation or seed infection)
-            layer    (str):   contact layer this infection was transmitted on
+            inds      (array): array of people to infect
+            genotypes (array): array of genotypes to infect people with
+            source    (array): source indices of the people who transmitted this infection (None if an importation or seed infection)
+            offset    (array): if provided, the infections will occur at the timepoint self.t+offset
+            dur_inf   (array): if provided, the duration of the infections
+            layer     (str):   contact layer this infection was transmitted on
 
         Returns:
             count (int): number of people infected
