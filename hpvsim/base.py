@@ -370,7 +370,7 @@ class BaseSim(ParsObj):
 
         **Examples**::
             sim.get_t('2015-03-01') # Get the closest timepoint to the specified date
-            sim.get_t(2015) # Can use floats
+            sim.get_t(3) # Will return 3
             sim.get_t('2015') # Can use strings
             sim.get_t(['2015.5', '2016.5']) # List of strings, will match as close as possible
             sim.get_t(['2015.5', '2016.5'], exact_match=True) # Raises an error since these dates aren't directly simulated
@@ -384,32 +384,41 @@ class BaseSim(ParsObj):
             if date in ['end', -1]: 
                 date = self['end']
 
-            # Try to convert from date-time format, and if this doesn't work,
-            # try to interpret it as a float, otherwise raise an error
-            try:
-                tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
-            except:
-                try:
-                    tp_raw  = float(date)
-                except:
-                    errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
+            # If it's an integer, make sure it's in the sim tvec
+            if sc.checktype(date, int):
+                if date in self.tvec:
+                    tp = date
+                else:
+                    errormsg = f'The requested timepoint {date} must be within the sim tvec: {self.tvec[0], self.tvec[-1]}.'
                     raise ValueError(errormsg)
 
-            # If the requested date is within the range of years covered by the sim,
-            # return the closest date
-            if (tp_raw >= self['start']) and (tp_raw <= self['end']):
-                if exact_match:
-                    tp_ind = sc.findinds(self.yearvec, tp_raw)
-                    if len(tp_ind)>0:
-                        tp = tp_ind[0]
-                    else:
-                        errormsg = f'The requested date {date} was not simulated; try exact_match=False to obtain the nearest date.'
+            # If it's not an integer, try to convert from date-time format, and if this doesn't work,
+            # try to interpret it as a float, otherwise raise an error
+            else:
+                try:
+                    tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
+                except:
+                    try:
+                        tp_raw  = float(date)
+                    except:
+                        errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
                         raise ValueError(errormsg)
+
+                # If the requested date is within the range of years covered by the sim,
+                # return the closest date
+                if (tp_raw >= self['start']) and (tp_raw <= self['end']):
+                    if exact_match:
+                        tp_ind = sc.findinds(self.yearvec, tp_raw)
+                        if len(tp_ind)>0:
+                            tp = tp_ind[0]
+                        else:
+                            errormsg = f'The requested date {date} was not simulated; try exact_match=False to obtain the nearest date.'
+                            raise ValueError(errormsg)
+                    else:
+                        tp = sc.findnearest(self.yearvec, tp_raw) # Get the nearest timestep to the requested one
                 else:
-                    tp = sc.findnearest(self.yearvec, tp_raw) # Get the nearest timestep to the requested one
-            else: 
-                errormsg = f'The requested date {date} must be within the simulation dates: {self["start"], self["end"]}.'
-                raise ValueError(errormsg)
+                    errormsg = f'The requested date {date} must be within the simulation dates: {self["start"], self["end"]}.'
+                    raise ValueError(errormsg)
 
             tps.append(tp)
 

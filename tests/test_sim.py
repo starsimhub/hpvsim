@@ -65,12 +65,13 @@ def test_epi():
     sim = hps.Sim()
 
     # Define the parameters to vary
-    vary_pars   = ['beta',        'acts',     'condoms',  'debut'] # Parameters
-    vary_vals   = [[0.05, 0.5],   [10,200],   [0.1,0.9],  [15,25]] # Values
-    vary_rels   = ['pos',         'pos',      'neg',      'neg'] # Expected association with infections
+    vary_pars   = ['beta',          'acts',         'condoms',      'debut',        'rel_cin1_prob',    'init_hpv_prev'] # Parameters
+    vary_vals   = [[0.05, 0.5],     [10,200],       [0.1,0.9],      [15,25],        [0.1, 2],           [0.01,0.5]] # Values
+    vary_rels   = ['pos',           'pos',          'neg',          'neg',          'pos',              'pos'] # Expected association with epi outcomes
+    vary_what   = ['infections',    'infections',   'infections',   'infections',   'cin1s',            'cin1s'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
-    for vpar,vval,vrel in zip(vary_pars, vary_vals, vary_rels):
+    for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
         if vpar=='acts':
             bp = sc.dcp(sim[vpar]['a'])
             lo = {'a':{**bp, 'par1': vval[0]}}
@@ -96,16 +97,16 @@ def test_epi():
         res1 = s1.summary
 
         # Check results
-        for key in ['cum_total_infections']:
-            v0 = res0[key]
-            v1 = res1[key]
-            print(f'Checking {key:20s} ... ', end='')
-            if vrel=='pos':
-                assert v0 <= v1, f'Expected {key} to be lower with {vpar}={lo} than with {vpar}={hi}, but {v0} > {v1})'
-                print(f'✓ ({v0} <= {v1})')
-            elif vrel=='neg':
-                assert v0 >= v1, f'Expected {key} to be higher with {vpar}={lo} than with {vpar}={hi}, but {v0} < {v1})'
-                print(f'✓ ({v0} => {v1})')
+        key='cum_total_'+vwhat
+        v0 = res0[key]
+        v1 = res1[key]
+        print(f'Checking {key:20s} ... ', end='')
+        if vrel=='pos':
+            assert v0 <= v1, f'Expected {key} to be lower with {vpar}={lo} than with {vpar}={hi}, but {v0} > {v1})'
+            print(f'✓ ({v0} <= {v1})')
+        elif vrel=='neg':
+            assert v0 >= v1, f'Expected {key} to be higher with {vpar}={lo} than with {vpar}={hi}, but {v0} < {v1})'
+            print(f'✓ ({v0} => {v1})')
 
     return
 
@@ -235,6 +236,40 @@ def test_location_loading():
     return
 
 
+def test_resuming():
+    sc.heading('Test that resuming a run works')
+
+    pop_size = 10e3
+    s0 = hps.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_resume')
+    s1 = s0.copy()
+    s0.run()
+
+    # Cannot run the same simulation multiple times
+    with pytest.raises(hps.AlreadyRunError):
+        s0.run()
+
+    # If until=0 then no timesteps will be taken
+    with pytest.raises(hps.AlreadyRunError):
+        s1.run(until='2015', reset_seed=False)
+    assert s1.initialized # It should still have been initialized though
+    with pytest.raises(RuntimeError):
+        s1.compute_summary(require_run=True) # Not ready yet
+
+    s1.run(until='2020', reset_seed=False)
+    with pytest.raises(hps.AlreadyRunError):
+        s1.run(until=10, reset_seed=False) # Error if running up to the same value
+    with pytest.raises(hps.AlreadyRunError):
+        s1.run(until=5, reset_seed=False) # Error if running until a previous timestep
+
+    s1.run(until='2023', reset_seed=False)
+    s1.run(reset_seed=False)
+    with pytest.raises(hps.AlreadyRunError):
+        s1.finalize() # Can't re-finalize a finalized sim
+
+    assert np.all(s0.results['cum_total_infections'].values == s1.results['cum_total_infections']) # Results should be identical
+
+    return s1
+
 
 # def test_fileio():
 #     sc.heading('Test file saving')
@@ -279,6 +314,7 @@ if __name__ == '__main__':
     sim3 = test_flexible_inputs()
     sim4 = test_result_consistency()
     sim5 = test_location_loading()
+    sim6 = test_resuming()
     # json = test_fileio()
 
     sc.toc(T)

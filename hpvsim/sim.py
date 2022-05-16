@@ -716,7 +716,7 @@ class Sim(hpb.BaseSim):
 
         # Check for AlreadyRun errors
         errormsg = None
-        until = self.npts if until is None else self.day(until)
+        until = self.npts if until is None else self.get_t(until)
         if until > self.npts:
             errormsg = f'Requested to run until t={until} but the simulation end is t={self.npts}'
         if self.t >= until: # NB. At the start, self.t is None so this check must occur after initialization
