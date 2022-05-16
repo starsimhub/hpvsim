@@ -220,6 +220,19 @@ def test_result_consistency():
 
 
 
+def test_location_loading():
+    ''' Check that data by location can be loaded '''
+
+    sim0 = hps.Sim() # Default values
+    sim1 = hps.Sim(location='zimbabwe') # Zimbabwe values
+    sim2 = hps.Sim(location='Zimbabwe') # Location should not be case sensitive
+    assert (sim0['birth_rates'][1] != sim1['birth_rates'][1]).all() # Values for Zimbabwe should be different to default values
+    assert (sim1['birth_rates'][1] == sim2['birth_rates'][1]).all() # Values for Zimbabwe should be loaded regardless of capitalization
+    with pytest.warns(RuntimeWarning): # If the location doesn't exist, should use defaults
+        sim3 = hps.Sim(location='penelope') # Make sure a warning message is raised
+    assert (sim0['birth_rates'][1] == sim3['birth_rates'][1]).all() # Check that defaults have been used
+
+    return
 
 
 
@@ -265,7 +278,8 @@ if __name__ == '__main__':
     sim2 = test_epi()
     sim3 = test_flexible_inputs()
     sim4 = test_result_consistency()
-     # json = test_fileio()
+    sim5 = test_location_loading()
+    # json = test_fileio()
 
     sc.toc(T)
     print('Done.')

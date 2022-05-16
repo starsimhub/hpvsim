@@ -220,7 +220,7 @@ def get_prognoses():
     return prognoses
 
 
-def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
+def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=None):
     '''
     Get mortality and fertility data by location if provided, or use default
 
@@ -245,7 +245,7 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
             birth_rates = hpdata.get_birth_rates(location=location)
         except ValueError as E:
             warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
-            hpm.warn(warnmsg)
+            hpm.warn(warnmsg, die=die)
     
     return birth_rates, death_rates
 

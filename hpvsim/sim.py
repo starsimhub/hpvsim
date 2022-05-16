@@ -457,7 +457,7 @@ class Sim(hpb.BaseSim):
             self['interventions'] = self._orig_pars.pop('interventions') # Restore
 
         for i,intervention in enumerate(self['interventions']):
-            if isinstance(intervention, cvi.Intervention):
+            if isinstance(intervention, hpi.Intervention):
                 intervention.initialize(self)
         return
 
