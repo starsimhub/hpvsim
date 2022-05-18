@@ -201,8 +201,8 @@ def test_result_consistency():
     # Check demographics
     assert (sim.results['n_alive_by_age'][:].sum(axis=0) == sim.results['n_alive'][:]).all()
     assert (sim.results['n_alive_by_sex'][0, :] == sim.results['f_alive_by_age'][:].sum(axis=0)).all()
-    assert (sim.results['n_alive'][-1]+sim.results['cum_other_deaths'][-1]==sim['pop_size'])
-    assert (sim['pop_size'] - sim.results['cum_births'][-1] == pop_size)
+    assert (sim.results['n_alive'][-1]+sim.results['cum_other_deaths'][-1]-sim.results['cum_births'][-1] == sim['pop_size'])
+    assert (sim['pop_size'] == pop_size)
 
     # Check that males don't have CINs or cancers
     import hpvsim.utils as hpu
