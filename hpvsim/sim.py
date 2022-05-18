@@ -573,6 +573,9 @@ class Sim(hpb.BaseSim):
         contacts = people.contacts # Shorten
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
+        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
+        if len(has_imm):
+            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
         hpimm.check_immunity(people)
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
@@ -687,10 +690,6 @@ class Sim(hpb.BaseSim):
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
-
-        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
-        if len(has_imm):
-            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
 
         # Tidy up
         self.t += 1

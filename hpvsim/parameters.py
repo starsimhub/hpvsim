@@ -72,8 +72,8 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
 
     # Parameters used to calculate immunity
-    pars['imm_init'] = dict(dist='beta', par1=5, par2=1)  # beta distribution for initial level of immunity following infection clearance
-    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=3), # decay rate, with half life in YEARS
+    pars['imm_init'] = dict(dist='beta', par1=20, par2=1)  # beta distribution for initial level of immunity following infection clearance
+    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=10), # decay rate, with half life in YEARS
                              vaccine=dict(form='exp_decay', init_val=1, half_life=20)) # decay rate, with half life in YEARS
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
     pars['imm_boost'] = 1.5  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.

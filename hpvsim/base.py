@@ -1134,10 +1134,6 @@ class BasePeople(FlexPretty):
                 errormsg = f'Not sure how to combine arrays of {npval.ndim} dimensions for {key}'
                 raise NotImplementedError(errormsg)
 
-        # Validate
-        self.pars['pop_size'] += people2.pars['pop_size']
-        self.validate()
-
         # Reassign UIDs so they're unique
         self.set('uid', np.arange(len(self)))
 

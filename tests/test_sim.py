@@ -154,7 +154,7 @@ def test_flexible_inputs():
     sim['init_hpv_prev'] = {'age_brackets': [15, 99], 'tot': [0.05, 0.1]}
     sim.initialize()
     sim['init_hpv_prev'] = {'age_brackets': [15, 99], 'm': [0.05, 0.1], 'f': [0.05, 0.1]}
-    sim.initialize()
+    sim.initialize(reset=True)
 
     # Check layer pars are internally consistent
     sim['condoms'] = {'invalid':30}
