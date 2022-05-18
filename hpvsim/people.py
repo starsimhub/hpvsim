@@ -440,7 +440,15 @@ class People(hpb.BasePeople):
             return 0
 
         # Remove duplicates
+        orig_len = len(inds)
         inds, unique = np.unique(inds, return_index=True)
+
+        if orig_len != len(inds):
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
+
         genotypes = genotypes[unique]
         if source is not None:
             source = source[unique]

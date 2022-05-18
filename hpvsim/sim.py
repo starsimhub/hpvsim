@@ -600,7 +600,7 @@ class Sim(hpb.BaseSim):
             m = ms[ln]
 
             # Compute transmissibility for each partnership
-            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln])
+            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln]) # Probability of
             foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
@@ -611,7 +611,10 @@ class Sim(hpb.BaseSim):
 
             for pship_inds, sources, targets, genotypes in discordant_pairs:
                 betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
-                source_inds, target_inds, genotype_inds = hpu.compute_infections(betas, sources, targets, genotypes)  # Calculate transmission
+                target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
+                target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
+                source_inds = sources[unique_inds]  # Extract indices of those who passed on an infection
+                genotype_inds = genotypes[unique_inds]  # Extract genotypes that have been transmitted
                 people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
 
             ln += 1
