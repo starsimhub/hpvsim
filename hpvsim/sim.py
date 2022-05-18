@@ -16,7 +16,7 @@ from . import analysis as hpa
 from . import plotting as hpplt
 from .settings import options as hpo
 from . import immunity as hpimm
-from . import interventions as cvi
+from . import interventions as hpi
 
 
 # Define the model
@@ -50,7 +50,7 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def initialize(self, reset=False, init_infections=True, **kwargs):
+    def initialize(self, reset=False, init_states=True, **kwargs):
         '''
         Perform all initializations on the sim.
         '''
@@ -60,7 +60,7 @@ class Sim(hpb.BaseSim):
         self.init_genotypes() # Initialize the genotypes
         self.init_immunity() # initialize information about immunity
         self.init_results() # After initializing the genotypes, create the results structure
-        self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
+        self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_interventions()  # Initialize the interventions...
         self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
@@ -68,6 +68,72 @@ class Sim(hpb.BaseSim):
         self.complete      = False
         self.results_ready = False
         return self
+
+
+    def layer_keys(self):
+        '''
+        Attempt to retrieve the current layer keys.
+        '''
+        try:
+            keys = list(self['acts'].keys()) # Get keys from acts
+        except: # pragma: no cover
+            keys = []
+        return keys
+
+
+    def reset_layer_pars(self, layer_keys=None, force=False):
+        '''
+        Reset the parameters to match the population.
+
+        Args:
+            layer_keys (list): override the default layer keys (use stored keys by default)
+            force (bool): reset the parameters even if they already exist
+        '''
+        if layer_keys is None:
+            if self.people is not None: # If people exist
+                layer_keys = self.people.contacts.keys()
+            elif self.popdict is not None:
+                layer_keys = self.popdict['layer_keys']
+        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
+        return
+
+
+    def validate_layer_pars(self):
+        '''
+        Handle layer parameters, since they need to be validated after the population
+        creation, rather than before.
+        '''
+
+        # First, try to figure out what the layer keys should be and perform basic type checking
+        layer_keys = self.layer_keys()
+        layer_pars = hppar.layer_pars # The names of the parameters that are specified by layer
+        for lp in layer_pars:
+            val = self[lp]
+            if sc.isnumber(val): # It's a scalar instead of a dict, assume it's all contacts
+                self[lp] = {k:val for k in layer_keys}
+
+        # Handle key mismatches
+        for lp in layer_pars:
+            lp_keys = set(self.pars[lp].keys())
+            if not lp_keys == set(layer_keys):
+                errormsg = 'At least one layer parameter is inconsistent with the layer keys; all parameters must have the same keys:'
+                errormsg += f'\nsim.layer_keys() = {layer_keys}'
+                for lp2 in layer_pars: # Fail on first error, but re-loop to list all of them
+                    errormsg += f'\n{lp2} = ' + ', '.join(self.pars[lp2].keys())
+                raise sc.KeyNotFoundError(errormsg)
+
+        # Handle mismatches with the population
+        if self.people is not None:
+            pop_keys = set(self.people.contacts.keys())
+            if pop_keys != set(layer_keys): # pragma: no cover
+                if not len(pop_keys):
+                    errormsg = f'Your population does not have any layer keys, but your simulation does {layer_keys}. If you called cv.People() directly, you probably need cv.make_people() instead.'
+                    raise sc.KeyNotFoundError(errormsg)
+                else:
+                    errormsg = f'Please update your parameter keys {layer_keys} to match population keys {pop_keys}. You may find sim.reset_layer_pars() helpful.'
+                    raise sc.KeyNotFoundError(errormsg)
+
+        return
 
 
     def validate_pars(self, validate_layers=True):
@@ -117,9 +183,16 @@ class Sim(hpb.BaseSim):
             errormsg = f'Population type "{choice}" not available; choices are: {choicestr}'
             raise ValueError(errormsg)
 
-        # Handle analyzers - TODO, interventions and genotypes will also go here
+        # Handle analyzers and interventions - TODO, genotypes will also go here
         for key in ['interventions', 'analyzers']: # Ensure all of them are lists
             self[key] = sc.dcp(sc.tolist(self[key], keepnone=False)) # All of these have initialize functions that run into issues if they're reused
+        for i,interv in enumerate(self['interventions']):
+            if isinstance(interv, dict): # It's a dictionary representation of an intervention
+                self['interventions'][i] = hpi.InterventionDict(**interv)
+
+        # Optionally handle layer parameters
+        if validate_layers:
+            self.validate_layer_pars()
 
         # Handle verbose
         if self['verbose'] == 'brief':
@@ -129,6 +202,78 @@ class Sim(hpb.BaseSim):
             raise ValueError(errormsg)
 
         return
+
+
+    def validate_init_conditions(self, init_hpv_prev):
+        '''
+        Initial prevalence values can be supplied with different amounts of detail.
+        Here we flesh out any missing details so that the initial prev values are
+        by age and genotype. We also check the prevalence values are ok.
+        '''
+
+        def validate_arrays(vals, n_age_brackets=None):
+            ''' Little helper function to check prevalence values '''
+            if n_age_brackets is not None:
+                if len(vals) != n_age_brackets:
+                    errormsg = f'The initial prevalence values must either be the same length as the age brackets: {len(vals)} vs {n_age_brackets}.'
+                    raise ValueError(errormsg)
+            else:
+                if len(vals) != 1:
+                    errormsg = f'No age brackets were supplied, but more than one prevalence value was supplied ({len(vals)}). An array of prevalence values can only be supplied along with an array of corresponding age brackets.'
+                    raise ValueError(errormsg)
+            if vals.any() < 0 or vals.any() > 1:
+                errormsg = f'The initial prevalence values must either between 0 and 1, not {vals}.'
+                raise ValueError(errormsg)
+
+            return
+
+        # If values have been provided, validate them
+        sex_keys = {'m', 'f'}
+        tot_keys = ['all', 'total', 'tot', 'average', 'avg']
+        n_age_brackets = None
+
+        if init_hpv_prev is not None:
+            if sc.checktype(init_hpv_prev, dict):
+                # Get age brackets if supplied
+                if 'age_brackets' in init_hpv_prev.keys():
+                    age_brackets = init_hpv_prev.pop('age_brackets')
+                    n_age_brackets = len(age_brackets)
+                else:
+                    age_brackets = np.array([150])
+
+                # Handle the rest of the keys
+                var_keys = list(init_hpv_prev.keys())
+                if (len(var_keys)==1 and var_keys[0] not in tot_keys) or (len(var_keys)>1 and set(var_keys) != sex_keys):
+                    errormsg = f'Could not understand the initial prevalence provided: {init_hpv_prev}. If supplying a dictionary, please use "m" and "f" keys or "tot". '
+                    raise ValueError(errormsg)
+                if len(var_keys) == 1:
+                    k = var_keys[0]
+                    init_hpv_prev = {sk: sc.promotetoarray(init_hpv_prev[k]) for sk in sex_keys}
+
+                # Now set the values
+                for k, vals in init_hpv_prev.items():
+                    init_hpv_prev[k] = sc.promotetoarray(vals)
+
+            elif sc.checktype(init_hpv_prev, 'arraylike') or sc.isnumber(init_hpv_prev):
+                # If it's an array, assume these values apply to males and females
+                init_hpv_prev = {sk: sc.promotetoarray(init_hpv_prev) for sk in sex_keys}
+                age_brackets = np.array([150])
+
+            else:
+                errormsg = f'Initial prevalence values of type {type(var)} not recognized, must be a dict, an array, or a float.'
+                raise ValueError(errormsg)
+
+            # Now validate the arrays
+            for sk, vals in init_hpv_prev.items():
+                validate_arrays(vals, n_age_brackets)
+
+        # If values haven't been supplied, assume zero
+        else:
+            init_hpv_prev = {'f': np.array([0]), 'm': np.array([0])}
+            age_brackets = np.array([150])
+
+        return init_hpv_prev, age_brackets
+
 
     def init_genotypes(self):
         ''' Initialize the genotypes '''
@@ -263,16 +408,16 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_people(self, popdict=None, init_infections=False, reset=False, verbose=None, **kwargs):
+    def init_people(self, popdict=None, init_states=False, reset=False, verbose=None, **kwargs):
         '''
         Create the people and the network.
 
-        Use ``init_infections=False`` for creating a fresh People object for use
+        Use ``init_states=False`` for creating a fresh People object for use
         in future simulations
 
         Args:
             popdict         (any):  pre-generated people of various formats.
-            init_infections (bool): whether to initialize infections (default false when called directly)
+            init_states     (bool): whether to initialize states (default false when called directly)
             reset           (bool): whether to regenerate the people even if they already exist
             verbose         (int):  detail to print
             kwargs          (dict): passed to hp.make_people()
@@ -296,8 +441,10 @@ class Sim(hpb.BaseSim):
         self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
-        if init_infections:
-            self.init_infections()
+        if init_states:
+            init_hpv_prev = sc.dcp(self['init_hpv_prev'])
+            init_hpv_prev, age_brackets = self.validate_init_conditions(init_hpv_prev)
+            self.init_states(age_brackets=age_brackets, init_hpv_prev=init_hpv_prev)
 
         return self
 
@@ -310,7 +457,7 @@ class Sim(hpb.BaseSim):
             self['interventions'] = self._orig_pars.pop('interventions') # Restore
 
         for i,intervention in enumerate(self['interventions']):
-            if isinstance(intervention, cvi.Intervention):
+            if isinstance(intervention, hpi.Intervention):
                 intervention.initialize(self)
         return
 
@@ -355,25 +502,39 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_infections(self):
+    def init_states(self, age_brackets=None, init_hpv_prev=None, init_cin_prev=None, init_cancer_prev=None):
         '''
         Initialize prior immunity and seed infections
         '''
 
-        age_inds = np.digitize(self.people.age, self.pars['init_hpv_prevalence']['f'][:, 0]) - 1
+        # Shorten key variables
+        ng = self['n_genotypes']
+
+        # Assign people to age buckets
+        age_inds = np.digitize(self.people.age, age_brackets)
+
+        # Assign probabilities of having HPV to each age/sex group
         hpv_probs = np.full(len(self.people), np.nan, dtype=hpd.default_float)
-        hpv_probs[self.people.f_inds] = self.pars['init_hpv_prevalence']['f'][age_inds[self.people.f_inds], 2]
-        hpv_probs[self.people.m_inds] = self.pars['init_hpv_prevalence']['m'][age_inds[self.people.m_inds], 2]
+        hpv_probs[self.people.f_inds] = init_hpv_prev['f'][age_inds[self.people.f_inds]]
+        hpv_probs[self.people.m_inds] = init_hpv_prev['m'][age_inds[self.people.m_inds]]
+        hpv_probs[~self.people.is_active] = 0 # Blank out people who are not yet sexually active
 
         # Get indices of people who have HPV (for now, split evenly between genotypes)
-        ng = self['n_genotypes']
         hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
         genotypes = np.random.randint(0, ng, len(hpv_inds))
-        new_infections = self.people.infect(inds=hpv_inds, genotypes=genotypes, layer='seed_infection')
-        self.results['cum_infections'].values           += new_infections[:,None]
-        self.results['cum_total_infections'][:]         += sum(new_infections)
-        self.results['cum_infections_by_age'][:]        += self.people.flows_by_age['new_infections_by_age'][:,:,None]
-        self.results['cum_total_infections_by_age'][:]  += self.people.total_flows_by_age['new_total_infections_by_age'][:,None]
+
+        # Figure of duration of infection and infect people
+        dur_inf = hpu.sample(**self['dur']['inf'], size=len(hpv_inds))
+        t_imm_event = np.floor(np.random.uniform(-dur_inf, 0) / self['dt'])
+        _ = self.people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur_inf=dur_inf, layer='seed_infection')
+
+        # Check for CINs
+        cin1_filters = self.people.date_cin1<0 * ((self.people.date_cin1_clearance > 0) + (self.people.date_cin2 > 0))
+        self.people.cin1[cin1_filters.nonzero()] = True
+        cin2_filters = self.people.date_cin2<0 * ((self.people.date_cin2_clearance > 0) + (self.people.date_cin3 > 0))
+        self.people.cin2[cin2_filters.nonzero()] = True
+        cin3_filters = self.people.date_cin3<0 * ((self.people.date_cin3_clearance > 0) + (self.people.date_cancerous > 0))
+        self.people.cin3[cin3_filters.nonzero()] = True
 
         return
 
@@ -412,6 +573,9 @@ class Sim(hpb.BaseSim):
         contacts = people.contacts # Shorten
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
+        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
+        if len(has_imm):
+            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
         hpimm.check_immunity(people)
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
@@ -439,7 +603,7 @@ class Sim(hpb.BaseSim):
             m = ms[ln]
 
             # Compute transmissibility for each partnership
-            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln])
+            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln]) # Probability of
             foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
@@ -450,7 +614,10 @@ class Sim(hpb.BaseSim):
 
             for pship_inds, sources, targets, genotypes in discordant_pairs:
                 betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
-                source_inds, target_inds, genotype_inds = hpu.compute_infections(betas, sources, targets, genotypes)  # Calculate transmission
+                target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
+                target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
+                source_inds = sources[unique_inds]  # Extract indices of those who passed on an infection
+                genotype_inds = genotypes[unique_inds]  # Extract genotypes that have been transmitted
                 people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
 
             ln += 1
@@ -524,10 +691,6 @@ class Sim(hpb.BaseSim):
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
 
-        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
-        if len(has_imm):
-            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
-
         # Tidy up
         self.t += 1
         if self.t == self.npts:
@@ -555,7 +718,7 @@ class Sim(hpb.BaseSim):
 
         # Check for AlreadyRun errors
         errormsg = None
-        until = self.npts if until is None else self.day(until)
+        until = self.npts if until is None else self.get_t(until)
         if until > self.npts:
             errormsg = f'Requested to run until t={until} but the simulation end is t={self.npts}'
         if self.t >= until: # NB. At the start, self.t is None so this check must occur after initialization
@@ -648,6 +811,7 @@ class Sim(hpb.BaseSim):
     def compute_results(self, verbose=None):
         ''' Perform final calculations on the results '''
         self.compute_states()
+        self.compute_summary()
         return
 
 

@@ -109,10 +109,10 @@ class PeopleMeta(sc.prettyobj):
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
 # the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples]
-flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total']
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu]
+flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total',            None]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -231,25 +231,11 @@ default_birth_rates = np.array([
     [12.4, 12.2, 11.8, 11.6, 11.4],
 ])
 
-default_hpv_prevalence = {
-    'm': np.array([
-        [0, 12, 0.0],
-        [13, 17, 0.05],
-        [18, 23, 0.15],
-        [24, 34, 0.25],
-        [35, 44, 0.15],
-        [45, 64, 0.05],
-        [65, 99, 0.005]]),
-    'f': np.array([
-        [0, 12, 0.0],
-        [13, 17, 0.05],
-        [18, 23, 0.15],
-        [24, 34, 0.25],
-        [35, 44, 0.15],
-        [45, 64, 0.05],
-        [65, 99, 0.005]])
-    }
-
+default_init_prev = {
+    'age_brackets'  : np.array([  12,   17,   24,   34,   44,   64,   150]),
+    'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
+    'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
+}
 
 #%% Default plotting settings
 
