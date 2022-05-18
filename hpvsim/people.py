@@ -328,6 +328,9 @@ class People(hpb.BasePeople):
         self.susceptible[genotype, inds] = True
         self.infectious[genotype, inds] = False
 
+        # Update immunity
+        hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
+
         return
 
     def check_cin_clearance(self, genotype):
@@ -439,27 +442,6 @@ class People(hpb.BasePeople):
         if len(inds) == 0:
             return 0
 
-        # Remove duplicates
-        inds, unique = np.unique(inds, return_index=True)
-        genotypes = genotypes[unique]
-        if source is not None:
-            source = source[unique]
-        if offset is not None:
-            offset = offset[unique]
-        if dur_inf is not None:
-            dur_inf = dur_inf[unique]
-
-        # Keep only susceptibles
-        keep = self.susceptible[genotypes, inds] # Unique indices in inds and source that are also susceptible
-        inds = inds[keep]
-        genotypes = genotypes[keep]
-        if source is not None:
-            source = source[keep]
-        if offset is not None:
-            offset = offset[keep]
-        if dur_inf is not None:
-            dur_inf = dur_inf[keep]
-
         dt = self.pars['dt']
 
         # Deal with genotype parameters
@@ -474,6 +456,11 @@ class People(hpb.BasePeople):
         # Set all dates
         base_t = self.t + offset if offset is not None else self.t
         self.date_infectious[genotypes,inds] = base_t
+
+        # Count reinfections
+        for g in range(ng):
+            self.flows['new_reinfections'][g]       += len((~np.isnan(self.date_hpv_clearance[g, inds[genotypes==g]])).nonzero()[-1])
+        self.total_flows['new_total_reinfections']  += len((~np.isnan(self.date_hpv_clearance[genotypes, inds])).nonzero()[-1])
         for key in ['date_hpv_clearance']:
             self[key][genotypes, inds] = np.nan
 
@@ -587,9 +574,6 @@ class People(hpb.BasePeople):
             excl_inds = hpu.true(self.date_cancerous[g, cancer_inds] < self.t) # Don't count cancers that were acquired before now
             self.date_cancerous[g, cancer_inds[excl_inds]] = np.nan
             self.date_cancerous[g, cancer_inds] = np.fmin(self.date_cancerous[g, cancer_inds], self.date_cin3[g, cancer_inds] + np.ceil(dur_cin3[is_cancer] / dt)) # Date they get cancer - minimum of any previous date and the date from the current infection
-
-            # Update immunity
-            hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=g)
 
         # Store the overal duration of infection and the date of HPV clearance
         self.dur_inf[genotypes, inds] = dur_inf  # This is overwritten later to ensure infections that progress to CIN1 last longer than the length of time it takes to get to CIN1

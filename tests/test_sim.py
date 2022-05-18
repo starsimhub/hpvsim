@@ -154,7 +154,7 @@ def test_flexible_inputs():
     sim['init_hpv_prev'] = {'age_brackets': [15, 99], 'tot': [0.05, 0.1]}
     sim.initialize()
     sim['init_hpv_prev'] = {'age_brackets': [15, 99], 'm': [0.05, 0.1], 'f': [0.05, 0.1]}
-    sim.initialize()
+    sim.initialize(reset=True)
 
     # Check layer pars are internally consistent
     sim['condoms'] = {'invalid':30}
@@ -201,8 +201,8 @@ def test_result_consistency():
     # Check demographics
     assert (sim.results['n_alive_by_age'][:].sum(axis=0) == sim.results['n_alive'][:]).all()
     assert (sim.results['n_alive_by_sex'][0, :] == sim.results['f_alive_by_age'][:].sum(axis=0)).all()
-    assert (sim.results['n_alive'][-1]+sim.results['cum_other_deaths'][-1]==sim['pop_size'])
-    assert (sim['pop_size'] - sim.results['cum_births'][-1] == pop_size)
+    assert (sim.results['n_alive'][-1]+sim.results['cum_other_deaths'][-1]-sim.results['cum_births'][-1] == sim['pop_size'])
+    assert (sim['pop_size'] == pop_size)
 
     # Check that males don't have CINs or cancers
     import hpvsim.utils as hpu

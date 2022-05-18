@@ -573,6 +573,9 @@ class Sim(hpb.BaseSim):
         contacts = people.contacts # Shorten
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
+        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
+        if len(has_imm):
+            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
         hpimm.check_immunity(people)
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
@@ -600,7 +603,7 @@ class Sim(hpb.BaseSim):
             m = ms[ln]
 
             # Compute transmissibility for each partnership
-            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln])
+            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln]) # Probability of
             foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
@@ -611,7 +614,10 @@ class Sim(hpb.BaseSim):
 
             for pship_inds, sources, targets, genotypes in discordant_pairs:
                 betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
-                source_inds, target_inds, genotype_inds = hpu.compute_infections(betas, sources, targets, genotypes)  # Calculate transmission
+                target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
+                target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
+                source_inds = sources[unique_inds]  # Extract indices of those who passed on an infection
+                genotype_inds = genotypes[unique_inds]  # Extract genotypes that have been transmitted
                 people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
 
             ln += 1
@@ -684,10 +690,6 @@ class Sim(hpb.BaseSim):
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
-
-        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
-        if len(has_imm):
-            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
 
         # Tidy up
         self.t += 1
