@@ -184,7 +184,8 @@ class People(hpb.BasePeople):
             self.flows['new_cin3s'][g]          += self.check_cin3(g)
             if t%self.resfreq==0:
                 self.flows['new_cins'][g]       += self.flows['new_cin1s'][g]+self.flows['new_cin2s'][g]+self.flows['new_cin3s'][g]
-            self.flows['new_cancers'][g]    += self.check_cancer(g)
+            self.flows['new_cancers'][g]        += self.check_cancer(g)
+            self.flows['new_cancer_deaths'][g]  += self.check_cancer_deaths(g)
             self.check_clearance(g)
 
         # Create total flows
@@ -193,6 +194,7 @@ class People(hpb.BasePeople):
         self.total_flows['new_total_cin3s']     += self.flows['new_cin3s'].sum()
         self.total_flows['new_total_cins']      += self.flows['new_cins'].sum()
         self.total_flows['new_total_cancers']   += self.flows['new_cancers'].sum()
+        self.total_flows['new_total_cancer_deaths']   += self.flows['new_cancer_deaths'].sum()
 
         new_cin = (self.date_cin1==t)*self.cin1+(self.date_cin2==t)*self.cin2+(self.date_cin3==t)*self.cin3
         age_inds, new_cins = np.unique(new_cin * self.age_brackets, return_counts=True)
@@ -201,6 +203,10 @@ class People(hpb.BasePeople):
         new_cancer = (self.date_cancerous==t)*self.cancerous
         age_inds, new_cancers = np.unique(new_cancer * self.age_brackets, return_counts=True)
         self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
+
+        new_cancer_deaths = (self.date_dead_cancer==t)*self.dead_cancer
+        age_inds, new_cancer_deaths = np.unique(new_cancer_deaths * self.age_brackets, return_counts=True)
+        self.total_flows_by_age['new_total_cancer_deaths_by_age'][age_inds[1:]-1] += new_cancer_deaths[1:]
 
         return new_people
 
@@ -315,6 +321,18 @@ class People(hpb.BasePeople):
         self.susceptible[:, inds] = False # TODO: wouldn't this already be false?
         self.infectious[:, inds] = False # TODO: consider how this will affect the totals
         return len(inds)
+
+
+    def check_cancer_deaths(self, genotype):
+        '''
+        Check for new progressions to cancer
+        Once an individual has cancer they are no longer susceptible to new HPV infections or CINs and no longer infectious
+        '''
+        filter_inds = self.true_by_genotype('cancerous', genotype)
+        inds = self.check_inds(self.dead_cancer[genotype,:], self.date_dead_cancer[genotype,:], filter_inds=filter_inds)
+        self.make_die(inds, genotype=genotype, cause='cancer')
+        return len(inds)
+
 
     def check_clearance(self, genotype):
         '''
@@ -565,13 +583,13 @@ class People(hpb.BasePeople):
         return new_infections # For incrementing counters
 
 
-    def make_die(self, inds, cause=None):
+    def make_die(self, inds, genotype=None, cause=None):
         ''' Make people die of all other causes (background mortality) '''
 
         if cause=='other':
             self.dead_other[inds] = True
         elif cause=='cancer':
-            self.dead_cancer[inds] = True
+            self.dead_cancer[genotype, inds] = True
         else:
             errormsg = f'Cause of death must be one of "other" or "cancer", not {cause}.'
             raise ValueError(errormsg)
