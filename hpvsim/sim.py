@@ -523,17 +523,17 @@ class Sim(hpb.BaseSim):
         hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
         genotypes = np.random.randint(0, ng, len(hpv_inds))
 
-        # Figure of duration of infection and infect people
-        dur_inf = hpu.sample(**self['dur']['inf'], size=len(hpv_inds))
-        t_imm_event = np.floor(np.random.uniform(-dur_inf, 0) / self['dt'])
-        _ = self.people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur_inf=dur_inf, layer='seed_infection')
+        # Figure of duration of infection and infect people. TODO: will need to redo this
+        dur_hpv = hpu.sample(**self['dur']['none'], size=len(hpv_inds))
+        t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
+        _ = self.people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur=dur_hpv, layer='seed_infection')
 
         # Check for CINs
-        cin1_filters = self.people.date_cin1<0 * ((self.people.date_cin1_clearance > 0) + (self.people.date_cin2 > 0))
+        cin1_filters = (self.people.date_cin1<0) * (self.people.date_cin2 > 0)
         self.people.cin1[cin1_filters.nonzero()] = True
-        cin2_filters = self.people.date_cin2<0 * ((self.people.date_cin2_clearance > 0) + (self.people.date_cin3 > 0))
+        cin2_filters = (self.people.date_cin2<0) * (self.people.date_cin3 > 0)
         self.people.cin2[cin2_filters.nonzero()] = True
-        cin3_filters = self.people.date_cin3<0 * ((self.people.date_cin3_clearance > 0) + (self.people.date_cancerous > 0))
+        cin3_filters = (self.people.date_cin3<0) * (self.people.date_cancerous > 0)
         self.people.cin3[cin3_filters.nonzero()] = True
 
         return
