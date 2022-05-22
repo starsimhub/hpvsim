@@ -184,7 +184,7 @@ class People(hpb.BasePeople):
             self.flows['new_cin3s'][g]          += self.check_cin3(g)
             if t%self.resfreq==0:
                 self.flows['new_cins'][g]       += self.flows['new_cin1s'][g]+self.flows['new_cin2s'][g]+self.flows['new_cin3s'][g]
-                self.flows['new_cancers'][g]    += self.check_cancer(g)
+            self.flows['new_cancers'][g]    += self.check_cancer(g)
             self.check_clearance(g)
 
         # Create total flows
@@ -263,7 +263,7 @@ class People(hpb.BasePeople):
         else:
             not_current = hpu.ifalsei(current, filter_inds)
         has_date = hpu.idefinedi(date, not_current)
-        inds     = hpu.itrue(self.t == date[has_date], has_date)
+        inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
 
     def check_inds_true(self, current, date, filter_inds=None):
@@ -517,8 +517,6 @@ class People(hpb.BasePeople):
             self.date_clearance[g, no_cin2_inds] = np.fmax(self.date_clearance[g, no_cin2_inds],self.date_cin1[g, no_cin2_inds] + np.ceil(dur_cin1[~is_cin2] / dt))
             self.dur_hpv[g, cin1_inds] += dur_cin1 # Duration of HPV is the sum of the period without dysplasia and the period with CIN1
 
-            # self.date_clearance[g, cin2_inds]       = np.nan # For people who are going to advance, remove any previous clearance date
-
             # CASE 2.2: Mild dysplasia progresses to moderate (CIN1 to CIN2)
             self.dur_cin12cin2[g, cin2_inds] = dur_cin1[is_cin2]
             excl_inds = hpu.true(self.date_cin2[g, cin2_inds] < self.t) # Don't count CIN2s that were acquired before now
@@ -537,8 +535,6 @@ class People(hpb.BasePeople):
             self.date_clearance[g, no_cin3_inds] = np.fmax(self.date_clearance[g, no_cin3_inds], self.date_cin2[g, no_cin3_inds] + np.ceil(dur_cin2[~is_cin3] / dt) ) # Date they clear CIN2
             self.dur_hpv[g, cin2_inds] += dur_cin2 # Duration of HPV is the sum of the period without dysplasia and the period with CIN
 
-            # self.date_clearance[g, cin3_inds]      = np.nan # For people who are going to advance, remove any previous CIN clearance date
-
             # Case 2.2.2: CIN2 with progression to CIN3
             self.dur_cin22cin3[g, cin3_inds] = dur_cin2[is_cin3]
             excl_inds = hpu.true(self.date_cin3[g, cin3_inds] < self.t) # Don't count CIN2s that were acquired before now
@@ -551,16 +547,12 @@ class People(hpb.BasePeople):
             cancer_probs    = progprobs[g]['rel_cancer_prob'] * progpars['cancer_probs'][dur_cin3_inds]
             is_cancer       = hpu.binomial_arr(cancer_probs)  # See if they develop cancer
             cancer_inds     = cin3_inds[is_cancer]
-            no_cancer_inds  = cin3_inds[~is_cancer]  # No cancer
 
-            # Case 2.2.2.1: Severe dysplasia regresses
-            self.date_clearance[g, no_cancer_inds]  = np.fmax(self.date_clearance[g, no_cancer_inds],self.date_cin3[g, no_cancer_inds] + np.ceil(dur_cin3[~is_cancer] / dt))  # Date they clear CIN3
             # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
+            self.date_clearance[g, cin3_inds] = np.fmax(self.date_clearance[g, cin3_inds],self.date_cin3[g, cin3_inds] + np.ceil(dur_cin3 / dt))  # HPV is cleared
             self.dur_hpv[g, cin3_inds] += dur_cin3  # Duration of HPV is the sum of the period without dysplasia and the period with CIN
 
-            # self.date_cin3_clearance[g, cancer_inds]    = np.nan # For people who are going to advance, remove any previous CIN clearance date
-
-            # Case 2.2.2.2: CIN3 progresses to cancer
+            # Case 2.2.2.1: Severe dysplasia regresses
             self.dur_cin2cancer[g, cancer_inds] = dur_cin3[is_cancer]
             excl_inds = hpu.true(self.date_cancerous[g, cancer_inds] < self.t) # Don't count cancers that were acquired before now
             self.date_cancerous[g, cancer_inds[excl_inds]] = np.nan

@@ -46,7 +46,7 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     verbose = 1
 
     # Create and run the simulation
-    sim = hps.Sim()
+    sim = hps.Sim(end=2035)
     sim.set_seed(seed)
     sim.run(verbose=verbose)
 
@@ -308,13 +308,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
+    # sim4 = test_result_consistency()
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
     # json = test_fileio()
 
     sc.toc(T)
