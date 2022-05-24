@@ -46,7 +46,7 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     verbose = 1
 
     # Create and run the simulation
-    sim = hps.Sim()
+    sim = hps.Sim(end=2035)
     sim.set_seed(seed)
     sim.run(verbose=verbose)
 

@@ -88,14 +88,13 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
 
-    # Duration parameters
+    # Parameters determining duration of dysplasia stages
     pars['dur'] = {}
-    pars['dur']['inf']  = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of infection in YEARS
-    pars['dur']['cin1']  = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of CIN1 in YEARS
-    pars['dur']['cin2'] = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 in YEARS
-    pars['dur']['cin3'] = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 in YEARS
-    pars['dur']['hpv_post_cin1'] = dict(dist='lognormal', par1=1.0, par2=1.0)  # For those who progress to CIN1, the length of time that HPV persists after CIN1 develops
-    pars['dur']['cin32cancer']  = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 before developing cancer in YEARS
+    pars['dur']['none']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Length of time that HPV is present without dysplasia
+    pars['dur']['cin1']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of CIN1 (mild/very mild dysplasia)
+    pars['dur']['cin2']     = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 (moderate dysplasia)
+    pars['dur']['cin3']     = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 (severe dysplasia/in situ carcinoma)
+    pars['dur']['cancer']   = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated cancer
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data

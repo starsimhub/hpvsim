@@ -75,16 +75,16 @@ class PeopleMeta(sc.prettyobj):
         ]
 
         self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
-        self.dates += ['date_hpv_clearance', 'date_cin1_clearance', 'date_cin2_clearance', 'date_cin3_clearance']
+        self.dates += ['date_clearance']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
-            'dur_inf', # duration with HPV infection
-            'dur_hpv2cin1',
-            'dur_cin12cin2',
-            'dur_cin22cin3',
-            'dur_cin2cancer',
-            'dur_disease',
+            'dur_hpv', # Length of time that a person has HPV DNA present. This is EITHER the period until the virus clears OR the period until viral integration
+            'dur_none2cin1', # Length of time to go from no dysplasia to CIN1
+            'dur_cin12cin2', # Length of time to go from CIN1 to CIN2
+            'dur_cin22cin3', # Length of time to go from CIN2 to CIN3
+            'dur_cin2cancer',# Length of time to go from CIN3 to cancer
+            'dur_cancer',  # Duration of cancer
         ]
 
         self.all_states = self.person + self.states + self.imm_states + \
