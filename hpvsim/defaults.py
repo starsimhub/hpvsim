@@ -57,8 +57,9 @@ class PeopleMeta(sc.prettyobj):
             'cin2',
             'cin3',
             'cancerous',
+            'alive', # Save this as a state so we can record population sizes
             'dead_cancer',
-            'other_dead',  # Dead from all other causes
+            'dead_other',  # Dead from all other causes
         ]
 
         # Immune states, by genotype
@@ -73,17 +74,17 @@ class PeopleMeta(sc.prettyobj):
             't_imm_event',  # Int, time since immunity event
         ]
 
-        self.dates = [f'date_{state}' for state in self.states] # Convert each state into a date
-        self.dates += ['date_hpv_clearance', 'date_cin1_clearance', 'date_cin2_clearance', 'date_cin3_clearance']
+        self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
+        self.dates += ['date_clearance']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
-            'dur_inf', # duration with HPV infection
-            'dur_hpv2cin1',
-            'dur_cin12cin2',
-            'dur_cin22cin3',
-            'dur_cin2cancer',
-            'dur_disease',
+            'dur_hpv', # Length of time that a person has HPV DNA present. This is EITHER the period until the virus clears OR the period until viral integration
+            'dur_none2cin1', # Length of time to go from no dysplasia to CIN1
+            'dur_cin12cin2', # Length of time to go from CIN1 to CIN2
+            'dur_cin22cin3', # Length of time to go from CIN2 to CIN3
+            'dur_cin2cancer',# Length of time to go from CIN3 to cancer
+            'dur_cancer',  # Duration of cancer
         ]
 
         self.all_states = self.person + self.states + self.imm_states + \
@@ -103,63 +104,49 @@ class PeopleMeta(sc.prettyobj):
         return
 
 
+#%% Default result settings
 
-#%% Define other defaults
+# Flows: we count new and cumulative totals for each
+# All are stored (1) by genotype and (2) as the total across genotypes
+# the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu]
+flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total',            None]
 
-# A subset of the above states are used for results
+# Stocks: the number in each of the following states
+# All are stored (1) by genotype and (2) as the total across genotypes
+# the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
+stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
+stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
+stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+stock_by_age = ['total',        'both',         None,           None,           None,           'total',        'total']
 
-result_stocks = {
-    'susceptible'   : 'Number susceptible',
-    'infectious'    : 'Number infectious',
-    'cin1'          : 'Number with CIN1',
-    'cin2'          : 'Number with CIN2',
-    'cin3'          : 'Number with CIN3',
-    'cin'           : 'Number with CINs',
-    'cancerous'     : 'Number with cervical cancer',
-    # 'dead'          : 'Number dead from cervical cancer',
-}
+# Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
+# All are stored (1) by genotype and (2) as the total across genotypes
+inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',          'cancer']
+inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN',          'cancer']
+inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+inci_by_age = ['both',      None,           None,           None,           'total',        'total']
 
-# The types of result that are counted as flows -- used in sim.py; value is the label suffix
-result_flows = {
-    'infections':  'infections',
-    'cin1'      :  'CIN1s',
-    'cin2'      :  'CIN2s',
-    'cin3'      :  'CIn3s',
-    'cins'      :  'CINs',
-    'cancers'   :  'cervical cancers',
-    'cancer_deaths': 'cancer deaths',
-}
+# Results by age
+age_brackets    = np.array([15, 25, 45, 65, 150])  # TODO: consider how this will change once vaccination status is there
+age_labels      = ['0-14', '15-24', '25-44', '45-64', '65+']
+n_age_brackets  = len(age_brackets)
+by_age_colors   = sc.gridcolors(n_age_brackets)
 
-# These are separated out so that they don't get mixed in with the logic of determining which things are by genotype
-demographic_flows = {
-    'other_deaths': 'deaths from other causes',
-    'births': 'births'
-}
+# Demographics
+dem_keys    = ['births',    'other_deaths']
+dem_names   = ['births',    'other deaths']
+dem_colors  = ['#000000',   '#000000']
 
-# Some results are needed by sex
-results_by_sex = {
-    'total_infections_by_sex'   : 'total infections by sex',
-    'other_deaths_by_sex': 'deaths from other causes by sex',
-}
+# Results by sex
+by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
+by_sex_names   = ['total infections by sex',    'deaths from other causes by sex']
+by_sex_colors  = ['#000000',                    '#000000']
 
-states = ['hpv', 'cin1', 'cin2', 'cin3', 'cin', 'cancer']
-labels = ['HPV', 'CIN1', 'CIN2', 'CIN3', 'CIN', 'Cancer']
-inci_prev_results = {s+'_'+which:l+' '+which for (s,l) in zip(states,labels) for which in ['incidence', 'prevalence']}
-agg_inci_prev_results = {'total_'+s+'_'+which:'Total '+l+' '+which for (s,l) in zip(states,labels) for which in ['incidence', 'prevalence']}
 
-# Define new and cumulative flows
-new_result_flows = [f'new_{key}' for key in result_flows.keys()]
-cum_result_flows = [f'cum_{key}' for key in result_flows.keys()]
-
-new_demographic_flows = [f'new_{key}' for key in demographic_flows.keys()]
-cum_demographic_flows = [f'cum_{key}' for key in demographic_flows.keys()]
-
-new_agg_result_flows = [f'new_total_{key}' for key in result_flows.keys()]
-cum_agg_result_flows = [f'cum_total_{key}' for key in result_flows.keys()]
-
-new_agg_result_flows_by_sex = [f'new_{key}' for key in results_by_sex.keys()]
-cum_agg_result_flows_by_sex = [f'cum_{key}' for key in results_by_sex.keys()]
-
+#%%
 # Parameters that can vary by genotype (WIP)
 genotype_pars = [
     'rel_beta',
@@ -169,6 +156,8 @@ genotype_pars = [
     'rel_cancer_prob',
     'rel_death_prob'
 ]
+
+#%% Default data (age, death rates, birth dates, initial prevalence)
 
 # Default age data, based on Seattle 2018 census data -- used in population.py
 default_age_data = np.array([
@@ -242,77 +231,13 @@ default_birth_rates = np.array([
     [12.4, 12.2, 11.8, 11.6, 11.4],
 ])
 
-default_hpv_prevalence = {
-    'm': np.array([
-        [0, 12, 0.0],
-        [13, 17, 0.05],
-        [18, 23, 0.15],
-        [24, 34, 0.25],
-        [35, 44, 0.15],
-        [45, 64, 0.05],
-        [65, 99, 0.005]]),
-    'f': np.array([
-        [0, 12, 0.0],
-        [13, 17, 0.05],
-        [18, 23, 0.15],
-        [24, 34, 0.25],
-        [35, 44, 0.15],
-        [45, 64, 0.05],
-        [65, 99, 0.005]])
-    }
+default_init_prev = {
+    'age_brackets'  : np.array([  12,   17,   24,   34,   44,   64,   150]),
+    'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
+    'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
+}
 
-
-def get_default_colors(n_genotypes=None):
-    '''
-    Specify plot colors -- used in sim.py.
-    NB, includes duplicates since stocks and flows are named differently.
-    '''
-
-    if n_genotypes is None:
-        n_genotypes = 1 # Set a default number of genotypes
-
-    c = sc.objdict()
-    c.default               = '#000000'
-
-    # Overall flows
-    c.total_infections      = c.default #pl.cm.GnBu(1)
-    c.total_hpv_incidence   = pl.cm.GnBu(1)
-    c.total_cins            = pl.cm.Oranges(1)
-    c.total_cin_incidence   = pl.cm.Oranges(1)
-    c.total_cancers         = pl.cm.Reds(1)
-    c.total_cancer_deaths   = pl.cm.Purples(1)
-    c.other_deaths          = '#000000'
-    c.births                = '#797ef6'
-
-    # Overall states
-    c.total_infectious      = c.total_infections
-    c.total_cin1            = c.total_cins
-    c.total_cin2            = c.total_cins
-    c.total_cin3            = c.total_cins
-    c.total_cancerous       = c.total_cancers
-    c.total_cancer_dead     = c.total_cancer_deaths
-
-    # All states are by genotype, except deaths from other causes
-    c.susceptible           = pl.cm.Greens(np.linspace(0.2, 0.8, n_genotypes))
-    c.infectious            = pl.cm.GnBu(np.linspace(0.2, 0.8, n_genotypes))
-    c.cin1                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
-    c.cin2                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
-    c.cin3                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
-    c.cins                  = pl.cm.Oranges(np.linspace(0.2, 0.8, n_genotypes))
-    c.cancerous             = pl.cm.Reds(np.linspace(0.2, 0.8, n_genotypes))
-    c.dead_cancer           = pl.cm.Purples(np.linspace(0.2, 0.8, n_genotypes))
-    c.other_dead            = c.other_deaths
-
-    # Flows by genotype
-    c.infections            = c.infectious
-    c.cin1s                  = c.cin1
-    c.cin2s                  = c.cin2
-    c.cin3s                  = c.cin3
-    c.cancers               = c.cancerous
-    c.cancer_deaths         = c.dead_cancer
-
-    return c
-
+#%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
@@ -357,9 +282,9 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'total_hpv_prevalence',
                     'hpv_prevalence',
                 ],
-                'HPV infections': [
-                    'new_total_infections',
-                    'new_infections',
+                'HPV incidence': [
+                    'total_hpv_incidence_by_age',
+                    # 'new_infections',
                 ],
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',

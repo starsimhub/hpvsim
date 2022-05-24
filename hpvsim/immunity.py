@@ -114,7 +114,7 @@ def init_immunity(sim, create=False):
     return
 
 
-def update_peak_immunity(people, inds, imm_pars, imm_source):
+def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None):
     '''
         Update immunity level
 
@@ -149,7 +149,8 @@ def update_peak_immunity(people, inds, imm_pars, imm_source):
         people.peak_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
 
     # people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
-    people.t_imm_event[imm_source, inds] = people.t
+    base_t = people.t + offset if offset is not None else people.t
+    people.t_imm_event[imm_source, inds] = base_t
     return
 
 

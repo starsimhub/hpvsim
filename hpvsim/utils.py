@@ -94,27 +94,16 @@ def get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n
     return f_source_inds, f_genotypes, m_source_inds, m_genotypes
 
 
-@nb.njit(             (nbfloat[:],  nbint[:],   nbint[:],   nbint[:]), cache=cache, parallel=safe_parallel)
-def compute_infections(betas,       sources,    targets,    genotypes):
+@nb.njit(             (nbfloat[:],  nbint[:]), cache=cache, parallel=safe_parallel)
+def compute_infections(betas,       targets):
     '''
     Compute who infects whom
     '''
-    ints = nbint
+    # Determine transmissions
+    transmissions   = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
+    target_inds     = targets[transmissions] # Extract indices of those who got infected
+    return target_inds
 
-    slist = np.empty(0, dtype=ints)
-    tlist = np.empty(0, dtype=ints)
-    glist = np.empty(0, dtype=ints)
-
-    # Loop over partnerships that involve females infected with this genotype and susceptible males
-    transmissions    = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
-    source_inds      = sources[transmissions] # Extract indices of those who passed on an infection
-    target_inds      = targets[transmissions] # Extract indices of those who got infected
-    genotype_inds    = genotypes[transmissions] # Extract genotypes that have been transmitted
-    slist = np.concatenate((slist, source_inds), axis=0)
-    tlist = np.concatenate((tlist, target_inds), axis=0)
-    glist = np.concatenate((glist, genotype_inds), axis=0)
-
-    return slist, tlist, glist
 
 @nb.njit(          (nbfloat[:,:],   nbint,  nbint[:,:],  nbint[:],  nbfloat[:], nbfloat[:,:]), cache=cache)
 def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    peak_imm):
