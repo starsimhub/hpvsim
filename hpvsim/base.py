@@ -134,18 +134,20 @@ class Result(object):
         print(r1.values)
     '''
 
-    def __init__(self, name=None, npts=None, scale=True, color=None, n_genotypes=0):
+    def __init__(self, name=None, npts=None, scale=True, color=None, n_rows=0, n_copies=0):
         self.name =  name  # Name of this result
         self.scale = scale # Whether or not to scale the result by the scale factor
         if color is None:
-            color = hpd.get_default_colors()['default']
+            color = '#000000'
         self.color = color # Default color
         if npts is None:
             npts = 0
         npts = int(npts)
 
-        if n_genotypes > 0:
-            self.values = np.zeros((n_genotypes, npts), dtype=hpd.result_float)
+        if n_rows > 0:
+            self.values = np.zeros((n_rows, npts), dtype=hpd.result_float)
+            if n_copies > 0:
+                self.values = np.zeros((n_copies, n_rows, npts), dtype=hpd.result_float)
         else:
             self.values = np.zeros(npts, dtype=hpd.result_float)
 
@@ -230,9 +232,9 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['cum_infections']
-                deaths = self.summary['cum_deaths']
-                results = f'{infections:n}⚙, {deaths:n}☠'
+                infections = self.summary['cum_total_infections']
+                cancers = self.summary['cum_total_cancers']
+                results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
 
@@ -279,8 +281,6 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
-            if 'init_hpv_prevalence' in pars and pars['init_hpv_prevalence'] is None:
-                pars['init_hpv_prevalence'] = hpd.default_hpv_prevalence
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 
@@ -370,7 +370,7 @@ class BaseSim(ParsObj):
 
         **Examples**::
             sim.get_t('2015-03-01') # Get the closest timepoint to the specified date
-            sim.get_t(2015) # Can use floats
+            sim.get_t(3) # Will return 3
             sim.get_t('2015') # Can use strings
             sim.get_t(['2015.5', '2016.5']) # List of strings, will match as close as possible
             sim.get_t(['2015.5', '2016.5'], exact_match=True) # Raises an error since these dates aren't directly simulated
@@ -384,32 +384,41 @@ class BaseSim(ParsObj):
             if date in ['end', -1]: 
                 date = self['end']
 
-            # Try to convert from date-time format, and if this doesn't work,
-            # try to interpret it as a float, otherwise raise an error
-            try:
-                tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
-            except:
-                try:
-                    tp_raw  = float(date)
-                except:
-                    errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
+            # If it's an integer, make sure it's in the sim tvec
+            if sc.checktype(date, int):
+                if date in self.tvec:
+                    tp = date
+                else:
+                    errormsg = f'The requested timepoint {date} must be within the sim tvec: {self.tvec[0], self.tvec[-1]}.'
                     raise ValueError(errormsg)
 
-            # If the requested date is within the range of years covered by the sim,
-            # return the closest date
-            if (tp_raw >= self['start']) and (tp_raw <= self['end']):
-                if exact_match:
-                    tp_ind = sc.findinds(self.yearvec, tp_raw)
-                    if len(tp_ind)>0:
-                        tp = tp_ind[0]
-                    else:
-                        errormsg = f'The requested date {date} was not simulated; try exact_match=False to obtain the nearest date.'
+            # If it's not an integer, try to convert from date-time format, and if this doesn't work,
+            # try to interpret it as a float, otherwise raise an error
+            else:
+                try:
+                    tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
+                except:
+                    try:
+                        tp_raw  = float(date)
+                    except:
+                        errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
                         raise ValueError(errormsg)
+
+                # If the requested date is within the range of years covered by the sim,
+                # return the closest date
+                if (tp_raw >= self['start']) and (tp_raw <= self['end']):
+                    if exact_match:
+                        tp_ind = sc.findinds(self.yearvec, tp_raw)
+                        if len(tp_ind)>0:
+                            tp = tp_ind[0]
+                        else:
+                            errormsg = f'The requested date {date} was not simulated; try exact_match=False to obtain the nearest date.'
+                            raise ValueError(errormsg)
+                    else:
+                        tp = sc.findnearest(self.yearvec, tp_raw) # Get the nearest timestep to the requested one
                 else:
-                    tp = sc.findnearest(self.yearvec, tp_raw) # Get the nearest timestep to the requested one
-            else: 
-                errormsg = f'The requested date {date} must be within the simulation dates: {self["start"], self["end"]}.'
-                raise ValueError(errormsg)
+                    errormsg = f'The requested date {date} must be within the simulation dates: {self["start"], self["end"]}.'
+                    raise ValueError(errormsg)
 
             tps.append(tp)
 
@@ -427,7 +436,7 @@ class BaseSim(ParsObj):
             return tps
 
 
-    def result_keys(self, which='main'):
+    def result_keys(self, which='total'):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
@@ -436,11 +445,15 @@ class BaseSim(ParsObj):
 
         '''
         keys = []
-        choices = ['main', 'genotype', 'all']
-        if which in ['main', 'all']:
-            keys += [key for key,res in self.results.items() if isinstance(res, Result)]
-        if which in ['genotype', 'all'] and 'genotype' in self.results:
-            keys += [key for key,res in self.results['genotype'].items() if isinstance(res, Result)]
+        choices = ['total', 'genotype', 'all', 'by_age', 'by_sex']
+        if which in ['total', 'all']:
+            keys += [k for k,res in self.results.items() if 'total' in k and 'by_age' not in k and isinstance(res, Result)]
+        if which in ['genotype', 'all']:
+            keys += [k for k,res in self.results.items() if 'total' not in k and isinstance(res, Result)]
+        if which in ['by_age', 'all']:
+            keys += [k for k,res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
+        if which in ['by_sex', 'all']:
+            keys += [k for k,res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
         if which not in choices: # pragma: no cover
             errormsg = f'Choice "which" not available; choices are: {sc.strjoin(choices)}'
             raise ValueError(errormsg)
@@ -1120,10 +1133,6 @@ class BasePeople(FlexPretty):
             else:
                 errormsg = f'Not sure how to combine arrays of {npval.ndim} dimensions for {key}'
                 raise NotImplementedError(errormsg)
-
-        # Validate
-        self.pars['pop_size'] += people2.pars['pop_size']
-        self.validate()
 
         # Reassign UIDs so they're unique
         self.set('uid', np.arange(len(self)))

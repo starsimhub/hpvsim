@@ -73,8 +73,10 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key == 'other_dead': # everything else is by genotype
+            if key == 'dead_other': # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
+            elif key == 'alive':  # All true at the beginning
+                self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
             elif key == 'susceptible':
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), True, dtype=bool)
             else:
@@ -82,7 +84,7 @@ class People(hpb.BasePeople):
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
-            if key == 'date_other_dead':
+            if key == 'date_dead_other':
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
             else:
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
@@ -127,13 +129,14 @@ class People(hpb.BasePeople):
 
     def init_flows(self):
         ''' Initialize flows to be zero '''
-        self.aggregate_flows = {key:0 for key in hpd.new_agg_result_flows}
-        self.aggregate_flows_by_sex = {}
-        for key in hpd.new_agg_result_flows_by_sex:
-            self.aggregate_flows_by_sex[key] = np.zeros(2, dtype=hpd.default_float)
-        self.flows = {}
-        for key in hpd.new_result_flows:
-            self.flows[key] = np.zeros(self.pars['n_genotypes'], dtype=hpd.default_float)
+        ng = self.pars['n_genotypes']
+        df = hpd.default_float
+        self.flows              = {f'new_{key}'                 : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
+        self.total_flows        = {f'new_total_{key}'           : 0 for key in hpd.flow_keys}
+        self.flows_by_sex       = {f'new_{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
+        self.demographic_flows  = {f'new_{key}'                 : 0 for key in hpd.dem_keys}
+        self.flows_by_age       = {f'new_{key}_by_age'          : np.zeros((hpd.n_age_brackets,ng), dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['genotype','both']}
+        self.total_flows_by_age = {f'new_total_{key}_by_age'    : np.zeros(hpd.n_age_brackets, dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['total','both']}
         return
 
 
@@ -151,34 +154,59 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t):
+    def update_states_pre(self, t, resfreq=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
         self.t = t
         self.dt = self.pars['dt']
+        self.resfreq = resfreq if resfreq is not None else 1
 
         # Perform updates that are not genotype-specific
-        self.init_flows()  # Initialize flows for this timestep to zero
+        if t%self.resfreq==0: self.init_flows()  # Only reinitialize flows to zero every nth step, where n is the requested result frequency
         self.increment_age()  # Let people age by one time step
-        self.aggregate_flows['new_other_deaths'], self.aggregate_flows_by_sex['new_other_deaths_by_sex'][0], self.aggregate_flows_by_sex['new_other_deaths_by_sex'][1] = self.apply_death_rates() # Apply death rates
-        self.aggregate_flows['new_births'], new_people = self.add_births() # Add births
-        self.aggregate_flows_by_sex['new_births_by_sex'][0] = len(hpu.true(new_people.is_female))
-        self.aggregate_flows_by_sex['new_births_by_sex'][1] = len(hpu.true(new_people.is_male))
+
+        # Apply death rates from other causes
+        new_other_deaths, deaths_female, deaths_male    = self.apply_death_rates()
+        self.demographic_flows['new_other_deaths']      += new_other_deaths
+        self.flows_by_sex['new_other_deaths_by_sex'][0] += deaths_female
+        self.flows_by_sex['new_other_deaths_by_sex'][1] += deaths_male
+
+        # Add births
+        new_births, new_people                  = self.add_births()
+        self.demographic_flows['new_births']    += new_births
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
-        for genotype in range(ng):
-            self.flows['new_cin1s'][genotype] += self.check_cin1(genotype)
-            self.flows['new_cin2s'][genotype] += self.check_cin2(genotype)
-            self.flows['new_cin3s'][genotype] += self.check_cin3(genotype)
-            self.flows['new_cins'] += self.flows['new_cin1s'][genotype]+self.flows['new_cin2s'][genotype]+self.flows['new_cin3s'][genotype]
-            if self.t * self.dt % 1 == 0:   # only check cancers every year
-                self.flows['new_cancers'][genotype] += self.check_cancer(genotype)
-                self.aggregate_flows['new_total_cancers'] += self.flows['new_cancers'][genotype]
-            self.check_hpv_clearance(genotype)
-            self.check_cin_clearance(genotype)
-        self.aggregate_flows['new_total_cins'] += self.flows['new_cins'].sum()
+        for g in range(ng):
+            self.flows['new_cin1s'][g]          += self.check_cin1(g)
+            self.flows['new_cin2s'][g]          += self.check_cin2(g)
+            self.flows['new_cin3s'][g]          += self.check_cin3(g)
+            if t%self.resfreq==0:
+                self.flows['new_cins'][g]       += self.flows['new_cin1s'][g]+self.flows['new_cin2s'][g]+self.flows['new_cin3s'][g]
+            self.flows['new_cancers'][g]        += self.check_cancer(g)
+            self.flows['new_cancer_deaths'][g]  += self.check_cancer_deaths(g)
+            self.check_clearance(g)
+
+        # Create total flows
+        self.total_flows['new_total_cin1s']     += self.flows['new_cin1s'].sum()
+        self.total_flows['new_total_cin2s']     += self.flows['new_cin2s'].sum()
+        self.total_flows['new_total_cin3s']     += self.flows['new_cin3s'].sum()
+        self.total_flows['new_total_cins']      += self.flows['new_cins'].sum()
+        self.total_flows['new_total_cancers']   += self.flows['new_cancers'].sum()
+        self.total_flows['new_total_cancer_deaths']   += self.flows['new_cancer_deaths'].sum()
+
+        new_cin = (self.date_cin1==t)*self.cin1+(self.date_cin2==t)*self.cin2+(self.date_cin3==t)*self.cin3
+        age_inds, new_cins = np.unique(new_cin * self.age_brackets, return_counts=True)
+        self.total_flows_by_age['new_total_cins_by_age'][age_inds[1:]-1] += new_cins[1:]
+
+        new_cancer = (self.date_cancerous==t)*self.cancerous
+        age_inds, new_cancers = np.unique(new_cancer * self.age_brackets, return_counts=True)
+        self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
+
+        new_cancer_deaths = (self.date_dead_cancer==t)*self.dead_cancer
+        age_inds, new_cancer_deaths = np.unique(new_cancer_deaths * self.age_brackets, return_counts=True)
+        self.total_flows_by_age['new_total_cancer_deaths_by_age'][age_inds[1:]-1] += new_cancer_deaths[1:]
 
         return new_people
 
@@ -256,7 +284,9 @@ class People(hpb.BasePeople):
 
     def check_cin1(self, genotype):
         ''' Check for new progressions to CIN1 '''
-        filter_inds = self.true_by_genotype('infectious', genotype)
+        # Only include infectious females who haven't already cleared CIN1 or progressed to CIN2
+        filters = self.infectious[genotype,:]*self.is_female*~(self.date_clearance[genotype,:]<=self.t)*(self.date_cin2[genotype,:]>=self.t)
+        filter_inds = filters.nonzero()[0]
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
         return len(inds)
@@ -266,6 +296,7 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('cin1', genotype)
         inds = self.check_inds(self.cin2[genotype,:], self.date_cin2[genotype,:], filter_inds=filter_inds)
         self.cin2[genotype, inds] = True
+        self.cin1[genotype, inds] = False # No longer counted as CIN1
         return len(inds)
 
     def check_cin3(self, genotype):
@@ -273,6 +304,7 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('cin2', genotype)
         inds = self.check_inds(self.cin3[genotype,:], self.date_cin3[genotype,:], filter_inds=filter_inds)
         self.cin3[genotype, inds] = True
+        self.cin2[genotype, inds] = False # No longer counted as CIN2
         return len(inds)
 
     def check_cancer(self, genotype):
@@ -283,43 +315,44 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('cin3', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
         self.cancerous[genotype, inds] = True
-        self.susceptible[:, inds] = False
-        self.infectious[:, inds] = False
+        self.cin1[:, inds] = False # No longer counted as CIN1 for this genotype. TODO: should this be done for all genotypes?
+        self.cin2[:, inds] = False # No longer counted as CIN2
+        self.cin3[:, inds] = False # No longer counted as CIN3
+        self.susceptible[:, inds] = False # TODO: wouldn't this already be false?
+        self.infectious[:, inds] = False # TODO: consider how this will affect the totals
         return len(inds)
 
-    def check_hpv_clearance(self, genotype):
+
+    def check_cancer_deaths(self, genotype):
+        '''
+        Check for new progressions to cancer
+        Once an individual has cancer they are no longer susceptible to new HPV infections or CINs and no longer infectious
+        '''
+        filter_inds = self.true_by_genotype('cancerous', genotype)
+        inds = self.check_inds(self.dead_cancer[genotype,:], self.date_dead_cancer[genotype,:], filter_inds=filter_inds)
+        self.make_die(inds, genotype=genotype, cause='cancer')
+        return len(inds)
+
+
+    def check_clearance(self, genotype):
         '''
         Check for HPV clearance.
         '''
         filter_inds = self.true_by_genotype('infectious', genotype)
-        inds = self.check_inds_true(self.infectious[genotype,:], self.date_hpv_clearance[genotype,:], filter_inds=filter_inds)
+        inds = self.check_inds_true(self.infectious[genotype,:], self.date_clearance[genotype,:], filter_inds=filter_inds)
 
         # Now reset disease states
         self.susceptible[genotype, inds] = True
         self.infectious[genotype, inds] = False
-
-        return
-
-    def check_cin_clearance(self, genotype):
-        '''
-        Check for CIN clearance.
-        '''
-
-        filter_inds = self.true_by_genotype('cin1', genotype)
-        inds = self.check_inds_true(self.cin1[genotype,:], self.date_cin1_clearance[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = False
-
-        filter_inds = self.true_by_genotype('cin2', genotype)
-        inds = self.check_inds_true(self.cin2[genotype, :], self.date_cin2_clearance[genotype, :],
-                                    filter_inds=filter_inds)
         self.cin2[genotype, inds] = False
-
-        filter_inds = self.true_by_genotype('cin3', genotype)
-        inds = self.check_inds_true(self.cin3[genotype, :], self.date_cin3_clearance[genotype, :],
-                                    filter_inds=filter_inds)
         self.cin3[genotype, inds] = False
 
+        # Update immunity
+        hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
+
         return
+
 
     def apply_death_rates(self):
         '''
@@ -328,21 +361,23 @@ class People(hpb.BasePeople):
         '''
 
         # Get age-dependent death rates. TODO: careful with rates vs probabilities!
-        age_inds = np.digitize(self.age,self.pars['death_rates']['f'][:,0])-1
+        death_pars = self.pars['death_rates']
+        age_inds = np.digitize(self.age, death_pars['f'][:,0])-1
         death_probs = np.full(len(self), np.nan, dtype=hpd.default_float)
-        death_probs[self.f_inds] = self.pars['death_rates']['f'][age_inds[self.f_inds],2]*self.dt
-        death_probs[self.m_inds] = self.pars['death_rates']['m'][age_inds[self.m_inds],2]*self.dt
+        death_probs[self.f_inds] = death_pars['f'][age_inds[self.f_inds],2]*self.dt
+        death_probs[self.m_inds] = death_pars['m'][age_inds[self.m_inds],2]*self.dt
 
         # Get indices of people who die of other causes, removing anyone already dead
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
-        already_dead = self.other_dead[death_inds]
+        already_dead = self.dead_other[death_inds]
         death_inds = death_inds[~already_dead]  # Unique indices in deaths that are not already dead
 
         deaths_female = len(hpu.true(self.is_female[death_inds]))
         deaths_male = len(hpu.true(self.is_male[death_inds]))
         # Apply deaths
-        new_other_deaths = self.make_die_other(death_inds)
+        new_other_deaths = self.make_die(death_inds, cause='other')
         return new_other_deaths, deaths_female, deaths_male
+
 
     def add_births(self):
         ''' Method to add births '''
@@ -387,16 +422,20 @@ class People(hpb.BasePeople):
 
         return
 
-    def infect(self, inds, genotypes=None, source=None, layer=None):
+
+    def infect(self, inds, genotypes=None, source=None, offset=None, dur=None, layer=None):
         '''
         Infect people and determine their eventual outcomes.
         Method also deduplicates input arrays in case one agent is infected many times
         and stores who infected whom in infection_log list.
 
         Args:
-            inds     (array): array of people to infect
-            source   (array): source indices of the people who transmitted this infection (None if an importation or seed infection)
-            layer    (str):   contact layer this infection was transmitted on
+            inds      (array): array of people to infect
+            genotypes (array): array of genotypes to infect people with
+            source    (array): source indices of the people who transmitted this infection (None if an importation or seed infection)
+            offset    (array): if provided, the infections will occur at the timepoint self.t+offset
+            dur_inf   (array): if provided, the duration of the infections
+            layer     (str):   contact layer this infection was transmitted on
 
         Returns:
             count (int): number of people infected
@@ -404,6 +443,8 @@ class People(hpb.BasePeople):
 
         if len(inds) == 0:
             return 0
+
+        dt = self.pars['dt']
 
         # Deal with genotype parameters
         ng              = self.pars['n_genotypes']
@@ -414,108 +455,151 @@ class People(hpb.BasePeople):
         progpars        = self.pars['prognoses']
         progprobs       = [{k: self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys} for g in range(ng)]  # np.array([[self.pars[k] * genotype_pars[genotype_map[g]][k] for k in genotype_keys] for g in range(ng)])
 
-        # Update states, genotype info, and flows
-        n_infections = len(inds) # Count the total number of new infections
-        new_infections = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)], dtype=np.float64) # Count the number by genotype
-        self.susceptible[genotypes, inds]  = False # Adjust states - set susceptible to false
-        self.infectious[genotypes, inds] = True # Adjust states - set infectious to true
-        self.aggregate_flows['new_total_infections'] += n_infections # Add the total count to the aggregate flow data
-        self.flows['new_infections'] += new_infections # Add the count by genotype to the flow data
+        # Set all dates
+        base_t = self.t + offset if offset is not None else self.t
+        self.date_infectious[genotypes,inds] = base_t
 
-        # Reset all other dates
-        for key in ['date_cin1', 'date_cin2', 'date_cin3', 'date_cancerous',
-                    'date_hpv_clearance', 'date_cin1_clearance', 'date_cin2_clearance', 'date_cin3_clearance']:
+        # Count reinfections
+        for g in range(ng):
+            self.flows['new_reinfections'][g]       += len((~np.isnan(self.date_clearance[g, inds[genotypes==g]])).nonzero()[-1])
+        self.total_flows['new_total_reinfections']  += len((~np.isnan(self.date_clearance[genotypes, inds])).nonzero()[-1])
+        for key in ['date_clearance']:
             self[key][genotypes, inds] = np.nan
 
-        infs_female = len(hpu.true(self.is_female[inds]))
-        infs_male = len(hpu.true(self.is_male[inds]))
-        self.aggregate_flows_by_sex['new_total_infections_by_sex'][0] += infs_female
-        self.aggregate_flows_by_sex['new_total_infections_by_sex'][1] += infs_male
+        # Update states, genotype info, and flows
+        new_total_infections    = len(inds) # Count the total number of new infections
+        new_infections          = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)], dtype=np.float64) # Count the number by genotype
+        self.susceptible[genotypes, inds]   = False # Adjust states - set susceptible to false
+        self.infectious[genotypes, inds]    = True # Adjust states - set infectious to true
 
-        # Set the dates of infection and recovery -- for now, just assume everyone recovers
-        dt = self.pars['dt']
-        self.date_infectious[genotypes,inds] = self.t
-        dur_inf = hpu.sample(**durpars['inf'], size=len(inds)) # Duration of infection in YEARS
-        self.dur_inf[genotypes, inds] = dur_inf
-        self.date_hpv_clearance[genotypes, inds] = self.t + np.ceil(dur_inf / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+        # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
+        if offset is None:
+            # Create overall flows
+            self.total_flows['new_total_infections']    += new_total_infections # Add the total count to the total flow data
+            self.flows['new_infections']                += new_infections # Add the count by genotype to the flow data
+
+            # Create by-age flows
+            for g in range(ng):
+                age_inds, infections = np.unique(self.age_brackets[inds[genotypes==g]],return_counts=True)
+                self.flows_by_age['new_infections_by_age'][age_inds-1,g] += infections
+            total_age_inds, total_infections = np.unique(self.age_brackets[inds], return_counts=True)
+            self.total_flows_by_age['new_total_infections_by_age'][total_age_inds-1] += total_infections
+
+            # Create by-sex flows
+            infs_female = len(hpu.true(self.is_female[inds]))
+            infs_male = len(hpu.true(self.is_male[inds]))
+            self.flows_by_sex['new_total_infections_by_sex'][0] += infs_female
+            self.flows_by_sex['new_total_infections_by_sex'][1] += infs_male
+
+        # Determine the duration of the HPV infection without any dysplasia
+        if dur is None:
+            dur = hpu.sample(**durpars['none'], size=len(inds)) # Duration of infection without dysplasia in years
+        else:
+            if len(dur) != len(inds):
+                errormsg = f'If supplying durations of infections, they must be the same length as inds: {len(dur)} vs. {len(inds)}.'
+                raise ValueError(errormsg)
+        dur_inds = np.digitize(dur, progpars['duration_cutoffs']) - 1  # Convert durations to indices
+        self.dur_hpv[genotypes, inds] = dur  # Set the initial duration of infection as the length of the period without dysplasia - this is then extended for those who progress
 
         # Use genotype-specific prognosis probabilities to determine what happens.
         # Only women can progress beyond infection.
         for g in range(ng):
-            inf_female = hpu.true((genotypes == g) * self.is_female[inds])
-            dur_inf_female = dur_inf[inf_female]
-            dur_inds = np.digitize(dur_inf_female, progpars['duration_cutoffs']) - 1  # Convert durations to indices
+
+            # Apply filters so we only select females with this genotype who don't already have a CIN attributable to this genotype
+            filters = self.is_female[inds] * (genotypes==g) * ~(self.cin1[g,inds]) * ~(self.cin2[g,inds]) * ~(self.cin3[g,inds])
 
             # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
-            cin1_probs = progprobs[g]['rel_cin1_prob'] * progpars['cin1_probs'][dur_inds]
-            is_cin1 = hpu.binomial_arr(cin1_probs)
+            cin1_probs      = progprobs[g]['rel_cin1_prob'] * progpars['cin1_probs'][dur_inds] * filters
+            is_cin1         = hpu.binomial_arr(cin1_probs)
+            cin1_inds       = inds[is_cin1]
+            no_cin1_inds    = inds[~is_cin1]
 
-            # HPV with progression to CIN1
-            cin1_inds = inf_female[is_cin1]
-            n_cin1_inds = len(cin1_inds)
-            durs_hpv2cin1 = hpu.sample(**durpars['hpv2cin1'], size=len(cin1_inds))  # Store how long this person took to develop CIN1
-            self.dur_hpv2cin1[g, cin1_inds] = durs_hpv2cin1
-            self.date_cin1[g, cin1_inds] = self.t + np.ceil(durs_hpv2cin1 / dt)  # Date they develop CIN1
+            # CASE 1: Infection clears without causing dysplasia
+            self.date_clearance[g, no_cin1_inds]    = self.date_infectious[g, no_cin1_inds] + np.ceil(self.dur_hpv[g, no_cin1_inds]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+
+            # CASE 2: Infection progresses to mild dysplasia (CIN1)
+            self.dur_none2cin1[g, cin1_inds] = dur[is_cin1] # Store the length of time before progressing
+            excl_inds = hpu.true(self.date_cin1[g, cin1_inds] < self.t) # Don't count CIN1s that were acquired before now
+            self.date_cin1[g, cin1_inds[excl_inds]] = np.nan
+            self.date_cin1[g, cin1_inds] = np.fmin(self.date_cin1[g,cin1_inds], self.date_infectious[g,cin1_inds] + np.ceil(self.dur_hpv[g, cin1_inds]/dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
+            dur_cin1 = hpu.sample(**durpars['cin1'], size=len(cin1_inds))
+            dur_cin1_inds = np.digitize(dur_cin1, progpars['duration_cutoffs']) - 1  # Convert durations to indices
 
             # Determine whether CIN1 clears or progresses to CIN2
-            dur_cin1 = hpu.sample(**durpars['cin1'], size=n_cin1_inds)  # Duration of infection in YEARS
-            dur_cin1_inds = np.digitize(dur_cin1, progpars['duration_cutoffs']) - 1  # Convert durations to indices
-            cin2_probs = progprobs[g]['rel_cin2_prob'] * progpars['cin2_probs'][dur_cin1_inds]
-            is_cin2 = hpu.binomial_arr(cin2_probs)
-            no_cin2_inds = cin1_inds[~is_cin2]
-            cin2_inds = cin1_inds[is_cin2]
+            cin2_probs      = progprobs[g]['rel_cin2_prob'] * progpars['cin2_probs'][dur_cin1_inds]
+            is_cin2         = hpu.binomial_arr(cin2_probs)
+            cin2_inds       = cin1_inds[is_cin2]
+            no_cin2_inds    = cin1_inds[~is_cin2]
 
-            # CIN1 with no progression to CIN2
-            self.date_cin1_clearance[g, no_cin2_inds] = self.date_cin1[g, no_cin2_inds] + np.ceil(dur_cin1[~is_cin2] / dt)  # Date they clear CIN1
+            # CASE 2.1: Mild dysplasia regresses and infection clears
+            self.date_clearance[g, no_cin2_inds] = np.fmax(self.date_clearance[g, no_cin2_inds],self.date_cin1[g, no_cin2_inds] + np.ceil(dur_cin1[~is_cin2] / dt))
+            self.dur_hpv[g, cin1_inds] += dur_cin1 # Duration of HPV is the sum of the period without dysplasia and the period with CIN1
 
-            # CIN1 with progression to CIN2
-            n_cin2_inds = len(cin2_inds)
+            # CASE 2.2: Mild dysplasia progresses to moderate (CIN1 to CIN2)
             self.dur_cin12cin2[g, cin2_inds] = dur_cin1[is_cin2]
-            self.date_cin2[g, cin2_inds] = self.date_cin1[g, cin2_inds] + np.ceil(dur_cin1[is_cin2] / dt)  # Date they get cancer
+            excl_inds = hpu.true(self.date_cin2[g, cin2_inds] < self.t) # Don't count CIN2s that were acquired before now
+            self.date_cin2[g, cin2_inds[excl_inds]] = np.nan
+            self.date_cin2[g, cin2_inds] = np.fmin(self.date_cin2[g, cin2_inds], self.date_cin1[g, cin2_inds] + np.ceil(dur_cin1[is_cin2] / dt)) # Date they get CIN2 - minimum of any previous date and the date from the current infection
+            dur_cin2 = hpu.sample(**durpars['cin2'], size=len(cin2_inds))
+            dur_cin2_inds = np.digitize(dur_cin2, progpars['duration_cutoffs']) - 1  # Convert durations to indices
 
             # Determine whether CIN2 clears or progresses to CIN3
-            dur_cin2 = hpu.sample(**durpars['cin2'], size=n_cin2_inds)  # Duration of infection in YEARS
-            dur_cin2_inds = np.digitize(dur_cin2, progpars['duration_cutoffs']) - 1  # Convert durations to indices
-            cin3_probs = progprobs[g]['rel_cin3_prob'] * progpars['cin3_probs'][dur_cin2_inds]
-            is_cin3 = hpu.binomial_arr(cin3_probs)
-            no_cin3_inds = cin2_inds[~is_cin3]
-            cin3_inds = cin2_inds[is_cin3]
+            cin3_probs      = progprobs[g]['rel_cin3_prob'] * progpars['cin3_probs'][dur_cin2_inds]
+            is_cin3         = hpu.binomial_arr(cin3_probs)
+            no_cin3_inds    = cin2_inds[~is_cin3]
+            cin3_inds       = cin2_inds[is_cin3]
 
-            # CIN2 with no progression to CIN3
-            self.date_cin2_clearance[g, no_cin3_inds] = self.date_cin2[g, no_cin3_inds] + np.ceil(dur_cin2[~is_cin3] / dt)  # Date they clear CIN2
+            # CASE 2.2.1: Moderate dysplasia regresses and the virus clears
+            self.date_clearance[g, no_cin3_inds] = np.fmax(self.date_clearance[g, no_cin3_inds], self.date_cin2[g, no_cin3_inds] + np.ceil(dur_cin2[~is_cin3] / dt) ) # Date they clear CIN2
+            self.dur_hpv[g, cin2_inds] += dur_cin2 # Duration of HPV is the sum of the period without dysplasia and the period with CIN
 
-            # Case 2.4: CIN2 with progression to CIN3
-            n_cin3_inds = len(cin3_inds)
+            # Case 2.2.2: CIN2 with progression to CIN3
             self.dur_cin22cin3[g, cin3_inds] = dur_cin2[is_cin3]
-            self.date_cin3[g, cin3_inds] = self.date_cin2[g, cin3_inds] + np.ceil(dur_cin2[is_cin3] / dt)  # Date they get CIN3
+            excl_inds = hpu.true(self.date_cin3[g, cin3_inds] < self.t) # Don't count CIN2s that were acquired before now
+            self.date_cin3[g, cin3_inds[excl_inds]] = np.nan
+            self.date_cin3[g, cin3_inds] = np.fmin(self.date_cin3[g, cin3_inds],self.date_cin2[g, cin3_inds] + np.ceil(dur_cin2[is_cin3] / dt))  # Date they get CIN3 - minimum of any previous date and the date from the current infection
+            dur_cin3 = hpu.sample(**durpars['cin3'], size=len(cin3_inds))
+            dur_cin3_inds = np.digitize(dur_cin3, progpars['duration_cutoffs']) - 1  # Convert durations to indices
 
             # Use prognosis probabilities to determine whether CIN3 clears or progresses to CIN2
-            dur_cin3 = hpu.sample(**durpars['cin3'], size=n_cin3_inds)  # Duration of infection in YEARS
-            dur_cin3_inds = np.digitize(dur_cin3, progpars['duration_cutoffs']) - 1  # Convert durations to indices
-            cancer_probs = progprobs[g]['rel_cancer_prob'] * progpars['cancer_probs'][dur_cin3_inds]
-            is_cancer = hpu.binomial_arr(cancer_probs)  # See if they develop cancer
-            cancer_inds = cin3_inds[is_cancer]
-            no_cancer_inds = cin3_inds[~is_cancer]  # No cancer
+            cancer_probs    = progprobs[g]['rel_cancer_prob'] * progpars['cancer_probs'][dur_cin3_inds]
+            is_cancer       = hpu.binomial_arr(cancer_probs)  # See if they develop cancer
+            cancer_inds     = cin3_inds[is_cancer]
 
-            # Case 2.1: CIN3 with no progression to cancer
-            self.date_cin3_clearance[g, no_cancer_inds] = self.date_cin3[g, no_cancer_inds] + np.ceil(dur_cin3[~is_cancer] / dt)  # Date they clear CIN
+            # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
+            self.date_clearance[g, cin3_inds] = np.fmax(self.date_clearance[g, cin3_inds],self.date_cin3[g, cin3_inds] + np.ceil(dur_cin3 / dt))  # HPV is cleared
+            self.dur_hpv[g, cin3_inds] += dur_cin3  # Duration of HPV is the sum of the period without dysplasia and the period with CIN
 
-            # Case 2.2: CIN3 with progression to cancer
+            # Case 2.2.2.1: Severe dysplasia regresses
             self.dur_cin2cancer[g, cancer_inds] = dur_cin3[is_cancer]
-            self.date_cancerous[g, cancer_inds] = self.date_cin3[g, cancer_inds] + np.ceil(dur_cin3[is_cancer] / dt)  # Date they get cancer
+            excl_inds = hpu.true(self.date_cancerous[g, cancer_inds] < self.t) # Don't count cancers that were acquired before now
+            self.date_cancerous[g, cancer_inds[excl_inds]] = np.nan
+            self.date_cancerous[g, cancer_inds] = np.fmin(self.date_cancerous[g, cancer_inds], self.date_cin3[g, cancer_inds] + np.ceil(dur_cin3[is_cancer] / dt)) # Date they get cancer - minimum of any previous date and the date from the current infection
 
-            # Update immunity
-            hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=g)
+            # Record eventual deaths from cancer (NB, assuming no survival without treatment)
+            dur_cancer = hpu.sample(**durpars['cancer'], size=len(cancer_inds))
+            self.date_dead_cancer[g, cancer_inds]  = self.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
 
         return new_infections # For incrementing counters
 
 
-    def make_die_other(self, inds):
+    def make_die(self, inds, genotype=None, cause=None):
         ''' Make people die of all other causes (background mortality) '''
 
-        self.other_dead[inds] = True
+        if cause=='other':
+            self.dead_other[inds] = True
+        elif cause=='cancer':
+            self.dead_cancer[genotype, inds] = True
+        else:
+            errormsg = f'Cause of death must be one of "other" or "cancer", not {cause}.'
+            raise ValueError(errormsg)
+
         self.susceptible[:, inds] = False
         self.infectious[:, inds] = False
+        self.cin1[:, inds] = False
+        self.cin2[:, inds] = False
+        self.cin3[:, inds] = False
+        self.cancerous[:, inds] = False
 
         # Remove dead people from contact network by setting the end date of any partnership they're in to now
         for contacts in self.contacts.values():

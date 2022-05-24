@@ -13,9 +13,10 @@ from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
 from . import analysis as hpa
+from . import plotting as hpplt
 from .settings import options as hpo
 from . import immunity as hpimm
-from . import interventions as cvi
+from . import interventions as hpi
 
 
 # Define the model
@@ -49,7 +50,7 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def initialize(self, reset=False, init_infections=True, **kwargs):
+    def initialize(self, reset=False, init_states=True, **kwargs):
         '''
         Perform all initializations on the sim.
         '''
@@ -59,7 +60,7 @@ class Sim(hpb.BaseSim):
         self.init_genotypes() # Initialize the genotypes
         self.init_immunity() # initialize information about immunity
         self.init_results() # After initializing the genotypes, create the results structure
-        self.init_people(reset=reset, init_infections=init_infections, **kwargs) # Create all the people (the heaviest step)
+        self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_interventions()  # Initialize the interventions...
         self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
@@ -67,6 +68,72 @@ class Sim(hpb.BaseSim):
         self.complete      = False
         self.results_ready = False
         return self
+
+
+    def layer_keys(self):
+        '''
+        Attempt to retrieve the current layer keys.
+        '''
+        try:
+            keys = list(self['acts'].keys()) # Get keys from acts
+        except: # pragma: no cover
+            keys = []
+        return keys
+
+
+    def reset_layer_pars(self, layer_keys=None, force=False):
+        '''
+        Reset the parameters to match the population.
+
+        Args:
+            layer_keys (list): override the default layer keys (use stored keys by default)
+            force (bool): reset the parameters even if they already exist
+        '''
+        if layer_keys is None:
+            if self.people is not None: # If people exist
+                layer_keys = self.people.contacts.keys()
+            elif self.popdict is not None:
+                layer_keys = self.popdict['layer_keys']
+        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
+        return
+
+
+    def validate_layer_pars(self):
+        '''
+        Handle layer parameters, since they need to be validated after the population
+        creation, rather than before.
+        '''
+
+        # First, try to figure out what the layer keys should be and perform basic type checking
+        layer_keys = self.layer_keys()
+        layer_pars = hppar.layer_pars # The names of the parameters that are specified by layer
+        for lp in layer_pars:
+            val = self[lp]
+            if sc.isnumber(val): # It's a scalar instead of a dict, assume it's all contacts
+                self[lp] = {k:val for k in layer_keys}
+
+        # Handle key mismatches
+        for lp in layer_pars:
+            lp_keys = set(self.pars[lp].keys())
+            if not lp_keys == set(layer_keys):
+                errormsg = 'At least one layer parameter is inconsistent with the layer keys; all parameters must have the same keys:'
+                errormsg += f'\nsim.layer_keys() = {layer_keys}'
+                for lp2 in layer_pars: # Fail on first error, but re-loop to list all of them
+                    errormsg += f'\n{lp2} = ' + ', '.join(self.pars[lp2].keys())
+                raise sc.KeyNotFoundError(errormsg)
+
+        # Handle mismatches with the population
+        if self.people is not None:
+            pop_keys = set(self.people.contacts.keys())
+            if pop_keys != set(layer_keys): # pragma: no cover
+                if not len(pop_keys):
+                    errormsg = f'Your population does not have any layer keys, but your simulation does {layer_keys}. If you called cv.People() directly, you probably need cv.make_people() instead.'
+                    raise sc.KeyNotFoundError(errormsg)
+                else:
+                    errormsg = f'Please update your parameter keys {layer_keys} to match population keys {pop_keys}. You may find sim.reset_layer_pars() helpful.'
+                    raise sc.KeyNotFoundError(errormsg)
+
+        return
 
 
     def validate_pars(self, validate_layers=True):
@@ -91,7 +158,7 @@ class Sim(hpb.BaseSim):
 
         # Handle end and n_years
         if self['end']:
-            self['n_years'] = self['end'] - self['start']
+            self['n_years'] = int(self['end'] - self['start'])
             if self['n_years'] <= 0:
                 errormsg = f"Number of years must be >0, but you supplied start={str(self['start'])} and end={str(self['end'])}, which gives n_years={self['n_years']}"
                 raise ValueError(errormsg)
@@ -116,9 +183,16 @@ class Sim(hpb.BaseSim):
             errormsg = f'Population type "{choice}" not available; choices are: {choicestr}'
             raise ValueError(errormsg)
 
-        # Handle analyzers - TODO, interventions and genotypes will also go here
+        # Handle analyzers and interventions - TODO, genotypes will also go here
         for key in ['interventions', 'analyzers']: # Ensure all of them are lists
             self[key] = sc.dcp(sc.tolist(self[key], keepnone=False)) # All of these have initialize functions that run into issues if they're reused
+        for i,interv in enumerate(self['interventions']):
+            if isinstance(interv, dict): # It's a dictionary representation of an intervention
+                self['interventions'][i] = hpi.InterventionDict(**interv)
+
+        # Optionally handle layer parameters
+        if validate_layers:
+            self.validate_layer_pars()
 
         # Handle verbose
         if self['verbose'] == 'brief':
@@ -128,6 +202,78 @@ class Sim(hpb.BaseSim):
             raise ValueError(errormsg)
 
         return
+
+
+    def validate_init_conditions(self, init_hpv_prev):
+        '''
+        Initial prevalence values can be supplied with different amounts of detail.
+        Here we flesh out any missing details so that the initial prev values are
+        by age and genotype. We also check the prevalence values are ok.
+        '''
+
+        def validate_arrays(vals, n_age_brackets=None):
+            ''' Little helper function to check prevalence values '''
+            if n_age_brackets is not None:
+                if len(vals) != n_age_brackets:
+                    errormsg = f'The initial prevalence values must either be the same length as the age brackets: {len(vals)} vs {n_age_brackets}.'
+                    raise ValueError(errormsg)
+            else:
+                if len(vals) != 1:
+                    errormsg = f'No age brackets were supplied, but more than one prevalence value was supplied ({len(vals)}). An array of prevalence values can only be supplied along with an array of corresponding age brackets.'
+                    raise ValueError(errormsg)
+            if vals.any() < 0 or vals.any() > 1:
+                errormsg = f'The initial prevalence values must either between 0 and 1, not {vals}.'
+                raise ValueError(errormsg)
+
+            return
+
+        # If values have been provided, validate them
+        sex_keys = {'m', 'f'}
+        tot_keys = ['all', 'total', 'tot', 'average', 'avg']
+        n_age_brackets = None
+
+        if init_hpv_prev is not None:
+            if sc.checktype(init_hpv_prev, dict):
+                # Get age brackets if supplied
+                if 'age_brackets' in init_hpv_prev.keys():
+                    age_brackets = init_hpv_prev.pop('age_brackets')
+                    n_age_brackets = len(age_brackets)
+                else:
+                    age_brackets = np.array([150])
+
+                # Handle the rest of the keys
+                var_keys = list(init_hpv_prev.keys())
+                if (len(var_keys)==1 and var_keys[0] not in tot_keys) or (len(var_keys)>1 and set(var_keys) != sex_keys):
+                    errormsg = f'Could not understand the initial prevalence provided: {init_hpv_prev}. If supplying a dictionary, please use "m" and "f" keys or "tot". '
+                    raise ValueError(errormsg)
+                if len(var_keys) == 1:
+                    k = var_keys[0]
+                    init_hpv_prev = {sk: sc.promotetoarray(init_hpv_prev[k]) for sk in sex_keys}
+
+                # Now set the values
+                for k, vals in init_hpv_prev.items():
+                    init_hpv_prev[k] = sc.promotetoarray(vals)
+
+            elif sc.checktype(init_hpv_prev, 'arraylike') or sc.isnumber(init_hpv_prev):
+                # If it's an array, assume these values apply to males and females
+                init_hpv_prev = {sk: sc.promotetoarray(init_hpv_prev) for sk in sex_keys}
+                age_brackets = np.array([150])
+
+            else:
+                errormsg = f'Initial prevalence values of type {type(var)} not recognized, must be a dict, an array, or a float.'
+                raise ValueError(errormsg)
+
+            # Now validate the arrays
+            for sk, vals in init_hpv_prev.items():
+                validate_arrays(vals, n_age_brackets)
+
+        # If values haven't been supplied, assume zero
+        else:
+            init_hpv_prev = {'f': np.array([0]), 'm': np.array([0])}
+            age_brackets = np.array([150])
+
+        return init_hpv_prev, age_brackets
+
 
     def init_genotypes(self):
         ''' Initialize the genotypes '''
@@ -161,86 +307,117 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_results(self):
+    def init_results(self, frequency='annual'):
         '''
         Create the main results structure.
         We differentiate between flows, stocks, and cumulative results
-        The prefix "new" is used for flow variables, i.e. counting new events (infections/deaths/recoveries) on each timestep
-        The prefix "n" is used for stock variables, i.e. counting the total number in any given state (sus/inf/rec/etc) on any particular timestep
+        The prefix "new" is used for flow variables, i.e. counting new events (infections/deaths) on each timestep
+        The prefix "n" is used for stock variables, i.e. counting the total number in any given state (sus/inf/etc) on any particular timestep
         The prefix "cum" is used for cumulative variables, i.e. counting the total number that have ever been in a given state at some point in the sim
-        Note that, by definition, n_dead is the same as cum_deaths and n_recovered is the same as cum_recoveries, so we only define the cumulative versions
+
+        Arguments:
+            sim         (hp.Sim)        : a sim
+            frequency   (str or float)  : the frequency with which to save results: accepts 'annual', 'dt', or a float which is interpreted as a fraction of a year, e.g. 0.2 will save results every 0.2 years
         '''
 
+        # Handle frequency
+        if type(frequency) == str:
+            if frequency == 'annual':
+                resfreq = int(1 / self['dt'])
+            elif frequency == 'dt':
+                resfreq = 1
+            else:
+                errormsg = f'Result frequency not understood: must be "annual", "dt" or a float, but you provided {frequency}.'
+                raise ValueError(errormsg)
+        elif type(frequency) == float:
+            if frequency < self['dt']:
+                errormsg = f'You requested results with frequency {frequency}, but this is smaller than the simulation timestep {self["dt"]}.'
+                raise ValueError(errormsg)
+            else:
+                resfreq = int(frequency / self['dt'])
+        self.resfreq = resfreq
+
+        # Construct the tvec that will be used with the results
+        points_to_use = np.arange(0, self.npts, self.resfreq)
+        res_yearvec = self.yearvec[points_to_use]
+        res_npts = len(res_yearvec)
+        res_tvec = np.arange(res_npts)
+
+        # Function to create results
         def init_res(*args, **kwargs):
             ''' Initialize a single result object '''
-            output = hpb.Result(*args, **kwargs, npts=self.npts)
+            output = hpb.Result(*args, **kwargs, npts=res_npts)
             return output
 
         ng = self['n_genotypes']
-        dcols = hpd.get_default_colors(ng) # Get default colors
+        results = dict()
 
-        # Aggregate flows and cumulative flows
-        for key,label in hpd.aggregate_result_flows.items():
-            self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key])  # Cumulative variables -- e.g. "Cumulative infections"
+        # Create new and cumulative flows
+        for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
+            for lkey,llab,cstride,g in zip(['_total',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+                for flow,name,cmap,by_age in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors, hpd.flow_by_age):
+                    results[f'{key+lkey}_{flow}'] = init_res(f'{llab+lab.lower()} {name}', color=cmap(cstride), n_rows=g)
+                    if by_age in ['both', 'genotype'] and lkey=='':
+                        results[f'{key}_{flow}_by_age'] = init_res(f'{lab} {name} by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                    if by_age in ['both', 'total'] and lkey=='_total':
+                        results[f'{key+lkey}_{flow}_by_age'] = init_res(f'{llab+lab.lower()} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
 
-        for key,label in hpd.aggregate_result_flows.items(): # Repeat to keep all the cumulative keys together
-            self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key]) # Flow variables -- e.g. "Number of new infections"
+        # Create stocks
+        for lkey,llabel,cstride,g in zip(['_total',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
+            for stock, name, cmap, by_age in zip(hpd.stock_keys, hpd.stock_names, hpd.stock_colors, hpd.stock_by_age):
+                results[f'n{lkey}_{stock}'] = init_res(f'{llabel} {name}', color=cmap(cstride), n_rows=g)
+                if by_age in ['both', 'genotype'] and lkey == '':
+                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                if by_age in ['both', 'total'] and lkey == '_total':
+                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
 
-        for key,label in hpd.aggregate_result_flows_by_sex.items():
-            self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', n_genotypes=2)  # Cumulative variables -- e.g. "Cumulative infections"
+        # Create incidence and prevalence results
+        for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+            for var,name,cmap,by_age in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors, hpd.inci_by_age):
+                for which in ['incidence', 'prevalence']:
+                    results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
+                    if by_age in ['both', 'genotype'] and lkey == '':
+                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                    if by_age in ['both', 'total'] and lkey == 'total_':
+                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
 
-        for key,label in hpd.aggregate_result_flows_by_sex.items(): # Repeat to keep all the cumulative keys together
-            self.results[f'new_{key}'] = init_res(f'Number of new {label}', n_genotypes=2) # Flow variables -- e.g. "Number of new infections"
+        # Create demographic flows
+        for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
+            for var, name, color in zip(hpd.dem_keys, hpd.dem_names, hpd.dem_colors):
+                results[f'{key}_{var}'] = init_res(f'{lab} {name}', color=color)
 
+        # Create results by sex
+        for key, lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
+            for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
+                results[f'{key}_{var}'] = init_res(f'{lab} {name}', color=color, n_rows=2)
 
-        # Aggregate stock variables
-        for key,label in hpd.aggregate_result_stocks.items():
-            self.results[f'n_{key}'] = init_res(label, color=dcols[key])
+        # Other results
+        results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
+        results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
+        results['n_alive'] = init_res('Number alive', scale=True)
+        results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_rows=2)
+        results['n_alive_by_age'] = init_res('Number alive by age', scale=True, n_rows=hpd.n_age_brackets)
+        results['f_alive_by_age'] = init_res('Women alive by age', scale=True, n_rows=hpd.n_age_brackets)
 
-        # Results in aggregate
-        self.results['hpv_prevalence'] = init_res('HPV prevalence', scale=False)
-        self.results['cin1_prevalence'] = init_res('CIN1 prevalence', scale=False)
-        self.results['cin2_prevalence'] = init_res('CIN2 prevalence', scale=False)
-        self.results['cin3_prevalence'] = init_res('CIN3 prevalence', scale=False)
-        self.results['cancer_incidence'] = init_res('Cancer incidence', scale=False)
+        # Time vector
+        results['year'] = res_yearvec
+        results['t'] = res_tvec
 
-        # Results by genotype
-        self.results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['hpv_incidence_by_genotype'] = init_res('HPV incidence by genotype', scale=False, n_genotypes=ng)
-        self.results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence by genotype', scale=False, n_genotypes=ng)
-        self.results['r_eff'] = init_res('Effective reproduction number', scale=False, n_genotypes=ng)
-        self.results['doubling_time'] = init_res('Doubling time', scale=False, n_genotypes=ng)
-        for key,label in hpd.result_flows.items():
-            self.results[f'cum_{key}'] = init_res(f'Cumulative {label}', color=dcols[key], n_genotypes=ng)  # Cumulative variables -- e.g. "Cumulative infections"
-        for key,label in hpd.result_flows.items(): # Repeat to keep all the cumulative keys together
-            self.results[f'new_{key}'] = init_res(f'Number of new {label}', color=dcols[key], n_genotypes=ng) # Flow variables -- e.g. "Number of new infections"
-        for key,label in hpd.result_stocks.items():
-            self.results[f'n_{key}'] = init_res(label, color=dcols[key], n_genotypes=ng)
-
-        # Populate the rest of the results
-        # Other variables
-        self.results['n_alive'] = init_res('Number alive', scale=True)
-        self.results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_genotypes=2)
-        self.results['year'] = self.yearvec
-        self.results['t']    = self.tvec
-        self.results['pop_size_by_sex'] = np.zeros(2, dtype=hpd.result_float)
-        self.results_ready   = False
-
+        self.results = results
+        self.results_ready = False
         return
 
 
-    def init_people(self, popdict=None, init_infections=False, reset=False, verbose=None, **kwargs):
+    def init_people(self, popdict=None, init_states=False, reset=False, verbose=None, **kwargs):
         '''
         Create the people and the network.
 
-        Use ``init_infections=False`` for creating a fresh People object for use
+        Use ``init_states=False`` for creating a fresh People object for use
         in future simulations
 
         Args:
             popdict         (any):  pre-generated people of various formats.
-            init_infections (bool): whether to initialize infections (default false when called directly)
+            init_states     (bool): whether to initialize states (default false when called directly)
             reset           (bool): whether to regenerate the people even if they already exist
             verbose         (int):  detail to print
             kwargs          (dict): passed to hp.make_people()
@@ -263,11 +440,11 @@ class Sim(hpb.BaseSim):
         microstructure = self['network']
         self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
-        self.results['pop_size_by_sex'][0] = len(hpu.true(self.people.is_female))
-        self.results['pop_size_by_sex'][1] = len(hpu.true(self.people.is_male))
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
-        if init_infections:
-            self.init_infections()
+        if init_states:
+            init_hpv_prev = sc.dcp(self['init_hpv_prev'])
+            init_hpv_prev, age_brackets = self.validate_init_conditions(init_hpv_prev)
+            self.init_states(age_brackets=age_brackets, init_hpv_prev=init_hpv_prev)
 
         return self
 
@@ -280,7 +457,7 @@ class Sim(hpb.BaseSim):
             self['interventions'] = self._orig_pars.pop('interventions') # Restore
 
         for i,intervention in enumerate(self['interventions']):
-            if isinstance(intervention, cvi.Intervention):
+            if isinstance(intervention, hpi.Intervention):
                 intervention.initialize(self)
         return
 
@@ -325,23 +502,39 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_infections(self):
+    def init_states(self, age_brackets=None, init_hpv_prev=None, init_cin_prev=None, init_cancer_prev=None):
         '''
         Initialize prior immunity and seed infections
         '''
 
-        age_inds = np.digitize(self.people.age, self.pars['init_hpv_prevalence']['f'][:, 0]) - 1
+        # Shorten key variables
+        ng = self['n_genotypes']
+
+        # Assign people to age buckets
+        age_inds = np.digitize(self.people.age, age_brackets)
+
+        # Assign probabilities of having HPV to each age/sex group
         hpv_probs = np.full(len(self.people), np.nan, dtype=hpd.default_float)
-        hpv_probs[self.people.f_inds] = self.pars['init_hpv_prevalence']['f'][age_inds[self.people.f_inds], 2]
-        hpv_probs[self.people.m_inds] = self.pars['init_hpv_prevalence']['m'][age_inds[self.people.m_inds], 2]
+        hpv_probs[self.people.f_inds] = init_hpv_prev['f'][age_inds[self.people.f_inds]]
+        hpv_probs[self.people.m_inds] = init_hpv_prev['m'][age_inds[self.people.m_inds]]
+        hpv_probs[~self.people.is_active] = 0 # Blank out people who are not yet sexually active
 
         # Get indices of people who have HPV (for now, split evenly between genotypes)
-        ng = self['n_genotypes']
         hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
         genotypes = np.random.randint(0, ng, len(hpv_inds))
-        new_infections = self.people.infect(inds=hpv_inds, genotypes=genotypes, layer='seed_infection')
-        self.results['cum_infections'].values += new_infections[:,None]
-        self.results['cum_total_infections'][:] += sum(new_infections)
+
+        # Figure of duration of infection and infect people. TODO: will need to redo this
+        dur_hpv = hpu.sample(**self['dur']['none'], size=len(hpv_inds))
+        t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
+        _ = self.people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur=dur_hpv, layer='seed_infection')
+
+        # Check for CINs
+        cin1_filters = (self.people.date_cin1<0) * (self.people.date_cin2 > 0)
+        self.people.cin1[cin1_filters.nonzero()] = True
+        cin2_filters = (self.people.date_cin2<0) * (self.people.date_cin3 > 0)
+        self.people.cin2[cin2_filters.nonzero()] = True
+        cin3_filters = (self.people.date_cin3<0) * (self.people.date_cancerous > 0)
+        self.people.cin3[cin3_filters.nonzero()] = True
 
         return
 
@@ -363,10 +556,12 @@ class Sim(hpb.BaseSim):
         gen_pars = self['genotype_pars']
         imm_kin_pars = self['imm_kin']
 
-        # Update states and partnerships
+        # Update demographics and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
         self.people.addtoself(new_people) # New births are added to the population
         people = self.people # Shorten
+        people.alive = ~people.dead_other
+        people.age_brackets = np.digitize(people.age, hpd.age_brackets)+1  # Store which age bucket people belong to, adding 1 so there are no zeros
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
         n_people = len(people)
@@ -378,6 +573,9 @@ class Sim(hpb.BaseSim):
         contacts = people.contacts # Shorten
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
+        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
+        if len(has_imm):
+            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
         hpimm.check_immunity(people)
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
@@ -405,7 +603,7 @@ class Sim(hpb.BaseSim):
             m = ms[ln]
 
             # Compute transmissibility for each partnership
-            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln])
+            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln]) # Probability of
             foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
@@ -413,38 +611,85 @@ class Sim(hpb.BaseSim):
             f_source_inds, f_genotypes, m_source_inds, m_genotypes = hpu.get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n_people)  # Calculate transmission
             discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
                                 [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
+
             for pship_inds, sources, targets, genotypes in discordant_pairs:
                 betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
-                source_inds, target_inds, genotype_inds = hpu.compute_infections(betas, sources, targets, genotypes)  # Calculate transmission
-            people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
+                target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
+                target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
+                source_inds = sources[unique_inds]  # Extract indices of those who passed on an infection
+                genotype_inds = genotypes[unique_inds]  # Extract genotypes that have been transmitted
+                people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
+
             ln += 1
 
-        # Update counts for this time step: stocks
-        for key in hpd.result_stocks.keys():
-            for genotype in range(ng):
-                self.results[f'n_{key}'][genotype, t] = people.count_by_genotype(key, genotype)
-            aggregate_version = f'total_{key}'
-            if aggregate_version in hpd.aggregate_result_stocks.keys():
-                self.results[f'n_{aggregate_version}'][t] = self.results[f'n_{key}'][:, t].sum()
+
+        # Index for results
+        idx = int(t / self.resfreq)
 
         # Update counts for this time step: flows
-        for key,count in people.aggregate_flows.items():
-            self.results[key][t] += count
+        for key,count in people.total_flows.items():
+            self.results[key][idx] += count
+        for key,count in people.demographic_flows.items():
+            self.results[key][idx] += count
         for key,count in people.flows.items():
             for genotype in range(ng):
-                self.results[key][genotype][t] += count[genotype]
-
-        for key,count in people.aggregate_flows_by_sex.items():
+                self.results[key][genotype][idx] += count[genotype]
+        for key,count in people.flows_by_sex.items():
             for sex in range(2):
-                self.results[key][sex][t] += count[sex]
+                self.results[key][sex][idx] += count[sex]
+
+        # By-age flows
+        self.results['new_infections_by_age'][:,:,idx] += people.flows_by_age['new_infections_by_age']
+        for key,count in people.total_flows_by_age.items():
+            self.results[key][:, idx] += count
+
+        # Make stock updates every nth step, where n is the frequency of result output
+        if t % self.resfreq == 0:
+
+            # Create total stocks
+            for key,by_age in zip(hpd.stock_keys, hpd.stock_by_age):
+                if key not in ['cin']:  # This is a special case
+                    if by_age is not None:
+                        count_age_brackets = people.age_brackets * people[key]  # Age buckets
+                    for g in range(ng):
+                        self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
+                        if by_age in ['both', 'genotype']:
+                            age_inds, n_by_age = np.unique(count_age_brackets[g, :], return_counts=True)  # Get the number infected by genotype
+                            self.results[f'n_{key}_by_age'][age_inds[1:]-1, g, idx] = n_by_age[1:]
+                if key not in ['cin']:  # This is a special case
+                    self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
+                    if by_age in ['both', 'total']:
+                        age_inds, n_by_age = np.unique(count_age_brackets, return_counts=True)  # Get the number infected
+                        self.results[f'n_total_{key}_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+
+            # Do total CINs separately
+            for genotype in range(ng):
+                self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
+            self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
+
+            count_age_brackets_all = people.age_brackets * (people['cin1'] + people['cin2'] + people['cin3'])
+            age_inds, n_by_age = np.unique(count_age_brackets_all, return_counts=True)  # Get the number infected
+            self.results[f'n_total_cin_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+
+            # Save number alive
+            self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
+            self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
+            self.results['n_alive_by_sex'][1,idx] = len((people.alive*people.is_male).nonzero()[0])
+
+            # Save number alive by age
+            count_age_brackets_alive = people.age_brackets * people.alive
+            age_inds, n_by_age = np.unique(count_age_brackets_alive, return_counts=True)  # Get the number infected
+            self.results[f'n_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+
+            # Save number of women alive by age
+            count_age_brackets_alive = people.age_brackets * people.alive * people.is_female
+            age_inds, n_by_age = np.unique(count_age_brackets_alive, return_counts=True)  # Get the number infected
+            self.results[f'f_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
             analyzer(self)
-
-        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
-        if len(has_imm):
-            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
 
         # Tidy up
         self.t += 1
@@ -473,7 +718,7 @@ class Sim(hpb.BaseSim):
 
         # Check for AlreadyRun errors
         errormsg = None
-        until = self.npts if until is None else self.day(until)
+        until = self.npts if until is None else self.get_t(until)
         if until > self.npts:
             errormsg = f'Requested to run until t={until} but the simulation end is t={self.npts}'
         if self.t >= until: # NB. At the start, self.t is None so this check must occur after initialization
@@ -514,6 +759,7 @@ class Sim(hpb.BaseSim):
         if self.complete:
             self.finalize(verbose=verbose, restore_pars=restore_pars)
             sc.printv(f'Run finished after {elapsed:0.2f} s.\n', 1, verbose)
+
         return self
 
 
@@ -526,12 +772,19 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Calculate cumulative results
-        for key in hpd.aggregate_result_flows.keys():
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=0)
-        for key in hpd.result_flows.keys():
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
-        for key in hpd.aggregate_result_flows_by_sex.keys():
-            self.results[f'cum_{key}'][:] += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+        for key,by_age in zip(hpd.flow_keys, hpd.flow_by_age):
+            self.results[f'cum_total_{key}'][:] += np.cumsum(self.results[f'new_total_{key}'][:], axis=0)
+            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
+            if by_age in ['both', 'total']:
+                self.results[f'cum_total_{key}_by_age'][:] += np.cumsum(self.results[f'new_total_{key}_by_age'][:], axis=-1)
+            if by_age in ['both', 'genotype']:
+                self.results[f'cum_{key}_by_age'][:] += np.cumsum(self.results[f'new_{key}_by_age'][:], axis=-1)
+
+        for key in hpd.by_sex_keys:
+            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=-1)
+
+        self.results[f'cum_other_deaths'][:]    += np.cumsum(self.results[f'new_other_deaths'][:], axis=-1)
+        self.results[f'cum_births'][:]          += np.cumsum(self.results[f'new_births'][:], axis=-1)
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
@@ -558,6 +811,7 @@ class Sim(hpb.BaseSim):
     def compute_results(self, verbose=None):
         ''' Perform final calculations on the results '''
         self.compute_states()
+        self.compute_summary()
         return
 
 
@@ -566,20 +820,50 @@ class Sim(hpb.BaseSim):
         Compute prevalence, incidence, and other states.
         '''
         res = self.results
-        self.results['n_alive'][:]         = self['pop_size'] + res['cum_births'][:] - res['cum_other_deaths'][:] # Number of people still alive.
-        self.results['n_alive_by_sex'][0,:]  = res['pop_size_by_sex'][0] + res['cum_births_by_sex'][0,:] - res['cum_other_deaths_by_sex'][0,:]
-        self.results['n_alive_by_sex'][0,:]  = res['pop_size_by_sex'][1] + res['cum_births_by_sex'][1,:] - res['cum_other_deaths_by_sex'][1,:]
-        self.results['hpv_incidence_by_genotype'][:] = np.einsum('ji,ji->ji', res['new_infections'][:],1 / res['n_susceptible'][:])  # Calculate the incidence
-        self.results['hpv_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_infectious'][:], 1 / res['n_alive'][:])
-        self.results['cin1_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin1'][:], 1 / res['n_alive_by_sex'][0,:])
-        self.results['cin2_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin2'][:], 1 / res['n_alive_by_sex'][0,:])
-        self.results['cin3_prevalence_by_genotype'][:] = np.einsum('ji,i->ji', res['n_cin3'][:], 1 / res['n_alive_by_sex'][0,:])
 
-        self.results['hpv_prevalence'][:] = res['n_total_infectious'][:]/ res['n_alive'][:]
-        self.results['cin1_prevalence'][:] = res['n_total_cin1'][:]/ res['n_alive_by_sex'][0,:]
-        self.results['cin2_prevalence'][:] = res['n_total_cin2'][:] / res['n_alive_by_sex'][0,:]
-        self.results['cin3_prevalence'][:] = res['n_total_cin3'][:] / res['n_alive_by_sex'][0,:]
-        self.results['cancer_incidence'][:] = res['new_total_cancers'][:]/(res['n_alive_by_sex'][0,:]-res['n_total_cancerous'][:])
+        # Compute HPV incidence and prevalence
+        self.results['total_hpv_incidence'][:]  = res['new_total_infections'][:]/ res['n_susceptible'][:].sum(axis=0)
+        self.results['hpv_incidence'][:]        = res['new_infections'][:]/ res['n_susceptible'][:]
+        self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
+        self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
+
+        # Compute CIN and cancer prevalence
+        alive_females = res['n_alive_by_sex'][0,:]
+        self.results['total_cin1_prevalence'][:]    = res['n_total_cin1'][:] / alive_females
+        self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / alive_females
+        self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / alive_females
+        self.results['total_cin_prevalence'][:]     = res['n_total_cin'][:] / alive_females
+        self.results['total_cancer_prevalence'][:]  = res['n_total_cancerous'][:] / alive_females
+        self.results['cin1_prevalence'][:]          = res['n_cin1'][:] / alive_females
+        self.results['cin2_prevalence'][:]          = res['n_cin2'][:] / alive_females
+        self.results['cin3_prevalence'][:]          = res['n_cin3'][:] / alive_females
+        self.results['cin_prevalence'][:]           = res['n_cin'][:] / alive_females
+        self.results['cancer_prevalence'][:]        = res['n_cancerous'][:] / alive_females
+
+        # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
+        # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
+        at_risk_females = alive_females - res['n_cancerous'].values.sum(axis=0)
+        scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
+        demoninator = at_risk_females * scale_factor
+        self.results['total_cin1_incidence'][:]    = res['new_total_cin1s'][:] / demoninator
+        self.results['total_cin2_incidence'][:]    = res['new_total_cin2s'][:] / demoninator
+        self.results['total_cin3_incidence'][:]    = res['new_total_cin3s'][:] / demoninator
+        self.results['total_cin_incidence'][:]     = res['new_total_cins'][:] / demoninator
+        self.results['total_cancer_incidence'][:]  = res['new_total_cancers'][:] / demoninator
+        self.results['cin1_incidence'][:]          = res['new_cin1s'][:] / demoninator
+        self.results['cin2_incidence'][:]          = res['new_cin2s'][:] / demoninator
+        self.results['cin3_incidence'][:]          = res['new_cin3s'][:] / demoninator
+        self.results['cin_incidence'][:]           = res['new_cins'][:] / demoninator
+        self.results['cancer_incidence'][:]        = res['new_cancers'][:] / demoninator
+
+        # Finally, add results by age
+        self.results['total_hpv_prevalence_by_age'][:]      = res['n_total_infectious_by_age'][:] / self.results['n_alive_by_age'][:]
+        self.results['total_hpv_incidence_by_age'][:]       = res['new_total_infections_by_age'][:] / self.results['n_total_susceptible_by_age'][:]
+        cin_inci_denom = (self.results['f_alive_by_age'][:] - res['n_total_cancerous_by_age'][:])*1e5
+        self.results['total_cin_prevalence_by_age'][:]      = res['n_total_cin_by_age'][:] / cin_inci_denom
+        self.results['total_cancer_prevalence_by_age'][:]   = res['n_total_cancerous_by_age'][:] / cin_inci_denom
+        self.results['total_cin_incidence_by_age'][:]       = res['new_total_cins_by_age'][:] / cin_inci_denom
+        self.results['total_cancer_incidence_by_age'][:]    = res['new_total_cancers_by_age'][:] / cin_inci_denom
 
         return
 
@@ -622,6 +906,7 @@ class Sim(hpb.BaseSim):
         '''
         Print a medium-length summary of the simulation, drawing from the last time
         point in the simulation by default. Called by default at the end of a sim run.
+        point in the simulation by default. Called by default at the end of a sim run.
         See also sim.disp() (detailed output) and sim.brief() (short output).
 
         Args:
@@ -645,7 +930,7 @@ class Sim(hpb.BaseSim):
         labelstr = f' "{self.label}"' if self.label else ''
         string = f'Simulation{labelstr} summary:\n'
         for key in self.result_keys():
-            if full or key.startswith('cum_total') and 'by_sex' not in key:
+            if full or key.startswith('cum_total') and 'by_sex' not in key and 'by_age' not in key:
                 val = np.round(summary[key])
                 string += f'   {val:10,.0f} {self.results[key].name.lower()}\n'.replace(',', sep) # Use replace since it's more flexible
 
@@ -656,10 +941,10 @@ class Sim(hpb.BaseSim):
             return string
 
 
-    def plot(self, toplot=None):
+    def plot(self, *args, **kwargs):
         ''' Plot the outputs of the model '''
-        pass
-
+        fig = hpplt.plot_sim(sim=self, *args, **kwargs)
+        return fig
 
 
 class AlreadyRunError(RuntimeError):

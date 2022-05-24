@@ -30,11 +30,13 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Population parameters
     pars['pop_size']        = 20e3      # Number of agents
-    pars['init_hpv_prevalence'] = None  # Initial HPV prevalence by age (and genotype), loaded below
     pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['death_rates']     = None      # Deaths from all other causes, loaded below
     pars['birth_rates']     = None      # Birth rates, loaded below
+
+    # Initialization parameters
+    pars['init_hpv_prev']       = hpd.default_init_prev # Initial prevalence
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
@@ -70,8 +72,8 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
 
     # Parameters used to calculate immunity
-    pars['imm_init'] = dict(dist='beta', par1=5, par2=1)  # beta distribution for initial level of immunity following infection clearance
-    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=5), # decay rate, with half life in YEARS
+    pars['imm_init'] = dict(dist='beta', par1=20, par2=1)  # beta distribution for initial level of immunity following infection clearance
+    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=10), # decay rate, with half life in YEARS
                              vaccine=dict(form='exp_decay', init_val=1, half_life=20)) # decay rate, with half life in YEARS
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
     pars['imm_boost'] = 1.5  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
@@ -86,15 +88,13 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
 
-    # Duration parameters
+    # Parameters determining duration of dysplasia stages
     pars['dur'] = {}
-    pars['dur']['inf']  = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of infection in YEARS
-    pars['dur']['cin1']  = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of CIN1 in YEARS
-    pars['dur']['cin2'] = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 in YEARS
-    pars['dur']['cin3'] = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 in YEARS
-    pars['dur']['hpv2cin1']  = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of infection before developing CIN in YEARS
-    pars['dur']['cin32cancer']  = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 before developing cancer in YEARS
-
+    pars['dur']['none']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Length of time that HPV is present without dysplasia
+    pars['dur']['cin1']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of CIN1 (mild/very mild dysplasia)
+    pars['dur']['cin2']     = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 (moderate dysplasia)
+    pars['dur']['cin3']     = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 (severe dysplasia/in situ carcinoma)
+    pars['dur']['cancer']   = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated cancer
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
@@ -219,7 +219,7 @@ def get_prognoses():
     return prognoses
 
 
-def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
+def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=None):
     '''
     Get mortality and fertility data by location if provided, or use default
 
@@ -244,7 +244,7 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False):
             birth_rates = hpdata.get_birth_rates(location=location)
         except ValueError as E:
             warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
-            hpm.warn(warnmsg)
+            hpm.warn(warnmsg, die=die)
     
     return birth_rates, death_rates
 
