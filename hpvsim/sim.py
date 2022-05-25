@@ -608,7 +608,8 @@ class Sim(hpb.BaseSim):
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
             # Compute transmissions
-            f_source_inds, f_genotypes, m_source_inds, m_genotypes = hpu.get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n_people)  # Calculate transmission
+            f_source_inds, f_genotypes = hpu.get_discordant_pairs(f_inf_inds, m_sus_inds, f, m, n_people)  # Calculate transmission
+            m_source_inds, m_genotypes = hpu.get_discordant_pairs(m_inf_inds, f_sus_inds, m, f, n_people)
             discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
                                 [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
 

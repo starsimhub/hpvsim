@@ -20,7 +20,7 @@ import hpvsim.utils as hpu
 
 
 sim = test_sim(do_plot=False)
-to_profile = 'infect' # Must be one of the options listed below
+to_profile = 'step' # Must be one of the options listed below
 
 func_options = {
     'make_contacts': hppop.make_random_contacts,

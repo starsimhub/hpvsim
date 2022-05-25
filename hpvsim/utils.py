@@ -87,22 +87,25 @@ def findinds(arr,       vals):
     return isin(arr,vals).nonzero()[0]
 
 
-@nb.njit()
-def get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n):
+# @nb.njit(cache=cache, parallel=safe_parallel)
+def get_discordant_pairs(p1_inf_inds, p2_sus_inds, p1, p2, n):
     '''
     Construct discordant partnerships
     '''
-    f_source_pships, f_genotypes = pair_lookup_vals(f, f_inf_inds[1], f_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    m_source_pships, m_genotypes = pair_lookup_vals(m, m_inf_inds[1], m_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    f_sus_pships = pair_lookup(f, f_sus_inds[1], n) # Pull out the indices of partnerships in which the female is susceptible, as well as the genotypes
-    m_sus_pships = pair_lookup(m, m_sus_inds[1], n) # ... same thing for males
-    f_genotypes = f_genotypes[(~np.isnan(f_genotypes)*m_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
-    m_genotypes = m_genotypes[(~np.isnan(m_genotypes)*f_sus_pships).nonzero()[0]].astype(hpd.default_int) # ... and again for males
-    f_source_pships = f_source_pships * m_sus_pships # Remove partnerships where both partners have an infection with the same genotype
-    m_source_pships = m_source_pships * f_sus_pships # ... same thing for males
-    f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
-    m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
-    return f_source_inds, f_genotypes, m_source_inds, m_genotypes
+
+    p1_source_pships, p1_genotypes = pair_lookup_vals(p1, p1_inf_inds[1], p1_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
+    p2_sus_pships = pair_lookup(p2, p2_sus_inds[1], n) # ... same thing for males
+    p1_genotypes = p1_genotypes[(~np.isnan(p1_genotypes)*p2_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
+    p1_source_pships = p1_source_pships * p2_sus_pships # Remove partnerships where both partners have an infection with the same genotype
+    p1_source_inds = p1_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
+    return p1_source_inds, p1_genotypes
+
+    # m_source_pships, m_genotypes = pair_lookup_vals(m, m_inf_inds[1], m_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
+    # f_sus_pships = pair_lookup(f, f_sus_inds[1], n) # Pull out the indices of partnerships in which the female is susceptible, as well as the genotypes
+    # m_genotypes = m_genotypes[(~np.isnan(m_genotypes)*f_sus_pships).nonzero()[0]].astype(hpd.default_int) # ... and again for males
+    # m_source_pships = m_source_pships * f_sus_pships # ... same thing for males
+    # m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
+    # return f_source_inds, f_genotypes, m_source_inds, m_genotypes
 
 
 @nb.njit(             (nbfloat[:],  nbint[:]), cache=cache, parallel=safe_parallel)
