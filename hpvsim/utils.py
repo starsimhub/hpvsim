@@ -45,8 +45,7 @@ def get_sources_targets(inf,           sus,            sex):
 
 @nb.njit(parallel=safe_parallel)
 def pair_lookup_vals(contacts_array, people_inds, genotypes, n):
-    lookup = np.empty(n, nbfloat)
-    lookup.fill(np.nan)
+    lookup = np.full(n, np.nan)
     lookup[people_inds[::-1]] = genotypes[::-1]
     res_val = lookup[contacts_array]
     mask = ~np.isnan(res_val)
@@ -58,6 +57,18 @@ def pair_lookup(contacts_array, people_inds, n):
     lookup[people_inds[::-1]] = True
     res_val = lookup[contacts_array]
     return res_val
+
+@nb.njit(cache=cache, parallel=safe_parallel)
+def unique(arr):
+    '''
+    Find the unique elements and counts in an array.
+    Equivalent to np.unique(return_counts=True) but ~5x faster, and
+    only works for arrays of positive integers.
+    '''
+    counts = np.bincount(arr.ravel())
+    unique = np.flatnonzero(counts)
+    counts = counts[unique]
+    return unique, counts
 
 @nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isin( arr,      search_inds):
@@ -76,7 +87,7 @@ def findinds(arr,       vals):
     return isin(arr,vals).nonzero()[0]
 
 
-@nb.njit()
+# @nb.njit()
 def get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n):
     '''
     Construct discordant partnerships

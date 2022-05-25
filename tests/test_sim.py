@@ -44,14 +44,17 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     # Settings
     seed = 1
     verbose = 1
+    from hpvsim.immunity import genotype
 
     # Create and run the simulation
-    sim = hps.Sim(end=2035)
+    hpv16 = genotype('HPV16')
+    hpv18 = genotype('HPV18')
+    sim = hps.Sim(end=2035, genotypes=[hpv16,hpv18])
     sim.set_seed(seed)
-    sim.run(verbose=verbose)
 
     # Optionally plot
     if do_plot:
+        sim.run(verbose=verbose)
         sim.plot(do_save=do_save)
 
     return sim
@@ -308,14 +311,44 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
+    # sim4 = test_result_consistency()
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
     # json = test_fileio()
 
-    sc.toc(T)
-    print('Done.')
+    # max_a = 20_000
+    # a = np.random.randint(1, max_a, size=10_000).astype(np.int32)
+    # import numba as nb
+    #
+    # def np_unique(a):
+    #     u, counts = np.unique(a, return_counts=True)
+    #     return u, counts
+    #
+    #
+    # @nb.njit()
+    # def fast_unique_counts(a):
+    #     counts = np.bincount(a)
+    #     u = np.flatnonzero(counts)
+    #     counts = counts[u]
+    #     return u, counts
+    #
+    #
+    # def fast_unique(a, max_a):
+    #     q = np.zeros(max_a, dtype=int)
+    #     q[a.ravel()] = 1
+    #     u = np.nonzero(q)[0]
+    #     return u
+    #
+    # u1, counts1 = np_unique(a)
+    # u2, counts2 = fast_unique_counts(a)
+    # u3 = fast_unique(a, max_a)
+    #
+    # np.array_equal(u1, u2)
+    # np.array_equal(u1, u3)
+    # np.array_equal(counts1, counts2)
+
+
