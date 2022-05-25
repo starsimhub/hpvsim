@@ -503,10 +503,12 @@ class People(hpb.BasePeople):
 
         # Use genotype-specific prognosis probabilities to determine what happens.
         # Only women can progress beyond infection.
+        f_inds = self.is_female[inds]
+
         for g in range(ng):
 
-            # Apply filters so we only select females with this genotype who don't already have a CIN attributable to this genotype
-            filters = self.is_female[inds] * (genotypes==g) * ~(self.cin1[g,inds]) * ~(self.cin2[g,inds]) * ~(self.cin3[g,inds])
+            # Apply filters so we only select females with this genotype
+            filters = f_inds * (genotypes==g)
 
             # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
             cin1_probs      = progprobs[g]['rel_cin1_prob'] * progpars['cin1_probs'][dur_inds] * filters

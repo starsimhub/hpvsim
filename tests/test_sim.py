@@ -311,44 +311,12 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
+    sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
-    # sim3 = test_flexible_inputs()
-    # sim4 = test_result_consistency()
-    # sim5 = test_location_loading()
-    # sim6 = test_resuming()
+    sim2 = test_epi()
+    sim3 = test_flexible_inputs()
+    sim4 = test_result_consistency()
+    sim5 = test_location_loading()
+    sim6 = test_resuming()
     # json = test_fileio()
-
-    # max_a = 20_000
-    # a = np.random.randint(1, max_a, size=10_000).astype(np.int32)
-    # import numba as nb
-    #
-    # def np_unique(a):
-    #     u, counts = np.unique(a, return_counts=True)
-    #     return u, counts
-    #
-    #
-    # @nb.njit()
-    # def fast_unique_counts(a):
-    #     counts = np.bincount(a)
-    #     u = np.flatnonzero(counts)
-    #     counts = counts[u]
-    #     return u, counts
-    #
-    #
-    # def fast_unique(a, max_a):
-    #     q = np.zeros(max_a, dtype=int)
-    #     q[a.ravel()] = 1
-    #     u = np.nonzero(q)[0]
-    #     return u
-    #
-    # u1, counts1 = np_unique(a)
-    # u2, counts2 = fast_unique_counts(a)
-    # u3 = fast_unique(a, max_a)
-    #
-    # np.array_equal(u1, u2)
-    # np.array_equal(u1, u3)
-    # np.array_equal(counts1, counts2)
-
 
