@@ -320,3 +320,5 @@ if __name__ == '__main__':
     sim6 = test_resuming()
     # json = test_fileio()
 
+    sc.toc(T)
+    print('Done.')
