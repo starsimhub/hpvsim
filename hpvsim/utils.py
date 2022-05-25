@@ -87,7 +87,7 @@ def findinds(arr,       vals):
     return isin(arr,vals).nonzero()[0]
 
 
-# @nb.njit()
+@nb.njit()
 def get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n):
     '''
     Construct discordant partnerships
