@@ -85,7 +85,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         if dt_round_age:
             ages = age_data_min[age_bins] + np.random.randint(age_data_range[age_bins]/dt)*dt # Uniformly distribute within this age bin
         else:
-            ages            = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
+            ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
 
         # Store output
         popdict = {}
@@ -105,7 +105,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 active_inds_layer = hpu.binomial_filter(sim['layer_probs'][lkey], active_inds)
                 durations = sim['dur_pship'][lkey]
                 acts = sim['acts'][lkey]
-                contacts[lkey], cp = make_random_contacts(p_count=partners[lno], sexes=sexes, n=n, durations=durations, acts=acts, mapping=active_inds_layer, **kwargs)
+                contacts[lkey], cp = make_random_contacts(p_count=partners[lno], sexes=sexes, ages=ages, n=n, durations=durations, acts=acts, mapping=active_inds_layer, **kwargs)
                 current_partners.append(cp)
                 lno += 1
         else: 
@@ -232,7 +232,7 @@ def _tidy_edgelist(m, f, mapping=None):
     return output
 
 
-def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, acts=None, mapping=None):
+def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=None, acts=None, mapping=None):
     '''
     Make random contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females with no additional age structure.
@@ -257,8 +257,10 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, acts=
     # Define indices; TODO fix or centralize this
     pop_size        = len(sexes)
     f_inds          = hpu.false(sexes)
-    all_inds        = np.arange(pop_size) 
+    all_inds        = np.arange(pop_size)
     f_active_inds   = np.intersect1d(mapping, f_inds)
+    age_order       = ages[f_active_inds].argsort() # We sort the contacts by age so they get matched to partners of similar age
+    f_active_inds   = f_active_inds[age_order]
     inactive_inds   = np.setdiff1d(all_inds, mapping)
 
     # Precalculate contacts
@@ -267,6 +269,8 @@ def make_random_contacts(p_count=None, sexes=None, n=None, durations=None, acts=
     weighting[inactive_inds] = 0 # Exclude people not active
     weighting       = weighting/sum(weighting) # Turn this into a probability
     m_contacts      = hpu.choose_w(weighting, n_all_contacts, unique=False) # Select males
+    m_age_order     = ages[m_contacts].argsort() # Sort the partners by age as well
+    m_contacts      = m_contacts[m_age_order]
 
     # Make contacts
     count = 0
