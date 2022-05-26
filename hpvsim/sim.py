@@ -594,7 +594,9 @@ class Sim(hpb.BaseSim):
         inf = people.infectious
         sus = people.susceptible
         sus_imm = people.sus_imm
-        f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds = hpu.get_sources_targets(inf, sus, people.sex.astype(bool))  # Males and females infected with this genotype
+
+        f_inf_genotypes, f_inf_inds, f_sus_genotypes, f_sus_inds = hpu.get_sources_targets(inf, sus, ~people.sex.astype(bool))  # Males and females infected with this genotype
+        m_inf_genotypes, m_inf_inds, m_sus_genotypes, m_sus_inds = hpu.get_sources_targets(inf, sus,  people.sex.astype(bool))  # Males and females infected with this genotype
 
         # Loop over layers
         ln = 0 # Layer number
@@ -603,13 +605,13 @@ class Sim(hpb.BaseSim):
             m = ms[ln]
 
             # Compute transmissibility for each partnership
-            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln]) # Probability of
-            foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln]
+            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln]) # Probability of not getting infected from any fractional acts
+            foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln] # Probability of not getting infected from whole acts
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
             # Compute transmissions
-            f_source_inds, f_genotypes = hpu.get_discordant_pairs(f_inf_inds, m_sus_inds, f, m, n_people)  # Calculate transmission
-            m_source_inds, m_genotypes = hpu.get_discordant_pairs(m_inf_inds, f_sus_inds, m, f, n_people)
+            f_source_inds, f_genotypes = hpu.get_discordant_pairs(f_inf_inds, f_inf_genotypes, m_sus_inds, f, m, n_people)  # Calculate transmission
+            m_source_inds, m_genotypes = hpu.get_discordant_pairs(m_inf_inds, m_inf_genotypes, f_sus_inds, m, f, n_people)
             discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
                                 [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
 

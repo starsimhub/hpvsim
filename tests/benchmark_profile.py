@@ -20,7 +20,7 @@ import hpvsim.utils as hpu
 
 
 sim = test_sim(do_plot=False)
-to_profile = 'step' # Must be one of the options listed below
+to_profile = 'update_pre' # Must be one of the options listed below
 
 func_options = {
     'make_contacts': hppop.make_random_contacts,
@@ -32,6 +32,7 @@ func_options = {
     'step':          sim.step,
     'get_pairs':     hpu.get_discordant_pairs,
     'pair_lookup':   hpu.pair_lookup_vals,
+    'update_pre':    hpp.People.update_states_pre,
     'infect':        hpp.People.infect,
 }
 

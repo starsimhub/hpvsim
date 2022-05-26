@@ -69,7 +69,7 @@ def test_epi():
 
     # Define the parameters to vary
     vary_pars   = ['beta',          'acts',         'condoms',      'debut',        'rel_cin1_prob',    'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.05, 0.5],     [10,200],       [0.1,0.9],      [15,25],        [0.1, 2],           [0.01,0.5]] # Values
+    vary_vals   = [[0.05, 0.5],     [10,200],       [0.1,1.0],      [15,25],        [0.1, 2],           [0.01,0.5]] # Values
     vary_rels   = ['pos',           'pos',          'neg',          'neg',          'pos',              'pos'] # Expected association with epi outcomes
     vary_what   = ['infections',    'infections',   'infections',   'infections',   'cin1s',            'cin1s'] # Epi outcomes to check
 
@@ -236,7 +236,7 @@ def test_location_loading():
         sim3 = hps.Sim(location='penelope') # Make sure a warning message is raised
     assert (sim0['birth_rates'][1] == sim3['birth_rates'][1]).all() # Check that defaults have been used
 
-    return
+    return sim1
 
 
 def test_resuming():

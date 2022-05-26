@@ -244,9 +244,15 @@ class People(hpb.BasePeople):
 
             # Draw female and male partners separately
             new_pship_inds_f    = hpu.choose_w(probs=new_pship_probs*self.is_female, n=n_new[lkey], unique=True)
-            new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male, n=n_new[lkey], unique=True)
+            new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male,   n=n_new[lkey], unique=True)
             new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
             self.current_partners[lno,new_pship_inds] += 1
+
+            # Sort the new contacts by age so partners are roughly the same age
+            sorted_f_inds = self.age[new_pship_inds_f].argsort()
+            new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
+            sorted_m_inds = self.age[new_pship_inds_m].argsort()
+            new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
 
             # Add everything to a contacts dictionary
             new_pships[lkey]['f']       = new_pship_inds_f
@@ -257,7 +263,7 @@ class People(hpb.BasePeople):
             new_pships[lkey]['acts']    = hpu.sample(**self['pars']['acts'][lkey], size=n_new[lkey]) # Acts per year for this pair, assumed constant over the duration of the partnership (TODO: EMOD uses a decay factor for this, consider?)
 
         self.add_contacts(new_pships)
-            
+
         return
 
 
