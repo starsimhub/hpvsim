@@ -1,5 +1,5 @@
 '''
-Base classes for *sim. These classes handle a lot of the boilerplate of the
+Base classes for \*sim. These classes handle a lot of the boilerplate of the
 People and Sim classes (e.g. loading, saving, key lookups, etc.), so those classes
 can be focused on the disease-specific functionality.
 '''
