@@ -1,0 +1,12 @@
+{
+  "time": {
+    "initialize": 0.044,
+    "run": 2.322
+  },
+  "parameters": {
+    "pop_size": 20000,
+    "n_genotypes": 2,
+    "n_years": 40
+  },
+  "cpu_performance": 0.502793766194081
+}

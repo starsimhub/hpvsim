@@ -197,15 +197,15 @@ class People(hpb.BasePeople):
         self.total_flows['new_total_cancer_deaths']   += self.flows['new_cancer_deaths'].sum()
 
         new_cin = (self.date_cin1==t)*self.cin1+(self.date_cin2==t)*self.cin2+(self.date_cin3==t)*self.cin3
-        age_inds, new_cins = np.unique(new_cin * self.age_brackets, return_counts=True)
+        age_inds, new_cins = hpu.unique(new_cin * self.age_brackets)
         self.total_flows_by_age['new_total_cins_by_age'][age_inds[1:]-1] += new_cins[1:]
 
         new_cancer = (self.date_cancerous==t)*self.cancerous
-        age_inds, new_cancers = np.unique(new_cancer * self.age_brackets, return_counts=True)
+        age_inds, new_cancers = hpu.unique(new_cancer * self.age_brackets)
         self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
 
         new_cancer_deaths = (self.date_dead_cancer==t)*self.dead_cancer
-        age_inds, new_cancer_deaths = np.unique(new_cancer_deaths * self.age_brackets, return_counts=True)
+        age_inds, new_cancer_deaths = hpu.unique(new_cancer_deaths * self.age_brackets)
         self.total_flows_by_age['new_total_cancer_deaths_by_age'][age_inds[1:]-1] += new_cancer_deaths[1:]
 
         return new_people
@@ -222,7 +222,7 @@ class People(hpb.BasePeople):
             dissolved = self.contacts[lkey].pop_inds(dissolve_inds) # Remove them from the contacts list
 
             # Update current number of partners
-            unique, counts = np.unique(np.concatenate([dissolved['f'],dissolved['m']]), return_counts=True)
+            unique, counts = hpu.unique(np.concatenate([dissolved['f'],dissolved['m']]))
             self.current_partners[lno,unique] -= counts
             n_dissolved[lkey] = len(dissolve_inds)
 
@@ -244,9 +244,15 @@ class People(hpb.BasePeople):
 
             # Draw female and male partners separately
             new_pship_inds_f    = hpu.choose_w(probs=new_pship_probs*self.is_female, n=n_new[lkey], unique=True)
-            new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male, n=n_new[lkey], unique=True)
+            new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male,   n=n_new[lkey], unique=True)
             new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
             self.current_partners[lno,new_pship_inds] += 1
+
+            # Sort the new contacts by age so partners are roughly the same age
+            sorted_f_inds = self.age[new_pship_inds_f].argsort()
+            new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
+            sorted_m_inds = self.age[new_pship_inds_m].argsort()
+            new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
 
             # Add everything to a contacts dictionary
             new_pships[lkey]['f']       = new_pship_inds_f
@@ -257,7 +263,7 @@ class People(hpb.BasePeople):
             new_pships[lkey]['acts']    = hpu.sample(**self['pars']['acts'][lkey], size=n_new[lkey]) # Acts per year for this pair, assumed constant over the duration of the partnership (TODO: EMOD uses a decay factor for this, consider?)
 
         self.add_contacts(new_pships)
-            
+
         return
 
 
@@ -480,9 +486,9 @@ class People(hpb.BasePeople):
 
             # Create by-age flows
             for g in range(ng):
-                age_inds, infections = np.unique(self.age_brackets[inds[genotypes==g]],return_counts=True)
+                age_inds, infections = hpu.unique(self.age_brackets[inds[genotypes==g]])
                 self.flows_by_age['new_infections_by_age'][age_inds-1,g] += infections
-            total_age_inds, total_infections = np.unique(self.age_brackets[inds], return_counts=True)
+            total_age_inds, total_infections = hpu.unique(self.age_brackets[inds])
             self.total_flows_by_age['new_total_infections_by_age'][total_age_inds-1] += total_infections
 
             # Create by-sex flows
@@ -503,10 +509,12 @@ class People(hpb.BasePeople):
 
         # Use genotype-specific prognosis probabilities to determine what happens.
         # Only women can progress beyond infection.
+        f_inds = self.is_female[inds]
+
         for g in range(ng):
 
-            # Apply filters so we only select females with this genotype who don't already have a CIN attributable to this genotype
-            filters = self.is_female[inds] * (genotypes==g) * ~(self.cin1[g,inds]) * ~(self.cin2[g,inds]) * ~(self.cin3[g,inds])
+            # Apply filters so we only select females with this genotype
+            filters = f_inds * (genotypes==g)
 
             # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
             cin1_probs      = progprobs[g]['rel_cin1_prob'] * progpars['cin1_probs'][dur_inds] * filters

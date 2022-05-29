@@ -44,14 +44,17 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     # Settings
     seed = 1
     verbose = 1
+    from hpvsim.immunity import genotype
 
     # Create and run the simulation
-    sim = hps.Sim(end=2035)
+    hpv16 = genotype('HPV16')
+    hpv18 = genotype('HPV18')
+    sim = hps.Sim(end=2035, genotypes=[hpv16,hpv18])
     sim.set_seed(seed)
-    sim.run(verbose=verbose)
 
     # Optionally plot
     if do_plot:
+        sim.run(verbose=verbose)
         sim.plot(do_save=do_save)
 
     return sim
@@ -66,7 +69,7 @@ def test_epi():
 
     # Define the parameters to vary
     vary_pars   = ['beta',          'acts',         'condoms',      'debut',        'rel_cin1_prob',    'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.05, 0.5],     [10,200],       [0.1,0.9],      [15,25],        [0.1, 2],           [0.01,0.5]] # Values
+    vary_vals   = [[0.05, 0.5],     [10,200],       [0.1,1.0],      [15,25],        [0.1, 2],           [0.01,0.5]] # Values
     vary_rels   = ['pos',           'pos',          'neg',          'neg',          'pos',              'pos'] # Expected association with epi outcomes
     vary_what   = ['infections',    'infections',   'infections',   'infections',   'cin1s',            'cin1s'] # Epi outcomes to check
 
@@ -233,7 +236,7 @@ def test_location_loading():
         sim3 = hps.Sim(location='penelope') # Make sure a warning message is raised
     assert (sim0['birth_rates'][1] == sim3['birth_rates'][1]).all() # Check that defaults have been used
 
-    return
+    return sim1
 
 
 def test_resuming():

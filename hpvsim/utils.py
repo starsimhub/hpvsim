@@ -36,15 +36,13 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 @nb.njit(              (nbbool[:,:],    nbbool[:,:],    nbbool[:]), cache=cache, parallel=safe_parallel)
 def get_sources_targets(inf,           sus,            sex):
     ''' Get indices of sources, i.e. people with current infections '''
-    f_sus = (sus * ~sex).nonzero()
-    m_sus = (sus * sex).nonzero()
-    f_inf = (inf * ~sex).nonzero()
-    m_inf = (inf * sex).nonzero()
-    return f_inf, m_inf, f_sus, m_sus
+    sus_genotypes, sus_inds = (sus * sex).nonzero()
+    inf_genotypes, inf_inds = (inf * sex).nonzero()
+    return inf_genotypes, inf_inds, sus_genotypes, sus_inds
 
 
-@nb.njit(parallel=safe_parallel)
-def pair_lookup_vals(contacts_array, people_inds, genotypes, n):
+@nb.njit(           (nbint[:],       nb.int64[:], nb.int64[:],  nbint), cache=cache,parallel=safe_parallel)
+def pair_lookup_vals(contacts_array, people_inds, genotypes,    n):
     lookup = np.empty(n, nbfloat)
     lookup.fill(np.nan)
     lookup[people_inds[::-1]] = genotypes[::-1]
@@ -52,12 +50,26 @@ def pair_lookup_vals(contacts_array, people_inds, genotypes, n):
     mask = ~np.isnan(res_val)
     return mask, res_val
 
-@nb.njit(parallel=safe_parallel)
+
+@nb.njit(      (nbint[:],       nb.int64[:], nbint), cache=cache,parallel=safe_parallel)
 def pair_lookup(contacts_array, people_inds, n):
     lookup = np.full(n, False)
     lookup[people_inds[::-1]] = True
     res_val = lookup[contacts_array]
     return res_val
+
+@nb.njit(cache=cache, parallel=safe_parallel)
+def unique(arr):
+    '''
+    Find the unique elements and counts in an array.
+    Equivalent to np.unique(return_counts=True) but ~5x faster, and
+    only works for arrays of positive integers.
+    '''
+    counts = np.bincount(arr.ravel())
+    unique = np.flatnonzero(counts)
+    counts = counts[unique]
+    return unique, counts
+
 
 @nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isin( arr,      search_inds):
@@ -70,28 +82,25 @@ def isin( arr,      search_inds):
             result[i] = True
     return result
 
+
 @nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
 def findinds(arr,       vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
     return isin(arr,vals).nonzero()[0]
 
 
-@nb.njit()
-def get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n):
+@nb.njit(               (nb.int64[:],   nb.int64[:],    nb.int64[:], nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
+def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p2,       n):
     '''
     Construct discordant partnerships
     '''
-    f_source_pships, f_genotypes = pair_lookup_vals(f, f_inf_inds[1], f_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    m_source_pships, m_genotypes = pair_lookup_vals(m, m_inf_inds[1], m_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    f_sus_pships = pair_lookup(f, f_sus_inds[1], n) # Pull out the indices of partnerships in which the female is susceptible, as well as the genotypes
-    m_sus_pships = pair_lookup(m, m_sus_inds[1], n) # ... same thing for males
-    f_genotypes = f_genotypes[(~np.isnan(f_genotypes)*m_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
-    m_genotypes = m_genotypes[(~np.isnan(m_genotypes)*f_sus_pships).nonzero()[0]].astype(hpd.default_int) # ... and again for males
-    f_source_pships = f_source_pships * m_sus_pships # Remove partnerships where both partners have an infection with the same genotype
-    m_source_pships = m_source_pships * f_sus_pships # ... same thing for males
-    f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
-    m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
-    return f_source_inds, f_genotypes, m_source_inds, m_genotypes
+
+    p1_source_pships, p1_genotypes = pair_lookup_vals(p1, p1_inf_inds, p1_inf_gens, n) # Pull out the indices of partnerships in which p1 is infected, as well as the genotypes
+    p2_sus_pships = pair_lookup(p2, p2_sus_inds, n) # ... pull out the indices of partnerships in which p2 is susceptible
+    p1_genotypes = p1_genotypes[(~np.isnan(p1_genotypes)*p2_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
+    p1_source_pships = p1_source_pships * p2_sus_pships # Remove partnerships where both partners have an infection with the same genotype
+    p1_source_inds = p1_source_pships.nonzero()[0] # Indices of partnerships where the p1 has an infection and p2 is susceptible
+    return p1_source_inds, p1_genotypes
 
 
 @nb.njit(             (nbfloat[:],  nbint[:]), cache=cache, parallel=safe_parallel)
