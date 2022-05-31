@@ -88,7 +88,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
 
         # Get death ages
-        death_ages = get_death_ages(life_tables=sim.pars['death_rates'], pop_size=pop_size, age_bins=age_bins, ages=ages, sexes=sexes, dt_round_age=dt_round_age, dt=dt)
+        death_ages = get_death_ages(life_tables=sim.pars['lx'], pop_size=pop_size, age_bins=age_bins, ages=ages, sexes=sexes, dt_round_age=dt_round_age, dt=dt)
 
         # Store output
         popdict = {}

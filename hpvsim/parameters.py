@@ -32,7 +32,7 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
     pars['pop_size']        = 20e3      # Number of agents
     pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
-    pars['death_rates']     = None      # Deaths from all other causes, loaded below
+    pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
     pars['birth_rates']     = None      # Birth rates, loaded below
 
     # Initialization parameters
@@ -260,22 +260,8 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
     return birth_rates, lx
 
 
+
 #%% Genotype/immunity parameters and functions
-
-def get_hpv_prevalence():
-    '''
-    Get HPV prevalence data by age and genotype for initializing the sim
-
-    Args:
-        filename (str):  filename; if none specified, use default value for XXX
-
-    Returns:
-        hpv_prevalence (dict): nested dictionary of hpv prevalence by sex (first level),  age (second level), and genotype (third level)
-    '''
-
-    hpv_prevalence = hpd.default_hpv_prevalence
-
-    return hpv_prevalence
 
 def get_genotype_choices():
     '''

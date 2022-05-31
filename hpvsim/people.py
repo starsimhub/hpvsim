@@ -388,7 +388,7 @@ class People(hpb.BasePeople):
             'n_genotypes': self.pars['n_genotypes'],
             'n_partner_types': self.pars['n_partner_types']
         }
-        death_ages = hppop.get_death_ages(life_tables=self.pars['death_rates'], pop_size=new_births, age_bins=np.zeros(new_births, dtype=int), ages=np.zeros(new_births), sexes=sexes, dt=self['dt'])
+        death_ages = hppop.get_death_ages(life_tables=self.pars['lx'], pop_size=new_births, age_bins=np.zeros(new_births, dtype=int), ages=np.zeros(new_births), sexes=sexes, dt=self['dt'])
         new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, death_age=death_ages, debut=debuts, partners=partners, strict=False)
 
         return new_births, new_people
