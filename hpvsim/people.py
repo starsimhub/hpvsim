@@ -383,11 +383,13 @@ class People(hpb.BasePeople):
         # Generate other characteristics of the new people
         uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
         pars = {
+            'dt': self['dt'],
             'pop_size': new_births,
             'n_genotypes': self.pars['n_genotypes'],
             'n_partner_types': self.pars['n_partner_types']
         }
-        new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
+        death_ages = hppop.get_death_ages(life_tables=self.pars['death_rates'], pop_size=new_births, age_bins=np.zeros(new_births, dtype=int), ages=np.zeros(new_births), sexes=sexes, dt=self['dt'])
+        new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, death_age=death_ages, debut=debuts, partners=partners, strict=False)
 
         return new_births, new_people
 
