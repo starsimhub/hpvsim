@@ -211,6 +211,12 @@ class People(hpb.BasePeople):
         age_inds, new_cancer_deaths = hpu.unique(new_cancer_deaths * self.age_brackets)
         self.total_flows_by_age['new_total_cancer_deaths_by_age'][age_inds[1:]-1] += new_cancer_deaths[1:]
 
+        if self.t==40:
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
+
         return new_people
 
 
