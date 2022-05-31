@@ -178,7 +178,7 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     '''
     # Load the raw data
     try:
-        df = sc.load('../data/age_specific_death_rates.obj')
+        df = sc.load('../data/lx.obj')
     except ValueError as E:
         errormsg = f'Could not locate datafile with age-specific death rates by country. Please run data/get_death_data.py first.'
         raise ValueError(errormsg)
@@ -186,7 +186,7 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     age_groups = df['dim.AGEGROUP'].unique()
     df = df.set_index(['dim.COUNTRY', 'dim.SEX', 'dim.AGEGROUP'])
     dd = df.groupby(level=0).apply(lambda df: df.xs(df.name).to_dict()).to_dict()
-    raw_death_rates = map_entries(dd,location)[location]['Value']
+    raw_lx = map_entries(dd,location)[location]['Value']
 
     sex_keys = []
     if by_sex: sex_keys += ['Male','Female']
@@ -201,15 +201,16 @@ def get_death_rates(location=None, by_sex=True, overall=False):
         sk_out = sex_key_map[sk]
         result[sk_out] = []
         for age in age_groups:
-            this_death_rate = float(raw_death_rates[(sk, age)])
-            if age[2] == '+':
-                val = [int(age[:2]), max_age, this_death_rate]
-            elif age[0] == '<':
-                val = [0, int(age[1]), this_death_rate]
-            else:
-                ages = re.split('-',age[:-6]) # Remove the 'years' part of the string
-                val = [int(ages[0]), int(ages[1]), this_death_rate]
-            result[sk_out].append(val)
+            if (sk, age) in raw_lx.keys():
+                this_lx = float(raw_lx[(sk, age)])
+                if age[2] == '+':
+                    val = [int(age[:2]), max_age, this_lx]
+                elif age[0] == '<':
+                    val = [0, int(age[1]), this_lx]
+                else:
+                    ages = re.split('-',age[:-6]) # Remove the 'years' part of the string
+                    val = [int(ages[0]), int(ages[1]), this_lx]
+                result[sk_out].append(val)
         result[sk_out] = np.array(result[sk_out])
         result[sk_out] = result[sk_out][result[sk_out][:, 0].argsort()]
 

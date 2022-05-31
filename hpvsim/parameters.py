@@ -230,17 +230,17 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
         overall  (bool): whether to get overall values ie not disaggregated by sex (default false)
 
     Returns:
-        survival (dict): dictionary keyed by sex, storing arrays of XXX by age
+        lx (dict): dictionary keyed by sex, storing arrays of lx - the number of people who survive to age x
         birth_rates (arr): array of crude birth rates by year
     '''
 
     birth_rates = hpd.default_birth_rates
-    survival = hpd.default_life_table
+    lx = hpd.default_lx
     if location is not None:
         if verbose:
             print(f'Loading location-specific demographic data for "{location}"')
         try:
-            death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+            lx          = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
             birth_rates = hpdata.get_birth_rates(location=location)
         except ValueError as E:
             warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
@@ -248,19 +248,16 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
 
     # Process the 85+ age group
     for sex in ['m','f']:
-        if survival[sex][-1][0] == 85:
-            last_val = survival[sex][-1][-1] # Save the last value
-            survival[sex] = np.delete(survival[sex], -1, 0) # Remove the last row
+        if lx[sex][-1][0] == 85:
+            last_val = lx[sex][-1][-1] # Save the last value
+            lx[sex] = np.delete(lx[sex], -1, 0) # Remove the last row
             # Break this 15 year age bracket into 3x 5 year age brackets
             s85_89  = np.array([[85, 89, int(last_val*.7)]])
             s90_99  = np.array([[90, 99, int(last_val*.7*.5)]])
             s100    = np.array([[100, 110, 0]])
-            survival[sex] = np.concatenate([survival[sex], s85_89, s90_99, s100])
-            # s90_94  = np.array([[90, 94, int(last_val*.7*.5)]])
-            # s95_99  = np.array([[95, 99, 0]])
-            # survival[sex] = np.concatenate([survival[sex], s85_89, s90_94, s95_99])
+            lx[sex] = np.concatenate([lx[sex], s85_89, s90_99, s100])
 
-    return birth_rates, survival
+    return birth_rates, lx
 
 
 #%% Genotype/immunity parameters and functions

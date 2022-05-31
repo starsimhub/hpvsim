@@ -1641,7 +1641,7 @@ class Person(sc.prettyobj):
     def __init__(self, pars=None, uid=None, age=-1, death_age=-1, sex=-1, debut=-1, partners=None, current_partners=None):
         self.uid                = uid # This person's unique identifier
         self.age                = hpd.default_float(age) # Age of the person (in years)
-        self.death_age          = hpd.default_float(death_age) # Age of the person (in years)
+        self.death_age          = hpd.default_float(death_age) # Age of the person at time of death (in years)
         self.sex                = hpd.default_int(sex) # Female (0) or male (1)
         self.partners           = partners # Preferred number of partners
         self.current_partners   = current_partners # Number of current partners
