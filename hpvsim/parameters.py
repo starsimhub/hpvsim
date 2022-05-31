@@ -250,21 +250,6 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
 
 #%% Genotype/immunity parameters and functions
 
-def get_hpv_prevalence():
-    '''
-    Get HPV prevalence data by age and genotype for initializing the sim
-
-    Args:
-        filename (str):  filename; if none specified, use default value for XXX
-
-    Returns:
-        hpv_prevalence (dict): nested dictionary of hpv prevalence by sex (first level),  age (second level), and genotype (third level)
-    '''
-
-    hpv_prevalence = hpd.default_hpv_prevalence
-
-    return hpv_prevalence
-
 def get_genotype_choices():
     '''
     Define valid genotype names

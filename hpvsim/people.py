@@ -68,6 +68,8 @@ class People(hpb.BasePeople):
                 self[key] = np.arange(self.pars['pop_size'], dtype=hpd.default_int)
             elif key in ['partners', 'current_partners']:
                 self[key] = np.full((self.pars['n_partner_types'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
+            elif key == 'cells':
+                self[key] = np.full(self.pars['pop_size'], 0, dtype=hpd.default_float)
             else:
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
 
@@ -476,7 +478,7 @@ class People(hpb.BasePeople):
         new_total_infections    = len(inds) # Count the total number of new infections
         new_infections          = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)], dtype=np.float64) # Count the number by genotype
         self.susceptible[genotypes, inds]   = False # Adjust states - set susceptible to false
-        self.infectious[genotypes, inds]    = True # Adjust states - set infectious to true
+        self.infectious[genotypes, inds]    = True  # Adjust states - set infectious to true
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
