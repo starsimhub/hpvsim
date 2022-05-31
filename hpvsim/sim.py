@@ -398,6 +398,8 @@ class Sim(hpb.BaseSim):
         results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_rows=2)
         results['n_alive_by_age'] = init_res('Number alive by age', scale=True, n_rows=hpd.n_age_brackets)
         results['f_alive_by_age'] = init_res('Women alive by age', scale=True, n_rows=hpd.n_age_brackets)
+        results['tfr'] = init_res('Total fatality rate', scale=False)
+        results['cbr'] = init_res('Crude birth rate', scale=False)
 
         # Time vector
         results['year'] = res_yearvec
@@ -786,8 +788,9 @@ class Sim(hpb.BaseSim):
         for key in hpd.by_sex_keys:
             self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=-1)
 
-        self.results[f'cum_other_deaths'][:]    += np.cumsum(self.results[f'new_other_deaths'][:], axis=-1)
-        self.results[f'cum_births'][:]          += np.cumsum(self.results[f'new_births'][:], axis=-1)
+        # Demographic results
+        self.results['cum_other_deaths'][:]    += np.cumsum(self.results['new_other_deaths'][:], axis=-1)
+        self.results['cum_births'][:]          += np.cumsum(self.results['new_births'][:], axis=-1)
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
@@ -867,6 +870,10 @@ class Sim(hpb.BaseSim):
         self.results['total_cancer_prevalence_by_age'][:]   = res['n_total_cancerous_by_age'][:] / cin_inci_denom
         self.results['total_cin_incidence_by_age'][:]       = res['new_total_cins_by_age'][:] / cin_inci_denom
         self.results['total_cancer_incidence_by_age'][:]    = res['new_total_cancers_by_age'][:] / cin_inci_denom
+
+        # Demographic results
+        self.results['tfr'][:]  = self.results['new_other_deaths'][:] / self.results['n_alive'][:]
+        self.results['cbr'][:]  = self.results['new_births'][:] / self.results['n_alive'][:]
 
         return
 

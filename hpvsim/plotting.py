@@ -383,8 +383,9 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
     # Do the plotting
     with hpo.with_style(args.style):
         fig, figs = create_figs(args, sep_figs, fig, ax)
-        total_keys = [k for k in sim.result_keys() if 'total' in k]
+        total_keys = sim.result_keys('total') # Consider a more robust way to do this
         age_keys = sim.result_keys('by_age')
+        sex_keys = sim.result_keys('by_sex')
         for pnum,title,keylabels in to_plot.enumitems():
             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
             for resnum,reskey in enumerate(keylabels):
@@ -408,6 +409,21 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         else:
                             label = v_label
                         ax.plot(res_t, res.values[age, :], label=label, **args.plot, c=color)  # Plot result
+                elif reskey in sex_keys:
+                    n_sexes = 2
+                    sex_colors = ['#4679A2', '#A24679']
+                    sex_labels = ['males', 'females']
+                    for sex in range(n_sexes):
+                        # Colors and labels
+                        v_color = sex_colors[sex]
+                        v_label = sex_labels[sex]  # TODO this should also come from the sim
+                        color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
+                        label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
+                        if label:
+                            label += f' - {v_label}'
+                        else:
+                            label = v_label
+                        ax.plot(res_t, res.values[sex, :], label=label, **args.plot, c=color)  # Plot result
                 else:
                     ng = sim['n_genotypes']
                     # genotype_colors = sc.gridcolors(ng)
@@ -419,7 +435,13 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label: label += f' - {v_label}'
                         else:     label = v_label
-                        ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result
+                        try:
+                            ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result
+                        except:
+                            import traceback;
+                            traceback.print_exc();
+                            import pdb;
+                            pdb.set_trace()
             #     if args.show['data']:
             #         plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
             #     if args.show['ticks']:

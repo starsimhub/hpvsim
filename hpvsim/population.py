@@ -203,13 +203,7 @@ def get_death_ages(life_tables=None, pop_size=None, age_bins=None, ages=None, se
         n_by_age_bin = np.bincount((age_bins + 1) * (sexes == sex_bools[sex]))[1:]  # Find how many people of this sex are in each age bin
         for aind, n_this_age in enumerate(n_by_age_bin):
             death_probs = -np.diff(lt[aind:, 2] / lt[aind, 2])  # This line gets the probability of dying in each subsequent age bin for someone of this age
-            try:
-                death_bins = hpu.n_multinomial(death_probs, n_this_age) + aind  # Select the death age bins
-            except:
-                import traceback;
-                traceback.print_exc();
-                import pdb;
-                pdb.set_trace()
+            death_bins = hpu.n_multinomial(death_probs, n_this_age) + aind  # Select the death age bins
             if dt_round_age:
                 these_death_ages = death_data_min[death_bins] + np.random.randint(death_data_range[death_bins] / dt) * dt
             else:

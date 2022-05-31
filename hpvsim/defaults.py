@@ -332,13 +332,20 @@ def get_default_plots(which='default', kind='sim', sim=None):
                 ],
                 'HPV incidence': [
                     'total_hpv_incidence_by_age',
-                    # 'new_infections',
                 ],
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
                     'cin_incidence',
                     'total_cancer_incidence',
                     ],
+                'Birth and death rates': [
+                    'tfr',
+                    'cbr',
+                ],
+                'Population size': [
+                    'n_alive',
+                    'n_alive_by_sex',
+                ],
             })
 
         else: # pragma: no cover

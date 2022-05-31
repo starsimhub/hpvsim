@@ -448,7 +448,7 @@ class BaseSim(ParsObj):
         keys = []
         choices = ['total', 'genotype', 'all', 'by_age', 'by_sex']
         if which in ['total', 'all']:
-            keys += [k for k,res in self.results.items() if 'total' in k and 'by_age' not in k and isinstance(res, Result)]
+            keys += [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
         if which in ['genotype', 'all']:
             keys += [k for k,res in self.results.items() if 'total' not in k and isinstance(res, Result)]
         if which in ['by_age', 'all']:
