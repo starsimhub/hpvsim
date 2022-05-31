@@ -87,11 +87,46 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         else:
             ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
 
+        # Set life expectancies and death dates
+        life_tables = sim.pars['death_rates']
+        death_ages = np.full(pop_size, np.nan, dtype=hpd.default_float)
+        death_ages.fill(np.nan)
+        sex_bools = {'f':1,'m':0}
+
+        for sex,lt in life_tables.items():
+            death_data_min = lt[:, 0]
+            death_data_max = lt[:, 1] + 1
+            death_data_range = death_data_max - death_data_min
+            prop_by_age = np.bincount((age_bins+1)*(sexes==sex_bools[sex]))[1:] # Find how many people of this sex are in each age bin
+            for aind,ab in enumerate(death_data_min[:-1]):
+                death_probs = -np.diff(lt[aind:,2]/lt[aind,2]) # This line gets the probability of dying in each subsequent age bin for someone of this age
+                death_bins = hpu.n_multinomial(death_probs, prop_by_age[aind]) + aind # Select the death age bins
+                if dt_round_age:
+                    these_death_ages = death_data_min[death_bins] + np.random.randint(death_data_range[death_bins]/dt)*dt
+                else:
+                    these_death_ages = death_data_min[death_bins] + death_data_range[death_bins]*np.random.random(pop_size)
+                filter_inds = (age_bins==aind)*(sexes==sex_bools[sex]) # Set the death ages for people of this sex & age range
+                death_ages[filter_inds] = np.maximum(these_death_ages, ages[filter_inds]) # Make sure people's death age is greater than their current age
+
+        # TODO:
+        # 1. store death_ages and time of death as an attribute of people
+        # 2. write a bunch of tests e.g. age pyramid and TFR over time
+        # 3. The data that's used should correspond to the first year of the simulation - add a check for this
+        # 4. incorporate changes in mortality over time. Life tables by year will be hard
+        #       to find. Think about how to deal with this... Could rely on data from the
+        #       human mortlaity project but it's mostly HICs.
+
+        # import traceback;
+        # traceback.print_exc();
+        # import pdb;
+        # pdb.set_trace()
+
         # Store output
         popdict = {}
         popdict['uid'] = uids
         popdict['age'] = ages
         popdict['sex'] = sexes
+        popdict['death_age'] = death_ages
         popdict['debut'] = debuts
         popdict['partners'] = partners
 
@@ -122,7 +157,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
-    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
+    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], death_age=popdict['death_age'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
     people.age_brackets = np.digitize(people.age, hpd.age_brackets)+1  # Store which age bucket people belong to, adding 1 so there are no zeros
 
     sc.printv(f'Created {pop_size} people, average age {people.age.mean():0.2f} years', 2, verbose)

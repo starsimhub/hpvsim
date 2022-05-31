@@ -230,12 +230,12 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
         overall  (bool): whether to get overall values ie not disaggregated by sex (default false)
 
     Returns:
-        death_rates (dict): nested dictionary of death rates by sex (first level) and age (second level)
+        survival (dict): dictionary keyed by sex, storing arrays of XXX by age
         birth_rates (arr): array of crude birth rates by year
     '''
 
-    birth_rates = hpd.default_birth_rates 
-    death_rates = hpd.default_death_rates
+    birth_rates = hpd.default_birth_rates
+    survival = hpd.default_life_table
     if location is not None:
         if verbose:
             print(f'Loading location-specific demographic data for "{location}"')
@@ -245,8 +245,23 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
         except ValueError as E:
             warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
             hpm.warn(warnmsg, die=die)
-    
-    return birth_rates, death_rates
+
+    # Process the 85+ age group
+    for sex in ['m','f']:
+        if survival[sex][-1][0] == 85:
+            last_val = survival[sex][-1][-1] # Save the last value
+            survival[sex] = np.delete(survival[sex], -1, 0) # Remove the last row
+            # Break this 15 year age bracket into 3x 5 year age brackets
+            s85_89  = np.array([[85, 89, int(last_val*.7)]])
+            s90_99  = np.array([[90, 99, int(last_val*.7*.5)]])
+            s100    = np.array([[100, 110, 0]])
+            survival[sex] = np.concatenate([survival[sex], s85_89, s90_99, s100])
+            # s90_94  = np.array([[90, 94, int(last_val*.7*.5)]])
+            # s95_99  = np.array([[95, 99, 0]])
+            # survival[sex] = np.concatenate([survival[sex], s85_89, s90_94, s95_99])
+
+    return birth_rates, survival
+
 
 #%% Genotype/immunity parameters and functions
 

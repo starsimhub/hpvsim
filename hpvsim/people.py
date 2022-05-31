@@ -124,6 +124,9 @@ class People(hpb.BasePeople):
             else:
                 self[key] = value
 
+        if 'death_age' in kwargs:
+            self.date_dead_other = ((self.death_age-self.age)/self.pars['dt']).astype(int)
+
         return
 
 
@@ -167,7 +170,7 @@ class People(hpb.BasePeople):
         self.increment_age()  # Let people age by one time step
 
         # Apply death rates from other causes
-        new_other_deaths, deaths_female, deaths_male    = self.apply_death_rates()
+        new_other_deaths, deaths_female, deaths_male    = self.check_death()
         self.demographic_flows['new_other_deaths']      += new_other_deaths
         self.flows_by_sex['new_other_deaths_by_sex'][0] += deaths_female
         self.flows_by_sex['new_other_deaths_by_sex'][1] += deaths_male
@@ -331,13 +334,25 @@ class People(hpb.BasePeople):
 
     def check_cancer_deaths(self, genotype):
         '''
-        Check for new progressions to cancer
-        Once an individual has cancer they are no longer susceptible to new HPV infections or CINs and no longer infectious
+        Check for new deaths from cancer
         '''
         filter_inds = self.true_by_genotype('cancerous', genotype)
         inds = self.check_inds(self.dead_cancer[genotype,:], self.date_dead_cancer[genotype,:], filter_inds=filter_inds)
         self.make_die(inds, genotype=genotype, cause='cancer')
         return len(inds)
+
+
+    def check_death(self):
+        '''
+        Check for new deaths
+        '''
+        filter_inds = self.true('alive')
+        inds = self.check_inds(self.dead_other, self.date_dead_other, filter_inds=filter_inds)
+        deaths_female = len(hpu.true(self.is_female[inds]))
+        deaths_male = len(hpu.true(self.is_male[inds]))
+        # Apply deaths
+        new_other_deaths = self.make_die(inds, cause='other')
+        return new_other_deaths, deaths_female, deaths_male
 
 
     def check_clearance(self, genotype):
@@ -358,31 +373,6 @@ class People(hpb.BasePeople):
         hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
 
         return
-
-
-    def apply_death_rates(self):
-        '''
-        Apply death rates to remove people from the population
-        NB people are not actually removed to avoid issues with indices
-        '''
-
-        # Get age-dependent death rates. TODO: careful with rates vs probabilities!
-        death_pars = self.pars['death_rates']
-        age_inds = np.digitize(self.age, death_pars['f'][:,0])-1
-        death_probs = np.full(len(self), np.nan, dtype=hpd.default_float)
-        death_probs[self.f_inds] = death_pars['f'][age_inds[self.f_inds],2]*self.dt
-        death_probs[self.m_inds] = death_pars['m'][age_inds[self.m_inds],2]*self.dt
-
-        # Get indices of people who die of other causes, removing anyone already dead
-        death_inds = hpu.true(hpu.binomial_arr(death_probs))
-        already_dead = self.dead_other[death_inds]
-        death_inds = death_inds[~already_dead]  # Unique indices in deaths that are not already dead
-
-        deaths_female = len(hpu.true(self.is_female[death_inds]))
-        deaths_male = len(hpu.true(self.is_male[death_inds]))
-        # Apply deaths
-        new_other_deaths = self.make_die(death_inds, cause='other')
-        return new_other_deaths, deaths_female, deaths_male
 
 
     def add_births(self):
