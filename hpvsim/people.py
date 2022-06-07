@@ -135,12 +135,12 @@ class People(hpb.BasePeople):
         ng = self.pars['n_genotypes']
         na = settings['n_age_brackets'] if settings is not None else len(hpd.age_brackets) # TEMP
         df = hpd.default_float
-        self.flows              = {f'new_{key}'                 : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
-        self.total_flows        = {f'new_total_{key}'           : 0 for key in hpd.flow_keys}
-        self.flows_by_sex       = {f'new_{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
-        self.demographic_flows  = {f'new_{key}'                 : 0 for key in hpd.dem_keys}
-        self.flows_by_age       = {f'new_{key}_by_age'          : np.zeros((na,ng), dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['genotype','both']}
-        self.total_flows_by_age = {f'new_total_{key}_by_age'    : np.zeros(na, dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['total','both']}
+        self.flows              = {f'{key}'                 : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
+        self.total_flows        = {f'total_{key}'           : 0 for key in hpd.flow_keys}
+        self.flows_by_sex       = {f'{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
+        self.demographic_flows  = {f'{key}'                 : 0 for key in hpd.dem_keys}
+        self.flows_by_age       = {f'{key}_by_age'          : np.zeros((na,ng), dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['genotype','both']}
+        self.total_flows_by_age = {f'total_{key}_by_age'    : np.zeros(na, dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['total','both']}
         return
 
 
@@ -171,46 +171,46 @@ class People(hpb.BasePeople):
         self.increment_age()  # Let people age by one time step
 
         # Apply death rates from other causes
-        new_other_deaths, deaths_female, deaths_male    = self.check_death()
-        self.demographic_flows['new_other_deaths']      += new_other_deaths
-        self.flows_by_sex['new_other_deaths_by_sex'][0] += deaths_female
-        self.flows_by_sex['new_other_deaths_by_sex'][1] += deaths_male
+        other_deaths, deaths_female, deaths_male    = self.check_death()
+        self.demographic_flows['other_deaths']      += other_deaths
+        self.flows_by_sex['other_deaths_by_sex'][0] += deaths_female
+        self.flows_by_sex['other_deaths_by_sex'][1] += deaths_male
 
         # Add births
         new_births, new_people                  = self.add_births()
-        self.demographic_flows['new_births']    += new_births
+        self.demographic_flows['births']    += new_births
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
         for g in range(ng):
-            self.flows['new_cin1s'][g]          += self.check_cin1(g)
-            self.flows['new_cin2s'][g]          += self.check_cin2(g)
-            self.flows['new_cin3s'][g]          += self.check_cin3(g)
+            self.flows['cin1s'][g]          += self.check_cin1(g)
+            self.flows['cin2s'][g]          += self.check_cin2(g)
+            self.flows['cin3s'][g]          += self.check_cin3(g)
             if t%self.resfreq==0:
-                self.flows['new_cins'][g]       += self.flows['new_cin1s'][g]+self.flows['new_cin2s'][g]+self.flows['new_cin3s'][g]
-            self.flows['new_cancers'][g]        += self.check_cancer(g)
-            self.flows['new_cancer_deaths'][g]  += self.check_cancer_deaths(g)
+                self.flows['cins'][g]       += self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
+            self.flows['cancers'][g]        += self.check_cancer(g)
+            self.flows['cancer_deaths'][g]  += self.check_cancer_deaths(g)
             self.check_clearance(g)
 
         # Create total flows
-        self.total_flows['new_total_cin1s']     += self.flows['new_cin1s'].sum()
-        self.total_flows['new_total_cin2s']     += self.flows['new_cin2s'].sum()
-        self.total_flows['new_total_cin3s']     += self.flows['new_cin3s'].sum()
-        self.total_flows['new_total_cins']      += self.flows['new_cins'].sum()
-        self.total_flows['new_total_cancers']   += self.flows['new_cancers'].sum()
-        self.total_flows['new_total_cancer_deaths']   += self.flows['new_cancer_deaths'].sum()
+        self.total_flows['total_cin1s']     += self.flows['cin1s'].sum()
+        self.total_flows['total_cin2s']     += self.flows['cin2s'].sum()
+        self.total_flows['total_cin3s']     += self.flows['cin3s'].sum()
+        self.total_flows['total_cins']      += self.flows['cins'].sum()
+        self.total_flows['total_cancers']   += self.flows['cancers'].sum()
+        self.total_flows['total_cancer_deaths']   += self.flows['cancer_deaths'].sum()
 
         new_cin = (self.date_cin1==t)*self.cin1+(self.date_cin2==t)*self.cin2+(self.date_cin3==t)*self.cin3
         age_inds, new_cins = hpu.unique(new_cin * self.age_brackets)
-        self.total_flows_by_age['new_total_cins_by_age'][age_inds[1:]-1] += new_cins[1:]
+        self.total_flows_by_age['total_cins_by_age'][age_inds[1:]-1] += new_cins[1:]
 
         new_cancer = (self.date_cancerous==t)*self.cancerous
         age_inds, new_cancers = hpu.unique(new_cancer * self.age_brackets)
-        self.total_flows_by_age['new_total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
+        self.total_flows_by_age['total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
 
         new_cancer_deaths = (self.date_dead_cancer==t)*self.dead_cancer
         age_inds, new_cancer_deaths = hpu.unique(new_cancer_deaths * self.age_brackets)
-        self.total_flows_by_age['new_total_cancer_deaths_by_age'][age_inds[1:]-1] += new_cancer_deaths[1:]
+        self.total_flows_by_age['total_cancer_deaths_by_age'][age_inds[1:]-1] += new_cancer_deaths[1:]
 
         return new_people
 
@@ -460,8 +460,8 @@ class People(hpb.BasePeople):
 
         # Count reinfections
         for g in range(ng):
-            self.flows['new_reinfections'][g]       += len((~np.isnan(self.date_clearance[g, inds[genotypes==g]])).nonzero()[-1])
-        self.total_flows['new_total_reinfections']  += len((~np.isnan(self.date_clearance[genotypes, inds])).nonzero()[-1])
+            self.flows['reinfections'][g]       += len((~np.isnan(self.date_clearance[g, inds[genotypes==g]])).nonzero()[-1])
+        self.total_flows['total_reinfections']  += len((~np.isnan(self.date_clearance[genotypes, inds])).nonzero()[-1])
         for key in ['date_clearance']:
             self[key][genotypes, inds] = np.nan
 
@@ -474,21 +474,21 @@ class People(hpb.BasePeople):
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
             # Create overall flows
-            self.total_flows['new_total_infections']    += new_total_infections # Add the total count to the total flow data
-            self.flows['new_infections']                += new_infections # Add the count by genotype to the flow data
+            self.total_flows['total_infections']    += new_total_infections # Add the total count to the total flow data
+            self.flows['infections']                += new_infections # Add the count by genotype to the flow data
 
             # Create by-age flows
             for g in range(ng):
                 age_inds, infections = hpu.unique(self.age_brackets[inds[genotypes==g]])
-                self.flows_by_age['new_infections_by_age'][age_inds-1,g] += infections
+                self.flows_by_age['infections_by_age'][age_inds-1,g] += infections
             total_age_inds, total_infections = hpu.unique(self.age_brackets[inds])
-            self.total_flows_by_age['new_total_infections_by_age'][total_age_inds-1] += total_infections
+            self.total_flows_by_age['total_infections_by_age'][total_age_inds-1] += total_infections
 
             # Create by-sex flows
             infs_female = len(hpu.true(self.is_female[inds]))
             infs_male = len(hpu.true(self.is_male[inds]))
-            self.flows_by_sex['new_total_infections_by_sex'][0] += infs_female
-            self.flows_by_sex['new_total_infections_by_sex'][1] += infs_male
+            self.flows_by_sex['total_infections_by_sex'][0] += infs_female
+            self.flows_by_sex['total_infections_by_sex'][1] += infs_male
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:

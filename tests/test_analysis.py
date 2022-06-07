@@ -45,11 +45,12 @@ def test_age_pyramids(do_plot=True):
     sc.heading('Testing age pyramids')
     import hpvsim.analysis as hpa
     import hpvsim.sim as hps
+    import hpvsim.sim as hps
 
     pars = dict(n_years=10, dt=0.5)
 
-    timepoints = ["2015", "2020", "2025"]
-    sim = hps.Sim(pars, pop_scale=2750, analyzers=hpa.age_pyramid(timepoints=timepoints, datafile='test_data/south_africa_age_pyramid.xlsx', edges=np.linspace(0,100,21)))
+    timepoints = ['2015', '2020', '2025']
+    sim = hps.Sim(pars, pop_scale=2765, analyzers=hpa.age_pyramid(timepoints=timepoints, datafile='test_data/south_africa_age_pyramid.xlsx', edges=np.linspace(0,100,21)))
     sim.run()
     agepyr = sim.get_analyzer()
 

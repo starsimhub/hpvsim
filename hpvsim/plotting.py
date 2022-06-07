@@ -134,7 +134,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
 
     # If not specified or specified as another string, load defaults
     if to_plot is None or isinstance(to_plot, str):
-        to_plot = hpd.get_default_plots(to_plot, kind=kind, sim=sim)
+        to_plot = hpd.get_default_plots(which=to_plot, kind=kind, sim=sim)
 
     # If a list of keys has been supplied or constructed
     if isinstance(to_plot, list):

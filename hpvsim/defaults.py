@@ -270,7 +270,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
         is_sim = kindmap[kind] == sim_kind
 
     # Default plots -- different for sims and scenarios
-    if which in ['none', 'default']:
+    if which in ['none', 'default', 'epi']:
 
         if is_sim:
             plots = sc.odict({
@@ -303,6 +303,20 @@ def get_default_plots(which='default', kind='sim', sim=None):
                 ],
                 'New infections per day': [
                     'new_infections',
+                ],
+            })
+
+    # Demographic plots
+    elif which in ['demographic', 'dem', 'demography']:
+        if is_sim:
+            plots = sc.odict({
+                'Birth and death rates': [
+                    'tfr',
+                    'cbr',
+                ],
+                'Population size': [
+                    'n_alive',
+                    'n_alive_by_sex',
                 ],
             })
 
