@@ -61,7 +61,7 @@ class Sim(hpb.BaseSim):
     def load_data(self, datafile=None, **kwargs):
         ''' Load the data to calibrate against, if provided '''
         if datafile is not None: # If a data file is provided, load it
-            self.data = hpm.load_data(self, datafile=datafile, **kwargs)
+            self.data = hpm.load_data(datafile=datafile, **kwargs)
         return
 
 
@@ -410,9 +410,9 @@ class Sim(hpb.BaseSim):
                 for which in ['incidence', 'prevalence']:
                     results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
                     if by_age in ['both', 'genotype'] and lkey == '':
-                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=g, n_copies=n_age_brackets)
+                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=g, n_copies=n_age_brackets, scale=False)
                     if by_age in ['both', 'total'] and lkey == 'total_':
-                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=n_age_brackets)
+                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=n_age_brackets, scale=False)
 
         # Create demographic flows
         for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
@@ -427,10 +427,10 @@ class Sim(hpb.BaseSim):
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
         results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
-        results['n_alive'] = init_res('Number alive', scale=True)
-        results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_rows=2)
-        results['n_alive_by_age'] = init_res('Number alive by age', scale=True, n_rows=n_age_brackets)
-        results['f_alive_by_age'] = init_res('Women alive by age', scale=True, n_rows=n_age_brackets)
+        results['n_alive'] = init_res('Number alive')
+        results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
+        results['n_alive_by_age'] = init_res('Number alive by age', n_rows=n_age_brackets)
+        results['f_alive_by_age'] = init_res('Women alive by age', n_rows=n_age_brackets)
         results['tfr'] = init_res('Total fatality rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False)
 
@@ -438,8 +438,11 @@ class Sim(hpb.BaseSim):
         results['year'] = res_yearvec
         results['t'] = res_tvec
 
+        # Final items
+        self.rescale_vec   = self['pop_scale']*np.ones(res_npts) # Not included in the results, but used to scale them
         self.results = results
         self.results_ready = False
+
         return
 
 
@@ -808,6 +811,14 @@ class Sim(hpb.BaseSim):
             # Because the results are rescaled in-place, finalizing the sim cannot be run more than once or
             # otherwise the scale factor will be applied multiple times
             raise AlreadyRunError('Simulation has already been finalized')
+
+        # Scale the results
+        for reskey in self.result_keys():
+            if self.results[reskey].scale:
+                self.results[reskey].values *= self.rescale_vec
+        # for reskey in self.result_keys('variant'):
+        #     if self.results['variant'][reskey].scale: # Scale the result
+        #         self.results['variant'][reskey].values = np.einsum('ij,j->ij', self.results['variant'][reskey].values, self.rescale_vec)
 
         # Calculate cumulative results
         for key,by_age in zip(hpd.flow_keys, hpd.flow_by_age):

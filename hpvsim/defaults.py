@@ -286,14 +286,14 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'cin_incidence',
                     'total_cancer_incidence',
                     ],
-                'Birth and death rates': [
-                    'tfr',
-                    'cbr',
-                ],
-                'Population size': [
-                    'n_alive',
-                    'n_alive_by_sex',
-                ],
+                # 'Birth and death rates': [
+                #     'tfr',
+                #     'cbr',
+                # ],
+                # 'Population size': [
+                #     'n_alive',
+                #     'n_alive_by_sex',
+                # ],
             })
 
         else: # pragma: no cover

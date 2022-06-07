@@ -41,13 +41,14 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Population parameters
     pars['pop_size']        = 20e3      # Number of agents
+    pars['pop_scale']       = 1         # How much to scale the population
     pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
     pars['birth_rates']     = None      # Birth rates, loaded below
 
     # Initialization parameters
-    pars['init_hpv_prev']       = hpd.default_init_prev # Initial prevalence
+    pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation

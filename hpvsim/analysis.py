@@ -304,12 +304,12 @@ class age_pyramid(Analyzer):
 
             date = self.dates[ind]
             self.age_pyramids[date] = sc.objdict() # Initialize the dictionary
-
-            age = sim.people.age # Get the age distribution,since used heavily
+            scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
+            age = sim.people.age # Get the age distribution
             self.age_pyramids[date]['bins'] = self.bins # Copy here for convenience
             for sb,sex in enumerate(['m','f']): # Loop over each sex; sb stands for sex boolean, translating the labels to 0/1
                 inds = (sim.people.alive*(sim.people.sex==sb)).nonzero()[0]
-                self.age_pyramids[date][sex] = np.histogram(age[inds], bins=self.edges)[0] # Bin people
+                self.age_pyramids[date][sex] = np.histogram(age[inds], bins=self.edges)[0]*scale  # Bin people
 
 
     def finalize(self, sim):
@@ -380,7 +380,7 @@ class age_pyramid(Analyzer):
                 if percentages:
                     xlabels = [f'{abs(i):.2f}' for i in xticks]
                 else:
-                    xlabels = [f'{abs(int(i))}' for i in xticks]
+                    xlabels = [f'{sc.sigfig(abs(i), sigfigs=2, SI=True)}' for i in xticks]
                 ax.set_xticks(xticks)
                 ax.set_xticklabels(xlabels)
                 ax.set_title(f'{date}')
@@ -394,7 +394,8 @@ class age_pyramid(Analyzer):
                         datadf.columns = datadf.columns.str[0]
                         datadf.columns = datadf.columns.str.lower()
                         if percentages:
-                            datadf = datadf.assign(m=datadf['m'] / sum(datadf['m']), f=-datadf['f'] / sum(datadf['f']))
+                            datadf = datadf.assign(m=datadf['m'] / sum(datadf['m']), f=datadf['f'] / sum(datadf['f']))
+                        datadf = datadf.assign(f=-datadf['f'])
 
                         # Start making plot
                         ax = pl.subplot(n_rows, n_cols, count)
@@ -407,7 +408,7 @@ class age_pyramid(Analyzer):
                         if percentages:
                             xlabels = [f'{abs(i):.2f}' for i in xticks]
                         else:
-                            xlabels = [f'{abs(int(i))}' for i in xticks]
+                            xlabels = [f'{sc.sigfig(abs(i), sigfigs=2, SI=True)}' for i in xticks]
                         ax.set_xticks(xticks)
                         ax.set_xticklabels(xlabels)
                         ax.set_title(f'{date} - data')
