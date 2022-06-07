@@ -27,13 +27,13 @@ def test_snapshot():
 
     pars = dict(n_years=10, dt=0.5)
 
-    sim = hps.Sim(pars, analyzers=hpa.snapshot('2016', '2019'))
+    sim = hps.Sim(pars, analyzers=hpa.snapshot(['2016', '2019']))
     sim.run()
     snapshot = sim.get_analyzer()
     people1 = snapshot.snapshots[0]         # Option 1
     people2 = snapshot.snapshots['2016.0']  # Option 2
-    people3 = snapshot.get('2019.0')        # Option 3
-    people4 = snapshot.get()                # Option 5
+    people3 = snapshot.snapshots['2019.0']
+    people4 = snapshot.get()                # Option 3
 
     assert people1 == people2, 'Snapshot options should match but do not'
     assert people3 != people4, 'Snapshot options should not match but do'
@@ -49,7 +49,7 @@ def test_age_pyramids(do_plot=True):
     pars = dict(n_years=10, dt=0.5)
 
     timepoints = ["2015", "2020", "2025"]
-    sim = hps.Sim(pars, pop_scale=2750, analyzers=hpa.age_pyramid(timepoints=timepoints, datafile='../data/south_africa_age_pyramid.xlsx', edges=np.linspace(0,100,21)))
+    sim = hps.Sim(pars, pop_scale=2750, analyzers=hpa.age_pyramid(timepoints=timepoints, datafile='test_data/south_africa_age_pyramid.xlsx', edges=np.linspace(0,100,21)))
     sim.run()
     agepyr = sim.get_analyzer()
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    # people      = test_snapshot()
+    people      = test_snapshot()
     sim, agepyr = test_age_pyramids()
 
     sc.toc(T)

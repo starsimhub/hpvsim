@@ -72,7 +72,7 @@ def test_data(do_plot=False, do_save=False):
     hpv16 = genotype('hpv16')
     hpv18 = genotype('hpv18')
     hpvhi = genotype('hpvhi')
-    sim = hps.Sim(start=1990, end=2020, pop_scale=2750, genotypes=[hpv16,hpv18,hpvhi], datafile='../data/south_africa_hpv_data.xlsx')
+    sim = hps.Sim(start=1990, end=2020, pop_scale=2750, genotypes=[hpv16,hpv18,hpvhi], datafile='test_data/south_africa_hpv_data.xlsx')
     sim.set_seed(seed)
 
     # Optionally plot
@@ -334,14 +334,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
-    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim = test_data(do_plot=True)
-    # sim3 = test_epi()
-    # sim4 = test_flexible_inputs()
-    # sim5 = test_result_consistency()
-    # sim6 = test_location_loading()
-    # sim7 = test_resuming()
+    sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim2 = test_data(do_plot=True)
+    sim3 = test_epi()
+    sim4 = test_flexible_inputs()
+    sim5 = test_result_consistency()
+    sim6 = test_location_loading()
+    sim7 = test_resuming()
     # json = test_fileio()
 
     sc.toc(T)
