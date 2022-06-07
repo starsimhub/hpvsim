@@ -139,8 +139,8 @@ class People(hpb.BasePeople):
         self.total_flows        = {f'total_{key}'           : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'                 : 0 for key in hpd.dem_keys}
-        self.flows_by_age       = {f'{key}_by_age'          : np.zeros((na,ng), dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['genotype','both']}
-        self.total_flows_by_age = {f'total_{key}_by_age'    : np.zeros(na, dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['total','both']}
+        # self.flows_by_age       = {f'{key}_by_age'          : np.zeros((na,ng), dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['genotype','both']}
+        # self.total_flows_by_age = {f'total_{key}_by_age'    : np.zeros(na, dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['total','both']}
         return
 
 
@@ -200,17 +200,17 @@ class People(hpb.BasePeople):
         self.total_flows['total_cancers']   += self.flows['cancers'].sum()
         self.total_flows['total_cancer_deaths']   += self.flows['cancer_deaths'].sum()
 
-        new_cin = (self.date_cin1==t)*self.cin1+(self.date_cin2==t)*self.cin2+(self.date_cin3==t)*self.cin3
-        age_inds, new_cins = hpu.unique(new_cin * self.age_brackets)
-        self.total_flows_by_age['total_cins_by_age'][age_inds[1:]-1] += new_cins[1:]
-
-        new_cancer = (self.date_cancerous==t)*self.cancerous
-        age_inds, new_cancers = hpu.unique(new_cancer * self.age_brackets)
-        self.total_flows_by_age['total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
-
-        new_cancer_deaths = (self.date_dead_cancer==t)*self.dead_cancer
-        age_inds, new_cancer_deaths = hpu.unique(new_cancer_deaths * self.age_brackets)
-        self.total_flows_by_age['total_cancer_deaths_by_age'][age_inds[1:]-1] += new_cancer_deaths[1:]
+        # new_cin = (self.date_cin1==t)*self.cin1+(self.date_cin2==t)*self.cin2+(self.date_cin3==t)*self.cin3
+        # age_inds, new_cins = hpu.unique(new_cin * self.age_brackets)
+        # self.total_flows_by_age['total_cins_by_age'][age_inds[1:]-1] += new_cins[1:]
+        #
+        # new_cancer = (self.date_cancerous==t)*self.cancerous
+        # age_inds, new_cancers = hpu.unique(new_cancer * self.age_brackets)
+        # self.total_flows_by_age['total_cancers_by_age'][age_inds[1:]-1] += new_cancers[1:]
+        #
+        # new_cancer_deaths = (self.date_dead_cancer==t)*self.dead_cancer
+        # age_inds, new_cancer_deaths = hpu.unique(new_cancer_deaths * self.age_brackets)
+        # self.total_flows_by_age['total_cancer_deaths_by_age'][age_inds[1:]-1] += new_cancer_deaths[1:]
 
         return new_people
 
@@ -478,11 +478,11 @@ class People(hpb.BasePeople):
             self.flows['infections']                += new_infections # Add the count by genotype to the flow data
 
             # Create by-age flows
-            for g in range(ng):
-                age_inds, infections = hpu.unique(self.age_brackets[inds[genotypes==g]])
-                self.flows_by_age['infections_by_age'][age_inds-1,g] += infections
-            total_age_inds, total_infections = hpu.unique(self.age_brackets[inds])
-            self.total_flows_by_age['total_infections_by_age'][total_age_inds-1] += total_infections
+            # for g in range(ng):
+            #     age_inds, infections = hpu.unique(self.age_brackets[inds[genotypes==g]])
+            #     self.flows_by_age['infections_by_age'][age_inds-1,g] += infections
+            # total_age_inds, total_infections = hpu.unique(self.age_brackets[inds])
+            # self.total_flows_by_age['total_infections_by_age'][total_age_inds-1] += total_infections
 
             # Create by-sex flows
             infs_female = len(hpu.true(self.is_female[inds]))

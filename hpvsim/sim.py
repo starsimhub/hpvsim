@@ -677,9 +677,9 @@ class Sim(hpb.BaseSim):
                 self.results[key][sex][idx] += count[sex]
 
         # By-age flows
-        self.results['infections_by_age'][:,:,idx] += people.flows_by_age['infections_by_age']
-        for key,count in people.total_flows_by_age.items():
-            self.results[key][:, idx] += count
+        # self.results['infections_by_age'][:,:,idx] += people.flows_by_age['infections_by_age']
+        # for key,count in people.total_flows_by_age.items():
+        #     self.results[key][:, idx] += count
 
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
@@ -705,9 +705,9 @@ class Sim(hpb.BaseSim):
                 self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
             self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
 
-            count_age_brackets_all = people.age_brackets * (people['cin1'] + people['cin2'] + people['cin3'])
-            age_inds, n_by_age = hpu.unique(count_age_brackets_all)  # Get the number infected
-            self.results[f'n_total_cin_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+            # count_age_brackets_all = people.age_brackets * (people['cin1'] + people['cin2'] + people['cin3'])
+            # age_inds, n_by_age = hpu.unique(count_age_brackets_all)  # Get the number infected
+            # self.results[f'n_total_cin_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
 
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
@@ -715,14 +715,14 @@ class Sim(hpb.BaseSim):
             self.results['n_alive_by_sex'][1,idx] = len((people.alive*people.is_male).nonzero()[0])
 
             # Save number alive by age
-            count_age_brackets_alive = people.age_brackets * people.alive
-            age_inds, n_by_age = hpu.unique(count_age_brackets_alive)  # Get the number infected
-            self.results[f'n_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+            # count_age_brackets_alive = people.age_brackets * people.alive
+            # age_inds, n_by_age = hpu.unique(count_age_brackets_alive)  # Get the number infected
+            # self.results[f'n_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
 
             # Save number of women alive by age
-            count_age_brackets_alive = people.age_brackets * people.alive * people.is_female
-            age_inds, n_by_age = hpu.unique(count_age_brackets_alive)  # Get the number infected
-            self.results[f'f_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+            # count_age_brackets_alive = people.age_brackets * people.alive * people.is_female
+            # age_inds, n_by_age = hpu.unique(count_age_brackets_alive)  # Get the number infected
+            # self.results[f'f_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
 
 
         # Apply analyzers
@@ -884,14 +884,14 @@ class Sim(hpb.BaseSim):
         self.results['cin_incidence'][:]           = res['cins'][:] / demoninator
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
 
-        # Finally, add results by age
-        self.results['total_hpv_prevalence_by_age'][:]      = res['n_total_infectious_by_age'][:] / self.results['n_alive_by_age'][:]
-        self.results['total_hpv_incidence_by_age'][:]       = res['total_infections_by_age'][:] / self.results['n_total_susceptible_by_age'][:]
-        cin_inci_denom = (self.results['f_alive_by_age'][:] - res['n_total_cancerous_by_age'][:])*1e5
-        self.results['total_cin_prevalence_by_age'][:]      = res['n_total_cin_by_age'][:] / cin_inci_denom
-        self.results['total_cancer_prevalence_by_age'][:]   = res['n_total_cancerous_by_age'][:] / cin_inci_denom
-        self.results['total_cin_incidence_by_age'][:]       = res['total_cins_by_age'][:] / cin_inci_denom
-        self.results['total_cancer_incidence_by_age'][:]    = res['total_cancers_by_age'][:] / cin_inci_denom
+        # # Finally, add results by age
+        # self.results['total_hpv_prevalence_by_age'][:]      = res['n_total_infectious_by_age'][:] / self.results['n_alive_by_age'][:]
+        # self.results['total_hpv_incidence_by_age'][:]       = res['total_infections_by_age'][:] / self.results['n_total_susceptible_by_age'][:]
+        # cin_inci_denom = (self.results['f_alive_by_age'][:] - res['n_total_cancerous_by_age'][:])*1e5
+        # self.results['total_cin_prevalence_by_age'][:]      = res['n_total_cin_by_age'][:] / cin_inci_denom
+        # self.results['total_cancer_prevalence_by_age'][:]   = res['n_total_cancerous_by_age'][:] / cin_inci_denom
+        # self.results['total_cin_incidence_by_age'][:]       = res['total_cins_by_age'][:] / cin_inci_denom
+        # self.results['total_cancer_incidence_by_age'][:]    = res['total_cancers_by_age'][:] / cin_inci_denom
 
         # Demographic results
         self.results['tfr'][:]  = self.results['other_deaths'][:] / self.results['n_alive'][:]
