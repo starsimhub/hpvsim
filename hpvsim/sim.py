@@ -22,13 +22,15 @@ from . import interventions as hpi
 # Define the model
 class Sim(hpb.BaseSim):
 
-    def __init__(self, pars=None, label=None,
+    def __init__(self, pars=None, settings=None, datafile=None, label=None,
                  popfile=None, people=None, version=None, **kwargs):
 
         # Set attributes
         self.label         = label    # The label/name of the simulation
         self.created       = None     # The datetime the sim was created
+        self.datafile      = datafile # The name of the data file
         self.popfile       = popfile  # The population file
+        self.data          = None     # The data
         self.popdict       = people   # The population dictionary
         self.people        = None     # Initialize these here so methods that check their length can see they're empty
         self.t             = None     # The current time in the simulation (during execution); outside of sim.step(), its value corresponds to next timestep to be computed
@@ -44,9 +46,22 @@ class Sim(hpb.BaseSim):
         default_pars = hppar.make_pars(version=version) # Start with default pars
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
-        # Update pars
-        self.update_pars(pars, **kwargs)   # Update the parameters, if provided
+        # Set things that aren't parameters, e.g. age brackets for data
+        self.settings = hppar.sim_settings()
+        if settings is not None:
+            self.settings = settings
 
+        # Update pars and load data
+        self.update_pars(pars, **kwargs)   # Update the parameters, if provided
+        self.load_data(datafile, header=[0,1,2]) # Load the data, if provided
+
+        return
+
+
+    def load_data(self, datafile=None, **kwargs):
+        ''' Load the data to calibrate against, if provided '''
+        if datafile is not None: # If a data file is provided, load it
+            self.data = hpm.load_data(self, datafile=datafile, **kwargs)
         return
 
 
@@ -56,6 +71,7 @@ class Sim(hpb.BaseSim):
         '''
         self.t = 0  # The current time index
         self.validate_pars() # Ensure parameters have valid values
+        self.validate_settings() # Check the settings and consistency with data and parameters
         self.set_seed() # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
         self.init_immunity() # initialize information about immunity
@@ -139,7 +155,6 @@ class Sim(hpb.BaseSim):
     def validate_pars(self, validate_layers=True):
         '''
         Some parameters can take multiple types; this makes them consistent.
-
         Args:
             validate_layers (bool): whether to validate layer parameters as well via validate_layer_pars() -- usually yes, except during initialization
         '''
@@ -201,6 +216,23 @@ class Sim(hpb.BaseSim):
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
 
+        return
+
+
+    def validate_settings(self, check_data=False):
+        ''' Validate settings '''
+        if 'age_brackets' in self.settings.keys():
+            self.settings['n_age_brackets'] = len(self.settings['age_brackets'])
+            if 'age_labels' in self.settings.keys():
+                if len(self.settings['age_brackets']) != len(self.settings['age_labels']):
+                    errormsg = f'The age brackets must be the same length as the age labels: {len(self.settings["age_brackets"])} vs {len(self.settings["age_labels"])}.'
+                    raise ValueError(errormsg)
+            else: # Age labels not supplied, use age brackets to construct them
+                self.settings['age_labels']  = [f'0-{self.settings["age_brackets"][0]}']
+                self.settings['age_labels'] += [f'{self.settings["age_brackets"][i]+1}-{self.settings["age_brackets"][i+1]}' for i in range(self.settings['n_age_brackets']-2)]
+                self.settings['age_labels'] += [f'{self.settings["age_brackets"][-2]}+']
+        if check_data:
+            a=3
         return
 
 
@@ -307,10 +339,9 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_results(self, frequency='annual'):
+    def init_results(self, frequency='annual', add_data=True):
         '''
         Create the main results structure.
-        We differentiate between flows, stocks, and cumulative results
         The prefix "new" is used for flow variables, i.e. counting new events (infections/deaths) on each timestep
         The prefix "n" is used for stock variables, i.e. counting the total number in any given state (sus/inf/etc) on any particular timestep
         The prefix "cum" is used for cumulative variables, i.e. counting the total number that have ever been in a given state at some point in the sim
@@ -318,6 +349,7 @@ class Sim(hpb.BaseSim):
         Arguments:
             sim         (hp.Sim)        : a sim
             frequency   (str or float)  : the frequency with which to save results: accepts 'annual', 'dt', or a float which is interpreted as a fraction of a year, e.g. 0.2 will save results every 0.2 years
+            add_data    (bool)          : whether or not to add data to the result structures
         '''
 
         # Handle frequency
@@ -351,6 +383,7 @@ class Sim(hpb.BaseSim):
 
         ng = self['n_genotypes']
         results = dict()
+        n_age_brackets = self.settings['n_age_brackets']
 
         # Create new and cumulative flows
         for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
@@ -358,18 +391,18 @@ class Sim(hpb.BaseSim):
                 for flow,name,cmap,by_age in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors, hpd.flow_by_age):
                     results[f'{key+lkey}_{flow}'] = init_res(f'{llab+lab.lower()} {name}', color=cmap(cstride), n_rows=g)
                     if by_age in ['both', 'genotype'] and lkey=='':
-                        results[f'{key}_{flow}_by_age'] = init_res(f'{lab} {name} by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                        results[f'{key}_{flow}_by_age'] = init_res(f'{lab} {name} by age', color=cmap(cstride), n_rows=g, n_copies=n_age_brackets)
                     if by_age in ['both', 'total'] and lkey=='_total':
-                        results[f'{key+lkey}_{flow}_by_age'] = init_res(f'{llab+lab.lower()} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
+                        results[f'{key+lkey}_{flow}_by_age'] = init_res(f'{llab+lab.lower()} {name} by age', color=cmap(cstride), n_rows=n_age_brackets)
 
         # Create stocks
         for lkey,llabel,cstride,g in zip(['_total',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
             for stock, name, cmap, by_age in zip(hpd.stock_keys, hpd.stock_names, hpd.stock_colors, hpd.stock_by_age):
                 results[f'n{lkey}_{stock}'] = init_res(f'{llabel} {name}', color=cmap(cstride), n_rows=g)
                 if by_age in ['both', 'genotype'] and lkey == '':
-                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=g, n_copies=n_age_brackets)
                 if by_age in ['both', 'total'] and lkey == '_total':
-                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
+                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=n_age_brackets)
 
         # Create incidence and prevalence results
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
@@ -377,9 +410,9 @@ class Sim(hpb.BaseSim):
                 for which in ['incidence', 'prevalence']:
                     results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
                     if by_age in ['both', 'genotype'] and lkey == '':
-                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
+                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=g, n_copies=n_age_brackets)
                     if by_age in ['both', 'total'] and lkey == 'total_':
-                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
+                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=n_age_brackets)
 
         # Create demographic flows
         for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
@@ -396,8 +429,8 @@ class Sim(hpb.BaseSim):
         results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
         results['n_alive'] = init_res('Number alive', scale=True)
         results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_rows=2)
-        results['n_alive_by_age'] = init_res('Number alive by age', scale=True, n_rows=hpd.n_age_brackets)
-        results['f_alive_by_age'] = init_res('Women alive by age', scale=True, n_rows=hpd.n_age_brackets)
+        results['n_alive_by_age'] = init_res('Number alive by age', scale=True, n_rows=n_age_brackets)
+        results['f_alive_by_age'] = init_res('Women alive by age', scale=True, n_rows=n_age_brackets)
         results['tfr'] = init_res('Total fatality rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False)
 
@@ -559,7 +592,7 @@ class Sim(hpb.BaseSim):
         imm_kin_pars = self['imm_kin']
 
         # Update demographics and partnerships
-        new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
+        new_people = self.people.update_states_pre(t=t, settings=self.settings) # NB this also ages people, applies deaths, and generates new births
         self.people.addtoself(new_people) # New births are added to the population
         people = self.people # Shorten
         people.alive = ~people.dead_other

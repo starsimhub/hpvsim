@@ -130,11 +130,9 @@ inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN
 inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
 inci_by_age = ['both',      None,           None,           None,           'total',        'total']
 
-# Results by age
-age_brackets    = np.array([20, 30, 40, 50, 60, 70, 80, 150])  # TODO: consider how this will change once vaccination status is there
+# Results by age - TODO, MOVE THIS?
+age_brackets    = np.array([20, 30, 40, 50, 60, 70, 80, 150])
 age_labels      = ['0-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80+']
-n_age_brackets  = len(age_brackets)
-by_age_colors   = sc.gridcolors(n_age_brackets)
 
 # Demographics
 dem_keys    = ['births',    'other_deaths']
@@ -225,7 +223,6 @@ default_lx = {
         [85, 99,  49349]]),
     }
 
-
 default_birth_rates = np.array([
     [2015, 2016, 2017, 2018, 2019],
     [12.4, 12.2, 11.8, 11.6, 11.4],
@@ -236,7 +233,6 @@ default_init_prev = {
     'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
     'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
 }
-
 #%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation

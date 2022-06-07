@@ -396,7 +396,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                     label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                     ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Plot result
                 elif reskey in age_keys:
-                    n_ages = hpd.n_age_brackets # TODO: this should be taken from the sim, not defaults
+                    n_ages = sim.settings['n_age_brackets']
                     age_colors = sc.gridcolors(n_ages)
                     for age in range(n_ages):
                         # Colors and labels

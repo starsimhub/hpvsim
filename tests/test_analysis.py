@@ -40,12 +40,35 @@ def test_snapshot():
     return people4
 
 
+def test_age_pyramids(do_plot=True):
+
+    sc.heading('Testing age pyramids')
+    import hpvsim.analysis as hpa
+    import hpvsim.sim as hps
+
+    pars = dict(n_years=10, dt=0.5)
+
+    timepoints = ["2015", "2020", "2025"]
+    sim = hps.Sim(pars, analyzers=hpa.age_pyramid(timepoints=timepoints, datafile='../data/south_africa_age_pyramid.xlsx', edges=np.linspace(0,100,21)))
+    sim.run()
+    agepyr = sim.get_analyzer()
+
+    # Check plot()
+    if do_plot:
+        fig = agepyr.plot()
+
+    return sim, agepyr
+
+
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
     T = sc.tic()
 
-    people = test_snapshot()
+    # people      = test_snapshot()
+    sim, agepyr = test_age_pyramids()
 
     sc.toc(T)
     print('Done.')

@@ -30,16 +30,16 @@ date_range = sc.daterange
 __all__ += ['load_data', 'load', 'save', 'savefig']
 
 
-def load_data(datafile, calculate=True, check_date=True, verbose=True, start_day=None, **kwargs):
+def load_data(datafile, check_date=True, header='infer', calculate=True, **kwargs):
     '''
     Load data for comparing to the model output, either from file or from a dataframe.
+    Data is expected to be in wide format, with each row representing a year and columns
+    for each variable by genotype/age/sex.
 
     Args:
-        datafile (str or df): if a string, the name of the file to load (either Excel or CSV); if a dataframe, use directly
-        calculate (bool): whether to calculate cumulative values from daily counts
-        check_date (bool): whether to check that a 'date' column is present
-        start_day (date): if the 'date' column is provided as integer number of days, consider them relative to this
-        kwargs (dict): passed to pd.read_excel()
+        datafile (str/df): if a string, the name of the file to load (either Excel or CSV); if a dataframe, use directly
+        start_year  (int): first year with data available
+        kwargs     (dict): passed to pd.read_excel()
 
     Returns:
         data (dataframe): pandas dataframe of the loaded data
@@ -50,14 +50,13 @@ def load_data(datafile, calculate=True, check_date=True, verbose=True, start_day
         datafile = str(datafile)
     if isinstance(datafile, str):
         df_lower = datafile.lower()
+        full_df = sc.makefilepath(datafile)
         if df_lower.endswith('csv'):
-            data = pd.read_csv(datafile, **kwargs)
+            data = pd.read_csv(full_df, header=header, **kwargs)
         elif df_lower.endswith('xlsx') or df_lower.endswith('xls'):
-            data = pd.read_excel(datafile, **kwargs)
-        elif df_lower.endswith('json'):
-            data = pd.read_json(datafile, **kwargs)
+            data = pd.read_excel(full_df, header=header, **kwargs)
         else:
-            errormsg = f'Currently loading is only supported from .csv, .xls/.xlsx, and .json files, not "{datafile}"'
+            errormsg = f'Currently loading is only supported from .csv, .xls, and .xlsx files, not "{datafile}"'
             raise NotImplementedError(errormsg)
     elif isinstance(datafile, pd.DataFrame):
         data = datafile
@@ -65,28 +64,11 @@ def load_data(datafile, calculate=True, check_date=True, verbose=True, start_day
         errormsg = f'Could not interpret data {type(datafile)}: must be a string or a dataframe'
         raise TypeError(errormsg)
 
-    # Calculate any cumulative columns that are missing
-    if calculate:
-        columns = data.columns
-        for col in columns:
-            if col.startswith('new'):
-                cum_col = col.replace('new_', 'cum_')
-                if cum_col not in columns:
-                    data[cum_col] = np.cumsum(data[col])
-                    if verbose:
-                        print(f'  Automatically adding cumulative column {cum_col} from {col}')
-
-    # Ensure required columns are present and reset the index
+    # Set the index to be the years
     if check_date:
         if 'date' not in data.columns:
-            errormsg = f'Required column "date" not found; columns are {data.columns}'
-            raise ValueError(errormsg)
-        else:
-            if data['date'].dtype == np.int64: # If it's integers, treat it as days from the start day
-                data['date'] = sc.date(data['date'].values, start_date=start_day)
-            else: # Otherwise, use Pandas to convert it
-                data['date'] = pd.to_datetime(data['date']).dt.date
-        data.set_index('date', inplace=True, drop=False) # Don't drop so sim.data['date'] can still be accessed
+            data.set_index(('name', 'age', 'genotype'), inplace=True)
+            data.index.names = ['date']
 
     return data
 

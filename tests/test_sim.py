@@ -60,6 +60,29 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     return sim
 
 
+def test_data(do_plot=False, do_save=False):
+    sc.heading('Try uploading and running with data')
+
+    # Settings
+    seed = 1
+    verbose = 1
+    from hpvsim.immunity import genotype
+
+    # Create and run the simulation
+    hpv16 = genotype('hpv16')
+    hpv18 = genotype('hpv18')
+    hpvhi = genotype('hpvhi')
+    sim = hps.Sim(start=1990, end=2020, genotypes=[hpv16,hpv18,hpvhi], datafile='../data/south_africa_hpv_data.xlsx')
+    sim.set_seed(seed)
+
+    # Optionally plot
+    if do_plot:
+        sim.run(verbose=verbose)
+        sim.plot(do_save=do_save)
+
+    return sim
+
+
 def test_epi():
     sc.heading('Test basic epi dynamics')
 
@@ -311,13 +334,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim2 = test_data(do_plot=True)
+    # sim3 = test_epi()
+    # sim4 = test_flexible_inputs()
+    # sim5 = test_result_consistency()
+    # sim6 = test_location_loading()
+    # sim7 = test_resuming()
     # json = test_fileio()
 
     sc.toc(T)

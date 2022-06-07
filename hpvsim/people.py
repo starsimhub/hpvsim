@@ -45,12 +45,12 @@ class People(hpb.BasePeople):
         ppl2 = hp.People(sim.pars)
     '''
 
-    def __init__(self, pars, strict=True, **kwargs):
+    def __init__(self, pars, settings=None, strict=True, **kwargs):
         
         # Initialize the BasePeople, which also sets things up for filtering  
         super().__init__()
 
-        # Handle pars and population size
+        # Handle pars and settings
         self.set_pars(pars)
         self.version = hpv.__version__ # Store version info
 
@@ -103,7 +103,7 @@ class People(hpb.BasePeople):
         if strict:
             self.lock() # If strict is true, stop further keys from being set (does not affect attributes)
 
-        # Store flows to be computed during simulation
+        # Store flows to be computed during simulation - only if settings have been provided
         self.init_flows()
 
         # Although we have called init(), we still need to call initialize()
@@ -130,16 +130,17 @@ class People(hpb.BasePeople):
         return
 
 
-    def init_flows(self):
+    def init_flows(self, settings=None):
         ''' Initialize flows to be zero '''
         ng = self.pars['n_genotypes']
+        na = settings['n_age_brackets'] if settings is not None else len(hpd.age_brackets) # TEMP
         df = hpd.default_float
         self.flows              = {f'new_{key}'                 : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
         self.total_flows        = {f'new_total_{key}'           : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'new_{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'new_{key}'                 : 0 for key in hpd.dem_keys}
-        self.flows_by_age       = {f'new_{key}_by_age'          : np.zeros((hpd.n_age_brackets,ng), dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['genotype','both']}
-        self.total_flows_by_age = {f'new_total_{key}_by_age'    : np.zeros(hpd.n_age_brackets, dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['total','both']}
+        self.flows_by_age       = {f'new_{key}_by_age'          : np.zeros((na,ng), dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['genotype','both']}
+        self.total_flows_by_age = {f'new_total_{key}_by_age'    : np.zeros(na, dtype=df) for kn,key in enumerate(hpd.flow_keys) if hpd.flow_by_age[kn] in ['total','both']}
         return
 
 
@@ -157,7 +158,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t, resfreq=None):
+    def update_states_pre(self, t, settings=None, resfreq=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
@@ -166,7 +167,7 @@ class People(hpb.BasePeople):
         self.resfreq = resfreq if resfreq is not None else 1
 
         # Perform updates that are not genotype-specific
-        if t%self.resfreq==0: self.init_flows()  # Only reinitialize flows to zero every nth step, where n is the requested result frequency
+        if t%self.resfreq==0: self.init_flows(settings=settings)  # Only reinitialize flows to zero every nth step, where n is the requested result frequency
         self.increment_age()  # Let people age by one time step
 
         # Apply death rates from other causes
