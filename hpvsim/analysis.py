@@ -356,6 +356,7 @@ class age_pyramid(Analyzer):
             raise ValueError(errormsg)
 
         # Make the figure(s)
+        xlabel = 'Share of population by sex' if percentages else 'Population by sex'
         with hpo.with_style(**kwargs):
             count=1
             for date,pyramid in pyramidsdict.items():
@@ -373,7 +374,7 @@ class age_pyramid(Analyzer):
                 ax = pl.subplot(n_rows, n_cols, count)
                 sns.barplot(x='m', y='bins', data=pydf, order=np.flip(bins), orient='h', ax=ax, color=m_color)
                 sns.barplot(x='f', y='bins', data=pydf, order=np.flip(bins), orient='h', ax=ax, color=f_color)
-                ax.set_xlabel('Population by sex')
+                ax.set_xlabel(xlabel)
                 ax.set_ylabel('Age group')
                 ax.set_yticklabels(labels[1:])
                 xticks = ax.get_xticks()
@@ -401,7 +402,7 @@ class age_pyramid(Analyzer):
                         ax = pl.subplot(n_rows, n_cols, count)
                         sns.barplot(x='m', y='a', data=datadf, order=np.flip(bins), orient='h', ax=ax, color=m_color)
                         sns.barplot(x='f', y='a', data=datadf, order=np.flip(bins), orient='h', ax=ax, color=f_color)
-                        ax.set_xlabel('Population by sex')
+                        ax.set_xlabel(xlabel)
                         ax.set_ylabel('Age group')
                         ax.set_yticklabels(labels[1:])
                         xticks = ax.get_xticks()
