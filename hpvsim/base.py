@@ -232,8 +232,8 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['cum_total_infections']
-                cancers = self.summary['cum_total_cancers']
+                infections = self.summary['total_infections']
+                cancers = self.summary['total_cancers']
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
