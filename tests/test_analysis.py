@@ -46,24 +46,29 @@ def test_age_pyramids(do_plot=True):
     import hpvsim.analysis as hpa
     import hpvsim.sim as hps
 
-    pars = dict(start=2000, n_years=30, dt=0.5)
+    n_agents = 50e3
+    pars = dict(pop_size=n_agents, start=2000, n_years=30, dt=0.5)
 
-    age_pyr = hpa.age_pyramid(
-        timepoints=['2010', '2020'],
-        datafile='test_data/australia_age_pyramid.xlsx',
-        edges=np.linspace(0, 100, 21))
-    sim = hps.Sim(
-        pars,
-        location = 'australia',
-        pop_scale=16.9e6/20e3,
-        analyzers=age_pyr)
+    # Loop over countries and their population sizes in the year 2000
+    for country,total_pop in zip(['south_africa', 'australia'], [45e6,17e6]):
 
-    sim.run()
-    a = sim.get_analyzer()
+        age_pyr = hpa.age_pyramid(
+            timepoints=['2010', '2020'],
+            datafile=f'test_data/{country}_age_pyramid.xlsx',
+            edges=np.linspace(0, 100, 21))
 
-    # Check plot()
-    if do_plot:
-        fig = a.plot(percentages=True)
+        sim = hps.Sim(
+            pars,
+            location = country.replace('_',' '),
+            pop_scale=total_pop/n_agents,
+            analyzers=age_pyr)
+
+        sim.run()
+        a = sim.get_analyzer()
+
+        # Check plot()
+        if do_plot:
+            fig = a.plot(percentages=True)
 
     return sim, a
 
@@ -102,9 +107,9 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    # people      = test_snapshot()
-    sim, a = test_age_pyramids()
-    # sim, a = test_age_results()
+    people      = test_snapshot()
+    sim0, a0    = test_age_pyramids()
+    sim1, a1    = test_age_results()
 
     sc.toc(T)
     print('Done.')
