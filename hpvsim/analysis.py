@@ -706,10 +706,10 @@ class age_results(Analyzer):
 
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
-                            ax.bar(x+xlocations[g], resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
+                            ax.bar(x+xlocations[g]-barwidth, resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
                             if len(thisdatadf)>0:
-                                ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g]].value)
-                                ax.bar(x, ydata, color=d_args.color, label=f'Data - {label}', width=barwidth)
+                                ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
+                                ax.bar(x+xlocations[g]+barwidth, ydata, color=self.result_properties[rkey].color[g], hatch='/', label=f'Data - {glabel}', width=barwidth)
 
                     else:
                         if len(thisdatadf) > 0:
