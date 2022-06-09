@@ -41,10 +41,11 @@ def get_sources_targets(inf,           sus,            sex):
     return inf_genotypes, inf_inds, sus_genotypes, sus_inds
 
 
-@nb.njit(           (nbint[:],       nb.int64[:], nb.int64[:],  nbint), cache=cache,parallel=safe_parallel)
+@nb.njit(           (nbint[:],       nb.int64[:], nb.int64[:],  nbint), cache=cache, parallel=safe_parallel)
 def pair_lookup_vals(contacts_array, people_inds, genotypes,    n):
-    lookup = np.empty(n, nbfloat)
-    lookup.fill(np.nan)
+    ft = hpd.default_float # nbfloat
+    lookup = np.empty(n, ft) # Create a lookup array consisting of length len(people)
+    lookup.fill(np.nan) # Fill it with NaNs
     lookup[people_inds[::-1]] = genotypes[::-1]
     res_val = lookup[contacts_array]
     mask = ~np.isnan(res_val)
@@ -95,7 +96,7 @@ def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p
     Construct discordant partnerships
     '''
 
-    p1_source_pships, p1_genotypes = pair_lookup_vals(p1, p1_inf_inds, p1_inf_gens, n) # Pull out the indices of partnerships in which p1 is infected, as well as the genotypes
+    p1_source_pships,   p1_genotypes = pair_lookup_vals(p1, p1_inf_inds, p1_inf_gens, n) # Pull out the indices of partnerships in which p1 is infected, as well as the genotypes they're infected with
     p2_sus_pships = pair_lookup(p2, p2_sus_inds, n) # ... pull out the indices of partnerships in which p2 is susceptible
     p1_genotypes = p1_genotypes[(~np.isnan(p1_genotypes)*p2_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
     p1_source_pships = p1_source_pships * p2_sus_pships # Remove partnerships where both partners have an infection with the same genotype

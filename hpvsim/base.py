@@ -437,7 +437,7 @@ class BaseSim(ParsObj):
             return tps
 
 
-    def result_keys(self, which='total'):
+    def result_keys(self, which='all'):
         '''
         Get the actual results objects, not other things stored in sim.results.
 

@@ -45,20 +45,54 @@ def test_age_pyramids(do_plot=True):
     sc.heading('Testing age pyramids')
     import hpvsim.analysis as hpa
     import hpvsim.sim as hps
-    import hpvsim.sim as hps
 
-    pars = dict(n_years=10, dt=0.5)
+    pars = dict(start=2000, n_years=30, dt=0.5)
 
-    timepoints = ['2015', '2020', '2025']
-    sim = hps.Sim(pars, pop_scale=2765, analyzers=hpa.age_pyramid(timepoints=timepoints, datafile='test_data/south_africa_age_pyramid.xlsx', edges=np.linspace(0,100,21)))
+    age_pyr = hpa.age_pyramid(
+        timepoints=['2010', '2020', '2025'],
+        datafile='test_data/south_africa_age_pyramid.xlsx',
+        edges=np.linspace(0, 100, 21))
+    sim = hps.Sim(
+        pars,
+        location = 'south africa',
+        pop_scale=2765,
+        analyzers=age_pyr)
+
     sim.run()
-    agepyr = sim.get_analyzer()
+    a = sim.get_analyzer()
 
     # Check plot()
     if do_plot:
-        fig = agepyr.plot(percentages=False)
+        fig = a.plot(percentages=False)
 
-    return sim, agepyr
+    return sim, a
+
+
+def test_age_results(do_plot=True):
+
+    sc.heading('Testing by-age results')
+    import hpvsim.analysis as hpa
+    import hpvsim.sim as hps
+    from hpvsim.immunity import genotype
+
+    pars = dict(pop_size=500e3, pop_scale=36.8e6/20e3, start=1990, n_years=40, dt=0.5, location='south africa')
+    hpv16 = genotype('hpv16')
+    hpv18 = genotype('hpv18')
+    timepoints = ['2010', '2013']
+    edges = np.array([ 0., 20., 30., 40., 50., 60., 70., 80., 100.])
+    az = hpa.age_results(timepoints=timepoints,
+                         result_keys=['total_cancers'],
+                         datafile='test_data/south_africa_cancer_data.xlsx',
+                         edges=edges)
+    sim = hps.Sim(pars, genotypes=[hpv16, hpv18], analyzers=az)
+    sim.run()
+    a = sim.get_analyzer()
+
+    # Check plot()
+    if do_plot:
+        fig = a.plot()
+
+    return sim, a
 
 
 
@@ -68,8 +102,9 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    people      = test_snapshot()
-    sim, agepyr = test_age_pyramids()
+    # people      = test_snapshot()
+    # sim, a = test_age_pyramids()
+    sim, a = test_age_results()
 
     sc.toc(T)
     print('Done.')

@@ -113,7 +113,8 @@ class PeopleMeta(sc.prettyobj):
 flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections']
 flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections']
 flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu]
-flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total',            None]
+flow_by_age = [None,            None,           None,           None,           None,           None,       None,               None]
+# flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total',            None]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes

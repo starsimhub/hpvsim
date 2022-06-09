@@ -687,18 +687,18 @@ class Sim(hpb.BaseSim):
             # Create total stocks
             for key,by_age in zip(hpd.stock_keys, hpd.stock_by_age):
                 if key not in ['cin']:  # This is a special case
-                    if by_age is not None:
-                        count_age_brackets = people.age_brackets * people[key]  # Age buckets
+                    # if by_age is not None:
+                    #     count_age_brackets = people.age_brackets * people[key]  # Age buckets
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
-                        if by_age in ['both', 'genotype']:
-                            age_inds, n_by_age = hpu.unique(count_age_brackets[g, :])  # Get the number infected by genotype
-                            self.results[f'n_{key}_by_age'][age_inds[1:]-1, g, idx] = n_by_age[1:]
+                        # if by_age in ['both', 'genotype']:
+                        #     age_inds, n_by_age = hpu.unique(count_age_brackets[g, :])  # Get the number infected by genotype
+                        #     self.results[f'n_{key}_by_age'][age_inds[1:]-1, g, idx] = n_by_age[1:]
                 if key not in ['cin']:  # This is a special case
                     self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
-                    if by_age in ['both', 'total']:
-                        age_inds, n_by_age = hpu.unique(count_age_brackets)  # Get the number infected
-                        self.results[f'n_total_{key}_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
+                    # if by_age in ['both', 'total']:
+                    #     age_inds, n_by_age = hpu.unique(count_age_brackets)  # Get the number infected
+                    #     self.results[f'n_total_{key}_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
 
             # Do total CINs separately
             for genotype in range(ng):

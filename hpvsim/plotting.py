@@ -435,13 +435,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label: label += f' - {v_label}'
                         else:     label = v_label
-                        try:
-                            ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result
-                        except:
-                            import traceback;
-                            traceback.print_exc();
-                            import pdb;
-                            pdb.set_trace()
+                        ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result
             #     if args.show['data']:
             #         plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
             #     if args.show['ticks']:
