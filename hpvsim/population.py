@@ -127,7 +127,6 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
     people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], death_age=popdict['death_age'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
-    people.age_brackets = np.digitize(people.age, hpd.age_brackets)+1  # Store which age bucket people belong to, adding 1 so there are no zeros
 
     sc.printv(f'Created {pop_size} people, average age {people.age.mean():0.2f} years', 2, verbose)
 

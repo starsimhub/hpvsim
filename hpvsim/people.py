@@ -45,7 +45,7 @@ class People(hpb.BasePeople):
         ppl2 = hp.People(sim.pars)
     '''
 
-    def __init__(self, pars, settings=None, strict=True, **kwargs):
+    def __init__(self, pars, strict=True, **kwargs):
         
         # Initialize the BasePeople, which also sets things up for filtering  
         super().__init__()
@@ -103,7 +103,7 @@ class People(hpb.BasePeople):
         if strict:
             self.lock() # If strict is true, stop further keys from being set (does not affect attributes)
 
-        # Store flows to be computed during simulation - only if settings have been provided
+        # Store flows to be computed during simulation
         self.init_flows()
 
         # Although we have called init(), we still need to call initialize()
@@ -130,10 +130,9 @@ class People(hpb.BasePeople):
         return
 
 
-    def init_flows(self, settings=None):
+    def init_flows(self):
         ''' Initialize flows to be zero '''
         ng = self.pars['n_genotypes']
-        na = settings['n_age_brackets'] if settings is not None else len(hpd.age_brackets) # TEMP
         df = hpd.default_float
         self.flows              = {f'{key}'                 : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
         self.total_flows        = {f'total_{key}'           : 0 for key in hpd.flow_keys}
@@ -156,7 +155,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t, settings=None, resfreq=None):
+    def update_states_pre(self, t, resfreq=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
@@ -165,7 +164,7 @@ class People(hpb.BasePeople):
         self.resfreq = resfreq if resfreq is not None else 1
 
         # Perform updates that are not genotype-specific
-        if t%self.resfreq==0: self.init_flows(settings=settings)  # Only reinitialize flows to zero every nth step, where n is the requested result frequency
+        if t%self.resfreq==0: self.init_flows()  # Only reinitialize flows to zero every nth step, where n is the requested result frequency
         self.increment_age()  # Let people age by one time step
 
         # Apply death rates from other causes

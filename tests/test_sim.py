@@ -60,29 +60,6 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     return sim
 
 
-def test_data(do_plot=False, do_save=False):
-    sc.heading('Try uploading and running with data')
-
-    # Settings
-    seed = 1
-    verbose = 1
-    from hpvsim.immunity import genotype
-
-    # Create and run the simulation
-    hpv16 = genotype('hpv16')
-    hpv18 = genotype('hpv18')
-    hpvhi = genotype('hpvhi')
-    sim = hps.Sim(start=1990, end=2020, pop_scale=36.8e6/20e3, genotypes=[hpv16,hpv18,hpvhi], datafile='test_data/south_africa_hpv_data.xlsx')
-    sim.set_seed(seed)
-
-    # Optionally plot
-    if do_plot:
-        sim.run(verbose=verbose)
-        sim.plot(to_plot='demography', do_save=do_save)
-
-    return sim
-
-
 def test_epi():
     sc.heading('Test basic epi dynamics')
 
@@ -206,9 +183,6 @@ def test_result_consistency():
     sim = hps.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
     sim.run()
 
-    # Check that infections by age sum up the the correct totals
-    # assert (sim.results['total_infections'][:] == sim.results['total_infections_by_age'][:].sum(axis=0)).all() # Check new results by age are equal to new results
-
     # Check that infections by genotype sum up the the correct totals
     assert (sim.results['infections'][:].sum(axis=0)==sim.results['total_infections'][:]).all() # Check flows by genotype are equal to total flows
     assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
@@ -217,15 +191,7 @@ def test_result_consistency():
     assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
     assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
 
-    # Check that cancers and CINs by age sum up the the correct totals
-    # assert (sim.results['total_cancers'][:] == sim.results['total_cancers_by_age'][:].sum(axis=0)).all()
-    # assert (sim.results['total_cins'][:] == sim.results['total_cins_by_age'][:].sum(axis=0)).all()
-    # assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) == sim.results['n_total_cin'][:]).all()
-    # assert (sim.results['n_total_cancerous_by_age'][:, :].sum(axis=0) == sim.results['n_total_cancerous'][:]).all()
-
     # Check demographics
-    # assert (sim.results['n_alive_by_age'][:].sum(axis=0) == sim.results['n_alive'][:]).all()
-    # assert (sim.results['n_alive_by_sex'][0, :] == sim.results['f_alive_by_age'][:].sum(axis=0)).all()
     assert (sim['pop_size'] == pop_size)
 
     # Check that males don't have CINs or cancers
@@ -334,12 +300,11 @@ if __name__ == '__main__':
 
     sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_data(do_plot=True)
-    sim3 = test_epi()
-    sim4 = test_flexible_inputs()
-    sim5 = test_result_consistency()
-    sim6 = test_location_loading()
-    sim7 = test_resuming()
+    sim2 = test_epi()
+    sim3 = test_flexible_inputs()
+    sim4 = test_result_consistency()
+    sim5 = test_location_loading()
+    sim6 = test_resuming()
     # json = test_fileio()
 
     sc.toc(T)

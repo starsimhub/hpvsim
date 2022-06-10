@@ -12,17 +12,6 @@ from .data import loaders as hpdata
 __all__ = ['make_pars', 'reset_layer_pars', 'get_prognoses']
 
 
-def sim_settings():
-    '''
-    Define settings for the sim, including the age brackets
-    '''
-    settings = {}
-    settings['age_brackets']    = hpd.age_brackets
-    # settings['age_labels']      = hpd.age_labels
-
-    return settings
-
-
 def make_pars(set_prognoses=False, **kwargs):
     '''
     Create the parameters for the simulation. Typically, this function is used

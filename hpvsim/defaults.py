@@ -113,8 +113,6 @@ class PeopleMeta(sc.prettyobj):
 flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections']
 flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections']
 flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu]
-flow_by_age = [None,            None,           None,           None,           None,           None,       None,               None]
-# flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total',            None]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -122,20 +120,12 @@ flow_by_age = [None,            None,           None,           None,           
 stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
 stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
-stock_by_age = [None,           None,           None,           None,           None,           None,        None]
-# stock_by_age = ['total',        'both',         None,           None,           None,           'total',        'total']
 
 # Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
 inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',          'cancer']
 inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN',          'cancer']
 inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
-inci_by_age = [None,        None,           None,           None,           None,           None]
-# inci_by_age = ['both',      None,           None,           None,           'total',        'total']
-
-# Results by age - TODO, MOVE THIS?
-age_brackets    = np.array([20, 30, 40, 50, 60, 70, 80, 150])
-age_labels      = ['0-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80+']
 
 # Demographics
 dem_keys    = ['births',    'other_deaths']
@@ -289,14 +279,6 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'cin_incidence',
                     'total_cancer_incidence',
                     ],
-                # 'Birth and death rates': [
-                #     'tfr',
-                #     'cbr',
-                # ],
-                # 'Population size': [
-                #     'n_alive',
-                #     'n_alive_by_sex',
-                # ],
             })
 
         else: # pragma: no cover
