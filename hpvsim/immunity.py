@@ -133,6 +133,12 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None):
         Returns: None
         '''
 
+    # Determine whether individual seroconverts based upon duration of infection
+    dur_inf = people.dur_hpv[imm_source, inds]
+    dur_inf_inds = np.digitize(dur_inf, imm_pars['prognoses']['seroconvert_probs']) - 1
+    seroconvert_probs = imm_pars['prognoses']['seroconvert_probs'][dur_inf_inds]
+    is_seroconvert = hpu.binomial_arr(seroconvert_probs)
+
     # Extract parameters and indices
     has_imm =  people.imm[imm_source, inds] > 0
     no_prior_imm_inds = inds[~has_imm]
@@ -146,7 +152,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None):
         people.peak_imm[imm_source, prior_imm_inds] *= boost
 
     if len(no_prior_imm_inds):
-        people.peak_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
+        people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert*hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
 
     # people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
     base_t = people.t + offset if offset is not None else people.t
