@@ -12,7 +12,7 @@ from .data import loaders as hpdata
 __all__ = ['make_pars', 'reset_layer_pars', 'get_prognoses']
 
 
-def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwargs):
+def make_pars(set_prognoses=False, **kwargs):
     '''
     Create the parameters for the simulation. Typically, this function is used
     internally rather than called by the user; e.g. typical use would be to do
@@ -30,13 +30,14 @@ def make_pars(version=None, nonactive_by_age=False, set_prognoses=False, **kwarg
 
     # Population parameters
     pars['pop_size']        = 20e3      # Number of agents
+    pars['pop_scale']       = 1         # How much to scale the population
     pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
-    pars['death_rates']     = None      # Deaths from all other causes, loaded below
+    pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
     pars['birth_rates']     = None      # Birth rates, loaded below
 
     # Initialization parameters
-    pars['init_hpv_prev']       = hpd.default_init_prev # Initial prevalence
+    pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
@@ -230,40 +231,38 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
         overall  (bool): whether to get overall values ie not disaggregated by sex (default false)
 
     Returns:
-        death_rates (dict): nested dictionary of death rates by sex (first level) and age (second level)
+        lx (dict): dictionary keyed by sex, storing arrays of lx - the number of people who survive to age x
         birth_rates (arr): array of crude birth rates by year
     '''
 
-    birth_rates = hpd.default_birth_rates 
-    death_rates = hpd.default_death_rates
+    birth_rates = hpd.default_birth_rates
+    lx = hpd.default_lx
     if location is not None:
         if verbose:
             print(f'Loading location-specific demographic data for "{location}"')
         try:
-            death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+            lx          = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
             birth_rates = hpdata.get_birth_rates(location=location)
         except ValueError as E:
             warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
             hpm.warn(warnmsg, die=die)
-    
-    return birth_rates, death_rates
+
+    # Process the 85+ age group
+    for sex in ['m','f']:
+        if lx[sex][-1][0] == 85:
+            last_val = lx[sex][-1][-1] # Save the last value
+            lx[sex] = np.delete(lx[sex], -1, 0) # Remove the last row
+            # Break this 15 year age bracket into 3x 5 year age brackets
+            s85_89  = np.array([[85, 89, int(last_val*.7)]])
+            s90_99  = np.array([[90, 99, int(last_val*.7*.5)]])
+            s100    = np.array([[100, 110, 0]])
+            lx[sex] = np.concatenate([lx[sex], s85_89, s90_99, s100])
+
+    return birth_rates, lx
+
+
 
 #%% Genotype/immunity parameters and functions
-
-def get_hpv_prevalence():
-    '''
-    Get HPV prevalence data by age and genotype for initializing the sim
-
-    Args:
-        filename (str):  filename; if none specified, use default value for XXX
-
-    Returns:
-        hpv_prevalence (dict): nested dictionary of hpv prevalence by sex (first level),  age (second level), and genotype (third level)
-    '''
-
-    hpv_prevalence = hpd.default_hpv_prevalence
-
-    return hpv_prevalence
 
 def get_genotype_choices():
     '''

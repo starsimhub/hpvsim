@@ -68,10 +68,10 @@ def test_epi():
     sim = hps.Sim()
 
     # Define the parameters to vary
-    vary_pars   = ['beta',          'acts',         'condoms',      'debut',        'rel_cin1_prob',    'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.05, 0.5],     [10,200],       [0.1,1.0],      [15,25],        [0.1, 2],           [0.01,0.5]] # Values
-    vary_rels   = ['pos',           'pos',          'neg',          'neg',          'pos',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['infections',    'infections',   'infections',   'infections',   'cin1s',            'cin1s'] # Epi outcomes to check
+    vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'rel_cin1_prob',    'init_hpv_prev'] # Parameters
+    vary_vals   = [[0.05, 0.5],     [10,200],           [0.1,1.0],          [15,25],            [0.1, 2],           [0.01,0.8]] # Values
+    vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos',              'pos'] # Expected association with epi outcomes
+    vary_what   = ['hpv_incidence', 'hpv_incidence',    'hpv_incidence',    'hpv_incidence',    'cin1_prevalence',  'cancer_prevalence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -100,7 +100,7 @@ def test_epi():
         res1 = s1.summary
 
         # Check results
-        key='cum_total_'+vwhat
+        key='total_'+vwhat
         v0 = res0[key]
         v1 = res1[key]
         print(f'Checking {key:20s} ... ', end='')
@@ -183,28 +183,15 @@ def test_result_consistency():
     sim = hps.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
     sim.run()
 
-    # Check that infections by age sum up the the correct totals
-    assert (sim.results['cum_total_infections'][:] == sim.results['cum_total_infections_by_age'][:].sum(axis=0)).all() # Check cumulative results by age are equal to cumulative results
-    assert (sim.results['new_total_infections'][:] == sim.results['new_total_infections_by_age'][:].sum(axis=0)).all() # Check new results by age are equal to new results
-
     # Check that infections by genotype sum up the the correct totals
-    assert (sim.results['new_infections'][:].sum(axis=0)==sim.results['new_total_infections'][:]).all() # Check flows by genotype are equal to total flows
+    assert (sim.results['infections'][:].sum(axis=0)==sim.results['total_infections'][:]).all() # Check flows by genotype are equal to total flows
     assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
     # Check that CINs by grade sum up the the correct totals
-    assert ((sim.results['new_total_cin1s'][:] + sim.results['new_total_cin2s'][:] + sim.results['new_total_cin3s'][:]) == sim.results['new_total_cins'][:]).all()
-    assert ((sim.results['new_cin1s'][:] + sim.results['new_cin2s'][:] + sim.results['new_cin3s'][:]) == sim.results['new_cins'][:]).all()
-
-    # Check that cancers and CINs by age sum up the the correct totals
-    assert (sim.results['new_total_cancers'][:] == sim.results['new_total_cancers_by_age'][:].sum(axis=0)).all()
-    assert (sim.results['new_total_cins'][:] == sim.results['new_total_cins_by_age'][:].sum(axis=0)).all()
-    assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) == sim.results['n_total_cin'][:]).all()
-    assert (sim.results['n_total_cancerous_by_age'][:, :].sum(axis=0) == sim.results['n_total_cancerous'][:]).all()
+    assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
+    assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
 
     # Check demographics
-    assert (sim.results['n_alive_by_age'][:].sum(axis=0) == sim.results['n_alive'][:]).all()
-    assert (sim.results['n_alive_by_sex'][0, :] == sim.results['f_alive_by_age'][:].sum(axis=0)).all()
-    assert (sim.results['n_alive'][-1]+sim.results['cum_other_deaths'][-1]-sim.results['cum_births'][-1] == sim['pop_size'])
     assert (sim['pop_size'] == pop_size)
 
     # Check that males don't have CINs or cancers
@@ -269,7 +256,7 @@ def test_resuming():
     with pytest.raises(hps.AlreadyRunError):
         s1.finalize() # Can't re-finalize a finalized sim
 
-    assert np.all(s0.results['cum_total_infections'].values == s1.results['cum_total_infections']) # Results should be identical
+    assert np.all(s0.results['total_infections'].values == s1.results['total_infections']) # Results should be identical
 
     return s1
 

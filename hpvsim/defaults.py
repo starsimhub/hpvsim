@@ -44,6 +44,7 @@ class PeopleMeta(sc.prettyobj):
             'uid',              # Int
             'age',              # Float
             'sex',              # Float
+            'death_age',        # Float
             'debut',            # Float
             'partners',         # Int by relationship type
             'current_partners', # Int by relationship type
@@ -112,7 +113,6 @@ class PeopleMeta(sc.prettyobj):
 flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections']
 flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections']
 flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu]
-flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total',            None]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -120,20 +120,12 @@ flow_by_age = ['both',          None,           None,           None,           
 stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
 stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
-stock_by_age = ['total',        'both',         None,           None,           None,           'total',        'total']
 
 # Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
 inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',          'cancer']
 inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN',          'cancer']
 inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
-inci_by_age = ['both',      None,           None,           None,           'total',        'total']
-
-# Results by age
-age_brackets    = np.array([15, 25, 45, 65, 150])  # TODO: consider how this will change once vaccination status is there
-age_labels      = ['0-14', '15-24', '25-44', '45-64', '65+']
-n_age_brackets  = len(age_brackets)
-by_age_colors   = sc.gridcolors(n_age_brackets)
 
 # Demographics
 dem_keys    = ['births',    'other_deaths']
@@ -183,47 +175,45 @@ default_age_data = np.array([
 ])
 
 
-default_death_rates = {
+default_lx = {
     'm': np.array([
-        [0, 1, 5.99966600e-03],
-        [1, 4, 2.51593000e-04],
-        [5, 9, 1.35127000e-04],
-        [10, 14, 1.78153000e-04],
-        [15, 19, 6.61341000e-04],
-        [20, 24, 1.30016800e-03],
-        [25, 29, 1.63925500e-03],
-        [30, 34, 1.96618300e-03],
-        [35, 39, 2.28799200e-03],
-        [40, 44, 2.63302300e-03],
-        [45, 49, 3.66449800e-03],
-        [50, 54, 5.70753600e-03],
-        [55, 59, 9.46976600e-03],
-        [60, 64, 1.34425950e-02],
-        [65, 69, 1.83650650e-02],
-        [70, 74, 2.89760800e-02],
-        [75, 79, 4.17993600e-02],
-        [80, 84, 6.58443370e-02],
-        [85, 99, 1.47244865e-01]]),
+        [ 0,  4, 100000],
+        [ 5,  9,  99218],
+        [10, 14,  99154],
+        [15, 19,  99071],
+        [20, 24,  98744],
+        [25, 29,  98108],
+        [30, 34,  97372],
+        [35, 39,  96529],
+        [40, 44,  95563],
+        [45, 49,  94353],
+        [50, 54,  92624],
+        [55, 59,  89871],
+        [60, 64,  85843],
+        [65, 69,  80364],
+        [70, 74,  73237],
+        [75, 79,  63567],
+        [80, 84,  51515],
+        [85, 99,  36055]]),
     'f': np.array([
-        [0, 1, 5.01953300e-03],
-        [1, 4, 2.01505000e-04],
-        [5, 9, 1.08226000e-04],
-        [10, 14, 1.25870000e-04],
-        [15, 19, 2.85938000e-04],
-        [20, 24, 4.81500000e-04],
-        [25, 29, 6.72314000e-04],
-        [30, 34, 9.84953000e-04],
-        [35, 39, 1.27814400e-03],
-        [40, 44, 1.61936000e-03],
-        [45, 49, 2.42485500e-03],
-        [50, 54, 3.86320600e-03],
-        [55, 59, 6.15726500e-03],
-        [60, 64, 8.21110500e-03],
-        [65, 69, 1.17604260e-02],
-        [70, 74, 1.86539200e-02],
-        [75, 79, 3.04550980e-02],
-        [80, 84, 5.16382510e-02],
-        [85, 99, 1.33729522e-01]])
+        [ 0,  4, 100000],
+        [ 5,  9,  99349],
+        [10, 14,  99300],
+        [15, 19,  99239],
+        [20, 24,  99097],
+        [25, 29,  98871],
+        [30, 34,  98571],
+        [35, 39,  98153],
+        [40, 44,  97608],
+        [45, 49,  96829],
+        [50, 54,  95641],
+        [55, 59,  93783],
+        [60, 64,  91150],
+        [65, 69,  87604],
+        [70, 74,  82579],
+        [75, 79,  75122],
+        [80, 84,  64402],
+        [85, 99,  49349]]),
     }
 
 default_birth_rates = np.array([
@@ -236,7 +226,6 @@ default_init_prev = {
     'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
     'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
 }
-
 #%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
@@ -274,7 +263,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
         is_sim = kindmap[kind] == sim_kind
 
     # Default plots -- different for sims and scenarios
-    if which in ['none', 'default']:
+    if which in ['none', 'default', 'epi']:
 
         if is_sim:
             plots = sc.odict({
@@ -283,8 +272,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'hpv_prevalence',
                 ],
                 'HPV incidence': [
-                    'total_hpv_incidence_by_age',
-                    # 'new_infections',
+                    'total_hpv_incidence',
                 ],
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
@@ -300,6 +288,20 @@ def get_default_plots(which='default', kind='sim', sim=None):
                 ],
                 'New infections per day': [
                     'new_infections',
+                ],
+            })
+
+    # Demographic plots
+    elif which in ['demographic', 'dem', 'demography']:
+        if is_sim:
+            plots = sc.odict({
+                'Birth and death rates': [
+                    'tfr',
+                    'cbr',
+                ],
+                'Population size': [
+                    'n_alive',
+                    'n_alive_by_sex',
                 ],
             })
 

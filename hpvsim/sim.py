@@ -22,13 +22,15 @@ from . import interventions as hpi
 # Define the model
 class Sim(hpb.BaseSim):
 
-    def __init__(self, pars=None, label=None,
+    def __init__(self, pars=None, datafile=None, label=None,
                  popfile=None, people=None, version=None, **kwargs):
 
         # Set attributes
         self.label         = label    # The label/name of the simulation
         self.created       = None     # The datetime the sim was created
+        self.datafile      = datafile # The name of the data file
         self.popfile       = popfile  # The population file
+        self.data          = None     # The data
         self.popdict       = people   # The population dictionary
         self.people        = None     # Initialize these here so methods that check their length can see they're empty
         self.t             = None     # The current time in the simulation (during execution); outside of sim.step(), its value corresponds to next timestep to be computed
@@ -44,9 +46,17 @@ class Sim(hpb.BaseSim):
         default_pars = hppar.make_pars(version=version) # Start with default pars
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
-        # Update pars
+        # Update pars and load data
         self.update_pars(pars, **kwargs)   # Update the parameters, if provided
+        self.load_data(datafile, header=[0,1,2]) # Load the data, if provided
 
+        return
+
+
+    def load_data(self, datafile=None, **kwargs):
+        ''' Load the data to calibrate against, if provided '''
+        if datafile is not None: # If a data file is provided, load it
+            self.data = hpm.load_data(datafile=datafile, **kwargs)
         return
 
 
@@ -139,7 +149,6 @@ class Sim(hpb.BaseSim):
     def validate_pars(self, validate_layers=True):
         '''
         Some parameters can take multiple types; this makes them consistent.
-
         Args:
             validate_layers (bool): whether to validate layer parameters as well via validate_layer_pars() -- usually yes, except during initialization
         '''
@@ -307,10 +316,9 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def init_results(self, frequency='annual'):
+    def init_results(self, frequency='annual', add_data=True):
         '''
         Create the main results structure.
-        We differentiate between flows, stocks, and cumulative results
         The prefix "new" is used for flow variables, i.e. counting new events (infections/deaths) on each timestep
         The prefix "n" is used for stock variables, i.e. counting the total number in any given state (sus/inf/etc) on any particular timestep
         The prefix "cum" is used for cumulative variables, i.e. counting the total number that have ever been in a given state at some point in the sim
@@ -318,6 +326,7 @@ class Sim(hpb.BaseSim):
         Arguments:
             sim         (hp.Sim)        : a sim
             frequency   (str or float)  : the frequency with which to save results: accepts 'annual', 'dt', or a float which is interpreted as a fraction of a year, e.g. 0.2 will save results every 0.2 years
+            add_data    (bool)          : whether or not to add data to the result structures
         '''
 
         # Handle frequency
@@ -352,59 +361,47 @@ class Sim(hpb.BaseSim):
         ng = self['n_genotypes']
         results = dict()
 
-        # Create new and cumulative flows
-        for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
-            for lkey,llab,cstride,g in zip(['_total',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
-                for flow,name,cmap,by_age in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors, hpd.flow_by_age):
-                    results[f'{key+lkey}_{flow}'] = init_res(f'{llab+lab.lower()} {name}', color=cmap(cstride), n_rows=g)
-                    if by_age in ['both', 'genotype'] and lkey=='':
-                        results[f'{key}_{flow}_by_age'] = init_res(f'{lab} {name} by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
-                    if by_age in ['both', 'total'] and lkey=='_total':
-                        results[f'{key+lkey}_{flow}_by_age'] = init_res(f'{llab+lab.lower()} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
+        # Create new flows
+        for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+            for flow,name,cmap in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors):
+                results[f'{lkey+flow}'] = init_res(f'{llab} {name}', color=cmap(cstride), n_rows=g)
 
         # Create stocks
-        for lkey,llabel,cstride,g in zip(['_total',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
-            for stock, name, cmap, by_age in zip(hpd.stock_keys, hpd.stock_names, hpd.stock_colors, hpd.stock_by_age):
-                results[f'n{lkey}_{stock}'] = init_res(f'{llabel} {name}', color=cmap(cstride), n_rows=g)
-                if by_age in ['both', 'genotype'] and lkey == '':
-                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
-                if by_age in ['both', 'total'] and lkey == '_total':
-                    results[f'n{lkey}_{stock}_by_age'] = init_res(f'{llabel} {name} by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
+        for lkey,llabel,cstride,g in zip(['total_',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
+            for stock, name, cmap in zip(hpd.stock_keys, hpd.stock_names, hpd.stock_colors):
+                results[f'n_{lkey+stock}'] = init_res(f'{llabel} {name}', color=cmap(cstride), n_rows=g)
 
         # Create incidence and prevalence results
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
-            for var,name,cmap,by_age in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors, hpd.inci_by_age):
+            for var,name,cmap in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
                 for which in ['incidence', 'prevalence']:
                     results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
-                    if by_age in ['both', 'genotype'] and lkey == '':
-                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=g, n_copies=hpd.n_age_brackets)
-                    if by_age in ['both', 'total'] and lkey == 'total_':
-                        results[f'{lkey+var}_{which}_by_age'] = init_res(llab+name+' '+which+' by age', color=cmap(cstride), n_rows=hpd.n_age_brackets)
 
         # Create demographic flows
-        for key,lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
-            for var, name, color in zip(hpd.dem_keys, hpd.dem_names, hpd.dem_colors):
-                results[f'{key}_{var}'] = init_res(f'{lab} {name}', color=color)
+        for var, name, color in zip(hpd.dem_keys, hpd.dem_names, hpd.dem_colors):
+            results[f'{var}'] = init_res(f'{name}', color=color)
 
         # Create results by sex
-        for key, lab in zip(['cum', 'new'], ['Cumulative', 'New']):  # key and label for new vs cumulative
-            for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
-                results[f'{key}_{var}'] = init_res(f'{lab} {name}', color=color, n_rows=2)
+        for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
+            results[f'{var}'] = init_res(f'{name}', color=color, n_rows=2)
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
         results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
-        results['n_alive'] = init_res('Number alive', scale=True)
-        results['n_alive_by_sex'] = init_res('Number alive by sex', scale=True, n_rows=2)
-        results['n_alive_by_age'] = init_res('Number alive by age', scale=True, n_rows=hpd.n_age_brackets)
-        results['f_alive_by_age'] = init_res('Women alive by age', scale=True, n_rows=hpd.n_age_brackets)
+        results['n_alive'] = init_res('Number alive')
+        results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
+        results['tfr'] = init_res('Total fatality rate', scale=False)
+        results['cbr'] = init_res('Crude birth rate', scale=False)
 
         # Time vector
         results['year'] = res_yearvec
         results['t'] = res_tvec
 
+        # Final items
+        self.rescale_vec   = self['pop_scale']*np.ones(res_npts) # Not included in the results, but used to scale them
         self.results = results
         self.results_ready = False
+
         return
 
 
@@ -561,7 +558,6 @@ class Sim(hpb.BaseSim):
         self.people.addtoself(new_people) # New births are added to the population
         people = self.people # Shorten
         people.alive = ~people.dead_other
-        people.age_brackets = np.digitize(people.age, hpd.age_brackets)+1  # Store which age bucket people belong to, adding 1 so there are no zeros
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
         n_people = len(people)
@@ -641,53 +637,26 @@ class Sim(hpb.BaseSim):
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
 
-        # By-age flows
-        self.results['new_infections_by_age'][:,:,idx] += people.flows_by_age['new_infections_by_age']
-        for key,count in people.total_flows_by_age.items():
-            self.results[key][:, idx] += count
-
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 
             # Create total stocks
-            for key,by_age in zip(hpd.stock_keys, hpd.stock_by_age):
+            for key in hpd.stock_keys:
                 if key not in ['cin']:  # This is a special case
-                    if by_age is not None:
-                        count_age_brackets = people.age_brackets * people[key]  # Age buckets
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
-                        if by_age in ['both', 'genotype']:
-                            age_inds, n_by_age = hpu.unique(count_age_brackets[g, :])  # Get the number infected by genotype
-                            self.results[f'n_{key}_by_age'][age_inds[1:]-1, g, idx] = n_by_age[1:]
                 if key not in ['cin']:  # This is a special case
                     self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
-                    if by_age in ['both', 'total']:
-                        age_inds, n_by_age = hpu.unique(count_age_brackets)  # Get the number infected
-                        self.results[f'n_total_{key}_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
 
             # Do total CINs separately
             for genotype in range(ng):
                 self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
             self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
 
-            count_age_brackets_all = people.age_brackets * (people['cin1'] + people['cin2'] + people['cin3'])
-            age_inds, n_by_age = hpu.unique(count_age_brackets_all)  # Get the number infected
-            self.results[f'n_total_cin_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
-
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
             self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
             self.results['n_alive_by_sex'][1,idx] = len((people.alive*people.is_male).nonzero()[0])
-
-            # Save number alive by age
-            count_age_brackets_alive = people.age_brackets * people.alive
-            age_inds, n_by_age = hpu.unique(count_age_brackets_alive)  # Get the number infected
-            self.results[f'n_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
-
-            # Save number of women alive by age
-            count_age_brackets_alive = people.age_brackets * people.alive * people.is_female
-            age_inds, n_by_age = hpu.unique(count_age_brackets_alive)  # Get the number infected
-            self.results[f'f_alive_by_age'][age_inds[1:]-1, idx] = n_by_age[1:]
 
 
         # Apply analyzers
@@ -774,20 +743,10 @@ class Sim(hpb.BaseSim):
             # otherwise the scale factor will be applied multiple times
             raise AlreadyRunError('Simulation has already been finalized')
 
-        # Calculate cumulative results
-        for key,by_age in zip(hpd.flow_keys, hpd.flow_by_age):
-            self.results[f'cum_total_{key}'][:] += np.cumsum(self.results[f'new_total_{key}'][:], axis=0)
-            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=1)
-            if by_age in ['both', 'total']:
-                self.results[f'cum_total_{key}_by_age'][:] += np.cumsum(self.results[f'new_total_{key}_by_age'][:], axis=-1)
-            if by_age in ['both', 'genotype']:
-                self.results[f'cum_{key}_by_age'][:] += np.cumsum(self.results[f'new_{key}_by_age'][:], axis=-1)
-
-        for key in hpd.by_sex_keys:
-            self.results[f'cum_{key}'][:]       += np.cumsum(self.results[f'new_{key}'][:], axis=-1)
-
-        self.results[f'cum_other_deaths'][:]    += np.cumsum(self.results[f'new_other_deaths'][:], axis=-1)
-        self.results[f'cum_births'][:]          += np.cumsum(self.results[f'new_births'][:], axis=-1)
+        # Scale the results
+        for reskey in self.result_keys():
+            if self.results[reskey].scale:
+                self.results[reskey].values *= self.rescale_vec
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
@@ -825,8 +784,8 @@ class Sim(hpb.BaseSim):
         res = self.results
 
         # Compute HPV incidence and prevalence
-        self.results['total_hpv_incidence'][:]  = res['new_total_infections'][:]/ res['n_susceptible'][:].sum(axis=0)
-        self.results['hpv_incidence'][:]        = res['new_infections'][:]/ res['n_susceptible'][:]
+        self.results['total_hpv_incidence'][:]  = res['total_infections'][:]/ res['n_susceptible'][:].sum(axis=0)
+        self.results['hpv_incidence'][:]        = res['infections'][:]/ res['n_susceptible'][:]
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
 
@@ -848,25 +807,20 @@ class Sim(hpb.BaseSim):
         at_risk_females = alive_females - res['n_cancerous'].values.sum(axis=0)
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
         demoninator = at_risk_females * scale_factor
-        self.results['total_cin1_incidence'][:]    = res['new_total_cin1s'][:] / demoninator
-        self.results['total_cin2_incidence'][:]    = res['new_total_cin2s'][:] / demoninator
-        self.results['total_cin3_incidence'][:]    = res['new_total_cin3s'][:] / demoninator
-        self.results['total_cin_incidence'][:]     = res['new_total_cins'][:] / demoninator
-        self.results['total_cancer_incidence'][:]  = res['new_total_cancers'][:] / demoninator
-        self.results['cin1_incidence'][:]          = res['new_cin1s'][:] / demoninator
-        self.results['cin2_incidence'][:]          = res['new_cin2s'][:] / demoninator
-        self.results['cin3_incidence'][:]          = res['new_cin3s'][:] / demoninator
-        self.results['cin_incidence'][:]           = res['new_cins'][:] / demoninator
-        self.results['cancer_incidence'][:]        = res['new_cancers'][:] / demoninator
+        self.results['total_cin1_incidence'][:]    = res['total_cin1s'][:] / demoninator
+        self.results['total_cin2_incidence'][:]    = res['total_cin2s'][:] / demoninator
+        self.results['total_cin3_incidence'][:]    = res['total_cin3s'][:] / demoninator
+        self.results['total_cin_incidence'][:]     = res['total_cins'][:] / demoninator
+        self.results['total_cancer_incidence'][:]  = res['total_cancers'][:] / demoninator
+        self.results['cin1_incidence'][:]          = res['cin1s'][:] / demoninator
+        self.results['cin2_incidence'][:]          = res['cin2s'][:] / demoninator
+        self.results['cin3_incidence'][:]          = res['cin3s'][:] / demoninator
+        self.results['cin_incidence'][:]           = res['cins'][:] / demoninator
+        self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
 
-        # Finally, add results by age
-        self.results['total_hpv_prevalence_by_age'][:]      = res['n_total_infectious_by_age'][:] / self.results['n_alive_by_age'][:]
-        self.results['total_hpv_incidence_by_age'][:]       = res['new_total_infections_by_age'][:] / self.results['n_total_susceptible_by_age'][:]
-        cin_inci_denom = (self.results['f_alive_by_age'][:] - res['n_total_cancerous_by_age'][:])*1e5
-        self.results['total_cin_prevalence_by_age'][:]      = res['n_total_cin_by_age'][:] / cin_inci_denom
-        self.results['total_cancer_prevalence_by_age'][:]   = res['n_total_cancerous_by_age'][:] / cin_inci_denom
-        self.results['total_cin_incidence_by_age'][:]       = res['new_total_cins_by_age'][:] / cin_inci_denom
-        self.results['total_cancer_incidence_by_age'][:]    = res['new_total_cancers_by_age'][:] / cin_inci_denom
+        # Demographic results
+        self.results['tfr'][:]  = self.results['other_deaths'][:] / self.results['n_alive'][:]
+        self.results['cbr'][:]  = self.results['births'][:] / self.results['n_alive'][:]
 
         return
 
@@ -933,7 +887,7 @@ class Sim(hpb.BaseSim):
         labelstr = f' "{self.label}"' if self.label else ''
         string = f'Simulation{labelstr} summary:\n'
         for key in self.result_keys():
-            if full or key.startswith('cum_total') and 'by_sex' not in key and 'by_age' not in key:
+            if full or key.startswith('total') and 'by_sex' not in key:
                 val = np.round(summary[key])
                 string += f'   {val:10,.0f} {self.results[key].name.lower()}\n'.replace(',', sep) # Use replace since it's more flexible
 

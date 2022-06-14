@@ -232,8 +232,8 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['cum_total_infections']
-                cancers = self.summary['cum_total_cancers']
+                infections = self.summary['total_infections']
+                cancers = self.summary['total_cancers']
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
@@ -280,7 +280,8 @@ class BaseSim(ParsObj):
             location = None
             if pars.get('location'):
                 location = pars['location']
-            pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
+            pars['birth_rates'], pars['lx'] = hppar.get_births_deaths(location=location) # Set birth and death rates
+
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 
@@ -399,7 +400,7 @@ class BaseSim(ParsObj):
                     tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
                 except:
                     try:
-                        tp_raw  = float(date)
+                        tp_raw  = int(date)
                     except:
                         errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
                         raise ValueError(errormsg)
@@ -436,7 +437,7 @@ class BaseSim(ParsObj):
             return tps
 
 
-    def result_keys(self, which='total'):
+    def result_keys(self, which='all'):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
@@ -447,7 +448,7 @@ class BaseSim(ParsObj):
         keys = []
         choices = ['total', 'genotype', 'all', 'by_age', 'by_sex']
         if which in ['total', 'all']:
-            keys += [k for k,res in self.results.items() if 'total' in k and 'by_age' not in k and isinstance(res, Result)]
+            keys += [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
         if which in ['genotype', 'all']:
             keys += [k for k,res in self.results.items() if 'total' not in k and isinstance(res, Result)]
         if which in ['by_age', 'all']:
@@ -1637,9 +1638,10 @@ class Person(sc.prettyobj):
     Class for a single person. Note: this is largely deprecated since sim.people
     is now based on arrays rather than being a list of people.
     '''
-    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, partners=None, current_partners=None):
+    def __init__(self, pars=None, uid=None, age=-1, death_age=-1, sex=-1, debut=-1, partners=None, current_partners=None):
         self.uid                = uid # This person's unique identifier
         self.age                = hpd.default_float(age) # Age of the person (in years)
+        self.death_age          = hpd.default_float(death_age) # Age of the person at time of death (in years)
         self.sex                = hpd.default_int(sex) # Female (0) or male (1)
         self.partners           = partners # Preferred number of partners
         self.current_partners   = current_partners # Number of current partners

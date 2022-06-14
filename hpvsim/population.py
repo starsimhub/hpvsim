@@ -87,11 +87,15 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         else:
             ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
 
+        # Get death ages
+        death_ages = get_death_ages(life_tables=sim.pars['lx'], pop_size=pop_size, age_bins=age_bins, ages=ages, sexes=sexes, dt_round_age=dt_round_age, dt=dt)
+
         # Store output
         popdict = {}
         popdict['uid'] = uids
         popdict['age'] = ages
         popdict['sex'] = sexes
+        popdict['death_age'] = death_ages
         popdict['debut'] = debuts
         popdict['partners'] = partners
 
@@ -122,8 +126,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
-    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
-    people.age_brackets = np.digitize(people.age, hpd.age_brackets)+1  # Store which age bucket people belong to, adding 1 so there are no zeros
+    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], death_age=popdict['death_age'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
 
     sc.printv(f'Created {pop_size} people, average age {people.age.mean():0.2f} years', 2, verbose)
 
@@ -182,6 +185,32 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5, dispersion=None):
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
     partners        = partner_count(pop_size=new_n, layer_keys=pars['partners'].keys(), means=pars['partners'].values(), dispersion=dispersion)
     return uid, sex, debut, partners
+
+
+def get_death_ages(life_tables=None, pop_size=None, age_bins=None, ages=None, sexes=None, dt_round_age=True, dt=None):
+    '''
+    Get the ages at which people die
+    '''
+    death_ages = np.full(pop_size, np.nan, dtype=hpd.default_float)
+    death_ages.fill(np.nan)
+    sex_bools = {'f': 1, 'm': 0}
+
+    for sex, lt in life_tables.items():
+        death_data_min = lt[:, 0]
+        death_data_max = lt[:, 1] + 1
+        death_data_range = death_data_max - death_data_min
+        n_by_age_bin = np.bincount((age_bins + 1) * (sexes == sex_bools[sex]))[1:]  # Find how many people of this sex are in each age bin
+        for aind, n_this_age in enumerate(n_by_age_bin):
+            death_probs = -np.diff(lt[aind:, 2] / lt[aind, 2])  # This line gets the probability of dying in each subsequent age bin for someone of this age
+            death_bins = hpu.n_multinomial(death_probs, n_this_age) + aind  # Select the death age bins
+            if dt_round_age:
+                these_death_ages = death_data_min[death_bins] + np.random.randint(death_data_range[death_bins] / dt) * dt
+            else:
+                these_death_ages = death_data_min[death_bins] + death_data_range[death_bins] * np.random.random(pop_size)
+            filter_inds = (age_bins == aind) * (sexes == sex_bools[sex])  # Set the death ages for people of this sex & age range
+            death_ages[filter_inds] = np.maximum(these_death_ages, ages[filter_inds])  # Make sure people's death age is greater than their current age
+
+    return death_ages
 
 
 def validate_popdict(popdict, pars, verbose=True):

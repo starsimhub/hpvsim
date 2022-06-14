@@ -134,7 +134,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
 
     # If not specified or specified as another string, load defaults
     if to_plot is None or isinstance(to_plot, str):
-        to_plot = hpd.get_default_plots(to_plot, kind=kind, sim=sim)
+        to_plot = hpd.get_default_plots(which=to_plot, kind=kind, sim=sim)
 
     # If a list of keys has been supplied or constructed
     if isinstance(to_plot, list):
@@ -383,8 +383,9 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
     # Do the plotting
     with hpo.with_style(args.style):
         fig, figs = create_figs(args, sep_figs, fig, ax)
-        total_keys = [k for k in sim.result_keys() if 'total' in k]
+        total_keys = sim.result_keys('total') # Consider a more robust way to do this
         age_keys = sim.result_keys('by_age')
+        sex_keys = sim.result_keys('by_sex')
         for pnum,title,keylabels in to_plot.enumitems():
             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
             for resnum,reskey in enumerate(keylabels):
@@ -395,7 +396,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                     label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                     ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Plot result
                 elif reskey in age_keys:
-                    n_ages = hpd.n_age_brackets # TODO: this should be taken from the sim, not defaults
+                    n_ages = sim.settings['n_age_brackets']
                     age_colors = sc.gridcolors(n_ages)
                     for age in range(n_ages):
                         # Colors and labels
@@ -408,6 +409,21 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         else:
                             label = v_label
                         ax.plot(res_t, res.values[age, :], label=label, **args.plot, c=color)  # Plot result
+                elif reskey in sex_keys:
+                    n_sexes = 2
+                    sex_colors = ['#4679A2', '#A24679']
+                    sex_labels = ['males', 'females']
+                    for sex in range(n_sexes):
+                        # Colors and labels
+                        v_color = sex_colors[sex]
+                        v_label = sex_labels[sex]  # TODO this should also come from the sim
+                        color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
+                        label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
+                        if label:
+                            label += f' - {v_label}'
+                        else:
+                            label = v_label
+                        ax.plot(res_t, res.values[sex, :], label=label, **args.plot, c=color)  # Plot result
                 else:
                     ng = sim['n_genotypes']
                     # genotype_colors = sc.gridcolors(ng)
