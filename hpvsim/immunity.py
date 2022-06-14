@@ -21,7 +21,7 @@ class genotype(sc.prettyobj):
     Add a new genotype to the sim
 
     Args:
-        genotype (str): name of variant
+        genotype (str): name of genotype
 
     **Example**::
 
@@ -30,7 +30,7 @@ class genotype(sc.prettyobj):
     '''
 
     def __init__(self, genotype):
-        self.index     = None # Index of the variant in the sim; set later
+        self.index     = None # Index of the genotype in the sim; set later
         self.label     = None # Genotype label (used as a dict key)
         self.p         = None # This is where the parameters will be stored
         self.parse(genotype=genotype) #
