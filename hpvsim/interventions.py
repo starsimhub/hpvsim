@@ -7,7 +7,7 @@ import numpy as np
 import sciris as sc
 # import pandas as pd
 # import scipy as sp
-# import pylab as pl
+import pylab as pl
 import inspect
 # import datetime as dt
 # from . import misc as cvm
@@ -16,7 +16,7 @@ import inspect
 from . import defaults as hpd
 from . import parameters as hppar
 from . import utils as hpu
-# from . import immunity as cvi
+from . import immunity as hpi
 # from collections import defaultdict
 
 
@@ -341,3 +341,297 @@ class dynamic_pars(Intervention):
 
 
 
+class BaseVaccination(Intervention):
+    '''
+    Apply a vaccine to a subset of the population.
+
+    This base class implements the mechanism of vaccinating people to modify their immunity.
+    It does not implement allocation of the vaccines, which is implemented by derived classes
+    such as `cv.vaccinate`. The idea is that vaccination involves a series of standard operations
+    to modify `cv.People` and applications will likely need to modify the vaccine parameters and
+    test potentially complex allocation strategies. These should be accounted for by:
+
+        - Custom vaccine parameters being passed in as a dictionary to the vaccine intervention
+        - Custom vaccine allocations being implemented by a derived class overloading
+          `BaseVaccination.select_people`. Any additional attributes required to manage the allocation
+          can be defined in the derived class. Refer to `cv.vaccinate` or `cv.vaccinate_sequential` for
+          an example of how to implement this.
+
+    Some quantities are tracked during execution for reporting after running the simulation.
+    These are:
+
+        - ``doses``:             the number of vaccine doses per person
+        - ``vaccination_dates``: integer; dates of all doses for this vaccine
+
+    Args:
+        vaccine (dict/str) : which vaccine to use; see below for dict parameters
+        label   (str)      : if vaccine is supplied as a dict, the name of the vaccine
+        kwargs  (dict)     : passed to Intervention()
+
+    If ``vaccine`` is supplied as a dictionary, it must have the following parameters:
+
+        - ``imm_init``:  the initial immunity level (higher = more protection)
+        - ``imm_boost``: how much of a boost being vaccinated on top of a previous dose or natural infection provides
+
+
+    See ``parameters.py`` for additional examples of these parameters.
+
+
+    '''
+    def __init__(self, vaccine, label=None, **kwargs):
+        super().__init__(**kwargs) # Initialize the Intervention object
+        self.index = None # Index of the vaccine in the sim; set later
+        self.label = label # Vaccine label (used as a dict key)
+        self.p     = None # Vaccine parameters
+        self.doses = None # Record the number of doses given per person *by this intervention*
+        self.vaccination_dates = None # Store the dates that each person was last vaccinated *by this intervention*
+
+        self._parse_vaccine_pars(vaccine=vaccine) # Populate
+        return
+
+
+    def _parse_vaccine_pars(self, vaccine=None):
+        ''' Unpack vaccine information, which may be given as a string or dict '''
+
+        # Option 1: vaccines can be chosen from a list of pre-defined vaccines
+        if isinstance(vaccine, str):
+
+            choices, mapping = hppar.get_vaccine_choices()
+            genotype_pars = hppar.get_vaccine_genotype_pars()
+            dose_pars = hppar.get_vaccine_dose_pars()
+
+            label = vaccine.lower()
+            for txt in ['.', ' ', '&', '-', 'vaccine']:
+                label = label.replace(txt, '')
+
+            if label in mapping:
+                label = mapping[label]
+                vaccine_pars = sc.mergedicts(genotype_pars[label], dose_pars[label])
+            else: # pragma: no cover
+                errormsg = f'The selected vaccine "{vaccine}" is not implemented; choices are:\n{sc.pp(choices, doprint=False)}'
+                raise NotImplementedError(errormsg)
+
+            if self.label is None:
+                self.label = label
+
+        # Option 2: vaccines can be specified as a dict of pars
+        elif isinstance(vaccine, dict):
+
+            # Parse label
+            vaccine_pars = vaccine
+            label = vaccine_pars.pop('label', None) # Allow including the label in the parameters
+            if self.label is None: # pragma: no cover
+                if label is None:
+                    self.label = 'custom'
+                else:
+                    self.label = label
+
+        else: # pragma: no cover
+            errormsg = f'Could not understand {type(vaccine)}, please specify as a string indexing a predefined vaccine or a dict.'
+            raise ValueError(errormsg)
+
+        # Set label and parameters
+        self.p = sc.objdict(vaccine_pars)
+
+        return
+
+
+    def initialize(self, sim):
+        super().initialize()
+
+        # Check that the simulation parameters are correct
+        if not sim['use_waning']: # pragma: no cover
+            errormsg = f'The cv.{self.__class__.__name__} intervention requires use_waning=True. Please enable waning, or else use cv.simple_vaccine().'
+            raise RuntimeError(errormsg)
+
+        # Populate any missing keys -- must be here, after genotypes are initialized
+        default_genotype_pars = hppar.get_vaccine_genotype_pars(default=True)
+        default_dose_pars    = hppar.get_vaccine_dose_pars(default=True)
+        variant_labels       = list(sim['variant_pars'].keys())
+        dose_keys            = list(default_dose_pars.keys())
+
+        # Handle dose keys
+        for key in dose_keys:
+            if key not in self.p:
+                self.p[key] = default_dose_pars[key]
+
+        # Handle variants
+        for key in variant_labels:
+            if key not in self.p:
+                if key in default_genotype_pars:
+                    val = default_genotype_pars[key]
+                else: # pragma: no cover
+                    val = 1.0
+                    if sim['verbose']: print(f'Note: No cross-immunity specified for vaccine {self.label} and genotype {key}, setting to 1.0')
+                self.p[key] = val
+
+
+        self.doses = np.zeros(sim['pop_size'], dtype=hpd.default_int) # Number of doses given per person
+        self.vaccination_dates = [[] for _ in range(sim.n)] # Store the dates when people are vaccinated
+
+        sim['vaccine_pars'][self.label] = self.p # Store the parameters
+        self.index = list(sim['vaccine_pars'].keys()).index(self.label) # Find where we are in the list
+        sim['vaccine_map'][self.index]  = self.label # Use that to populate the reverse mapping
+
+        # update sim['immunity']
+        n_vax = self.index+1
+        n_imm_sources = n_vax + len(sim['genotype_map'])
+        immunity = sim['immunity']
+
+        # add this vaccine to the immunity map
+        sim['immunity_map'][n_imm_sources-1] = 'vaccine'
+        if n_imm_sources > len(immunity): # need to add this vaccine, otherwise it's a duplicate
+            vacc_kin = hpi.precompute_waning(length=max(sim.npts, len(sim.pars['imm_kin'][0])), pars=sim['nab_decay']['vaccine'])
+            sim['imm_kin'] = np.vstack((sim.pars['imm_kin'], vacc_kin))
+            vacc_mapping = [self.p.get(label, 1.0) for label in sim['genotype_map'].values()]
+            for _ in range(n_vax):
+                vacc_mapping.append(1)
+            vacc_mapping = np.reshape(vacc_mapping, (n_imm_sources, 1))
+            immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
+            immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
+            sim['immunity'] = immunity
+            imm_boost = list(sim['imm_boost']) + [self.p['imm_boost']]
+            sim['imm_boost'] = np.array(imm_boost)
+            sim.people.set_pars(sim.pars)
+
+        return
+
+
+    def finalize(self, sim):
+        ''' Ensure variables with large memory footprints get erased '''
+        super().finalize()
+        self.subtarget = None # Reset to save memory
+        return
+
+
+    def select_people(self, sim):
+        """
+        Return an array of indices of people to vaccinate
+        Derived classes must implement this function to determine who to vaccinate at each timestep
+        Args:
+            sim: A cv.Sim instance
+        Returns: Array of person indices
+        """
+        raise NotImplementedError
+
+
+    def vaccinate(self, sim, vacc_inds, t=None):
+        '''
+        Vaccinate people
+
+        This method applies the vaccine to the requested people indices. The indices of people vaccinated
+        is returned. These may be different to the requested indices, because anyone that is dead will be
+        skipped, as well as anyone already fully vaccinated (if booster=False). This could
+        occur if a derived class does not filter out such people in its `select_people` method.
+
+        Args:
+            sim: A cv.Sim instance
+            vacc_inds: An array of person indices to vaccinate
+            t: Optionally override the day on which vaccinations are recorded for historical vaccination
+
+        Returns: An array of person indices of people vaccinated
+        '''
+
+        if t is None:
+            t = sim.t
+        else: # pragma: no cover
+            assert t <= sim.t, 'Overriding the vaccination day should only be used for historical vaccination' # High potential for errors to creep in if future vaccines could be scheduled here
+
+        # Perform checks
+        vacc_inds = vacc_inds[~sim.people.dead[vacc_inds]] # Skip anyone that is dead
+        # Skip anyone that has already had all the doses of *this* vaccine (not counting boosters).
+        # Otherwise, they will receive the 2nd dose boost cumulatively for every subsequent dose.
+        # Note, this does not preclude someone from getting additional doses of another vaccine (e.g. a booster)
+        vacc_inds = vacc_inds[self.doses[vacc_inds] < self.p['doses']]
+
+        # Extract indices of already-vaccinated people and get indices of newly-vaccinated
+        prior_vacc = hpu.true(sim.people.vaccinated)
+        new_vacc   = np.setdiff1d(vacc_inds, prior_vacc)
+
+        if len(vacc_inds):
+            self.doses[vacc_inds] += 1
+            for v_ind in vacc_inds:
+                self.vaccination_dates[v_ind].append(t)
+
+            sim.people.vaccinated[vacc_inds] = True
+            sim.people.vaccine_source[vacc_inds] = self.index
+            sim.people.doses[vacc_inds] += 1
+            sim.people.date_vaccinated[vacc_inds] = t
+            hpi.update_peak_immunity(sim.people, vacc_inds, self.p, self.index)
+
+            if t >= 0: # Only record these quantities by default if it's not a historical dose
+                factor = sim['pop_scale']/sim.rescale_vec[t] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized
+                sim.people.flows['new_doses']      += len(vacc_inds)*factor # Count number of doses given
+                sim.people.flows['new_vaccinated'] += len(new_vacc)*factor # Count number of people not already vaccinated given doses
+
+        return vacc_inds
+
+
+    def apply(self, sim):
+        ''' Perform vaccination each timestep '''
+
+        inds = self.select_people(sim)
+        if len(inds):
+            inds = self.vaccinate(sim, inds)
+        return inds
+
+
+    def shrink(self, in_place=True):
+        ''' Shrink vaccination intervention '''
+        obj = super().shrink(in_place=in_place)
+        obj.vaccinated = None
+        obj.doses = None
+        obj.vaccination_dates = None
+        if hasattr(obj, 'second_dose_days'):
+            obj.second_dose_days = None
+        return obj
+
+
+def check_doses(doses, interval):
+    ''' Check that doses and intervals are supplied in correct formats '''
+
+    # First check that they're both numbers
+    if not sc.checktype(doses, int):
+        raise ValueError(f'Doses must be an integer, not {doses}.')
+    if interval is not None and not sc.isnumber(interval):
+        errormsg = f"Can't understand the dosing interval given by '{interval}'. Dosing interval should be a number."
+        raise ValueError(errormsg)
+
+    # Now check that they're compatible
+    if doses == 1 and interval is not None:
+        raise ValueError("Can't use dosing intervals for vaccines with only one dose.")
+    elif doses == 2 and interval is None:
+        raise ValueError('Must specify a dosing interval if using a vaccine with more than one dose.')
+    elif doses > 2:
+        raise NotImplementedError('Scheduling three or more doses not yet supported; use a booster vaccine instead')
+
+    return
+
+
+def process_doses(num_doses, sim):
+    ''' Handle different types of dose data'''
+    if sc.isnumber(num_doses):
+        num_people = num_doses
+    elif callable(num_doses):
+        num_people = num_doses(sim)
+    elif sim.t in num_doses:
+        num_people = num_doses[sim.t]
+    else:
+        num_people = 0
+    return num_people
+
+
+def process_sequence(sequence, sim):
+    ''' Handle different types of prioritization sequence for vaccination '''
+    if callable(sequence):
+        sequence = sequence(sim.people)
+    elif sequence == 'age':
+        sequence = np.argsort(-sim.people.age)
+    elif sequence is None:
+        sequence = np.random.permutation(sim.n)
+    elif sc.checktype(sequence, 'arraylike'):
+        sequence = sc.promotetoarray(sequence)
+    else:
+        errormsg = f'Unable to interpret sequence {type(sequence)}: must be None, "age", callable, or an array'
+        raise TypeError(errormsg)
+    return sequence

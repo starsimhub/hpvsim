@@ -89,6 +89,10 @@ def make_pars(set_prognoses=False, **kwargs):
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
 
+    # Vaccine parameters
+    pars['vaccine_pars'] = dict()  # Vaccines that are being used; populated during initialization
+    pars['vaccine_map'] = dict()  # Reverse mapping from number to vaccine key
+
     # Parameters determining duration of dysplasia stages
     pars['dur'] = {}
     pars['dur']['none']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Length of time that HPV is present without dysplasia
@@ -283,6 +287,20 @@ def get_genotype_choices():
         'hpvlo': ['hpvlo', 'low', 'low-risk'],
         'hpvhi': ['hpvhi', 'high', 'high-risk'],
         'hpvhi5': ['hpvhi5', 'high5'],
+    }
+    mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
+    return choices, mapping
+
+def get_vaccine_choices():
+    '''
+    Define valid pre-defined vaccine names
+    '''
+    # List of choices currently available: new ones can be added to the list along with their aliases
+    choices = {
+        'default': ['default', None],
+        'bivalent':  ['bivalent', 'hpv2', 'cervarix'],
+        'quadrivalent': ['quadrivalent', 'hpv4', 'gardasil'],
+        'nonavalent': ['nonavalent', 'hpv9', 'cervarix9'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -609,3 +627,110 @@ def get_cross_immunity(default=False, genotype=None):
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
 
+def get_vaccine_genotype_pars(default=False, vaccine=None):
+    '''
+    Define the effectiveness of each vaccine against each genotype
+    '''
+    pars = dict(
+
+        default = dict(
+            hpv16=0.96,
+            hpv18=0.96,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
+        ),
+
+        bivalent = dict(
+            hpv16=0.96,
+            hpv18=0.96,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
+        ),
+
+        quadrivalent=dict(
+            hpv16=0.96,
+            hpv18=0.96,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0.96,  # Assumption
+            hpv11=0.96,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
+        ),
+
+        nonavalent=dict(
+            hpv16=0.96,
+            hpv18=0.96,  # Assumption
+            hpv31=0.96,  # Assumption
+            hpv33=0.96,  # Assumption
+            hpv45=0.96,  # Assumption
+            hpv52=0.96,  # Assumption
+            hpv58=0.96,  # Assumption
+            hpv6=0.96,  # Assumption
+            hpv11=0.96,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0.96,  # Assumption
+        ),
+    )
+
+    return _get_from_pars(pars, default=default, key=vaccine)
+
+
+def get_vaccine_dose_pars(default=False, vaccine=None):
+    '''
+    Define the parameters for each vaccine
+    '''
+
+    pars = dict(
+
+        default = dict(
+            imm_init  = dict(dist='beta', par1=20, par2=2), # Initial distribution of immunity
+            imm_boost = 2, # Factor by which a dose increases existing NABs
+            doses     = 1, # Number of doses for this vaccine
+            interval  = None, # Interval between doses
+        ),
+
+        bivalent = dict(
+            nab_init  = dict(dist='normal', par1=-1, par2=2),
+            nab_boost = 4,
+            doses     = 2,
+            interval  = 21,
+        ),
+
+        quadrivalent = dict(
+            nab_init  = dict(dist='normal', par1=-1, par2=2),
+            nab_boost = 8,
+            doses     = 2,
+            interval  = 28,
+        ),
+
+        nonavalent = dict(
+            nab_init  = dict(dist='normal', par1=-1.5, par2=2),
+            nab_boost = 2,
+            doses     = 2,
+            interval  = 21,
+        ),
+    )
+
+    return _get_from_pars(pars, default, key=vaccine)
