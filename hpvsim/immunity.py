@@ -11,7 +11,7 @@ from . import parameters as hppar
 
 
 
-# %% Define variant class -- all other functions are for internal use only
+# %% Define genotype class -- all other functions are for internal use only
 
 __all__ = ['genotype']
 
