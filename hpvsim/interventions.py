@@ -56,6 +56,87 @@ def find_day(arr, t=None, interv=None, sim=None, which='first'):
     return inds
 
 
+def preprocess_day(day, sim):
+    '''
+    Preprocess a day: leave it as-is if it's a function, or try to convert it to
+    an integer if it's anything else.
+    '''
+    if callable(day):  # pragma: no cover
+        return day # If it's callable, leave it as-is
+    else:
+        day = sim.day(day) # Otherwise, convert it to an int
+    return day
+
+
+def get_day(day, interv=None, sim=None):
+    '''
+    Return the day if it's an integer, or call it if it's a function.
+    '''
+    if callable(day): # pragma: no cover
+        return day(interv, sim) # If it's callable, call it
+    else:
+        return day # Otherwise, leave it as-is
+
+
+def process_days(sim, days, return_dates=False):
+    '''
+    Ensure lists of days are in consistent format. Used by change_beta, clip_edges,
+    and some analyzers. If day is 'end' or -1, use the final day of the simulation.
+    Optionally return dates as well as days. If days is callable, leave unchanged.
+    '''
+    if callable(days):
+        return days
+    if sc.isstring(days) or not sc.isiterable(days):
+        days = sc.promotetolist(days)
+    for d,day in enumerate(days):
+        if day in ['end', -1]: # pragma: no cover
+            day = sim['end_day']
+        days[d] = preprocess_day(day, sim) # Ensure it's an integer and not a string or something
+    days = np.sort(sc.promotetoarray(days)) # Ensure they're an array and in order
+    if return_dates:
+        dates = [sim.date(day) for day in days] # Store as date strings
+        return days, dates
+    else:
+        return days
+
+def get_subtargets(subtarget, sim):
+    '''
+    A small helper function to see if subtargeting is a list of indices to use,
+    or a function that needs to be called. If a function, it must take a single
+    argument, a sim object, and return a list of indices. Also validates the values.
+    Currently designed for use with testing interventions, but could be generalized
+    to other interventions. Not typically called directly by the user.
+
+    Args:
+        subtarget (dict): dict with keys 'inds' and 'vals'; see test_num() for examples of a valid subtarget dictionary
+        sim (Sim): the simulation object
+    '''
+
+    # Validation
+    if callable(subtarget):
+        subtarget = subtarget(sim)
+
+    if 'inds' not in subtarget: # pragma: no cover
+        errormsg = f'The subtarget dict must have keys "inds" and "vals", but you supplied {subtarget}'
+        raise ValueError(errormsg)
+
+    # Handle the two options of type
+    if callable(subtarget['inds']): # A function has been provided
+        subtarget_inds = subtarget['inds'](sim) # Call the function to get the indices
+    else:
+        subtarget_inds = subtarget['inds'] # The indices are supplied directly
+
+    # Validate the values
+    if callable(subtarget['vals']): # A function has been provided
+        subtarget_vals = subtarget['vals'](sim) # Call the function to get the indices
+    else:
+        subtarget_vals = subtarget['vals'] # The indices are supplied directly
+    if sc.isiterable(subtarget_vals):
+        if len(subtarget_vals) != len(subtarget_inds): # pragma: no cover
+            errormsg = f'Length of subtargeting indices ({len(subtarget_inds)}) does not match length of values ({len(subtarget_vals)})'
+            raise ValueError(errormsg)
+
+    return subtarget_inds, subtarget_vals
 
 #%% Generic intervention classes
 
@@ -439,15 +520,10 @@ class BaseVaccination(Intervention):
     def initialize(self, sim):
         super().initialize()
 
-        # Check that the simulation parameters are correct
-        if not sim['use_waning']: # pragma: no cover
-            errormsg = f'The cv.{self.__class__.__name__} intervention requires use_waning=True. Please enable waning, or else use cv.simple_vaccine().'
-            raise RuntimeError(errormsg)
-
         # Populate any missing keys -- must be here, after genotypes are initialized
         default_genotype_pars = hppar.get_vaccine_genotype_pars(default=True)
         default_dose_pars    = hppar.get_vaccine_dose_pars(default=True)
-        variant_labels       = list(sim['variant_pars'].keys())
+        genotype_labels       = list(sim['genotype_pars'].keys())
         dose_keys            = list(default_dose_pars.keys())
 
         # Handle dose keys
@@ -455,8 +531,8 @@ class BaseVaccination(Intervention):
             if key not in self.p:
                 self.p[key] = default_dose_pars[key]
 
-        # Handle variants
-        for key in variant_labels:
+        # Handle genotypes
+        for key in genotype_labels:
             if key not in self.p:
                 if key in default_genotype_pars:
                     val = default_genotype_pars[key]
@@ -466,7 +542,6 @@ class BaseVaccination(Intervention):
                 self.p[key] = val
 
 
-        self.doses = np.zeros(sim['pop_size'], dtype=hpd.default_int) # Number of doses given per person
         self.vaccination_dates = [[] for _ in range(sim.n)] # Store the dates when people are vaccinated
 
         sim['vaccine_pars'][self.label] = self.p # Store the parameters
@@ -481,8 +556,6 @@ class BaseVaccination(Intervention):
         # add this vaccine to the immunity map
         sim['immunity_map'][n_imm_sources-1] = 'vaccine'
         if n_imm_sources > len(immunity): # need to add this vaccine, otherwise it's a duplicate
-            vacc_kin = hpi.precompute_waning(length=max(sim.npts, len(sim.pars['imm_kin'][0])), pars=sim['nab_decay']['vaccine'])
-            sim['imm_kin'] = np.vstack((sim.pars['imm_kin'], vacc_kin))
             vacc_mapping = [self.p.get(label, 1.0) for label in sim['genotype_map'].values()]
             for _ in range(n_vax):
                 vacc_mapping.append(1)
@@ -538,18 +611,17 @@ class BaseVaccination(Intervention):
             assert t <= sim.t, 'Overriding the vaccination day should only be used for historical vaccination' # High potential for errors to creep in if future vaccines could be scheduled here
 
         # Perform checks
-        vacc_inds = vacc_inds[~sim.people.dead[vacc_inds]] # Skip anyone that is dead
+        vacc_inds = vacc_inds[sim.people.alive[vacc_inds]] # Skip anyone that is dead
         # Skip anyone that has already had all the doses of *this* vaccine (not counting boosters).
         # Otherwise, they will receive the 2nd dose boost cumulatively for every subsequent dose.
         # Note, this does not preclude someone from getting additional doses of another vaccine (e.g. a booster)
-        vacc_inds = vacc_inds[self.doses[vacc_inds] < self.p['doses']]
+        vacc_inds = vacc_inds[sim.people.doses[vacc_inds] < self.p['doses']]
 
         # Extract indices of already-vaccinated people and get indices of newly-vaccinated
         prior_vacc = hpu.true(sim.people.vaccinated)
         new_vacc   = np.setdiff1d(vacc_inds, prior_vacc)
 
         if len(vacc_inds):
-            self.doses[vacc_inds] += 1
             for v_ind in vacc_inds:
                 self.vaccination_dates[v_ind].append(t)
 
@@ -557,12 +629,12 @@ class BaseVaccination(Intervention):
             sim.people.vaccine_source[vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
             sim.people.date_vaccinated[vacc_inds] = t
-            hpi.update_peak_immunity(sim.people, vacc_inds, self.p, self.index)
+            imm_source = len(sim['genotype_map']) + self.index
+            hpi.update_peak_immunity(sim.people, vacc_inds, self.p, imm_source, infection=False)
 
-            if t >= 0: # Only record these quantities by default if it's not a historical dose
-                factor = sim['pop_scale']/sim.rescale_vec[t] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized
-                sim.people.flows['new_doses']      += len(vacc_inds)*factor # Count number of doses given
-                sim.people.flows['new_vaccinated'] += len(new_vacc)*factor # Count number of people not already vaccinated given doses
+            factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
+            sim.people.flows['doses']      += len(vacc_inds)*factor # Count number of doses given
+            sim.people.flows['vaccinated'] += len(new_vacc)*factor # Count number of people not already vaccinated given doses
 
         return vacc_inds
 
@@ -635,3 +707,82 @@ def process_sequence(sequence, sim):
         errormsg = f'Unable to interpret sequence {type(sequence)}: must be None, "age", callable, or an array'
         raise TypeError(errormsg)
     return sequence
+
+
+
+class vaccinate_prob(BaseVaccination):
+    '''
+    Probability-based vaccination
+
+    This vaccine intervention allocates vaccines parametrized by the daily probability
+    of being vaccinated.
+
+    Args:
+        vaccine (dict/str): which vaccine to use; see below for dict parameters
+        label        (str): if vaccine is supplied as a dict, the name of the vaccine
+        timepoints   (int/arr): the day or array of days to apply the interventions
+        prob       (float): probability of being vaccinated (i.e., fraction of the population)
+        subtarget   (dict): subtarget intervention to people with particular indices (see test_num() for details)
+        kwargs      (dict): passed to Intervention()
+
+
+    **Example**::
+
+        pfizer = cv.vaccinate_prob(vaccine='pfizer', days=30, prob=0.7)
+        cv.Sim(interventions=pfizer, use_waning=True).run().plot()
+    '''
+    def __init__(self, vaccine, timepoints, label=None, prob=None, subtarget=None, **kwargs):
+        super().__init__(vaccine,label=label,**kwargs) # Initialize the Intervention object
+        self.tps      = sc.dcp(timepoints)
+        if prob is None: # Populate default value of probability: 1 if no subtargeting, 0 if subtargeting
+            prob = 1.0 if subtarget is None else 0.0
+        self.prob      = prob
+        self.subtarget = subtarget
+        self.second_dose_days = None  # Track scheduled second doses
+        return
+
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.tps = sim.get_t(self.tps) # days that group becomes eligible
+        self.second_dose_days     = [None]*sim.npts # People who get second dose (if relevant)
+        check_doses(self.p['doses'], self.p['interval'])
+        return
+
+
+    def select_people(self, sim):
+
+        vacc_inds = np.array([], dtype=int)  # Initialize in case no one gets their first dose
+
+        if sim.t >= np.min(self.tps):
+
+            # Vaccinate people with their first dose
+            for _ in find_day(self.tps, sim.t, interv=self, sim=sim):
+
+                vacc_probs = np.zeros(len(sim.people))
+
+                # Find eligible people
+                vacc_probs[hpu.true(~sim.people.alive)] *= 0.0  # Do not vaccinate dead people
+                eligible_inds = sc.findinds(~sim.people.vaccinated)
+                vacc_probs[eligible_inds] = self.prob  # Assign equal vaccination probability to everyone
+
+                # Apply any subtargeting
+                if self.subtarget is not None:
+                    subtarget_inds, subtarget_vals = get_subtargets(self.subtarget, sim)
+                    vacc_probs[subtarget_inds] = subtarget_vals  # People being explicitly subtargeted
+
+                vacc_inds = hpu.true(hpu.binomial_arr(vacc_probs))  # Calculate who actually gets vaccinated
+
+                if len(vacc_inds):
+                    if self.p.interval is not None:
+                        # Schedule the doses
+                        next_dose_days = sim.t + self.p.interval
+                        if next_dose_days < sim['n_days']:
+                            self.second_dose_days[next_dose_days] = vacc_inds
+
+            # Also, if appropriate, vaccinate people with their second dose
+            vacc_inds_dose2 = self.second_dose_days[sim.t]
+            if vacc_inds_dose2 is not None:
+                vacc_inds = np.concatenate((vacc_inds, vacc_inds_dose2), axis=None)
+
+        return vacc_inds

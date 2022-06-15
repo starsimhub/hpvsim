@@ -104,7 +104,7 @@ def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p
     return p1_source_inds, p1_genotypes
 
 
-@nb.njit(             (nbfloat[:],  nbint[:]), cache=cache, parallel=safe_parallel)
+# @nb.njit(             (nbfloat[:],  nbint[:]), cache=cache, parallel=safe_parallel)
 def compute_infections(betas,       targets):
     '''
     Compute who infects whom

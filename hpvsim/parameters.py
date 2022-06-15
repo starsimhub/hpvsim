@@ -74,10 +74,9 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Parameters used to calculate immunity
     pars['imm_init'] = dict(dist='beta', par1=20, par2=1)  # beta distribution for initial level of immunity following infection clearance
-    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=10), # decay rate, with half life in YEARS
-                             vaccine=dict(form='exp_decay', init_val=1, half_life=20)) # decay rate, with half life in YEARS
+    pars['imm_decay'] = dict(form='exp_decay', init_val=1, half_life=20) # decay rate, with half life in YEARS
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
-    pars['imm_boost'] = 1.5  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
+    pars['imm_boost'] = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity'] = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
     pars['immunity_map'] = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
 
@@ -88,6 +87,7 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
+    pars['n_imm_sources'] = 1 # The number of immunity sources circulating in the population
 
     # Vaccine parameters
     pars['vaccine_pars'] = dict()  # Vaccines that are being used; populated during initialization
@@ -338,7 +338,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=1.0,
             rel_cin3_prob=1.0,
             rel_cancer_prob = 1.0,
-            rel_death_prob  = 1.0
+            rel_death_prob  = 1.0,
+            imm_boost = 1.5
         ),
 
         hpv18 = dict(
@@ -347,7 +348,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=1.0,
             rel_cin3_prob=1.0,
             rel_cancer_prob = 0.8,
-            rel_death_prob  = 0.8
+            rel_death_prob  = 0.8,
+            imm_boost = 1.5
         ),
 
         hpv31=dict(
@@ -356,7 +358,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=1.0,
             rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
-            rel_death_prob=1.0
+            rel_death_prob=1.0,
+            imm_boost = 1.5
         ),
 
         hpv33=dict(
@@ -365,7 +368,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=1.0,
             rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
-            rel_death_prob=1.0
+            rel_death_prob=1.0,
+            imm_boost = 1.5
         ),
 
         hpv45=dict(
@@ -374,7 +378,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=1.0,
             rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
-            rel_death_prob=1.0
+            rel_death_prob=1.0,
+            imm_boost = 1.5
         ),
 
         hpv52=dict(
@@ -383,7 +388,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=1.0,
             rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
-            rel_death_prob=1.0
+            rel_death_prob=1.0,
+            imm_boost = 1.5
         ),
 
         hpv6=dict(
@@ -392,7 +398,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=0,
             rel_cin3_prob=0,
             rel_cancer_prob=0,
-            rel_death_prob=0
+            rel_death_prob=0,
+            imm_boost = 1.5
         ),
 
         hpv11=dict(
@@ -401,7 +408,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=0,
             rel_cin3_prob=0,
             rel_cancer_prob=0,
-            rel_death_prob=0
+            rel_death_prob=0,
+            imm_boost = 1.5
         ),
 
         hpvlo=dict(
@@ -410,7 +418,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=0,
             rel_cin3_prob=0,
             rel_cancer_prob=0,
-            rel_death_prob=0
+            rel_death_prob=0,
+            imm_boost = 1.5
         ),
 
         hpvhi=dict(
@@ -419,7 +428,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=1.0,
             rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
-            rel_death_prob=1.0
+            rel_death_prob=1.0,
+            imm_boost = 1.5
         ),
 
         hpvhi5=dict(
@@ -428,7 +438,8 @@ def get_genotype_pars(default=False, genotype=None):
             rel_cin2_prob=1.0,
             rel_cin3_prob=1.0,
             rel_cancer_prob=1.0,
-            rel_death_prob=1.0
+            rel_death_prob=1.0,
+            imm_boost = 1.5
         ),
 
     )
@@ -706,30 +717,30 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
 
         default = dict(
             imm_init  = dict(dist='beta', par1=20, par2=2), # Initial distribution of immunity
-            imm_boost = 2, # Factor by which a dose increases existing NABs
+            imm_boost = 2, # Factor by which a dose increases immunity
             doses     = 1, # Number of doses for this vaccine
             interval  = None, # Interval between doses
         ),
 
         bivalent = dict(
-            nab_init  = dict(dist='normal', par1=-1, par2=2),
-            nab_boost = 4,
-            doses     = 2,
-            interval  = 21,
+            imm_init=dict(dist='beta', par1=20, par2=2),  # Initial distribution of immunity
+            imm_boost=2,  # Factor by which a dose increases immunity
+            doses=1,  # Number of doses for this vaccine
+            interval=None,  # Interval between doses
         ),
 
         quadrivalent = dict(
-            nab_init  = dict(dist='normal', par1=-1, par2=2),
-            nab_boost = 8,
-            doses     = 2,
-            interval  = 28,
+            imm_init=dict(dist='beta', par1=20, par2=2),  # Initial distribution of immunity
+            imm_boost=2,  # Factor by which a dose increases immunity
+            doses=1,  # Number of doses for this vaccine
+            interval=None,  # Interval between doses
         ),
 
         nonavalent = dict(
-            nab_init  = dict(dist='normal', par1=-1.5, par2=2),
-            nab_boost = 2,
-            doses     = 2,
-            interval  = 21,
+            imm_init=dict(dist='beta', par1=20, par2=2),  # Initial distribution of immunity
+            imm_boost=2,  # Factor by which a dose increases immunity
+            doses=1,  # Number of doses for this vaccine
+            interval=None,  # Interval between doses
         ),
     )
 

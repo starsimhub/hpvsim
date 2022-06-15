@@ -50,6 +50,36 @@ def test_dynamic_pars():
     return sim
 
 
+def test_vaccines():
+    sc.heading('Test prophylactic vaccine intervention')
+
+    import hpvsim.interventions as hpint
+    import hpvsim.sim as hps
+    from hpvsim.immunity import genotype
+    hpv16 = genotype('HPV16')
+    hpv18 = genotype('HPV18')
+
+    pars = {
+        'pop_size': 10e3,
+        'n_years': 10,
+        'genotypes': [hpv16, hpv18],
+        'dt': .1,
+    }
+
+    # Model an intervention to roll out prophylactic vaccination
+    def age_subtarget(sim):
+        ''' Select people who are eligible for vaccination '''
+        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=14))
+        return {'vals': [1.0 for _ in inds], 'inds': inds}
+
+    bivalent_vx = hpint.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints='2020',
+                                       subtarget=age_subtarget)
+
+    sim = hps.Sim(pars=pars, interventions=[bivalent_vx])
+    sim.run()
+    return sim
+
+
 
 
 #%% Run as a script
@@ -58,7 +88,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_dynamic_pars()
+    # sim0 = test_dynamic_pars()
+    sim1 = test_vaccines()
 
     sc.toc(T)
     print('Done.')

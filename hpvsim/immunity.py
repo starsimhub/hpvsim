@@ -72,6 +72,7 @@ class genotype(sc.prettyobj):
         sim['genotype_pars'][self.label] = self.p  # Store the parameters
         self.index = list(sim['genotype_pars'].keys()).index(self.label) # Find where we are in the list
         sim['genotype_map'][self.index]  = self.label # Use that to populate the reverse mapping
+        sim['imm_boost'] = list(sim['imm_boost']) + [self.p['imm_boost']]
         self.initialized = True
         return
 
@@ -90,7 +91,7 @@ def init_immunity(sim, create=False):
     if sim['immunity'] is None or create:
 
         # Precompute waning - same for all genotypes
-        imm_decay = sc.dcp(sim['imm_decay']['infection'])
+        imm_decay = sc.dcp(sim['imm_decay'])
         imm_decay['half_life'] /= sim['dt']
         sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
 
@@ -114,7 +115,7 @@ def init_immunity(sim, create=False):
     return
 
 
-def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None):
+def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infection=True):
     '''
         Update immunity level
 
@@ -133,26 +134,32 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None):
         Returns: None
         '''
 
-    # Determine whether individual seroconverts based upon duration of infection
-    dur_inf = people.dur_hpv[imm_source, inds]
-    dur_inf_inds = np.digitize(dur_inf, imm_pars['prognoses']['seroconvert_probs']) - 1
-    seroconvert_probs = imm_pars['prognoses']['seroconvert_probs'][dur_inf_inds]
-    is_seroconvert = hpu.binomial_arr(seroconvert_probs)
+
 
     # Extract parameters and indices
     has_imm =  people.imm[imm_source, inds] > 0
     no_prior_imm_inds = inds[~has_imm]
     prior_imm_inds = inds[has_imm]
 
+    if infection:
+        # Determine whether individual seroconverts based upon duration of infection
+        dur_inf = people.dur_hpv[imm_source, inds]
+        dur_inf_inds = np.digitize(dur_inf, imm_pars['prognoses']['seroconvert_probs']) - 1
+        seroconvert_probs = imm_pars['prognoses']['seroconvert_probs'][dur_inf_inds]
+        is_seroconvert = hpu.binomial_arr(seroconvert_probs)
+    else:
+        # assume all vaccine recipients seroconvert
+        is_seroconvert = np.ones(len(inds))
+
     if len(prior_imm_inds):
         if isinstance(imm_pars['imm_boost'], Iterable):
             boost = imm_pars['imm_boost'][imm_source]
         else:
             boost = imm_pars['imm_boost']
-        people.peak_imm[imm_source, prior_imm_inds] *= boost
+        people.peak_imm[imm_source, prior_imm_inds] *= is_seroconvert[has_imm]*boost
 
     if len(no_prior_imm_inds):
-        people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert*hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
+        people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm]*hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
 
     # people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
     base_t = people.t + offset if offset is not None else people.t
