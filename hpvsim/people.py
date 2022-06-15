@@ -197,6 +197,7 @@ class People(hpb.BasePeople):
         self.total_flows['total_cancers']   += self.flows['cancers'].sum()
         self.total_flows['total_cancer_deaths']   += self.flows['cancer_deaths'].sum()
 
+
         return new_people
 
 

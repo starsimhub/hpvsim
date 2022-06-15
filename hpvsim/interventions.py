@@ -635,7 +635,8 @@ class BaseVaccination(Intervention):
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
             sim.people.flows['doses']      += len(vacc_inds)*factor # Count number of doses given
             sim.people.flows['vaccinated'] += len(new_vacc)*factor # Count number of people not already vaccinated given doses
-
+            sim.people.total_flows['total_doses'] += len(vacc_inds)*factor
+            sim.people.total_flows['total_vaccinated'] += len(new_vacc)*factor
         return vacc_inds
 
 

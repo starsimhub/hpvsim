@@ -70,7 +70,7 @@ def test_vaccines():
     def age_subtarget(sim):
         ''' Select people who are eligible for vaccination '''
         inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=14))
-        return {'vals': [1.0 for _ in inds], 'inds': inds}
+        return {'vals': [0.3 for _ in inds], 'inds': inds}
 
     bivalent_vx = hpint.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints='2020',
                                        subtarget=age_subtarget)
