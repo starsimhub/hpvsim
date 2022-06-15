@@ -18,6 +18,8 @@ Installation
 
 Run ``pip install -e .`` to install ``hpvsim`` and its dependencies. This will make ``hpvsim`` available on the Python path.
 
+Run ``get_birth_data.py`` and ``get_death_data.py`` to update the data folder, if desired.
+
 
 Usage
 -----

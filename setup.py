@@ -44,5 +44,6 @@ setup(
         'sciris',
         'matplotlib',
         'seaborn',
+        'wbgapi',
     ],
 )
