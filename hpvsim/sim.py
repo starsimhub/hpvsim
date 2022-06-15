@@ -521,7 +521,7 @@ class Sim(hpb.BaseSim):
         genotypes = np.random.randint(0, ng, len(hpv_inds))
 
         # Figure of duration of infection and infect people. TODO: will need to redo this
-        dur_hpv = hpu.sample(**self['dur']['none'], size=len(hpv_inds))
+        dur_hpv = np.array([hpu.sample(**self['dur'][stage], size=len(hpv_inds)) for stage in ['none', 'cin1', 'cin2', 'cin3']]).sum(axis=0)
         t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
         _ = self.people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur=dur_hpv, layer='seed_infection')
 
@@ -606,7 +606,13 @@ class Sim(hpb.BaseSim):
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
             # Compute transmissions
-            f_source_inds, f_genotypes = hpu.get_discordant_pairs(f_inf_inds, f_inf_genotypes, m_sus_inds, f, m, n_people)  # Calculate transmission
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
+            for g in range(ng):
+                f_source_inds = hpu.get_discordant_pairs(f_inf_inds[f_inf_genotypes==g], m_sus_inds, f, m, n_people)  # Calculate transmission
+                f_source_inds, f_genotypes = hpu.get_discordant_pairs(f_inf_inds, f_inf_genotypes, m_sus_inds, f, m, n_people)  # Calculate transmission
             m_source_inds, m_genotypes = hpu.get_discordant_pairs(m_inf_inds, m_inf_genotypes, f_sus_inds, m, f, n_people)
             discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
                                 [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
@@ -620,7 +626,6 @@ class Sim(hpb.BaseSim):
                 people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
 
             ln += 1
-
 
         # Index for results
         idx = int(t / self.resfreq)
@@ -642,7 +647,7 @@ class Sim(hpb.BaseSim):
 
             # Create total stocks
             for key in hpd.stock_keys:
-                if key not in ['cin']:  # This is a special case
+                if key not in ['alive', 'cin']:  # This is a special case
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['cin']:  # This is a special case

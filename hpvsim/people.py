@@ -13,7 +13,7 @@ from . import defaults as hpd
 from . import base as hpb
 from . import population as hppop
 from . import plotting as hpplt
-from . import immunity as hpi
+from . import immunity as hpimm
 
 
 __all__ = ['People']
@@ -356,7 +356,7 @@ class People(hpb.BasePeople):
         self.cin3[genotype, inds] = False
 
         # Update immunity
-        hpi.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
+        hpimm.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
 
         return
 
