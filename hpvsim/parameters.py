@@ -311,13 +311,28 @@ def get_genotype_pars(default=False, genotype=None):
     '''
     Define the default parameters for the different genotypes
     '''
-    pars = dict(
 
+    dur_dict = sc.objdict()
+    for stage in ['none', 'cin1', 'cin2', 'cin3']:
+        dur_dict[stage] = dict()
+
+    pars = sc.objdict()
+
+    pars.hpv16 = sc.objdict()
+    pars.hpv16.dur = dict()
+    pars.hpv16.dur['none']  = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur['cin1']  = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur['cin2']  = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur['cin3']  = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.rel_beta     = 1.0 
+
+        = dict(
         hpv16 = dict(
+            dur             = dur_dict,
             rel_beta        = 1.0, # Default values
-            rel_cin1_prob    = 1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
+            rel_cin1_prob   = 1.0,
+            rel_cin2_prob   = 1.0,
+            rel_cin3_prob   = 1.0,
             rel_cancer_prob = 1.0,
             rel_death_prob  = 1.0
         ),
