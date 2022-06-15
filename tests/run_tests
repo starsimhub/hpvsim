@@ -2,4 +2,6 @@
 # Run the integration tests Requires pytest-parallel:
 #   pip install pytest-parallel
 
+echo "Warning: not currently functional due to plotting conflicting with parallelization"
+
 pytest test_*.py --workers auto --durations=0
