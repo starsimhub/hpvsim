@@ -12,4 +12,3 @@ from .interventions import *
 from .immunity      import *
 from .analysis      import *
 from .sim           import *
-from .run           import *

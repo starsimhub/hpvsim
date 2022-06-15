@@ -23,14 +23,14 @@ CLASSIFIERS = [
 ]
 
 setup(
-    name="fpsim",
+    name="hpvsim",
     version=version,
     author="Robyn Stuart, Jamie Cohen, Mariah Boudreau, Cliff Kerr, Daniel Klein, Hao Hu",
     author_email="robyn.stuart@gatesfoundation.org",
     description="HPVsim: Human Papillomavirus Simulator",
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    url='http://fpsim.org',
+    url='http://hpvsim.org',
     keywords=["HPV", "agent-based model", "simulation"],
     platforms=["OS Independent"],
     classifiers=CLASSIFIERS,

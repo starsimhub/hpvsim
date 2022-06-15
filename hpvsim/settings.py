@@ -602,5 +602,4 @@ def load_fonts(folder=None, rebuild=False, verbose=False, **kwargs):
 
 
 # Create the options on module load, and load the fonts
-load_fonts()
 options = Options()
