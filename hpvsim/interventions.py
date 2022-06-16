@@ -5,14 +5,8 @@ defined by the user by inheriting from these classes.
 
 import numpy as np
 import sciris as sc
-# import pandas as pd
-# import scipy as sp
 import pylab as pl
 import inspect
-# import datetime as dt
-# from . import misc as cvm
-# from . import utils as cvu
-# from . import base as cvb
 from . import defaults as hpd
 from . import parameters as hppar
 from . import utils as hpu
@@ -139,9 +133,6 @@ def get_subtargets(subtarget, sim):
     return subtarget_inds, subtarget_vals
 
 #%% Generic intervention classes
-
-__all__ = ['Intervention']
-
 
 class Intervention:
     '''

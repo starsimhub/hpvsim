@@ -7,10 +7,7 @@ import numpy as np
 import sciris as sc
 import os
 import sys
-# Add module to paths and import hpvsim
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
-import hpvsim.sim as hps
+import hpvsim as hpv
 
 do_plot = 1
 do_save = 0
@@ -25,9 +22,8 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     '''
 
     # Define the genotypes
-    from hpvsim.immunity import genotype
-    hpv16 = genotype('HPV16')
-    hpv18 = genotype('HPV18')
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
 
     # Define the parameters
     pars = dict(
@@ -39,7 +35,7 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     )
 
     # Create the sim
-    sim = hps.Sim(pars)
+    sim = hpv.Sim(pars)
 
     # Optionally plot
     if do_plot:
