@@ -5,21 +5,17 @@ import sciris as sc
 import pylab as pl
 import sys
 import os
-
-# Add module to paths
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
+import hpvsim as hpv
 
 # Create genotypes - used in all subsequent tests
-from hpvsim.sim import Sim
-from hpvsim.immunity import genotype
-hpv16 = genotype('HPV16')
-hpv18 = genotype('HPV18')
-hpvhi5 = genotype('hpvhi5')
-hpv6 = genotype('hpv6')
-hpv11 = genotype('hpv11')
-hpv31 = genotype('hpv31')
-hpv33 = genotype('hpv33')
+
+hpv16 = hpv.genotype('HPV16')
+hpv18 = hpv.genotype('HPV18')
+hpvhi5 = hpv.genotype('hpvhi5')
+hpv6 = hpv.genotype('hpv6')
+hpv11 = hpv.genotype('hpv11')
+hpv31 = hpv.genotype('hpv31')
+hpv33 = hpv.genotype('hpv33')
 
 
 
@@ -34,7 +30,7 @@ def test_basic(doplot=True):
         'dt': .1,
         'end': 2035
     }
-    sim = Sim(pars=pars)
+    sim = hpv.Sim(pars=pars)
     sim.run()
     sim.plot()
     return sim
