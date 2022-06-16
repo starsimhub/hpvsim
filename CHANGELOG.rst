@@ -12,7 +12,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 Version 0.0.2 (2022-06-15)
 --------------------------
 - Made into a Python module.
-- *GitHub info*: PR `64 <https://github.com/amath-idm/fp_analyses/pull/64>`__
+- *GitHub info*: PR `64 <https://github.com/amath-idm/hpvsim/pull/64>`__
 
 
 Version 0.0.1 (2022-04-04)
