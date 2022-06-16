@@ -43,7 +43,7 @@ def test_dynamic_pars():
     return sim
 
 
-def test_vaccines():
+def test_vaccines(do_plot=False):
     sc.heading('Test prophylactic vaccine intervention')
 
     hpv16 = hpv.genotype('HPV16')
@@ -67,6 +67,8 @@ def test_vaccines():
 
     sim = hpv.Sim(pars=pars, interventions=[bivalent_vx])
     sim.run()
+    if do_plot:
+        sim.plot()
     return sim
 
 
@@ -79,7 +81,7 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_dynamic_pars()
-    sim1 = test_vaccines()
+    sim1 = test_vaccines(do_plot=True)
 
     sc.toc(T)
     print('Done.')

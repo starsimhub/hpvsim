@@ -134,6 +134,8 @@ def get_subtargets(subtarget, sim):
 
 #%% Generic intervention classes
 
+__all__ = ['Intervention']
+
 class Intervention:
     '''
     Base class for interventions.
@@ -293,8 +295,8 @@ class Intervention:
                             label_shown = True
                         else:
                             label = None
-                        # date = sc.date(sim.date(day))
-                        # ax.axvline(date, label=label, **line_args)
+                        date = sim.yearvec[timepoint]
+                        ax.axvline(date, label=label, **line_args)
         return
 
 
@@ -321,7 +323,9 @@ class Intervention:
 
 
 
-#%%
+#%% Behavior change interventions
+__all__ += ['dynamic_pars']
+
 class dynamic_pars(Intervention):
     '''
     A generic intervention that modifies a set of parameters at specified points
@@ -412,6 +416,7 @@ class dynamic_pars(Intervention):
         return
 
 
+__all__ += ['BaseVaccination', 'vaccinate_prob']
 
 class BaseVaccination(Intervention):
     '''
@@ -730,13 +735,15 @@ class vaccinate_prob(BaseVaccination):
             prob = 1.0 if subtarget is None else 0.0
         self.prob      = prob
         self.subtarget = subtarget
+        self.timepoints = timepoints
+        self.dates = None  # Representations in terms of years, e.g. 2020.4, set during initialization
         self.second_dose_days = None  # Track scheduled second doses
         return
 
 
     def initialize(self, sim):
         super().initialize(sim)
-        self.tps = sim.get_t(self.tps) # days that group becomes eligible
+        self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
         self.second_dose_days     = [None]*sim.npts # People who get second dose (if relevant)
         check_doses(self.p['doses'], self.p['interval'])
         return
@@ -746,10 +753,10 @@ class vaccinate_prob(BaseVaccination):
 
         vacc_inds = np.array([], dtype=int)  # Initialize in case no one gets their first dose
 
-        if sim.t >= np.min(self.tps):
+        if sim.t >= np.min(self.timepoints):
 
             # Vaccinate people with their first dose
-            for _ in find_day(self.tps, sim.t, interv=self, sim=sim):
+            for _ in find_day(self.timepoints, sim.t, interv=self, sim=sim):
 
                 vacc_probs = np.zeros(len(sim.people))
 
