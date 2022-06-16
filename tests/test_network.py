@@ -29,10 +29,10 @@ def test_network(do_plot=True):
                 debut = dict(f=dict(dist='normal', par1=15., par2=2.1),
                              m=dict(dist='normal', par1=16., par2=1.8))
                 )
-    hpv6 = hpv.genotype('HPV6')
-    hpv11 = hpv.genotype('HPV11')
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
+    hpv6    = hpv.genotype('HPV6')
+    hpv11   = hpv.genotype('HPV11')
+    hpv16   = hpv.genotype('HPV16')
+    hpv18   = hpv.genotype('HPV18')
 
     # Loop over countries and their population sizes in the year 2000
     age_pyr = hpv.age_pyramid(
