@@ -134,20 +134,19 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None):
         '''
 
     # Extract parameters and indices
-    # has_imm =  people.imm[imm_source, inds] > 0
-    # no_prior_imm_inds = inds[~has_imm]
-    # prior_imm_inds = inds[has_imm]
+    has_imm =  people.imm[imm_source, inds] > 0
+    no_prior_imm_inds = inds[~has_imm]
+    prior_imm_inds = inds[has_imm]
 
-    # if len(prior_imm_inds):
-    #     if isinstance(imm_pars['imm_boost'], Iterable):
-    #         boost = imm_pars['imm_boost'][imm_source]
-    #     else:
-    #         boost = imm_pars['imm_boost']
-    #     people.peak_imm[imm_source, prior_imm_inds] *= boost
+    if len(prior_imm_inds):
+        if isinstance(imm_pars['imm_boost'], Iterable):
+            boost = imm_pars['imm_boost'][imm_source]
+        else:
+            boost = imm_pars['imm_boost']
+        people.peak_imm[imm_source, prior_imm_inds] *= boost
 
-    # if len(no_prior_imm_inds):
-    #     people.peak_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
-    people.peak_imm[imm_source, inds] = hpu.sample(**imm_pars['imm_init'], size=len(inds))
+    if len(no_prior_imm_inds):
+        people.peak_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
 
     # people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
     base_t = people.t + offset if offset is not None else people.t
