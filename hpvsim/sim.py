@@ -521,9 +521,10 @@ class Sim(hpb.BaseSim):
         genotypes = np.random.randint(0, ng, len(hpv_inds))
 
         # Figure of duration of infection and infect people. TODO: will need to redo this
-        dur_hpv = hpu.sample(**self['dur']['none'], size=len(hpv_inds))
+        dur_hpv = np.array([hpu.sample(**self['dur'][stage], size=len(hpv_inds)) for stage in ['none', 'cin1', 'cin2', 'cin3']]).sum(axis=0)
         t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
-        _ = self.people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur=dur_hpv, layer='seed_infection')
+        for g in range(ng):
+            _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
         # Check for CINs
         cin1_filters = (self.people.date_cin1<0) * (self.people.date_cin2 > 0)
@@ -606,21 +607,20 @@ class Sim(hpb.BaseSim):
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
             # Compute transmissions
-            f_source_inds, f_genotypes = hpu.get_discordant_pairs(f_inf_inds, f_inf_genotypes, m_sus_inds, f, m, n_people)  # Calculate transmission
-            m_source_inds, m_genotypes = hpu.get_discordant_pairs(m_inf_inds, m_inf_genotypes, f_sus_inds, m, f, n_people)
-            discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
-                                [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
+            for g in range(ng):
+                f_source_inds = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
+                m_source_inds = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
 
-            for pship_inds, sources, targets, genotypes in discordant_pairs:
-                betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
-                target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
-                target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
-                source_inds = sources[unique_inds]  # Extract indices of those who passed on an infection
-                genotype_inds = genotypes[unique_inds]  # Extract genotypes that have been transmitted
-                people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
+                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g]],
+                                    [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g]]]
+
+                for pship_inds, sources, targets, genotypes in discordant_pairs:
+                    betas = foi[g, pship_inds] * (1. - sus_imm[g, targets])  # Pull out the transmissibility associated with this partnership
+                    target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
+                    target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
+                    people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
 
             ln += 1
-
 
         # Index for results
         idx = int(t / self.resfreq)
@@ -642,11 +642,15 @@ class Sim(hpb.BaseSim):
 
             # Create total stocks
             for key in hpd.stock_keys:
-                if key not in ['cin']:  # This is a special case
+                if key not in ['alive', 'cin']:  # This is a special case
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
-                if key not in ['cin']:  # This is a special case
-                    self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
+                if key not in ['cin', 'susceptible']:
+                    # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
+                    self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
+                elif key == 'susceptible':
+                    # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
+                    self.results[f'n_total_{key}'][idx] = people.count(key)
 
             # Do total CINs separately
             for genotype in range(ng):
@@ -743,6 +747,12 @@ class Sim(hpb.BaseSim):
             # otherwise the scale factor will be applied multiple times
             raise AlreadyRunError('Simulation has already been finalized')
 
+        # Fix the last timepoint
+        if self.t % self.resfreq != self.resfreq-1: # This means we didn't get to accumulate all points in the final year
+            for reskey in hpd.flow_keys:
+                self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+                self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
@@ -784,7 +794,7 @@ class Sim(hpb.BaseSim):
         res = self.results
 
         # Compute HPV incidence and prevalence
-        self.results['total_hpv_incidence'][:]  = res['total_infections'][:]/ res['n_susceptible'][:].sum(axis=0)
+        self.results['total_hpv_incidence'][:]  = res['total_infections'][:]/ res['n_total_susceptible'][:]
         self.results['hpv_incidence'][:]        = res['infections'][:]/ res['n_susceptible'][:]
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]

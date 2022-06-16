@@ -692,9 +692,10 @@ class age_results(Analyzer):
                     barwidth = 1 * width
                     ax = pl.subplot(n_rows, n_cols, col_count+row_count)
                     x = np.arange(len(self.age_labels))  # the label locations
-                    thisdatadf = self.data[(self.data.year == float(date))&(self.data.name == rkey)]
-                    if len(thisdatadf)>0:
-                        barwidth /= 2 # Adjust width based on data
+                    if self.data is not None:
+                        thisdatadf = self.data[(self.data.year == float(date))&(self.data.name == rkey)]
+                        if len(thisdatadf)>0:
+                            barwidth /= 2 # Adjust width based on data
 
                     if 'total' not in rkey:
                         # Prepare plot settings
@@ -712,7 +713,7 @@ class age_results(Analyzer):
                                 ax.bar(x+xlocations[g]+barwidth, ydata, color=self.result_properties[rkey].color[g], hatch='/', label=f'Data - {glabel}', width=barwidth)
 
                     else:
-                        if len(thisdatadf) > 0:
+                        if (self.data is not None) and (len(thisdatadf) > 0):
                             ax.bar(x-1/2*barwidth, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
                             ydata = np.array(thisdatadf.value)
                             ax.bar(x+1/2*barwidth, ydata, color=d_args.color, width=barwidth, label='Data')

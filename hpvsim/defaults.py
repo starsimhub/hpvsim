@@ -226,6 +226,7 @@ default_init_prev = {
     'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
     'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
 }
+
 #%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
@@ -273,6 +274,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                 ],
                 'HPV incidence': [
                     'total_hpv_incidence',
+                    'hpv_incidence',
                 ],
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
