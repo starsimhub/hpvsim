@@ -606,16 +606,17 @@ class Sim(hpb.BaseSim):
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
             # Compute transmissions
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
+            f_source_inds, m_source_inds, f_genotypes, m_genotypes = np.array([], dtype=hpd.default_int), np.array([], dtype=hpd.default_int), np.array([], dtype=hpd.default_int), np.array([], dtype=hpd.default_int)
             for g in range(ng):
-                f_source_inds = hpu.get_discordant_pairs(f_inf_inds[f_inf_genotypes==g], m_sus_inds, f, m, n_people)  # Calculate transmission
-                f_source_inds, f_genotypes = hpu.get_discordant_pairs(f_inf_inds, f_inf_genotypes, m_sus_inds, f, m, n_people)  # Calculate transmission
-            m_source_inds, m_genotypes = hpu.get_discordant_pairs(m_inf_inds, m_inf_genotypes, f_sus_inds, m, f, n_people)
-            discordant_pairs = [[f_source_inds.astype(hpd.default_int), f[f_source_inds], m[f_source_inds], f_genotypes],
-                                [m_source_inds.astype(hpd.default_int), m[m_source_inds], f[m_source_inds], m_genotypes]]
+                f_pairs = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
+                m_pairs = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
+                f_source_inds = np.concatenate([f_source_inds.astype(hpd.default_int), f_pairs]) # Calculate transmission
+                m_source_inds = np.concatenate([m_source_inds.astype(hpd.default_int), m_pairs])
+                f_genotypes = np.concatenate([f_genotypes, np.array([g] * len(f_pairs), dtype=hpd.default_int)])
+                m_genotypes = np.concatenate([m_genotypes, np.array([g] * len(m_pairs), dtype=hpd.default_int)])
+
+            discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_genotypes],
+                                [m_source_inds, m[m_source_inds], f[m_source_inds], m_genotypes]]
 
             for pship_inds, sources, targets, genotypes in discordant_pairs:
                 betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
