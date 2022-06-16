@@ -645,8 +645,12 @@ class Sim(hpb.BaseSim):
                 if key not in ['alive', 'cin']:  # This is a special case
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
-                if key not in ['cin']:  # This is a special case
-                    self.results[f'n_total_{key}'][idx] = self.results[f'n_{key}'][:, idx].sum()
+                if key not in ['cin', 'susceptible']:
+                    # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
+                    self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
+                elif key == 'susceptible':
+                    # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
+                    self.results[f'n_total_{key}'][idx] = people.count(key)
 
             # Do total CINs separately
             for genotype in range(ng):
@@ -743,6 +747,12 @@ class Sim(hpb.BaseSim):
             # otherwise the scale factor will be applied multiple times
             raise AlreadyRunError('Simulation has already been finalized')
 
+        # Fix the last timepoint
+        if self.t % self.resfreq != self.resfreq-1: # This means we didn't get to accumulate all points in the final year
+            for reskey in hpd.flow_keys:
+                self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+                self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
@@ -784,7 +794,7 @@ class Sim(hpb.BaseSim):
         res = self.results
 
         # Compute HPV incidence and prevalence
-        self.results['total_hpv_incidence'][:]  = res['total_infections'][:]/ res['n_susceptible'][:].sum(axis=0)
+        self.results['total_hpv_incidence'][:]  = res['total_infections'][:]/ res['n_total_susceptible'][:]
         self.results['hpv_incidence'][:]        = res['infections'][:]/ res['n_susceptible'][:]
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
