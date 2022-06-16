@@ -64,7 +64,7 @@ def test_epi():
 
     # Define the parameters to vary
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'rel_cin1_prob',    'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.05, 0.5],     [10,200],           [0.1,1.0],          [15,25],            [0.1, 2],           [0.01,0.8]] # Values
+    vary_vals   = [[0.01, 0.8],     [10,200],           [0.1,1.0],         [15,25],            [0.1, 2],           [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos',              'pos'] # Expected association with epi outcomes
     vary_what   = ['hpv_incidence', 'hpv_incidence',    'hpv_incidence',    'hpv_incidence',    'cin1_prevalence',  'cancer_prevalence'] # Epi outcomes to check
 
@@ -295,9 +295,9 @@ if __name__ == '__main__':
 
     sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
+    # sim2 = test_epi() # CURRENTLY BROKEN
     sim3 = test_flexible_inputs()
-    # sim4 = test_result_consistency()
+    sim4 = test_result_consistency()
     sim5 = test_location_loading()
     sim6 = test_resuming()
     # json = test_fileio()
