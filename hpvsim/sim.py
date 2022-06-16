@@ -610,8 +610,8 @@ class Sim(hpb.BaseSim):
             for g in range(ng):
                 f_pairs = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
                 m_pairs = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
-                f_source_inds = np.concatenate([f_source_inds.astype(hpd.default_int), f_pairs]) # Calculate transmission
-                m_source_inds = np.concatenate([m_source_inds.astype(hpd.default_int), m_pairs])
+                f_source_inds = np.concatenate([f_source_inds, f_pairs.astype(hpd.default_int)]) # Calculate transmission
+                m_source_inds = np.concatenate([m_source_inds, m_pairs.astype(hpd.default_int)])
                 f_genotypes = np.concatenate([f_genotypes, np.array([g] * len(f_pairs), dtype=hpd.default_int)])
                 m_genotypes = np.concatenate([m_genotypes, np.array([g] * len(m_pairs), dtype=hpd.default_int)])
 
