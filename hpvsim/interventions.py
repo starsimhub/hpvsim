@@ -5,19 +5,10 @@ defined by the user by inheriting from these classes.
 
 import numpy as np
 import sciris as sc
-# import pandas as pd
-# import scipy as sp
-# import pylab as pl
 import inspect
-# import datetime as dt
-# from . import misc as cvm
-# from . import utils as cvu
-# from . import base as cvb
 from . import defaults as hpd
 from . import parameters as hppar
 from . import utils as hpu
-# from . import immunity as cvi
-# from collections import defaultdict
 
 
 #%% Helper functions
@@ -58,9 +49,6 @@ def find_day(arr, t=None, interv=None, sim=None, which='first'):
 
 
 #%% Generic intervention classes
-
-__all__ = ['Intervention']
-
 
 class Intervention:
     '''

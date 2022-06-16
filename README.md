@@ -1,2 +1,0 @@
-# hpvsim
-HPVsim

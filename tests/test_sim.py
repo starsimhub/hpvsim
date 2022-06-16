@@ -8,11 +8,7 @@ import pytest
 import sys
 import sciris as sc
 import numpy as np
-
-# Add module to paths and import hpvsim
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
-import hpvsim.sim as hps
+import hpvsim as hpv
 
 do_plot = 1
 do_save = 0
@@ -23,7 +19,7 @@ do_save = 0
 def test_microsim():
     sc.heading('Minimal sim test')
 
-    sim = hps.Sim()
+    sim = hpv.Sim()
     pars = {
         'pop_size': 10,
         'init_hpv_prev': .1,
@@ -44,12 +40,11 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     # Settings
     seed = 1
     verbose = 1
-    from hpvsim.immunity import genotype
 
     # Create and run the simulation
-    hpv16 = genotype('HPV16')
-    hpv18 = genotype('HPV18')
-    sim = hps.Sim(end=2035, genotypes=[hpv16,hpv18])
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
+    sim = hpv.Sim(end=2035, genotypes=[hpv16,hpv18])
     sim.set_seed(seed)
 
     # Optionally plot
@@ -65,7 +60,7 @@ def test_epi():
 
     # Define baseline parameters and initialize sim
     base_pars = dict(n_years=10, dt=0.5)
-    sim = hps.Sim()
+    sim = hpv.Sim()
 
     # Define the parameters to vary
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'rel_cin1_prob',    'init_hpv_prev'] # Parameters
@@ -94,8 +89,8 @@ def test_epi():
         pars1 = sc.mergedicts(base_pars, {vpar:hi}) # Use upper parameter bound
 
         # Run the simulations and pull out the results
-        s0 = hps.Sim(pars0, label=f'{vpar} {vval[0]}').run()
-        s1 = hps.Sim(pars1, label=f'{vpar} {vval[1]}').run()
+        s0 = hpv.Sim(pars0, label=f'{vpar} {vval[0]}').run()
+        s1 = hpv.Sim(pars1, label=f'{vpar} {vval[1]}').run()
         res0 = s0.summary
         res1 = s1.summary
 
@@ -118,7 +113,7 @@ def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
-    sim = hps.Sim(pop_size=100, label='test_label')
+    sim = hpv.Sim(pop_size=100, label='test_label')
     sim.reset_layer_pars()
     sim.initialize()
     sim.reset_layer_pars()
@@ -180,7 +175,7 @@ def test_result_consistency():
 
     # Create sim
     pop_size = 10e3
-    sim = hps.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
+    sim = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
     sim.run()
 
     # Check that infections by genotype sum up the the correct totals
@@ -214,13 +209,13 @@ def test_result_consistency():
 def test_location_loading():
     ''' Check that data by location can be loaded '''
 
-    sim0 = hps.Sim() # Default values
-    sim1 = hps.Sim(location='zimbabwe') # Zimbabwe values
-    sim2 = hps.Sim(location='Zimbabwe') # Location should not be case sensitive
+    sim0 = hpv.Sim() # Default values
+    sim1 = hpv.Sim(location='zimbabwe') # Zimbabwe values
+    sim2 = hpv.Sim(location='Zimbabwe') # Location should not be case sensitive
     assert (sim0['birth_rates'][1] != sim1['birth_rates'][1]).all() # Values for Zimbabwe should be different to default values
     assert (sim1['birth_rates'][1] == sim2['birth_rates'][1]).all() # Values for Zimbabwe should be loaded regardless of capitalization
     with pytest.warns(RuntimeWarning): # If the location doesn't exist, should use defaults
-        sim3 = hps.Sim(location='penelope') # Make sure a warning message is raised
+        sim3 = hpv.Sim(location='penelope') # Make sure a warning message is raised
     assert (sim0['birth_rates'][1] == sim3['birth_rates'][1]).all() # Check that defaults have been used
 
     return sim1
@@ -230,30 +225,30 @@ def test_resuming():
     sc.heading('Test that resuming a run works')
 
     pop_size = 10e3
-    s0 = hps.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_resume')
+    s0 = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_resume')
     s1 = s0.copy()
     s0.run()
 
     # Cannot run the same simulation multiple times
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s0.run()
 
     # If until=0 then no timesteps will be taken
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s1.run(until='2015', reset_seed=False)
     assert s1.initialized # It should still have been initialized though
     with pytest.raises(RuntimeError):
         s1.compute_summary(require_run=True) # Not ready yet
 
     s1.run(until='2020', reset_seed=False)
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s1.run(until=10, reset_seed=False) # Error if running up to the same value
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s1.run(until=5, reset_seed=False) # Error if running until a previous timestep
 
     s1.run(until='2023', reset_seed=False)
     s1.run(reset_seed=False)
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s1.finalize() # Can't re-finalize a finalized sim
 
     assert np.all(s0.results['total_infections'].values == s1.results['total_infections']) # Results should be identical
