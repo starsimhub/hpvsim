@@ -50,49 +50,6 @@ def find_day(arr, t=None, interv=None, sim=None, which='first'):
     return inds
 
 
-def preprocess_day(day, sim):
-    '''
-    Preprocess a day: leave it as-is if it's a function, or try to convert it to
-    an integer if it's anything else.
-    '''
-    if callable(day):  # pragma: no cover
-        return day # If it's callable, leave it as-is
-    else:
-        day = sim.day(day) # Otherwise, convert it to an int
-    return day
-
-
-def get_day(day, interv=None, sim=None):
-    '''
-    Return the day if it's an integer, or call it if it's a function.
-    '''
-    if callable(day): # pragma: no cover
-        return day(interv, sim) # If it's callable, call it
-    else:
-        return day # Otherwise, leave it as-is
-
-
-def process_days(sim, days, return_dates=False):
-    '''
-    Ensure lists of days are in consistent format. Used by change_beta, clip_edges,
-    and some analyzers. If day is 'end' or -1, use the final day of the simulation.
-    Optionally return dates as well as days. If days is callable, leave unchanged.
-    '''
-    if callable(days):
-        return days
-    if sc.isstring(days) or not sc.isiterable(days):
-        days = sc.promotetolist(days)
-    for d,day in enumerate(days):
-        if day in ['end', -1]: # pragma: no cover
-            day = sim['end_day']
-        days[d] = preprocess_day(day, sim) # Ensure it's an integer and not a string or something
-    days = np.sort(sc.promotetoarray(days)) # Ensure they're an array and in order
-    if return_dates:
-        dates = [sim.date(day) for day in days] # Store as date strings
-        return days, dates
-    else:
-        return days
-
 def get_subtargets(subtarget, sim):
     '''
     A small helper function to see if subtargeting is a list of indices to use,
@@ -438,7 +395,6 @@ class BaseVaccination(Intervention):
     These are:
 
         - ``doses``:             the number of vaccine doses per person
-        - ``vaccination_dates``: integer; dates of all doses for this vaccine
 
     Args:
         vaccine (dict/str) : which vaccine to use; see below for dict parameters
@@ -461,8 +417,6 @@ class BaseVaccination(Intervention):
         self.label = label # Vaccine label (used as a dict key)
         self.p     = None # Vaccine parameters
         self.doses = None # Record the number of doses given per person *by this intervention*
-        self.vaccination_dates = None # Store the dates that each person was last vaccinated *by this intervention*
-
         self._parse_vaccine_pars(vaccine=vaccine) # Populate
         return
 
@@ -537,8 +491,6 @@ class BaseVaccination(Intervention):
                     if sim['verbose']: print(f'Note: No cross-immunity specified for vaccine {self.label} and genotype {key}, setting to 1.0')
                 self.p[key] = val
 
-
-        self.vaccination_dates = [[] for _ in range(sim.n)] # Store the dates when people are vaccinated
 
         sim['vaccine_pars'][self.label] = self.p # Store the parameters
         self.index = list(sim['vaccine_pars'].keys()).index(self.label) # Find where we are in the list
@@ -618,8 +570,6 @@ class BaseVaccination(Intervention):
         new_vacc   = np.setdiff1d(vacc_inds, prior_vacc)
 
         if len(vacc_inds):
-            for v_ind in vacc_inds:
-                self.vaccination_dates[v_ind].append(t)
 
             sim.people.vaccinated[vacc_inds] = True
             sim.people.vaccine_source[vacc_inds] = self.index
@@ -650,7 +600,6 @@ class BaseVaccination(Intervention):
         obj = super().shrink(in_place=in_place)
         obj.vaccinated = None
         obj.doses = None
-        obj.vaccination_dates = None
         if hasattr(obj, 'second_dose_days'):
             obj.second_dose_days = None
         return obj

@@ -640,13 +640,13 @@ def get_cross_immunity(default=False, genotype=None):
 
 def get_vaccine_genotype_pars(default=False, vaccine=None):
     '''
-    Define the effectiveness of each vaccine against each genotype
+    Define the cross-immunity of each vaccine against each genotype
     '''
     pars = dict(
 
         default = dict(
-            hpv16=0.96,
-            hpv18=0.96,  # Assumption
+            hpv16=1,
+            hpv18=1,  # Assumption
             hpv31=0,  # Assumption
             hpv33=0,  # Assumption
             hpv45=0,  # Assumption
@@ -660,8 +660,8 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
         ),
 
         bivalent = dict(
-            hpv16=0.96,
-            hpv18=0.96,  # Assumption
+            hpv16=1,
+            hpv18=1,  # Assumption
             hpv31=0,  # Assumption
             hpv33=0,  # Assumption
             hpv45=0,  # Assumption
@@ -675,33 +675,33 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
         ),
 
         quadrivalent=dict(
-            hpv16=0.96,
-            hpv18=0.96,  # Assumption
+            hpv16=1,
+            hpv18=1,  # Assumption
             hpv31=0,  # Assumption
             hpv33=0,  # Assumption
             hpv45=0,  # Assumption
             hpv52=0,  # Assumption
             hpv58=0,  # Assumption
-            hpv6=0.96,  # Assumption
-            hpv11=0.96,  # Assumption
+            hpv6=1,  # Assumption
+            hpv11=1,  # Assumption
             hpvlo=0,  # Assumption
             hpvhi=0,  # Assumption
             hpvhi5=0,  # Assumption
         ),
 
         nonavalent=dict(
-            hpv16=0.96,
-            hpv18=0.96,  # Assumption
-            hpv31=0.96,  # Assumption
-            hpv33=0.96,  # Assumption
-            hpv45=0.96,  # Assumption
-            hpv52=0.96,  # Assumption
-            hpv58=0.96,  # Assumption
-            hpv6=0.96,  # Assumption
-            hpv11=0.96,  # Assumption
+            hpv16=1,
+            hpv18=1,  # Assumption
+            hpv31=1,  # Assumption
+            hpv33=1,  # Assumption
+            hpv45=1,  # Assumption
+            hpv52=1,  # Assumption
+            hpv58=1,  # Assumption
+            hpv6=1,  # Assumption
+            hpv11=1,  # Assumption
             hpvlo=0,  # Assumption
             hpvhi=0,  # Assumption
-            hpvhi5=0.96,  # Assumption
+            hpvhi5=1,  # Assumption
         ),
     )
 
