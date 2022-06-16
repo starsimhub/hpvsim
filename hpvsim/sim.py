@@ -523,7 +523,8 @@ class Sim(hpb.BaseSim):
         # Figure of duration of infection and infect people. TODO: will need to redo this
         dur_hpv = np.array([hpu.sample(**self['dur'][stage], size=len(hpv_inds)) for stage in ['none', 'cin1', 'cin2', 'cin3']]).sum(axis=0)
         t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
-        _ = self.people.infect(inds=hpv_inds, genotypes=genotypes, offset=t_imm_event, dur=dur_hpv, layer='seed_infection')
+        for g in range(ng):
+            _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
         # Check for CINs
         cin1_filters = (self.people.date_cin1<0) * (self.people.date_cin2 > 0)
@@ -606,25 +607,18 @@ class Sim(hpb.BaseSim):
             foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
 
             # Compute transmissions
-            f_source_inds, m_source_inds, f_genotypes, m_genotypes = np.array([], dtype=hpd.default_int), np.array([], dtype=hpd.default_int), np.array([], dtype=hpd.default_int), np.array([], dtype=hpd.default_int)
             for g in range(ng):
-                f_pairs = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
-                m_pairs = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
-                f_source_inds = np.concatenate([f_source_inds, f_pairs.astype(hpd.default_int)]) # Calculate transmission
-                m_source_inds = np.concatenate([m_source_inds, m_pairs.astype(hpd.default_int)])
-                f_genotypes = np.concatenate([f_genotypes, np.array([g] * len(f_pairs), dtype=hpd.default_int)])
-                m_genotypes = np.concatenate([m_genotypes, np.array([g] * len(m_pairs), dtype=hpd.default_int)])
+                f_source_inds = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
+                m_source_inds = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
 
-            discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_genotypes],
-                                [m_source_inds, m[m_source_inds], f[m_source_inds], m_genotypes]]
+                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g]],
+                                    [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g]]]
 
-            for pship_inds, sources, targets, genotypes in discordant_pairs:
-                betas = foi[genotypes, pship_inds] * (1. - sus_imm[genotypes, targets])  # Pull out the transmissibility associated with this partnership
-                target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
-                target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
-                source_inds = sources[unique_inds]  # Extract indices of those who passed on an infection
-                genotype_inds = genotypes[unique_inds]  # Extract genotypes that have been transmitted
-                people.infect(inds=target_inds, genotypes=genotype_inds, source=source_inds, layer=lkey)  # Actually infect people
+                for pship_inds, sources, targets, genotypes in discordant_pairs:
+                    betas = foi[g, pship_inds] * (1. - sus_imm[g, targets])  # Pull out the transmissibility associated with this partnership
+                    target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
+                    target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
+                    people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
 
             ln += 1
 

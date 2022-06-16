@@ -86,7 +86,7 @@ def test_age_results(do_plot=True):
     timepoints = ['2010']
     edges = np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.])
     az = hpa.age_results(timepoints=timepoints,
-                         result_keys=['hpv_prevalence'],
+                         result_keys=['hpv_incidence'],
                          datafile='test_data/south_africa_hpv_data.xlsx',
                          edges=edges)
     sim = hps.Sim(pars, genotypes=[hpv16, hpv18], analyzers=az)
