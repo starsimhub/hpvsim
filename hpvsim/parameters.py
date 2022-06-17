@@ -145,9 +145,11 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
 
     # Specify defaults for basic sexual network with regular and casual partners
     layer_defaults['basic'] = dict(
-        partners    = dict(r=1, c=2),       # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
-        acts        = dict(r=dict(dist='neg_binomial', par1=80, par2=40),
-                           c=dict(dist='neg_binomial', par1=10, par2=5)),
+        partners    = dict(r=1, c=2), # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
+        acts         = dict(r=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts for people at sexual peak
+                            c=dict(dist='neg_binomial', par1=10, par2=5)), # Default number of acts for people at sexual peak
+        age_act_pars = dict(r=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
+                            c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1)), # Parameters describing changes in coital frequency over agent lifespans
         layer_probs = dict(r=0.7, c=0.4),   # Default proportion of the population in each layer
         dur_pship   = dict(r=dict(dist='normal_pos', par1=10,par2=3),
                            c=dict(dist='normal_pos', par1=2, par2=1)),

@@ -555,12 +555,15 @@ class Sim(hpb.BaseSim):
         imm_kin_pars = self['imm_kin']
 
         # Update demographics and partnerships
+        old_pop_size = len(self.people)
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
         self.people.addtoself(new_people) # New births are added to the population
+
         people = self.people # Shorten
         people.alive = ~people.dead_other
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
-        people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
+        new_pop_size = len(people)
+        people.create_partnerships(t=t, n_new=n_dissolved, scale_factor=new_pop_size/old_pop_size) # Create new partnerships (maintaining the same overall partnerhip rate)
         n_people = len(people)
 
         # Apply interventions
@@ -582,10 +585,12 @@ class Sim(hpb.BaseSim):
             ms.append(layer['m'])
 
             # Get the number of acts per timestep for this partnership type
+            acts = layer['acts'] * dt
             fa, wa = np.modf(layer['acts'] * dt)
             frac_acts.append(fa)
             whole_acts.append(wa.astype(hpd.default_int))
             effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
+
 
         gen_betas = np.array([g['rel_beta']*beta for g in gen_pars.values()], dtype=hpd.default_float)
         inf = people.infectious

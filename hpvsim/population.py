@@ -8,7 +8,6 @@ import numpy as np # Needed for a few things not provided by pl
 import sciris as sc
 from . import utils as hpu
 from . import misc as hpm
-# from . import base as cvb
 from . import data as hpdata
 from . import defaults as hpd
 from . import parameters as hppar
@@ -20,7 +19,7 @@ from . import people as hpppl
 
 
 def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
-                sex_ratio=0.5, dt_round_age=True, dispersion=None, microstructure=None, **kwargs):
+                sex_ratio=0.5, dt_round_age=True, dispersion=5, microstructure=None, **kwargs):
     '''
     Make the people for the simulation.
 
@@ -133,7 +132,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     return people
 
 
-def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispersion=None):
+def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispersion=5):
     '''
     Assign each person a preferred number of concurrent partners for each layer
     Args:
@@ -173,7 +172,7 @@ def partner_count(pop_size=None, layer_keys=None, means=None, sample=True, dispe
     return np.array(partners)
 
 
-def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5, dispersion=None):
+def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5, dispersion=5):
     '''
     Set static population characteristics that do not change over time.
     Can be used when adding new births, in which case the existing popsize can be given.
@@ -288,8 +287,8 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=
     f_inds          = hpu.false(sexes)
     all_inds        = np.arange(pop_size)
     f_active_inds   = np.intersect1d(mapping, f_inds)
-    age_order       = ages[f_active_inds].argsort() # We sort the contacts by age so they get matched to partners of similar age
-    f_active_inds   = f_active_inds[age_order]
+    # age_order       = ages[f_active_inds].argsort() # We sort the contacts by age so they get matched to partners of similar age
+    # f_active_inds   = f_active_inds[age_order]
     inactive_inds   = np.setdiff1d(all_inds, mapping)
 
     # Precalculate contacts
@@ -298,8 +297,8 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=
     weighting[inactive_inds] = 0 # Exclude people not active
     weighting       = weighting/sum(weighting) # Turn this into a probability
     m_contacts      = hpu.choose_w(weighting, n_all_contacts, unique=False) # Select males
-    m_age_order     = ages[m_contacts].argsort() # Sort the partners by age as well
-    m_contacts      = m_contacts[m_age_order]
+    # m_age_order     = ages[m_contacts].argsort() # Sort the partners by age as well
+    # m_contacts      = m_contacts[m_age_order]
 
     # Make contacts
     count = 0
@@ -322,8 +321,6 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=
     output['acts'] = hpu.sample(**acts, size=n_partnerships)
     output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
     output['end'] = output['start'] + output['dur']
-
-    # TODO: count the number of acts for each person
 
     return output, actual_p_count
 
