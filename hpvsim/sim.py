@@ -600,10 +600,10 @@ class Sim(hpb.BaseSim):
 
         # Calculate relative transmissibility by stage of infection
         rel_trans_pars = self['rel_trans']
-        people.rel_trans = people.infectious[:].astype(hpd.default_float)
-        people.rel_trans[people.cin1] *= rel_trans_pars['cin1']
-        people.rel_trans[people.cin2] *= rel_trans_pars['cin2']
-        people.rel_trans[people.cin3] *= rel_trans_pars['cin3']
+        rel_trans = people.infectious[:].astype(hpd.default_float)
+        rel_trans[people.cin1] *= rel_trans_pars['cin1']
+        rel_trans[people.cin2] *= rel_trans_pars['cin2']
+        rel_trans[people.cin3] *= rel_trans_pars['cin3']
 
         # Loop over layers
         ln = 0 # Layer number
@@ -625,7 +625,7 @@ class Sim(hpb.BaseSim):
 
                 # Compute transmissibility for each partnership
                 for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
-                    betas = this_foi[pship_inds] * (1. - sus_imm[g, targets]) # Pull out the transmissibility associated with this partnership
+                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
                     target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people

@@ -257,35 +257,6 @@ def test_resuming():
     return s1
 
 
-# def test_fileio():
-#     sc.heading('Test file saving')
-#
-#     json_path = 'test_hpvsim.json'
-#     xlsx_path = 'test_hpvsim.xlsx'
-#
-#     # Create and run the simulation
-#     sim = hps.Sim()
-#     sim['n_years'] = 5
-#     sim['pop_size'] = 1000
-#     sim.run(verbose=0)
-#
-#     # Create objects
-#     json = sim.to_json()
-#     xlsx = sim.to_excel()
-#     print(xlsx)
-#
-#     # Save files
-#     sim.to_json(json_path)
-#     sim.to_excel(xlsx_path)
-#
-#     for path in [json_path, xlsx_path]:
-#         print(f'Removing {path}')
-#         os.remove(path)
-#
-#     return json
-
-
-
 
 
 #%% Run as a script
@@ -294,14 +265,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
+    sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
-    # sim3 = test_flexible_inputs()
-    # sim4 = test_result_consistency()
-    # sim5 = test_location_loading()
-    # sim6 = test_resuming()
-    # json = test_fileio()
+    sim2 = test_epi()
+    sim3 = test_flexible_inputs()
+    sim4 = test_result_consistency()
+    sim5 = test_location_loading()
+    sim6 = test_resuming()
 
     sc.toc(T)
     print('Done.')

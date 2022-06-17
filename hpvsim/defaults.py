@@ -66,7 +66,6 @@ class PeopleMeta(sc.prettyobj):
         # Immune states, by genotype
         self.imm_states = [
             'sus_imm',  # Float, by genotype
-            'rel_trans',  # Float by genotype
         ]
 
         # Immunity states, by genotype/vaccine
@@ -223,9 +222,9 @@ default_birth_rates = np.array([
 ])
 
 default_init_prev = {
-    'age_brackets'  : np.array([  12,   17,   24,   34,   44,   64,   150]),
-    'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
-    'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
+    'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
+    'm'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
+    'f'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
 }
 
 #%% Default plotting settings
