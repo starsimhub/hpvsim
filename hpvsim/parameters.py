@@ -62,9 +62,9 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility TODO does this get used? if not remove.
-    pars['beta']            = 0.35  # Per-act transmission probability; absolute value, calibrated
-    pars['transm2f']        = 1.0   # Relative transmissibility of insertive partners in penile-vaginal intercourse; baseline value
-    pars['transf2m']        = 0.8   # Relative transmissibility of receptive partners in penile-vaginal intercourse; PLACEHOLDER VALUE, NEEDS SOURCE
+    pars['beta']            = 0.15  # Per-act transmission probability; absolute value, calibrated
+    pars['transf2m']        = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
+    pars['transm2f']        = 3.69   # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Probabilities of disease progression
     pars['rel_cin1_prob'] = 1.0  # Scale factor for proportion of CIN cases
