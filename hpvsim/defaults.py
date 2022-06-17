@@ -66,7 +66,7 @@ class PeopleMeta(sc.prettyobj):
         # Immune states, by genotype
         self.imm_states = [
             'sus_imm',  # Float, by genotype
-            'viral_load',  # Float by genotype
+            'rel_trans',  # Float by genotype
         ]
 
         # Immunity states, by genotype/vaccine

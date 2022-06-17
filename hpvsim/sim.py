@@ -598,8 +598,12 @@ class Sim(hpb.BaseSim):
         f_inf_genotypes, f_inf_inds, f_sus_genotypes, f_sus_inds = hpu.get_sources_targets(inf, sus, ~people.sex.astype(bool))  # Males and females infected with this genotype
         m_inf_genotypes, m_inf_inds, m_sus_genotypes, m_sus_inds = hpu.get_sources_targets(inf, sus,  people.sex.astype(bool))  # Males and females infected with this genotype
 
-        # Calculate viral load
-
+        # Calculate relative transmissibility by stage of infection
+        rel_trans_pars = self['rel_trans']
+        people.rel_trans = people.infectious[:].astype(hpd.default_float)
+        people.rel_trans[people.cin1] *= rel_trans_pars['cin1']
+        people.rel_trans[people.cin2] *= rel_trans_pars['cin2']
+        people.rel_trans[people.cin3] *= rel_trans_pars['cin3']
 
         # Loop over layers
         ln = 0 # Layer number

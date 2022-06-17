@@ -99,6 +99,13 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['dur']['cin3']     = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 (severe dysplasia/in situ carcinoma)
     pars['dur']['cancer']   = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated cancer
 
+    # Parameters determining relative transmissibility at each stage of disease
+    pars['rel_trans'] = {}
+    pars['rel_trans']['none']   = 1 # Baseline value
+    pars['rel_trans']['cin1']   = 0.5 # Less transmissible. Assumption, need data
+    pars['rel_trans']['cin2']   = 0.2 # Assumption, need data
+    pars['rel_trans']['cin3']   = 0.05 # Assumption, need data
+
     # Efficacy of protection
     pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
 
