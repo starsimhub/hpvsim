@@ -468,6 +468,7 @@ class People(hpb.BasePeople):
         # Now use genotype-specific prognosis probabilities to determine what happens.
         # Only women can progress beyond infection.
         f_inds = self.is_female[inds].nonzero()[-1]
+        m_inds = self.is_male[inds].nonzero()[-1]
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
@@ -560,6 +561,9 @@ class People(hpb.BasePeople):
             # Record eventual deaths from cancer (NB, assuming no survival without treatment)
             dur_cancer = hpu.sample(**self.pars['dur']['cancer'], size=len(cancer_inds))
             self.date_dead_cancer[g, cancer_inds]  = self.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
+
+        if len(m_inds)>0:
+            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_hpv[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return len(inds) # For incrementing counters
 
