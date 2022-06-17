@@ -483,8 +483,8 @@ class People(hpb.BasePeople):
             this_dur_f  = dur[self.is_female[inds]]
             self.dur_hpv[g, inds] = this_dur  # Set the initial duration of infection as the length of the period without dysplasia - this is then extended for those who progress
 
-        # Henceforth, apply filters so we only select females with this genotype
-        # We can skip all subsequent steps if there are no females
+        # Start calculating the probabilities of progressing through disease stages
+        # We can skip all this if there are no females; males are updated below
         if len(f_inds)>0:
 
             fg_inds = inds[self.is_female[inds]] # Subset the indices so we're only looking at females with this genotype
