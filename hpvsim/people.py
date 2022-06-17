@@ -563,6 +563,9 @@ class People(hpb.BasePeople):
         if len(m_inds)>0:
             self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_hpv[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
+        if len(m_inds)>0:
+            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_hpv[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+
         return len(inds) # For incrementing counters
 
 
