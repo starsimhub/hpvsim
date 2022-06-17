@@ -553,7 +553,7 @@ class Sim(hpb.BaseSim):
         beta = self['beta']
         gen_pars = self['genotype_pars']
         imm_kin_pars = self['imm_kin']
-        trans = np.array([self['transm2f'],self['transf2m']])
+        trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
 
         # Update demographics and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
