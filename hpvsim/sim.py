@@ -553,6 +553,7 @@ class Sim(hpb.BaseSim):
         beta = self['beta']
         gen_pars = self['genotype_pars']
         imm_kin_pars = self['imm_kin']
+        trans = np.array([self['transm2f'],self['transf2m']])
 
         # Update demographics and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
@@ -601,21 +602,21 @@ class Sim(hpb.BaseSim):
             f = fs[ln]
             m = ms[ln]
 
-            # Compute transmissibility for each partnership
-            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln]) # Probability of not getting infected from any fractional acts
-            foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln] # Probability of not getting infected from whole acts
-            foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
-
             # Compute transmissions
             for g in range(ng):
                 f_source_inds = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
                 m_source_inds = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
 
-                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g]],
-                                    [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g]]]
+                foi_frac = 1 - frac_acts[ln] * gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])  # Probability of not getting infected from any fractional acts
+                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])) ** whole_acts[ln]  # Probability of not getting infected from whole acts
+                foi = (1 - (foi_whole * foi_frac)).astype(hpd.default_float)
 
-                for pship_inds, sources, targets, genotypes in discordant_pairs:
-                    betas = foi[g, pship_inds] * (1. - sus_imm[g, targets])  # Pull out the transmissibility associated with this partnership
+                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g], foi[0,:]],
+                                    [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g], foi[1,:]]]
+
+                # Compute transmissibility for each partnership
+                for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
+                    betas = this_foi[pship_inds] * (1. - sus_imm[g, targets]) # Pull out the transmissibility associated with this partnership
                     target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people

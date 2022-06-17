@@ -44,7 +44,8 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     # Create and run the simulation
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
-    sim = hpv.Sim(end=2035, genotypes=[hpv16,hpv18])
+    hpv6 = hpv.genotype('HPV6')
+    sim = hpv.Sim(end=2035, genotypes=[hpv16,hpv18,hpv6])
     sim.set_seed(seed)
 
     # Optionally plot
