@@ -239,10 +239,10 @@ class People(hpb.BasePeople):
             self.current_partners[lno,new_pship_inds] += 1
 
             # Sort the new contacts by age so partners are roughly the same age
-            # sorted_f_inds = self.age[new_pship_inds_f].argsort()
-            # new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
-            # sorted_m_inds = self.age[new_pship_inds_m].argsort()
-            # new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
+            sorted_f_inds = self.age[new_pship_inds_f].argsort()
+            new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
+            sorted_m_inds = self.age[new_pship_inds_m].argsort()
+            new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
 
             # Add everything to a contacts dictionary
             new_pships[lkey]['f']       = new_pship_inds_f
@@ -251,6 +251,8 @@ class People(hpb.BasePeople):
             new_pships[lkey]['start']   = np.array([t*self['pars']['dt']]*this_n_new, dtype=hpd.default_float)
             new_pships[lkey]['end']     = new_pships[lkey]['start'] + new_pships[lkey]['dur']
             new_pships[lkey]['acts']    = hpu.sample(**self['pars']['acts'][lkey], size=this_n_new) # Acts per year for this pair, assumed constant over the duration of the partnership (TODO: EMOD uses a decay factor for this, consider?)
+            new_pships[lkey]['age_f']   = self.age[new_pship_inds_f]
+            new_pships[lkey]['age_m']   = self.age[new_pship_inds_m]
 
         self.add_contacts(new_pships)
 

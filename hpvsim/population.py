@@ -115,8 +115,8 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
             raise NotImplementedError(errormsg)
 
-        popdict['contacts']   = contacts
-        popdict['current_partners']   = np.array(current_partners)
+        popdict['contacts'] = contacts
+        popdict['current_partners'] = np.array(current_partners)
         popdict['layer_keys'] = list(sim['partners'].keys())
 
     # Ensure prognoses are set
@@ -287,8 +287,8 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=
     f_inds          = hpu.false(sexes)
     all_inds        = np.arange(pop_size)
     f_active_inds   = np.intersect1d(mapping, f_inds)
-    # age_order       = ages[f_active_inds].argsort() # We sort the contacts by age so they get matched to partners of similar age
-    # f_active_inds   = f_active_inds[age_order]
+    age_order       = ages[f_active_inds].argsort() # We sort the contacts by age so they get matched to partners of similar age
+    f_active_inds   = f_active_inds[age_order]
     inactive_inds   = np.setdiff1d(all_inds, mapping)
 
     # Precalculate contacts
@@ -297,8 +297,8 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=
     weighting[inactive_inds] = 0 # Exclude people not active
     weighting       = weighting/sum(weighting) # Turn this into a probability
     m_contacts      = hpu.choose_w(weighting, n_all_contacts, unique=False) # Select males
-    # m_age_order     = ages[m_contacts].argsort() # Sort the partners by age as well
-    # m_contacts      = m_contacts[m_age_order]
+    m_age_order     = ages[m_contacts].argsort() # Sort the partners by age as well
+    m_contacts      = m_contacts[m_age_order]
 
     # Make contacts
     count = 0
@@ -321,6 +321,8 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=
     output['acts'] = hpu.sample(**acts, size=n_partnerships)
     output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
     output['end'] = output['start'] + output['dur']
+    output['age_f'] = ages[f]
+    output['age_m'] = ages[m]
 
     return output, actual_p_count
 

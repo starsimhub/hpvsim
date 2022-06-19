@@ -1823,6 +1823,8 @@ class Layer(FlexDict):
             'dur':   hpd.default_float, # Duration of partnership
             'start': hpd.default_int, # Date of partnership start
             'end':   hpd.default_float, # Date of partnership end
+            'age_f': hpd.default_float,  # Age of female partner
+            'age_m': hpd.default_float,  # Age of male partner
         }
         self.basekey = 'f' # Assign a base key for calculating lengths and performing other operations
         self.label = label

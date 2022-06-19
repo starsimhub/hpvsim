@@ -52,6 +52,16 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
         sim.run(verbose=verbose)
         sim.plot(do_save=do_save)
 
+        # Plot age mixing
+        import pylab as pl
+        pl.rcParams.update({'font.size': 22})
+        fig, ax = pl.subplots(figsize=(12,8))
+        h = ax.hist2d(sim.people.contacts['a']['age_f'], sim.people.contacts['a']['age_m'], bins=np.linspace(0,100,21))
+        ax.set_xlabel('Age of female partner')
+        ax.set_ylabel('Age of male partner')
+        fig.colorbar(h[3], ax=ax)
+        pl.show()
+
     return sim
 
 
@@ -293,13 +303,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
+    # sim4 = test_result_consistency()
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
     # json = test_fileio()
 
     sc.toc(T)

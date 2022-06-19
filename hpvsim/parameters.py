@@ -143,17 +143,20 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         condoms     = dict(a=0.25),  # Default proportion of acts in which condoms are used
     )
 
-    # Specify defaults for basic sexual network with regular and casual partners
-    layer_defaults['basic'] = dict(
-        partners    = dict(r=1, c=2), # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
-        acts         = dict(r=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts for people at sexual peak
-                            c=dict(dist='neg_binomial', par1=10, par2=5)), # Default number of acts for people at sexual peak
-        age_act_pars = dict(r=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
-                            c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1)), # Parameters describing changes in coital frequency over agent lifespans
-        layer_probs = dict(r=0.7, c=0.4),   # Default proportion of the population in each layer
-        dur_pship   = dict(r=dict(dist='normal_pos', par1=10,par2=3),
-                           c=dict(dist='normal_pos', par1=2, par2=1)),
-        condoms     = dict(r=0.01, c=0.8),  # Default proportion of acts in which condoms are used
+    # Specify defaults for basic sexual network with marital, casual, and one-off partners
+    layer_defaults['default'] = dict(
+        partners    = dict(m=1, c=1, o=1), # Default number of concurrent sexual partners
+        acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts for people at sexual peak
+                            c=dict(dist='neg_binomial', par1=10, par2=5), # Default number of acts for people at sexual peak
+                            o=dict(dist='neg_binomial', par1=2,  par2=1)),  # Default number of acts for people at sexual peak
+        age_act_pars = dict(m=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
+                            c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
+                            o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
+        layer_probs = dict(m=0.7, c=0.4, o=0.05),   # Default proportion of the population in each layer
+        dur_pship   = dict(m=dict(dist='normal_pos', par1=10,par2=3),
+                           c=dict(dist='normal_pos', par1=2, par2=1),
+                           o=dict(dist='normal_pos', par1=0.1, par2=0.05)),
+        condoms     = dict(m=0.01, c=0.5, o=0.6),  # Default proportion of acts in which condoms are used
     )
 
     # Choose the parameter defaults based on the population type, and get the layer keys
