@@ -74,7 +74,7 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Parameters used to calculate immunity
     pars['imm_init'] = dict(dist='beta', par1=20, par2=1)  # beta distribution for initial level of immunity following infection clearance
-    pars['imm_decay'] = dict(form='exp_decay', init_val=1, half_life=20) # decay rate, with half life in YEARS
+    pars['imm_decay'] = dict(form='exp_decay', init_val=1, half_life=20) # decay rate, with half life in years
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
     pars['imm_boost'] = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity'] = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
@@ -330,119 +330,155 @@ def get_genotype_pars(default=False, genotype=None):
     '''
     Define the default parameters for the different genotypes
     '''
-    pars = dict(
 
-        hpv16 = dict(
-            rel_beta        = 1.0, # Default values
-            rel_cin1_prob    = 1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
-            rel_cancer_prob = 1.0,
-            rel_death_prob  = 1.0,
-            imm_boost = 1.5
-        ),
+    dur_dict = sc.objdict()
+    for stage in ['none', 'cin1', 'cin2', 'cin3']:
+        dur_dict[stage] = dict()
 
-        hpv18 = dict(
-            rel_beta        = 0.8, # Default values
-            rel_cin1_prob=1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
-            rel_cancer_prob = 0.8,
-            rel_death_prob  = 0.8,
-            imm_boost = 1.5
-        ),
+    pars = sc.objdict()
 
-        hpv31=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
-            rel_cancer_prob=1.0,
-            rel_death_prob=1.0,
-            imm_boost = 1.5
-        ),
+    pars.hpv16 = sc.objdict()
+    pars.hpv16.dur = dict()
+    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpv16.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv16.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv16.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv16.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv16.imm_boost        = 1.0 # TODO: look for data
 
-        hpv33=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
-            rel_cancer_prob=1.0,
-            rel_death_prob=1.0,
-            imm_boost = 1.5
-        ),
+    pars.hpv18 = sc.objdict()
+    pars.hpv18.dur = dict()
+    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpv18.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.imm_boost        = 1.0 # TODO: look for data
 
-        hpv45=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
-            rel_cancer_prob=1.0,
-            rel_death_prob=1.0,
-            imm_boost = 1.5
-        ),
+    pars.hpv31 = sc.objdict()
+    pars.hpv31.dur = dict()
+    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv31.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv31.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv31.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv31.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpv31.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv31.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv31.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv31.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv31.imm_boost        = 1.0 # TODO: look for data
 
-        hpv52=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
-            rel_cancer_prob=1.0,
-            rel_death_prob=1.0,
-            imm_boost = 1.5
-        ),
+    pars.hpv33 = sc.objdict()
+    pars.hpv33.dur = dict()
+    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv33.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv33.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv33.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv33.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpv33.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv33.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv33.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv33.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv33.imm_boost        = 1.0 # TODO: look for data
 
-        hpv6=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=0,
-            rel_cin2_prob=0,
-            rel_cin3_prob=0,
-            rel_cancer_prob=0,
-            rel_death_prob=0,
-            imm_boost = 1.5
-        ),
+    pars.hpv45 = sc.objdict()
+    pars.hpv45.dur = dict()
+    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv45.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv45.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv45.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv45.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpv45.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv45.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv45.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv45.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv45.imm_boost        = 1.0 # TODO: look for data
 
-        hpv11=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=0,
-            rel_cin2_prob=0,
-            rel_cin3_prob=0,
-            rel_cancer_prob=0,
-            rel_death_prob=0,
-            imm_boost = 1.5
-        ),
+    pars.hpv52 = sc.objdict()
+    pars.hpv52.dur = dict()
+    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv52.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv52.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv52.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv52.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpv52.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv52.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv52.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv52.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv52.imm_boost        = 1.0 # TODO: look for data
 
-        hpvlo=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=0,
-            rel_cin2_prob=0,
-            rel_cin3_prob=0,
-            rel_cancer_prob=0,
-            rel_death_prob=0,
-            imm_boost = 1.5
-        ),
+    pars.hpv6 = sc.objdict()
+    pars.hpv6.dur = dict()
+    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv6.dur['cin1']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv6.dur['cin2']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv6.dur['cin3']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv6.rel_beta          = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpv6.rel_cin1_prob     = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cin2_prob     = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cin3_prob     = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cancer_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.imm_boost         = 1.0 # TODO: look for data
 
-        hpvhi=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
-            rel_cancer_prob=1.0,
-            rel_death_prob=1.0,
-            imm_boost = 1.5
-        ),
+    pars.hpv11 = sc.objdict()
+    pars.hpv11.dur = dict()
+    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv11.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv11.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv11.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv11.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpv11.rel_cin1_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.imm_boost        = 1.0 # TODO: look for data
 
-        hpvhi5=dict(
-            rel_beta=1.0,  # Default values
-            rel_cin1_prob=1.0,
-            rel_cin2_prob=1.0,
-            rel_cin3_prob=1.0,
-            rel_cancer_prob=1.0,
-            rel_death_prob=1.0,
-            imm_boost = 1.5
-        ),
+    pars.hpvlo = sc.objdict()
+    pars.hpvlo.dur = dict()
+    pars.hpvlo.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvlo.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvlo.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvlo.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvlo.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpvlo.rel_cin1_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvlo.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvlo.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvlo.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvlo.imm_boost        = 1.0 # TODO: look for data
 
-    )
+    pars.hpvhi = sc.objdict()
+    pars.hpvhi.dur = dict()
+    pars.hpvhi.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpvhi.rel_cin1_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi.imm_boost        = 1.0 # TODO: look for data
+
+    pars.hpvhi5 = sc.objdict()
+    pars.hpvhi5.dur = dict()
+    pars.hpvhi5.dur['none']     = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi5.dur['cin1']     = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi5.dur['cin2']     = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi5.dur['cin3']     = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi5.rel_beta        = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
+    pars.hpvhi5.rel_cin1_prob   = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi5.rel_cin2_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi5.rel_cin3_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi5.rel_cancer_prob = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi5.imm_boost       = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 

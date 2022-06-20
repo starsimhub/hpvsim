@@ -228,13 +228,14 @@ default_init_prev = {
     'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
     'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
 }
+
 #%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
-    'cum_total_infections',
-    'cum_total_cins',
-    'cum_total_cancers',
+    'total_infections',
+    'total_cins',
+    'total_cancers',
 ]
 
 
@@ -275,6 +276,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                 ],
                 'HPV incidence': [
                     'total_hpv_incidence',
+                    'hpv_incidence',
                 ],
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
@@ -285,12 +287,12 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         else: # pragma: no cover
             plots = sc.odict({
-                'Cumulative infections': [
-                    'cum_infections',
+                'HPV incidence': [
+                    'total_hpv_incidence',
                 ],
-                'New infections per day': [
-                    'new_infections',
-                ],
+                'Cancers per 100,000 women': [
+                    'total_cancer_incidence',
+                    ],
             })
 
     # Demographic plots
