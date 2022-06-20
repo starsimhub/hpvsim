@@ -34,30 +34,30 @@ def test_singlerun():
 def test_multirun(do_plot=do_plot): # If being run via pytest, turn off
     sc.heading('Multirun test')
 
-    n_days = 60
+    n_years = 20
 
     # Method 1 -- Note: this runs 3 simulations, not 3x3!
     iterpars = {'beta': [0.015, 0.025, 0.035],
-                'iso_factor': [0.1, 0.5, 0.9],
+                'rel_cin1_prob': [0.1, 1.0, 5.0],
                 }
-    sim = cv.Sim(n_days=n_days, pop_size=pop_size)
-    sims = cv.multi_run(sim=sim, iterpars=iterpars, verbose=verbose)
+    sim = hpv.Sim(n_years=n_years, pop_size=pop_size)
+    sims = hpv.multi_run(sim=sim, iterpars=iterpars, verbose=verbose)
 
     # Method 2 -- run a list of sims
     simlist = []
     for i in range(len(iterpars['beta'])):
-        sim = cv.Sim(n_days=n_days, pop_size=pop_size, beta=iterpars['beta'][i], iso_factor=iterpars['iso_factor'][i])
+        sim = hpv.Sim(n_years=n_years, pop_size=pop_size, beta=iterpars['beta'][i], rel_cin1_prob=iterpars['rel_cin1_prob'][i])
         simlist.append(sim)
-    sims2 = cv.multi_run(sim=simlist, verbose=verbose)
+    sims2 = hpv.multi_run(sim=simlist, verbose=verbose)
 
     # Method 3 -- shortcut for parallelization
-    s1 = cv.Sim(n_days=n_days, pop_size=pop_size)
+    s1 = hpv.Sim(n_years=n_years, pop_size=pop_size)
     s2 = s1.copy()
-    s1,s2 = cv.parallel(s1, s2).sims
+    s1,s2 = hpv.parallel(s1, s2).sims
     assert np.allclose(s1.summary[:], s2.summary[:], rtol=0, atol=0, equal_nan=True)
 
     # Run in serial for debugging
-    cv.multi_run(sim=cv.Sim(n_days=n_days, pop_size=pop_size), n_runs=2, parallel=False)
+    hpv.multi_run(sim=hpv.Sim(n_years=n_years, pop_size=pop_size), n_runs=2, parallel=False)
 
     if do_plot:
         for sim in sims + sims2:
@@ -70,10 +70,10 @@ def test_multisim_reduce(do_plot=do_plot): # If being run via pytest, turn off
     sc.heading('Combine results test')
 
     n_runs = 3
-    pop_infected = 10
+    init_hpv_prev = 0.1
 
-    sim = cv.Sim(pop_size=pop_size, pop_infected=pop_infected)
-    msim = cv.MultiSim(sim, n_runs=n_runs, noise=0.1)
+    sim = hpv.Sim(pop_size=pop_size, init_hpv_prev=init_hpv_prev)
+    msim = hpv.MultiSim(sim, n_runs=n_runs, noise=0.1)
     msim.run(verbose=verbose, reduce=True)
 
     if do_plot:
@@ -86,17 +86,17 @@ def test_multisim_combine(do_plot=do_plot): # If being run via pytest, turn off
     sc.heading('Combine results test')
 
     n_runs = 3
-    pop_infected = 10
+    init_hpv_prev = 0.1
 
     print('Running first sim...')
-    sim = cv.Sim(pop_size=pop_size, pop_infected=pop_infected, verbose=verbose)
-    msim = cv.MultiSim(sim)
+    sim = hpv.Sim(pop_size=pop_size, init_hpv_prev=init_hpv_prev, verbose=verbose)
+    msim = hpv.MultiSim(sim)
     msim.run(n_runs=n_runs, keep_people=True)
     sim1 = msim.combine(output=True)
     assert sim1['pop_size'] == pop_size*n_runs
 
     print('Running second sim, results should be similar but not identical (stochastic differences)...')
-    sim2 = cv.Sim(pop_size=pop_size*n_runs, pop_infected=pop_infected*n_runs)
+    sim2 = hpv.Sim(pop_size=pop_size*n_runs, init_hpv_prev=init_hpv_prev)
     sim2.run(verbose=verbose)
 
     if do_plot:
@@ -115,10 +115,10 @@ def test_multisim_advanced():
     # Creat the sims/msims
     sims = sc.objdict()
     for i in range(4):
-        sims[f's{i}'] = cv.Sim(label=f'Sim {i}', pop_size=pop_size, beta=0.01*i)
+        sims[f's{i}'] = hpv.Sim(label=f'Sim {i}', pop_size=pop_size, beta=0.01*i)
 
-    m1 = cv.MultiSim(sims=[sims.s0, sims.s1])
-    m2 = cv.MultiSim(sims=[sims.s2, sims.s3])
+    m1 = hpv.MultiSim(sims=[sims.s0, sims.s1])
+    m2 = hpv.MultiSim(sims=[sims.s2, sims.s3])
 
     # Test methods
     m1.init_sims()
@@ -134,13 +134,13 @@ def test_multisim_advanced():
 
     # Check save/load
     m1.save(msim_path)
-    m1b = cv.MultiSim.load(msim_path)
+    m1b = hpv.MultiSim.load(msim_path)
     assert np.allclose(m1.summary[:], m1b.summary[:], rtol=0, atol=0, equal_nan=True)
     os.remove(msim_path)
 
     # Check merging/splitting
-    merged1 = cv.MultiSim.merge(m1, m2)
-    merged2 = cv.MultiSim.merge([m1, m2], base=True)
+    merged1 = hpv.MultiSim.merge(m1, m2)
+    merged2 = hpv.MultiSim.merge([m1, m2], base=True)
     m1c, m2c = merged1.split()
     m1d, m2d = merged1.split(chunks=[2,2])
 
@@ -154,7 +154,7 @@ def test_simple_scenarios(do_plot=do_plot):
     json_path = 'scen_test.json'
     xlsx_path = 'scen_test.xlsx'
 
-    scens = cv.Scenarios(basepars=basepars)
+    scens = hpv.Scenarios(basepars=basepars)
     scens.run(verbose=verbose)
     if do_plot:
         scens.plot()
@@ -177,81 +177,49 @@ def test_complex_scenarios(do_plot=do_plot, do_save=False, fig_path=None):
     n_runs = 3
     base_pars = {
       'pop_size': pop_size,
-      'pop_type': 'hybrid',
+      'network': 'basic',
       }
 
-    base_sim = cv.Sim(base_pars) # create sim object
-    base_sim['n_days'] = 50
-    base_sim['beta'] = 0.03 # Increase beta
-
-    n_people = base_sim['pop_size']
-    npts = base_sim.npts
-
-    # Define overall testing assumptions
-    testing_prop = 0.1 # Assumes we could test 10% of the population daily (way too optimistic!!)
-    daily_tests = [testing_prop*n_people]*npts # Number of daily tests
+    base_sim = hpv.Sim(base_pars) # create sim object
+    base_sim['n_years'] = 30
 
     # Define the scenarios
     scenarios = {
-        'lowtrace': {
-            'name': 'Poor contact tracing',
+        'default': {
+            'name': 'Default sexual behavior',
             'pars': {
-                'quar_factor': {'h': 1, 's': 0.5, 'w': 0.5, 'c': 0.25},
-                'quar_period': 7,
-                'interventions': [cv.test_num(daily_tests=daily_tests),
-                cv.contact_tracing(trace_probs = {'h': 0, 's': 0, 'w': 0, 'c': 0},
-                        trace_time  = {'h': 1, 's': 7,   'w': 7,   'c': 7})]
             }
         },
-        'modtrace': {
-            'name': 'Moderate contact tracing',
+        'high': {
+            'name': 'Higher-risk sexual behavior',
             'pars': {
-                'quar_factor': {'h': 0.75, 's': 0.25, 'w': 0.25, 'c': 0.1},
-                'quar_period': 10,
-                'interventions': [cv.test_num(daily_tests=daily_tests),
-                cv.contact_tracing(trace_probs = {'h': 1, 's': 0.8, 'w': 0.5, 'c': 0.1},
-                        trace_time  = {'h': 0,  's': 3,  'w': 3,   'c': 8})]
+                'acts': dict(r=dict(dist='neg_binomial', par1=120, par2=40),
+                           c=dict(dist='neg_binomial', par1=20, par2=5)),
+                'condoms': dict(r=0, c=0.1),
+                'debut': dict(f=dict(dist='normal', par1=14, par2=2),
+                              m=dict(dist='normal', par1=14, par2=2))
             }
         },
-        'hightrace': {
-            'name': 'Fast contact tracing',
+        'low': {
+            'name': 'Lower-risk sexual behavior',
             'pars': {
-                'quar_factor': {'h': 0.5, 's': 0.1, 'w': 0.1, 'c': 0.1},
-                'quar_period': 14,
-                'interventions': [cv.test_num(daily_tests=daily_tests),
-                cv.contact_tracing(trace_probs = {'h': 1, 's': 0.8, 'w': 0.8, 'c': 0.2},
-                        trace_time  = {'h': 0, 's': 1,   'w': 1,   'c': 5})]
-            }
-        },
-        'alltrace': {
-            'name': 'Same-day contact tracing',
-            'pars': {
-                'quar_factor': {'h': 0.0, 's': 0.0, 'w': 0.0, 'c': 0.0},
-                'quar_period': 21,
-                'interventions': [cv.test_num(daily_tests=daily_tests),
-                cv.contact_tracing(trace_probs = {'h': 1, 's': 1, 'w': 1, 'c': 1},
-                        trace_time  = {'h': 0, 's': 1, 'w': 1, 'c': 2})]
+                'acts': dict(r=dict(dist='neg_binomial', par1=40, par2=10),
+                           c=dict(dist='neg_binomial', par1=2, par2=1)),
+                'condoms': dict(r=0.5, c=0.9),
+                'debut': dict(f=dict(dist='normal', par1=20, par2=2),
+                              m=dict(dist='normal', par1=21, par2=2))
             }
         },
     }
 
     metapars = {'n_runs': n_runs}
 
-    scens = cv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
+    scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
     scens.run(verbose=verbose, debug=debug)
     scens.compare()
 
     if do_plot:
-        to_plot = [
-            'cum_infections',
-            'cum_recoveries',
-            'new_infections',
-            'cum_severe',
-            'n_quarantined',
-            'new_quarantined'
-        ]
-        fig_args = dict(figsize=(24,16))
-        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path, n_cols=2, fig_args=fig_args)
+        scens.plot(do_save=do_save, fig_path=fig_path)
 
     return scens
 
@@ -264,12 +232,12 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim1   = test_singlerun()
-    # sims2  = test_multirun(do_plot=do_plot)
-    # msim1  = test_multisim_reduce(do_plot=do_plot)
-    # msim2  = test_multisim_combine(do_plot=do_plot)
-    # m1,m2  = test_multisim_advanced()
-    # scens1 = test_simple_scenarios(do_plot=do_plot)
-    # scens2 = test_complex_scenarios(do_plot=do_plot)
+    sims2  = test_multirun(do_plot=do_plot)
+    msim1  = test_multisim_reduce(do_plot=do_plot)
+    msim2  = test_multisim_combine(do_plot=do_plot)
+    m1,m2  = test_multisim_advanced()
+    scens1 = test_simple_scenarios(do_plot=do_plot)
+    scens2 = test_complex_scenarios(do_plot=do_plot)
 
     sc.toc(T)
     print('Done.')

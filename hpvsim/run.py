@@ -258,26 +258,34 @@ class MultiSim(hpb.FlexPretty):
 
         # Perform the statistics
         raw = {}
-        mainkeys = reduced_sim.result_keys('main')
-        variantkeys = reduced_sim.result_keys('variant')
-        for reskey in mainkeys:
-            raw[reskey] = np.zeros((reduced_sim.npts, len(self.sims)))
+
+        totalkeys = reduced_sim.result_keys('total')
+        genotypekeys = reduced_sim.result_keys('genotype')
+        sexkeys = reduced_sim.result_keys('by_sex')
+
+        for reskey in totalkeys:
+            raw[reskey] = np.zeros((reduced_sim.res_npts, len(self.sims)))
             for s,sim in enumerate(self.sims):
                 vals = sim.results[reskey].values
                 raw[reskey][:, s] = vals
-        for reskey in variantkeys:
-            raw[reskey] = np.zeros((reduced_sim['n_variants'], reduced_sim.npts, len(self.sims)))
+        for reskey in genotypekeys:
+            raw[reskey] = np.zeros((reduced_sim['n_genotypes'], reduced_sim.res_npts, len(self.sims)))
             for s,sim in enumerate(self.sims):
-                vals = sim.results['variant'][reskey].values
+                vals = sim.results[reskey].values
+                raw[reskey][:, :, s] = vals
+        for reskey in sexkeys:
+            raw[reskey] = np.zeros((2, reduced_sim.res_npts, len(self.sims)))
+            for s,sim in enumerate(self.sims):
+                vals = sim.results[reskey].values
                 raw[reskey][:, :, s] = vals
 
-        for reskey in mainkeys + variantkeys:
-            if reskey in mainkeys:
+        for reskey in totalkeys + genotypekeys + sexkeys:
+            if reskey in totalkeys:
                 axis = 1
                 results = reduced_sim.results
             else:
                 axis = 2
-                results = reduced_sim.results['variant']
+                results = reduced_sim.results
             if use_mean:
                 r_mean = np.mean(raw[reskey], axis=axis)
                 r_std = np.std(raw[reskey], axis=axis)
@@ -349,8 +357,8 @@ class MultiSim(hpb.FlexPretty):
                 combined_sim['pop_size'] += sim['pop_size']  # Record the number of people
             for key in sim.result_keys():
                 vals = sim.results[key].values
-                if len(vals) != combined_sim.npts:
-                    errormsg = f'Cannot combine sims with inconsistent numbers of days: {combined_sim.npts} vs. {len(vals)}'
+                if vals.shape[-1] != combined_sim.res_npts:
+                    errormsg = f'Cannot combine sims with inconsistent numbers of timepoints: {combined_sim.res_npts} vs. {len(vals)}'
                     raise ValueError(errormsg)
                 combined_sim.results[key].values += vals
 
@@ -921,6 +929,9 @@ class Scenarios(hpb.ParsObj):
         self.tvec       = self.base_sim.tvec
         self.yearvec    = self.base_sim.yearvec
         self['verbose'] = self.base_sim['verbose']
+        self.res_npts       = self.base_sim.res_npts
+        self.res_tvec       = self.base_sim.res_tvec
+        self.res_yearvec    = self.base_sim.res_yearvec
 
         # Create the results object; order is: results key, scenario, best/low/high
         self.sims = sc.objdict()
@@ -970,7 +981,7 @@ class Scenarios(hpb.ParsObj):
 
         totalkeys   = self.result_keys('total')
         genotypekeys = self.result_keys('genotype')
-        sexkeys = self.result_keys('sex')
+        sexkeys = self.result_keys('by_sex')
 
         # Loop over scenarios
         for scenkey,scen in self.scenarios.items():
@@ -978,8 +989,8 @@ class Scenarios(hpb.ParsObj):
             scenpars = scen['pars']
 
             # This is necessary for plotting, and since self.npts is defined prior to run
-            if 'n_days' in scenpars.keys():
-                errormsg = 'Scenarios cannot be run with different numbers of days; set via basepars instead'
+            if 'n_years' in scenpars.keys():
+                errormsg = 'Scenarios cannot be run with different numbers of years; set via basepars instead'
                 raise ValueError(errormsg)
 
             # Create and run the simulations
@@ -1006,15 +1017,15 @@ class Scenarios(hpb.ParsObj):
             ng = scen_sims[0]['n_genotypes'] # Get number of genotypes
             scenraw = {}
             for reskey in totalkeys:
-                scenraw[reskey] = np.zeros((self.npts, len(scen_sims)))
+                scenraw[reskey] = np.zeros((self.res_npts, len(scen_sims)))
                 for s,sim in enumerate(scen_sims):
                     scenraw[reskey][:,s] = sim.results[reskey].values
             for reskey in genotypekeys:
-                scenraw[reskey] = np.zeros((ng, self.npts, len(scen_sims)))
+                scenraw[reskey] = np.zeros((ng, self.res_npts, len(scen_sims)))
                 for s,sim in enumerate(scen_sims):
                     scenraw[reskey][:,:,s] = sim.results[reskey].values
             for reskey in sexkeys:
-                scenraw[reskey] = np.zeros((2, self.npts, len(scen_sims)))
+                scenraw[reskey] = np.zeros((2, self.res_npts, len(scen_sims)))
                 for s,sim in enumerate(scen_sims):
                     scenraw[reskey][:,:,s] = sim.results[reskey].values
 
@@ -1022,13 +1033,13 @@ class Scenarios(hpb.ParsObj):
             scenres.best = {}
             scenres.low = {}
             scenres.high = {}
-            for reskey in mainkeys + genotypekeys + sexkeys:
-                axis = 1 if reskey in mainkeys else 2
+            for reskey in totalkeys + genotypekeys + sexkeys:
+                axis = 1 if reskey in totalkeys else 2
                 scenres.best[reskey] = np.quantile(scenraw[reskey], q=0.5, axis=axis) # Changed from median to mean for smoother plots
                 scenres.low[reskey]  = np.quantile(scenraw[reskey], q=self['quantiles']['low'], axis=axis)
                 scenres.high[reskey] = np.quantile(scenraw[reskey], q=self['quantiles']['high'], axis=axis)
 
-            for reskey in mainkeys + genotypekeys + sexkeys:
+            for reskey in totalkeys + genotypekeys + sexkeys:
                 self.results[reskey][scenkey]['name'] = scenname
                 for blh in ['best', 'low', 'high']:
                     self.results[reskey][scenkey][blh] = scenres[blh][reskey]
@@ -1067,7 +1078,7 @@ class Scenarios(hpb.ParsObj):
             daystr = 'the last timepoint'
         else:
             daystr = f'timepoint {t}'
-        day = self.base_sim.get_t(t) # Unlike MultiSims, scenarios must have the same start day
+        day = t
 
         # Compute dataframe
         x = defaultdict(dict)
@@ -1078,7 +1089,7 @@ class Scenarios(hpb.ParsObj):
                 if reskey in genotypekeys:
                     for genotype in range(self.base_sim['n_genotypes']):
                         val = self.results[reskey][scenkey].best[genotype, day] # Only prints results for infections by first variant
-                        genotypekey = reskey + str(variant) # Add variant number to the summary output
+                        genotypekey = reskey + str(genotype) # Add variant number to the summary output
                         x[scenkey][genotypekey] = int(val)
                 elif reskey in sexkeys:
                     for sex in range(2):
@@ -1158,7 +1169,7 @@ class Scenarios(hpb.ParsObj):
         spreadsheet = sc.Spreadsheet()
         spreadsheet.freshbytes()
         with pd.ExcelWriter(spreadsheet.bytes, engine='xlsxwriter') as writer:
-            for key in self.result_keys('main'): # Multidimensional variant keys can't be exported
+            for key in self.result_keys('total'): # Multidimensional variant keys can't be exported
                 result_df = pd.DataFrame.from_dict(sc.flattendict(self.results[key], sep='_'))
                 result_df.to_excel(writer, sheet_name=key)
         spreadsheet.load()
