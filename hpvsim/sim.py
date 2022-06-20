@@ -633,10 +633,6 @@ class Sim(hpb.BaseSim):
                                     [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g]]]
 
                 for pship_inds, sources, targets, genotypes in discordant_pairs:
-                    import traceback;
-                    traceback.print_exc();
-                    import pdb;
-                    pdb.set_trace()
                     betas = foi[g, pship_inds] * (1. - sus_imm[g, targets])  # Pull out the transmissibility associated with this partnership
                     target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them

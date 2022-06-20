@@ -471,10 +471,10 @@ class BaseVaccination(Intervention):
         super().initialize()
 
         # Populate any missing keys -- must be here, after genotypes are initialized
-        default_genotype_pars = hppar.get_vaccine_genotype_pars(default=True)
-        default_dose_pars    = hppar.get_vaccine_dose_pars(default=True)
-        genotype_labels       = list(sim['genotype_pars'].keys())
-        dose_keys            = list(default_dose_pars.keys())
+        default_genotype_pars   = hppar.get_vaccine_genotype_pars(default=True)
+        default_dose_pars       = hppar.get_vaccine_dose_pars(default=True)
+        genotype_labels         = list(sim['genotype_pars'].keys())
+        dose_keys               = list(default_dose_pars.keys())
 
         # Handle dose keys
         for key in dose_keys:
@@ -491,12 +491,11 @@ class BaseVaccination(Intervention):
                     if sim['verbose']: print(f'Note: No cross-immunity specified for vaccine {self.label} and genotype {key}, setting to 1.0')
                 self.p[key] = val
 
-
         sim['vaccine_pars'][self.label] = self.p # Store the parameters
         self.index = list(sim['vaccine_pars'].keys()).index(self.label) # Find where we are in the list
         sim['vaccine_map'][self.index]  = self.label # Use that to populate the reverse mapping
 
-        # update sim['immunity']
+        # Prepare to update sim['immunity']
         n_vax = self.index+1
         n_imm_sources = n_vax + len(sim['genotype_map'])
         immunity = sim['immunity']
@@ -504,10 +503,10 @@ class BaseVaccination(Intervention):
         # add this vaccine to the immunity map
         sim['immunity_map'][n_imm_sources-1] = 'vaccine'
         if n_imm_sources > len(immunity): # need to add this vaccine, otherwise it's a duplicate
-            vacc_mapping = [self.p.get(label, 1.0) for label in sim['genotype_map'].values()]
+            vacc_mapping = [self.p[label] for label in sim['genotype_map'].values()]
             for _ in range(n_vax):
                 vacc_mapping.append(1)
-            vacc_mapping = np.reshape(vacc_mapping, (n_imm_sources, 1))
+            vacc_mapping = np.reshape(vacc_mapping, (n_imm_sources, 1)).astype(hpd.default_float)
             immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
             sim['immunity'] = immunity
