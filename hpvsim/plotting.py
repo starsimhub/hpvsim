@@ -379,15 +379,8 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         if label: label += f' - {v_label}'
                         else:     label = v_label
                         ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result
-<<<<<<< HEAD
-            #     if args.show['data']:
-            #         plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
-            #     if args.show['ticks']:
-            #         reset_ticks(ax, sim, args.date, n_cols=n_cols) # Optionally reset tick marks (useful for e.g. plotting weeks/months)
             if args.show['interventions']:
                 plot_interventions(sim, ax) # Plot the interventions
-=======
->>>>>>> main
             title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
         output = tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
