@@ -26,9 +26,9 @@ def test_network(do_plot=True):
                 n_years=30,
                 dt=0.5,
                 pop_scale=25.2e6/n_agents,
-                network='basic',
-                debut = dict(f=dict(dist='normal', par1=15., par2=2.1),
-                             m=dict(dist='normal', par1=16., par2=1.8))
+                network='default',
+                debut = dict(f=dict(dist='normal', par1=15., par2=1),
+                             m=dict(dist='normal', par1=16., par2=1))
                 )
     hpv6    = hpv.genotype('HPV6')
     hpv11   = hpv.genotype('HPV11')
@@ -43,7 +43,7 @@ def test_network(do_plot=True):
 
     az = hpv.age_results(
         timepoints=['1990', '2020'],
-        result_keys=['total_hpv_incidence']
+        result_keys=['total_infections', 'total_hpv_incidence']
     )
 
     # TO PLOT:
@@ -52,22 +52,11 @@ def test_network(do_plot=True):
     # 2. Individual lifetime
     # 3. Plot gaps between relationships
 
-    # To ADD
-    # 1. transm2f vs tansf2m
-    # 2. Link transmissibility to disease stage
-
-    # Q:
-    # 1. Circumcision effect?
-    # 2. Investigate network generation
-    # 3. Consider storing discordancy
-    # 4. ERF graphs
-    # 5.
-
 
     sim = hpv.Sim(
         pars,
         genotypes = [hpv16, hpv11, hpv6, hpv18],
-        network='basic',
+        network='default',
         location = 'tanzania',
         analyzers=[age_pyr, az])
 

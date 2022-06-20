@@ -185,7 +185,7 @@ class Sim(hpb.BaseSim):
         self.tvec          = np.arange(self.npts)
         
         # Handle population network data
-        network_choices = ['random', 'basic']
+        network_choices = ['random', 'default']
         choice = self['network']
         if choice and choice not in network_choices: # pragma: no cover
             choicestr = ', '.join(network_choices)

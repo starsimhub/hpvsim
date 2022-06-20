@@ -116,7 +116,7 @@ def make_pars(set_prognoses=False, **kwargs):
 
 
 # Define which parameters need to be specified as a dictionary by layer -- define here so it's available at the module level for sim.py
-layer_pars = ['partners', 'acts', 'layer_probs', 'dur_pship', 'condoms']
+layer_pars = ['partners', 'acts', 'age_act_pars', 'layer_probs', 'dur_pship', 'condoms']
 
 
 def reset_layer_pars(pars, layer_keys=None, force=False):
@@ -138,6 +138,7 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     layer_defaults['random'] = dict(
         partners    = dict(a=1),    # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
         acts        = dict(a=dict(dist='neg_binomial', par1=100,par2=50)),  # Default number of sexual acts per year
+        age_act_pars = dict(a=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1)), # Parameters describing changes in coital frequency over agent lifespans
         layer_probs = dict(a=1.0),  # Default proportion of the population in each layer
         dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships
         condoms     = dict(a=0.25),  # Default proportion of acts in which condoms are used
@@ -148,7 +149,7 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         partners    = dict(m=1, c=1, o=1), # Default number of concurrent sexual partners
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts for people at sexual peak
                             c=dict(dist='neg_binomial', par1=10, par2=5), # Default number of acts for people at sexual peak
-                            o=dict(dist='neg_binomial', par1=2,  par2=1)),  # Default number of acts for people at sexual peak
+                            o=dict(dist='neg_binomial', par1=1,  par2=.01)),  # Default number of acts for people at sexual peak
         age_act_pars = dict(m=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
                             c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
                             o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),

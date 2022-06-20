@@ -100,7 +100,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
         # Create the contacts
         active_inds = hpu.true(ages>debuts)     # Indices of sexually experienced people
-        if microstructure in ['random', 'basic']:
+        if microstructure in ['random', 'default']:
             contacts = dict()
             current_partners = []
             lno = 0
@@ -108,7 +108,8 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 active_inds_layer = hpu.binomial_filter(sim['layer_probs'][lkey], active_inds)
                 durations = sim['dur_pship'][lkey]
                 acts = sim['acts'][lkey]
-                contacts[lkey], cp = make_random_contacts(p_count=partners[lno], sexes=sexes, ages=ages, n=n, durations=durations, acts=acts, mapping=active_inds_layer, **kwargs)
+                contacts[lkey], cp = make_random_contacts(p_count=partners[lno], sexes=sexes, ages=ages, age_act_pars=sim['age_act_pars'][lkey], debuts=debuts, n=n, durations=durations, acts=acts, mapping=active_inds_layer, **kwargs)
+                contacts[lkey]['acts'] += 1 # To avoid zeros
                 current_partners.append(cp)
                 lno += 1
         else: 
@@ -250,8 +251,6 @@ def validate_popdict(popdict, pars, verbose=True):
 
 def _tidy_edgelist(m, f, mapping=None):
     ''' Helper function to convert lists to arrays and optionally map arrays '''
-    m = np.array(m, dtype=hpd.default_int)
-    f = np.array(f, dtype=hpd.default_int)
     if mapping is not None:
         mapping = np.array(mapping, dtype=hpd.default_int)
         m = mapping[m]
@@ -260,7 +259,40 @@ def _tidy_edgelist(m, f, mapping=None):
     return output
 
 
-def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=None, acts=None, mapping=None):
+def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f=None, debut_m=None):
+    ''' Scale the number of acts for each relationship according to the age of the partners '''
+
+    # For each couple, get the average age they are now and the average age of debut
+    avg_age     = np.array([age_f, age_m]).mean(axis=0)
+    avg_debut   = np.array([debut_f, debut_m]).mean(axis=0)
+
+    # Shorten parameter names
+    dr = age_act_pars['debut_ratio']
+    peak = age_act_pars['peak']
+    rr = age_act_pars['retirement_ratio']
+    retire = age_act_pars['retirement']
+
+    # Get indices of people at different stages
+    below_peak_inds = avg_age <=  age_act_pars['peak']
+    above_peak_inds = (avg_age >  age_act_pars['peak']) & (avg_age <  age_act_pars['retirement'])
+    retired_inds    = avg_age >  age_act_pars['retirement']
+
+    # Set values by linearly scaling the number of acts for each partnership according to
+    # the age of the couple at the commencement of the relationship
+    below_peak_vals = acts[below_peak_inds]* (dr + (1-dr)/(peak - avg_debut[below_peak_inds]) * (avg_age[below_peak_inds] - avg_debut[below_peak_inds]))
+    above_peak_vals = acts[above_peak_inds]* (rr + (1-rr)/(peak - retire)                     * (avg_age[above_peak_inds] - retire))
+    retired_vals = 0
+
+    # Set values and return
+    scaled_acts = np.full(len(acts), np.nan, dtype=hpd.default_float)
+    scaled_acts[below_peak_inds] = below_peak_vals
+    scaled_acts[above_peak_inds] = above_peak_vals
+    scaled_acts[retired_inds] = retired_vals
+
+    return scaled_acts
+
+
+def make_random_contacts(p_count=None, sexes=None, ages=None, age_act_pars=None, debuts=None, n=None, durations=None, acts=None, mapping=None):
     '''
     Make random contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females with no additional age structure.
@@ -308,23 +340,31 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, n=None, durations=
         count += n_contacts
         f.extend([p]*n_contacts)
         m.extend(these_contacts)
+    m = np.array(m, dtype=hpd.default_int)
+    f = np.array(f, dtype=hpd.default_int)
 
     # Count how many contacts there actually are: will be different for males, should be the same for females
-    unique, count = np.unique(np.concatenate([np.array(m),np.array(f)]),return_counts=True)
+    unique, count = np.unique(np.concatenate([m, f]),return_counts=True)
     actual_p_count = np.full(pop_size, 0, dtype=hpd.default_int)
     actual_p_count[unique] = count
+
+    # Scale number of acts by age of couple
+    acts = hpu.sample(**acts, size=len(f))
+    scaled_acts = age_scale_acts(acts=acts, age_act_pars=age_act_pars, age_f=ages[f], age_m=ages[m], debut_f=debuts[f], debut_m=debuts[m])
+    keep_inds = scaled_acts>0 # Discard partnerships with zero acts (e.g. because they are "post-retirement")
+    m = m[keep_inds]
+    f = f[keep_inds]
+    scaled_acts = scaled_acts[keep_inds]
 
     # Tidy up and add durations and start dates
     output = _tidy_edgelist(m, f)
     n_partnerships = len(output['m'])
-    output['dur'] = hpu.sample(**durations, size=n_partnerships)
-    output['acts'] = hpu.sample(**acts, size=n_partnerships)
-    output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
-    output['end'] = output['start'] + output['dur']
     output['age_f'] = ages[f]
     output['age_m'] = ages[m]
+    output['dur'] = hpu.sample(**durations, size=n_partnerships)
+    output['acts'] = scaled_acts
+    output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
+    output['end'] = output['start'] + output['dur']
 
     return output, actual_p_count
 
-
-# %%
