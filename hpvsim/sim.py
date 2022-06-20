@@ -348,14 +348,14 @@ class Sim(hpb.BaseSim):
 
         # Construct the tvec that will be used with the results
         points_to_use = np.arange(0, self.npts, self.resfreq)
-        res_yearvec = self.yearvec[points_to_use]
-        res_npts = len(res_yearvec)
-        res_tvec = np.arange(res_npts)
+        self.res_yearvec = self.yearvec[points_to_use]
+        self.res_npts = len(self.res_yearvec)
+        self.res_tvec = np.arange(self.res_npts)
 
         # Function to create results
         def init_res(*args, **kwargs):
             ''' Initialize a single result object '''
-            output = hpb.Result(*args, **kwargs, npts=res_npts)
+            output = hpb.Result(*args, **kwargs, npts=self.res_npts)
             return output
 
         ng = self['n_genotypes']
@@ -394,11 +394,11 @@ class Sim(hpb.BaseSim):
         results['cbr'] = init_res('Crude birth rate', scale=False)
 
         # Time vector
-        results['year'] = res_yearvec
-        results['t'] = res_tvec
+        results['year'] = self.res_yearvec
+        results['t'] = self.res_tvec
 
         # Final items
-        self.rescale_vec   = self['pop_scale']*np.ones(res_npts) # Not included in the results, but used to scale them
+        self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts) # Not included in the results, but used to scale them
         self.results = results
         self.results_ready = False
 
@@ -860,7 +860,7 @@ class Sim(hpb.BaseSim):
             raise RuntimeError(errormsg)
 
         summary = sc.objdict()
-        for key in self.result_keys():
+        for key in self.result_keys('total'):
             summary[key] = self.results[key][t]
 
         # Update the stored state

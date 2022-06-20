@@ -1,9 +1,5 @@
 '''
 Core plotting functions for simulations, multisims, and scenarios.
-
-Also includes Plotly-based plotting functions to supplement the Matplotlib based
-ones that are of the Sim and Scenarios objects. Intended mostly for use with the
-webapp.
 '''
 
 import numpy as np
@@ -14,7 +10,7 @@ from . import defaults as hpd
 from .settings import options as hpo
 
 
-# __all__ = ['plot_sim', 'plot_scens', 'plot_result', 'plot_compare', 'plot_people', 'plotly_sim', 'plotly_people', 'plotly_animate']
+__all__ = ['plot_sim', 'plot_scens', 'plot_result', 'plot_people']
 
 
 #%% Plotting helper functions
@@ -288,43 +284,6 @@ def title_grid_legend(ax, title, grid, commaticks, setylim, legend_args, show_ar
     return
 
 
-def reset_ticks(ax, sim=None, date_args=None, start_day=None, n_cols=1):
-    ''' Set the tick marks, using dates by default '''
-
-    # Handle options
-    date_args = sc.objdict(date_args) # Ensure it's not a regular dict
-    if start_day is None and sim is not None:
-        start_day = sim['start_day']
-
-    # Set xticks as dates
-    d_args = {k:date_args.pop(k) for k in ['as_dates', 'dateformat']} # Pop these to handle separately
-    if d_args['as_dates']:
-        if d_args['dateformat'] is None and n_cols >= 3: # Change default date format if more than 2 columns are shown
-            d_args['dateformat'] = 'concise'
-        if d_args['dateformat'] in ['covasim', 'sciris', 'auto', 'matplotlib', 'concise', 'brief']: # Handle date formatter rather than date format
-            style, dateformat = d_args['dateformat'], None # Swap argument order
-            style = style.replace('covasim', 'sciris') # In case any users are confused about what "default" is
-        else:
-            dateformat, style = d_args['dateformat'], 'sciris' # Otherwise, treat dateformat as a date format
-        sc.dateformatter(ax=ax, style=style, dateformat=dateformat, **date_args) # Actually format the axis with dates, rotation, etc.
-    else:
-        # Handle start and end days
-        xmin,xmax = ax.get_xlim()
-        if date_args.start:
-            xmin = float(sc.day(date_args.start, start_date=start_day)) # Keep original type (float)
-        if date_args.end:
-            xmax = float(sc.day(date_args.end, start_date=start_day))
-        ax.set_xlim([xmin, xmax])
-
-        # Set the x-axis intervals
-        if date_args.interval:
-            ax.set_xticks(np.arange(xmin, xmax+1, date_args.interval))
-
-    # Restore date args
-    date_args.update(d_args)
-
-    return
-
 
 def tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args):
     ''' Handle saving, figure showing, and what value to return '''
@@ -427,101 +386,107 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
     return output
 
 
-# def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
-#          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
-#          show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
-#          log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None, **kwargs):
-#     ''' Plot the results of a scenario -- see Scenarios.plot() for documentation '''
+def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
+         scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
+         show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
+         log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None, **kwargs):
+    ''' Plot the results of a scenario -- see Scenarios.plot() for documentation '''
 
-#     # Handle inputs
-#     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
-#                    legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
-#     to_plot, n_cols, n_rows = handle_to_plot('scens', to_plot, n_cols, sim=scens.base_sim, check_ready=False) # Since this sim isn't run
+    # Handle inputs
+    args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
+                   legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
+    to_plot, n_cols, n_rows = handle_to_plot('scens', to_plot, n_cols, sim=scens.base_sim, check_ready=False) # Since this sim isn't run
 
-#     # Do the plotting
-#     with cvo.with_style(args.style):
-#         fig, figs = create_figs(args, sep_figs, fig, ax)
-#         default_colors = sc.gridcolors(ncolors=len(scens.sims))
-#         for pnum,title,reskeys in to_plot.enumitems():
-#             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
-#             reskeys = sc.promotetolist(reskeys) # In case it's a string
-#             for reskey in reskeys:
-#                 res_t = scens.datevec
-#                 resdata = scens.results[reskey]
-#                 for snum,scenkey,scendata in resdata.enumitems():
-#                     sim = scens.sims[scenkey][0] # Pull out the first sim in the list for this scenario
-#                     genotype_keys = sim.result_keys('genotype')
-#                     if reskey in genotype_keys:
-#                         ns = sim['n_genotypes']
-#                         genotype_colors = sc.gridcolors(ns)
-#                         for genotype in range(ns):
-#                             res_y = scendata.best[genotype,:]
-#                             color = genotype_colors[genotype]  # Choose the color
-#                             label = 'wild type' if genotype == 0 else sim['genotypes'][genotype - 1].label
-#                             ax.fill_between(res_t, scendata.low[genotype,:], scendata.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
-#                             ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
-#                             if args.show['data']:
-#                                 plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
-#                     else:
-#                         res_y = scendata.best
-#                         color = set_line_options(colors, scenkey, snum, default_colors[snum])  # Choose the color
-#                         label = set_line_options(labels, scenkey, snum, scendata.name)  # Choose the label
-#                         ax.fill_between(res_t, scendata.low, scendata.high, color=color, **args.fill)  # Create the uncertainty bound
-#                         ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
-#                         if args.show['data']:
-#                             plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
+    # Do the plotting
+    with hpo.with_style(args.style):
+        fig, figs = create_figs(args, sep_figs, fig, ax)
+        default_colors = sc.gridcolors(ncolors=len(scens.sims))
+        for pnum,title,reskeys in to_plot.enumitems():
+            ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
+            reskeys = sc.promotetolist(reskeys) # In case it's a string
+            for reskey in reskeys:
+                res_t = scens.res_yearvec
+                resdata = scens.results[reskey]
+                for snum,scenkey,scendata in resdata.enumitems():
+                    sim = scens.sims[scenkey][0] # Pull out the first sim in the list for this scenario
+                    genotypekeys = sim.result_keys('genotype')
+                    sexkeys = sim.result_keys('by_sex')
+                    if reskey in genotypekeys:
+                        ng = sim['n_genotypes']
+                        genotype_colors = sc.gridcolors(ng)
+                        for genotype in range(ng):
+                            res_y = scendata.best[genotype,:]
+                            color = genotype_colors[genotype]
+                            label = sim['genotypes'][genotype].label.upper()
+                            ax.fill_between(res_t, scendata.low[genotype,:], scendata.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
+                            ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
+                    elif reskey in sexkeys:
+                        n_sexes = 2
+                        sex_colors = ['#4679A2', '#A24679']
+                        sex_labels = ['males', 'females']
+                        for sex in range(n_sexes):
+                            # Colors and labels
+                            v_label = sex_labels[sex]  # TODO this should also come from the sim
+                            res_y = scendata.best[sex, :]
+                            color = sex_colors[sex]
+                            label = res.name + sex_labels[sex]
+                            ax.fill_between(res_t, scendata.low[genotype, :], scendata.high[genotype, :],
+                                            color=color, **args.fill)  # Create the uncertainty bound
+                            ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
+                    else:
+                        res_y = scendata.best
+                        color = set_line_options(colors, scenkey, snum, default_colors[snum])  # Choose the color
+                        label = set_line_options(labels, scenkey, snum, scendata.name)  # Choose the label
+                        ax.fill_between(res_t, scendata.low, scendata.high, color=color, **args.fill)  # Create the uncertainty bound
+                        ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
 
-#                     if args.show['interventions']:
-#                         plot_interventions(sim, ax) # Plot the interventions
-#                     if args.show['ticks']:
-#                         reset_ticks(ax, sim, args.date) # Optionally reset tick marks (useful for e.g. plotting weeks/months)
-#             if args.show['legend']:
-#                 title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum==0) # Configure the title, grid, and legend -- only show legend for first
+                    if args.show['interventions']:
+                        plot_interventions(sim, ax) # Plot the interventions
+            if args.show['legend']:
+                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum==0) # Configure the title, grid, and legend -- only show legend for first
 
-#     return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+    return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
 
 
-# def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, scatter_args=None,
-#                 date_args=None, style_args=None, grid=False, commaticks=True, setylim=True, color=None, label=None,
-#                 do_show=None, do_save=False, fig_path=None, fig=None, ax=None, **kwargs):
-#     ''' Plot a single result -- see ``cv.Sim.plot_result()`` for documentation '''
+def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, scatter_args=None,
+                date_args=None, style_args=None, grid=False, commaticks=True, setylim=True, color=None, label=None,
+                do_show=None, do_save=False, fig_path=None, fig=None, ax=None, **kwargs):
+    ''' Plot a single result -- see ``hpv.Sim.plot_result()`` for documentation '''
 
-#     # Handle inputs
-#     sep_figs = False # Only one figure
-#     fig_args  = sc.mergedicts({'figsize':(8,5)}, fig_args)
-#     axis_args = sc.mergedicts({'top': 0.95}, axis_args)
-#     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args,
-#                        date_args=date_args, style_args=style_args, **kwargs)
+    # Handle inputs
+    sep_figs = False # Only one figure
+    fig_args  = sc.mergedicts({'figsize':(8,5)}, fig_args)
+    axis_args = sc.mergedicts({'top': 0.95}, axis_args)
+    args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args,
+                       date_args=date_args, style_args=style_args, **kwargs)
 
-#     # Gather results
-#     res = sim.results[key]
-#     res_t = sim.results['date']
-#     if color is None:
-#         color = res.color
+    # Gather results
+    res = sim.results[key]
+    res_t = sim.results['year']
+    if color is None:
+        color = res.color
 
-#     # Do the plotting
-#     with cvo.with_style(args.style):
-#         fig, figs = create_figs(args, sep_figs, fig, ax)
+    # Do the plotting
+    with hpo.with_style(args.style):
+        fig, figs = create_figs(args, sep_figs, fig, ax)
 
-#         # Reuse the figure, if available
-#         if ax is None: # Otherwise, make a new one
-#             try:
-#                 ax = fig.axes[0]
-#             except:
-#                 ax = fig.add_subplot(111, label='ax1')
+        # Reuse the figure, if available
+        if ax is None: # Otherwise, make a new one
+            try:
+                ax = fig.axes[0]
+            except:
+                ax = fig.add_subplot(111, label='ax1')
 
-#         if label is None:
-#             label = res.name
-#         if res.low is not None and res.high is not None:
-#             ax.fill_between(res_t, res.low, res.high, color=color, **args.fill) # Create the uncertainty bound
+        if label is None:
+            label = res.name
+        if res.low is not None and res.high is not None:
+            ax.fill_between(res_t, res.low, res.high, color=color, **args.fill) # Create the uncertainty bound
 
-#         ax.plot(res_t, res.values, c=color, label=label, **args.plot)
-#         plot_data(sim, ax, key, args.scatter, color=color) # Plot the data
-#         plot_interventions(sim, ax) # Plot the interventions
-#         title_grid_legend(ax, res.name, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
-#         reset_ticks(ax, sim, args.date) # Optionally reset tick marks (useful for e.g. plotting weeks/months)
+        ax.plot(res_t, res.values, c=color, label=label, **args.plot)
+        plot_interventions(sim, ax) # Plot the interventions
+        title_grid_legend(ax, res.name, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
-#     return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+    return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
 
 
 # def plot_compare(df, log_scale=True, fig_args=None, axis_args=None, style_args=None, grid=False,
