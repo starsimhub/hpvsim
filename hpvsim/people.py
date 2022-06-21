@@ -223,52 +223,54 @@ class People(hpb.BasePeople):
 
         new_pships = dict()
         for lno,lkey in enumerate(self.layer_keys()):
-            new_pships[lkey] = dict()
             this_n_new = int(n_new[lkey] * scale_factor)
-            
-            # Define probabilities of entering new partnerships
-            new_pship_probs                     = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship
-            new_pship_probs[~self.is_active]    *= 0 # Blank out people not yet active
-            underpartnered                      = hpu.true(self.current_partners[lno,:]<self.partners[lno,:]) # Indices of those who have fewer partners than desired
-            new_pship_probs[underpartnered]     *= pref_weight # Increase weight for those who are underpartnerned
+            new_pships[lkey] = dict()
 
-            # Draw female and male partners separately
-            new_pship_inds_f    = hpu.choose_w(probs=new_pship_probs*self.is_female, n=this_n_new, unique=True)
-            new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male,   n=this_n_new, unique=True)
-            new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
-            self.current_partners[lno,new_pship_inds] += 1
+            if this_n_new>0:
 
-            # Sort the new contacts by age so partners are roughly the same age
-            sorted_f_inds = self.age[new_pship_inds_f].argsort()
-            new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
-            sorted_m_inds = self.age[new_pship_inds_m].argsort()
-            new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
+                # Define probabilities of entering new partnerships
+                new_pship_probs                     = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship
+                new_pship_probs[~self.is_active]    *= 0 # Blank out people not yet active
+                underpartnered                      = hpu.true(self.current_partners[lno,:]<self.partners[lno,:]) # Indices of those who have fewer partners than desired
+                new_pship_probs[underpartnered]     *= pref_weight # Increase weight for those who are underpartnerned
 
-            # Handle acts: these must be scaled according to age
-            acts = hpu.sample(**self['pars']['acts'][lkey], size=this_n_new)
-            kwargs = dict(acts=acts,
-                          age_act_pars=self['pars']['age_act_pars'][lkey],
-                          age_f=self.age[new_pship_inds_f],
-                          age_m=self.age[new_pship_inds_f],
-                          debut_f=self.debut[new_pship_inds_f],
-                          debut_m=self.debut[new_pship_inds_m]
-                          )
-            scaled_acts = hppop.age_scale_acts(**kwargs)
-            keep_inds = scaled_acts > 0  # Discard partnerships with zero acts (e.g. because they are "post-retirement")
-            f = new_pship_inds_f[keep_inds]
-            m = new_pship_inds_m[keep_inds]
-            scaled_acts = scaled_acts[keep_inds]
-            final_n_new = len(f)
+                # Draw female and male partners separately
+                new_pship_inds_f    = hpu.choose_w(probs=new_pship_probs*self.is_female, n=this_n_new, unique=True)
+                new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male,   n=this_n_new, unique=True)
+                new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
+                self.current_partners[lno,new_pship_inds] += 1
 
-            # Add everything to a contacts dictionary
-            new_pships[lkey]['f']       = f
-            new_pships[lkey]['m']       = m
-            new_pships[lkey]['dur']     = hpu.sample(**self['pars']['dur_pship'][lkey], size=final_n_new)
-            new_pships[lkey]['start']   = np.array([t*self['pars']['dt']]*final_n_new, dtype=hpd.default_float)
-            new_pships[lkey]['end']     = new_pships[lkey]['start'] + new_pships[lkey]['dur']
-            new_pships[lkey]['acts']    = scaled_acts
-            new_pships[lkey]['age_f']   = self.age[f]
-            new_pships[lkey]['age_m']   = self.age[m]
+                # Sort the new contacts by age so partners are roughly the same age
+                sorted_f_inds = self.age[new_pship_inds_f].argsort()
+                new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
+                sorted_m_inds = self.age[new_pship_inds_m].argsort()
+                new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
+
+                # Handle acts: these must be scaled according to age
+                acts = hpu.sample(**self['pars']['acts'][lkey], size=this_n_new)
+                kwargs = dict(acts=acts,
+                              age_act_pars=self['pars']['age_act_pars'][lkey],
+                              age_f=self.age[new_pship_inds_f],
+                              age_m=self.age[new_pship_inds_f],
+                              debut_f=self.debut[new_pship_inds_f],
+                              debut_m=self.debut[new_pship_inds_m]
+                              )
+                scaled_acts = hppop.age_scale_acts(**kwargs)
+                keep_inds = scaled_acts > 0  # Discard partnerships with zero acts (e.g. because they are "post-retirement")
+                f = new_pship_inds_f[keep_inds]
+                m = new_pship_inds_m[keep_inds]
+                scaled_acts = scaled_acts[keep_inds]
+                final_n_new = len(f)
+
+                # Add everything to a contacts dictionary
+                new_pships[lkey]['f']       = f
+                new_pships[lkey]['m']       = m
+                new_pships[lkey]['dur']     = hpu.sample(**self['pars']['dur_pship'][lkey], size=final_n_new)
+                new_pships[lkey]['start']   = np.array([t*self['pars']['dt']]*final_n_new, dtype=hpd.default_float)
+                new_pships[lkey]['end']     = new_pships[lkey]['start'] + new_pships[lkey]['dur']
+                new_pships[lkey]['acts']    = scaled_acts
+                new_pships[lkey]['age_f']   = self.age[f]
+                new_pships[lkey]['age_m']   = self.age[m]
 
         self.add_contacts(new_pships)
 
@@ -655,8 +657,8 @@ class People(hpb.BasePeople):
             ''' Friendly name for common layer keys '''
             if lkey.lower() == 'a':
                 llabel = 'default contact'
-            if lkey.lower() == 'r':
-                llabel = 'regular'
+            if lkey.lower() == 'm':
+                llabel = 'marital'
             elif lkey.lower() == 'c':
                 llabel = 'casual'
             else:

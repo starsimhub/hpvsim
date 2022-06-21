@@ -42,7 +42,7 @@ def test_network(do_plot=True):
         edges=np.linspace(0, 100, 21))
 
     az = hpv.age_results(
-        timepoints=['1990', '2020'],
+        timepoints=['1990', '2000'],
         result_keys=['total_infections', 'total_hpv_incidence']
     )
 

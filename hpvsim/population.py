@@ -317,20 +317,29 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, age_act_pars=None,
     # Define indices; TODO fix or centralize this
     pop_size        = len(sexes)
     f_inds          = hpu.false(sexes)
+    m_inds          = hpu.true(sexes)
     all_inds        = np.arange(pop_size)
     f_active_inds   = np.intersect1d(mapping, f_inds)
+    m_active_inds   = np.intersect1d(mapping, m_inds)
     age_order       = ages[f_active_inds].argsort() # We sort the contacts by age so they get matched to partners of similar age
     f_active_inds   = f_active_inds[age_order]
     inactive_inds   = np.setdiff1d(all_inds, mapping)
-
-    # Precalculate contacts
-    n_all_contacts  = int(sum(p_count[f_active_inds])) # Sum of partners for sexually active females
     weighting       = sexes*p_count # Males are more likely to be selected if they have higher concurrency; females will not be selected
     weighting[inactive_inds] = 0 # Exclude people not active
-    weighting       = weighting/sum(weighting) # Turn this into a probability
-    m_contacts      = hpu.choose_w(weighting, n_all_contacts, unique=False) # Select males
-    m_age_order     = ages[m_contacts].argsort() # Sort the partners by age as well
-    m_contacts      = m_contacts[m_age_order]
+
+    # First attempt at mixing
+    mixing = hppar.get_mixing() # TODO: move this somewhere else
+    bins = mixing['m'][:, 0] # This too
+    age_bins_f = np.digitize(ages[f_active_inds], bins=bins)-1 # and this
+    age_bins_m = np.digitize(ages[m_active_inds], bins=bins)-1 # and this
+    bin_range_f = np.unique(age_bins_f) # For each female age bin, how many females need partners?
+    m_contacts = [] # Initialize the male contact list
+    for ab in bin_range_f: # Loop through the age bins of females and the number of males needed for each
+        nm  = int(sum(p_count[f_active_inds[age_bins_f==ab]])) # How many males will be needed?
+        male_dist = mixing['m'][:, ab+1] # Get the distribution of ages of the male partners of females of this age
+        this_weighting = weighting[m_active_inds] * male_dist[age_bins_m] # Weight males according to the age preferences of females of this age
+        selected_males = hpu.choose_w(this_weighting, nm, unique=False)  # Select males
+        m_contacts += m_active_inds[selected_males].tolist() # Extract the indices of the selected males and add them to the contact list
 
     # Make contacts
     count = 0
