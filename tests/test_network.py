@@ -42,16 +42,9 @@ def test_network(do_plot=True):
         edges=np.linspace(0, 100, 21))
 
     az = hpv.age_results(
-        timepoints=['1990', '2000'],
-        result_keys=['total_infections', 'total_hpv_incidence']
+        timepoints=['1990', '2000', '2010', '2020'],
+        result_keys=['total_infections']
     )
-
-    # TO PLOT:
-    # 1. Heat map of discordant partners
-    # m on one axis, f on other, colour by number of HPV discordant partnerships
-    # 2. Individual lifetime
-    # 3. Plot gaps between relationships
-
 
     sim = hpv.Sim(
         pars,
