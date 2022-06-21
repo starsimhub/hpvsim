@@ -62,11 +62,19 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
     vx_prop = 1.0
     def age_subtarget(sim):
         ''' Select people who are eligible for vaccination '''
+        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=14))
+        return {'vals': [vx_prop for _ in inds], 'inds': inds}
+
+    def faster_age_subtarget(sim):
+        ''' Select people who are eligible for vaccination '''
         inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=24))
         return {'vals': [vx_prop for _ in inds], 'inds': inds}
 
     bivalent_vx = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints='2020',
                                        subtarget=age_subtarget)
+
+    bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints='2020',
+                                       subtarget=faster_age_subtarget)
 
     sim = hpv.Sim(pars=pars)
 
@@ -83,6 +91,12 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
             'name': f'Vaccinate {vx_prop*100}% of 9-14y girls starting in 2020',
             'pars': {
                 'interventions': [bivalent_vx]
+            }
+        },
+        'faster_vx': {
+            'name': f'Vaccinate {vx_prop * 100}% of 9-24y girls starting in 2020',
+            'pars': {
+                'interventions': [bivalent_vx_faster]
             }
         },
     }

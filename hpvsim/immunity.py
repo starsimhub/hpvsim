@@ -121,7 +121,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
         Update immunity level
 
         This function updates the immunity for individuals when an infection or vaccination occurs.
-            - individuals that already have immunity from a previous vaccination/infection have their immunity level boosted;
+            - individuals that are infected and already have immunity from a previous vaccination/infection have their immunity level;
             - individuals without prior immunity are assigned an initial level drawn from a distribution. This level
                 depends on whether the immunity is from a natural infection or from a vaccination (and if so, on the type of vaccine).
 
@@ -133,14 +133,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
             imm_source: index of either genotype or vaccine where immunity is coming from
 
         Returns: None
-        '''
-
-
-
-    # Extract parameters and indices
-    has_imm =  people.imm[imm_source, inds] > 0
-    no_prior_imm_inds = inds[~has_imm]
-    prior_imm_inds = inds[has_imm]
+    '''
 
     if infection:
         # Determine whether individual seroconverts based upon duration of infection
@@ -148,21 +141,26 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
         dur_inf_inds = np.digitize(dur_inf, imm_pars['prognoses']['seroconvert_probs']) - 1
         seroconvert_probs = imm_pars['prognoses']['seroconvert_probs'][dur_inf_inds]
         is_seroconvert = hpu.binomial_arr(seroconvert_probs)
+
+        # Extract parameters and indices
+        has_imm = people.imm[imm_source, inds] > 0
+        no_prior_imm_inds = inds[~has_imm]
+        prior_imm_inds = inds[has_imm]
+
+        if len(prior_imm_inds):
+            if isinstance(imm_pars['imm_boost'], Iterable):
+                boost = imm_pars['imm_boost'][imm_source]
+            else:
+                boost = imm_pars['imm_boost']
+            people.peak_imm[imm_source, prior_imm_inds] *= is_seroconvert[has_imm] * boost
+
+        if len(no_prior_imm_inds):
+            people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(
+                **imm_pars['imm_init'], size=len(no_prior_imm_inds))
+
     else:
-        # assume all vaccine recipients seroconvert
-        is_seroconvert = np.ones(len(inds))
+        people.peak_imm[imm_source, inds] = hpu.sample(**imm_pars['imm_init'],size=len(inds))
 
-    if len(prior_imm_inds):
-        if isinstance(imm_pars['imm_boost'], Iterable):
-            boost = imm_pars['imm_boost'][imm_source]
-        else:
-            boost = imm_pars['imm_boost']
-        people.peak_imm[imm_source, prior_imm_inds] *= is_seroconvert[has_imm]*boost
-
-    if len(no_prior_imm_inds):
-        people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm]*hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
-
-    # people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
     base_t = people.t + offset if offset is not None else people.t
     people.t_imm_event[imm_source, inds] = base_t
     return
