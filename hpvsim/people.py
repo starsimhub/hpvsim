@@ -175,8 +175,8 @@ class People(hpb.BasePeople):
         self.flows_by_sex['other_deaths_by_sex'][1] += deaths_male
 
         # Add births
-        new_births, new_people                  = self.add_births()
-        self.demographic_flows['births']    += new_births
+        new_births, new_people = self.add_births()
+        self.demographic_flows['births'] += new_births
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
@@ -224,6 +224,8 @@ class People(hpb.BasePeople):
 
         new_pships = dict()
         mixing = self.pars['mixing']
+
+
         for lno,lkey in enumerate(self.layer_keys()):
             this_n_new = int(n_new[lkey] * scale_factor)
             new_pships[lkey] = dict()
@@ -238,13 +240,15 @@ class People(hpb.BasePeople):
 
                 # Draw female partners
                 new_pship_inds_f = hpu.choose_w(probs=new_pship_probs*self.is_female, n=this_n_new, unique=True)
+                sorted_f_inds = self.age[new_pship_inds_f].argsort()
+                new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
 
                 # Draw male partners based on mixing matrices if provided
                 if mixing is not None:
                     bins = mixing[lkey][:, 0]
                     m_active_inds = hpu.true(self.is_active*self.is_male)
                     age_bins_f = np.digitize(self.age[new_pship_inds_f], bins=bins) - 1
-                    age_bins_m = np.digitize(self.age[self.is_active*self.is_male], bins=bins) - 1
+                    age_bins_m = np.digitize(self.age[m_active_inds], bins=bins) - 1
                     bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
                     weighting = new_pship_probs*self.is_male
                     new_pship_inds_m = []  # Initialize the male contact list
@@ -258,8 +262,6 @@ class People(hpb.BasePeople):
                 # Otherwise, do rough age assortativity
                 else:
                     new_pship_inds_m  = hpu.choose_w(probs=new_pship_probs*self.is_male, n=this_n_new, unique=True)
-                    sorted_f_inds = self.age[new_pship_inds_f].argsort()
-                    new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
                     sorted_m_inds = self.age[new_pship_inds_m].argsort()
                     new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
 

@@ -42,8 +42,12 @@ def test_network(do_plot=True):
         edges=np.linspace(0, 100, 21))
 
     az = hpv.age_results(
-        timepoints=['1990', '2000', '2010', '2020'],
+        timepoints=['2000', '2020'],
         result_keys=['total_infections']
+    )
+
+    snap = hpv.snapshot(
+        timepoints=['1990', '2000', '2010', '2020'],
     )
 
     sim = hpv.Sim(
@@ -51,25 +55,35 @@ def test_network(do_plot=True):
         genotypes = [hpv16, hpv11, hpv6, hpv18],
         network='default',
         location = 'tanzania',
-        analyzers=[age_pyr, az])
+        analyzers=[age_pyr, az, snap])
 
     sim.run()
-    a = sim.get_analyzer()
+    a = sim.get_analyzer(1)
 
     # Check plot()
     if do_plot:
         fig = a.plot()
         sim.plot()
 
+        snapshot = sim.get_analyzer()
+        people1990 = snapshot.snapshots[0]
+        people2000 = snapshot.snapshots[1]
+        people2010 = snapshot.snapshots[2]
+        people2020 = snapshot.snapshots[3]
+
         # Plot age mixing
         import pylab as pl
-        pl.rcParams.update({'font.size': 22})
-        fig, ax = pl.subplots(figsize=(12, 8))
-        h = ax.hist2d(sim.people.contacts['m']['age_f'], sim.people.contacts['m']['age_m'],
-                      bins=np.linspace(0, 100, 21))
-        ax.set_xlabel('Age of female partner')
-        ax.set_ylabel('Age of male partner')
-        fig.colorbar(h[3], ax=ax)
+        pl.rcParams.update({'font.size': 14})
+        fig, axes = pl.subplots(nrows=2, ncols=2, figsize=(12, 8))
+        ax = axes.flatten()
+        ['1990']
+        for ai,people in enumerate([people1990, people2000, people2010, people2020]):
+            h = ax[ai].hist2d(people.contacts['c']['age_f'], people.contacts['c']['age_m'], bins=np.linspace(0, 100, 21))
+            ax[ai].set_xlabel('Age of female partner')
+            ax[ai].set_ylabel('Age of male partner')
+            fig.colorbar(h[3], ax=ax[ai])
+            ax[ai].set_title(snapshot.dates[ai])
+
         pl.show()
 
     return sim, a
