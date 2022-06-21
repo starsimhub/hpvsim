@@ -68,6 +68,17 @@ def test_network(do_plot=True):
         fig = a.plot()
         sim.plot()
 
+        # Plot age mixing
+        import pylab as pl
+        pl.rcParams.update({'font.size': 22})
+        fig, ax = pl.subplots(figsize=(12, 8))
+        h = ax.hist2d(sim.people.contacts['m']['age_f'], sim.people.contacts['m']['age_m'],
+                      bins=np.linspace(0, 100, 21))
+        ax.set_xlabel('Age of female partner')
+        ax.set_ylabel('Age of male partner')
+        fig.colorbar(h[3], ax=ax)
+        pl.show()
+
     return sim, a
 
 

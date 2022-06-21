@@ -12,6 +12,7 @@ from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
 from . import population as hppop
+from . import parameters as hppar
 from . import plotting as hpplt
 from . import immunity as hpimm
 
@@ -235,7 +236,27 @@ class People(hpb.BasePeople):
                 new_pship_probs[underpartnered]     *= pref_weight # Increase weight for those who are underpartnerned
 
                 # Draw female and male partners separately
-                new_pship_inds_f    = hpu.choose_w(probs=new_pship_probs*self.is_female, n=this_n_new, unique=True)
+                new_pship_inds_f = hpu.choose_w(probs=new_pship_probs*self.is_female, n=this_n_new, unique=True)
+
+                mixing = hppar.get_mixing()  # TODO: move this somewhere else
+                bins = mixing[lkey][:, 0]  # This too
+                age_bins_f = np.digitize(self.age[new_pship_inds_f], bins=bins) - 1  # and this
+                age_bins_m = np.digitize(ages[m_active_inds], bins=bins) - 1  # and this
+                bin_range_f = np.unique(age_bins_f)  # For each female age bin, how many females need partners?
+                m_contacts = []  # Initialize the male contact list
+                for ab in bin_range_f:  # Loop through the age bins of females and the number of males needed for each
+                    nm = int(sum(p_count[f_active_inds[age_bins_f == ab]]))  # How many males will be needed?
+                    male_dist = mixing['m'][:, ab+1]  # Get the distribution of ages of the male partners of females of this age
+                    this_weighting = weighting[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
+                    selected_males = hpu.choose_w(this_weighting, nm, unique=False)  # Select males
+                    m_contacts += m_active_inds[selected_males].tolist()  # Extract the indices of the selected males and add them to the contact list
+
+                import traceback;
+                traceback.print_exc();
+                import pdb;
+                pdb.set_trace()
+
+
                 new_pship_inds_m    = hpu.choose_w(probs=new_pship_probs*self.is_male,   n=this_n_new, unique=True)
                 new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
                 self.current_partners[lno,new_pship_inds] += 1

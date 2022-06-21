@@ -292,7 +292,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
     return scaled_acts
 
 
-def make_random_contacts(p_count=None, sexes=None, ages=None, age_act_pars=None, debuts=None, n=None, durations=None, acts=None, mapping=None):
+def make_random_contacts(p_count=None, mixing=None, sexes=None, ages=None, age_act_pars=None, debuts=None, n=None, durations=None, acts=None, mapping=None):
     '''
     Make random contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females with no additional age structure.
@@ -327,19 +327,22 @@ def make_random_contacts(p_count=None, sexes=None, ages=None, age_act_pars=None,
     weighting       = sexes*p_count # Males are more likely to be selected if they have higher concurrency; females will not be selected
     weighting[inactive_inds] = 0 # Exclude people not active
 
-    # First attempt at mixing
-    mixing = hppar.get_mixing() # TODO: move this somewhere else
-    bins = mixing['m'][:, 0] # This too
-    age_bins_f = np.digitize(ages[f_active_inds], bins=bins)-1 # and this
-    age_bins_m = np.digitize(ages[m_active_inds], bins=bins)-1 # and this
-    bin_range_f = np.unique(age_bins_f) # For each female age bin, how many females need partners?
-    m_contacts = [] # Initialize the male contact list
-    for ab in bin_range_f: # Loop through the age bins of females and the number of males needed for each
-        nm  = int(sum(p_count[f_active_inds[age_bins_f==ab]])) # How many males will be needed?
-        male_dist = mixing['m'][:, ab+1] # Get the distribution of ages of the male partners of females of this age
-        this_weighting = weighting[m_active_inds] * male_dist[age_bins_m] # Weight males according to the age preferences of females of this age
-        selected_males = hpu.choose_w(this_weighting, nm, unique=False)  # Select males
-        m_contacts += m_active_inds[selected_males].tolist() # Extract the indices of the selected males and add them to the contact list
+    if mixing is not None:
+        bins = mixing[:, 0] # This too
+        age_bins_f = np.digitize(ages[f_active_inds], bins=bins)-1 # and this
+        age_bins_m = np.digitize(ages[m_active_inds], bins=bins)-1 # and this
+        bin_range_f = np.unique(age_bins_f) # For each female age bin, how many females need partners?
+        m_contacts = [] # Initialize the male contact list
+        for ab in bin_range_f: # Loop through the age bins of females and the number of males needed for each
+            nm  = int(sum(p_count[f_active_inds[age_bins_f==ab]])) # How many males will be needed?
+            male_dist = mixing['m'][:, ab+1] # Get the distribution of ages of the male partners of females of this age
+            this_weighting = weighting[m_active_inds] * male_dist[age_bins_m] # Weight males according to the age preferences of females of this age
+            selected_males = hpu.choose_w(this_weighting, nm, unique=False)  # Select males
+            m_contacts += m_active_inds[selected_males].tolist() # Extract the indices of the selected males and add them to the contact list
+
+    else: # If no mixing has been specified, just do rough age assortivity
+        
+
 
     # Make contacts
     count = 0
