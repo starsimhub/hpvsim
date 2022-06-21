@@ -92,7 +92,8 @@ def init_immunity(sim, create=False):
 
         # Precompute waning - same for all genotypes
         imm_decay = sc.dcp(sim['imm_decay'])
-        imm_decay['half_life'] /= sim['dt']
+        if 'half_life' in imm_decay.keys():
+            imm_decay['half_life'] /= sim['dt']
         sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
 
         sim['immunity_map'] = dict()
@@ -221,7 +222,10 @@ def precompute_waning(t, pars=None):
     ]
 
     # Process inputs
-    if form is None or form == 'exp_decay':
+    if form is None:
+        output = np.ones(len(t), dtype=hpd.default_float)
+
+    elif form == 'exp_decay':
         if pars['half_life'] is None: pars['half_life'] = np.nan
         output = exp_decay(t, **pars)
 

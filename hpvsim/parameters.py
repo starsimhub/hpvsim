@@ -73,8 +73,9 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
 
     # Parameters used to calculate immunity
-    pars['imm_init'] = dict(dist='beta', par1=20, par2=1)  # beta distribution for initial level of immunity following infection clearance
-    pars['imm_decay'] = dict(form='exp_decay', init_val=1, half_life=20) # decay rate, with half life in years
+    pars['imm_init'] = dict(dist='beta', par1=5, par2=3)  # beta distribution for initial level of immunity following infection clearance
+    pars['imm_decay'] = dict(form=None)  # decay rate, with half life in years
+    # pars['imm_decay'] = dict(form='exp_decay', init_val=1, half_life=20) # decay rate, with half life in years
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
     pars['imm_boost'] = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity'] = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
@@ -752,28 +753,28 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
     pars = dict(
 
         default = dict(
-            imm_init  = dict(dist='beta', par1=20, par2=2), # Initial distribution of immunity
+            imm_init  = dict(dist='beta', par1=30, par2=2), # Initial distribution of immunity
             imm_boost = 2, # Factor by which a dose increases immunity
             doses     = 1, # Number of doses for this vaccine
             interval  = None, # Interval between doses
         ),
 
         bivalent = dict(
-            imm_init=dict(dist='beta', par1=20, par2=2),  # Initial distribution of immunity
+            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
             imm_boost=2,  # Factor by which a dose increases immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
         ),
 
         quadrivalent = dict(
-            imm_init=dict(dist='beta', par1=20, par2=2),  # Initial distribution of immunity
+            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
             imm_boost=2,  # Factor by which a dose increases immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
         ),
 
         nonavalent = dict(
-            imm_init=dict(dist='beta', par1=20, par2=2),  # Initial distribution of immunity
+            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
             imm_boost=2,  # Factor by which a dose increases immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses

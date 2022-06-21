@@ -59,10 +59,10 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
     }
 
     # Model an intervention to roll out prophylactic vaccination
-    vx_prop = 0.3
+    vx_prop = 1.0
     def age_subtarget(sim):
         ''' Select people who are eligible for vaccination '''
-        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=14))
+        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=24))
         return {'vals': [vx_prop for _ in inds], 'inds': inds}
 
     bivalent_vx = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints='2020',
