@@ -341,8 +341,10 @@ def make_random_contacts(p_count=None, mixing=None, sexes=None, ages=None, age_a
             m_contacts += m_active_inds[selected_males].tolist() # Extract the indices of the selected males and add them to the contact list
 
     else: # If no mixing has been specified, just do rough age assortivity
-        
-
+        n_all_contacts = int(sum(p_count[f_active_inds]))  # Sum of partners for sexually active females
+        m_contacts = hpu.choose_w(weighting, n_all_contacts, unique=False)  # Select males
+        m_age_order = ages[m_contacts].argsort()  # Sort the partners by age as well
+        m_contacts = m_contacts[m_age_order]
 
     # Make contacts
     count = 0
