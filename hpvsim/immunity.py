@@ -11,7 +11,7 @@ from . import parameters as hppar
 
 
 
-# %% Define variant class -- all other functions are for internal use only
+# %% Define genotype class -- all other functions are for internal use only
 
 __all__ = ['genotype']
 
@@ -21,7 +21,7 @@ class genotype(sc.prettyobj):
     Add a new genotype to the sim
 
     Args:
-        genotype (str): name of variant
+        genotype (str): name of genotype
 
     **Example**::
 
@@ -30,7 +30,7 @@ class genotype(sc.prettyobj):
     '''
 
     def __init__(self, genotype):
-        self.index     = None # Index of the variant in the sim; set later
+        self.index     = None # Index of the genotype in the sim; set later
         self.label     = None # Genotype label (used as a dict key)
         self.p         = None # This is where the parameters will be stored
         self.parse(genotype=genotype) #
@@ -72,6 +72,7 @@ class genotype(sc.prettyobj):
         sim['genotype_pars'][self.label] = self.p  # Store the parameters
         self.index = list(sim['genotype_pars'].keys()).index(self.label) # Find where we are in the list
         sim['genotype_map'][self.index]  = self.label # Use that to populate the reverse mapping
+        sim['imm_boost'] = list(sim['imm_boost']) + [self.p['imm_boost']]
         self.initialized = True
         return
 
@@ -90,8 +91,9 @@ def init_immunity(sim, create=False):
     if sim['immunity'] is None or create:
 
         # Precompute waning - same for all genotypes
-        imm_decay = sc.dcp(sim['imm_decay']['infection'])
-        imm_decay['half_life'] /= sim['dt']
+        imm_decay = sc.dcp(sim['imm_decay'])
+        if 'half_life' in imm_decay.keys():
+            imm_decay['half_life'] /= sim['dt']
         sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
 
         sim['immunity_map'] = dict()
@@ -114,12 +116,12 @@ def init_immunity(sim, create=False):
     return
 
 
-def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None):
+def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infection=True):
     '''
         Update immunity level
 
         This function updates the immunity for individuals when an infection or vaccination occurs.
-            - individuals that already have immunity from a previous vaccination/infection have their immunity level boosted;
+            - individuals that are infected and already have immunity from a previous vaccination/infection have their immunity level;
             - individuals without prior immunity are assigned an initial level drawn from a distribution. This level
                 depends on whether the immunity is from a natural infection or from a vaccination (and if so, on the type of vaccine).
 
@@ -131,24 +133,34 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None):
             imm_source: index of either genotype or vaccine where immunity is coming from
 
         Returns: None
-        '''
+    '''
 
-    # Extract parameters and indices
-    has_imm =  people.imm[imm_source, inds] > 0
-    no_prior_imm_inds = inds[~has_imm]
-    prior_imm_inds = inds[has_imm]
+    if infection:
+        # Determine whether individual seroconverts based upon duration of infection
+        dur_inf = people.dur_hpv[imm_source, inds]
+        dur_inf_inds = np.digitize(dur_inf, imm_pars['prognoses']['seroconvert_probs']) - 1
+        seroconvert_probs = imm_pars['prognoses']['seroconvert_probs'][dur_inf_inds]
+        is_seroconvert = hpu.binomial_arr(seroconvert_probs)
 
-    if len(prior_imm_inds):
-        if isinstance(imm_pars['imm_boost'], Iterable):
-            boost = imm_pars['imm_boost'][imm_source]
-        else:
-            boost = imm_pars['imm_boost']
-        people.peak_imm[imm_source, prior_imm_inds] *= boost
+        # Extract parameters and indices
+        has_imm = people.imm[imm_source, inds] > 0
+        no_prior_imm_inds = inds[~has_imm]
+        prior_imm_inds = inds[has_imm]
 
-    if len(no_prior_imm_inds):
-        people.peak_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
+        if len(prior_imm_inds):
+            if isinstance(imm_pars['imm_boost'], Iterable):
+                boost = imm_pars['imm_boost'][imm_source]
+            else:
+                boost = imm_pars['imm_boost']
+            people.peak_imm[imm_source, prior_imm_inds] *= is_seroconvert[has_imm] * boost
 
-    # people.imm[imm_source, inds] = people.peak_imm[imm_source, inds]
+        if len(no_prior_imm_inds):
+            people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(
+                **imm_pars['imm_init'], size=len(no_prior_imm_inds))
+
+    else:
+        people.peak_imm[imm_source, inds] = hpu.sample(**imm_pars['imm_init'],size=len(inds))
+
     base_t = people.t + offset if offset is not None else people.t
     people.t_imm_event[imm_source, inds] = base_t
     return
@@ -208,7 +220,10 @@ def precompute_waning(t, pars=None):
     ]
 
     # Process inputs
-    if form is None or form == 'exp_decay':
+    if form is None:
+        output = np.ones(len(t), dtype=hpd.default_float)
+
+    elif form == 'exp_decay':
         if pars['half_life'] is None: pars['half_life'] = np.nan
         output = exp_decay(t, **pars)
 

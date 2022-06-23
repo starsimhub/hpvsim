@@ -74,7 +74,7 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key == 'dead_other': # ALl false at the beginning
+            if key == 'dead_other' or key == 'vaccinated': # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
             elif key == 'alive':  # All true at the beginning
                 self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
@@ -85,19 +85,19 @@ class People(hpb.BasePeople):
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
-            if key == 'date_dead_other':
+            if key == 'date_dead_other' or key == 'date_vaccinated':
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
             else:
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
 
         # Set genotype states, which store info about which genotype a person is exposed to
-        for key in self.meta.imm_states:  # Everyone starts out with no immunity
-            self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
-        for key in self.meta.imm_by_source_states:  # Everyone starts out with no immunity; TODO, reconsider this
+        for key in self.meta.imm_states:  # Everyone starts out with no immunity; TODO, reconsider this
             if key == 't_imm_event':
-                self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_int)
+                self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_int)
             else:
-                self[key] = np.zeros((self.pars['n_genotypes'], self.pars['pop_size']), dtype=hpd.default_float)
+                self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_float)
+        for key in self.meta.vacc_states:
+            self[key] = np.zeros(self.pars['pop_size'], dtype=hpd.default_int)
 
         # Store the dtypes used in a flat dict
         self._dtypes = {key:self[key].dtype for key in self.keys()} # Assign all to float by default
@@ -197,6 +197,7 @@ class People(hpb.BasePeople):
         self.total_flows['total_cins']      += self.flows['cins'].sum()
         self.total_flows['total_cancers']   += self.flows['cancers'].sum()
         self.total_flows['total_cancer_deaths']   += self.flows['cancer_deaths'].sum()
+
 
         return new_people
 
@@ -431,6 +432,7 @@ class People(hpb.BasePeople):
             'dt': self['dt'],
             'pop_size': new_births,
             'n_genotypes': self.pars['n_genotypes'],
+            'n_imm_sources': self.pars['n_imm_sources'],
             'n_partner_types': self.pars['n_partner_types']
         }
         death_ages = hppop.get_death_ages(life_tables=self.pars['lx'], pop_size=new_births, age_bins=np.zeros(new_births, dtype=int), ages=np.zeros(new_births), sexes=sexes, dt=self['dt'])
@@ -527,6 +529,7 @@ class People(hpb.BasePeople):
         # Now use genotype-specific prognosis probabilities to determine what happens.
         # Only women can progress beyond infection.
         f_inds = self.is_female[inds].nonzero()[-1]
+        m_inds = self.is_male[inds].nonzero()[-1]
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
@@ -541,8 +544,8 @@ class People(hpb.BasePeople):
             this_dur_f  = dur[self.is_female[inds]]
             self.dur_hpv[g, inds] = this_dur  # Set the initial duration of infection as the length of the period without dysplasia - this is then extended for those who progress
 
-        # Henceforth, apply filters so we only select females with this genotype
-        # We can skip all subsequent steps if there are no females
+        # Start calculating the probabilities of progressing through disease stages
+        # We can skip all this if there are no females; males are updated below
         if len(f_inds)>0:
 
             fg_inds = inds[self.is_female[inds]] # Subset the indices so we're only looking at females with this genotype
@@ -619,6 +622,9 @@ class People(hpb.BasePeople):
             # Record eventual deaths from cancer (NB, assuming no survival without treatment)
             dur_cancer = hpu.sample(**self.pars['dur']['cancer'], size=len(cancer_inds))
             self.date_dead_cancer[g, cancer_inds]  = self.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
+
+        if len(m_inds)>0:
+            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_hpv[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return len(inds) # For incrementing counters
 

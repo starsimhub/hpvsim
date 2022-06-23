@@ -44,7 +44,8 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     # Create and run the simulation
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
-    sim = hpv.Sim(end=2035, genotypes=[hpv16,hpv18])
+    hpv6 = hpv.genotype('HPV6')
+    sim = hpv.Sim(end=2035, genotypes=[hpv16,hpv18,hpv6])
     sim.set_seed(seed)
 
     # Optionally plot
@@ -266,35 +267,6 @@ def test_resuming():
     return s1
 
 
-# def test_fileio():
-#     sc.heading('Test file saving')
-#
-#     json_path = 'test_hpvsim.json'
-#     xlsx_path = 'test_hpvsim.xlsx'
-#
-#     # Create and run the simulation
-#     sim = hps.Sim()
-#     sim['n_years'] = 5
-#     sim['pop_size'] = 1000
-#     sim.run(verbose=0)
-#
-#     # Create objects
-#     json = sim.to_json()
-#     xlsx = sim.to_excel()
-#     print(xlsx)
-#
-#     # Save files
-#     sim.to_json(json_path)
-#     sim.to_excel(xlsx_path)
-#
-#     for path in [json_path, xlsx_path]:
-#         print(f'Removing {path}')
-#         os.remove(path)
-#
-#     return json
-
-
-
 
 
 #%% Run as a script
@@ -310,7 +282,6 @@ if __name__ == '__main__':
     sim4 = test_result_consistency()
     sim5 = test_location_loading()
     sim6 = test_resuming()
-    # json = test_fileio()
 
     sc.toc(T)
     print('Done.')
