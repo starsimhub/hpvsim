@@ -123,7 +123,71 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
 
     return scens
 
+def test_screening(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test screening intervention')
 
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
+    verbose = .1
+    debug = 0
+
+    pars = {
+        'pop_size': 50e3,
+        'n_years': 20,
+        'genotypes': [hpv16, hpv18],
+        'dt': .2,
+    }
+
+    # Model an intervention to screen 50% of 30 year olds with VIA and treat immediately
+    screen_prop = 0.5
+    hpv_screening = hpv.
+
+    sim = hpv.Sim(pars=pars)
+
+    n_runs = 3
+
+    # Define the scenarios
+    scenarios = {
+        'no_vx': {
+            'name': 'No vaccination',
+            'pars': {
+            }
+        },
+        'vx': {
+            'name': f'Vaccinate {vx_prop*100}% of 9-14y girls starting in 2020',
+            'pars': {
+                'interventions': [bivalent_vx]
+            }
+        },
+        'faster_vx': {
+            'name': f'Vaccinate {vx_prop * 100}% of 9-24y girls starting in 2020',
+            'pars': {
+                'interventions': [bivalent_vx_faster]
+            }
+        },
+    }
+
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV incidence': [
+                'total_hpv_incidence',
+            ],
+            'HPV infections': [
+                'total_infections',
+            ],
+            'Cancers per 100,000 women': [
+                'total_cancer_incidence',
+            ],
+        }
+        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
+
+    return scens
 
 
 #%% Run as a script
@@ -134,6 +198,7 @@ if __name__ == '__main__':
 
     # sim0 = test_dynamic_pars()
     scens = test_vaccines(do_plot=True)
+    scens = test_screening(do_plot=True)
 
     sc.toc(T)
     print('Done.')

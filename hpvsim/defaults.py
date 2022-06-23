@@ -62,6 +62,7 @@ class PeopleMeta(sc.prettyobj):
             'dead_cancer',
             'dead_other',  # Dead from all other causes
             'vaccinated',
+            'screened'
         ]
 
         # Immune states, by genotype/vaccine
@@ -72,10 +73,11 @@ class PeopleMeta(sc.prettyobj):
             't_imm_event',  # Int, time since immunity event
         ]
 
-        # Additional vaccination states
-        self.vacc_states = [
+        # Additional intervention states
+        self.intv_states = [
             'doses',  # Number of doses given per person
             'vaccine_source',  # index of vaccine that individual received
+            'screens', # Number of screens given per person
         ]
 
         self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
@@ -91,11 +93,11 @@ class PeopleMeta(sc.prettyobj):
             'dur_cancer',  # Duration of cancer
         ]
 
-        self.all_states = self.person + self.states + self.imm_states + self.vacc_states + \
+        self.all_states = self.person + self.states + self.imm_states + self.intv_states + \
                           self.dates + self.durs
 
         # Validate
-        self.state_types = ['person', 'states', 'imm_states', 'vacc_states', 'dates', 'durs', 'all_states']
+        self.state_types = ['person', 'states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
         for state_type in self.state_types:
             states = getattr(self, state_type)
             n_states        = len(states)

@@ -96,6 +96,9 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['vaccine_pars'] = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map'] = dict()  # Reverse mapping from number to vaccine key
 
+    # Screening parameters
+    pars['screen_pars'] = dict()  # Screening method that is being used; populated during initialization
+
     # Parameters determining duration of dysplasia stages
     pars['dur'] = {}
     pars['dur']['none']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Length of time that HPV is present without dysplasia
@@ -107,7 +110,7 @@ def make_pars(set_prognoses=False, **kwargs):
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
     pars['rel_trans']['none']   = 1 # Baseline value
-    pars['rel_trans']['cin1']   = 0.5 # Less transmissible. Assumption, need data
+    pars['rel_trans']['cin1']   = 1 # Less transmissible. Assumption, need data
     pars['rel_trans']['cin2']   = 0.2 # Assumption, need data
     pars['rel_trans']['cin3']   = 0.05 # Assumption, need data
 
@@ -228,8 +231,8 @@ def get_prognoses():
     prognoses = dict(
         duration_cutoffs  = np.array([0,       1,          2,          3,          4]),     # Duration cutoffs (lower limits)
         seroconvert_probs = np.array([0.25,    0.5,        0.75,       1.0,        1.0]), # Probability of seroconverting given duration of infection
-        cin1_probs        = np.array([0.015,   0.05655,    0.10800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
-        cin2_probs        = np.array([0.015,   0.0655,     0.1080,     0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
+        cin1_probs        = np.array([0.015,   0.15655,    0.30800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
+        cin2_probs        = np.array([0.015,   0.0655,     0.3080,     0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
         cin3_probs        = np.array([0.15,    0.655,      0.80,       0.855,      0.90]),   # Conditional probability of developing CIN3 given CIN2
         cancer_probs      = np.array([0.0055,  0.0655,     0.2080,     0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
         death_probs       = np.array([0.0015,  0.00655,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
@@ -305,9 +308,6 @@ def get_genotype_choices():
         'hpv45': ['hpv45', '45'],
         'hpv52': ['hpv52', '52'],
         'hpv58': ['hpv58', '58'],
-        'hpvlo': ['hpvlo', 'low', 'low-risk'],
-        'hpvhi': ['hpvhi', 'high', 'high-risk'],
-        'hpvhi5': ['hpvhi5', 'high5'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -322,6 +322,34 @@ def get_vaccine_choices():
         'bivalent':  ['bivalent', 'hpv2', 'cervarix'],
         'quadrivalent': ['quadrivalent', 'hpv4', 'gardasil'],
         'nonavalent': ['nonavalent', 'hpv9', 'cervarix9'],
+    }
+    mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
+    return choices, mapping
+
+def get_screen_choices():
+    '''
+    Define valid pre-defined screening names
+    '''
+    # List of choices currently available: new ones can be added to the list along with their aliases
+    choices = {
+        'hpv':  ['hpv', 'hpvdna'],
+        'hpv1618': ['hpv1618', 'hpvgenotyping'],
+        'cytology': ['cytology', 'pap', 'papsmear'],
+        'via': ['via', 'visualinspection'],
+        'colposcopy': ['colposcopy', 'colpo'],
+    }
+    mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
+    return choices, mapping
+
+def get_treatment_choices():
+    '''
+    Define valid pre-defined treatment names
+    '''
+    # List of choices currently available: new ones can be added to the list along with their aliases
+    choices = {
+        'default': ['default', None],
+        'ablative':  ['ablative'],
+        'excisional': ['excisional'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -360,18 +388,18 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur = dict()
-    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=0.1935, par2=0.5)
+    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=2.3625, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dur['cin2']      = dict(dist='gamma', par1=2.33, par2=9.67)
+    pars.hpv16.dur['cin2']      = dict(dist='gamma', par1=2.33, par2=6)
                                     # Shift this to the left compared to the cin3 distribution
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv16.dur['cin3']      = dict(dist='gamma', par1=3.33, par2=9.67)
+    pars.hpv16.dur['cin3']      = dict(dist='gamma', par1=3.33, par2=6)
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv16.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
@@ -383,7 +411,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur = dict()
-    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=0.1874, par2=0.5)
+    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=2.2483, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
@@ -406,7 +434,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv31 = sc.objdict()
     pars.hpv31.dur = dict()
-    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=0.2100, par2=1.0)
+    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=2.5197, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -427,7 +455,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv33 = sc.objdict()
     pars.hpv33.dur = dict()
-    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=0.1936, par2=1.0)
+    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=2.3226, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -448,7 +476,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv45 = sc.objdict()
     pars.hpv45.dur = dict()
-    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=0.1684, par2=1.0)
+    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=2.0213, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -469,7 +497,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv52 = sc.objdict()
     pars.hpv52.dur = dict()
-    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=0.1958, par2=1.0)
+    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=2.3491, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -490,7 +518,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv6 = sc.objdict()
     pars.hpv6.dur = dict()
-    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=0.1540, par2=1.0)
+    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=1.8245, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv6.dur['cin1']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dur['cin2']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -504,7 +532,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur = dict()
-    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=0.1560, par2=1.0)
+    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=1.8718, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv11.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -515,51 +543,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv11.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv11.imm_boost        = 1.0 # TODO: look for data
-
-    pars.hpvlo = sc.objdict()
-    pars.hpvlo.dur = dict()
-    pars.hpvlo.dur['none']      = dict(dist='lognormal', par1=0.1596, par2=1.0)
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpvlo.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvlo.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvlo.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvlo.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpvlo.rel_cin1_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvlo.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvlo.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvlo.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvlo.imm_boost        = 1.0 # TODO: look for data
-
-    pars.hpvhi = sc.objdict()
-    pars.hpvhi.dur = dict()
-    pars.hpvhi.dur['none']      = dict(dist='lognormal', par1=0.1709, par2=1.0)
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpvhi.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvhi.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvhi.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvhi.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpvhi.rel_cin1_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvhi.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvhi.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvhi.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvhi.imm_boost        = 1.0 # TODO: look for data
-
-    pars.hpvhi5 = sc.objdict()
-    pars.hpvhi5.dur = dict()
-    pars.hpvhi5.dur['none']     = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvhi5.dur['cin1']     = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvhi5.dur['cin2']     = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvhi5.dur['cin3']     = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpvhi5.rel_beta        = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpvhi5.rel_cin1_prob   = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvhi5.rel_cin2_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvhi5.rel_cin3_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvhi5.rel_cancer_prob = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpvhi5.imm_boost       = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
@@ -580,9 +563,6 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58 = 0, # Assumption
             hpv6 = 0, # Assumption
             hpv11 = 0, # Assumption
-            hpvlo = 0, # Assumption
-            hpvhi = 0, # Assumption
-            hpvhi5 = 0, # Assumption
         ),
 
         hpv18 = dict(
@@ -595,9 +575,6 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
         ),
 
         hpv31=dict(
@@ -610,9 +587,6 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
         ),
 
         hpv33=dict(
@@ -625,9 +599,6 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
         ),
 
         hpv45=dict(
@@ -640,9 +611,6 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
         ),
 
         hpv52=dict(
@@ -655,9 +623,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
+
         ),
 
         hpv58=dict(
@@ -670,9 +636,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
+
         ),
 
         hpv6=dict(
@@ -685,9 +649,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=0,  # Assumption
             hpv6=1.0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
+
         ),
 
         hpv11=dict(
@@ -700,56 +662,10 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=1.0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
-        ),
-
-        hpvlo=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
-            hpvlo=1.0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
-        ),
-
-        hpvhi=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=1.0,  # Assumption
-            hpvhi5=0,  # Assumption
-        ),
-
-        hpvhi5=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=1.0,  # Assumption
 
         ),
+
+
     )
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
@@ -912,9 +828,6 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
         ),
 
         bivalent = dict(
@@ -927,9 +840,6 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
         ),
 
         quadrivalent=dict(
@@ -942,9 +852,6 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv58=0,  # Assumption
             hpv6=1,  # Assumption
             hpv11=1,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=0,  # Assumption
         ),
 
         nonavalent=dict(
@@ -957,9 +864,6 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv58=1,  # Assumption
             hpv6=1,  # Assumption
             hpv11=1,  # Assumption
-            hpvlo=0,  # Assumption
-            hpvhi=0,  # Assumption
-            hpvhi5=1,  # Assumption
         ),
     )
 
@@ -1003,3 +907,52 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
     )
 
     return _get_from_pars(pars, default, key=vaccine)
+
+
+def get_screen_pars(screen=None):
+    '''
+    Define the parameters for each screen method
+    '''
+
+    pars = dict(
+        hpv = dict(
+            sensitivity=dict(
+                infectious=1
+            ),
+            specificity=None,
+        ),
+
+        hpv1618 = dict(
+            sensitivity=dict(
+                infectious=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+            ),
+            specificity=None,
+        ),
+
+        cytology = dict(
+            sensitivity=None,
+            specificity=None,
+        ),
+
+        via=dict(
+            sensitivity=None,
+            specificity=None,
+        ),
+
+        colposcopy=dict(
+            sensitivity=None,
+            specificity=None,
+        ),
+    )
+
+    return _get_from_pars(pars, key=screen)

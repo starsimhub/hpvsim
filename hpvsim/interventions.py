@@ -733,3 +733,192 @@ class vaccinate_prob(BaseVaccination):
                 vacc_inds = np.concatenate((vacc_inds, vacc_inds_dose2), axis=None)
 
         return vacc_inds
+
+
+class BaseScreening(Intervention):
+    '''
+    Apply a screening program to a subset of the population.
+
+    This base class implements the mechanism of screening people to identify and treat pre-cancerous lesions.
+    Screening involves a series of standard operations to modify the trajectories of `hpv.People`. Screening algorithms
+    can vary in complexity along the dimensions of primary screening modalities, triage modalities, treatment modalities,
+    interval between screens and follow-up protocol, loss-to-follow-up, test characteristics, and efficacies.
+
+    Args:
+         primary_screen_test (dict/str)  : the screening test to use as a primary filtering method
+         triage_screen_test  (dict/str)  : the screening test to use as a triage (or None)
+         treatment           (dict/str)  : treatment to be used upon a positive test and/or triage
+         screen_start_age    (int)       : age to start screening
+         screen_interval     (int)       : interval between screens
+         screen_stop_age     (int)       : age to stop screening
+         timepoints          (int/arr)   : the day or array of days to apply the interventions
+         prob                (float)     : probability of being screened (per screen)
+         label               (str)       : the name of screening strategy
+         kwargs (dict)      : passed to Intervention()
+
+    If ``primary_screen_test`` and/or ``triage_screen_test`` is supplied as a dictionary, it must have the following parameters:
+        - ``sensitivity``   : dictionary of probability of testing positive given each stage (i.e., HPV, CIN1, CIN2)
+        - ``specificity``   : dictionary of specificity for each stage (i.e., HPV, CIN1, CIN2)
+
+    If ``treatment`` is supplied as a dictionary, it must have the following parameters:
+        - ``efficacy``   : dictionary of probability of clearing/regressing given stage
+
+    '''
+
+    def __init__(self, primary_screen_test, treatment, screen_start_age, screen_interval, screen_stop_age,
+                 timepoints, prob=None, triage_screen_test=None, label=None, **kwargs):
+        super().__init__(**kwargs) # Initialize the Intervention object
+        self.label = label  # Screening label (used as a dict key)
+        self.p = None  # Screening parameters
+        self.timepoints = timepoints
+        if prob is None: # Populate default value of probability: 1
+            prob = 1.0
+        self.prob = prob
+        self.screen_start_age = screen_start_age
+        self.screen_interval = screen_interval
+        self.screen_stop_age = screen_stop_age
+        self._parse_screening_pars(screen=primary_screen_test)  # Populate
+        self._parse_screening_pars(screen=triage_screen_test, triage=True)  # Populate
+        self._parse_screening_pars(screen=treatment, treatment=True)  # Populate
+        return
+
+    def _parse_screening_pars(self, screen, triage=False, treatment=False):
+        ''' Unpack screening information, which may be given as a string or dict '''
+
+        # Option 1: screening can be chosen from a list of pre-defined screening strategies
+        if isinstance(screen, str):
+
+            choices, mapping = hppar.get_screen_choices()
+            screen_pars = hppar.get_screen_pars()
+
+            label = screen.lower()
+            for txt in ['.', ' ', '&', '-', 'screen']:
+                label = label.replace(txt, '')
+
+            if label in mapping:
+                label = mapping[label]
+                screen_pars = screen_pars[label]
+            else: # pragma: no cover
+                errormsg = f'The selected screening method "{screen}" is not implemented; choices are:\n{sc.pp(choices, doprint=False)}'
+                raise NotImplementedError(errormsg)
+
+            if self.label is None:
+                self.label = label
+
+        # Option 2: screening can be specified as a dict of pars
+        elif isinstance(screen, dict):
+
+            # Parse label
+            screen_pars = screen
+            label = screen_pars.pop('label', None) # Allow including the label in the parameters
+            if self.label is None: # pragma: no cover
+                if label is None:
+                    self.label = 'custom'
+                else:
+                    self.label = label
+
+        # Option 3: we are in triage and no triage is defined
+        elif screen is None:
+            screen_pars = None
+
+        else: # pragma: no cover
+            errormsg = f'Could not understand {type(screen)}, please specify as a string indexing a predefined vaccine or a dict.'
+            raise ValueError(errormsg)
+
+        if triage:
+            if screen is None:
+                self.p = sc.mergedicts(self.p, {'triage': None})
+            else:
+                self.p = sc.mergedicts(self.p, {'triage': sc.objdict(screen_pars)})
+        elif treatment:
+            self.p = sc.mergedicts(self.p, {'treatment': sc.objdict(screen_pars)})
+        else:
+            # Set label and parameters
+            self.p = {'primary': sc.objdict(screen_pars)}
+
+        return
+
+    def initialize(self, sim):
+        super().initialize()
+        self.timepoints, self.dates = sim.get_t(self.timepoints,return_date_format='str')  # Ensure timepoints and dates are in the right format
+        self.p['screen_start_age'] = self.screen_start_age
+        self.p['screen_interval'] = self.screen_interval
+        self.p['screen_stop_age'] = self.screen_stop_age
+
+        sim['screen_pars'][self.label] = self.p  # Store the parameters
+        return
+
+    def select_people(self, sim):
+        """
+        Return an array of indices of people to vaccinate
+        Derived classes must implement this function to determine who to vaccinate at each timestep
+        Args:
+            sim: A cv.Sim instance
+        Returns: Array of person indices
+        """
+
+        screen_inds = np.array([], dtype=int)  # Initialize in case no one gets their first dose
+        if sim.t >= np.min(self.timepoints):
+            for _ in find_day(self.timepoints, sim.t, interv=self, sim=sim):
+                screen_probs = np.zeros(len(sim.people))
+
+                # Find eligible people
+                screen_probs[hpu.true(~sim.people.alive)] *= 0.0  # Do not screen dead people
+                eligible_inds = sc.findinds((sim.people.age >= self.p['screen_start_age']) & (sim.people.age <= self.p['screen_stop_age']))
+                screen_probs[eligible_inds] = self.prob  # Assign equal screening probability to everyone
+
+        return screen_inds
+
+
+    def screen(self, sim, screen_inds):
+        '''
+        Screen people
+
+        This method applies the screening to the requested people indices. The indices of people screened
+        is returned. These may be different to the requested indices, because anyone that is dead will be
+        skipped.
+
+        Args:
+            sim: A cv.Sim instance
+            screen_inds: An array of person indices to screen
+
+        Returns: An array of person indices of people screened
+        '''
+
+        # Perform checks
+        screen_inds = screen_inds[sim.people.alive[screen_inds]] # Skip anyone that is dead
+
+        if len(screen_inds):
+
+            sim.people.screened[screen_inds] = True
+            sim.people.date_screened[screen_inds] = sim.t
+
+            # Do the actual screening!
+
+            # Step 1, filter positives from primary screen
+
+            # Step 2, filter positives from triage (if appropriate)
+
+            # Step 3, treat and adjust prognoses accordingly
+
+            factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
+            sim.people.flows['screens']      += len(screen_inds)*factor # Count number of doses given
+            sim.people.flows['screened'] += len(screen_inds)*factor # Count number of people not already vaccinated given doses
+            sim.people.total_flows['total_screens'] += len(screen_inds)*factor
+            sim.people.total_flows['total_screened'] += len(screen_inds)*factor
+        return screen_inds
+
+
+    def apply(self, sim):
+        ''' Perform vaccination each timestep '''
+
+        inds = self.select_people(sim)
+        if len(inds):
+            inds = self.screen(sim, inds)
+        return inds
+
+
+    def shrink(self, in_place=True):
+        ''' Shrink vaccination intervention '''
+        obj = super().shrink(in_place=in_place)
+        return obj

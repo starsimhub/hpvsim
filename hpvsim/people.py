@@ -74,7 +74,7 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key == 'dead_other' or key == 'vaccinated': # ALl false at the beginning
+            if key == 'dead_other' or key == 'vaccinated' or key == 'screened': # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
             elif key == 'alive':  # All true at the beginning
                 self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
@@ -85,7 +85,7 @@ class People(hpb.BasePeople):
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
-            if key == 'date_dead_other' or key == 'date_vaccinated':
+            if key == 'date_dead_other' or key == 'date_vaccinated' or key == 'date_screened':
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
             else:
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
@@ -96,7 +96,7 @@ class People(hpb.BasePeople):
                 self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_int)
             else:
                 self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_float)
-        for key in self.meta.vacc_states:
+        for key in self.meta.intv_states:
             self[key] = np.zeros(self.pars['pop_size'], dtype=hpd.default_int)
 
         # Store the dtypes used in a flat dict
@@ -604,7 +604,7 @@ class People(hpb.BasePeople):
             dur_cin3 = hpu.sample(**durpars['cin3'], size=len(cin3_inds))
             dur_cin3_inds = np.digitize(dur_cin3, progpars['duration_cutoffs']) - 1  # Convert durations to indices
 
-            # Use prognosis probabilities to determine whether CIN3 clears or progresses to CIN2
+            # Use prognosis probabilities to determine whether CIN3 clears or progresses to cancer
             cancer_probs    = cinprobs['rel_cancer_prob'] * progpars['cancer_probs'][dur_cin3_inds]
             is_cancer       = hpu.binomial_arr(cancer_probs)  # See if they develop cancer
             cancer_inds     = cin3_inds[is_cancer]
