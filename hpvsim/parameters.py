@@ -750,7 +750,29 @@ def get_cross_immunity(default=False, genotype=None):
 
 
 def get_mixing(network=None):
-    ''' Default sexual mixing matrices '''
+    '''
+    Define defaults for sexual mixing matrices and the proportion of people of each age group
+    who have relationships of each type.
+
+    The mixing matrices represent males in the rows and females in the columns.
+    Non-zero entires mean that there are some relationships between males/females of the age
+    bands in the row/column combination. Entries >1 or <1 can be used to represent relative
+    likelihoods of males of a given age cohort partnering with females of that cohort.
+    For example, a mixing matrix like the following would mean that males aged 15-30 were twice
+    likely to partner with females of age 15-30 compared to females aged 30-50.
+        mixing = np.array([
+                                #15, 30,
+                            [15,  2, 1],
+                            [30,  1, 1]])
+    Note that the first column of the mixing matrix represents the age bins. The same age bins
+    must be used for males and females, i.e. the matrix must be square.
+
+    The proportion of people of each age group who have relationships of each type is
+    given by the layer_probs array. The first row represents the age bins, the second row
+    represents the proportion of females of each age who have relationships of each type, and
+    the third row represents the proportion of males of each age who have relationships of
+    each type.
+    '''
 
     if network == 'default':
 
