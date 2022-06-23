@@ -360,17 +360,18 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur = dict()
-    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=2.3625, par2=0.5)
+    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=0.1935, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dur['cin2']      = dict(dist='gamma', par1=3.347, par2=115.4385)
+    pars.hpv16.dur['cin2']      = dict(dist='gamma', par1=2.33, par2=9.67)
+                                    # Shift this to the left compared to the cin3 distribution
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv16.dur['cin3']      = dict(dist='gamma', par1=3.347, par2=115.4385)
+    pars.hpv16.dur['cin3']      = dict(dist='gamma', par1=3.33, par2=9.67)
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv16.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
@@ -382,17 +383,18 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur = dict()
-    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=2.2483, par2=0.5)
+    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=0.1874, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv18.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv18.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
+                                    # Shift this to the left compared to cin3 distribution
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv18.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv18.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv18.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
@@ -404,15 +406,16 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv31 = sc.objdict()
     pars.hpv31.dur = dict()
-    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=2.5197, par2=1.0)
+    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=0.2100, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv31.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv31.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv31.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
+                                    # Shift this to the left compared to cin3 distribution
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv31.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv31.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv31.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
@@ -424,15 +427,16 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv33 = sc.objdict()
     pars.hpv33.dur = dict()
-    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=2.3226, par2=1.0)
+    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=0.1936, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv33.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv33.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv33.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
+                                    # Shift this to the left compared to cin3 distribution
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv33.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv33.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv33.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
@@ -444,15 +448,16 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv45 = sc.objdict()
     pars.hpv45.dur = dict()
-    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=2.0213, par2=1.0)
+    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=0.1684, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv45.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv45.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv45.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
+                                    # Shift this to the left compared to cin3 distribution
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv45.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv45.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv45.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
@@ -464,15 +469,16 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv52 = sc.objdict()
     pars.hpv52.dur = dict()
-    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=2.3491, par2=1.0)
+    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=0.1958, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv52.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv52.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv52.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
+                                    # Shift this to the left compared to cin3 distribution
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv52.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+    pars.hpv52.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv52.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
@@ -484,7 +490,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv6 = sc.objdict()
     pars.hpv6.dur = dict()
-    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=1.8245, par2=1.0)
+    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=0.1540, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv6.dur['cin1']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dur['cin2']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -498,7 +504,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur = dict()
-    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=1.8718, par2=1.0)
+    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=0.1560, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv11.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -512,7 +518,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpvlo = sc.objdict()
     pars.hpvlo.dur = dict()
-    pars.hpvlo.dur['none']      = dict(dist='lognormal', par1=1.1948, par2=1.0)
+    pars.hpvlo.dur['none']      = dict(dist='lognormal', par1=0.1596, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -528,7 +534,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpvhi = sc.objdict()
     pars.hpvhi.dur = dict()
-    pars.hpvhi.dur['none']      = dict(dist='lognormal', par1=2.0509, par2=1.0)
+    pars.hpvhi.dur['none']      = dict(dist='lognormal', par1=0.1709, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
