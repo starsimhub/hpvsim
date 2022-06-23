@@ -256,57 +256,59 @@ class People(hpb.BasePeople):
                 sorted_f_inds = self.age[new_pship_inds_f].argsort()
                 new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
 
-            # Draw male partners based on mixing matrices if provided
-            if mixing is not None:
-                bins = mixing[lkey][:, 0]
-                m_active_inds = hpu.true(self.is_active*self.is_male) # Males eligible to be selected
-                age_bins_f = np.digitize(self.age[new_pship_inds_f], bins=bins) - 1 # Age bins of females that are entering new relationships
-                age_bins_m = np.digitize(self.age[m_active_inds], bins=bins) - 1 # Age bins of eligible males
-                bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
-                weighting = new_pship_probs*self.is_male # Weight males according to how underpartnered they are so they're ready to be selected
-                new_pship_inds_m = []  # Initialize the male contact list
-                for ab,nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
-                    male_dist = mixing[lkey][:, ab+1]  # Get the distribution of ages of the male partners of females of this age
-                    this_weighting = weighting[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
-                    selected_males = hpu.choose_w(this_weighting, nm, unique=False)  # Select males
-                    new_pship_inds_m += m_active_inds[selected_males].tolist()  # Extract the indices of the selected males and add them to the contact list
-                new_pship_inds_m = np.array(new_pship_inds_m)
+            if len(new_pship_inds_f)>0:
 
-            # Otherwise, do rough age assortativity
-            else:
-                new_pship_inds_m  = hpu.choose_w(probs=new_pship_probs*self.is_male, n=this_n_new, unique=True)
-                sorted_m_inds = self.age[new_pship_inds_m].argsort()
-                new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
+                # Draw male partners based on mixing matrices if provided
+                if mixing is not None:
+                    bins = mixing[lkey][:, 0]
+                    m_active_inds = hpu.true(self.is_active*self.is_male) # Males eligible to be selected
+                    age_bins_f = np.digitize(self.age[new_pship_inds_f], bins=bins) - 1 # Age bins of females that are entering new relationships
+                    age_bins_m = np.digitize(self.age[m_active_inds], bins=bins) - 1 # Age bins of eligible males
+                    bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
+                    weighting = new_pship_probs*self.is_male # Weight males according to how underpartnered they are so they're ready to be selected
+                    new_pship_inds_m = []  # Initialize the male contact list
+                    for ab,nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
+                        male_dist = mixing[lkey][:, ab+1]  # Get the distribution of ages of the male partners of females of this age
+                        this_weighting = weighting[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
+                        selected_males = hpu.choose_w(this_weighting, nm, unique=False)  # Select males
+                        new_pship_inds_m += m_active_inds[selected_males].tolist()  # Extract the indices of the selected males and add them to the contact list
+                    new_pship_inds_m = np.array(new_pship_inds_m)
 
-            # Increment the number of current partners
-            new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
-            self.current_partners[lno,new_pship_inds] += 1
+                # Otherwise, do rough age assortativity
+                else:
+                    new_pship_inds_m  = hpu.choose_w(probs=new_pship_probs*self.is_male, n=this_n_new, unique=True)
+                    sorted_m_inds = self.age[new_pship_inds_m].argsort()
+                    new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
 
-            # Handle acts: these must be scaled according to age
-            acts = hpu.sample(**self['pars']['acts'][lkey], size=len(new_pship_inds_f))
-            kwargs = dict(acts=acts,
-                          age_act_pars=self['pars']['age_act_pars'][lkey],
-                          age_f=self.age[new_pship_inds_f],
-                          age_m=self.age[new_pship_inds_m],
-                          debut_f=self.debut[new_pship_inds_f],
-                          debut_m=self.debut[new_pship_inds_m]
-                          )
-            scaled_acts = hppop.age_scale_acts(**kwargs)
-            keep_inds = scaled_acts > 0  # Discard partnerships with zero acts (e.g. because they are "post-retirement")
-            f = new_pship_inds_f[keep_inds]
-            m = new_pship_inds_m[keep_inds]
-            scaled_acts = scaled_acts[keep_inds]
-            final_n_new = len(f)
+                # Increment the number of current partners
+                new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
+                self.current_partners[lno,new_pship_inds] += 1
 
-            # Add everything to a contacts dictionary
-            new_pships[lkey]['f']       = f
-            new_pships[lkey]['m']       = m
-            new_pships[lkey]['dur']     = hpu.sample(**self['pars']['dur_pship'][lkey], size=final_n_new)
-            new_pships[lkey]['start']   = np.array([t*self['pars']['dt']]*final_n_new, dtype=hpd.default_float)
-            new_pships[lkey]['end']     = new_pships[lkey]['start'] + new_pships[lkey]['dur']
-            new_pships[lkey]['acts']    = scaled_acts
-            new_pships[lkey]['age_f']   = self.age[f]
-            new_pships[lkey]['age_m']   = self.age[m]
+                # Handle acts: these must be scaled according to age
+                acts = hpu.sample(**self['pars']['acts'][lkey], size=len(new_pship_inds_f))
+                kwargs = dict(acts=acts,
+                              age_act_pars=self['pars']['age_act_pars'][lkey],
+                              age_f=self.age[new_pship_inds_f],
+                              age_m=self.age[new_pship_inds_m],
+                              debut_f=self.debut[new_pship_inds_f],
+                              debut_m=self.debut[new_pship_inds_m]
+                              )
+                scaled_acts = hppop.age_scale_acts(**kwargs)
+                keep_inds = scaled_acts > 0  # Discard partnerships with zero acts (e.g. because they are "post-retirement")
+                f = new_pship_inds_f[keep_inds]
+                m = new_pship_inds_m[keep_inds]
+                scaled_acts = scaled_acts[keep_inds]
+                final_n_new = len(f)
+
+                # Add everything to a contacts dictionary
+                new_pships[lkey]['f']       = f
+                new_pships[lkey]['m']       = m
+                new_pships[lkey]['dur']     = hpu.sample(**self['pars']['dur_pship'][lkey], size=final_n_new)
+                new_pships[lkey]['start']   = np.array([t*self['pars']['dt']]*final_n_new, dtype=hpd.default_float)
+                new_pships[lkey]['end']     = new_pships[lkey]['start'] + new_pships[lkey]['dur']
+                new_pships[lkey]['acts']    = scaled_acts
+                new_pships[lkey]['age_f']   = self.age[f]
+                new_pships[lkey]['age_m']   = self.age[m]
 
         self.add_contacts(new_pships)
 
