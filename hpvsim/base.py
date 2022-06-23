@@ -456,7 +456,7 @@ class BaseSim(ParsObj):
         elif which in ['by_sex']:
             keys = [k for k,res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
         else:
-            errormsg = f'Choice "which" not available; choices are: {sc.strjoin(choices)}'
+            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(choices)}'
             raise ValueError(errormsg)
         return keys
 

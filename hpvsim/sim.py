@@ -73,6 +73,7 @@ class Sim(hpb.BaseSim):
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_interventions()  # Initialize the interventions...
         self.init_analyzers()  # ...and the analyzers...
+        self.validate_imm_pars()  # Once the population and interventions are initialized, validate the immunity parameters
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
         self.complete      = False
@@ -142,6 +143,22 @@ class Sim(hpb.BaseSim):
                 else:
                     errormsg = f'Please update your parameter keys {layer_keys} to match population keys {pop_keys}. You may find sim.reset_layer_pars() helpful.'
                     raise sc.KeyNotFoundError(errormsg)
+
+        return
+
+    def validate_imm_pars(self):
+        '''
+        Handle immunity parameters, since they need to be validated after the population and intervention
+        creation, rather than before.
+        '''
+
+        # Handle nab sources, as we need to init the people and interventions first
+        self.pars['n_imm_sources'] = self.pars['n_genotypes'] + len(self.pars['vaccine_map'])
+        for key in self.people.meta.imm_states:
+            if key == 't_imm_event':
+                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_int)
+            else:
+                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_float)
 
         return
 
@@ -307,6 +324,7 @@ class Sim(hpb.BaseSim):
         len_map = len(self['genotype_map'])
         assert len_pars == len_map, f"genotype_pars and genotype_map must be the same length, but they're not: {len_pars} ≠ {len_map}"
         self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
+        self['n_imm_sources'] = len_pars
 
         return
 
@@ -348,14 +366,14 @@ class Sim(hpb.BaseSim):
 
         # Construct the tvec that will be used with the results
         points_to_use = np.arange(0, self.npts, self.resfreq)
-        res_yearvec = self.yearvec[points_to_use]
-        res_npts = len(res_yearvec)
-        res_tvec = np.arange(res_npts)
+        self.res_yearvec = self.yearvec[points_to_use]
+        self.res_npts = len(self.res_yearvec)
+        self.res_tvec = np.arange(self.res_npts)
 
         # Function to create results
         def init_res(*args, **kwargs):
             ''' Initialize a single result object '''
-            output = hpb.Result(*args, **kwargs, npts=res_npts)
+            output = hpb.Result(*args, **kwargs, npts=self.res_npts)
             return output
 
         ng = self['n_genotypes']
@@ -394,11 +412,11 @@ class Sim(hpb.BaseSim):
         results['cbr'] = init_res('Crude birth rate', scale=False)
 
         # Time vector
-        results['year'] = res_yearvec
-        results['t'] = res_tvec
+        results['year'] = self.res_yearvec
+        results['t'] = self.res_tvec
 
         # Final items
-        self.rescale_vec   = self['pop_scale']*np.ones(res_npts) # Not included in the results, but used to scale them
+        self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts) # Not included in the results, but used to scale them
         self.results = results
         self.results_ready = False
 
@@ -553,6 +571,7 @@ class Sim(hpb.BaseSim):
         beta = self['beta']
         gen_pars = self['genotype_pars']
         imm_kin_pars = self['imm_kin']
+        trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
 
         # Update demographics and partnerships
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
@@ -587,13 +606,22 @@ class Sim(hpb.BaseSim):
             whole_acts.append(wa.astype(hpd.default_int))
             effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
 
+        # Shorten more variables
         gen_betas = np.array([g['rel_beta']*beta for g in gen_pars.values()], dtype=hpd.default_float)
         inf = people.infectious
         sus = people.susceptible
         sus_imm = people.sus_imm
 
+        # Get indices of infected/susceptible people by genotype
         f_inf_genotypes, f_inf_inds, f_sus_genotypes, f_sus_inds = hpu.get_sources_targets(inf, sus, ~people.sex.astype(bool))  # Males and females infected with this genotype
         m_inf_genotypes, m_inf_inds, m_sus_genotypes, m_sus_inds = hpu.get_sources_targets(inf, sus,  people.sex.astype(bool))  # Males and females infected with this genotype
+
+        # Calculate relative transmissibility by stage of infection
+        rel_trans_pars = self['rel_trans']
+        rel_trans = people.infectious[:].astype(hpd.default_float)
+        rel_trans[people.cin1] *= rel_trans_pars['cin1']
+        rel_trans[people.cin2] *= rel_trans_pars['cin2']
+        rel_trans[people.cin3] *= rel_trans_pars['cin3']
 
         # Loop over layers
         ln = 0 # Layer number
@@ -601,21 +629,21 @@ class Sim(hpb.BaseSim):
             f = fs[ln]
             m = ms[ln]
 
-            # Compute transmissibility for each partnership
-            foi_frac  = 1 - frac_acts[ln] * gen_betas[:,None] * (1 - effective_condoms[ln]) # Probability of not getting infected from any fractional acts
-            foi_whole = (1 - gen_betas[:,None] * (1 - effective_condoms[ln]))**whole_acts[ln] # Probability of not getting infected from whole acts
-            foi = (1 - (foi_whole*foi_frac)).astype(hpd.default_float)
-
             # Compute transmissions
             for g in range(ng):
                 f_source_inds = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
                 m_source_inds = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
 
-                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g]],
-                                    [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g]]]
+                foi_frac = 1 - frac_acts[ln] * gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])  # Probability of not getting infected from any fractional acts
+                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])) ** whole_acts[ln]  # Probability of not getting infected from whole acts
+                foi = (1 - (foi_whole * foi_frac)).astype(hpd.default_float)
 
-                for pship_inds, sources, targets, genotypes in discordant_pairs:
-                    betas = foi[g, pship_inds] * (1. - sus_imm[g, targets])  # Pull out the transmissibility associated with this partnership
+                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g], foi[0,:]],
+                                    [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g], foi[1,:]]]
+
+                # Compute transmissibility for each partnership
+                for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
+                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
                     target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
@@ -855,7 +883,7 @@ class Sim(hpb.BaseSim):
             raise RuntimeError(errormsg)
 
         summary = sc.objdict()
-        for key in self.result_keys():
+        for key in self.result_keys('total'):
             summary[key] = self.results[key][t]
 
         # Update the stored state

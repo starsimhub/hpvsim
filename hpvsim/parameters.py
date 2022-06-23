@@ -62,7 +62,9 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility TODO does this get used? if not remove.
-    pars['beta']            = 0.35  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']            = 0.15  # Per-act transmission probability; absolute value, calibrated
+    pars['transf2m']        = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
+    pars['transm2f']        = 3.69   # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Probabilities of disease progression
     pars['rel_cin1_prob'] = 1.0  # Scale factor for proportion of CIN cases
@@ -73,11 +75,11 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
 
     # Parameters used to calculate immunity
-    pars['imm_init'] = dict(dist='beta', par1=20, par2=1)  # beta distribution for initial level of immunity following infection clearance
-    pars['imm_decay'] = dict(infection=dict(form='exp_decay', init_val=1, half_life=5), # decay rate, with half life in YEARS
-                             vaccine=dict(form='exp_decay', init_val=1, half_life=20)) # decay rate, with half life in YEARS
+    pars['imm_init'] = dict(dist='beta', par1=5, par2=3)  # beta distribution for initial level of immunity following infection clearance
+    pars['imm_decay'] = dict(form=None)  # decay rate, with half life in years
+    # pars['imm_decay'] = dict(form='exp_decay', init_val=1, half_life=20) # decay rate, with half life in years
     pars['imm_kin'] = None  # Constructed during sim initialization using the nab_decay parameters
-    pars['imm_boost'] = 1.  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
+    pars['imm_boost'] = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity'] = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
     pars['immunity_map'] = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
 
@@ -88,6 +90,11 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Genotype parameters
     pars['n_genotypes'] = 1 # The number of genotypes circulating in the population
+    pars['n_imm_sources'] = 1 # The number of immunity sources circulating in the population
+
+    # Vaccine parameters
+    pars['vaccine_pars'] = dict()  # Vaccines that are being used; populated during initialization
+    pars['vaccine_map'] = dict()  # Reverse mapping from number to vaccine key
 
     # Parameters determining duration of dysplasia stages
     pars['dur'] = {}
@@ -96,6 +103,13 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['dur']['cin2']     = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 (moderate dysplasia)
     pars['dur']['cin3']     = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 (severe dysplasia/in situ carcinoma)
     pars['dur']['cancer']   = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated cancer
+
+    # Parameters determining relative transmissibility at each stage of disease
+    pars['rel_trans'] = {}
+    pars['rel_trans']['none']   = 1 # Baseline value
+    pars['rel_trans']['cin1']   = 0.5 # Less transmissible. Assumption, need data
+    pars['rel_trans']['cin2']   = 0.2 # Assumption, need data
+    pars['rel_trans']['cin3']   = 0.05 # Assumption, need data
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
@@ -202,11 +216,12 @@ def get_prognoses():
     '''
 
     prognoses = dict(
-        duration_cutoffs  = np.array([0,       1,          2,          5,          10]),     # Duration cutoffs (lower limits)
-        cin1_probs        = np.array([0.015,  0.05655,    0.10800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
-        cin2_probs        = np.array([0.015,  0.0655,    0.1080,    0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
-        cin3_probs        = np.array([0.15,  0.655,    0.80,    0.855,    0.90]),   # Conditional probability of developing CIN3 given CIN2
-        cancer_probs      = np.array([0.0055,  0.0655,    0.2080,    0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
+        duration_cutoffs  = np.array([0,       1,          2,          3,          4]),     # Duration cutoffs (lower limits)
+        seroconvert_probs = np.array([0.25,    0.5,        0.75,       1.0,        1.0]), # Probability of seroconverting given duration of infection
+        cin1_probs        = np.array([0.015,   0.05655,    0.10800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
+        cin2_probs        = np.array([0.015,   0.0655,     0.1080,     0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
+        cin3_probs        = np.array([0.15,    0.655,      0.80,       0.855,      0.90]),   # Conditional probability of developing CIN3 given CIN2
+        cancer_probs      = np.array([0.0055,  0.0655,     0.2080,     0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
         death_probs       = np.array([0.0015,  0.00655,    0.02080,    0.20655,    0.70]),   # Conditional probability of dying from cancer given cancer
         )
 
@@ -287,6 +302,20 @@ def get_genotype_choices():
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
 
+def get_vaccine_choices():
+    '''
+    Define valid pre-defined vaccine names
+    '''
+    # List of choices currently available: new ones can be added to the list along with their aliases
+    choices = {
+        'default': ['default', None],
+        'bivalent':  ['bivalent', 'hpv2', 'cervarix'],
+        'quadrivalent': ['quadrivalent', 'hpv4', 'gardasil'],
+        'nonavalent': ['nonavalent', 'hpv9', 'cervarix9'],
+    }
+    mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
+    return choices, mapping
+
 
 def _get_from_pars(pars, default=False, key=None, defaultkey='default'):
     ''' Helper function to get the right output from genotype functions '''
@@ -312,6 +341,7 @@ def get_genotype_pars(default=False, genotype=None):
     '''
     Define the default parameters for the different genotypes
     '''
+
     dur_dict = sc.objdict()
     for stage in ['none', 'cin1', 'cin2', 'cin3']:
         dur_dict[stage] = dict()
@@ -338,6 +368,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv16.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv16.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv16.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur = dict()
@@ -359,6 +390,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv18.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv18.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
     pars.hpv31.dur = dict()
@@ -378,6 +410,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv31.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv31.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv31.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv31.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
     pars.hpv33.dur = dict()
@@ -397,6 +430,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv33.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv33.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv33.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv33.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
     pars.hpv45.dur = dict()
@@ -416,6 +450,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv45.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv45.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv45.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv45.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
     pars.hpv52.dur = dict()
@@ -435,6 +470,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv52.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv52.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv52.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv52.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv6 = sc.objdict()
     pars.hpv6.dur = dict()
@@ -445,9 +481,10 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.dur['cin3']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.rel_beta          = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv6.rel_cin1_prob     = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cin2_prob     = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cin3_prob     = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cancer_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.imm_boost         = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur = dict()
@@ -461,6 +498,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv11.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv11.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpvlo = sc.objdict()
     pars.hpvlo.dur = dict()
@@ -476,6 +514,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpvlo.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpvlo.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpvlo.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvlo.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpvhi = sc.objdict()
     pars.hpvhi.dur = dict()
@@ -491,6 +530,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpvhi.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpvhi.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpvhi.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpvhi5 = sc.objdict()
     pars.hpvhi5.dur = dict()
@@ -503,6 +543,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpvhi5.rel_cin2_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpvhi5.rel_cin3_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpvhi5.rel_cancer_prob = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpvhi5.imm_boost       = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
@@ -698,3 +739,110 @@ def get_cross_immunity(default=False, genotype=None):
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
 
+def get_vaccine_genotype_pars(default=False, vaccine=None):
+    '''
+    Define the cross-immunity of each vaccine against each genotype
+    '''
+    pars = dict(
+
+        default = dict(
+            hpv16=1,
+            hpv18=1,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
+        ),
+
+        bivalent = dict(
+            hpv16=1,
+            hpv18=1,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=0,  # Assumption
+            hpv11=0,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
+        ),
+
+        quadrivalent=dict(
+            hpv16=1,
+            hpv18=1,  # Assumption
+            hpv31=0,  # Assumption
+            hpv33=0,  # Assumption
+            hpv45=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=0,  # Assumption
+            hpv6=1,  # Assumption
+            hpv11=1,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=0,  # Assumption
+        ),
+
+        nonavalent=dict(
+            hpv16=1,
+            hpv18=1,  # Assumption
+            hpv31=1,  # Assumption
+            hpv33=1,  # Assumption
+            hpv45=1,  # Assumption
+            hpv52=1,  # Assumption
+            hpv58=1,  # Assumption
+            hpv6=1,  # Assumption
+            hpv11=1,  # Assumption
+            hpvlo=0,  # Assumption
+            hpvhi=0,  # Assumption
+            hpvhi5=1,  # Assumption
+        ),
+    )
+
+    return _get_from_pars(pars, default=default, key=vaccine)
+
+
+def get_vaccine_dose_pars(default=False, vaccine=None):
+    '''
+    Define the parameters for each vaccine
+    '''
+
+    pars = dict(
+
+        default = dict(
+            imm_init  = dict(dist='beta', par1=30, par2=2), # Initial distribution of immunity
+            imm_boost = 2, # Factor by which a dose increases immunity
+            doses     = 1, # Number of doses for this vaccine
+            interval  = None, # Interval between doses
+        ),
+
+        bivalent = dict(
+            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_boost=2,  # Factor by which a dose increases immunity
+            doses=1,  # Number of doses for this vaccine
+            interval=None,  # Interval between doses
+        ),
+
+        quadrivalent = dict(
+            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_boost=2,  # Factor by which a dose increases immunity
+            doses=1,  # Number of doses for this vaccine
+            interval=None,  # Interval between doses
+        ),
+
+        nonavalent = dict(
+            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_boost=2,  # Factor by which a dose increases immunity
+            doses=1,  # Number of doses for this vaccine
+            interval=None,  # Interval between doses
+        ),
+    )
+
+    return _get_from_pars(pars, default, key=vaccine)

@@ -50,7 +50,7 @@ class PeopleMeta(sc.prettyobj):
             'current_partners', # Int by relationship type
         ]
 
-        # Set the states that a person can be in, all booleans per person and per genotype except other_dead
+        # Set the states that a person can be in, all booleans per person and per genotype except other_dead and vaccinated
         self.states = [
             'susceptible',
             'infectious',
@@ -61,18 +61,21 @@ class PeopleMeta(sc.prettyobj):
             'alive', # Save this as a state so we can record population sizes
             'dead_cancer',
             'dead_other',  # Dead from all other causes
+            'vaccinated',
         ]
 
-        # Immune states, by genotype
+        # Immune states, by genotype/vaccine
         self.imm_states = [
             'sus_imm',  # Float, by genotype
-        ]
-
-        # Immunity states, by genotype/vaccine
-        self.imm_by_source_states = [
-            'peak_imm', # Float, peak level of immunity
+            'peak_imm',  # Float, peak level of immunity
             'imm',  # Float, current immunity level
             't_imm_event',  # Int, time since immunity event
+        ]
+
+        # Additional vaccination states
+        self.vacc_states = [
+            'doses',  # Number of doses given per person
+            'vaccine_source',  # index of vaccine that individual received
         ]
 
         self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
@@ -88,12 +91,11 @@ class PeopleMeta(sc.prettyobj):
             'dur_cancer',  # Duration of cancer
         ]
 
-        self.all_states = self.person + self.states + self.imm_states + \
-                          self.imm_by_source_states + self.dates + self.durs
+        self.all_states = self.person + self.states + self.imm_states + self.vacc_states + \
+                          self.dates + self.durs
 
         # Validate
-        self.state_types = ['person', 'states', 'imm_states',
-                            'imm_by_source_states', 'dates', 'durs', 'all_states']
+        self.state_types = ['person', 'states', 'imm_states', 'vacc_states', 'dates', 'durs', 'all_states']
         for state_type in self.state_types:
             states = getattr(self, state_type)
             n_states        = len(states)
@@ -110,9 +112,9 @@ class PeopleMeta(sc.prettyobj):
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
 # the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu]
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections',     'doses',        'vaccinated']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections',     'doses',        'vaccinated']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu,          pl.cm.Oranges,  pl.cm.Oranges,]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -222,18 +224,18 @@ default_birth_rates = np.array([
 ])
 
 default_init_prev = {
-    'age_brackets'  : np.array([  12,   17,   24,   34,   44,   64,   150]),
-    'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
-    'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
+    'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
+    'm'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
+    'f'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
 }
 
 #%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
-    'cum_total_infections',
-    'cum_total_cins',
-    'cum_total_cancers',
+    'total_infections',
+    'total_cins',
+    'total_cancers',
 ]
 
 
@@ -285,12 +287,12 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         else: # pragma: no cover
             plots = sc.odict({
-                'Cumulative infections': [
-                    'cum_infections',
+                'HPV incidence': [
+                    'total_hpv_incidence',
                 ],
-                'New infections per day': [
-                    'new_infections',
-                ],
+                'Cancers per 100,000 women': [
+                    'total_cancer_incidence',
+                    ],
             })
 
     # Demographic plots
