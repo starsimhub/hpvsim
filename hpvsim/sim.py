@@ -606,13 +606,22 @@ class Sim(hpb.BaseSim):
             whole_acts.append(wa.astype(hpd.default_int))
             effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
 
+        # Shorten more variables
         gen_betas = np.array([g['rel_beta']*beta for g in gen_pars.values()], dtype=hpd.default_float)
         inf = people.infectious
         sus = people.susceptible
         sus_imm = people.sus_imm
 
+        # Get indices of infected/susceptible people by genotype
         f_inf_genotypes, f_inf_inds, f_sus_genotypes, f_sus_inds = hpu.get_sources_targets(inf, sus, ~people.sex.astype(bool))  # Males and females infected with this genotype
         m_inf_genotypes, m_inf_inds, m_sus_genotypes, m_sus_inds = hpu.get_sources_targets(inf, sus,  people.sex.astype(bool))  # Males and females infected with this genotype
+
+        # Calculate relative transmissibility by stage of infection
+        rel_trans_pars = self['rel_trans']
+        rel_trans = people.infectious[:].astype(hpd.default_float)
+        rel_trans[people.cin1] *= rel_trans_pars['cin1']
+        rel_trans[people.cin2] *= rel_trans_pars['cin2']
+        rel_trans[people.cin3] *= rel_trans_pars['cin3']
 
         # Loop over layers
         ln = 0 # Layer number
@@ -634,7 +643,7 @@ class Sim(hpb.BaseSim):
 
                 # Compute transmissibility for each partnership
                 for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
-                    betas = this_foi[pship_inds] * (1. - sus_imm[g, targets]) # Pull out the transmissibility associated with this partnership
+                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
                     target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
