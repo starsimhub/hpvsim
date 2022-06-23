@@ -86,6 +86,7 @@ def test_network(do_plot=True):
 
         pl.show()
 
+
     return sim, a
 
 

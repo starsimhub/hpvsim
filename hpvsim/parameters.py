@@ -727,27 +727,12 @@ def get_mixing(network=None):
             c=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
                 [ 0,  0,  0.10,   0.6,  0.3,  0.1,  0.1,  0.1,   0.1,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
-                [ 0,  0,  0.05,   0.1,  0.2,  0.3,  0.4,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
+                [ 0,  0,  0.05,   0.5,  0.5,  0.3,  0.4,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
             ),
             o=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
                 [ 0,  0,  0.01,  0.05, 0.05, 0.04, 0.03, 0.02,  0.01,  0.01,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having one-off relationships
                 [ 0,  0,  0.01,  0.01, 0.01, 0.02, 0.03, 0.04,  0.05,  0.05,  0.03, 0.02, 0.01, 0.01, 0.01, 0.01]], # Share of males of each age having one-off relationships
-            ),
-            mc=np.array([
-                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  1e-4,  1e-4, 1e-4, 1e-4, 1e-4, 1e-4,  1e-4,  1e-4,  1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5], # Share of married females of each age having extra-marital casual relationships
-                [ 0,  0,  1e-4,  1e-3, 1e-3, 1e-3, 1e-3, 1e-3,  1e-2,  1e-2,  1e-2, 1e-3, 1e-3, 1e-3, 1e-3, 1e-4]], # Share of married males of each age having extra-marital casual relationships
-            ),
-            mo=np.array([
-                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  1e-4,  1e-4, 1e-4, 1e-4, 1e-4, 1e-4,  1e-4,  1e-4,  1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5], # Share of females of each age having extra-marital one-off relationships
-                [ 0,  0,  1e-4,  1e-3, 1e-3, 1e-3, 1e-3, 1e-3,  1e-2,  1e-2,  1e-2, 1e-3, 1e-3, 1e-3, 1e-3, 1e-4]], # Share of males of each age having extra-marital one-off relationships
-            ),
-            co=np.array([
-                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  1e-4,  1e-4, 1e-4, 1e-4, 1e-4, 1e-4,  1e-4,  1e-4,  1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5], # Share of females of each age in casual relationships having additional one-off relationships
-                [ 0,  0,  1e-4,  1e-3, 1e-3, 1e-3, 1e-3, 1e-3,  1e-2,  1e-2,  1e-2, 1e-3, 1e-3, 1e-3, 1e-3, 1e-4]], # Share of males of each age in casual relationships having additional one-off relationships
             ),
         )
 
