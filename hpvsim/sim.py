@@ -73,6 +73,7 @@ class Sim(hpb.BaseSim):
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_interventions()  # Initialize the interventions...
         self.init_analyzers()  # ...and the analyzers...
+        self.validate_imm_pars()  # Once the population and interventions are initialized, validate the immunity parameters
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
         self.complete      = False
@@ -142,6 +143,22 @@ class Sim(hpb.BaseSim):
                 else:
                     errormsg = f'Please update your parameter keys {layer_keys} to match population keys {pop_keys}. You may find sim.reset_layer_pars() helpful.'
                     raise sc.KeyNotFoundError(errormsg)
+
+        return
+
+    def validate_imm_pars(self):
+        '''
+        Handle immunity parameters, since they need to be validated after the population and intervention
+        creation, rather than before.
+        '''
+
+        # Handle nab sources, as we need to init the people and interventions first
+        self.pars['n_imm_sources'] = self.pars['n_genotypes'] + len(self.pars['vaccine_map'])
+        for key in self.people.meta.imm_states:
+            if key == 't_imm_event':
+                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_int)
+            else:
+                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_float)
 
         return
 
@@ -307,6 +324,7 @@ class Sim(hpb.BaseSim):
         len_map = len(self['genotype_map'])
         assert len_pars == len_map, f"genotype_pars and genotype_map must be the same length, but they're not: {len_pars} ≠ {len_map}"
         self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
+        self['n_imm_sources'] = len_pars
 
         return
 
@@ -348,14 +366,14 @@ class Sim(hpb.BaseSim):
 
         # Construct the tvec that will be used with the results
         points_to_use = np.arange(0, self.npts, self.resfreq)
-        res_yearvec = self.yearvec[points_to_use]
-        res_npts = len(res_yearvec)
-        res_tvec = np.arange(res_npts)
+        self.res_yearvec = self.yearvec[points_to_use]
+        self.res_npts = len(self.res_yearvec)
+        self.res_tvec = np.arange(self.res_npts)
 
         # Function to create results
         def init_res(*args, **kwargs):
             ''' Initialize a single result object '''
-            output = hpb.Result(*args, **kwargs, npts=res_npts)
+            output = hpb.Result(*args, **kwargs, npts=self.res_npts)
             return output
 
         ng = self['n_genotypes']
@@ -394,11 +412,11 @@ class Sim(hpb.BaseSim):
         results['cbr'] = init_res('Crude birth rate', scale=False)
 
         # Time vector
-        results['year'] = res_yearvec
-        results['t'] = res_tvec
+        results['year'] = self.res_yearvec
+        results['t'] = self.res_tvec
 
         # Final items
-        self.rescale_vec   = self['pop_scale']*np.ones(res_npts) # Not included in the results, but used to scale them
+        self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts) # Not included in the results, but used to scale them
         self.results = results
         self.results_ready = False
 
@@ -865,7 +883,7 @@ class Sim(hpb.BaseSim):
             raise RuntimeError(errormsg)
 
         summary = sc.objdict()
-        for key in self.result_keys():
+        for key in self.result_keys('total'):
             summary[key] = self.results[key][t]
 
         # Update the stored state
