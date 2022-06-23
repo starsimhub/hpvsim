@@ -1566,21 +1566,22 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
 
         # Ensure the columns are right and add values if supplied
         for lkey, new_layer in new_contacts.items():
-            n = len(new_layer['f'])
-            if 'beta' not in new_layer.keys() or len(new_layer['beta']) != n:
-                if beta is None:
-                    beta = 1.0
-                beta = hpd.default_float(beta)
-                new_layer['beta'] = np.ones(n, dtype=hpd.default_float)*beta
+            if len(new_layer)>0:
+                n = len(new_layer['f'])
+                if 'beta' not in new_layer.keys() or len(new_layer['beta']) != n:
+                    if beta is None:
+                        beta = 1.0
+                    beta = hpd.default_float(beta)
+                    new_layer['beta'] = np.ones(n, dtype=hpd.default_float)*beta
 
-            # Create the layer if it doesn't yet exist
-            if lkey not in self.contacts:
-                self.contacts[lkey] = Layer(label=lkey)
+                # Create the layer if it doesn't yet exist
+                if lkey not in self.contacts:
+                    self.contacts[lkey] = Layer(label=lkey)
 
-            # Actually include them, and update properties if supplied
-            for col in self.contacts[lkey].keys(): # Loop over the supplied columns
-                self.contacts[lkey][col] = np.concatenate([self.contacts[lkey][col], new_layer[col]])
-            self.contacts[lkey].validate()
+                # Actually include them, and update properties if supplied
+                for col in self.contacts[lkey].keys(): # Loop over the supplied columns
+                    self.contacts[lkey][col] = np.concatenate([self.contacts[lkey][col], new_layer[col]])
+                self.contacts[lkey].validate()
 
         return
 
@@ -1823,6 +1824,8 @@ class Layer(FlexDict):
             'dur':   hpd.default_float, # Duration of partnership
             'start': hpd.default_int, # Date of partnership start
             'end':   hpd.default_float, # Date of partnership end
+            'age_f': hpd.default_float,  # Age of female partner
+            'age_m': hpd.default_float,  # Age of male partner
         }
         self.basekey = 'f' # Assign a base key for calculating lengths and performing other operations
         self.label = label

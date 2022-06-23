@@ -178,6 +178,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     - 'poisson'       : Poisson distribution with rate=par1 (par2 is not used); mean and variance are equal to par1
     - 'neg_binomial'  : negative binomial distribution with mean=par1 and k=par2; converges to Poisson with k=∞
     - 'beta'          : beta distribution with alpha=par1 and beta=par2;
+    - 'gamma'         : gamma distribution with shape=par1 and scale=par2;
 
     Args:
         dist (str):   the distribution to sample from
@@ -219,6 +220,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
         'poisson',
         'neg_binomial',
         'beta',
+        'gamma',
     ]
 
     # Ensure it's an integer
@@ -234,6 +236,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     elif dist == 'poisson':           samples = n_poisson(rate=par1, n=size, **kwargs) # Use Numba version below for speed
     elif dist == 'neg_binomial':      samples = n_neg_binomial(rate=par1, dispersion=par2, n=size, **kwargs) # Use custom version below
     elif dist == 'beta':              samples = np.random.beta(a=par1, b=par2, size=size, **kwargs)
+    elif dist == 'gamma':             samples = np.random.gamma(shape=par1, scale=par2, size=size, **kwargs)
     elif dist in ['lognorm', 'lognormal', 'lognorm_int', 'lognormal_int']:
         if par1>0:
             mean  = np.log(par1**2 / np.sqrt(par2**2 + par1**2)) # Computes the mean of the underlying normal distribution

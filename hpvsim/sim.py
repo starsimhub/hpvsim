@@ -126,12 +126,15 @@ class Sim(hpb.BaseSim):
         # Handle key mismatches
         for lp in layer_pars:
             lp_keys = set(self.pars[lp].keys())
-            if not lp_keys == set(layer_keys):
-                errormsg = 'At least one layer parameter is inconsistent with the layer keys; all parameters must have the same keys:'
-                errormsg += f'\nsim.layer_keys() = {layer_keys}'
-                for lp2 in layer_pars: # Fail on first error, but re-loop to list all of them
-                    errormsg += f'\n{lp2} = ' + ', '.join(self.pars[lp2].keys())
-                raise sc.KeyNotFoundError(errormsg)
+            if lp != 'layer_probs':
+                if not lp_keys == set(layer_keys):
+                    errormsg = 'At least one layer parameter is inconsistent with the layer keys; all parameters must have the same keys:'
+                    errormsg += f'\nsim.layer_keys() = {layer_keys}'
+                    for lp2 in layer_pars: # Fail on first error, but re-loop to list all of them
+                        errormsg += f'\n{lp2} = ' + ', '.join(self.pars[lp2].keys())
+                    raise sc.KeyNotFoundError(errormsg)
+
+            # TODO: add validation here for layer_probs
 
         # Handle mismatches with the population
         if self.people is not None:
@@ -202,7 +205,7 @@ class Sim(hpb.BaseSim):
         self.tvec          = np.arange(self.npts)
         
         # Handle population network data
-        network_choices = ['random', 'basic']
+        network_choices = ['random', 'default']
         choice = self['network']
         if choice and choice not in network_choices: # pragma: no cover
             choicestr = ', '.join(network_choices)
@@ -574,12 +577,15 @@ class Sim(hpb.BaseSim):
         trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
 
         # Update demographics and partnerships
+        old_pop_size = len(self.people)
         new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
         self.people.addtoself(new_people) # New births are added to the population
+
         people = self.people # Shorten
         people.alive = ~people.dead_other
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
-        people.create_partnerships(t=t, n_new=n_dissolved) # Create new partnerships (maintaining the same overall partnerhip rate)
+        new_pop_size = len(people)
+        people.create_partnerships(t=t, n_new=n_dissolved, scale_factor=new_pop_size/old_pop_size) # Create new partnerships (maintaining the same overall partnerhip rate)
         n_people = len(people)
 
         # Apply interventions
@@ -601,6 +607,7 @@ class Sim(hpb.BaseSim):
             ms.append(layer['m'])
 
             # Get the number of acts per timestep for this partnership type
+            acts = layer['acts'] * dt
             fa, wa = np.modf(layer['acts'] * dt)
             frac_acts.append(fa)
             whole_acts.append(wa.astype(hpd.default_int))

@@ -26,8 +26,9 @@ def test_network(do_plot=True):
                 n_years=30,
                 dt=0.5,
                 pop_scale=25.2e6/n_agents,
-                debut = dict(f=dict(dist='normal', par1=15., par2=2.1),
-                             m=dict(dist='normal', par1=16., par2=1.8))
+                network='default',
+                debut = dict(f=dict(dist='normal', par1=15., par2=1),
+                             m=dict(dist='normal', par1=16., par2=1))
                 )
     hpv6    = hpv.genotype('HPV6')
     hpv11   = hpv.genotype('HPV11')
@@ -41,24 +42,50 @@ def test_network(do_plot=True):
         edges=np.linspace(0, 100, 21))
 
     az = hpv.age_results(
-        timepoints=['1990', '2020'],
-        result_keys=['total_hpv_incidence']
+        timepoints=['2000', '2020'],
+        result_keys=['total_infections']
+    )
+
+    snap = hpv.snapshot(
+        timepoints=['1990', '2000', '2010', '2020'],
     )
 
     sim = hpv.Sim(
         pars,
         genotypes = [hpv16, hpv11, hpv6, hpv18],
-        network='basic',
+        network='default',
         location = 'tanzania',
-        analyzers=[age_pyr, az])
+        analyzers=[age_pyr, az, snap])
 
     sim.run()
-    a = sim.get_analyzer()
+    a = sim.get_analyzer(1)
 
     # Check plot()
     if do_plot:
         fig = a.plot()
         sim.plot()
+
+        snapshot = sim.get_analyzer()
+        people1990 = snapshot.snapshots[0]
+        people2000 = snapshot.snapshots[1]
+        people2010 = snapshot.snapshots[2]
+        people2020 = snapshot.snapshots[3]
+
+        # Plot age mixing
+        import pylab as pl
+        pl.rcParams.update({'font.size': 14})
+        fig, axes = pl.subplots(nrows=2, ncols=2, figsize=(12, 8))
+        ax = axes.flatten()
+        ['1990']
+        for ai,people in enumerate([people1990, people2000, people2010, people2020]):
+            h = ax[ai].hist2d(people.contacts['c']['age_f'], people.contacts['c']['age_m'], bins=np.linspace(0, 100, 21))
+            ax[ai].set_xlabel('Age of female partner')
+            ax[ai].set_ylabel('Age of male partner')
+            fig.colorbar(h[3], ax=ax[ai])
+            ax[ai].set_title(snapshot.dates[ai])
+
+        pl.show()
+
 
     return sim, a
 

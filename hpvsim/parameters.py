@@ -55,7 +55,7 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['condoms']         = None  # The proportion of acts in which condoms are used for each partnership type
     pars['layer_probs']     = None  # Proportion of the population in each partnership type
     pars['dur_pship']       = None  # Duration of partnerships in each partnership type
-    pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships - TODO
+    pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
     # pars['nonactive_by_age']= nonactive_by_age
     # pars['nonactive']       = None 
@@ -112,7 +112,8 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['rel_trans']['cin3']   = 0.05 # Assumption, need data
 
     # Efficacy of protection
-    pars['eff_condoms']     = 0.8  # The efficacy of condoms; assumption; TODO replace with data
+    pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
+
 
     # Events and interventions
     pars['interventions'] = []   # The interventions present in this simulation; populated by the user
@@ -130,7 +131,7 @@ def make_pars(set_prognoses=False, **kwargs):
 
 
 # Define which parameters need to be specified as a dictionary by layer -- define here so it's available at the module level for sim.py
-layer_pars = ['partners', 'acts', 'layer_probs', 'dur_pship', 'condoms']
+layer_pars = ['partners', 'mixing', 'acts', 'age_act_pars', 'layer_probs', 'dur_pship', 'condoms']
 
 
 def reset_layer_pars(pars, layer_keys=None, force=False):
@@ -150,23 +151,33 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     layer_defaults = {}
     # Specify defaults for random -- layer 'a' for 'all'
     layer_defaults['random'] = dict(
-        partners    = dict(a=1),    # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
-        acts        = dict(a=dict(dist='neg_binomial', par1=100,par2=50)),  # Default number of sexual acts per year
+        partners    = dict(a=dict(dist='poisson', par1=0.01)), # Everyone in this layer has one partner; this captures *additional* partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 partner
+        acts        = dict(a=dict(dist='neg_binomial', par1=100,par2=50)),  # Default number of sexual acts per year for people at sexual peak
+        age_act_pars = dict(a=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1)), # Parameters describing changes in coital frequency over agent lifespans
         layer_probs = dict(a=1.0),  # Default proportion of the population in each layer
         dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships
         condoms     = dict(a=0.25),  # Default proportion of acts in which condoms are used
     )
+    layer_defaults['random']['mixing'], layer_defaults['random']['layer_probs'] = get_mixing('random')
 
-    # Specify defaults for basic sexual network with regular and casual partners
-    layer_defaults['basic'] = dict(
-        partners    = dict(r=1, c=2),       # Default number of concurrent sexual partners; TODO make this a distribution and incorporate zero inflation
-        acts        = dict(r=dict(dist='neg_binomial', par1=80, par2=40),
-                           c=dict(dist='neg_binomial', par1=10, par2=5)),
-        layer_probs = dict(r=0.7, c=0.4),   # Default proportion of the population in each layer
-        dur_pship   = dict(r=dict(dist='normal_pos', par1=10,par2=3),
-                           c=dict(dist='normal_pos', par1=2, par2=1)),
-        condoms     = dict(r=0.01, c=0.8),  # Default proportion of acts in which condoms are used
+    # Specify defaults for basic sexual network with marital, casual, and one-off partners
+    layer_defaults['default'] = dict(
+        partners    = dict(m=dict(dist='poisson', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
+                           c=dict(dist='poisson', par1=0.05), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
+                           o=dict(dist='poisson', par1=0.0),), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 one-off partner at a time. Can be set to zero since these relationships only last a single timestep
+        acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts per year for people at sexual peak
+                            c=dict(dist='neg_binomial', par1=10, par2=5), # Default number of acts per year for people at sexual peak
+                            o=dict(dist='neg_binomial', par1=1,  par2=.01)),  # Default number of acts per year for people at sexual peak
+        age_act_pars = dict(m=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
+                            c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
+                            o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
+        # layer_probs = dict(m=0.7, c=0.4, o=0.05),   # Default proportion of the population in each layer
+        dur_pship   = dict(m=dict(dist='normal_pos', par1=10,par2=3),
+                           c=dict(dist='normal_pos', par1=2, par2=1),
+                           o=dict(dist='normal_pos', par1=0.1, par2=0.05)),
+        condoms     = dict(m=0.01, c=0.5, o=0.6),  # Default proportion of acts in which condoms are used
     )
+    layer_defaults['default']['mixing'], layer_defaults['default']['layer_probs'] = get_mixing('default')
 
     # Choose the parameter defaults based on the population type, and get the layer keys
     try:
@@ -174,7 +185,7 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     except Exception as E:
         errormsg = f'Cannot load defaults for population type "{pars["network"]}"'
         raise ValueError(errormsg) from E
-    default_layer_keys = list(defaults['acts'].keys()) # All layers should be the same, but use beta_layer for convenience
+    default_layer_keys = list(defaults['acts'].keys()) # All layers should be the same, but use acts for convenience
 
     # Actually set the parameters
     for pkey in layer_pars:
@@ -349,10 +360,19 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur = dict()
-    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=2.3625, par2=0.5)
+                                    # Made the distribution wider to accommodate varying means
+                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
+                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
+                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
+                                    # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur['cin2']      = dict(dist='gamma', par1=3.347, par2=115.4385)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
+    pars.hpv16.dur['cin3']      = dict(dist='gamma', par1=3.347, par2=115.4385)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv16.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv16.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv16.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
@@ -362,10 +382,19 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur = dict()
-    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=2.2483, par2=0.5)
+                                    # Made the distribution wider to accommodate varying means
+                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
+                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
+                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
+                                    # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv18.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
+    pars.hpv18.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv18.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv18.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv18.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
@@ -375,10 +404,17 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv31 = sc.objdict()
     pars.hpv31.dur = dict()
-    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=2.5197, par2=1.0)
+                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
+                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
+                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv31.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv31.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv31.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv31.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
+    pars.hpv31.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv31.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv31.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv31.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
@@ -388,10 +424,17 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv33 = sc.objdict()
     pars.hpv33.dur = dict()
-    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=2.3226, par2=1.0)
+                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
+                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
+                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv33.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv33.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv33.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv33.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
+    pars.hpv33.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv33.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv33.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv33.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
@@ -401,10 +444,17 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv45 = sc.objdict()
     pars.hpv45.dur = dict()
-    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=2.0213, par2=1.0)
+                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
+                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
+                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv45.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv45.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv45.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv45.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
+    pars.hpv45.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv45.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv45.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv45.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
@@ -414,10 +464,17 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv52 = sc.objdict()
     pars.hpv52.dur = dict()
-    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=2.3491, par2=1.0)
+                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
+                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
+                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv52.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv52.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv52.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv52.dur['cin2']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
+    pars.hpv52.dur['cin3']      = dict(dist='gamma', par1=9.13, par2=29.88)
+                                    # Assume that par1 = shape parameter, par2 = scale parameter
+                                    # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv52.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv52.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv52.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
@@ -427,7 +484,8 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv6 = sc.objdict()
     pars.hpv6.dur = dict()
-    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=1.8245, par2=1.0)
+                                    # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv6.dur['cin1']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dur['cin2']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dur['cin3']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -440,7 +498,8 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur = dict()
-    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=1.8718, par2=1.0)
+                                    # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv11.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -453,7 +512,10 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpvlo = sc.objdict()
     pars.hpvlo.dur = dict()
-    pars.hpvlo.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvlo.dur['none']      = dict(dist='lognormal', par1=1.1948, par2=1.0)
+                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
+                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
+                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpvlo.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpvlo.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpvlo.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -466,7 +528,10 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpvhi = sc.objdict()
     pars.hpvhi.dur = dict()
-    pars.hpvhi.dur['none']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpvhi.dur['none']      = dict(dist='lognormal', par1=2.0509, par2=1.0)
+                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
+                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
+                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpvhi.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpvhi.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpvhi.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -682,6 +747,147 @@ def get_cross_immunity(default=False, genotype=None):
     )
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
+
+
+def get_mixing(network=None):
+    '''
+    Define defaults for sexual mixing matrices and the proportion of people of each age group
+    who have relationships of each type.
+
+    The mixing matrices represent males in the rows and females in the columns.
+    Non-zero entires mean that there are some relationships between males/females of the age
+    bands in the row/column combination. Entries >1 or <1 can be used to represent relative
+    likelihoods of males of a given age cohort partnering with females of that cohort.
+    For example, a mixing matrix like the following would mean that males aged 15-30 were twice
+    likely to partner with females of age 15-30 compared to females aged 30-50.
+        mixing = np.array([
+                                #15, 30,
+                            [15,  2, 1],
+                            [30,  1, 1]])
+    Note that the first column of the mixing matrix represents the age bins. The same age bins
+    must be used for males and females, i.e. the matrix must be square.
+
+    The proportion of people of each age group who have relationships of each type is
+    given by the layer_probs array. The first row represents the age bins, the second row
+    represents the proportion of females of each age who have relationships of each type, and
+    the third row represents the proportion of males of each age who have relationships of
+    each type.
+    '''
+
+    if network == 'default':
+
+        mixing = dict(
+            m=np.array([
+            #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
+            [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  0,  0,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0,  0,  0,  0,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0],
+            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0],
+            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1, .5],
+            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1],
+        ]),
+            c=np.array([
+            #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
+            [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
+            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
+            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5],
+            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1],
+        ]),
+            o=np.array([
+            #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
+            [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
+            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
+            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5],
+            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1],
+        ]),
+        )
+
+        layer_probs = dict(
+            m=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.04,   0.2,  0.6,  0.8,  0.8,  0.8,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
+                [ 0,  0,  0.01,  0.01,  0.2,  0.6,  0.8,  0.9,  0.90,  0.90,  0.90,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
+            ),
+            c=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.10,   0.6,  0.3,  0.1,  0.1,  0.1,   0.1,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
+                [ 0,  0,  0.05,   0.5,  0.5,  0.3,  0.4,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
+            ),
+            o=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.01,  0.05, 0.05, 0.04, 0.03, 0.02,  0.01,  0.01,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having one-off relationships
+                [ 0,  0,  0.01,  0.01, 0.01, 0.02, 0.03, 0.04,  0.05,  0.05,  0.03, 0.02, 0.01, 0.01, 0.01, 0.01]], # Share of males of each age having one-off relationships
+            ),
+        )
+
+    elif network == 'random':
+        mixing = dict(
+            a=np.array([
+            #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
+            [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
+            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
+            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5],
+            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1],
+        ])
+        )
+        layer_probs = dict(
+            a=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.04,   0.2,  0.6,  0.8,  0.8,  0.8,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
+                [ 0,  0,  0.01,  0.01,  0.2,  0.6,  0.8,  0.9,  0.90,  0.90,  0.90,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
+            ))
+
+    else:
+        errormsg = f'Network "{network}" not found; the choices at this stage are random and default.'
+        raise ValueError(errormsg)
+
+    return mixing, layer_probs
 
 
 def get_vaccine_genotype_pars(default=False, vaccine=None):
