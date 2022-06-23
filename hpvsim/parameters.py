@@ -143,24 +143,26 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships
         condoms     = dict(a=0.25),  # Default proportion of acts in which condoms are used
     )
-    layer_defaults['random']['mixing'] = get_mixing('random')
+    layer_defaults['random']['mixing'], layer_defaults['random']['layer_probs'] = get_mixing('random')
 
     # Specify defaults for basic sexual network with marital, casual, and one-off partners
     layer_defaults['default'] = dict(
-        partners    = dict(m=1, c=1, o=1), # Default number of concurrent sexual partners
+        partners    = dict(m=dict(dist='poisson', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
+                           c=dict(dist='poisson', par1=0.05), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
+                           o=dict(dist='poisson', par1=0.0),), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 one-off partner at a time. Can be set to zero since these relationships only last a single timestep
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts for people at sexual peak
                             c=dict(dist='neg_binomial', par1=10, par2=5), # Default number of acts for people at sexual peak
                             o=dict(dist='neg_binomial', par1=1,  par2=.01)),  # Default number of acts for people at sexual peak
         age_act_pars = dict(m=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
                             c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
                             o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
-        layer_probs = dict(m=0.7, c=0.4, o=0.05),   # Default proportion of the population in each layer
+        # layer_probs = dict(m=0.7, c=0.4, o=0.05),   # Default proportion of the population in each layer
         dur_pship   = dict(m=dict(dist='normal_pos', par1=10,par2=3),
                            c=dict(dist='normal_pos', par1=2, par2=1),
                            o=dict(dist='normal_pos', par1=0.1, par2=0.05)),
         condoms     = dict(m=0.01, c=0.5, o=0.6),  # Default proportion of acts in which condoms are used
     )
-    layer_defaults['default']['mixing'] = get_mixing('default')
+    layer_defaults['default']['mixing'], layer_defaults['default']['layer_probs'] = get_mixing('default')
 
     # Choose the parameter defaults based on the population type, and get the layer keys
     try:
@@ -716,6 +718,39 @@ def get_mixing(network=None):
         ]),
         )
 
+        layer_probs = dict(
+            m=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.04,   0.2,  0.6,  0.8,  0.8,  0.8,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
+                [ 0,  0,  0.01,  0.01,  0.2,  0.6,  0.8,  0.9,  0.90,  0.90,  0.90,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
+            ),
+            c=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.10,   0.6,  0.3,  0.1,  0.1,  0.1,   0.1,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
+                [ 0,  0,  0.05,   0.1,  0.2,  0.3,  0.4,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
+            ),
+            o=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.01,  0.05, 0.05, 0.04, 0.03, 0.02,  0.01,  0.01,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having one-off relationships
+                [ 0,  0,  0.01,  0.01, 0.01, 0.02, 0.03, 0.04,  0.05,  0.05,  0.03, 0.02, 0.01, 0.01, 0.01, 0.01]], # Share of males of each age having one-off relationships
+            ),
+            mc=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  1e-4,  1e-4, 1e-4, 1e-4, 1e-4, 1e-4,  1e-4,  1e-4,  1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5], # Share of married females of each age having extra-marital casual relationships
+                [ 0,  0,  1e-4,  1e-3, 1e-3, 1e-3, 1e-3, 1e-3,  1e-2,  1e-2,  1e-2, 1e-3, 1e-3, 1e-3, 1e-3, 1e-4]], # Share of married males of each age having extra-marital casual relationships
+            ),
+            mo=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  1e-4,  1e-4, 1e-4, 1e-4, 1e-4, 1e-4,  1e-4,  1e-4,  1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5], # Share of females of each age having extra-marital one-off relationships
+                [ 0,  0,  1e-4,  1e-3, 1e-3, 1e-3, 1e-3, 1e-3,  1e-2,  1e-2,  1e-2, 1e-3, 1e-3, 1e-3, 1e-3, 1e-4]], # Share of males of each age having extra-marital one-off relationships
+            ),
+            co=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  1e-4,  1e-4, 1e-4, 1e-4, 1e-4, 1e-4,  1e-4,  1e-4,  1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5], # Share of females of each age in casual relationships having additional one-off relationships
+                [ 0,  0,  1e-4,  1e-3, 1e-3, 1e-3, 1e-3, 1e-3,  1e-2,  1e-2,  1e-2, 1e-3, 1e-3, 1e-3, 1e-3, 1e-4]], # Share of males of each age in casual relationships having additional one-off relationships
+            ),
+        )
+
     elif network == 'random':
         mixing = dict(
             a=np.array([
@@ -738,10 +773,16 @@ def get_mixing(network=None):
             [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1],
         ])
         )
+        layer_probs = dict(
+            a=np.array([
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.04,   0.2,  0.6,  0.8,  0.8,  0.8,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
+                [ 0,  0,  0.01,  0.01,  0.2,  0.6,  0.8,  0.9,  0.90,  0.90,  0.90,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
+            ))
 
     else:
         errormsg = f'Network "{network}" not found; the choices at this stage are random and default.'
         raise ValueError(errormsg)
 
-    return mixing
+    return mixing, layer_probs
 

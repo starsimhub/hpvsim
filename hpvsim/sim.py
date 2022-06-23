@@ -125,12 +125,15 @@ class Sim(hpb.BaseSim):
         # Handle key mismatches
         for lp in layer_pars:
             lp_keys = set(self.pars[lp].keys())
-            if not lp_keys == set(layer_keys):
-                errormsg = 'At least one layer parameter is inconsistent with the layer keys; all parameters must have the same keys:'
-                errormsg += f'\nsim.layer_keys() = {layer_keys}'
-                for lp2 in layer_pars: # Fail on first error, but re-loop to list all of them
-                    errormsg += f'\n{lp2} = ' + ', '.join(self.pars[lp2].keys())
-                raise sc.KeyNotFoundError(errormsg)
+            if lp != 'layer_probs':
+                if not lp_keys == set(layer_keys):
+                    errormsg = 'At least one layer parameter is inconsistent with the layer keys; all parameters must have the same keys:'
+                    errormsg += f'\nsim.layer_keys() = {layer_keys}'
+                    for lp2 in layer_pars: # Fail on first error, but re-loop to list all of them
+                        errormsg += f'\n{lp2} = ' + ', '.join(self.pars[lp2].keys())
+                    raise sc.KeyNotFoundError(errormsg)
+
+            # TODO: add validation here for layer_probs
 
         # Handle mismatches with the population
         if self.people is not None:
