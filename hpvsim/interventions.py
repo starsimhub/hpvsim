@@ -936,6 +936,7 @@ class Screening(Intervention):
             dt = sim['dt']
             # Step 1, filter positives from primary screen
             primary_screen_pars = self.p['primary']['sensitivity']
+            triage_screen_pars = self.p['triage']
             states = ['infectious', 'cin1', 'cin2', 'cin3']
             screen_pos = []
 
@@ -950,7 +951,10 @@ class Screening(Intervention):
             # remove duplicates from list
             screen_pos = np.array(list(set(screen_pos)))
 
-            # Step 2, filter positives from triage (if appropriate)
+            # Step 2, filter positives from triage (if appropriate) TODO: fill this part in
+            if triage_screen_pars is not None:
+                screen_pars = triage_screen_pars['sensitivity']
+
 
             # Step 3, treat and adjust prognoses accordingly
             treat_pars = self.p['treatment']['efficacy']
