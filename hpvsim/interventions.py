@@ -373,7 +373,7 @@ class dynamic_pars(Intervention):
         return
 
 
-__all__ += ['BaseVaccination', 'vaccinate_prob']
+__all__ += ['BaseVaccination', 'vaccinate_prob', 'Screening']
 
 class BaseVaccination(Intervention):
     '''
@@ -735,7 +735,7 @@ class vaccinate_prob(BaseVaccination):
         return vacc_inds
 
 
-class BaseScreening(Intervention):
+class Screening(Intervention):
     '''
     Apply a screening program to a subset of the population.
 
@@ -790,6 +790,12 @@ class BaseScreening(Intervention):
 
             choices, mapping = hppar.get_screen_choices()
             screen_pars = hppar.get_screen_pars()
+            if treatment:
+                choices, mapping = hppar.get_treatment_choices()
+                screen_pars = hppar.get_treatment_pars()
+            else:
+                choices, mapping = hppar.get_screen_choices()
+                screen_pars = hppar.get_screen_pars()
 
             label = screen.lower()
             for txt in ['.', ' ', '&', '-', 'screen']:
@@ -838,13 +844,13 @@ class BaseScreening(Intervention):
 
         return
 
+
     def initialize(self, sim):
         super().initialize()
         self.timepoints, self.dates = sim.get_t(self.timepoints,return_date_format='str')  # Ensure timepoints and dates are in the right format
         self.p['screen_start_age'] = self.screen_start_age
         self.p['screen_interval'] = self.screen_interval
         self.p['screen_stop_age'] = self.screen_stop_age
-
         sim['screen_pars'][self.label] = self.p  # Store the parameters
         return
 
@@ -859,14 +865,21 @@ class BaseScreening(Intervention):
 
         screen_inds = np.array([], dtype=int)  # Initialize in case no one gets their first dose
         if sim.t >= np.min(self.timepoints):
-            for _ in find_day(self.timepoints, sim.t, interv=self, sim=sim):
-                screen_probs = np.zeros(len(sim.people))
+            screen_probs = np.zeros(len(sim.people))
+            # Find people eligible for first screen
+            screen_probs[hpu.true(~sim.people.alive)] *= 0.0  # Do not screen dead people
+            eligible_inds = sc.findinds((sim.people.age >= self.p['screen_start_age']) &
+                                        (sim.people.age <= self.p['screen_stop_age']) &
+                                        (sim.people.screens == 0) )
+            screen_probs[eligible_inds] = self.prob  # Assign equal screening probability to everyone
 
-                # Find eligible people
-                screen_probs[hpu.true(~sim.people.alive)] *= 0.0  # Do not screen dead people
-                eligible_inds = sc.findinds((sim.people.age >= self.p['screen_start_age']) & (sim.people.age <= self.p['screen_stop_age']))
-                screen_probs[eligible_inds] = self.prob  # Assign equal screening probability to everyone
+            # find people eligible for next screen
+            next_eligible_inds = sc.findinds((sim.people.age >= self.p['screen_start_age']) &
+                                    (sim.people.age <= self.p['screen_stop_age']) &
+                                    (sim.people.date_screened == sim.t - self.p['screen_interval']))
+            screen_probs[next_eligible_inds] = self.prob  # Assign equal screening probability to everyone
 
+            screen_inds = hpu.true(hpu.binomial_arr(screen_probs))  # Calculate who actually gets screened
         return screen_inds
 
 
@@ -891,6 +904,7 @@ class BaseScreening(Intervention):
         if len(screen_inds):
 
             sim.people.screened[screen_inds] = True
+            sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
 
             # Do the actual screening!
@@ -903,8 +917,8 @@ class BaseScreening(Intervention):
 
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
             sim.people.flows['screens']      += len(screen_inds)*factor # Count number of doses given
-            sim.people.flows['screened'] += len(screen_inds)*factor # Count number of people not already vaccinated given doses
-            sim.people.total_flows['total_screens'] += len(screen_inds)*factor
+            sim.people.flows['screened']     += len(screen_inds)*factor # Count number of people not already vaccinated given doses
+            sim.people.total_flows['total_screens']  += len(screen_inds)*factor
             sim.people.total_flows['total_screened'] += len(screen_inds)*factor
         return screen_inds
 

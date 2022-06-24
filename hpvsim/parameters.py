@@ -917,7 +917,50 @@ def get_screen_pars(screen=None):
     pars = dict(
         hpv = dict(
             sensitivity=dict(
-                infectious=1
+                infectious=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=1,
+                    hpv33=1,
+                    hpv45=1,
+                    hpv52=1,
+                    hpv58=1,
+                    hpv6=1,
+                    hpv11=1,
+                ),
+                cin1=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=1,
+                    hpv33=1,
+                    hpv45=1,
+                    hpv52=1,
+                    hpv58=1,
+                    hpv6=1,
+                    hpv11=1,
+                ),
+                cin2=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=1,
+                    hpv33=1,
+                    hpv45=1,
+                    hpv52=1,
+                    hpv58=1,
+                    hpv6=1,
+                    hpv11=1,
+                ),
+                cin3=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=1,
+                    hpv33=1,
+                    hpv45=1,
+                    hpv52=1,
+                    hpv58=1,
+                    hpv6=1,
+                    hpv11=1,
+                ),
             ),
             specificity=None,
         ),
@@ -925,6 +968,39 @@ def get_screen_pars(screen=None):
         hpv1618 = dict(
             sensitivity=dict(
                 infectious=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin1=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin2=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin3=dict(
                     hpv16=1,
                     hpv18=1,
                     hpv31=0,
@@ -952,6 +1028,32 @@ def get_screen_pars(screen=None):
         colposcopy=dict(
             sensitivity=None,
             specificity=None,
+        ),
+    )
+
+    return _get_from_pars(pars, key=screen)
+
+def get_treatment_pars(screen=None):
+    '''
+    Define the parameters for each treatment method
+    '''
+
+    pars = dict(
+        excisional = dict(
+            efficacy=dict(
+                infectious=1,
+                cin1=1,
+                cin2=2,
+                cin3=3,
+            )
+        ),
+        ablative=dict(
+            efficacy=dict(
+                infectious=1,
+                cin1=1,
+                cin2=2,
+                cin3=3,
+            )
         ),
     )
 

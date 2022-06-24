@@ -140,7 +140,9 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     # Model an intervention to screen 50% of 30 year olds with VIA and treat immediately
     screen_prop = 0.5
-    hpv_screening = hpv.
+    hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='ablative', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, timepoints='2020',
+                                  prob=screen_prop)
 
     sim = hpv.Sim(pars=pars)
 
@@ -148,21 +150,15 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     # Define the scenarios
     scenarios = {
-        'no_vx': {
-            'name': 'No vaccination',
+        'no_screening': {
+            'name': 'No screening',
             'pars': {
             }
         },
         'vx': {
-            'name': f'Vaccinate {vx_prop*100}% of 9-14y girls starting in 2020',
+            'name': f'Screen {screen_prop*100}% of 30-50y women 2x starting in 2020',
             'pars': {
-                'interventions': [bivalent_vx]
-            }
-        },
-        'faster_vx': {
-            'name': f'Vaccinate {vx_prop * 100}% of 9-24y girls starting in 2020',
-            'pars': {
-                'interventions': [bivalent_vx_faster]
+                'interventions': [hpv_screening]
             }
         },
     }
@@ -178,8 +174,8 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             'HPV incidence': [
                 'total_hpv_incidence',
             ],
-            'HPV infections': [
-                'total_infections',
+            'CIN incidence': [
+                'total_cin_incidence',
             ],
             'Cancers per 100,000 women': [
                 'total_cancer_incidence',
@@ -197,7 +193,7 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_dynamic_pars()
-    scens = test_vaccines(do_plot=True)
+    # scens = test_vaccines(do_plot=True)
     scens = test_screening(do_plot=True)
 
     sc.toc(T)
