@@ -1043,16 +1043,28 @@ def get_treatment_pars(screen=None):
             efficacy=dict(
                 infectious=1,
                 cin1=1,
-                cin2=2,
-                cin3=3,
+                cin2=1,
+                cin3=1,
+            ),
+            time_to_clearance=dict(
+                infectious=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,
+                cin1=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
+                cin2=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
+                cin3=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
             )
         ),
         ablative=dict(
             efficacy=dict(
                 infectious=1,
                 cin1=1,
-                cin2=2,
-                cin3=3,
+                cin2=1,
+                cin3=1,
+            ),
+            time_to_clearance=dict(
+                infectious=dict(dist='lognormal', par1=1.0, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,
+                cin1=dict(dist='lognormal', par1=1.0, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+                cin2=dict(dist='lognormal', par1=1.0, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+                cin3=dict(dist='lognormal', par1=1.0, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
             )
         ),
     )
