@@ -53,7 +53,7 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
 
     pars = {
         'pop_size': 50e3,
-        'n_years': 20,
+        'n_years': 40,
         'genotypes': [hpv16, hpv18],
         'dt': .2,
     }
@@ -112,8 +112,8 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
             'HPV incidence': [
                 'total_hpv_incidence',
             ],
-            'HPV infections': [
-                'total_infections',
+            'CIN prevalence': [
+                'total_cin_prevalence',
             ],
             'Cancers per 100,000 women': [
                 'total_cancer_incidence',
@@ -193,8 +193,8 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_dynamic_pars()
-    # scens = test_vaccines(do_plot=True)
-    scens = test_screening(do_plot=True)
+    scens = test_vaccines(do_plot=True)
+    # scens = test_screening(do_plot=True)
 
     sc.toc(T)
     print('Done.')

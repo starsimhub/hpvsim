@@ -535,7 +535,7 @@ class BaseVaccination(Intervention):
         raise NotImplementedError
 
 
-    def vaccinate(self, sim, vacc_inds, t=None):
+    def vaccinate(self, sim, vacc_inds):
         '''
         Vaccinate people
 
@@ -547,15 +547,10 @@ class BaseVaccination(Intervention):
         Args:
             sim: A cv.Sim instance
             vacc_inds: An array of person indices to vaccinate
-            t: Optionally override the day on which vaccinations are recorded for historical vaccination
 
         Returns: An array of person indices of people vaccinated
         '''
 
-        if t is None:
-            t = sim.t
-        else: # pragma: no cover
-            assert t <= sim.t, 'Overriding the vaccination day should only be used for historical vaccination' # High potential for errors to creep in if future vaccines could be scheduled here
 
         # Perform checks
         vacc_inds = vacc_inds[sim.people.alive[vacc_inds]] # Skip anyone that is dead
@@ -573,7 +568,7 @@ class BaseVaccination(Intervention):
             sim.people.vaccinated[vacc_inds] = True
             sim.people.vaccine_source[vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
-            sim.people.date_vaccinated[vacc_inds] = t
+            sim.people.date_vaccinated[vacc_inds] = sim.t
             imm_source = len(sim['genotype_map']) + self.index
             hpi.update_peak_immunity(sim.people, vacc_inds, self.p, imm_source, infection=False)
 
