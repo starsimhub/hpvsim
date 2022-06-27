@@ -138,7 +138,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         'dt': .2,
     }
 
-    # Model an intervention to screen 50% of 30 year olds with VIA and treat immediately
+    # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
     screen_prop = 0.5
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='ablative', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2020',
@@ -156,7 +156,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             }
         },
         'vx': {
-            'name': f'Screen {screen_prop*100}% of 30-50y women 2x starting in 2020',
+            'name': f'Screen {screen_prop*100}% of 30-50y women with {hpv_screening.label}',
             'pars': {
                 'interventions': [hpv_screening]
             }
@@ -174,8 +174,8 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             'HPV incidence': [
                 'total_hpv_incidence',
             ],
-            'CIN incidence': [
-                'total_cin_incidence',
+            'CIN prevalence': [
+                'total_cin_prevalence',
             ],
             'Cancers per 100,000 women': [
                 'total_cancer_incidence',

@@ -864,16 +864,22 @@ class Screening(Intervention):
         states = ['infectious', 'cin1', 'cin2', 'cin3']
 
         for state in states:
-            tmp_screen_pars = np.ones(ng, dtype=hpd.default_float)
+            tmp_sens_pars = np.ones(ng, dtype=hpd.default_float)
+            tmp_spec_pars = np.ones(ng, dtype=hpd.default_float)
             for g in range(ng):
-                tmp_screen_pars[g] = primary_screen_pars['sensitivity'][state][genotype_map[g]]
-            self.p['primary']['sensitivity'][state] = tmp_screen_pars
+                tmp_sens_pars[g] = primary_screen_pars['sensitivity'][state][genotype_map[g]]
+                tmp_spec_pars[g] = primary_screen_pars['specificity'][state][genotype_map[g]]
+            self.p['primary']['sensitivity'][state] = tmp_sens_pars
+            self.p['primary']['specificity'][state] = tmp_spec_pars
 
         if triage_screen_pars is not None:
-            tmp_screen_pars = np.ones(ng, dtype=hpd.default_float)
+            tmp_sens_pars = np.ones(ng, dtype=hpd.default_float)
+            tmp_spec_pars = np.ones(ng, dtype=hpd.default_float)
             for g in range(ng):
-                tmp_screen_pars[g] = triage_screen_pars['sensitivity'][state][genotype_map[g]]
-            self.p['triage']['sensitivity'][state] = tmp_screen_pars
+                tmp_sens_pars[g] = triage_screen_pars['sensitivity'][state][genotype_map[g]]
+                tmp_spec_pars[g] = triage_screen_pars['specificity'][state][genotype_map[g]]
+            self.p['triage']['sensitivity'][state] = tmp_sens_pars
+            self.p['triage']['specificity'][state] = tmp_spec_pars
         return
 
     def select_people(self, sim):
@@ -934,8 +940,9 @@ class Screening(Intervention):
             # Do the actual screening!
             ng = sim['n_genotypes']
             dt = sim['dt']
+
             # Step 1, filter positives from primary screen
-            primary_screen_pars = self.p['primary']['sensitivity']
+            primary_screen_pars = self.p['primary']
             triage_screen_pars = self.p['triage']
             states = ['infectious', 'cin1', 'cin2', 'cin3']
             screen_pos = []
@@ -944,7 +951,9 @@ class Screening(Intervention):
                 for g in range(ng):
                     screen_probs = np.zeros(len(sim.people))
                     tp_inds = hpu.true(sim.people[state][g,:])
-                    screen_probs[tp_inds] = primary_screen_pars[state][g]
+                    tn_inds = hpu.false(sim.people[state][g,:])
+                    screen_probs[tp_inds] = primary_screen_pars['sensitivity'][state][g]
+                    screen_probs[tn_inds] = 1 - primary_screen_pars['specificity'][state][g]
                     screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
                     screen_pos += list(screen_pos_inds)
 
@@ -961,18 +970,32 @@ class Screening(Intervention):
             treat_dur_pars = self.p['treatment']['time_to_clearance']
 
             # Find those with active CIN, if tx is efficacious, apply new time_to_clearance
-            for state in ['cin1', 'cin2', 'cin3']:
+
+            # Then, find people with ONLY active infection, determine if tx is efficacious and apply new time to clearance
+            for state in ['infectious', 'cin1', 'cin2', 'cin3']:
                 for g in range(ng):
-                    inds = screen_pos[hpu.true(sim.people[state][g,screen_pos])]
+                    if state == 'infectious': # want to be sure to think of these states as mutually exclusive, which is ok for all but infectious
+                        inds = np.union1d(screen_pos, sc.findinds((~sim.people['cin1'][g,:]) & (~sim.people['cin2'][g,:]) & (~sim.people['cin3'][g,:]) & (sim.people['infectious'][g,:])))
+                    else:
+                        inds = screen_pos[hpu.true(sim.people[state][g,screen_pos])]
                     eff_probs = np.zeros(len(inds))
                     eff_probs.fill(treat_pars[state])
                     eff_inds = hpu.true(hpu.binomial_arr(eff_probs))
                     eff_inds = inds[eff_inds]
 
                     dur_to_clearance = hpu.sample(**treat_dur_pars[state], size=len(eff_inds))
-                    sim.people.date_clearance[g,eff_inds] = np.fmin(sim.people.date_clearance[g, eff_inds],sim.people.date_cin1[g, eff_inds] + np.ceil(dur_to_clearance / dt))
+                    sim.people.date_clearance[g,eff_inds] =sim.t + np.ceil(dur_to_clearance / dt) # TODO: make this an fp.min statement so we dont ever give someone a time to clearance that is slower than their currently assigned time to clearance
+
+            # Extract indices of already-vaccinated people and get indices of newly-vaccinated
+            prior_screen = hpu.true(sim.people.screened)
+            new_screen = np.setdiff1d(screen_inds, prior_screen)
 
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
+            sim.people.flows['screens'] += len(screen_inds) * factor  # Count number of screens given
+            sim.people.flows['screened'] += len(new_screen) * factor  # Count number of people not already screened
+            sim.people.total_flows['total_doses'] += len(screen_inds) * factor
+            sim.people.total_flows['total_vaccinated'] += len(new_screen) * factor
+
         return screen_inds
 
 
