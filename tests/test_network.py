@@ -23,7 +23,8 @@ def test_network(do_plot=True):
     n_agents = 50e3
     pars = dict(pop_size=n_agents,
                 start=1990,
-                n_years=30,
+                n_years=40,
+                burnin=10,
                 dt=0.5,
                 pop_scale=25.2e6/n_agents,
                 network='default',
@@ -74,15 +75,15 @@ def test_network(do_plot=True):
         # Plot age mixing
         import pylab as pl
         pl.rcParams.update({'font.size': 14})
-        fig, axes = pl.subplots(nrows=2, ncols=2, figsize=(12, 8))
-        ax = axes.flatten()
-        ['1990']
-        for ai,people in enumerate([people1990, people2000, people2010, people2020]):
-            h = ax[ai].hist2d(people.contacts['c']['age_f'], people.contacts['c']['age_m'], bins=np.linspace(0, 100, 21))
-            ax[ai].set_xlabel('Age of female partner')
-            ax[ai].set_ylabel('Age of male partner')
-            fig.colorbar(h[3], ax=ax[ai])
-            ax[ai].set_title(snapshot.dates[ai])
+        for lkey in ['m','c']:
+            fig, axes = pl.subplots(nrows=2, ncols=2, figsize=(12, 8))
+            ax = axes.flatten()
+            for ai,people in enumerate([people1990, people2000, people2010, people2020]):
+                h = ax[ai].hist2d(people.contacts[lkey]['age_f'], people.contacts[lkey]['age_m'], bins=np.linspace(0, 100, 21))
+                ax[ai].set_xlabel('Age of female partner')
+                ax[ai].set_ylabel('Age of male partner')
+                fig.colorbar(h[3], ax=ax[ai])
+                ax[ai].set_title(snapshot.dates[ai])
 
         pl.show()
 

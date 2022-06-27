@@ -53,16 +53,6 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
         sim.run(verbose=verbose)
         sim.plot(do_save=do_save)
 
-        # Plot age mixing
-        import pylab as pl
-        pl.rcParams.update({'font.size': 22})
-        fig, ax = pl.subplots(figsize=(12,8))
-        h = ax.hist2d(sim.people.contacts['a']['age_f'], sim.people.contacts['a']['age_m'], bins=np.linspace(0,100,21))
-        ax.set_xlabel('Age of female partner')
-        ax.set_ylabel('Age of male partner')
-        fig.colorbar(h[3], ax=ax)
-        pl.show()
-
     return sim
 
 
