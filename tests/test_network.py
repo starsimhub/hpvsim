@@ -23,7 +23,8 @@ def test_network(do_plot=True):
     n_agents = 50e3
     pars = dict(pop_size=n_agents,
                 start=1990,
-                n_years=30,
+                n_years=40,
+                burnin=10,
                 dt=0.5,
                 pop_scale=25.2e6/n_agents,
                 network='default',
