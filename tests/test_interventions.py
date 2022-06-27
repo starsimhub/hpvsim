@@ -51,9 +51,12 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
     verbose = .1
     debug = 0
 
+    # Define parameters
     pars = {
         'pop_size': 50e3,
-        'n_years': 20,
+        'start': 2010,
+        'burnin': 5,
+        'n_years': 30,
         'genotypes': [hpv16, hpv18],
         'dt': .2,
     }
@@ -76,8 +79,12 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
     bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints='2020',
                                        subtarget=faster_age_subtarget)
 
-    sim = hpv.Sim(pars=pars)
+    az = hpv.age_results(
+        timepoints=['2019', '2030'],
+        result_keys=['total_infections']
+    )
 
+    sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
 
     # Define the scenarios
@@ -120,6 +127,7 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
+        scens.plot_age_results()
 
     return scens
 

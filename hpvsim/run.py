@@ -1128,6 +1128,25 @@ class Scenarios(hpb.ParsObj):
         return hppl.plot_scens(scens=self, *args, **kwargs)
 
 
+    def plot_age_results(self, *args, **kwargs):
+        '''
+        Plot all age_results analyzers in a scenario together.
+
+        Returns:
+            fig: Figure handle
+
+
+        **Example**::
+
+            az = hpv.age_results(timepoints=['2015', '2020'], results=['hpv_incidence', 'total_cancers'])
+            base_sim = hpv.Sim(analyzers=az)
+            scens = hpv.Scenarios(sim=base_sim)
+            scens.run()
+            scens.plot_age_results()
+        '''
+        return hppl.plot_scen_age_results(scens=self, *args, **kwargs)
+
+
     def to_json(self, filename=None, tostring=True, indent=2, verbose=False, *args, **kwargs):
         '''
         Export results as JSON.
