@@ -42,7 +42,8 @@ def make_pars(set_prognoses=False, **kwargs):
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
     pars['end']             = None          # End of the simulation
-    pars['n_years']         = 10.           # Number of years to run, if end isn't specified
+    pars['n_years']         = 15            # Number of years to run, if end isn't specified. Note that this includes burn-in
+    pars['burnin']          = 5             # Number of years of burnin. NB, this is doesn't affect the start and end dates of the simulation, but it is possible remove these years from plots
     pars['dt']              = 0.2           # Timestep (in years)
     pars['rand_seed']       = 1             # Random seed, if None, don't reset
     pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
@@ -99,24 +100,18 @@ def make_pars(set_prognoses=False, **kwargs):
     # Screening parameters
     pars['screen_pars'] = dict()  # Screening method that is being used; populated during initialization
 
-    # Parameters determining duration of dysplasia stages
-    pars['dur'] = {}
-    pars['dur']['none']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Length of time that HPV is present without dysplasia
-    pars['dur']['cin1']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of CIN1 (mild/very mild dysplasia)
-    pars['dur']['cin2']     = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 (moderate dysplasia)
-    pars['dur']['cin3']     = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 (severe dysplasia/in situ carcinoma)
-    pars['dur']['cancer']   = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated cancer
+    # Duration of invasive cerival cancer before death
+    pars['dur_cancer']  = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated cancer
 
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
     pars['rel_trans']['none']   = 1 # Baseline value
-    pars['rel_trans']['cin1']   = 1 # Less transmissible. Assumption, need data
+    pars['rel_trans']['cin1']   = 1 # Baseline value. Assumption, need data
     pars['rel_trans']['cin2']   = 0.2 # Assumption, need data
     pars['rel_trans']['cin3']   = 0.05 # Assumption, need data
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
-
 
     # Events and interventions
     pars['interventions'] = []   # The interventions present in this simulation; populated by the user
@@ -703,17 +698,17 @@ def get_mixing(network=None):
             #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
             [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
             [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [15,    0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [20,    0,  0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [25,    0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [30,    0,  0,  0,  0,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0,  0,  0],
-            [35,    0,  0,  0,  0,  0,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0,  0],
-            [40,    0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0],
-            [45,    0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0,  0],
-            [50,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0],
-            [55,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0],
-            [60,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0],
+            [10,    0,  0, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .1, .1, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0, .5, .1, .5 ,.1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  1, .5, .5, .5, .5, .1,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0, .5,  1,  1, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0, .5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0, .1,  1,  1,  2,  1,  1, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0, .1, .5,  1,  1,  1,  2, .5,  0,  0],
             [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0],
             [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1, .5],
             [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1],

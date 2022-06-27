@@ -233,7 +233,7 @@ class People(hpb.BasePeople):
             new_pships[lkey] = dict()
             new_pship_probs = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship. This will be used for males, and for females if no layer_probs are provided
             new_pship_probs[~self.is_active] *= 0  # Blank out people not yet active
-            underpartnered = self.current_partners[lno, :] < self.partners[lno,:]  # Whether or not people are underpartnered in this layer
+            underpartnered = (self.current_partners[lno, :] < self.partners[lno,:]) + (np.isnan(self.current_partners[lno,:])*self.is_active)  # Whether or not people are underpartnered in this layer, also selects newly active people
             new_pship_probs[underpartnered] *= pref_weight  # Increase weight for those who are underpartnerned
 
             if layer_probs is not None: # If layer probabilities have been provided, we use them to select females by age
@@ -476,10 +476,9 @@ class People(hpb.BasePeople):
 
         Args:
             inds      (array): array of people to infect
-            genotypes (array): array of genotypes to infect people with
-            source    (array): source indices of the people who transmitted this infection (None if an importation or seed infection)
+            g         (int):   int of genotype to infect people with
             offset    (array): if provided, the infections will occur at the timepoint self.t+offset
-            dur_inf   (array): if provided, the duration of the infections
+            dur       (array): if provided, the duration of the infections
             layer     (str):   contact layer this infection was transmitted on
 
         Returns:
@@ -492,7 +491,6 @@ class People(hpb.BasePeople):
         dt = self.pars['dt']
 
         # Deal with genotype parameters
-        ng              = self.pars['n_genotypes']
         prog_keys       = ['rel_cin1_prob', 'rel_cin2_prob', 'rel_cin3_prob', 'rel_cancer_prob']
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
@@ -620,7 +618,7 @@ class People(hpb.BasePeople):
             self.date_cancerous[g, cancer_inds] = np.fmin(self.date_cancerous[g, cancer_inds], self.date_cin3[g, cancer_inds] + np.ceil(dur_cin3[is_cancer] / dt)) # Date they get cancer - minimum of any previous date and the date from the current infection
 
             # Record eventual deaths from cancer (NB, assuming no survival without treatment)
-            dur_cancer = hpu.sample(**self.pars['dur']['cancer'], size=len(cancer_inds))
+            dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))
             self.date_dead_cancer[g, cancer_inds]  = self.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
 
         if len(m_inds)>0:

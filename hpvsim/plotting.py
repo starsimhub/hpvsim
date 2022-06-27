@@ -144,7 +144,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
             else:
                 invalid += reskey
         if len(invalid):
-            errormsg = f'The following key(s) are invalid:\n{sc.strjoin(invalid)}\n\nValid main keys are:\n{sc.strjoin(reskeys)}\n\nValid genotype keys are:\n{sc.strjoin(varkeys)}'
+            errormsg = f'The following key(s) are invalid:\n{sc.strjoin(invalid)}\n\nValid main keys are:\n{sc.strjoin(reskeys)}\n\nValid genotype keys are:\n{sc.strjoin(genkeys)}'
             raise sc.KeyNotFoundError(errormsg)
 
     to_plot = sc.odict(sc.dcp(to_plot)) # In case it's supplied as a dict
@@ -331,7 +331,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
          show_args=None, style_args=None, n_cols=None, grid=True, commaticks=True,
          setylim=True, log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False,
-         fig=None, ax=None, **kwargs):
+         fig=None, ax=None, plot_burnin=False, **kwargs):
     ''' Plot the results of a single simulation -- see Sim.plot() for documentation '''
 
     # Handle inputs
@@ -340,6 +340,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
     to_plot, n_cols, n_rows = handle_to_plot('sim', to_plot, n_cols, sim=sim)
 
     # Do the plotting
+    bi = 0 if plot_burnin else int(sim['burnin'])
     with hpo.with_style(args.style):
         fig, figs = create_figs(args, sep_figs, fig, ax)
         total_keys = sim.result_keys('total') # Consider a more robust way to do this
@@ -347,12 +348,12 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
         for pnum,title,keylabels in to_plot.enumitems():
             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
             for resnum,reskey in enumerate(keylabels):
-                res_t = sim.results['year']
+                res_t = sim.results['year'][bi:]
                 res = sim.results[reskey]
                 if reskey in total_keys:
                     color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
                     label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
-                    ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Plot result
+                    ax.plot(res_t, res.values[bi:], label=label, **args.plot, c=color)  # Plot result
                 elif reskey in sex_keys:
                     n_sexes = 2
                     sex_colors = ['#4679A2', '#A24679']
@@ -367,7 +368,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                             label += f' - {v_label}'
                         else:
                             label = v_label
-                        ax.plot(res_t, res.values[sex, :], label=label, **args.plot, c=color)  # Plot result
+                        ax.plot(res_t, res.values[sex, bi:], label=label, **args.plot, c=color)  # Plot result
                 else:
                     ng = sim['n_genotypes']
                     for genotype in range(ng):
@@ -378,7 +379,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label: label += f' - {v_label}'
                         else:     label = v_label
-                        ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result
+                        ax.plot(res_t, res.values[genotype,bi:], label=label, **args.plot, c=color)  # Plot result
             if args.show['interventions']:
                 plot_interventions(sim, ax) # Plot the interventions
             title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
@@ -391,7 +392,8 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
 def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
          show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
-         log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None, **kwargs):
+         log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None,
+         plot_burnin=False,**kwargs):
     ''' Plot the results of a scenario -- see Scenarios.plot() for documentation '''
 
     # Handle inputs
@@ -411,17 +413,18 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
                 resdata = scens.results[reskey]
                 for snum,scenkey,scendata in resdata.enumitems():
                     sim = scens.sims[scenkey][0] # Pull out the first sim in the list for this scenario
+                    bi = 0 if plot_burnin else int(sim['burnin'])
                     genotypekeys = sim.result_keys('genotype')
                     sexkeys = sim.result_keys('by_sex')
                     if reskey in genotypekeys:
                         ng = sim['n_genotypes']
                         genotype_colors = sc.gridcolors(ng)
                         for genotype in range(ng):
-                            res_y = scendata.best[genotype,:]
+                            res_y = scendata.best
                             color = genotype_colors[genotype]
                             label = sim['genotypes'][genotype].label.upper()
                             ax.fill_between(res_t, scendata.low[genotype,:], scendata.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
-                            ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
+                            ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
                     elif reskey in sexkeys:
                         n_sexes = 2
                         sex_colors = ['#4679A2', '#A24679']
@@ -432,15 +435,15 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
                             res_y = scendata.best[sex, :]
                             color = sex_colors[sex]
                             label = res.name + sex_labels[sex]
-                            ax.fill_between(res_t, scendata.low[genotype, :], scendata.high[genotype, :],
+                            ax.fill_between(res_t[bi:], scendata.low[genotype, bi:], scendata.high[genotype, bi:],
                                             color=color, **args.fill)  # Create the uncertainty bound
-                            ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
+                            ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
                     else:
                         res_y = scendata.best
                         color = set_line_options(colors, scenkey, snum, default_colors[snum])  # Choose the color
                         label = set_line_options(labels, scenkey, snum, scendata.name)  # Choose the label
-                        ax.fill_between(res_t, scendata.low, scendata.high, color=color, **args.fill)  # Create the uncertainty bound
-                        ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
+                        ax.fill_between(res_t[bi:], scendata.low[bi:], scendata.high[bi:], color=color, **args.fill)  # Create the uncertainty bound
+                        ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
 
                     if args.show['interventions']:
                         plot_interventions(sim, ax) # Plot the interventions
@@ -452,7 +455,7 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
 
 def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, scatter_args=None,
                 date_args=None, style_args=None, grid=False, commaticks=True, setylim=True, color=None, label=None,
-                do_show=None, do_save=False, fig_path=None, fig=None, ax=None, **kwargs):
+                do_show=None, do_save=False, fig_path=None, fig=None, ax=None, plot_burnin=False, **kwargs):
     ''' Plot a single result -- see ``hpv.Sim.plot_result()`` for documentation '''
 
     # Handle inputs
@@ -465,6 +468,7 @@ def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, sc
     # Gather results
     res = sim.results[key]
     res_t = sim.results['year']
+    bi = 0 if plot_burnin else int(sim['burnin'])
     if color is None:
         color = res.color
 
@@ -482,9 +486,9 @@ def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, sc
         if label is None:
             label = res.name
         if res.low is not None and res.high is not None:
-            ax.fill_between(res_t, res.low, res.high, color=color, **args.fill) # Create the uncertainty bound
+            ax.fill_between(res_t[bi:], res.low[bi:], res.high[bi:], color=color, **args.fill) # Create the uncertainty bound
 
-        ax.plot(res_t, res.values, c=color, label=label, **args.plot)
+        ax.plot(res_t[bi:], res.values[bi:], c=color, label=label, **args.plot)
         plot_interventions(sim, ax) # Plot the interventions
         title_grid_legend(ax, res.name, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
