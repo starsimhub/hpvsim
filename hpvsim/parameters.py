@@ -360,7 +360,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur = dict()
-    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=0.1935, par2=0.5)
+    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=2, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
@@ -383,7 +383,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur = dict()
-    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=0.1874, par2=0.5)
+    pars.hpv18.dur['none']      = dict(dist='lognormal', par1=2, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
@@ -406,7 +406,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv31 = sc.objdict()
     pars.hpv31.dur = dict()
-    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=0.2100, par2=1.0)
+    pars.hpv31.dur['none']      = dict(dist='lognormal', par1=2, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -427,7 +427,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv33 = sc.objdict()
     pars.hpv33.dur = dict()
-    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=0.1936, par2=1.0)
+    pars.hpv33.dur['none']      = dict(dist='lognormal', par1=2, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -448,7 +448,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv45 = sc.objdict()
     pars.hpv45.dur = dict()
-    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=0.1684, par2=1.0)
+    pars.hpv45.dur['none']      = dict(dist='lognormal', par1=2, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -469,7 +469,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv52 = sc.objdict()
     pars.hpv52.dur = dict()
-    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=0.1958, par2=1.0)
+    pars.hpv52.dur['none']      = dict(dist='lognormal', par1=2, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -490,7 +490,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv6 = sc.objdict()
     pars.hpv6.dur = dict()
-    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=0.1540, par2=1.0)
+    pars.hpv6.dur['none']       = dict(dist='lognormal', par1=2, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv6.dur['cin1']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dur['cin2']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -504,7 +504,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur = dict()
-    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=0.1560, par2=1.0)
+    pars.hpv11.dur['none']      = dict(dist='lognormal', par1=2, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv11.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
@@ -518,7 +518,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpvlo = sc.objdict()
     pars.hpvlo.dur = dict()
-    pars.hpvlo.dur['none']      = dict(dist='lognormal', par1=0.1596, par2=1.0)
+    pars.hpvlo.dur['none']      = dict(dist='lognormal', par1=2, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -534,7 +534,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpvhi = sc.objdict()
     pars.hpvhi.dur = dict()
-    pars.hpvhi.dur['none']      = dict(dist='lognormal', par1=0.1709, par2=1.0)
+    pars.hpvhi.dur['none']      = dict(dist='lognormal', par1=2, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -787,17 +787,17 @@ def get_mixing(network=None):
             #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
             [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
             [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [15,    0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [20,    0,  0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [25,    0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [30,    0,  0,  0,  0,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0,  0,  0],
-            [35,    0,  0,  0,  0,  0,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0,  0],
-            [40,    0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0,  0,  0],
-            [45,    0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0,  0],
-            [50,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0,  0],
-            [55,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0,  0],
-            [60,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0,  0],
+            [10,    0,  0, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .1, .1, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0, .5, .1, .5 ,.1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  1, .5, .5, .5, .5, .1,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0, .5,  1,  1, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0, .5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0, .1,  1,  1,  2,  1,  1, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0, .1, .5,  1,  1,  1,  2, .5,  0,  0],
             [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0],
             [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1, .5],
             [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1],
