@@ -42,7 +42,8 @@ def make_pars(set_prognoses=False, **kwargs):
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
     pars['end']             = None          # End of the simulation
-    pars['n_years']         = 10.           # Number of years to run, if end isn't specified
+    pars['n_years']         = 15            # Number of years to run, if end isn't specified. Note that this includes burn-in
+    pars['burnin']          = 5             # Number of years of burnin. NB, this is doesn't affect the start and end dates of the simulation, but it is possible remove these years from plots
     pars['dt']              = 0.2           # Timestep (in years)
     pars['rand_seed']       = 1             # Random seed, if None, don't reset
     pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
@@ -113,7 +114,6 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
-
 
     # Events and interventions
     pars['interventions'] = []   # The interventions present in this simulation; populated by the user
