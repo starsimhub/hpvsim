@@ -618,7 +618,7 @@ class People(hpb.BasePeople):
             self.date_cancerous[g, cancer_inds] = np.fmin(self.date_cancerous[g, cancer_inds], self.date_cin3[g, cancer_inds] + np.ceil(dur_cin3[is_cancer] / dt)) # Date they get cancer - minimum of any previous date and the date from the current infection
 
             # Record eventual deaths from cancer (NB, assuming no survival without treatment)
-            dur_cancer = hpu.sample(**self.pars['dur']['cancer'], size=len(cancer_inds))
+            dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))
             self.date_dead_cancer[g, cancer_inds]  = self.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
 
         if len(m_inds)>0:

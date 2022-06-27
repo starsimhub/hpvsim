@@ -97,14 +97,8 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['vaccine_pars'] = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map'] = dict()  # Reverse mapping from number to vaccine key
 
-    # Parameters determining duration of dysplasia stages
-    pars['dur'] = {}
-    # all of these are provided as genotype-specific durations except cancer, right?
-    # pars['dur']['none']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Length of time that HPV is present without dysplasia
-    # pars['dur']['cin1']     = dict(dist='lognormal', par1=2.0, par2=1.0)  # Duration of CIN1 (mild/very mild dysplasia)
-    # pars['dur']['cin2']     = dict(dist='lognormal', par1=3.0, par2=1.0)  # Duration of CIN2 (moderate dysplasia)
-    # pars['dur']['cin3']     = dict(dist='lognormal', par1=4.0, par2=1.0)  # Duration of CIN3 (severe dysplasia/in situ carcinoma)
-    pars['dur']['cancer']   = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated cancer
+    # Duration of invasive cerival cancer before death
+    pars['dur_cancer']  = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated cancer
 
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
