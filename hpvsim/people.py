@@ -233,7 +233,7 @@ class People(hpb.BasePeople):
             new_pships[lkey] = dict()
             new_pship_probs = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship. This will be used for males, and for females if no layer_probs are provided
             new_pship_probs[~self.is_active] *= 0  # Blank out people not yet active
-            underpartnered = self.current_partners[lno, :] < self.partners[lno,:]  # Whether or not people are underpartnered in this layer
+            underpartnered = (self.current_partners[lno, :] < self.partners[lno,:]) + (np.isnan(self.current_partners[lno,:])*self.is_active)  # Whether or not people are underpartnered in this layer, also selects newly active people
             new_pship_probs[underpartnered] *= pref_weight  # Increase weight for those who are underpartnerned
 
             if layer_probs is not None: # If layer probabilities have been provided, we use them to select females by age
