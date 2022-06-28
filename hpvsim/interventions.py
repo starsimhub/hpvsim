@@ -728,13 +728,19 @@ class vaccinate_prob(BaseVaccination):
                 if len(vacc_inds):
                     if self.p.interval is not None:
                         # Schedule the doses
-                        second_dose_timepoints = sim.t + self.p.interval[0]/sim['dt']
+                        second_dose_timepoints = sim.t + int(self.p.interval[0]/sim['dt'])
                         if second_dose_timepoints < sim.npts:
                             self.second_dose_timepoints[second_dose_timepoints] = vacc_inds
                         if self.p.doses==3:
-                            third_dose_timepoints = sim.t + self.p.interval[1] / sim['dt']
+                            third_dose_timepoints = sim.t + int(self.p.interval[1] / sim['dt'])
                             if third_dose_timepoints < sim.npts:
                                 self.third_dose_timepoints[third_dose_timepoints] = vacc_inds
+
+                        # next_dose_days = sim.t + self.p.interval
+                        # if next_dose_days < sim['n_days']:
+                        #     self.second_dose_days[next_dose_days] = vacc_inds
+
+
 
             # Also, if appropriate, vaccinate people with their second and third doses
             vacc_inds_dose2 = self.second_dose_timepoints[sim.t]
