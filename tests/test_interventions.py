@@ -58,6 +58,7 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
         'dt': .2,
     }
 
+    sim = hpv.Sim(pars=pars)
     # Model an intervention to roll out prophylactic vaccination
     vx_prop = 1.0
     def age_subtarget(sim):
@@ -69,14 +70,12 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
         ''' Select people who are eligible for vaccination '''
         inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=24))
         return {'vals': [vx_prop for _ in inds], 'inds': inds}
-
-    bivalent_vx = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints='2020',
+    years = np.arange(sim['burnin'], sim['n_years']-sim['burnin'], dtype=int)
+    bivalent_vx = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints=years,
                                        subtarget=age_subtarget)
 
-    bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints='2020',
+    bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints=years,
                                        subtarget=faster_age_subtarget)
-
-    sim = hpv.Sim(pars=pars)
 
     n_runs = 3
 
@@ -133,7 +132,9 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     pars = {
         'pop_size': 50e3,
-        'n_years': 20,
+        'n_years': 60,
+        'burnin': 30,
+        'start': 1990,
         'genotypes': [hpv16, hpv18],
         'dt': .2,
     }
@@ -193,8 +194,8 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_dynamic_pars()
-    scens = test_vaccines(do_plot=True)
-    # scens = test_screening(do_plot=True)
+    # scens = test_vaccines(do_plot=True)
+    scens = test_screening(do_plot=True)
 
     sc.toc(T)
     print('Done.')
