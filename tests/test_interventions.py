@@ -140,7 +140,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     }
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
-    screen_prop = 0.5
+    screen_prop = 1
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='ablative', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2020',
                                   prob=screen_prop)
@@ -172,8 +172,8 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     if do_plot:
         to_plot = {
-            'HPV incidence': [
-                'total_hpv_incidence',
+            'HPV prevalence': [
+                'total_hpv_prevalence',
             ],
             'CIN prevalence': [
                 'total_cin_prevalence',

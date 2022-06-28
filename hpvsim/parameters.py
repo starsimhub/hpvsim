@@ -63,9 +63,9 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility TODO does this get used? if not remove.
-    pars['beta']            = 0.15  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']        = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
-    pars['transm2f']        = 3.69   # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
+    pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Probabilities of disease progression
     pars['rel_cin1_prob'] = 1.0  # Scale factor for proportion of CIN cases
@@ -225,7 +225,7 @@ def get_prognoses():
 
     prognoses = dict(
         duration_cutoffs  = np.array([0,       1,          2,          3,          4]),     # Duration cutoffs (lower limits)
-        seroconvert_probs = np.array([0.25,    0.5,        0.75,       1.0,        1.0]), # Probability of seroconverting given duration of infection
+        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0]), # Probability of seroconverting given duration of infection
         cin1_probs        = np.array([0.015,   0.15655,    0.30800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
         cin2_probs        = np.array([0.015,   0.0655,     0.3080,     0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
         cin3_probs        = np.array([0.15,    0.655,      0.80,       0.855,      0.90]),   # Conditional probability of developing CIN3 given CIN2
@@ -1056,8 +1056,98 @@ def get_screen_pars(screen=None):
         ),
 
         cytology = dict(
-            sensitivity=None,
-            specificity=None,
+            sensitivity=dict(
+                infectious=dict(
+                    hpv16=0.05,
+                    hpv18=0.05,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin1=dict(
+                    hpv16=0.1,
+                    hpv18=0.1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin2=dict(
+                    hpv16=.9,
+                    hpv18=.9,
+                    hpv31=.9,
+                    hpv33=.9,
+                    hpv45=.9,
+                    hpv52=.9,
+                    hpv58=.9,
+                    hpv6=.9,
+                    hpv11=.9,
+                ),
+                cin3=dict(
+                    hpv16=0.95,
+                    hpv18=0.95,
+                    hpv31=0.95,
+                    hpv33=0.95,
+                    hpv45=0.95,
+                    hpv52=0.95,
+                    hpv58=0.95,
+                    hpv6=0.95,
+                    hpv11=0.95,
+                ),
+            ),
+            specificity=dict(
+                infectious=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=1,
+                    hpv33=1,
+                    hpv45=1,
+                    hpv52=1,
+                    hpv58=1,
+                    hpv6=1,
+                    hpv11=1,
+                ),
+                cin1=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=1,
+                    hpv33=1,
+                    hpv45=1,
+                    hpv52=1,
+                    hpv58=1,
+                    hpv6=1,
+                    hpv11=1,
+                ),
+                cin2=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=1,
+                    hpv33=1,
+                    hpv45=1,
+                    hpv52=1,
+                    hpv58=1,
+                    hpv6=1,
+                    hpv11=1,
+                ),
+                cin3=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=1,
+                    hpv33=1,
+                    hpv45=1,
+                    hpv52=1,
+                    hpv58=1,
+                    hpv6=1,
+                    hpv11=1,
+                ),
+            ),
         ),
 
         via=dict(
@@ -1101,10 +1191,10 @@ def get_treatment_pars(screen=None):
                 cin3=1,
             ),
             time_to_clearance=dict(
-                infectious=dict(dist='lognormal', par1=1.0, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,
-                cin1=dict(dist='lognormal', par1=1.0, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-                cin2=dict(dist='lognormal', par1=1.0, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-                cin3=dict(dist='lognormal', par1=1.0, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+                infectious=dict(dist='lognormal', par1=0.05, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,
+                cin1=dict(dist='lognormal', par1=0.05, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+                cin2=dict(dist='lognormal', par1=0.05, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+                cin3=dict(dist='lognormal', par1=0.05, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
             )
         ),
     )
