@@ -9,9 +9,19 @@ import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
+import hpvsim.parameters as hpvpar
 
 do_plot = 1
 do_save = 0
+hpv16 = hpv.genotype('HPV16')
+hpv18 = hpv.genotype('HPV18')
+
+base_pars = {
+    'pop_size': 50e3,
+    'n_years': 20,
+    'genotypes': [hpv16, hpv18],
+    'dt': .2,
+}
 
 
 #%% Define the tests
@@ -46,17 +56,8 @@ def test_dynamic_pars():
 def test_vaccines(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test prophylactic vaccine intervention')
 
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 0
-
-    pars = {
-        'pop_size': 50e3,
-        'n_years': 20,
-        'genotypes': [hpv16, hpv18],
-        'dt': .2,
-    }
 
     # Model an intervention to roll out prophylactic vaccination
     vx_prop = 1.0
@@ -76,7 +77,7 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
     bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints='2020',
                                        subtarget=faster_age_subtarget)
 
-    sim = hpv.Sim(pars=pars)
+    sim = hpv.Sim(pars=base_pars)
 
     n_runs = 3
 
@@ -124,6 +125,37 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
     return scens
 
 
+def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test vaccinate_num intervention')
+
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
+    verbose = .1
+    debug = 0
+
+    vx_prop = 1.
+    def age_subtarget(sim):
+        ''' Select people who are eligible for vaccination '''
+        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=14))
+        return {'vals': [vx_prop for _ in inds], 'inds': inds}
+
+    # Model an intervention to roll out prophylactic vaccination with a given number of doses over time
+    bivalent_1_dose = hpv.vaccinate_prob(vaccine='bivalent_1dose', label='bivalent, 9-14', timepoints='2020', subtarget=age_subtarget)
+    bivalent_2_dose = hpv.vaccinate_prob(vaccine='bivalent_2dose', label='bivalent, 9-14', timepoints='2020', subtarget=age_subtarget)
+    bivalent_3_dose = hpv.vaccinate_prob(vaccine='bivalent_3dose', label='bivalent, 9-14', timepoints='2020', subtarget=age_subtarget)
+
+    sim1 = hpv.Sim(pars=base_pars, interventions=[bivalent_1_dose])
+    sim2 = hpv.Sim(pars=base_pars, interventions=[bivalent_2_dose])
+    sim3 = hpv.Sim(pars=base_pars, interventions=[bivalent_3_dose])
+
+    # sim1.run(verbose=verbose)
+    sim2.run(verbose=verbose)
+    sim3.run(verbose=verbose)
+
+    return sim1, sim2, sim3
+
+
+
 
 
 #%% Run as a script
@@ -133,7 +165,8 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_dynamic_pars()
-    scens = test_vaccines(do_plot=True)
+    # scens = test_vaccines(do_plot=True)
+    sim1, sim2, sim3 = test_vaccinate_num(do_plot=True)
 
     sc.toc(T)
     print('Done.')

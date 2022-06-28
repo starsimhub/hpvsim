@@ -318,6 +318,20 @@ def get_vaccine_choices():
         'quadrivalent': ['quadrivalent', 'hpv4', 'gardasil'],
         'nonavalent': ['nonavalent', 'hpv9', 'cervarix9'],
     }
+    dose_1_options = ['1dose', '1doses', '1_dose', '1_doses', 'single_dose']
+    dose_2_options = ['2dose', '2doses', '2_dose', '2_doses', 'double_dose']
+    dose_3_options = ['3dose', '3doses', '3_dose', '3_doses', 'triple_dose']
+
+    choices['bivalent_2dose'] = [f'{x}_{dose}' for x in choices['bivalent'] for dose in dose_2_options]
+    choices['bivalent_3dose'] = [f'{x}_{dose}' for x in choices['bivalent'] for dose in dose_3_options]
+    choices['bivalent'] = [f'{x}_{dose}' for x in choices['bivalent'] for dose in dose_1_options]
+    choices['quadrivalent_2dose'] = [f'{x}_{dose}' for x in choices['quadrivalent'] for dose in dose_2_options]
+    choices['quadrivalent_3dose'] = [f'{x}_{dose}' for x in choices['quadrivalent'] for dose in dose_3_options]
+    choices['quadrivalent'] = [f'{x}_{dose}' for x in choices['quadrivalent'] for dose in dose_1_options]
+    choices['nonavalent_2dose'] = [f'{x}_{dose}' for x in choices['nonavalent'] for dose in dose_2_options]
+    choices['nonavalent_3dose'] = [f'{x}_{dose}' for x in choices['nonavalent'] for dose in dose_3_options]
+    choices['nonavalent'] = [f'{x}_{dose}' for x in choices['nonavalent'] for dose in dose_1_options]
+
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
 
@@ -958,6 +972,13 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
         ),
     )
 
+    pars['bivalent_2dose'] = pars['bivalent']
+    pars['bivalent_3dose'] = pars['bivalent']
+    pars['quadrivalent_2dose'] = pars['quadrivalent']
+    pars['quadrivalent_3dose'] = pars['quadrivalent']
+    pars['nonavalent_2dose'] = pars['nonavalent']
+    pars['nonavalent_3dose'] = pars['nonavalent']
+
     return _get_from_pars(pars, default=default, key=vaccine)
 
 
@@ -980,6 +1001,20 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
             imm_boost=2,  # Factor by which a dose increases immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
+        ),
+
+        bivalent_2dose = dict(
+            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_boost=2,  # Factor by which a dose increases immunity
+            doses=2,  # Number of doses for this vaccine
+            interval=0.5,  # Interval between doses in years
+        ),
+
+        bivalent_3dose = dict(
+            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_boost=[2, 2],  # Factor by which each dose increases immunity
+            doses=3,  # Number of doses for this vaccine
+            interval=[0.2, 0.5],  # Interval between doses in years
         ),
 
         quadrivalent = dict(
