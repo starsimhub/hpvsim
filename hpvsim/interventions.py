@@ -11,7 +11,7 @@ from . import defaults as hpd
 from . import parameters as hppar
 from . import utils as hpu
 from . import immunity as hpi
-# from collections import defaultdict
+from collections import defaultdict
 
 
 #%% Helper functions
@@ -756,17 +756,8 @@ class vaccinate_num(BaseVaccination):
         vaccine (dict/str): which vaccine to use; see below for dict parameters
         label        (str): if vaccine is supplied as a dict, the name of the vaccine
         subtarget  (dict): subtarget intervention to people with particular indices
-        sequence: Specify the order in which people should get vaccinated. This can be
-
-            - An array of person indices in order of vaccination priority
-            - A callable that takes in `hpv.People` and returns an ordered sequence. For example, to
-              vaccinate people in descending age order, ``def age_sequence(people): return np.argsort(-people.age)``
-              would be suitable.
-            - The shortcut 'age', which does prioritization by age (see below for implementation)
-              If not specified, people will be randomly ordered.
         num_doses: Specify the number of doses per timepoint. This can take three forms
-
-            - A scalar number of doses per day
+            - A scalar number of doses per timepoint
             - A dict keyed by year/date with the number of doses e.g. ``{2010:10000, '2021-05-01':20000}``.
               Any dates are converted to simulation days in `initialize()` which will also copy the
               dictionary passed in.
@@ -779,9 +770,10 @@ class vaccinate_num(BaseVaccination):
         hpv.Sim(interventions=bivalent).run().plot()
     '''
 
-    def __init__(self, vaccine, num_doses, subtarget=None, **kwargs):
+    def __init__(self, vaccine, num_doses, timepoints, subtarget=None, **kwargs):
         super().__init__(vaccine, **kwargs)  # Initialize the Intervention object
         self.num_doses = num_doses
+        self.timepoints = timepoints
         self.subtarget = subtarget
         self._scheduled_doses = defaultdict(set)  # Track scheduled doses, where applicable
         return
@@ -790,11 +782,12 @@ class vaccinate_num(BaseVaccination):
     def initialize(self, sim):
 
         super().initialize(sim)
+        self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
 
         # Perform checks and process inputs
         if isinstance(self.num_doses, dict):  # Convert any dates to simulation days
             self.num_doses = {sim.get_t(k): v for k, v in self.num_doses.items()}
-        check_doses(self.p['doses'], self.p['interval'])
+        self.p['doses'], self.p['interval'] = check_doses(self.p['doses'], self.p['interval'])
 
         return
 
@@ -803,55 +796,46 @@ class vaccinate_num(BaseVaccination):
         # Work out how many people to vaccinate today
         num_people = process_doses(self.num_doses, sim)
         if num_people == 0:
-            self._scheduled_doses[sim.t + 1].update(self._scheduled_doses[sim.t])  # Defer any extras
+            self._scheduled_doses[sim.t + 1].update(self._scheduled_doses[sim.t])  # Defer any extras til the next timestep
             return np.array([])
         num_agents = sc.randround(num_people / sim['pop_scale'])
 
-        # First, see how many scheduled second doses we are going to deliver
+        # First, see how many scheduled second/third doses we are going to deliver
         if self._scheduled_doses[sim.t]:
-            scheduled = np.fromiter(self._scheduled_doses[sim.t], dtype=cvd.default_int)  # Everyone scheduled today
-            scheduled = scheduled[(self.doses[scheduled] < self.p['doses']) & ~sim.people.dead[
-                scheduled]]  # Remove anyone who's already had all doses of this vaccine, also dead people
+            scheduled = np.fromiter(self._scheduled_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
+            scheduled = scheduled[(self.doses[scheduled] < self.p['doses']) & ~sim.people.dead[scheduled]]  # Remove anyone who's already had all doses of this vaccine, also dead people
 
-            # If there are more people due for a second dose than there are doses, vaccinate as many second doses
-            # as possible, and add the remainder to tomorrow's doses. At the moment, they don't get priority
-            # because the order of the scheduling doesn't matter (so there is a chance someone could go for several days
-            # before being allocated their second dose) but then there is some flexibility in the dosing schedules anyway
-            # e.g. Pfizer being 3-6 weeks in some jurisdictions
+            # If there are more people due for a second/third dose than there are doses, vaccinate as many
+            # as possible, and add the remainder to the next time step's doses.
             if len(scheduled) > num_agents:
                 np.random.shuffle(scheduled)  # Randomly pick who to defer
                 self._scheduled_doses[sim.t + 1].update(scheduled[num_agents:])  # Defer any extras
                 return scheduled[:num_agents]
         else:
-            scheduled = np.array([], dtype=cvd.default_int)
+            scheduled = np.array([], dtype=hpd.default_int)
 
         # Next, work out who is eligible for their first dose
         vacc_probs = np.ones(sim.n)  # Begin by assigning equal weight (converted to a probability) to everyone
-        vacc_probs[cvu.true(sim.people.dead)] = 0.0  # Dead people are not eligible
+        vacc_probs[hpu.true(sim.people.dead_other+sim.people.dead_cancer)] = 0.0  # Dead people are not eligible
 
         # Apply any subtargeting for this vaccination
         if self.subtarget is not None:
             subtarget_inds, subtarget_vals = get_subtargets(self.subtarget, sim)
             vacc_probs[subtarget_inds] = vacc_probs[subtarget_inds] * subtarget_vals
 
-        # If this is a booster, exclude unvaccinated people; otherwise, exclude vaccinated people
-        if self.booster:
-            vacc_probs[cvu.false(sim.people.vaccinated)] = 0.0
-        else:
-            vacc_probs[cvu.true(
-                sim.people.vaccinated)] = 0.0  # Anyone who's received at least one dose is counted as vaccinated
+        # Exclude vaccinated people
+        vacc_probs[hpu.true(sim.people.vaccinated)] = 0.0  # Anyone who's received at least one dose is counted as vaccinated
 
         # All remaining people can be vaccinated, although anyone who has received half of a multi-dose
         # vaccine would have had subsequent doses scheduled and therefore should not be selected here
-        first_dose_eligible = self.sequence[cvu.binomial_arr(vacc_probs[self.sequence])]
+        first_dose_eligible = hpu.binomial_arr(vacc_probs)
 
         if len(first_dose_eligible) == 0:
             return scheduled  # Just return anyone that is scheduled
 
         elif len(first_dose_eligible) > num_agents:
             # Truncate it to the number of agents for performance when checking whether anyone scheduled overlaps with first doses to allocate
-            first_dose_eligible = first_dose_eligible[
-                                  :num_agents]  # This is the maximum number of people we could vaccinate this timestep, if there are no second doses allocated
+            first_dose_eligible = first_dose_eligible[:num_agents]  # This is the maximum number of people we could vaccinate this timestep, if there are no second doses allocated
 
         # It's *possible* that someone has been *scheduled* for a first dose by some other mechanism externally
         # Therefore, we need to check and remove them from the first dose list, otherwise they could be vaccinated
@@ -864,9 +848,10 @@ class vaccinate_num(BaseVaccination):
             first_dose_inds = first_dose_eligible
 
         # Schedule subsequent doses
-        # For vaccines with >2 doses, scheduled doses will also need to be checked
-        if self.p['doses'] > 1:
-            self._scheduled_doses[sim.t + self.p.interval].update(first_dose_inds)
+        if self.p['doses'] == 2:
+            self._scheduled_doses[sim.t + self.p.interval[0]].update(first_dose_inds)
+        if self.p['doses'] == 3:
+            self._scheduled_doses[sim.t + self.p.interval[1]].update(first_dose_inds)
 
         vacc_inds = np.concatenate([scheduled, first_dose_inds])
 
