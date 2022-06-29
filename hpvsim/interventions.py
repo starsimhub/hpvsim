@@ -492,6 +492,9 @@ class BaseVaccination(Intervention):
                     if sim['verbose']: print(f'Note: No cross-immunity specified for vaccine {self.label} and genotype {key}, setting to 1.0')
                 self.p[key] = val
 
+        self.doses = np.zeros(sim['pop_size'], dtype=hpd.default_int) # Number of doses given per person
+        self.vaccination_dates = [[] for _ in range(sim.n)] # Store the dates when people are vaccinated
+
         sim['vaccine_pars'][self.label] = self.p # Store the parameters
         self.index = list(sim['vaccine_pars'].keys()).index(self.label) # Find where we are in the list
         sim['vaccine_map'][self.index]  = self.label # Use that to populate the reverse mapping
@@ -570,7 +573,7 @@ class BaseVaccination(Intervention):
         new_vacc   = np.setdiff1d(vacc_inds, prior_vacc)
 
         if len(vacc_inds):
-
+            self.doses[vacc_inds] += 1
             sim.people.vaccinated[vacc_inds] = True
             sim.people.vaccine_source[vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
@@ -589,6 +592,8 @@ class BaseVaccination(Intervention):
     def apply(self, sim):
         ''' Perform vaccination each timestep '''
 
+        new_people_doses = np.zeros(sum(sim.people.age==0), dtype=hpd.default_int)  # Babies haven't had any doses yet
+        self.doses = np.concatenate([self.doses, new_people_doses])
         inds = self.select_people(sim)
         if len(inds):
             inds = self.vaccinate(sim, inds)
@@ -833,30 +838,28 @@ class vaccinate_num(BaseVaccination):
         # First, see how many scheduled second/third doses we are going to deliver
         if self._scheduled_third_doses[sim.t]:
             scheduled_third = np.fromiter(self._scheduled_third_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
-            scheduled_third = scheduled_third[(self.doses[scheduled_third] == 2) & ~sim.people.dead[scheduled_third]]  # Remove anyone who's already had all doses of this vaccine, also dead people
+            still_alive = ~sim.people.dead_other[scheduled_third] & ~sim.people.dead_cancer[:, scheduled_third].sum(axis=0).astype(bool)
+            scheduled_third = scheduled_third[(self.doses[scheduled_third] == 2) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
 
             # If there are more people due for a second/third dose than there are doses, vaccinate as many
             # as possible, and add the remainder to the next time step's doses.
             if len(scheduled_third) > num_agents:
                 np.random.shuffle(scheduled_third)  # Randomly pick who to defer
-                self.scheduled_third[sim.t + 1].update(scheduled_third[num_agents:])  # Defer any extras
+                self._scheduled_third_doses[sim.t + 1].update(scheduled_third[num_agents:])  # Defer any extras
                 return scheduled_third[:num_agents]
         else:
             scheduled_third = np.array([], dtype=hpd.default_int)
 
         if self._scheduled_second_doses[sim.t]:
             scheduled_second = np.fromiter(self._scheduled_second_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
-            scheduled_second = scheduled_second[(self.doses[scheduled_second] == 1) & ~sim.people.dead[scheduled_second]]  # Remove anyone who's already had all doses of this vaccine, also dead people
+            still_alive = ~sim.people.dead_other[scheduled_second] & ~sim.people.dead_cancer[:, scheduled_second].sum(axis=0).astype(bool)
+            scheduled_second = scheduled_second[(self.doses[scheduled_second] == 1) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
 
             # If there are more people due for a second/third dose than there are doses, vaccinate as many
             # as possible, and add the remainder to the next time step's doses.
             if (len(scheduled_second)+len(scheduled_third)) > num_agents:
                 scheduled_second = scheduled_second[:(num_agents - len(scheduled_third))]
-                self.scheduled_second[sim.t + 1].update(scheduled_second[(num_agents - len(scheduled_third)):])  # Defer any extras
+                self._scheduled_second_doses[sim.t + 1].update(scheduled_second[(num_agents - len(scheduled_third)):])  # Defer any extras
                 scheduled = np.concatenate([scheduled_third, scheduled_second[:(num_agents - len(scheduled_third))]])
                 return scheduled
             else:
