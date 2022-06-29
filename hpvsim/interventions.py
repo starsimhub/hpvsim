@@ -417,6 +417,8 @@ class BaseVaccination(Intervention):
         self.label = label # Vaccine label (used as a dict key)
         self.p     = None # Vaccine parameters
         self.doses = None # Record the number of doses given per person *by this intervention*
+        self.immunity = None # Record the immunity conferred by this vaccine to each of the genotypes in the sim
+        self.immunity_inds = None # Record the indices of genotypes that are targeted by this vaccine
         self._parse_vaccine_pars(vaccine=vaccine) # Populate
         return
 
@@ -482,7 +484,10 @@ class BaseVaccination(Intervention):
             if key not in self.p:
                 self.p[key] = default_dose_pars[key]
 
-        # Handle genotypes
+        # Set immunity to each genotype in the sim
+        self.immunity = np.array([self.p[k] for k in genotype_labels])
+        self.immunity_inds = hpu.true(self.immunity)
+
         for key in genotype_labels:
             if key not in self.p:
                 if key in default_genotype_pars:
@@ -493,7 +498,7 @@ class BaseVaccination(Intervention):
                 self.p[key] = val
 
         self.doses = np.zeros(sim['pop_size'], dtype=hpd.default_int) # Number of doses given per person
-        self.vaccination_dates = [[] for _ in range(sim.n)] # Store the dates when people are vaccinated
+        # self.vaccination_dates = [[] for _ in range(sim.n)] # Store the dates when people are vaccinated
 
         sim['vaccine_pars'][self.label] = self.p # Store the parameters
         self.index = list(sim['vaccine_pars'].keys()).index(self.label) # Find where we are in the list
@@ -571,10 +576,12 @@ class BaseVaccination(Intervention):
         # Extract indices of already-vaccinated people and get indices of newly-vaccinated
         prior_vacc = hpu.true(sim.people.vaccinated)
         new_vacc   = np.setdiff1d(vacc_inds, prior_vacc)
+        # Indices of vaccination to each genotype
+        fancy_vacc_inds = (np.array([[ii]*len(vacc_inds) for ii in self.immunity_inds]).flatten(), np.tile(vacc_inds,len(self.immunity_inds)))
 
         if len(vacc_inds):
             self.doses[vacc_inds] += 1
-            sim.people.vaccinated[vacc_inds] = True
+            sim.people.vaccinated[fancy_vacc_inds] = True
             sim.people.vaccine_source[vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
             sim.people.date_vaccinated[vacc_inds] = t
@@ -582,10 +589,10 @@ class BaseVaccination(Intervention):
             hpi.update_peak_immunity(sim.people, vacc_inds, self.p, imm_source, infection=False)
 
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
-            sim.people.flows['doses']      += len(vacc_inds)*factor # Count number of doses given
-            sim.people.flows['vaccinated'] += len(new_vacc)*factor # Count number of people not already vaccinated given doses
-            sim.people.total_flows['total_doses'] += len(vacc_inds)*factor
-            sim.people.total_flows['total_vaccinated'] += len(new_vacc)*factor
+            # sim.people.flows['doses']      += len(vacc_inds)*factor # Count number of doses given
+            # sim.people.flows['vaccinated'] += len(new_vacc)*factor # Count number of people not already vaccinated given doses
+            # sim.people.total_flows['total_doses'] += len(vacc_inds)*factor
+            # sim.people.total_flows['total_vaccinated'] += len(new_vacc)*factor
         return vacc_inds
 
 
