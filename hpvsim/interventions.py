@@ -519,6 +519,10 @@ class BaseVaccination(Intervention):
             immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
             sim['immunity'] = immunity
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
             imm_boost = list(sim['imm_boost']) + [self.p['imm_boost']]
             sim['imm_boost'] = np.array(imm_boost)
             sim.people.set_pars(sim.pars)
@@ -577,12 +581,12 @@ class BaseVaccination(Intervention):
         prior_vacc = hpu.true(sim.people.vaccinated)
         new_vacc   = np.setdiff1d(vacc_inds, prior_vacc)
         # Indices of vaccination to each genotype
-        fancy_vacc_inds = (np.array([[ii]*len(vacc_inds) for ii in self.immunity_inds]).flatten(), np.tile(vacc_inds,len(self.immunity_inds)))
+        full_vacc_inds = (np.array([[ii]*len(vacc_inds) for ii in self.immunity_inds]).flatten(), np.tile(vacc_inds,len(self.immunity_inds)))
         idx = int(sim.t / sim.resfreq)
 
         if len(vacc_inds):
             self.doses[vacc_inds] += 1
-            sim.people.vaccinated[fancy_vacc_inds] = True
+            sim.people.vaccinated[full_vacc_inds] = True
             sim.people.vaccine_source[vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
             sim.people.date_vaccinated[vacc_inds] = t

@@ -1005,14 +1005,14 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
 
         bivalent_2dose = dict(
             imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
-            imm_boost=2,  # Factor by which a dose increases immunity
+            imm_boost=[3, 1.2],  # Factor by which a dose increases immunity
             doses=2,  # Number of doses for this vaccine
             interval=0.5,  # Interval between doses in years
         ),
 
         bivalent_3dose = dict(
             imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
-            imm_boost=[2, 2],  # Factor by which each dose increases immunity
+            imm_boost=[3, 1.2, 1.1],  # Factor by which each dose increases immunity
             doses=3,  # Number of doses for this vaccine
             interval=[0.2, 0.5],  # Interval between doses in years
         ),
