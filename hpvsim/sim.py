@@ -594,7 +594,6 @@ class Sim(hpb.BaseSim):
         self.people.addtoself(new_people) # New births are added to the population
 
         people = self.people # Shorten
-        people.alive = ~people.dead_other
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         new_pop_size = len(people)
         people.create_partnerships(t=t, n_new=n_dissolved, scale_factor=new_pop_size/old_pop_size) # Create new partnerships (maintaining the same overall partnerhip rate)

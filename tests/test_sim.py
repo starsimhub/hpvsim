@@ -9,6 +9,7 @@ import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
+import hpvsim.utils as hpu
 
 do_plot = 1
 do_save = 0
@@ -45,7 +46,24 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
     hpv6 = hpv.genotype('HPV6')
-    sim = hpv.Sim(end=2035, genotypes=[hpv16,hpv18,hpv6])
+
+    pars = {
+        'pop_size': 50e3,
+        'start': 1990,
+        'burnin': 30,
+        'end': 2030,
+        'genotypes': [hpv16, hpv18],
+        'location': 'tanzania',
+        'dt': .2,
+    }
+
+    age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
+    doses_per_year = 2e3
+    bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year,
+                                        timepoints=['2020', '2021', '2022', '2023', '2024'],
+                                        label='bivalent 2 dose, 9-14', subtarget=age_target)
+
+    sim = hpv.Sim(pars=pars, genotypes=[hpv16,hpv18,hpv6], interventions=[bivalent_2_dose])
     sim.set_seed(seed)
 
     # Optionally plot

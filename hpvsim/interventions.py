@@ -404,7 +404,6 @@ class BaseVaccination(Intervention):
         self.index = None # Index of the vaccine in the sim; set later
         self.label = label # Vaccine label (used as a dict key)
         self.p     = None # Vaccine parameters
-        self.doses = None # Record the number of doses given per person *by this intervention*
         self.immunity = None # Record the immunity conferred by this vaccine to each of the genotypes in the sim
         self.immunity_inds = None # Record the indices of genotypes that are targeted by this vaccine
         self._parse_vaccine_pars(vaccine=vaccine) # Populate
@@ -485,9 +484,6 @@ class BaseVaccination(Intervention):
                     if sim['verbose']: print(f'Note: No cross-immunity specified for vaccine {self.label} and genotype {key}, setting to 1.0')
                 self.p[key] = val
 
-        self.doses = np.zeros(sim['pop_size'], dtype=hpd.default_int) # Number of doses given per person by this intervention
-        # self.vaccination_dates = [[] for _ in range(sim.n)] # Store the dates when people are vaccinated
-
         sim['vaccine_pars'][self.label] = self.p # Store the parameters
         self.index = list(sim['vaccine_pars'].keys()).index(self.label) # Find where we are in the list
         sim['vaccine_map'][self.index]  = self.label # Use that to populate the reverse mapping
@@ -560,15 +556,11 @@ class BaseVaccination(Intervention):
         # Note, this does not preclude someone from getting additional doses of another vaccine (e.g. a booster)
         vacc_inds = vacc_inds[sim.people.doses[vacc_inds] < self.p['doses']]
 
-        # Extract indices of already-vaccinated people and get indices of newly-vaccinated
-        prior_vacc = hpu.true(sim.people.vaccinated)
-        new_vacc   = np.setdiff1d(vacc_inds, prior_vacc)
         # Indices of vaccination to each genotype
         full_vacc_inds = (np.array([[ii]*len(vacc_inds) for ii in self.immunity_inds]).flatten(), np.tile(vacc_inds,len(self.immunity_inds)))
         idx = int(sim.t / sim.resfreq)
 
         if len(vacc_inds):
-            self.doses[vacc_inds] += 1
             sim.people.vaccinated[full_vacc_inds] = True
             sim.people.vaccine_source[vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
@@ -585,9 +577,6 @@ class BaseVaccination(Intervention):
 
     def apply(self, sim):
         ''' Perform vaccination each timestep '''
-
-        new_people_doses = np.zeros(sum(sim.people.age==0), dtype=hpd.default_int)  # Babies haven't had any doses yet
-        self.doses = np.concatenate([self.doses, new_people_doses])
         inds = self.select_people(sim)
         if len(inds):
             inds = self.vaccinate(sim, inds)
@@ -833,7 +822,7 @@ class vaccinate_num(BaseVaccination):
         if self._scheduled_third_doses[sim.t]:
             scheduled_third = np.fromiter(self._scheduled_third_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
             still_alive = ~sim.people.dead_other[scheduled_third] & ~sim.people.dead_cancer[:, scheduled_third].sum(axis=0).astype(bool)
-            scheduled_third = scheduled_third[(self.doses[scheduled_third] == 2) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
+            scheduled_third = scheduled_third[(sim.people.doses[scheduled_third] == 2) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
 
             # If there are more people due for a second/third dose than there are doses, vaccinate as many
             # as possible, and add the remainder to the next time step's doses.
@@ -847,7 +836,7 @@ class vaccinate_num(BaseVaccination):
         if self._scheduled_second_doses[sim.t]:
             scheduled_second = np.fromiter(self._scheduled_second_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
             still_alive = ~sim.people.dead_other[scheduled_second] & ~sim.people.dead_cancer[:, scheduled_second].sum(axis=0).astype(bool)
-            scheduled_second = scheduled_second[(self.doses[scheduled_second] == 1) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
+            scheduled_second = scheduled_second[(sim.people.doses[scheduled_second] == 1) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
 
             # If there are more people due for a second/third dose than there are doses, vaccinate as many
             # as possible, and add the remainder to the next time step's doses.
@@ -863,7 +852,7 @@ class vaccinate_num(BaseVaccination):
 
         # Next, work out who is eligible for their first dose
         vacc_probs = np.ones(sim.n)  # Begin by assigning equal weight (converted to a probability) to everyone
-        vacc_probs[hpu.true(sim.people.dead_other+sim.people.dead_cancer)] = 0.0  # Dead people are not eligible
+        vacc_probs[~sim.people.alive] = 0.0  # Dead people are not eligible
 
         # Apply any subtargeting for this vaccination
         if self.subtarget is not None:
@@ -871,7 +860,7 @@ class vaccinate_num(BaseVaccination):
             vacc_probs[subtarget_inds] = vacc_probs[subtarget_inds] * subtarget_vals
 
         # Exclude vaccinated people
-        vacc_probs[hpu.true(sim.people.vaccinated)] = 0.0  # Anyone who's received at least one dose is counted as vaccinated
+        vacc_probs[sim.people.vaccinated[0,:]] = 0.0  # Anyone who's received at least one dose is counted as vaccinated
 
         # All remaining people can be vaccinated, although anyone who has received half of a multi-dose
         # vaccine would have had subsequent doses scheduled and therefore should not be selected here
