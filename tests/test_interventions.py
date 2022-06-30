@@ -57,7 +57,7 @@ def test_dynamic_pars():
     return sim
 
 
-def test_vaccines(do_plot=False, do_save=False, fig_path=None):
+def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test prophylactic vaccine intervention')
 
     verbose = .1
@@ -210,9 +210,9 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
-    scens = test_vaccines(do_plot=True)
-    # scens = test_vaccinate_num(do_plot=True)
+    sim0 = test_dynamic_pars()
+    scens1 = test_vaccinate_prob(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
 
     sc.toc(T)
     print('Done.')
