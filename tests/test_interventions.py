@@ -19,7 +19,7 @@ hpv18 = hpv.genotype('HPV18')
 
 base_pars = {
     'pop_size': 50e3,
-    'start': 1990,
+    'start': 1985,
     'burnin': 30,
     'end': 2030,
     'genotypes': [hpv16, hpv18],
