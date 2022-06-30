@@ -211,8 +211,8 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_dynamic_pars()
-    # scens = test_vaccines(do_plot=True)
-    scens = test_vaccinate_num(do_plot=True)
+    scens = test_vaccines(do_plot=True)
+    # scens = test_vaccinate_num(do_plot=True)
 
     sc.toc(T)
     print('Done.')
