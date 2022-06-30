@@ -1191,10 +1191,10 @@ def get_treatment_pars(screen=None):
                 cin3=1,
             ),
             time_to_clearance=dict(
-                infectious=dict(dist='lognormal', par1=0.05, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,
-                cin1=dict(dist='lognormal', par1=0.05, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-                cin2=dict(dist='lognormal', par1=0.05, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-                cin3=dict(dist='lognormal', par1=0.05, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+                infectious=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,
+                cin1=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+                cin2=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+                cin3=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
             )
         ),
     )

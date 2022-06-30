@@ -134,8 +134,8 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     pars = {
         'pop_size': n_agents,
         'n_years': 60,
-        'burnin': 30,
-        'start': 1970,
+        'burnin': 25,
+        'start': 1975,
         'genotypes': [hpv16, hpv18],
         'pop_scale' : 25.2e6 / n_agents,
         'dt': .2,
@@ -147,6 +147,9 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
 
+    cyto_screening = hpv.Screening(primary_screen_test='cytology', treatment='ablative', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, timepoints='2010',
+                                  prob=screen_prop)
     sim = hpv.Sim(pars=pars,
 
                   )
@@ -156,18 +159,26 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     # Define the scenarios
     scenarios = {
         'no_screening_rsa': {
-            'name': 'No screening rsa',
+            'name': 'No screening',
             'pars': {
                 'location': 'south africa'
             }
         },
-        'screening_rsa': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}, rsa',
+        'hpv_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
             'pars': {
                 'interventions': [hpv_screening],
                 'location': 'south africa'
             }
         },
+        'cyto_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {cyto_screening.label}',
+            'pars': {
+                'interventions': [cyto_screening],
+                'location': 'south africa'
+            }
+        },
+
     }
 
     metapars = {'n_runs': n_runs}
@@ -188,7 +199,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                 'total_cancer_incidence',
             ],
         }
-        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path, plot_burnin=True)
+        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
 
     return scens
 
