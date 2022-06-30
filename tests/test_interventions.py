@@ -55,6 +55,7 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
         'pop_size': 50e3,
         'n_years': 20,
         'genotypes': [hpv16, hpv18],
+        'location': 'tanzania',
         'dt': .2,
     }
 
