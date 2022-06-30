@@ -20,8 +20,8 @@ hpv18 = hpv.genotype('HPV18')
 base_pars = {
     'pop_size': 50e3,
     'start': 1990,
-    'burnin': 20,
-    'end': 2035,
+    'burnin': 30,
+    'end': 2030,
     'genotypes': [hpv16, hpv18],
     'location': 'tanzania',
     'dt': .2,
@@ -144,11 +144,6 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
     bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024'], label='bivalent 2 dose, 9-14', subtarget=age_target)
     bivalent_3_dose = hpv.vaccinate_num(vaccine='bivalent_3dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024'], label='bivalent 3 dose, 9-14', subtarget=age_target)
 
-    # sim = hpv.Sim(pars=base_pars, interventions=[bivalent_1_dose])
-    # sim.run()
-    # sim.plot()
-    # return sim
-
     sim = hpv.Sim(pars=base_pars)
     n_runs = 3
 
@@ -190,11 +185,8 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
             'HPV incidence': [
                 'total_hpv_incidence',
             ],
-            'HPV infections': [
-                'total_infections',
-            ],
-            'Cancers per 100,000 women': [
-                'total_cancer_incidence',
+            'Number vaccinated': [
+                'cum_total_vaccinated',
             ],
         }
         scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
@@ -214,7 +206,7 @@ if __name__ == '__main__':
 
     # sim0 = test_dynamic_pars()
     # scens = test_vaccines(do_plot=True)
-    scens = test_vaccinate_num(do_plot=True)
+    sim = test_vaccinate_num(do_plot=True)
 
     sc.toc(T)
     print('Done.')

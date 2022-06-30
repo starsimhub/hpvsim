@@ -400,7 +400,7 @@ class BaseSim(ParsObj):
                     tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
                 except:
                     try:
-                        tp_raw  = float(date)
+                        tp_raw  = float(date) # This must be float, not int, otherwise some attempts to get t will fail
                     except:
                         errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
                         raise ValueError(errormsg)
