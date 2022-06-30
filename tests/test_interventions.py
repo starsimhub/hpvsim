@@ -24,7 +24,7 @@ base_pars = {
     'end': 2025,
     'genotypes': [hpv16, hpv18],
     'location': 'tanzania',
-    'dt': .5,
+    'dt': .2,
 }
 
 
