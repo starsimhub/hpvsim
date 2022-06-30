@@ -902,11 +902,12 @@ class Screening(Intervention):
             # find people eligible for next screen
             next_eligible_inds = sc.findinds((sim.people.age >= self.p['screen_start_age']) &
                                     (sim.people.age <= self.p['screen_stop_age']) &
-                                    (sim.people.date_screened == sim.t - self.p['screen_interval']))
+                                    (sim.people.date_next_screen == sim.t))
+
             screen_probs[next_eligible_inds] = self.prob  # Assign equal screening probability to everyone
 
             screen_probs[hpu.true(~sim.people.alive)] *= 0.0  # Do not screen dead people
-            screen_probs[hpu.true(~sim.people.is_male)] *= 0.0  # Do not screen men
+            screen_probs[hpu.true(sim.people.is_male)] *= 0.0  # Do not screen men
             screen_inds = hpu.true(hpu.binomial_arr(screen_probs))  # Calculate who actually gets screened
         return screen_inds
 
@@ -930,10 +931,6 @@ class Screening(Intervention):
         screen_inds = screen_inds[sim.people.alive[screen_inds]] # Skip anyone that is dead
 
         if len(screen_inds):
-
-            sim.people.screened[screen_inds] = True
-            sim.people.screens[screen_inds] += 1
-            sim.people.date_screened[screen_inds] = sim.t
 
             # Pull our parameters that will be used below
             ng = sim['n_genotypes']
@@ -965,7 +962,7 @@ class Screening(Intervention):
             for state in states:
                 for g in range(ng):
                     if state == 'infectious': # want to be sure to think of these states as mutually exclusive, which is ok for all but infectious
-                        inds = np.union1d(treat_inds, sc.findinds((~sim.people['cin1'][g,:]) & (~sim.people['cin2'][g,:]) & (~sim.people['cin3'][g,:]) & (sim.people['infectious'][g,:])))
+                        inds = np.intersect1d(treat_inds, sc.findinds((~sim.people['cin1'][g,:]) & (~sim.people['cin2'][g,:]) & (~sim.people['cin3'][g,:]) & (sim.people['infectious'][g,:])))
                     else:
                         inds = treat_inds[hpu.true(sim.people[state][g,treat_inds])]
                     eff_probs = np.zeros(len(inds))
@@ -974,11 +971,16 @@ class Screening(Intervention):
                     eff_inds = inds[eff_inds]
 
                     dur_to_clearance = hpu.sample(**treat_pars['time_to_clearance'][state], size=len(eff_inds))
-                    sim.people.date_clearance[g,eff_inds] =sim.t + np.ceil(dur_to_clearance / dt) # TODO: make this an fp.min statement so we dont ever give someone a time to clearance that is slower than their currently assigned time to clearance
+                    sim.people.date_clearance[g,eff_inds] = np.minimum((sim.t + np.ceil(dur_to_clearance / dt)), sim.people.date_clearance[g,eff_inds])
 
-            # Extract indices of already-vaccinated people and get indices of newly-vaccinated
+            # Extract indices of already-screened people and get indices of newly-screened
             prior_screen = hpu.true(sim.people.screened)
             new_screen = np.setdiff1d(screen_inds, prior_screen)
+
+            sim.people.screened[screen_inds] = True
+            sim.people.screens[screen_inds] += 1
+            sim.people.date_screened[screen_inds] = sim.t
+            sim.people.date_next_screen[screen_inds] = sim.t + self.p['screen_interval']/sim['dt']
 
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
             sim.people.flows['screens'] += len(screen_inds) * factor  # Count number of screens given
@@ -995,7 +997,7 @@ class Screening(Intervention):
         for state in states:
             for g in range(ng):
                 screen_probs = np.zeros(len(screen_inds))
-                tp_inds = hpu.true(sim.people[state][g, screen_inds])
+                tp_inds = hpu.true(sim.people[state][g, screen_inds]) #TODO: hmm this isn't exactly right
                 tn_inds = hpu.false(sim.people[state][g, screen_inds])
                 screen_probs[tp_inds] = pars['sensitivity'][state][g]
                 screen_probs[tn_inds] = 1 - pars['specificity'][state][g]
@@ -1004,6 +1006,7 @@ class Screening(Intervention):
 
         # remove duplicates from list
         screen_pos = np.array(list(set(screen_pos)))
+        screen_pos = screen_inds[screen_pos]
         return screen_pos
 
     def apply(self, sim):
