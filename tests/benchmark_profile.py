@@ -10,7 +10,7 @@ from test_sim import test_sim
 
 
 sim = test_sim(do_plot=False)
-to_profile = 'apply_int' # Must be one of the options listed below
+to_profile = 'vaccinate' # Must be one of the options listed below
 
 func_options = {
     'make_contacts': hpv.make_contacts,

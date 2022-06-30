@@ -688,7 +688,7 @@ class Sim(hpb.BaseSim):
 
             # Create total stocks
             for key in hpd.stock_keys:
-                if key not in ['alive', 'cin']:  # These are all special cases
+                if key not in ['alive', 'cin', 'vaccinated']:  # These are all special cases
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['cin', 'susceptible']:

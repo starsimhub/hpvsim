@@ -160,9 +160,9 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
 
     else:
         # Vaccination by dose
-        dose1_inds = inds[hpu.true(people.doses[inds]==1)] # First doses
-        dose2_inds = inds[hpu.true(people.doses[inds]==2)] # Second doses
-        dose3_inds = inds[hpu.true(people.doses[inds]==3)] # Third doses
+        dose1_inds = inds[people.doses[inds]==1] # First doses
+        dose2_inds = inds[people.doses[inds]==2] # Second doses
+        dose3_inds = inds[people.doses[inds]==3] # Third doses
         if imm_pars['doses']>1:
             imm_pars['imm_boost'] = sc.promotetolist(imm_pars['imm_boost'])
         if len(dose1_inds)>0: # Initialize immunity for newly vaccinated people

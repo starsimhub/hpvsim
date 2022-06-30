@@ -556,12 +556,8 @@ class BaseVaccination(Intervention):
         # Note, this does not preclude someone from getting additional doses of another vaccine (e.g. a booster)
         vacc_inds = vacc_inds[sim.people.doses[vacc_inds] < self.p['doses']]
 
-        # Indices of vaccination to each genotype
-        full_vacc_inds = (np.array([[ii]*len(vacc_inds) for ii in self.immunity_inds]).flatten(), np.tile(vacc_inds,len(self.immunity_inds)))
-        idx = int(sim.t / sim.resfreq)
-
         if len(vacc_inds):
-            sim.people.vaccinated[full_vacc_inds] = True
+            sim.people.vaccinated[vacc_inds] = True #
             sim.people.vaccine_source[vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
             sim.people.date_vaccinated[vacc_inds] = t
@@ -569,6 +565,7 @@ class BaseVaccination(Intervention):
             hpi.update_peak_immunity(sim.people, vacc_inds, self.p, imm_source, infection=False)
 
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
+            idx = int(sim.t / sim.resfreq)
             sim.results['new_vaccinated'][self.immunity_inds, idx] += len(vacc_inds)
             sim.results['new_total_vaccinated'][idx] += len(vacc_inds)
 
@@ -616,20 +613,6 @@ def check_doses(doses, interval, imm_boost):
             raise ValueError(f'Dosing interval and imm_boost must both be length {doses-1}, not {len(interval)} and {len(imm_boost)}.')
 
     return doses, interval, imm_boost
-
-
-def process_doses(num_doses, sim):
-    ''' Handle different types of dose data'''
-    if sc.isnumber(num_doses):
-        num_people = num_doses
-    elif callable(num_doses):
-        num_people = num_doses(sim)
-    elif sim.t in num_doses:
-        num_people = num_doses[sim.t]
-    else:
-        num_people = 0
-    return num_people
-
 
 
 class vaccinate_prob(BaseVaccination):
@@ -810,7 +793,9 @@ class vaccinate_num(BaseVaccination):
     def select_people(self, sim):
 
         # Work out how many people to vaccinate today
-        num_people = process_doses(self.num_doses, sim)
+        if sim.t in self.num_doses: num_people = self.num_doses[sim.t]
+        else:                       num_people = 0
+
         if num_people == 0:
             self._scheduled_third_doses[sim.t + 1].update(self._scheduled_third_doses[sim.t])  # Defer any extras til the next timestep
             self._scheduled_second_doses[sim.t + 1].update(self._scheduled_second_doses[sim.t])  # Defer any extras til the next timestep
@@ -860,7 +845,7 @@ class vaccinate_num(BaseVaccination):
             vacc_probs[subtarget_inds] = vacc_probs[subtarget_inds] * subtarget_vals
 
         # Exclude vaccinated people
-        vacc_probs[sim.people.vaccinated[0,:]] = 0.0  # Anyone who's received at least one dose is counted as vaccinated
+        vacc_probs[sim.people.vaccinated] = 0.0  # Anyone who's received at least one dose is counted as vaccinated
 
         # All remaining people can be vaccinated, although anyone who has received half of a multi-dose
         # vaccine would have had subsequent doses scheduled and therefore should not be selected here
