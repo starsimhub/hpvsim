@@ -381,19 +381,10 @@ class BaseVaccination(Intervention):
 
     This base class implements the mechanism of vaccinating people to modify their immunity.
     It does not implement allocation of the vaccines, which is implemented by derived classes
-    such as `cv.vaccinate`. The idea is that vaccination involves a series of standard operations
-    to modify `cv.People` and applications will likely need to modify the vaccine parameters and
-    test potentially complex allocation strategies. These should be accounted for by:
-
-        - Custom vaccine parameters being passed in as a dictionary to the vaccine intervention
-        - Custom vaccine allocations being implemented by a derived class overloading
-          `BaseVaccination.select_people`. Any additional attributes required to manage the allocation
-          can be defined in the derived class. Refer to `cv.vaccinate` or `cv.vaccinate_sequential` for
-          an example of how to implement this.
+    such as `hpv.vaccinate_num`.
 
     Some quantities are tracked during execution for reporting after running the simulation.
     These are:
-
         - ``doses``:             the number of vaccine doses per person
 
     Args:
@@ -402,15 +393,12 @@ class BaseVaccination(Intervention):
         kwargs  (dict)     : passed to Intervention()
 
     If ``vaccine`` is supplied as a dictionary, it must have the following parameters:
-
         - ``imm_init``:  the initial immunity level (higher = more protection)
-        - ``imm_boost``: how much of a boost being vaccinated on top of a previous dose or natural infection provides
-
 
     See ``parameters.py`` for additional examples of these parameters.
 
-
     '''
+
     def __init__(self, vaccine, label=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.index = None # Index of the vaccine in the sim; set later
@@ -497,7 +485,7 @@ class BaseVaccination(Intervention):
                     if sim['verbose']: print(f'Note: No cross-immunity specified for vaccine {self.label} and genotype {key}, setting to 1.0')
                 self.p[key] = val
 
-        self.doses = np.zeros(sim['pop_size'], dtype=hpd.default_int) # Number of doses given per person
+        self.doses = np.zeros(sim['pop_size'], dtype=hpd.default_int) # Number of doses given per person by this intervention
         # self.vaccination_dates = [[] for _ in range(sim.n)] # Store the dates when people are vaccinated
 
         sim['vaccine_pars'][self.label] = self.p # Store the parameters
@@ -519,12 +507,7 @@ class BaseVaccination(Intervention):
             immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
             sim['immunity'] = immunity
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
-            imm_boost = list(sim['imm_boost']) + [self.p['imm_boost']]
-            sim['imm_boost'] = np.array(imm_boost)
+            sc.promotetolist(sim['imm_boost']).append(sc.promotetolist(self.p['imm_boost'])) # This line happens in-place
             sim.people.set_pars(sim.pars)
 
         return
@@ -621,29 +604,29 @@ class BaseVaccination(Intervention):
         return obj
 
 
-def check_doses(doses, interval):
-    ''' Check that doses and intervals are supplied in correct formats '''
+def check_doses(doses, interval, imm_boost):
+    ''' Check that doses, intervals, and boost factors are supplied in correct formats '''
 
     # First check types
     if interval is not None:
         if sc.checktype(interval, 'num'):
-            interval = sc.promotetoarray(interval)
-        elif sc.checktype(interval, list):
-            interval = np.array(interval)
+            interval = sc.promotetolist(interval)
+        if sc.checktype(imm_boost, 'num'):
+            imm_boost = sc.promotetolist(imm_boost)
 
     if not sc.checktype(doses, int):
         raise ValueError(f'Doses must be an integer or array/list of integers, not {doses}.')
 
     # Now check that they're compatible
-    if doses == 1 and interval is not None:
-        raise ValueError("Can't use dosing intervals for vaccines with only one dose.")
+    if doses == 1 and ((interval is not None) or (imm_boost is not None)):
+        raise ValueError("Can't use dosing intervals or boosting factors for vaccines with only one dose.")
     elif doses > 1:
-        if interval is None:
-            raise ValueError('Must specify a dosing interval if using a vaccine with more than one dose.')
-        elif len(interval) != doses-1:
-            raise ValueError(f'Dosing interval must be length {doses-1}, not {len(interval)}.')
+        if interval is None or imm_boost is None:
+            raise ValueError('Must specify a dosing interval and boosting factor if using a vaccine with more than one dose.')
+        elif (len(interval) != doses-1) or (len(interval) != len(imm_boost)):
+            raise ValueError(f'Dosing interval and imm_boost must both be length {doses-1}, not {len(interval)} and {len(imm_boost)}.')
 
-    return doses, interval
+    return doses, interval, imm_boost
 
 
 def process_doses(num_doses, sim):
@@ -698,7 +681,7 @@ class vaccinate_prob(BaseVaccination):
         self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
         self.second_dose_timepoints = [None]*sim.npts # People who get second dose (if relevant)
         self.third_dose_timepoints  = [None]*sim.npts # People who get second dose (if relevant)
-        self.p['doses'], self.p['interval'] = check_doses(self.p['doses'], self.p['interval'])
+        self.p['doses'], self.p['interval'], self.p['imm_boost'] = check_doses(self.p['doses'], self.p['interval'], self.p['imm_boost'])
         return
 
 
@@ -830,7 +813,7 @@ class vaccinate_num(BaseVaccination):
         # Perform checks and process inputs
         if isinstance(self.num_doses, dict):  # Convert any dates to simulation days
             self.num_doses = {sim.get_t(k)[0]: v for k, v in self.num_doses.items()}
-        self.p['doses'], self.p['interval'] = check_doses(self.p['doses'], self.p['interval'])
+        self.p['doses'], self.p['interval'], self.p['imm_boost'] = check_doses(self.p['doses'], self.p['interval'], self.p['imm_boost'])
 
         return
 
