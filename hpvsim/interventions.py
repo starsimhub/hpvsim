@@ -555,10 +555,11 @@ class BaseVaccination(Intervention):
         # Otherwise, they will receive the 2nd dose boost cumulatively for every subsequent dose.
         # Note, this does not preclude someone from getting additional doses of another vaccine (e.g. a booster)
         vacc_inds = vacc_inds[sim.people.doses[vacc_inds] < self.p['doses']]
+        first_vacc_inds = vacc_inds[~sim.people.vaccinated[vacc_inds]]
 
         if len(vacc_inds):
-            sim.people.vaccinated[vacc_inds] = True #
-            sim.people.vaccine_source[vacc_inds] = self.index
+            sim.people.vaccinated[first_vacc_inds] = True #
+            sim.people.vaccine_source[first_vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
             sim.people.date_vaccinated[vacc_inds] = t
             imm_source = len(sim['genotype_map']) + self.index
@@ -566,8 +567,9 @@ class BaseVaccination(Intervention):
 
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
             idx = int(sim.t / sim.resfreq)
-            sim.results['new_vaccinated'][self.immunity_inds, idx] += len(vacc_inds)
-            sim.results['new_total_vaccinated'][idx] += len(vacc_inds)
+            sim.results['new_vaccinated'][self.immunity_inds, idx] += len(first_vacc_inds)
+            sim.results['new_total_vaccinated'][idx] += len(first_vacc_inds)
+            sim.results['new_doses'][idx] += len(vacc_inds)
 
         return vacc_inds
 

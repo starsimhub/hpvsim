@@ -139,7 +139,7 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
 
     # Model an intervention to roll out prophylactic vaccination with a given number of doses over time
     age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
-    doses_per_year = 2e3
+    doses_per_year = 10e3
     bivalent_1_dose = hpv.vaccinate_num(vaccine='bivalent_1dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024'], label='bivalent 1 dose, 9-14', subtarget=age_target)
     bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024'], label='bivalent 2 dose, 9-14', subtarget=age_target)
     bivalent_3_dose = hpv.vaccinate_num(vaccine='bivalent_3dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024'], label='bivalent 3 dose, 9-14', subtarget=age_target)
