@@ -85,7 +85,7 @@ class People(hpb.BasePeople):
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
-            if key == 'date_dead_other' or key == 'date_vaccinated' or key == 'date_screened':
+            if key == 'date_dead_other' or key == 'date_vaccinated' or key == 'date_screened' or key == 'date_next_screen':
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
             else:
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)

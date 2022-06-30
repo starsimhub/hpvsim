@@ -902,11 +902,12 @@ class Screening(Intervention):
             # find people eligible for next screen
             next_eligible_inds = sc.findinds((sim.people.age >= self.p['screen_start_age']) &
                                     (sim.people.age <= self.p['screen_stop_age']) &
-                                    (sim.people.date_screened == sim.t - self.p['screen_interval']))
+                                    (sim.people.date_next_screen == sim.t))
+
             screen_probs[next_eligible_inds] = self.prob  # Assign equal screening probability to everyone
 
             screen_probs[hpu.true(~sim.people.alive)] *= 0.0  # Do not screen dead people
-            screen_probs[hpu.true(~sim.people.is_male)] *= 0.0  # Do not screen men
+            screen_probs[hpu.true(sim.people.is_male)] *= 0.0  # Do not screen men
             screen_inds = hpu.true(hpu.binomial_arr(screen_probs))  # Calculate who actually gets screened
         return screen_inds
 
@@ -979,6 +980,7 @@ class Screening(Intervention):
             sim.people.screened[screen_inds] = True
             sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
+            sim.people.date_next_screen[screen_inds] = sim.t + self.p['screen_interval']/sim['dt']
 
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
             sim.people.flows['screens'] += len(screen_inds) * factor  # Count number of screens given

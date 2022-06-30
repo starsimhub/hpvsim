@@ -81,7 +81,7 @@ class PeopleMeta(sc.prettyobj):
         ]
 
         self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
-        self.dates += ['date_clearance']
+        self.dates += ['date_clearance', 'date_next_screen']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [

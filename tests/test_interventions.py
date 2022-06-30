@@ -129,18 +129,20 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 0
+    n_agents = 50e3
 
     pars = {
-        'pop_size': 50e3,
+        'pop_size': n_agents,
         'n_years': 60,
         'burnin': 30,
         'start': 1970,
         'genotypes': [hpv16, hpv18],
+        'pop_scale' : 25.2e6 / n_agents,
         'dt': .2,
     }
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
-    screen_prop = 0.5
+    screen_prop = .1
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='ablative', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
