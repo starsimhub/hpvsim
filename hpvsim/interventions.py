@@ -753,7 +753,7 @@ class vaccinate_num(BaseVaccination):
         hpv.Sim(interventions=bivalent).run().plot()
     '''
 
-    def __init__(self, vaccine, num_doses, timepoints=None, dates=None, subtarget=None, spread_doses=True, **kwargs):
+    def __init__(self, vaccine, num_doses, timepoints=None, dates=None, subtarget=None, spread_doses=False, **kwargs):
         super().__init__(vaccine, **kwargs)  # Initialize the Intervention object
         self.num_doses = num_doses
         self.timepoints = timepoints

@@ -21,7 +21,7 @@ base_pars = {
     'pop_size': 50e3,
     'start': 1990,
     'burnin': 20,
-    'end': 2025,
+    'end': 2035,
     'genotypes': [hpv16, hpv18],
     'location': 'tanzania',
     'dt': .2,
