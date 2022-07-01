@@ -927,6 +927,12 @@ class Screening(Intervention):
         # Perform checks
         if len(screen_inds):
 
+            # Set screening states and dates
+            sim.people.screened[screen_inds] = True
+            sim.people.screens[screen_inds] += 1
+            sim.people.date_screened[screen_inds] = sim.t
+            sim.people.date_next_screen[screen_inds] = sim.t + self.screen_interval/sim['dt']
+
             # Pull our parameters that will be used below
             ng = sim['n_genotypes']
             dt = sim['dt']
@@ -939,54 +945,46 @@ class Screening(Intervention):
             # Step 1, filter positives from primary screen
             screen_pos = self.find_test_pos(screen_inds, primary_screen_pars, sim, screen_states, ng)
 
-            # Step 2, filter positives from triage (if appropriate)
-            if triage_screen_pars is not None:
+            # If anyone screens positive, continue
+            if len(screen_pos):
 
-                triage_probs = np.zeros(len(screen_pos))
-                triage_probs.fill(self.compliance)
-                triage_inds = hpu.true(hpu.binomial_arr(triage_probs))
-                triage_inds = screen_pos[triage_inds]
-                triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, states, ng)
-                screen_pos = triage_pos
+                # Step 2, filter positives from triage (if appropriate)
+                if triage_screen_pars is not None:
+                    triage_probs = np.zeros(len(screen_pos))
+                    triage_probs.fill(self.compliance)
+                    triage_inds = hpu.true(hpu.binomial_arr(triage_probs))
+                    triage_inds = screen_pos[triage_inds]
+                    triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, states, ng)
+                    screen_pos = triage_pos
 
-            # Step 3, treat and adjust prognoses accordingly
-            treat_eligible = sum([sim.people[state] for state in treat_states]).astype(bool).any(axis=0) # Determine who is eligible for treatment (i.e., those with HSILs)
-            treat_eligible_and_screened = screen_pos[treat_eligible[screen_pos]] # Screened and eligible for treatment
-            treat_probs = np.full(len(treat_eligible_and_screened), self.compliance, dtype=hpd.default_float) # Assign everyone who's screened and eligible for treatment a probability of compliance
-            to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
-            treat_inds = treat_eligible_and_screened[to_treat] # Indices of those who get treated
-            sim.people.treated[treat_inds] = True
-            sim.people.date_treated[treat_inds] = sim.t
+                # Step 3, Determine who is gets treated
+                treat_eligible = sum([sim.people[state] for state in treat_states]).astype(bool).any(axis=0) # Determine who is eligible for treatment (i.e., those with HSILs)
+                treat_eligible_and_screened = screen_pos[treat_eligible[screen_pos]] # Screened and eligible for treatment
+                treat_probs = np.full(len(treat_eligible_and_screened), self.compliance, dtype=hpd.default_float) # Assign everyone who's screened and eligible for treatment a probability of compliance
+                to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
+                treat_inds = treat_eligible_and_screened[to_treat] # Indices of those who get treated
+                sim.people.treated[treat_inds] = True
+                sim.people.date_treated[treat_inds] = sim.t
 
-            for state in treat_states:
+                # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
+                for state in treat_states:
 
-                # Determine whether treatment is successful in removing the HSIL
-                eff_probs = np.full(len(treat_inds), treat_pars['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
-                to_eff_treat = hpu.binomial_arr(eff_probs) # Determine who will have effective treatment
-                eff_treat_inds = treat_inds[to_eff_treat]
-                sim.people[state][:, eff_treat_inds] = False # People who get treated have their CINs removed
+                    # Determine whether treatment is successful in removing the HSIL
+                    eff_probs = np.full(len(treat_inds), treat_pars['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
+                    to_eff_treat = hpu.binomial_arr(eff_probs) # Determine who will have effective treatment
+                    eff_treat_inds = treat_inds[to_eff_treat]
+                    sim.people[state][:, eff_treat_inds] = False # People who get treated have their CINs removed
 
-                # Determine whether infection persists
-                persistance_probs = np.full(len(eff_treat_inds), treat_pars['persistance'][state], dtype=hpd.default_float)  # Assign probabilities of infection persisting
-                to_persist = hpu.binomial_arr(persistance_probs)  # Determine who will have persistant infection
-                to_clear = eff_treat_inds[~to_persist] # Determine who will clear infection
-                dur_to_clearance = hpu.sample(**treat_pars['time_to_clearance'][state], size=len(to_clear))
-                for g in range(ng):
-                    sim.people.date_clearance[g, to_clear] = np.minimum((sim.t + np.ceil(dur_to_clearance / dt)), sim.people.date_clearance[g,to_clear])
-
-            # Set screening states and dates
-            sim.people.screened[screen_inds] = True
-            sim.people.screens[screen_inds] += 1
-            sim.people.date_screened[screen_inds] = sim.t
-            sim.people.date_next_screen[screen_inds] = sim.t + self.screen_interval/sim['dt']
-
-            # factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
-            # sim.people.flows['screens'] += len(screen_inds) * factor  # Count number of screens given
-            # sim.people.flows['screened'] += len(new_screen) * factor  # Count number of people not already screened
-            # sim.people.total_flows['total_doses'] += len(screen_inds) * factor
-            # sim.people.total_flows['total_vaccinated'] += len(new_screen) * factor
+                    # Determine whether infection persists
+                    persistance_probs = np.full(len(eff_treat_inds), treat_pars['persistance'][state], dtype=hpd.default_float)  # Assign probabilities of infection persisting
+                    to_persist = hpu.binomial_arr(persistance_probs)  # Determine who will have persistant infection
+                    to_clear = eff_treat_inds[~to_persist] # Determine who will clear infection
+                    dur_to_clearance = hpu.sample(**treat_pars['time_to_clearance'][state], size=len(to_clear))
+                    for g in range(ng):
+                        sim.people.date_clearance[g, to_clear] = np.minimum((sim.t + np.ceil(dur_to_clearance / dt)), sim.people.date_clearance[g,to_clear])
 
         return screen_inds
+
 
     def find_test_pos(self, screen_inds, pars, sim, states, ng):
         ''' Extract indices of those who will return a positive result from their screen '''
@@ -1003,7 +1001,8 @@ class Screening(Intervention):
 
         # remove duplicates from list
         screen_pos = np.array(list(set(screen_pos)))
-        screen_pos = screen_inds[screen_pos]
+        if len(screen_pos)>0:
+            screen_pos = screen_inds[screen_pos]
 
         return screen_pos
 

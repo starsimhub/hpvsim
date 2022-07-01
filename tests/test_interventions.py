@@ -134,8 +134,8 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     pars = {
         'pop_size': n_agents,
         'n_years': 60,
-        'burnin': 5,
-        'start': 1995,
+        'burnin': 25,
+        'start': 1975,
         'genotypes': [hpv16, hpv18],
         'pop_scale' : 25.2e6 / n_agents,
         'dt': .2,
@@ -150,59 +150,59 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     cyto_screening = hpv.Screening(primary_screen_test='cytology', treatment='ablative', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
-    sim = hpv.Sim(pars=pars, interventions = [hpv_screening])
-    sim.run()
-    sim.plot()
-    return sim
+    # sim = hpv.Sim(pars=pars, interventions = [hpv_screening])
+    # sim.run()
+    # sim.plot()
+    # return sim
 
-    # n_runs = 3
-    #
-    # # Define the scenarios
-    # scenarios = {
-    #     'no_screening_rsa': {
-    #         'name': 'No screening',
-    #         'pars': {
-    #             'location': 'south africa'
-    #         }
-    #     },
-    #     'hpv_screening': {
-    #         'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-    #         'pars': {
-    #             'interventions': [hpv_screening],
-    #             'location': 'south africa'
-    #         }
-    #     },
-    #     'cyto_screening': {
-    #         'name': f'Screen {screen_prop * 100}% of 30-50y women with {cyto_screening.label}',
-    #         'pars': {
-    #             'interventions': [cyto_screening],
-    #             'location': 'south africa'
-    #         }
-    #     },
-    #
-    # }
-    #
-    # metapars = {'n_runs': n_runs}
-    #
-    # scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
-    # scens.run(verbose=verbose, debug=debug)
-    # scens.compare()
-    #
-    # if do_plot:
-    #     to_plot = {
-    #         'HPV prevalence': [
-    #             'total_hpv_prevalence',
-    #         ],
-    #         'CIN prevalence': [
-    #             'total_cin_prevalence',
-    #         ],
-    #         'Cancers per 100,000 women': [
-    #             'total_cancer_incidence',
-    #         ],
-    #     }
-    #     scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
-    #
-    # return scens
+    sim = hpv.Sim(pars=pars)
+    n_runs = 1
+
+    # Define the scenarios
+    scenarios = {
+        'no_screening_rsa': {
+            'name': 'No screening',
+            'pars': {
+                'location': 'south africa'
+            }
+        },
+        'hpv_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+            'pars': {
+                'interventions': [hpv_screening],
+                'location': 'south africa'
+            }
+        },
+        'cyto_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {cyto_screening.label}',
+            'pars': {
+                'interventions': [cyto_screening],
+                'location': 'south africa'
+            }
+        },
+    }
+
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV incidence': [
+                'total_hpv_incidence',
+            ],
+            'CIN prevalence': [
+                'total_cin_prevalence',
+            ],
+            'Cancers per 100,000 women': [
+                'total_cancer_incidence',
+            ],
+        }
+        scens.plot(to_plot=to_plot)
+
+    return scens
 
 
 #%% Run as a script
