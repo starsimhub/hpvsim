@@ -937,7 +937,7 @@ class Screening(Intervention):
             ng = sim['n_genotypes']
             dt = sim['dt']
             screen_states = ['infectious', 'cin1', 'cin2', 'cin3']
-            treat_states = ['cin2', 'cin3']
+            treat_states = ['cin1', 'cin2', 'cin3']
             primary_screen_pars = self.p['primary']
             triage_screen_pars = self.p['triage']
             treat_pars = self.p['treatment']
@@ -958,11 +958,13 @@ class Screening(Intervention):
                     screen_pos = triage_pos
 
                 # Step 3, Determine who is gets treated
-                treat_eligible = sum([sim.people[state] for state in treat_states]).astype(bool).any(axis=0) # Determine who is eligible for treatment (i.e., those with HSILs)
-                treat_eligible_and_screened = screen_pos[treat_eligible[screen_pos]] # Screened and eligible for treatment
-                treat_probs = np.full(len(treat_eligible_and_screened), self.compliance, dtype=hpd.default_float) # Assign everyone who's screened and eligible for treatment a probability of compliance
+                # treat_eligible = sum([sim.people[state] for state in treat_states]).astype(bool).any(axis=0) # Determine who is eligible for treatment (i.e., those with HSILs)
+                # treat_eligible_and_screened = screen_pos[treat_eligible[screen_pos]] # Screened and eligible for treatment
+                # treat_probs = np.full(len(treat_eligible_and_screened), self.compliance, dtype=hpd.default_float) # Assign everyone who's screened and eligible for treatment a probability of compliance
+                treat_probs = np.full(len(screen_pos), self.compliance, dtype=hpd.default_float)
                 to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
-                treat_inds = treat_eligible_and_screened[to_treat] # Indices of those who get treated
+                # treat_inds = treat_eligible_and_screened[to_treat] # Indices of those who get treated
+                treat_inds = screen_pos[to_treat]  # Indices of those who get treated
                 sim.people.treated[treat_inds] = True
                 sim.people.date_treated[treat_inds] = sim.t
 
@@ -975,12 +977,18 @@ class Screening(Intervention):
                     eff_treat_inds = treat_inds[to_eff_treat]
                     sim.people[state][:, eff_treat_inds] = False # People who get treated have their CINs removed
 
-                    # Determine whether infection persists
-                    persistance_probs = np.full(len(eff_treat_inds), treat_pars['persistance'][state], dtype=hpd.default_float)  # Assign probabilities of infection persisting
-                    to_persist = hpu.binomial_arr(persistance_probs)  # Determine who will have persistant infection
-                    to_clear = eff_treat_inds[~to_persist] # Determine who will clear infection
-                    dur_to_clearance = hpu.sample(**treat_pars['time_to_clearance'][state], size=len(to_clear))
                     for g in range(ng):
+                        # Determine whether infection persists
+                        inf_inds = hpu.true(sim.people['infectious'][g, eff_treat_inds])
+                        inf_inds = eff_treat_inds[inf_inds]
+                        persistance_probs = np.full(len(inf_inds), treat_pars['persistance'][sim['genotype_map'][g]],
+                                                    dtype=hpd.default_float)  # Assign probabilities of infection persisting
+                        to_persist = hpu.binomial_arr(persistance_probs)  # Determine who will have persistant infection, give them new prognoses
+
+                        persist_inds = inf_inds[to_persist]
+                        # Clear infection for women who clear
+                        to_clear = inf_inds[~to_persist]  # Determine who will clear infection
+                        dur_to_clearance = hpu.sample(**treat_pars['time_to_clearance'], size=len(to_clear))
                         sim.people.date_clearance[g, to_clear] = np.minimum((sim.t + np.ceil(dur_to_clearance / dt)), sim.people.date_clearance[g,to_clear])
 
         return screen_inds

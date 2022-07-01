@@ -1174,28 +1174,37 @@ def get_treatment_pars(screen=None):
                 cin2=1,
                 cin3=1,
             ),
-            time_to_clearance=dict(
-                cin2=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
-                cin3=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
-            ),
+            time_to_clearance=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
             persistance=dict(
-                cin2=0.2, # PLACEHOLDER: Probability of persistance
-                cin3=0.3, # PLACEHOLDER: Probability of persistance
+                hpv16=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv18=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv31=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv33=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv45=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv52=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv58=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv6=0.25, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv11=0.25, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
             )
         ),
 
         ablative=dict(
             efficacy=dict(
-                cin2=1,
-                cin3=1,
+                cin1=0.81,
+                cin2=0.81,
+                cin3=0.81,
             ),
-            time_to_clearance=dict(
-                cin2=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-                cin3=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-            ),
+            time_to_clearance=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
             persistance=dict(
-                cin2=0.2,  # PLACEHOLDER: Probability of persistance
-                cin3=0.3,  # PLACEHOLDER: Probability of persistance
+                hpv16=0.66,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv18=0.66,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv31=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv33=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv45=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv52=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv58=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv6=0.25,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv11=0.25,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
             )
         ),
     )
