@@ -62,7 +62,8 @@ class PeopleMeta(sc.prettyobj):
             'dead_cancer',
             'dead_other',  # Dead from all other causes
             'vaccinated',
-            'screened'
+            'screened',
+            'treated',
         ]
 
         # Immune states, by genotype/vaccine

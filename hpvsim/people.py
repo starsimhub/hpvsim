@@ -74,7 +74,7 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key == 'dead_other' or key == 'vaccinated' or key == 'screened': # ALl false at the beginning
+            if key in ['dead_other', 'vaccinated', 'screened', 'treated']: # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
             elif key == 'alive':  # All true at the beginning
                 self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
@@ -85,7 +85,7 @@ class People(hpb.BasePeople):
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
-            if key == 'date_dead_other' or key == 'date_vaccinated' or key == 'date_screened' or key == 'date_next_screen':
+            if key in ['date_dead_other', 'date_vaccinated','date_screened', 'date_next_screen', 'date_treated']:
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
             else:
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)

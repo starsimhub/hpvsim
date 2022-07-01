@@ -1171,30 +1171,31 @@ def get_treatment_pars(screen=None):
     pars = dict(
         excisional = dict(
             efficacy=dict(
-                infectious=1,
-                cin1=1,
                 cin2=1,
                 cin3=1,
             ),
             time_to_clearance=dict(
-                infectious=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,
-                cin1=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
                 cin2=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
                 cin3=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
+            ),
+            persistance=dict(
+                cin2=0.2, # PLACEHOLDER: Probability of persistance
+                cin3=0.3, # PLACEHOLDER: Probability of persistance
             )
         ),
+
         ablative=dict(
             efficacy=dict(
-                infectious=1,
-                cin1=1,
                 cin2=1,
                 cin3=1,
             ),
             time_to_clearance=dict(
-                infectious=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,
-                cin1=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
                 cin2=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
                 cin3=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+            ),
+            persistance=dict(
+                cin2=0.2,  # PLACEHOLDER: Probability of persistance
+                cin3=0.3,  # PLACEHOLDER: Probability of persistance
             )
         ),
     )
