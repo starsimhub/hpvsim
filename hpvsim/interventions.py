@@ -954,7 +954,7 @@ class Screening(Intervention):
                     triage_probs.fill(self.compliance)
                     triage_inds = hpu.true(hpu.binomial_arr(triage_probs))
                     triage_inds = screen_pos[triage_inds]
-                    triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, states, ng)
+                    triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, screen_states, ng)
                     screen_pos = triage_pos
 
                 # Step 3, Determine who is gets treated
