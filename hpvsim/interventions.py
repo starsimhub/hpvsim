@@ -995,6 +995,14 @@ class Screening(Intervention):
                     persist_inds = inf_inds[to_persist]
 
                     dur_hpv = (sim.t - sim.people.date_infectious[g,persist_inds])*sim['dt']
+                    prog_keys = ['rel_cin1_prob', 'rel_cin2_prob', 'rel_cin3_prob', 'rel_cancer_prob']
+                    genotype_pars = sim['genotype_pars']
+                    genotype_map = sim['genotype_map']
+                    durpars = genotype_pars[genotype_map[g]]['dur']
+                    progpars = sim['prognoses']
+                    cinprobs = {k: sim[k] * genotype_pars[genotype_map[g]][k] for k in prog_keys}
+
+                    hpu.set_prognoses(sim.people, g, dur_hpv, progpars, cinprobs, durpars, sim['dt'])
 
                     # Clear infection for women who clear
                     to_clear = inf_inds[~to_persist]  # Determine who will clear infection
