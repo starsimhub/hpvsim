@@ -998,12 +998,9 @@ class Screening(Intervention):
 
                     # Clear infection for women who clear
                     to_clear = inf_inds[~to_persist]  # Determine who will clear infection
-                    dur_to_clearance = hpu.sample(**treat_pars['time_to_clearance'], size=len(to_clear))
-                    sim.people.date_clearance[g, to_clear] = np.minimum((sim.t + np.ceil(dur_to_clearance / dt)),
-                                                                        sim.people.date_clearance[g, to_clear])
-
-                    # update dur_disease for those who are successfully treated and who clear infection
+                    sim.people['infectious'][g, to_clear] = False  # People whose HPV clears
                     sim.people.dur_disease[g, to_clear] = (sim.t - sim.people.date_infectious[g, to_clear]) * sim['dt']
+                    hpi.update_peak_immunity(sim.people, to_clear, imm_pars=sim.pars, imm_source=g)
 
         return screen_inds
 
