@@ -987,28 +987,23 @@ class Screening(Intervention):
                     # Determine whether infection persists
                     inf_inds = hpu.true(sim.people['infectious'][g, successfully_treated])
                     inf_inds = successfully_treated[inf_inds]
-                    persistance_probs = np.full(len(inf_inds), treat_pars['persistance'][sim['genotype_map'][g]],
+                    persistence_probs = np.full(len(inf_inds), treat_pars['persistence'][sim['genotype_map'][g]],
                                                 dtype=hpd.default_float)  # Assign probabilities of infection persisting
-                    to_persist = hpu.binomial_arr(
-                        persistance_probs)  # Determine who will have persistant infection, give them new prognoses
 
+                    # Determine who will have persistent infection, give them new prognoses
+                    to_persist = hpu.binomial_arr(persistence_probs)
                     persist_inds = inf_inds[to_persist]
-
                     dur_hpv = (sim.t - sim.people.date_infectious[g,persist_inds])*sim['dt']
-                    prog_keys = ['rel_cin1_prob', 'rel_cin2_prob', 'rel_cin3_prob', 'rel_cancer_prob']
-                    genotype_pars = sim['genotype_pars']
-                    genotype_map = sim['genotype_map']
-                    durpars = genotype_pars[genotype_map[g]]['dur']
-                    progpars = sim['prognoses']
-                    cinprobs = {k: sim[k] * genotype_pars[genotype_map[g]][k] for k in prog_keys}
-
-                    hpu.set_prognoses(sim.people, g, dur_hpv, progpars, cinprobs, durpars, sim['dt'])
+                    hpu.set_prognoses(sim.people, persist_inds, g, dur_hpv)
 
                     # Clear infection for women who clear
                     to_clear = inf_inds[~to_persist]  # Determine who will clear infection
                     dur_to_clearance = hpu.sample(**treat_pars['time_to_clearance'], size=len(to_clear))
                     sim.people.date_clearance[g, to_clear] = np.minimum((sim.t + np.ceil(dur_to_clearance / dt)),
                                                                         sim.people.date_clearance[g, to_clear])
+
+                    # update dur_disease for those who are successfully treated and who clear infection
+                    sim.people.dur_disease[g, to_clear] = (sim.t - sim.people.date_infectious[g, to_clear]) * sim['dt']
 
         return screen_inds
 

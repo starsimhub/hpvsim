@@ -1175,7 +1175,7 @@ def get_treatment_pars(screen=None):
                 cin3=1,
             ),
             time_to_clearance=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-            persistance=dict(
+            persistence=dict(
                 hpv16=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
                 hpv18=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
                 hpv31=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
@@ -1195,7 +1195,7 @@ def get_treatment_pars(screen=None):
                 cin3=0.81,
             ),
             time_to_clearance=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-            persistance=dict(
+            persistence=dict(
                 hpv16=0.66,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
                 hpv18=0.66,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
                 hpv31=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196

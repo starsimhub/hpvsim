@@ -532,7 +532,6 @@ class People(hpb.BasePeople):
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
             this_dur = hpu.sample(**durpars['none'], size=len(inds))  # Duration of infection without dysplasia in years
-            self.dur_hpv[g, inds] = this_dur  # Set the initial duration of infection as the length of the period without dysplasia - this is then extended for those who progress
             this_dur_f = self.dur_hpv[g, inds[self.is_female[inds]]]
         else:
             if len(dur) != len(inds):
@@ -540,7 +539,9 @@ class People(hpb.BasePeople):
                 raise ValueError(errormsg)
             this_dur    = dur
             this_dur_f  = dur[self.is_female[inds]]
-            self.dur_hpv[g, inds] = this_dur  # Set the initial duration of infection as the length of the period without dysplasia - this is then extended for those who progress
+
+        self.dur_hpv[g, inds] = this_dur  # Set the duration of infection
+        self.dur_disease[g, inds] = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
 
         # Start calculating the probabilities of progressing through disease stages
         # We can skip all this if there are no females; males are updated below
@@ -574,7 +575,7 @@ class People(hpb.BasePeople):
 
             # CASE 2.1: Mild dysplasia regresses and infection clears
             self.date_clearance[g, no_cin2_inds] = np.fmax(self.date_clearance[g, no_cin2_inds],self.date_cin1[g, no_cin2_inds] + np.ceil(dur_cin1[~is_cin2] / dt))
-            self.dur_hpv[g, cin1_inds] += dur_cin1 # Duration of HPV is the sum of the period without dysplasia and the period with CIN1
+            self.dur_disease[g, cin1_inds] += dur_cin1 # Duration of disease is the sum of the period without dysplasia and the period with CIN1
 
             # CASE 2.2: Mild dysplasia progresses to moderate (CIN1 to CIN2)
             self.dur_cin12cin2[g, cin2_inds] = dur_cin1[is_cin2]
@@ -592,7 +593,7 @@ class People(hpb.BasePeople):
 
             # CASE 2.2.1: Moderate dysplasia regresses and the virus clears
             self.date_clearance[g, no_cin3_inds] = np.fmax(self.date_clearance[g, no_cin3_inds], self.date_cin2[g, no_cin3_inds] + np.ceil(dur_cin2[~is_cin3] / dt) ) # Date they clear CIN2
-            self.dur_hpv[g, cin2_inds] += dur_cin2 # Duration of HPV is the sum of the period without dysplasia and the period with CIN
+            self.dur_disease[g, cin2_inds] += dur_cin2 # Duration of disease is the sum of the period without dysplasia and the period with CIN
 
             # Case 2.2.2: CIN2 with progression to CIN3
             self.dur_cin22cin3[g, cin3_inds] = dur_cin2[is_cin3]
@@ -609,7 +610,7 @@ class People(hpb.BasePeople):
 
             # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
             self.date_clearance[g, cin3_inds] = np.fmax(self.date_clearance[g, cin3_inds],self.date_cin3[g, cin3_inds] + np.ceil(dur_cin3 / dt))  # HPV is cleared
-            self.dur_hpv[g, cin3_inds] += dur_cin3  # Duration of HPV is the sum of the period without dysplasia and the period with CIN
+            self.dur_disease[g, cin3_inds] += dur_cin3  # Duration of disease is the sum of the period without dysplasia and the period with CIN
 
             # Case 2.2.2.1: Severe dysplasia regresses
             self.dur_cin2cancer[g, cancer_inds] = dur_cin3[is_cancer]
@@ -619,6 +620,7 @@ class People(hpb.BasePeople):
 
             # Record eventual deaths from cancer (NB, assuming no survival without treatment)
             dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))
+            self.dur_disease[g, cancer_inds] += dur_cancer  # Duration of disease is the sum of the period without dysplasia and the period with CIN and period with cancer
             self.date_dead_cancer[g, cancer_inds]  = self.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
 
         if len(m_inds)>0:

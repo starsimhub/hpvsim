@@ -158,7 +158,14 @@ def find_contacts(p1, p2, inds): # pragma: no cover
     return pairing_partners
 
 
-def set_prognoses(people, inds, g, dur_hpv, progpars, cinprobs, durpars, dt):
+def set_prognoses(people, inds, g, dur_hpv):
+    dt = people.pars['dt']
+    prog_keys = ['rel_cin1_prob', 'rel_cin2_prob', 'rel_cin3_prob', 'rel_cancer_prob']
+    genotype_pars = people.pars['genotype_pars']
+    genotype_map = people.pars['genotype_map']
+    durpars = genotype_pars[genotype_map[g]]['dur']
+    progpars = people.pars['prognoses']
+    cinprobs = {k: people.pars[k] * genotype_pars[genotype_map[g]][k] for k in prog_keys}
     dur_inds = np.digitize(dur_hpv, progpars['duration_cutoffs']) - 1  # Convert durations to indices
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
@@ -189,7 +196,7 @@ def set_prognoses(people, inds, g, dur_hpv, progpars, cinprobs, durpars, dt):
 
     # CASE 2.1: Mild dysplasia regresses and infection clears
     people.date_clearance[g, no_cin2_inds] = np.fmax(people.date_clearance[g, no_cin2_inds],
-                                                   people.date_cin1[g, no_cin2_inds] + np.ceil(dur_cin1[~is_cin2] / dt))
+                                                   people.date_cin1[g, no_cin2_inds] + np.ceil(dur_cin1[~is_cin2] / people.pars['dt']))
     people.dur_hpv[
         g, cin1_inds] += dur_cin1  # Duration of HPV is the sum of the period without dysplasia and the period with CIN1
 
