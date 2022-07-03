@@ -935,7 +935,6 @@ class Screening(Intervention):
 
             # Pull our parameters that will be used below
             ng = sim['n_genotypes']
-            dt = sim['dt']
             screen_states = ['infectious', 'cin1', 'cin2', 'cin3']
             treat_states = ['cin1', 'cin2', 'cin3']
             primary_screen_pars = self.p['primary']
@@ -958,12 +957,8 @@ class Screening(Intervention):
                     screen_pos = triage_pos
 
                 # Step 3, Determine who is gets treated
-                # treat_eligible = sum([sim.people[state] for state in treat_states]).astype(bool).any(axis=0) # Determine who is eligible for treatment (i.e., those with HSILs)
-                # treat_eligible_and_screened = screen_pos[treat_eligible[screen_pos]] # Screened and eligible for treatment
-                # treat_probs = np.full(len(treat_eligible_and_screened), self.compliance, dtype=hpd.default_float) # Assign everyone who's screened and eligible for treatment a probability of compliance
                 treat_probs = np.full(len(screen_pos), self.compliance, dtype=hpd.default_float)
                 to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
-                # treat_inds = treat_eligible_and_screened[to_treat] # Indices of those who get treated
                 treat_inds = screen_pos[to_treat]  # Indices of those who get treated
                 sim.people.treated[treat_inds] = True
                 sim.people.date_treated[treat_inds] = sim.t
@@ -1011,7 +1006,7 @@ class Screening(Intervention):
         for state in states:
             for g in range(ng):
                 screen_probs = np.zeros(len(screen_inds))
-                tp_inds = hpu.true(sim.people[state][g, screen_inds]) # TODO: hmm this isn't exactly right
+                tp_inds = hpu.true(sim.people[state][g, screen_inds])
                 tn_inds = hpu.false(sim.people[state][g, screen_inds])
                 screen_probs[tp_inds] = pars['sensitivity'][state][g]
                 screen_probs[tn_inds] = 1 - pars['specificity'][state][g]

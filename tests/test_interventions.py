@@ -160,19 +160,19 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     # Define the scenarios
     scenarios = {
-        'no_screening_rsa': {
-            'name': 'No screening',
-            'pars': {
-                'location': 'south africa'
-            }
-        },
-        'hpv_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-            'pars': {
-                'interventions': [hpv_screening],
-                'location': 'south africa'
-            }
-        },
+        # 'no_screening_rsa': {
+        #     'name': 'No screening',
+        #     'pars': {
+        #         'location': 'south africa'
+        #     }
+        # },
+        # 'hpv_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_screening],
+        #         'location': 'south africa'
+        #     }
+        # },
         'cyto_screening': {
             'name': f'Screen {screen_prop * 100}% of 30-50y women with {cyto_screening.label}',
             'pars': {
