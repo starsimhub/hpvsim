@@ -1003,6 +1003,7 @@ def get_screen_pars(screen=None):
                     hpv11=1,
                 ),
             ),
+            inadequacy=0,
         ),
 
         hpv1618 = dict(
@@ -1053,6 +1054,7 @@ def get_screen_pars(screen=None):
                 ),
             ),
             specificity=None,
+            inadequacy=0,
         ),
 
         cytology = dict(
@@ -1080,26 +1082,26 @@ def get_screen_pars(screen=None):
                     hpv11=0,
                 ),
                 cin2=dict(
-                    hpv16=.9,
-                    hpv18=.9,
-                    hpv31=.9,
-                    hpv33=.9,
-                    hpv45=.9,
-                    hpv52=.9,
-                    hpv58=.9,
-                    hpv6=.9,
-                    hpv11=.9,
+                    hpv16=.8,
+                    hpv18=.8,
+                    hpv31=.8,
+                    hpv33=.8,
+                    hpv45=.8,
+                    hpv52=.8,
+                    hpv58=.8,
+                    hpv6=.8,
+                    hpv11=.8,
                 ),
                 cin3=dict(
-                    hpv16=0.95,
-                    hpv18=0.95,
-                    hpv31=0.95,
-                    hpv33=0.95,
-                    hpv45=0.95,
-                    hpv52=0.95,
-                    hpv58=0.95,
-                    hpv6=0.95,
-                    hpv11=0.95,
+                    hpv16=0.9,
+                    hpv18=0.9,
+                    hpv31=0.9,
+                    hpv33=0.9,
+                    hpv45=0.9,
+                    hpv52=0.9,
+                    hpv58=0.9,
+                    hpv6=0.9,
+                    hpv11=0.9,
                 ),
             ),
             specificity=dict(
@@ -1148,6 +1150,7 @@ def get_screen_pars(screen=None):
                     hpv11=1,
                 ),
             ),
+            inadequacy=0.07,
         ),
 
         via=dict(
@@ -1171,30 +1174,38 @@ def get_treatment_pars(screen=None):
     pars = dict(
         excisional = dict(
             efficacy=dict(
-                infectious=1,
-                cin1=1,
                 cin2=1,
                 cin3=1,
             ),
-            time_to_clearance=dict(
-                infectious=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,
-                cin1=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
-                cin2=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
-                cin3=dict(dist='lognormal', par1=1.0, par2=1.0), # PLACEHOLDERS; INSERT SOURCE,,
+            persistence=dict(
+                hpv16=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv18=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv31=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv33=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv45=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv52=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv58=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv6=0.25, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv11=0.25, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
             )
         ),
+
         ablative=dict(
             efficacy=dict(
-                infectious=1,
-                cin1=1,
-                cin2=1,
-                cin3=1,
+                cin1=0.81,
+                cin2=0.81,
+                cin3=0.81,
             ),
-            time_to_clearance=dict(
-                infectious=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,
-                cin1=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-                cin2=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
-                cin3=dict(dist='lognormal', par1=0.5, par2=1.0),  # PLACEHOLDERS; INSERT SOURCE,,
+            persistence=dict(
+                hpv16=0.66,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv18=0.66,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv31=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv33=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv45=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv52=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv58=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv6=0.25,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
+                hpv11=0.25,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
             )
         ),
     )

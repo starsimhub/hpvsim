@@ -142,7 +142,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     }
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
-    screen_prop = .1
+    screen_prop = .5
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='ablative', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
@@ -150,11 +150,13 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     cyto_screening = hpv.Screening(primary_screen_test='cytology', treatment='ablative', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
-    sim = hpv.Sim(pars=pars,
+    # sim = hpv.Sim(pars=pars, interventions = [hpv_screening])
+    # sim.run()
+    # sim.plot()
+    # return sim
 
-                  )
-
-    n_runs = 3
+    sim = hpv.Sim(pars=pars)
+    n_runs = 1
 
     # Define the scenarios
     scenarios = {
@@ -178,7 +180,6 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                 'location': 'south africa'
             }
         },
-
     }
 
     metapars = {'n_runs': n_runs}
@@ -199,7 +200,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                 'total_cancer_incidence',
             ],
         }
-        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
+        scens.plot(to_plot=to_plot)
 
     return scens
 
