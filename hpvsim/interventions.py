@@ -373,11 +373,7 @@ class dynamic_pars(Intervention):
         return
 
 
-<<<<<<< HEAD
-__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_num']
-=======
-__all__ += ['BaseVaccination', 'vaccinate_prob', 'Screening']
->>>>>>> main
+__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_num', 'Screening']
 
 class BaseVaccination(Intervention):
     '''
@@ -725,7 +721,6 @@ class vaccinate_num(BaseVaccination):
         hpv.Sim(interventions=bivalent).run().plot()
     '''
 
-<<<<<<< HEAD
     def __init__(self, vaccine, num_doses, timepoints=None, dates=None, subtarget=None, spread_doses=False, **kwargs):
         super().__init__(vaccine, **kwargs)  # Initialize the Intervention object
         self.num_doses = num_doses
@@ -878,8 +873,6 @@ class vaccinate_num(BaseVaccination):
 
         vacc_inds = np.concatenate([scheduled, first_dose_inds])
 
-        return vacc_inds
-=======
         return vacc_inds
 
 
@@ -1188,4 +1181,3 @@ class Screening(Intervention):
         ''' Shrink vaccination intervention '''
         obj = super().shrink(in_place=in_place)
         return obj
->>>>>>> main
