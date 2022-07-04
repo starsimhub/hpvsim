@@ -91,10 +91,11 @@ def init_immunity(sim, create=False):
     if sim['immunity'] is None or create:
 
         # Precompute waning - same for all genotypes
-        imm_decay = sc.dcp(sim['imm_decay'])
-        if 'half_life' in imm_decay.keys():
-            imm_decay['half_life'] /= sim['dt']
-        sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
+        if sim['use_waning']:
+            imm_decay = sc.dcp(sim['imm_decay'])
+            if 'half_life' in imm_decay.keys():
+                imm_decay['half_life'] /= sim['dt']
+            sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
 
         sim['immunity_map'] = dict()
         # Firstly, initialize immunity matrix with defaults. These are then overwitten with genotype-specific values below
@@ -155,8 +156,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
             people.peak_imm[imm_source, prior_imm_inds] *= is_seroconvert[has_imm] * boost
 
         if len(no_prior_imm_inds):
-            people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(
-                **imm_pars['imm_init'], size=len(no_prior_imm_inds))
+            people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
 
     else:
         # Vaccination by dose
@@ -174,6 +174,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
 
     base_t = people.t + offset if offset is not None else people.t
     people.t_imm_event[imm_source, inds] = base_t
+
     return
 
 
