@@ -96,8 +96,8 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
+    # people      = test_snapshot()
+    # sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
 
     sc.toc(T)
