@@ -11,7 +11,7 @@ from . import defaults as hpd
 from . import parameters as hppar
 from . import utils as hpu
 from . import immunity as hpi
-# from collections import defaultdict
+from collections import defaultdict
 
 
 #%% Helper functions
@@ -373,7 +373,7 @@ class dynamic_pars(Intervention):
         return
 
 
-__all__ += ['BaseVaccination', 'vaccinate_prob', 'Screening']
+__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_num', 'Screening']
 
 class BaseVaccination(Intervention):
     '''
@@ -381,19 +381,10 @@ class BaseVaccination(Intervention):
 
     This base class implements the mechanism of vaccinating people to modify their immunity.
     It does not implement allocation of the vaccines, which is implemented by derived classes
-    such as `cv.vaccinate`. The idea is that vaccination involves a series of standard operations
-    to modify `cv.People` and applications will likely need to modify the vaccine parameters and
-    test potentially complex allocation strategies. These should be accounted for by:
-
-        - Custom vaccine parameters being passed in as a dictionary to the vaccine intervention
-        - Custom vaccine allocations being implemented by a derived class overloading
-          `BaseVaccination.select_people`. Any additional attributes required to manage the allocation
-          can be defined in the derived class. Refer to `cv.vaccinate` or `cv.vaccinate_sequential` for
-          an example of how to implement this.
+    such as `hpv.vaccinate_num`.
 
     Some quantities are tracked during execution for reporting after running the simulation.
     These are:
-
         - ``doses``:             the number of vaccine doses per person
 
     Args:
@@ -402,21 +393,19 @@ class BaseVaccination(Intervention):
         kwargs  (dict)     : passed to Intervention()
 
     If ``vaccine`` is supplied as a dictionary, it must have the following parameters:
-
         - ``imm_init``:  the initial immunity level (higher = more protection)
-        - ``imm_boost``: how much of a boost being vaccinated on top of a previous dose or natural infection provides
-
 
     See ``parameters.py`` for additional examples of these parameters.
 
-
     '''
+
     def __init__(self, vaccine, label=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.index = None # Index of the vaccine in the sim; set later
         self.label = label # Vaccine label (used as a dict key)
         self.p     = None # Vaccine parameters
-        self.doses = None # Record the number of doses given per person *by this intervention*
+        self.immunity = None # Record the immunity conferred by this vaccine to each of the genotypes in the sim
+        self.immunity_inds = None # Record the indices of genotypes that are targeted by this vaccine
         self._parse_vaccine_pars(vaccine=vaccine) # Populate
         return
 
@@ -438,6 +427,7 @@ class BaseVaccination(Intervention):
             if label in mapping:
                 label = mapping[label]
                 vaccine_pars = sc.mergedicts(genotype_pars[label], dose_pars[label])
+
             else: # pragma: no cover
                 errormsg = f'The selected vaccine "{vaccine}" is not implemented; choices are:\n{sc.pp(choices, doprint=False)}'
                 raise NotImplementedError(errormsg)
@@ -481,7 +471,10 @@ class BaseVaccination(Intervention):
             if key not in self.p:
                 self.p[key] = default_dose_pars[key]
 
-        # Handle genotypes
+        # Set immunity to each genotype in the sim
+        self.immunity = np.array([self.p[k] for k in genotype_labels])
+        self.immunity_inds = hpu.true(self.immunity)
+
         for key in genotype_labels:
             if key not in self.p:
                 if key in default_genotype_pars:
@@ -510,8 +503,7 @@ class BaseVaccination(Intervention):
             immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
             sim['immunity'] = immunity
-            imm_boost = list(sim['imm_boost']) + [self.p['imm_boost']]
-            sim['imm_boost'] = np.array(imm_boost)
+            sc.promotetolist(sim['imm_boost']).append(sc.promotetolist(self.p['imm_boost'])) # This line happens in-place
             sim.people.set_pars(sim.pars)
 
         return
@@ -558,31 +550,27 @@ class BaseVaccination(Intervention):
         # Otherwise, they will receive the 2nd dose boost cumulatively for every subsequent dose.
         # Note, this does not preclude someone from getting additional doses of another vaccine (e.g. a booster)
         vacc_inds = vacc_inds[sim.people.doses[vacc_inds] < self.p['doses']]
-
-        # Extract indices of already-vaccinated people and get indices of newly-vaccinated
-        prior_vacc = hpu.true(sim.people.vaccinated)
-        new_vacc   = np.setdiff1d(vacc_inds, prior_vacc)
+        first_vacc_inds = vacc_inds[~sim.people.vaccinated[vacc_inds]]
 
         if len(vacc_inds):
-
-            sim.people.vaccinated[vacc_inds] = True
-            sim.people.vaccine_source[vacc_inds] = self.index
+            sim.people.vaccinated[first_vacc_inds] = True #
+            sim.people.vaccine_source[first_vacc_inds] = self.index
             sim.people.doses[vacc_inds] += 1
             sim.people.date_vaccinated[vacc_inds] = sim.t
             imm_source = len(sim['genotype_map']) + self.index
             hpi.update_peak_immunity(sim.people, vacc_inds, self.p, imm_source, infection=False)
 
             factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
-            sim.people.flows['doses']      += len(vacc_inds)*factor # Count number of doses given
-            sim.people.flows['vaccinated'] += len(new_vacc)*factor # Count number of people not already vaccinated given doses
-            sim.people.total_flows['total_doses'] += len(vacc_inds)*factor
-            sim.people.total_flows['total_vaccinated'] += len(new_vacc)*factor
+            idx = int(sim.t / sim.resfreq)
+            sim.results['new_vaccinated'][self.immunity_inds, idx] += len(first_vacc_inds)
+            sim.results['new_total_vaccinated'][idx] += len(first_vacc_inds)
+            sim.results['new_doses'][idx] += len(vacc_inds)
+
         return vacc_inds
 
 
     def apply(self, sim):
         ''' Perform vaccination each timestep '''
-
         inds = self.select_people(sim)
         if len(inds):
             inds = self.vaccinate(sim, inds)
@@ -599,55 +587,29 @@ class BaseVaccination(Intervention):
         return obj
 
 
-def check_doses(doses, interval):
-    ''' Check that doses and intervals are supplied in correct formats '''
+def check_doses(doses, interval, imm_boost):
+    ''' Check that doses, intervals, and boost factors are supplied in correct formats '''
 
-    # First check that they're both numbers
+    # First check types
+    if interval is not None:
+        if sc.checktype(interval, 'num'):
+            interval = sc.promotetolist(interval)
+        if sc.checktype(imm_boost, 'num'):
+            imm_boost = sc.promotetolist(imm_boost)
+
     if not sc.checktype(doses, int):
-        raise ValueError(f'Doses must be an integer, not {doses}.')
-    if interval is not None and not sc.isnumber(interval):
-        errormsg = f"Can't understand the dosing interval given by '{interval}'. Dosing interval should be a number."
-        raise ValueError(errormsg)
+        raise ValueError(f'Doses must be an integer or array/list of integers, not {doses}.')
 
     # Now check that they're compatible
-    if doses == 1 and interval is not None:
-        raise ValueError("Can't use dosing intervals for vaccines with only one dose.")
-    elif doses == 2 and interval is None:
-        raise ValueError('Must specify a dosing interval if using a vaccine with more than one dose.')
-    elif doses > 2:
-        raise NotImplementedError('Scheduling three or more doses not yet supported; use a booster vaccine instead')
+    if doses == 1 and ((interval is not None) or (imm_boost is not None)):
+        raise ValueError("Can't use dosing intervals or boosting factors for vaccines with only one dose.")
+    elif doses > 1:
+        if interval is None or imm_boost is None:
+            raise ValueError('Must specify a dosing interval and boosting factor if using a vaccine with more than one dose.')
+        elif (len(interval) != doses-1) or (len(interval) != len(imm_boost)):
+            raise ValueError(f'Dosing interval and imm_boost must both be length {doses-1}, not {len(interval)} and {len(imm_boost)}.')
 
-    return
-
-
-def process_doses(num_doses, sim):
-    ''' Handle different types of dose data'''
-    if sc.isnumber(num_doses):
-        num_people = num_doses
-    elif callable(num_doses):
-        num_people = num_doses(sim)
-    elif sim.t in num_doses:
-        num_people = num_doses[sim.t]
-    else:
-        num_people = 0
-    return num_people
-
-
-def process_sequence(sequence, sim):
-    ''' Handle different types of prioritization sequence for vaccination '''
-    if callable(sequence):
-        sequence = sequence(sim.people)
-    elif sequence == 'age':
-        sequence = np.argsort(-sim.people.age)
-    elif sequence is None:
-        sequence = np.random.permutation(sim.n)
-    elif sc.checktype(sequence, 'arraylike'):
-        sequence = sc.promotetoarray(sequence)
-    else:
-        errormsg = f'Unable to interpret sequence {type(sequence)}: must be None, "age", callable, or an array'
-        raise TypeError(errormsg)
-    return sequence
-
+    return doses, interval, imm_boost
 
 
 class vaccinate_prob(BaseVaccination):
@@ -660,16 +622,15 @@ class vaccinate_prob(BaseVaccination):
     Args:
         vaccine (dict/str): which vaccine to use; see below for dict parameters
         label        (str): if vaccine is supplied as a dict, the name of the vaccine
-        timepoints   (int/arr): the day or array of days to apply the interventions
+        timepoints   (int/arr): the year or array of timepoints to apply the interventions
         prob       (float): probability of being vaccinated (i.e., fraction of the population)
-        subtarget   (dict): subtarget intervention to people with particular indices (see test_num() for details)
+        subtarget   (dict): subtarget intervention to people with particular indices
         kwargs      (dict): passed to Intervention()
-
 
     **Example**::
 
-        pfizer = cv.vaccinate_prob(vaccine='pfizer', days=30, prob=0.7)
-        cv.Sim(interventions=pfizer, use_waning=True).run().plot()
+        bivalent = hpv.vaccinate_prob(vaccine='bivalent', timepoints='2020', prob=0.7)
+        hpv.Sim(interventions=bivalent).run().plot()
     '''
     def __init__(self, vaccine, timepoints, label=None, prob=None, subtarget=None, **kwargs) -> object:
         super().__init__(vaccine,label=label,**kwargs) # Initialize the Intervention object
@@ -686,8 +647,9 @@ class vaccinate_prob(BaseVaccination):
     def initialize(self, sim):
         super().initialize(sim)
         self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
-        self.second_dose_days     = [None]*sim.npts # People who get second dose (if relevant)
-        check_doses(self.p['doses'], self.p['interval'])
+        self.second_dose_timepoints = [None]*sim.npts # People who get second dose (if relevant)
+        self.third_dose_timepoints  = [None]*sim.npts # People who get second dose (if relevant)
+        self.p['doses'], self.p['interval'], self.p['imm_boost'] = check_doses(self.p['doses'], self.p['interval'], self.p['imm_boost'])
         return
 
 
@@ -717,14 +679,199 @@ class vaccinate_prob(BaseVaccination):
                 if len(vacc_inds):
                     if self.p.interval is not None:
                         # Schedule the doses
-                        next_dose_days = sim.t + self.p.interval
-                        if next_dose_days < sim['n_days']:
-                            self.second_dose_days[next_dose_days] = vacc_inds
+                        second_dose_timepoints = sim.t + int(self.p.interval[0]/sim['dt'])
+                        if second_dose_timepoints < sim.npts:
+                            self.second_dose_timepoints[second_dose_timepoints] = vacc_inds
+                        if self.p.doses==3:
+                            third_dose_timepoints = sim.t + int(self.p.interval[1] / sim['dt'])
+                            if third_dose_timepoints < sim.npts:
+                                self.third_dose_timepoints[third_dose_timepoints] = vacc_inds
 
-            # Also, if appropriate, vaccinate people with their second dose
-            vacc_inds_dose2 = self.second_dose_days[sim.t]
+            # Also, if appropriate, vaccinate people with their second and third doses
+            vacc_inds_dose2 = self.second_dose_timepoints[sim.t]
+            vacc_inds_dose3 = self.third_dose_timepoints[sim.t]
             if vacc_inds_dose2 is not None:
                 vacc_inds = np.concatenate((vacc_inds, vacc_inds_dose2), axis=None)
+            if vacc_inds_dose3 is not None:
+                vacc_inds = np.concatenate((vacc_inds, vacc_inds_dose3), axis=None)
+
+        return vacc_inds
+
+
+class vaccinate_num(BaseVaccination):
+    '''
+    This vaccine intervention allocates vaccines in a pre-computed order of
+    distribution, at a specified rate of doses per day.
+
+    Args:
+        vaccine (dict/str): which vaccine to use; see below for dict parameters
+        label        (str): if vaccine is supplied as a dict, the name of the vaccine
+        subtarget  (dict): subtarget intervention to people with particular indices
+        num_doses: Specify the number of doses per timepoint. This can take three forms
+            - A scalar number of doses per timepoint
+            - A dict keyed by year/date with the number of doses e.g. ``{2010:10000, '2021-05-01':20000}``.
+              Any dates are converted to simulation days in `initialize()` which will also copy the
+              dictionary passed in.
+            - A callable that takes in a ``hpv.Sim`` and returns a scalar number of doses. For example,
+              ``def doses(sim): return 100 if sim.t > 10 else 0`` would be suitable
+        **kwargs: Additional arguments passed to ``hpv.BaseVaccination``
+
+    **Example**::
+        bivalent = hpv.vaccinate_num(vaccine='bivalent', num_doses=1e6, timepoints=2020)
+        hpv.Sim(interventions=bivalent).run().plot()
+    '''
+
+    def __init__(self, vaccine, num_doses, timepoints=None, dates=None, subtarget=None, spread_doses=False, **kwargs):
+        super().__init__(vaccine, **kwargs)  # Initialize the Intervention object
+        self.num_doses = num_doses
+        self.timepoints = timepoints
+        self.dates = dates
+        self.subtarget = subtarget
+        self.spread_doses = spread_doses
+        self._scheduled_second_doses = defaultdict(set)
+        self._scheduled_third_doses = defaultdict(set)
+        return
+
+
+    def initialize(self, sim):
+
+        super().initialize(sim)
+
+        # Firstly, translate the timepoints and dates to consistent formats
+        if self.timepoints is None:
+            if self.dates is not None: # Try to get timepoints from dates, if supplied
+                self.timepoints, self.dates = sim.get_t(self.dates, return_date_format='str')
+            else: # Otherwise, use all timepoints in the sim
+                self.timepoints = sim.tvec
+                self.dates = np.array([str(date) for date in sim.yearvec])
+        else: # If timepoints have been supplied, use them
+            self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
+
+        # Spread doses over the year
+        if self.spread_doses:
+            # Calculate these, but don't set them yet
+            full_timepoints = [tp + dt for tp in self.timepoints for dt in range(int(1 / sim['dt']))]
+            full_dates = [str(date) for date in sim.yearvec[full_timepoints]]
+        else:
+            full_timepoints = self.timepoints
+            full_dates = self.dates
+
+        # Check consistency of doses and timepoints
+        if sc.checktype(self.num_doses, 'num'):
+            if not sc.checktype(self.timepoints, int) and len(self.timepoints)>1:
+                # If doses is a single entry, assume it applies to all timepoints
+                if self.spread_doses:   num_doses = self.num_doses*sim['dt']
+                else:                   num_doses = self.num_doses
+                new_num_doses = {float(date):num_doses for date in full_dates}
+                self.num_doses = new_num_doses
+
+        elif sc.checktype(self.num_doses, 'listlike'):
+            if not sc.checktype(self.timepoints, int) and len(self.timepoints)>1:
+                if len(self.timepoints) != len(self.num_doses): # Check consistency
+                    raise ValueError(f'Inconsistent lengths of num_doses and timepoints: {len(self.num_doses)} vs. {len(self.timepoints)}.')
+                else:
+                    if self.spread_doses:
+                        num_doses = self.num_doses * sim['dt']
+                        new_num_doses = {float(date): num_doses for date in full_dates}
+                        self.num_doses = new_num_doses
+
+        self.timepoints = np.array(full_timepoints)
+        self.dates = np.array(full_dates)
+
+        # Perform checks and process inputs
+        if isinstance(self.num_doses, dict):  # Convert any dates to simulation days
+            self.num_doses = {sim.get_t(k)[0]: v for k, v in self.num_doses.items()}
+        self.p['doses'], self.p['interval'], self.p['imm_boost'] = check_doses(self.p['doses'], self.p['interval'], self.p['imm_boost'])
+
+        return
+
+
+    def select_people(self, sim):
+
+        # Work out how many people to vaccinate today
+        if sim.t in self.num_doses: num_people = self.num_doses[sim.t]
+        else:                       num_people = 0
+
+        if num_people == 0:
+            self._scheduled_third_doses[sim.t + 1].update(self._scheduled_third_doses[sim.t])  # Defer any extras til the next timestep
+            self._scheduled_second_doses[sim.t + 1].update(self._scheduled_second_doses[sim.t])  # Defer any extras til the next timestep
+            return np.array([])
+
+        num_agents = sc.randround(num_people / sim['pop_scale'])
+
+        # First, see how many scheduled second/third doses we are going to deliver
+        if self._scheduled_third_doses[sim.t]:
+            scheduled_third = np.fromiter(self._scheduled_third_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
+            still_alive = ~sim.people.dead_other[scheduled_third] & ~sim.people.dead_cancer[:, scheduled_third].sum(axis=0).astype(bool)
+            scheduled_third = scheduled_third[(sim.people.doses[scheduled_third] == 2) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
+
+            # If there are more people due for a second/third dose than there are doses, vaccinate as many
+            # as possible, and add the remainder to the next time step's doses.
+            if len(scheduled_third) > num_agents:
+                np.random.shuffle(scheduled_third)  # Randomly pick who to defer
+                self._scheduled_third_doses[sim.t + 1].update(scheduled_third[num_agents:])  # Defer any extras
+                return scheduled_third[:num_agents]
+        else:
+            scheduled_third = np.array([], dtype=hpd.default_int)
+
+        if self._scheduled_second_doses[sim.t]:
+            scheduled_second = np.fromiter(self._scheduled_second_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
+            still_alive = ~sim.people.dead_other[scheduled_second] & ~sim.people.dead_cancer[:, scheduled_second].sum(axis=0).astype(bool)
+            scheduled_second = scheduled_second[(sim.people.doses[scheduled_second] == 1) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
+
+            # If there are more people due for a second/third dose than there are doses, vaccinate as many
+            # as possible, and add the remainder to the next time step's doses.
+            if (len(scheduled_second)+len(scheduled_third)) > num_agents:
+                scheduled_second = scheduled_second[:(num_agents - len(scheduled_third))]
+                self._scheduled_second_doses[sim.t + 1].update(scheduled_second[(num_agents - len(scheduled_third)):])  # Defer any extras
+                scheduled = np.concatenate([scheduled_third, scheduled_second[:(num_agents - len(scheduled_third))]])
+                return scheduled
+            else:
+                scheduled = np.concatenate([scheduled_third, scheduled_second])
+        else:
+            scheduled = np.array([], dtype=hpd.default_int)
+
+        # Next, work out who is eligible for their first dose
+        vacc_probs = np.ones(sim.n)  # Begin by assigning equal weight (converted to a probability) to everyone
+        vacc_probs[~sim.people.alive] = 0.0  # Dead people are not eligible
+
+        # Apply any subtargeting for this vaccination
+        if self.subtarget is not None:
+            subtarget_inds, subtarget_vals = get_subtargets(self.subtarget, sim)
+            vacc_probs[subtarget_inds] = vacc_probs[subtarget_inds] * subtarget_vals
+
+        # Exclude vaccinated people
+        vacc_probs[sim.people.vaccinated] = 0.0  # Anyone who's received at least one dose is counted as vaccinated
+
+        # All remaining people can be vaccinated, although anyone who has received half of a multi-dose
+        # vaccine would have had subsequent doses scheduled and therefore should not be selected here
+        first_dose_eligible = hpu.binomial_arr(vacc_probs)
+        first_dose_eligible_inds = hpu.true(first_dose_eligible)
+
+        if len(first_dose_eligible_inds) == 0:
+            return scheduled  # Just return anyone that is scheduled
+
+        elif len(first_dose_eligible_inds) > num_agents:
+            # Truncate it to the number of agents for performance when checking whether anyone scheduled overlaps with first doses to allocate
+            first_dose_eligible_inds = first_dose_eligible_inds[:num_agents]  # This is the maximum number of people we could vaccinate this timestep, if there are no second doses allocated
+
+        # It's *possible* that someone has been *scheduled* for a first dose by some other mechanism externally
+        # Therefore, we need to check and remove them from the first dose list, otherwise they could be vaccinated
+        # twice here (which would amount to wasting a dose)
+        first_dose_eligible_inds = first_dose_eligible_inds[~np.in1d(first_dose_eligible_inds, scheduled)]
+
+        if (len(first_dose_eligible_inds) + len(scheduled)) > num_agents:
+            first_dose_inds = first_dose_eligible_inds[:(num_agents - len(scheduled))]
+        else:
+            first_dose_inds = first_dose_eligible_inds
+
+        # Schedule subsequent doses
+        if self.p['doses'] > 1:
+            self._scheduled_second_doses[int(sim.t + np.ceil(self.p.interval[0]/sim['dt']))].update(first_dose_inds)
+        if self.p['doses'] > 2:
+            self._scheduled_third_doses[int(sim.t + np.ceil(self.p.interval[1]/sim['dt']))].update(first_dose_inds)
+
+        vacc_inds = np.concatenate([scheduled, first_dose_inds])
 
         return vacc_inds
 

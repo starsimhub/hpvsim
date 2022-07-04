@@ -572,6 +572,7 @@ class People(hpb.BasePeople):
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False
         self.cancerous[:, inds] = False
+        self.alive[inds] = False
 
         # Remove dead people from contact network by setting the end date of any partnership they're in to now
         for contacts in self.contacts.values():
