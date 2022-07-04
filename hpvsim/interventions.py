@@ -935,9 +935,8 @@ class Screening(Intervention):
 
             # Pull our parameters that will be used below
             ng = sim['n_genotypes']
-            dt = sim['dt']
             screen_states = ['infectious', 'cin1', 'cin2', 'cin3']
-            treat_states = ['cin2', 'cin3']
+            treat_states = ['cin1', 'cin2', 'cin3']
             primary_screen_pars = self.p['primary']
             triage_screen_pars = self.p['triage']
             treat_pars = self.p['treatment']
@@ -958,30 +957,45 @@ class Screening(Intervention):
                     screen_pos = triage_pos
 
                 # Step 3, Determine who is gets treated
-                treat_eligible = sum([sim.people[state] for state in treat_states]).astype(bool).any(axis=0) # Determine who is eligible for treatment (i.e., those with HSILs)
-                treat_eligible_and_screened = screen_pos[treat_eligible[screen_pos]] # Screened and eligible for treatment
-                treat_probs = np.full(len(treat_eligible_and_screened), self.compliance, dtype=hpd.default_float) # Assign everyone who's screened and eligible for treatment a probability of compliance
+                treat_probs = np.full(len(screen_pos), self.compliance, dtype=hpd.default_float)
                 to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
-                treat_inds = treat_eligible_and_screened[to_treat] # Indices of those who get treated
+                treat_inds = screen_pos[to_treat]  # Indices of those who get treated
                 sim.people.treated[treat_inds] = True
                 sim.people.date_treated[treat_inds] = sim.t
 
                 # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
+                successfully_treated = []
                 for state in treat_states:
-
-                    # Determine whether treatment is successful in removing the HSIL
-                    eff_probs = np.full(len(treat_inds), treat_pars['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
+                    people_in_state = sim.people[state].any(axis=0)
+                    treat_state_inds = treat_inds[people_in_state[treat_inds]]
+                    # Determine whether treatment is successful
+                    eff_probs = np.full(len(treat_state_inds), treat_pars['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
                     to_eff_treat = hpu.binomial_arr(eff_probs) # Determine who will have effective treatment
-                    eff_treat_inds = treat_inds[to_eff_treat]
+                    eff_treat_inds = treat_state_inds[to_eff_treat]
+                    successfully_treated += list(eff_treat_inds)
                     sim.people[state][:, eff_treat_inds] = False # People who get treated have their CINs removed
+                    sim.people[f'date_{state}'][:, eff_treat_inds] = np.nan
 
+                successfully_treated = np.array(list(set(successfully_treated)))
+
+                for g in range(ng):
                     # Determine whether infection persists
-                    persistance_probs = np.full(len(eff_treat_inds), treat_pars['persistance'][state], dtype=hpd.default_float)  # Assign probabilities of infection persisting
-                    to_persist = hpu.binomial_arr(persistance_probs)  # Determine who will have persistant infection
-                    to_clear = eff_treat_inds[~to_persist] # Determine who will clear infection
-                    dur_to_clearance = hpu.sample(**treat_pars['time_to_clearance'][state], size=len(to_clear))
-                    for g in range(ng):
-                        sim.people.date_clearance[g, to_clear] = np.minimum((sim.t + np.ceil(dur_to_clearance / dt)), sim.people.date_clearance[g,to_clear])
+                    inf_inds = hpu.true(sim.people['infectious'][g, successfully_treated])
+                    inf_inds = successfully_treated[inf_inds]
+                    persistence_probs = np.full(len(inf_inds), treat_pars['persistence'][sim['genotype_map'][g]],
+                                                dtype=hpd.default_float)  # Assign probabilities of infection persisting
+
+                    # Determine who will have persistent infection, give them new prognoses
+                    to_persist = hpu.binomial_arr(persistence_probs)
+                    persist_inds = inf_inds[to_persist]
+                    dur_hpv = (sim.t - sim.people.date_infectious[g,persist_inds])*sim['dt']
+                    hpu.set_prognoses(sim.people, persist_inds, g, dur_hpv)
+
+                    # Clear infection for women who clear
+                    to_clear = inf_inds[~to_persist]  # Determine who will clear infection
+                    sim.people['infectious'][g, to_clear] = False  # People whose HPV clears
+                    sim.people.dur_disease[g, to_clear] = (sim.t - sim.people.date_infectious[g, to_clear]) * sim['dt']
+                    hpi.update_peak_immunity(sim.people, to_clear, imm_pars=sim.pars, imm_source=g)
 
         return screen_inds
 
@@ -992,7 +1006,7 @@ class Screening(Intervention):
         for state in states:
             for g in range(ng):
                 screen_probs = np.zeros(len(screen_inds))
-                tp_inds = hpu.true(sim.people[state][g, screen_inds]) # TODO: hmm this isn't exactly right
+                tp_inds = hpu.true(sim.people[state][g, screen_inds])
                 tn_inds = hpu.false(sim.people[state][g, screen_inds])
                 screen_probs[tp_inds] = pars['sensitivity'][state][g]
                 screen_probs[tn_inds] = 1 - pars['specificity'][state][g]

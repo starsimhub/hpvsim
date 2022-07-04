@@ -190,8 +190,8 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     if do_plot:
         to_plot = {
-            'HPV incidence': [
-                'total_hpv_incidence',
+            'HPV prevalence': [
+                'total_hpv_prevalence',
             ],
             'CIN prevalence': [
                 'total_cin_prevalence',
