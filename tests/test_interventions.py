@@ -63,8 +63,6 @@ def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
     verbose = .1
     debug = 0
 
-    sim = hpv.Sim(pars=base_pars)
-
     # Model an intervention to roll out prophylactic vaccination
     vx_prop = 0.5
     def age_subtarget(sim):
@@ -77,13 +75,19 @@ def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
         inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=24))
         return {'vals': [vx_prop for _ in inds], 'inds': inds}
 
-    years = np.arange(sim['burnin'], sim['n_years']-sim['burnin'], dtype=int)
+    years = np.arange(2020, base_pars['end'], dtype=int)
     bivalent_vx = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints=years,
                                        subtarget=age_subtarget)
     bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints=years,
                                        subtarget=faster_age_subtarget)
 
+    # sim = hpv.Sim(pars=base_pars, interventions = [bivalent_vx])
+    # sim.run()
+    # sim.plot()
+    # return sim
+
     n_runs = 3
+    sim = hpv.Sim(pars=base_pars)
 
     # Define the scenarios
     scenarios = {
