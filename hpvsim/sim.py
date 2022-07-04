@@ -556,8 +556,9 @@ class Sim(hpb.BaseSim):
 
         for g in range(ng):
             durpars = genotype_pars[genotype_map[g]]['dur']
-            dur_hpv = np.array([hpu.sample(**durpars[stage], size=len(hpv_inds)) for stage in
-                                ['none', 'cin1', 'cin2', 'cin3']]).sum(axis=0)
+            # dur_hpv = np.array([hpu.sample(**durpars[stage], size=len(hpv_inds)) for stage in
+            #                     ['none', 'cin1', 'cin2', 'cin3']]).sum(axis=0)
+            dur_hpv = hpu.sample(**durpars['none'], size=len(hpv_inds))
             t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
             _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 

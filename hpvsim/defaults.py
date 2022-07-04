@@ -62,6 +62,8 @@ class PeopleMeta(sc.prettyobj):
             'dead_cancer',
             'dead_other',  # Dead from all other causes
             'vaccinated',
+            'screened',
+            'treated',
         ]
 
         # Immune states, by genotype/vaccine
@@ -72,18 +74,20 @@ class PeopleMeta(sc.prettyobj):
             't_imm_event',  # Int, time since immunity event
         ]
 
-        # Additional vaccination states
-        self.vacc_states = [
+        # Additional intervention states
+        self.intv_states = [
             'doses',  # Number of doses given per person
             'vaccine_source',  # index of vaccine that individual received
+            'screens', # Number of screens given per person
         ]
 
         self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
-        self.dates += ['date_clearance']
+        self.dates += ['date_clearance', 'date_next_screen']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
-            'dur_hpv', # Length of time that a person has HPV DNA present. This is EITHER the period until the virus clears OR the period until viral integration
+            'dur_hpv', # Length of time that a person has HPV before progressing to CIN
+            'dur_disease', # Length of time that a person has >= HPV present
             'dur_none2cin1', # Length of time to go from no dysplasia to CIN1
             'dur_cin12cin2', # Length of time to go from CIN1 to CIN2
             'dur_cin22cin3', # Length of time to go from CIN2 to CIN3
@@ -91,11 +95,11 @@ class PeopleMeta(sc.prettyobj):
             'dur_cancer',  # Duration of cancer
         ]
 
-        self.all_states = self.person + self.states + self.imm_states + self.vacc_states + \
+        self.all_states = self.person + self.states + self.imm_states + self.intv_states + \
                           self.dates + self.durs
 
         # Validate
-        self.state_types = ['person', 'states', 'imm_states', 'vacc_states', 'dates', 'durs', 'all_states']
+        self.state_types = ['person', 'states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
         for state_type in self.state_types:
             states = getattr(self, state_type)
             n_states        = len(states)
@@ -112,9 +116,15 @@ class PeopleMeta(sc.prettyobj):
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
 # the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
+<<<<<<< HEAD
 flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections']
 flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections']
 flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu]
+=======
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections',     'doses',        'vaccinated',   'screens',  'screened']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections',     'doses',        'vaccinated',   'screens',  'screened']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu,          pl.cm.Oranges,  pl.cm.Oranges, pl.cm.Purples, pl.cm.Purples,]
+>>>>>>> main
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
