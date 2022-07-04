@@ -966,17 +966,17 @@ class Screening(Intervention):
                 # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
                 successfully_treated = []
                 for state in treat_states:
-                    treat_state_inds = treat_inds[sum([sim.people[state] for state in [state]]).astype(bool).any(axis=0)[treat_inds]]
+                    people_in_state = sim.people[state].any(axis=0)
+                    treat_state_inds = treat_inds[people_in_state[treat_inds]]
                     # Determine whether treatment is successful
                     eff_probs = np.full(len(treat_state_inds), treat_pars['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
                     to_eff_treat = hpu.binomial_arr(eff_probs) # Determine who will have effective treatment
                     eff_treat_inds = treat_state_inds[to_eff_treat]
                     successfully_treated += list(eff_treat_inds)
                     sim.people[state][:, eff_treat_inds] = False # People who get treated have their CINs removed
+                    sim.people[f'date_{state}'][:, eff_treat_inds] = np.nan
 
                 successfully_treated = np.array(list(set(successfully_treated)))
-                sim.people.date_cin2[:, successfully_treated] = np.nan
-                sim.people.date_cin3[:, successfully_treated] = np.nan
 
                 for g in range(ng):
                     # Determine whether infection persists

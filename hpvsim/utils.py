@@ -159,6 +159,9 @@ def find_contacts(p1, p2, inds): # pragma: no cover
 
 
 def set_prognoses(people, inds, g, dur_hpv):
+    ''' Set disease progression '''
+
+    # Get parameters that will be sued later
     dt = people.pars['dt']
     prog_keys = ['rel_cin1_prob', 'rel_cin2_prob', 'rel_cin3_prob', 'rel_cancer_prob']
     genotype_pars = people.pars['genotype_pars']
