@@ -259,6 +259,7 @@ def set_prognoses(people, inds, g, dur_hpv):
     # Record eventual deaths from cancer (NB, assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
     people.date_dead_cancer[g, cancer_inds] = people.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
+
     return
 
 
