@@ -8,6 +8,7 @@ import pytest
 import sys
 import sciris as sc
 import numpy as np
+import seaborn as sns
 import hpvsim as hpv
 import hpvsim.parameters as hpvpar
 import hpvsim.utils as hpu
@@ -86,6 +87,7 @@ def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
     # sim.plot()
     # return sim
 
+    sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
     sim = hpv.Sim(pars=base_pars)
 
@@ -189,6 +191,7 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
+        scens.plot_age_results()
 
     return scens
 
@@ -205,10 +208,11 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     pars = {
         'pop_size': n_agents,
         'n_years': 60,
-        'burnin': 25,
-        'start': 1975,
+        'burnin': 30,
+        'start': 1970,
         'genotypes': [hpv16, hpv18],
         'pop_scale' : 25.2e6 / n_agents,
+        'location': 'tanzania',
         'dt': .2,
     }
 
@@ -221,34 +225,32 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     cyto_screening = hpv.Screening(primary_screen_test='cytology', treatment='ablative', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
-    # sim = hpv.Sim(pars=pars, interventions = [hpv_screening])
-    # sim.run()
-    # sim.plot()
-    # return sim
 
-    sim = hpv.Sim(pars=pars)
-    n_runs = 1
+    az = hpv.age_results(
+        timepoints=['2025', '2030'],
+        result_keys=['total_cin1_prevalence'] # NB< not curerntly possible to request total_cin_prevalence since sim.people.cin doesn't exist. Should add this!
+    )
+
+    sim = hpv.Sim(pars=pars, analyzers=[az])
+    n_runs = 3
 
     # Define the scenarios
     scenarios = {
         'no_screening_rsa': {
             'name': 'No screening',
             'pars': {
-                'location': 'south africa'
             }
         },
         'hpv_screening': {
             'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
             'pars': {
                 'interventions': [hpv_screening],
-                'location': 'south africa'
             }
         },
         'cyto_screening': {
             'name': f'Screen {screen_prop * 100}% of 30-50y women with {cyto_screening.label}',
             'pars': {
                 'interventions': [cyto_screening],
-                'location': 'south africa'
             }
         },
     }
@@ -272,9 +274,9 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(to_plot=to_plot)
+        scens.plot_age_results(plot_type=sns.boxplot)
 
     return scens
-
 
 
 #%% Run as a script
@@ -283,9 +285,9 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_dynamic_pars()
-    scens1 = test_vaccinate_prob(do_plot=True)
-    scens2 = test_vaccinate_num(do_plot=True)
+    # sim0 = test_dynamic_pars()
+    # scens1 = test_vaccinate_prob(do_plot=True)
+    # scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
 
     sc.toc(T)

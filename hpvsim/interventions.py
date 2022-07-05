@@ -1125,24 +1125,26 @@ class Screening(Intervention):
 
                 successfully_treated = np.array(list(set(successfully_treated)))
 
-                for g in range(ng):
-                    # Determine whether infection persists
-                    inf_inds = hpu.true(sim.people['infectious'][g, successfully_treated])
-                    inf_inds = successfully_treated[inf_inds]
-                    persistence_probs = np.full(len(inf_inds), treat_pars['persistence'][sim['genotype_map'][g]],
-                                                dtype=hpd.default_float)  # Assign probabilities of infection persisting
+                if len(successfully_treated)>0:
 
-                    # Determine who will have persistent infection, give them new prognoses
-                    to_persist = hpu.binomial_arr(persistence_probs)
-                    persist_inds = inf_inds[to_persist]
-                    dur_hpv = (sim.t - sim.people.date_infectious[g,persist_inds])*sim['dt']
-                    hpu.set_prognoses(sim.people, persist_inds, g, dur_hpv)
+                    for g in range(ng):
+                        # Determine whether infection persists
+                        inf_inds = hpu.true(sim.people['infectious'][g, successfully_treated])
+                        inf_inds = successfully_treated[inf_inds]
+                        persistence_probs = np.full(len(inf_inds), treat_pars['persistence'][sim['genotype_map'][g]],
+                                                    dtype=hpd.default_float)  # Assign probabilities of infection persisting
 
-                    # Clear infection for women who clear
-                    to_clear = inf_inds[~to_persist]  # Determine who will clear infection
-                    sim.people['infectious'][g, to_clear] = False  # People whose HPV clears
-                    sim.people.dur_disease[g, to_clear] = (sim.t - sim.people.date_infectious[g, to_clear]) * sim['dt']
-                    hpi.update_peak_immunity(sim.people, to_clear, imm_pars=sim.pars, imm_source=g)
+                        # Determine who will have persistent infection, give them new prognoses
+                        to_persist = hpu.binomial_arr(persistence_probs)
+                        persist_inds = inf_inds[to_persist]
+                        dur_hpv = (sim.t - sim.people.date_infectious[g,persist_inds])*sim['dt']
+                        hpu.set_prognoses(sim.people, persist_inds, g, dur_hpv)
+
+                        # Clear infection for women who clear
+                        to_clear = inf_inds[~to_persist]  # Determine who will clear infection
+                        sim.people['infectious'][g, to_clear] = False  # People whose HPV clears
+                        sim.people.dur_disease[g, to_clear] = (sim.t - sim.people.date_infectious[g, to_clear]) * sim['dt']
+                        hpi.update_peak_immunity(sim.people, to_clear, imm_pars=sim.pars, imm_source=g)
 
         return screen_inds
 

@@ -5,12 +5,14 @@ Core plotting functions for simulations, multisims, and scenarios.
 import numpy as np
 import pylab as pl
 import sciris as sc
+import pandas as pd
+import seaborn as sns
 from . import misc as hpm
 from . import defaults as hpd
 from .settings import options as hpo
 
 
-__all__ = ['plot_sim', 'plot_scens', 'plot_result', 'plot_people']
+__all__ = ['plot_sim', 'plot_scens', 'plot_scen_age_results', 'plot_result', 'plot_people']
 
 
 #%% Plotting helper functions
@@ -181,7 +183,7 @@ def create_figs(args, sep_figs, fig=None, ax=None):
     return fig, figs
 
 
-def create_subplots(figs, fig, shareax, n_rows, n_cols, pnum, fig_args, sep_figs, log_scale, title):
+def create_subplots(figs, fig, shareax, n_rows, n_cols, pnum, fig_args, sep_figs, log_scale, title=None):
     ''' Create subplots and set logarithmic scale '''
 
     # Try to find axes by label, if they've already been defined -- this is to avoid the deprecation warning of reusing axes
@@ -449,6 +451,81 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
                         plot_interventions(sim, ax) # Plot the interventions
             if args.show['legend']:
                 title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum==0) # Configure the title, grid, and legend -- only show legend for first
+
+    return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+
+
+def plot_scen_age_results(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
+         scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
+         show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
+         log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None,
+         plot_burnin=False, plot_type=sns.boxplot, **kwargs):
+    ''' Plot age results of a scenario'''
+
+    # Handle inputs
+    args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
+                   legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
+
+    # Get the analyzer details from the base sim
+    base_analyzer = scens.sims[0][0].get_analyzer() # TODO: use an index here to let the user choose which one, and validate
+    base_res    = base_analyzer.results
+    timepoints  = base_analyzer.timepoints
+    result_keys = base_analyzer.result_keys
+    age_labels  = base_analyzer.age_labels
+
+    # Handle what to plot
+    if not len(base_res):
+        errormsg = f'Cannot plot since no age results were recorded.'
+        raise ValueError(errormsg)
+    if len(timepoints) > 1:
+        n_rows = len(timepoints)  # One row for each requested timepoint
+        n_cols = len(result_keys)  # One column for each requested result
+    else:  # If there's only one timepoint, automatically figure out rows and columns
+        n_plots = len(result_keys)
+        n_rows, n_cols = sc.get_rows_cols(n_plots)
+
+    # Construct dataframe for result storage
+    to_plot = {k:base_analyzer.result_properties[k].name for k in result_keys}
+    n_runs = scens['n_runs']
+    n_result_keys = len(result_keys)
+    n_timepoints = len(timepoints)
+    n_bins = len(base_res[0]['bins'])
+
+    # Do the plotting
+    with hpo.with_style(args.style):
+        fig, figs = create_figs(args, sep_figs, fig, ax)
+
+        pnum = 0
+        for tp in base_analyzer.results.keys():
+            for reskey in result_keys:
+
+                # Construct a dataframe with things in the most logical order for plotting
+                bins = []
+                scen_names = []
+                values = []
+                for bno, bin in enumerate(base_res[0]['bins']):
+                    for sno in range(len(scens.scenarios)):
+                        for rep in range(n_runs):
+                            bins.append(bin)
+                            scen_key = scens.sims.keys()[sno]
+                            scen_names.append(scens.scenarios[scen_key]['name'])
+                            values.append(scens.sims[sno][rep].get_analyzer().results[tp][reskey][bno])
+                replicates = np.arange(n_runs).tolist() * n_bins * len(scens.scenarios)
+                resdict = dict(bin=bins, scen_name=scen_names, replicate=replicates, value=values)
+                resdf = pd.DataFrame(resdict)
+
+                # Start plot
+                ax = pl.subplot(n_rows, n_cols, pnum+1)
+                ax = plot_type(ax=ax, x="bin", y="value", hue="scen_name", data=resdf, dodge=True)
+                ax.legend([], [], frameon=False) # Temporarily turn off legend
+                title = f'{base_analyzer.result_properties[reskey].name} - {int(float(tp))}'
+                if args.show['legend']:
+                    title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum == 0)  # Configure the title, grid, and legend -- only show legend for first
+                ax.set_xlabel("Age group")
+                ax.set_xticklabels(age_labels)
+                ax.set_ylabel("")
+                pnum +=1
+
 
     return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
 
