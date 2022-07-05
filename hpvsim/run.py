@@ -987,6 +987,7 @@ class Scenarios(hpb.ParsObj):
         for scenkey,scen in self.scenarios.items():
             scenname = scen['name']
             scenpars = scen['pars']
+            allpars = sc.mergedicts(scenpars, {'location': self.base_sim['location']})
 
             # This is necessary for plotting, and since self.npts is defined prior to run
             if 'n_years' in scenpars.keys():
@@ -1001,7 +1002,7 @@ class Scenarios(hpb.ParsObj):
             scen_sim.scen = scen
 
             # Update the parameters, if provided, and re-initialize aspects of the simulation
-            scen_sim.update_pars(scenpars)
+            scen_sim.update_pars(allpars)
             scen_sim.initialized = False # Ensure it gets re-initialized
 
             run_args = dict(n_runs=self['n_runs'], noise=self['noise'], noisepar=self['noisepar'], keep_people=keep_people, verbose=verbose)

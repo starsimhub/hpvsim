@@ -406,6 +406,14 @@ class Sim(hpb.BaseSim):
         for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
             results[f'{var}'] = init_res(f'{name}', color=color, n_rows=2)
 
+        # Vaccination results
+        results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
+        results['new_total_vaccinated'] = init_res('Newly vaccinated')
+        results['cum_vaccinated'] = init_res('Cumulative number vaccinated by genotype', n_rows=ng)
+        results['cum_total_vaccinated'] = init_res('Cumulative number vaccinated')
+        results['new_doses'] = init_res('New doses')
+        results['cum_doses'] = init_res('Cumulative doses')
+
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
         results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
@@ -542,9 +550,16 @@ class Sim(hpb.BaseSim):
         genotypes = np.random.randint(0, ng, len(hpv_inds))
 
         # Figure of duration of infection and infect people. TODO: will need to redo this
-        dur_hpv = np.array([hpu.sample(**self['dur'][stage], size=len(hpv_inds)) for stage in ['none', 'cin1', 'cin2', 'cin3']]).sum(axis=0)
-        t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
+
+        genotype_pars = self.pars['genotype_pars']
+        genotype_map = self.pars['genotype_map']
+
         for g in range(ng):
+            durpars = genotype_pars[genotype_map[g]]['dur']
+            # dur_hpv = np.array([hpu.sample(**durpars[stage], size=len(hpv_inds)) for stage in
+            #                     ['none', 'cin1', 'cin2', 'cin3']]).sum(axis=0)
+            dur_hpv = hpu.sample(**durpars['none'], size=len(hpv_inds))
+            t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
             _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
         # Check for CINs
@@ -582,7 +597,6 @@ class Sim(hpb.BaseSim):
         self.people.addtoself(new_people) # New births are added to the population
 
         people = self.people # Shorten
-        people.alive = ~people.dead_other
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         new_pop_size = len(people)
         people.create_partnerships(t=t, n_new=n_dissolved, scale_factor=new_pop_size/old_pop_size) # Create new partnerships (maintaining the same overall partnerhip rate)
@@ -677,7 +691,7 @@ class Sim(hpb.BaseSim):
 
             # Create total stocks
             for key in hpd.stock_keys:
-                if key not in ['alive', 'cin']:  # This is a special case
+                if key not in ['alive', 'cin', 'vaccinated']:  # These are all special cases
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['cin', 'susceptible']:
@@ -696,7 +710,6 @@ class Sim(hpb.BaseSim):
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
             self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
             self.results['n_alive_by_sex'][1,idx] = len((people.alive*people.is_male).nonzero()[0])
-
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
@@ -866,6 +879,11 @@ class Sim(hpb.BaseSim):
         # Demographic results
         self.results['tfr'][:]  = self.results['other_deaths'][:] / self.results['n_alive'][:]
         self.results['cbr'][:]  = self.results['births'][:] / self.results['n_alive'][:]
+
+        # Vaccination results
+        self.results['cum_vaccinated'][:] = np.cumsum(self.results['new_vaccinated'][:], axis=0)
+        self.results['cum_total_vaccinated'][:] = np.cumsum(self.results['new_total_vaccinated'][:])
+        self.results['cum_doses'][:] = np.cumsum(self.results['new_doses'][:])
 
         return
 

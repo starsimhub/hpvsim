@@ -542,9 +542,9 @@ class age_results(Analyzer):
         # Handle variable names (TODO, should this be centralized somewhere?)
         self.mapping = {
             'infections': ['date_infectious', 'infectious'],
-            'cin1s': ['date_cin1', 'cin1'],
-            'cin2s': ['date_cin2', 'cin2'],
-            'cin3s': ['date_cin3', 'cin3'],
+            'cin1': ['date_cin1', 'cin1'],
+            'cin2': ['date_cin2', 'cin2'],
+            'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
         }
 
@@ -590,7 +590,7 @@ class age_results(Analyzer):
                     if attr == 'hpv': attr = 'infectious' # People with HPV are referred to as infectious in the sim
                     if attr != 'cin': # This is stored differently
                         if 'total' in rkey:
-                            inds = sim.people[attr].nonzero()  # Pull out people for which this state is true
+                            inds = sim.people[attr.replace('total_','')].nonzero()  # Pull out people for which this state is true
                             self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
                         else:
                             for g in range(ng):

@@ -8,10 +8,25 @@ import pytest
 import sys
 import sciris as sc
 import numpy as np
+import seaborn as sns
 import hpvsim as hpv
+import hpvsim.parameters as hpvpar
+import hpvsim.utils as hpu
 
 do_plot = 1
 do_save = 0
+hpv16 = hpv.genotype('HPV16')
+hpv18 = hpv.genotype('HPV18')
+
+base_pars = {
+    'pop_size': 50e3,
+    'start': 1985,
+    'burnin': 30,
+    'end': 2050,
+    'genotypes': [hpv16, hpv18],
+    'location': 'tanzania',
+    'dt': .2,
+}
 
 
 #%% Define the tests
@@ -43,26 +58,14 @@ def test_dynamic_pars():
     return sim
 
 
-def test_vaccines(do_plot=False, do_save=False, fig_path=None):
+def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test prophylactic vaccine intervention')
 
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 0
 
-    # Define parameters
-    pars = {
-        'pop_size': 50e3,
-        'start': 2010,
-        'burnin': 5,
-        'n_years': 30,
-        'genotypes': [hpv16, hpv18],
-        'dt': .2,
-    }
-
     # Model an intervention to roll out prophylactic vaccination
-    vx_prop = 1.0
+    vx_prop = 0.5
     def age_subtarget(sim):
         ''' Select people who are eligible for vaccination '''
         inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=14))
@@ -73,19 +76,20 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
         inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <=24))
         return {'vals': [vx_prop for _ in inds], 'inds': inds}
 
-    bivalent_vx = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints='2020',
+    years = np.arange(2020, base_pars['end'], dtype=int)
+    bivalent_vx = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints=years,
                                        subtarget=age_subtarget)
-
-    bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints='2020',
+    bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints=years,
                                        subtarget=faster_age_subtarget)
 
-    az = hpv.age_results(
-        timepoints=['2019', '2030'],
-        result_keys=['total_infections']
-    )
+    # sim = hpv.Sim(pars=base_pars, interventions = [bivalent_vx])
+    # sim.run()
+    # sim.plot()
+    # return sim
 
     sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
+    sim = hpv.Sim(pars=base_pars)
 
     # Define the scenarios
     scenarios = {
@@ -119,11 +123,71 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
             'HPV incidence': [
                 'total_hpv_incidence',
             ],
-            'HPV infections': [
-                'total_infections',
+            'CIN prevalence': [
+                'total_cin_prevalence',
             ],
-            'Cancers per 100,000 women': [
-                'total_cancer_incidence',
+            'Number vaccinated': [
+                'cum_total_vaccinated',
+            ],
+        }
+        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
+
+    return scens
+
+
+def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test vaccinate_num intervention')
+
+    verbose = .1
+    debug = 0
+
+    # Model an intervention to roll out prophylactic vaccination with a given number of doses over time
+    age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give vaccine to people who have had 2 doses
+    doses_per_year = 6e3
+    bivalent_1_dose = hpv.vaccinate_num(vaccine='bivalent_1dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029'], label='bivalent 1 dose, 9-14', subtarget=age_target)
+    bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029'], label='bivalent 2 dose, 9-14', subtarget=age_target)
+    # bivalent_3_dose = hpv.vaccinate_num(vaccine='bivalent_3dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024'], label='bivalent 3 dose, 9-14', subtarget=age_target)
+
+    sim = hpv.Sim(pars=base_pars)
+    n_runs = 3
+
+    # Define the scenarios
+    scenarios = {
+        'no_vx': {
+            'name': 'No vaccination',
+            'pars': {
+            }
+        },
+        'vx2': {
+            'name': f'Double dose, 9-14y girls, {int(doses_per_year)} doses available per year',
+            'pars': {
+                'interventions': [bivalent_2_dose]
+            }
+        },
+        'vx1': {
+            'name': f'Single dose, 9-14y girls, {int(doses_per_year)} doses available per year',
+            'pars': {
+                'interventions': [bivalent_1_dose]
+            }
+        }
+    }
+
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV incidence': [
+                'total_hpv_incidence',
+            ],
+            'CIN prevalence': [
+                'total_cin_prevalence',
+            ],
+            'Number vaccinated': [
+                'cum_total_vaccinated',
             ],
         }
         scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
@@ -132,6 +196,87 @@ def test_vaccines(do_plot=False, do_save=False, fig_path=None):
     return scens
 
 
+def test_screening(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test screening intervention')
+
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
+    verbose = .1
+    debug = 0
+    n_agents = 50e3
+
+    pars = {
+        'pop_size': n_agents,
+        'n_years': 60,
+        'burnin': 30,
+        'start': 1970,
+        'genotypes': [hpv16, hpv18],
+        'pop_scale' : 25.2e6 / n_agents,
+        'location': 'tanzania',
+        'dt': .2,
+    }
+
+    # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
+    screen_prop = .5
+    hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='ablative', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, timepoints='2010',
+                                  prob=screen_prop)
+
+    cyto_screening = hpv.Screening(primary_screen_test='cytology', treatment='ablative', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, timepoints='2010',
+                                  prob=screen_prop)
+
+    az = hpv.age_results(
+        timepoints=['2025', '2030'],
+        result_keys=['total_cin1_prevalence']
+    )
+
+    sim = hpv.Sim(pars=pars, analyzers=[az])
+    n_runs = 3
+
+    # Define the scenarios
+    scenarios = {
+        'no_screening_rsa': {
+            'name': 'No screening',
+            'pars': {
+            }
+        },
+        'hpv_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+            'pars': {
+                'interventions': [hpv_screening],
+            }
+        },
+        'cyto_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {cyto_screening.label}',
+            'pars': {
+                'interventions': [cyto_screening],
+            }
+        },
+    }
+
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV prevalence': [
+                'total_hpv_prevalence',
+            ],
+            'CIN prevalence': [
+                'total_cin_prevalence',
+            ],
+            'Cancers per 100,000 women': [
+                'total_cancer_incidence',
+            ],
+        }
+        scens.plot(to_plot=to_plot)
+        scens.plot_age_results(plot_type=sns.swarmplot)
+
+    return scens
 
 
 #%% Run as a script
@@ -141,7 +286,9 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_dynamic_pars()
-    scens = test_vaccines(do_plot=True)
+    # scens1 = test_vaccinate_prob(do_plot=True)
+    # scens2 = test_vaccinate_num(do_plot=True)
+    scens3 = test_screening(do_plot=True)
 
     sc.toc(T)
     print('Done.')
