@@ -155,7 +155,7 @@ class Sim(hpb.BaseSim):
         creation, rather than before.
         '''
 
-        # Handle nab sources, as we need to init the people and interventions first
+        # Handle sources, as we need to init the people and interventions first
         self.pars['n_imm_sources'] = self.pars['n_genotypes'] + len(self.pars['vaccine_map'])
         for key in self.people.meta.imm_states:
             if key == 't_imm_event':
@@ -609,10 +609,13 @@ class Sim(hpb.BaseSim):
         contacts = people.contacts # Shorten
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
-        has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
-        if len(has_imm):
-            hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
-        hpimm.check_immunity(people)
+        if self['use_waning']:
+            has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
+            if len(has_imm):
+                hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
+            hpimm.check_immunity(people)
+        else:
+            people.imm = people.peak_imm
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
