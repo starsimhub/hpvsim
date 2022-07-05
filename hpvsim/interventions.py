@@ -1014,14 +1014,14 @@ class Screening(Intervention):
             self.p['primary']['sensitivity'][state] = tmp_sens_pars
             self.p['primary']['specificity'][state] = tmp_spec_pars
 
-        if triage_screen_pars is not None:
-            tmp_sens_pars = np.ones(ng, dtype=hpd.default_float)
-            tmp_spec_pars = np.ones(ng, dtype=hpd.default_float)
-            for g in range(ng):
-                tmp_sens_pars[g] = triage_screen_pars['sensitivity'][state][genotype_map[g]]
-                tmp_spec_pars[g] = triage_screen_pars['specificity'][state][genotype_map[g]]
-            self.p['triage']['sensitivity'][state] = tmp_sens_pars
-            self.p['triage']['specificity'][state] = tmp_spec_pars
+            if triage_screen_pars is not None:
+                tmp_sens_pars = np.ones(ng, dtype=hpd.default_float)
+                tmp_spec_pars = np.ones(ng, dtype=hpd.default_float)
+                for g in range(ng):
+                    tmp_sens_pars[g] = triage_screen_pars['sensitivity'][state][genotype_map[g]]
+                    tmp_spec_pars[g] = triage_screen_pars['specificity'][state][genotype_map[g]]
+                self.p['triage']['sensitivity'][state] = tmp_sens_pars
+                self.p['triage']['specificity'][state] = tmp_spec_pars
         return
 
     def select_people(self, sim):

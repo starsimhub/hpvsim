@@ -82,12 +82,6 @@ def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
     bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints=years,
                                        subtarget=faster_age_subtarget)
 
-    # sim = hpv.Sim(pars=base_pars, interventions = [bivalent_vx])
-    # sim.run()
-    # sim.plot()
-    # return sim
-
-    sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
     sim = hpv.Sim(pars=base_pars)
 
@@ -228,7 +222,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     az = hpv.age_results(
         timepoints=['2025', '2030'],
-        result_keys=['total_cin1_prevalence'] # NB< not curerntly possible to request total_cin_prevalence since sim.people.cin doesn't exist. Should add this!
+        result_keys=['total_cin3_prevalence'] # NB< not curerntly possible to request total_cin_prevalence since sim.people.cin doesn't exist. Should add this!
     )
 
     sim = hpv.Sim(pars=pars, analyzers=[az])
