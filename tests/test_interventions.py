@@ -216,8 +216,12 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
 
-    cyto_screening = hpv.Screening(primary_screen_test='cytology', treatment='ablative', screen_start_age=30,
+    via_screening = hpv.Screening(primary_screen_test='via', treatment='ablative', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
+                                  prob=screen_prop)
+
+    hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='ablative', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
                                   prob=screen_prop)
 
     az = hpv.age_results(
@@ -241,10 +245,16 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                 'interventions': [hpv_screening],
             }
         },
-        'cyto_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {cyto_screening.label}',
+        'via_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {via_screening.label}',
             'pars': {
-                'interventions': [cyto_screening],
+                'interventions': [via_screening],
+            }
+        },
+        'hpv_via_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
+            'pars': {
+                'interventions': [hpv_via_screening],
             }
         },
     }
@@ -268,7 +278,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(to_plot=to_plot)
-        scens.plot_age_results(plot_type=sns.boxplot)
+        # scens.plot_age_results(plot_type=sns.boxplot)
 
     return scens
 

@@ -991,37 +991,22 @@ class Screening(Intervention):
     def initialize(self, sim):
         super().initialize()
         self.timepoints, self.dates = sim.get_t(self.timepoints,return_date_format='str')  # Ensure timepoints and dates are in the right format
-        self.validate_screen_pars(sim)
+        # self.validate_screen_pars(sim)
         sim['screen_pars'][self.label] = self.p  # Store the parameters
         return
 
     def validate_screen_pars(self, sim):
 
-        # pull out genotypes in sim to start the mapping process
-        ng = sim['n_genotypes']
-        genotype_map = sim['genotype_map']
-
         primary_screen_pars = self.p['primary']
         triage_screen_pars = self.p['triage']
-        states = ['infectious', 'cin1', 'cin2', 'cin3']
+        states = ['infectious', 'cin1', 'cin2', 'cin3', 'cancerous']
 
         for state in states:
-            tmp_sens_pars = np.ones(ng, dtype=hpd.default_float)
-            tmp_spec_pars = np.ones(ng, dtype=hpd.default_float)
-            for g in range(ng):
-                tmp_sens_pars[g] = primary_screen_pars['sensitivity'][state][genotype_map[g]]
-                tmp_spec_pars[g] = primary_screen_pars['specificity'][state][genotype_map[g]]
-            self.p['primary']['sensitivity'][state] = tmp_sens_pars
-            self.p['primary']['specificity'][state] = tmp_spec_pars
+            self.p['primary']['test_positivity'][state] = primary_screen_pars['test_positivity'][state]
 
             if triage_screen_pars is not None:
-                tmp_sens_pars = np.ones(ng, dtype=hpd.default_float)
-                tmp_spec_pars = np.ones(ng, dtype=hpd.default_float)
-                for g in range(ng):
-                    tmp_sens_pars[g] = triage_screen_pars['sensitivity'][state][genotype_map[g]]
-                    tmp_spec_pars[g] = triage_screen_pars['specificity'][state][genotype_map[g]]
-                self.p['triage']['sensitivity'][state] = tmp_sens_pars
-                self.p['triage']['specificity'][state] = tmp_spec_pars
+                self.p['triage']['test_positivity'][state] = triage_screen_pars['test_positivity'][state]
+
         return
 
     def select_people(self, sim):
@@ -1078,18 +1063,18 @@ class Screening(Intervention):
             sim.people.screened[screen_inds] = True
             sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
-            sim.people.date_next_screen[screen_inds] = sim.t + self.screen_interval/sim['dt']
+            sim.people.date_next_screen[screen_inds] = sim.t + self.screen_interval/sim['dt'] #TODO: this should be different based on results? ie followup rescreen sooner
 
             # Pull our parameters that will be used below
             ng = sim['n_genotypes']
-            screen_states = ['infectious', 'cin1', 'cin2', 'cin3']
+            screen_states = ['infectious', 'cin1', 'cin2', 'cin3', 'cancerous']
             treat_states = ['cin1', 'cin2', 'cin3']
             primary_screen_pars = self.p['primary']
             triage_screen_pars = self.p['triage']
             treat_pars = self.p['treatment']
 
             # Step 1, filter positives from primary screen
-            screen_pos = self.find_test_pos(screen_inds, primary_screen_pars, sim, screen_states, ng)
+            screen_pos = self.find_test_pos(screen_inds, primary_screen_pars, sim, screen_states)
 
             # If anyone screens positive, continue
             if len(screen_pos):
@@ -1100,10 +1085,16 @@ class Screening(Intervention):
                     triage_probs.fill(self.compliance)
                     triage_inds = hpu.true(hpu.binomial_arr(triage_probs))
                     triage_inds = screen_pos[triage_inds]
-                    triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, screen_states, ng)
+                    triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, screen_states)
                     screen_pos = triage_pos
 
-                # Step 3, Determine who is gets treated
+                # Step 3, determine if any of screen positives have cancer, if so diagnose and refer
+                cancerous_inds = hpu.true(sim.people.cancerous.any(axis=0))
+                diagnosed_inds = np.intersect1d(screen_pos, cancerous_inds)
+                sim.people.diagnosed[diagnosed_inds] = True
+                screen_pos = np.setdiff1d(screen_pos, diagnosed_inds)
+
+                # Step 3, Determine who gets treated
                 treat_probs = np.full(len(screen_pos), self.compliance, dtype=hpd.default_float)
                 to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
                 treat_inds = screen_pos[to_treat]  # Indices of those who get treated
@@ -1149,18 +1140,15 @@ class Screening(Intervention):
         return screen_inds
 
 
-    def find_test_pos(self, screen_inds, pars, sim, states, ng):
+    def find_test_pos(self, screen_inds, pars, sim, states):
         ''' Extract indices of those who will return a positive result from their screen '''
         screen_pos = []
         for state in states:
-            for g in range(ng):
-                screen_probs = np.zeros(len(screen_inds))
-                tp_inds = hpu.true(sim.people[state][g, screen_inds])
-                tn_inds = hpu.false(sim.people[state][g, screen_inds])
-                screen_probs[tp_inds] = pars['sensitivity'][state][g]
-                screen_probs[tn_inds] = 1 - pars['specificity'][state][g]
-                screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                screen_pos += list(screen_pos_inds)
+            screen_probs = np.zeros(len(screen_inds))
+            tp_inds = hpu.true(sim.people[state][:,screen_inds].any(axis=0))
+            screen_probs[tp_inds] = pars['test_positivity'][state]
+            screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+            screen_pos += list(screen_pos_inds)
 
         # remove duplicates from list
         screen_pos = np.array(list(set(screen_pos)))
