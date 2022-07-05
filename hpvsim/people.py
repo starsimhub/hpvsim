@@ -495,8 +495,6 @@ class People(hpb.BasePeople):
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
         durpars         = genotype_pars[genotype_map[g]]['dur']
-        progpars        = self.pars['prognoses']
-        cinprobs        = {k: self.pars[k] * genotype_pars[genotype_map[g]][k] for k in prog_keys}
 
         # Set all dates
         base_t = self.t + offset if offset is not None else self.t
