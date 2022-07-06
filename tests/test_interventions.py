@@ -211,18 +211,17 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     }
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
-    screen_prop = .5
+    screen_prop = .7
+    compliance = .9
+    cancer_compliance = 0.5
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=10, timepoints='2010',
-                                  prob=screen_prop)
+                                  screen_stop_age=50, screen_interval=5, timepoints='2010',
+                                  prob=screen_prop, compliance=compliance, compliance_cancer=cancer_compliance)
 
-    via_screening = hpv.Screening(primary_screen_test='via', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=10, timepoints='2010',
-                                  prob=screen_prop)
 
     hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
-                                  prob=screen_prop)
+                                  prob=screen_prop, compliance=compliance, compliance_cancer=cancer_compliance)
 
     az = hpv.age_results(
         timepoints=['2025', '2030'],
@@ -243,12 +242,6 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
             'pars': {
                 'interventions': [hpv_screening],
-            }
-        },
-        'via_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {via_screening.label}',
-            'pars': {
-                'interventions': [via_screening],
             }
         },
         'hpv_via_screening': {
