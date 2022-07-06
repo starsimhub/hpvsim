@@ -212,15 +212,15 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
     screen_prop = .5
-    hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='ablative', screen_start_age=30,
+    hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
 
-    via_screening = hpv.Screening(primary_screen_test='via', treatment='ablative', screen_start_age=30,
+    via_screening = hpv.Screening(primary_screen_test='via', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010',
                                   prob=screen_prop)
 
-    hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='ablative', screen_start_age=30,
+    hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
                                   prob=screen_prop)
 

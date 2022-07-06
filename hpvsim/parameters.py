@@ -345,6 +345,7 @@ def get_screen_choices():
         'hpv1618': ['hpv1618', 'hpvgenotyping'],
         'cytology': ['cytology', 'pap', 'papsmear'],
         'via': ['via', 'visualinspection'],
+        'via_triage': ['via_triage'],
         'colposcopy': ['colposcopy', 'colpo'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
@@ -359,7 +360,6 @@ def get_treatment_choices():
         'default': ['default', None],
         'ablative':  ['ablative', 'thermal_ablation', 'TA'],
         'excisional': ['excisional'],
-        'LEEP': ['LEEP'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -990,6 +990,16 @@ def get_screen_pars(screen=None):
             ),
             inadequacy=0,
         ),
+        via_triage=dict(
+            test_positivity=dict(
+                infectious=0.98,
+                cin1=0.97,
+                cin2=0.89,
+                cin3=0.79,
+                cancerous=0.4,
+            ),
+            inadequacy=0,
+        ),
     )
 
     return _get_from_pars(pars, key=screen)
@@ -1002,8 +1012,9 @@ def get_treatment_pars(screen=None):
     pars = dict(
         excisional = dict(
             efficacy=dict(
-                cin2=1,
-                cin3=1,
+                cin1=0.936,
+                cin2=0.936,
+                cin3=0.936,
             ),
             persistence=dict(
                 hpv16=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196

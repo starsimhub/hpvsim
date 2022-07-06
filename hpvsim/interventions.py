@@ -882,13 +882,13 @@ class Screening(Intervention):
 
     This base class implements the mechanism of screening people to identify and treat pre-cancerous lesions.
     Screening involves a series of standard operations to modify the trajectories of `hpv.People`. Screening algorithms
-    can vary in complexity along the dimensions of primary screening modalities, triage modalities, treatment modalities,
+    can vary in complexity along the dimensions of primary screening modalities, triage modalities,
     interval between screens and follow-up protocol, loss-to-follow-up, test characteristics, and efficacies.
 
     Args:
          primary_screen_test (dict/str)  : the screening test to use as a primary filtering method
          triage_screen_test  (dict/str)  : the screening test to use as a triage (or None)
-         treatment           (dict/str)  : treatment to be used upon a positive test and/or triage
+         treatment           (dict/str)  : the test used to determine if ablative or excisional treatment is used
          screen_start_age    (int)       : age to start screening
          screen_interval     (int)       : interval between screens
          screen_stop_age     (int)       : age to stop screening
@@ -899,11 +899,7 @@ class Screening(Intervention):
          kwargs (dict)      : passed to Intervention()
 
     If ``primary_screen_test`` and/or ``triage_screen_test`` is supplied as a dictionary, it must have the following parameters:
-        - ``sensitivity``   : dictionary of probability of testing positive given each stage (i.e., HPV, CIN1, CIN2)
-        - ``specificity``   : dictionary of specificity for each stage (i.e., HPV, CIN1, CIN2)
-
-    If ``treatment`` is supplied as a dictionary, it must have the following parameters:
-        - ``efficacy``   : dictionary of probability of clearing/regressing given stage
+        - ``test_positivity``   : dictionary of probability of testing positive given each stage (i.e., HPV, CIN1, CIN2)
 
     '''
 
@@ -933,12 +929,9 @@ class Screening(Intervention):
         # Option 1: screening can be chosen from a list of pre-defined screening strategies
         if isinstance(screen, str):
 
-            if treatment:
-                choices, mapping = hppar.get_treatment_choices()
-                screen_pars = hppar.get_treatment_pars()
-            else:
-                choices, mapping = hppar.get_screen_choices()
-                screen_pars = hppar.get_screen_pars()
+            choices, mapping = hppar.get_screen_choices()
+            screen_pars = hppar.get_screen_pars()
+
 
             label = screen.lower()
             for txt in ['.', ' ', '&', '-', 'screen']:
@@ -979,9 +972,11 @@ class Screening(Intervention):
                 self.p = sc.mergedicts(self.p, {'triage': None})
             else:
                 self.p = sc.mergedicts(self.p, {'triage': sc.objdict(screen_pars)})
-        elif treatment:
-            self.p = sc.mergedicts(self.p, {'treatment': sc.objdict(screen_pars)})
-        else:
+        if treatment:
+            self.p = sc.mergedicts(self.p, {'treatment_eligibility': sc.objdict(screen_pars)})
+            treat_pars = hppar.get_treatment_pars()
+            self.p = sc.mergedicts(self.p, {'treatment': sc.objdict(treat_pars)})
+        if treatment is False and triage is False:
             # Set label and parameters
             self.p = {'primary': sc.objdict(screen_pars)}
 
@@ -991,23 +986,9 @@ class Screening(Intervention):
     def initialize(self, sim):
         super().initialize()
         self.timepoints, self.dates = sim.get_t(self.timepoints,return_date_format='str')  # Ensure timepoints and dates are in the right format
-        # self.validate_screen_pars(sim)
         sim['screen_pars'][self.label] = self.p  # Store the parameters
         return
 
-    def validate_screen_pars(self, sim):
-
-        primary_screen_pars = self.p['primary']
-        triage_screen_pars = self.p['triage']
-        states = ['infectious', 'cin1', 'cin2', 'cin3', 'cancerous']
-
-        for state in states:
-            self.p['primary']['test_positivity'][state] = primary_screen_pars['test_positivity'][state]
-
-            if triage_screen_pars is not None:
-                self.p['triage']['test_positivity'][state] = triage_screen_pars['test_positivity'][state]
-
-        return
 
     def select_people(self, sim):
         """
@@ -1072,6 +1053,7 @@ class Screening(Intervention):
             primary_screen_pars = self.p['primary']
             triage_screen_pars = self.p['triage']
             treat_pars = self.p['treatment']
+            treat_eligibility = self.p['treatment_eligibility']
 
             # Step 1, filter positives from primary screen
             screen_pos = self.find_test_pos(screen_inds, primary_screen_pars, sim, screen_states)
@@ -1094,20 +1076,34 @@ class Screening(Intervention):
                 sim.people.diagnosed[diagnosed_inds] = True
                 screen_pos = np.setdiff1d(screen_pos, diagnosed_inds)
 
-                # Step 3, Determine who gets treated
+                # Step 3, Determine who gets treated with what
                 treat_probs = np.full(len(screen_pos), self.compliance, dtype=hpd.default_float)
                 to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
                 treat_inds = screen_pos[to_treat]  # Indices of those who get treated
+                ablation_inds = []
+
+                for state in treat_states:
+                    ablate_probs = np.zeros(len(treat_inds))
+                    ablate_inds = hpu.true(sim.people[state][:,treat_inds].any(axis=0))
+                    ablate_probs[ablate_inds] = treat_eligibility['test_positivity'][state]
+                    ablate_inds = hpu.true(hpu.binomial_arr(ablate_probs))
+                    ablation_inds += list(ablate_inds)
+
+                # remove duplicates from list
+                ablation_inds = np.array(list(set(ablation_inds)))
+                ablation_inds = treat_inds[ablation_inds]
+                excision_inds = np.setdiff1d(treat_inds, ablation_inds)
+
                 sim.people.treated[treat_inds] = True
                 sim.people.date_treated[treat_inds] = sim.t
 
                 # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
                 successfully_treated = []
-                for state in treat_states:
+                for state, (method, inds) in zip(treat_states, {'ablative': ablation_inds, 'excisional': excision_inds}.items()):
                     people_in_state = sim.people[state].any(axis=0)
-                    treat_state_inds = treat_inds[people_in_state[treat_inds]]
+                    treat_state_inds = inds[people_in_state[inds]]
                     # Determine whether treatment is successful
-                    eff_probs = np.full(len(treat_state_inds), treat_pars['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
+                    eff_probs = np.full(len(treat_state_inds), treat_pars[method]['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
                     to_eff_treat = hpu.binomial_arr(eff_probs) # Determine who will have effective treatment
                     eff_treat_inds = treat_state_inds[to_eff_treat]
                     successfully_treated += list(eff_treat_inds)
@@ -1122,7 +1118,7 @@ class Screening(Intervention):
                         # Determine whether infection persists
                         inf_inds = hpu.true(sim.people['infectious'][g, successfully_treated])
                         inf_inds = successfully_treated[inf_inds]
-                        persistence_probs = np.full(len(inf_inds), treat_pars['persistence'][sim['genotype_map'][g]],
+                        persistence_probs = np.full(len(inf_inds), treat_pars['ablative']['persistence'][sim['genotype_map'][g]],
                                                     dtype=hpd.default_float)  # Assign probabilities of infection persisting
 
                         # Determine who will have persistent infection, give them new prognoses
