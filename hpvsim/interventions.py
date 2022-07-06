@@ -373,7 +373,8 @@ class dynamic_pars(Intervention):
         return
 
 
-__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_num', 'Screening']
+#%% Vaccination
+__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_num']
 
 class BaseVaccination(Intervention):
     '''
@@ -876,9 +877,12 @@ class vaccinate_num(BaseVaccination):
         return vacc_inds
 
 
+#%% Screening and treatment
+__all__ += ['Screening']
+
 class Screening(Intervention):
     '''
-    Apply a screening program to a subset of the population.
+    Screen, triage, and treat a subset of the population.
 
     This base class implements the mechanism of screening people to identify and treat pre-cancerous lesions.
     Screening involves a series of standard operations to modify the trajectories of `hpv.People`. Screening algorithms
@@ -904,7 +908,8 @@ class Screening(Intervention):
     '''
 
     def __init__(self, primary_screen_test, treatment, screen_start_age, screen_interval, screen_stop_age,
-                 timepoints, prob=None, compliance=None, triage_screen_test=None, label=None, **kwargs):
+                 timepoints, prob=None, compliance=None, triage_screen_test=None, label=None,
+                 screen_states=None, treat_states=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.label = label  # Screening label (used as a dict key)
         self.p = None  # Screening parameters
@@ -918,9 +923,21 @@ class Screening(Intervention):
         self.screen_start_age = screen_start_age
         self.screen_interval = screen_interval
         self.screen_stop_age = screen_stop_age
+
+        # States that will return a positive screen results
+        if screen_states is None:
+            screen_states = ['infectious', 'cin1', 'cin2', 'cin3', 'cancerous']
+        self.screen_states = screen_states
+        # States eligible for pre-cancer treatment (NB, cancer treatment is handled separately)
+        if treat_states is None:
+            treat_states = ['cin1', 'cin2', 'cin3']
+        self.treat_states = treat_states
+
+        # Parse the screening and treatment parameters, which can be provided in different formats
         self._parse_screening_pars(screen=primary_screen_test)  # Populate
         self._parse_screening_pars(screen=triage_screen_test, triage=True)  # Populate
         self._parse_screening_pars(screen=treatment, treatment=True)  # Populate
+
         return
 
     def _parse_screening_pars(self, screen, triage=False, treatment=False):
@@ -1019,121 +1036,126 @@ class Screening(Intervention):
             # Calculate who actually gets screened
             screen_inds = hpu.true(hpu.binomial_arr(screen_probs))
 
-        return screen_inds
-
-
-    def screen(self, sim, screen_inds):
-        '''
-        Screen people
-
-        This method applies the screening to the requested people indices. The indices of people screened
-        is returned. These may be different to the requested indices, because anyone that is dead will be
-        skipped.
-
-        Args:
-            sim: A cv.Sim instance
-            screen_inds: An array of person indices to screen
-
-        Returns: An array of person indices of people screened
-        '''
-
-        # Perform checks
-        if len(screen_inds):
-
             # Set screening states and dates
             sim.people.screened[screen_inds] = True
             sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
             sim.people.date_next_screen[screen_inds] = sim.t + self.screen_interval/sim['dt'] #TODO: this should be different based on results? ie followup rescreen sooner
 
-            # Pull our parameters that will be used below
-            ng = sim['n_genotypes']
-            screen_states = ['infectious', 'cin1', 'cin2', 'cin3', 'cancerous']
-            treat_states = ['cin1', 'cin2', 'cin3']
-            primary_screen_pars = self.p['primary']
-            triage_screen_pars = self.p['triage']
-            treat_pars = self.p['treatment']
-            treat_eligibility = self.p['treatment_eligibility']
-
-            # Step 1, filter positives from primary screen
-            screen_pos = self.find_test_pos(screen_inds, primary_screen_pars, sim, screen_states)
-
-            # If anyone screens positive, continue
-            if len(screen_pos):
-
-                # Step 2, filter positives from triage (if appropriate)
-                if triage_screen_pars is not None:
-                    triage_probs = np.zeros(len(screen_pos))
-                    triage_probs.fill(self.compliance)
-                    triage_inds = hpu.true(hpu.binomial_arr(triage_probs))
-                    triage_inds = screen_pos[triage_inds]
-                    triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, screen_states)
-                    screen_pos = triage_pos
-
-                # Step 3, determine if any of screen positives have cancer, if so diagnose and refer
-                cancerous_inds = hpu.true(sim.people.cancerous.any(axis=0))
-                diagnosed_inds = np.intersect1d(screen_pos, cancerous_inds)
-                sim.people.diagnosed[diagnosed_inds] = True
-                screen_pos = np.setdiff1d(screen_pos, diagnosed_inds)
-
-                # Step 3, Determine who gets treated with what
-                treat_probs = np.full(len(screen_pos), self.compliance, dtype=hpd.default_float)
-                to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
-                treat_inds = screen_pos[to_treat]  # Indices of those who get treated
-                ablation_inds = []
-
-                for state in treat_states:
-                    ablate_probs = np.zeros(len(treat_inds))
-                    ablate_inds = hpu.true(sim.people[state][:,treat_inds].any(axis=0))
-                    ablate_probs[ablate_inds] = treat_eligibility['test_positivity'][state]
-                    ablate_inds = hpu.true(hpu.binomial_arr(ablate_probs))
-                    ablation_inds += list(ablate_inds)
-
-                # remove duplicates from list
-                ablation_inds = np.array(list(set(ablation_inds)))
-                ablation_inds = treat_inds[ablation_inds]
-                excision_inds = np.setdiff1d(treat_inds, ablation_inds)
-
-                sim.people.treated[treat_inds] = True
-                sim.people.date_treated[treat_inds] = sim.t
-
-                # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
-                successfully_treated = []
-                for state, (method, inds) in zip(treat_states, {'ablative': ablation_inds, 'excisional': excision_inds}.items()):
-                    people_in_state = sim.people[state].any(axis=0)
-                    treat_state_inds = inds[people_in_state[inds]]
-                    # Determine whether treatment is successful
-                    eff_probs = np.full(len(treat_state_inds), treat_pars[method]['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
-                    to_eff_treat = hpu.binomial_arr(eff_probs) # Determine who will have effective treatment
-                    eff_treat_inds = treat_state_inds[to_eff_treat]
-                    successfully_treated += list(eff_treat_inds)
-                    sim.people[state][:, eff_treat_inds] = False # People who get treated have their CINs removed
-                    sim.people[f'date_{state}'][:, eff_treat_inds] = np.nan
-
-                successfully_treated = np.array(list(set(successfully_treated)))
-
-                if len(successfully_treated)>0:
-
-                    for g in range(ng):
-                        # Determine whether infection persists
-                        inf_inds = hpu.true(sim.people['infectious'][g, successfully_treated])
-                        inf_inds = successfully_treated[inf_inds]
-                        persistence_probs = np.full(len(inf_inds), treat_pars['ablative']['persistence'][sim['genotype_map'][g]],
-                                                    dtype=hpd.default_float)  # Assign probabilities of infection persisting
-
-                        # Determine who will have persistent infection, give them new prognoses
-                        to_persist = hpu.binomial_arr(persistence_probs)
-                        persist_inds = inf_inds[to_persist]
-                        dur_hpv = (sim.t - sim.people.date_infectious[g,persist_inds])*sim['dt']
-                        hpu.set_prognoses(sim.people, persist_inds, g, dur_hpv)
-
-                        # Clear infection for women who clear
-                        to_clear = inf_inds[~to_persist]  # Determine who will clear infection
-                        sim.people['infectious'][g, to_clear] = False  # People whose HPV clears
-                        sim.people.dur_disease[g, to_clear] = (sim.t - sim.people.date_infectious[g, to_clear]) * sim['dt']
-                        hpi.update_peak_immunity(sim.people, to_clear, imm_pars=sim.pars, imm_source=g)
-
         return screen_inds
+
+
+    def screen(self, sim, screen_inds):
+        '''
+        Screen people
+        Args:
+            sim: hpv.Sim instance
+            screen_inds: An array of person indices to screen
+        Returns: TBC
+        '''
+
+        # parameters that will be used below
+        primary_screen_pars = self.p['primary']
+        triage_screen_pars = self.p['triage']
+        treat_pars = self.p['treatment']
+        treat_eligibility = self.p['treatment_eligibility']
+
+        # Step 1, filter positives from primary screen
+        screen_pos = self.find_test_pos(screen_inds, primary_screen_pars, sim, screen_states)
+
+        # If anyone screens positive, continue
+        if len(screen_pos):
+
+            # Step 2, filter positives from triage (if appropriate)
+            if triage_screen_pars is not None:
+                triage_probs = np.zeros(len(screen_pos))
+                triage_probs.fill(self.compliance)
+                triage_inds = hpu.true(hpu.binomial_arr(triage_probs))
+                triage_inds = screen_pos[triage_inds]
+                triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, screen_states)
+                screen_pos = triage_pos
+
+            # Step 3, determine if any of screen positives have cancer, if so diagnose and refer
+            cancerous_inds = hpu.true(sim.people.cancerous.any(axis=0))
+            diagnosed_inds = np.intersect1d(screen_pos, cancerous_inds)
+            sim.people.diagnosed[diagnosed_inds] = True
+            screen_pos = np.setdiff1d(screen_pos, diagnosed_inds)
+
+            # Step 4, Determine who gets treated with what
+            treat_probs = np.full(len(screen_pos), self.compliance, dtype=hpd.default_float)
+            to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
+            treat_inds = screen_pos[to_treat]  # Indices of those who get treated
+
+        return treat_inds
+
+
+    def treat(self, sim, treat_inds, treatment=None):
+        '''
+        Treat people
+
+        Args:
+            sim: hpv.Sim instance
+            treat_inds: An array of person indices to treat
+
+        Returns: TBC
+        '''
+
+        ablation_inds = []
+
+        for state in treat_states:
+            ablate_probs = np.zeros(len(treat_inds))
+            ablate_inds = hpu.true(sim.people[state][:,treat_inds].any(axis=0))
+            ablate_probs[ablate_inds] = treat_eligibility['test_positivity'][state]
+            ablate_inds = hpu.true(hpu.binomial_arr(ablate_probs))
+            ablation_inds += list(ablate_inds)
+
+        # remove duplicates from list
+        ablation_inds = np.array(list(set(ablation_inds)))
+        ablation_inds = treat_inds[ablation_inds]
+        excision_inds = np.setdiff1d(treat_inds, ablation_inds)
+
+        sim.people.treated[treat_inds] = True
+        sim.people.date_treated[treat_inds] = sim.t
+
+        # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
+        successfully_treated = []
+        for state in treat_states:
+            for (method, inds) in {'ablative': ablation_inds, 'excisional': excision_inds}.items():
+
+                people_in_state = sim.people[state].any(axis=0)
+                treat_state_inds = inds[people_in_state[inds]]
+                # Determine whether treatment is successful
+                eff_probs = np.full(len(treat_state_inds), treat_pars[method]['efficacy'][state], dtype=hpd.default_float)  # Assign probabilities of treatment success
+                to_eff_treat = hpu.binomial_arr(eff_probs) # Determine who will have effective treatment
+                eff_treat_inds = treat_state_inds[to_eff_treat]
+                successfully_treated += list(eff_treat_inds)
+                sim.people[state][:, eff_treat_inds] = False # People who get treated have their CINs removed
+                sim.people[f'date_{state}'][:, eff_treat_inds] = np.nan
+
+        successfully_treated = np.array(list(set(successfully_treated)))
+
+        if len(successfully_treated)>0:
+
+            for g in range(ng):
+                # Determine whether infection persists
+                inf_inds = hpu.true(sim.people['infectious'][g, successfully_treated])
+                inf_inds = successfully_treated[inf_inds]
+                persistence_probs = np.full(len(inf_inds), treat_pars['ablative']['persistence'][sim['genotype_map'][g]],
+                                            dtype=hpd.default_float)  # Assign probabilities of infection persisting
+
+                # Determine who will have persistent infection, give them new prognoses
+                to_persist = hpu.binomial_arr(persistence_probs)
+                persist_inds = inf_inds[to_persist]
+                dur_hpv = (sim.t - sim.people.date_infectious[g,persist_inds])*sim['dt']
+                hpu.set_prognoses(sim.people, persist_inds, g, dur_hpv)
+
+                # Clear infection for women who clear
+                to_clear = inf_inds[~to_persist]  # Determine who will clear infection
+                sim.people['infectious'][g, to_clear] = False  # People whose HPV clears
+                sim.people.dur_disease[g, to_clear] = (sim.t - sim.people.date_infectious[g, to_clear]) * sim['dt']
+                hpi.update_peak_immunity(sim.people, to_clear, imm_pars=sim.pars, imm_source=g)
+
+        return treat_inds
 
 
     def find_test_pos(self, screen_inds, pars, sim, states):
@@ -1157,10 +1179,14 @@ class Screening(Intervention):
     def apply(self, sim):
         ''' Perform vaccination each timestep '''
 
-        inds = self.select_people(sim)
-        if len(inds):
-            inds = self.screen(sim, inds)
-        return inds
+        screen_inds = self.select_people(sim)
+        if len(screen_inds): # Screen people
+            triage_inds = self.screen(sim, screen_inds) # Determine who is eligible for triage
+            if len(triage_inds): # Triage people
+                treat_inds = self.triage(sim, triage_inds) # Determine who is eligible for treatment
+                if len(treat_inds): # Treat people
+                    treat_inds = self.treat(sim, treat_inds)
+        return
 
 
     def shrink(self, in_place=True):
