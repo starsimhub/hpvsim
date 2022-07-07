@@ -224,9 +224,10 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                                   prob=screen_prop, compliance=compliance, compliance_cancer=cancer_compliance)
 
     az = hpv.age_results(
-        timepoints=['2025', '2030'],
-        result_keys=['total_cin3_prevalence'] # NB< not curerntly possible to request total_cin_prevalence since sim.people.cin doesn't exist. Should add this!
+        timepoints=['2030'],
+        result_keys=['total_cin_prevalence']
     )
+
 
     sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
