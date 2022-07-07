@@ -948,7 +948,7 @@ def get_screen_pars(screen=None):
     pars = dict(
         hpv = dict(
             test_positivity=dict(
-                infectious=0.56,
+                hpv=0.75,
                 cin1=0.8415,
                 cin2=0.93,
                 cin3=0.984,
@@ -959,7 +959,7 @@ def get_screen_pars(screen=None):
 
         hpv1618 = dict(
             test_positivity=dict(
-                infectious=0.56,
+                hpv=0.56,
                 cin1=0.8415,
                 cin2=0.93,
                 cin3=0.984,
@@ -970,7 +970,7 @@ def get_screen_pars(screen=None):
 
         via=dict(
             test_positivity=dict(
-                infectious=0.25,
+                hpv=0.25,
                 cin1=0.3,
                 cin2=0.45,
                 cin3=0.41,
@@ -980,7 +980,7 @@ def get_screen_pars(screen=None):
         ),
         via_triage=dict(
             test_positivity=dict(
-                infectious=0.98,
+                hpv=0.98,
                 cin1=0.97,
                 cin2=0.89,
                 cin3=0.79,
@@ -1009,8 +1009,9 @@ def get_treatment_pars(screen=None):
             hpv6=dict(dist='beta', par1=2, par2=7),
             hpv11=dict(dist='beta', par1=2, par2=7),
         ),
-        excisional = dict(
+        excisional=dict(
             efficacy=dict(
+                hpv=0,
                 cin1=0.936,
                 cin2=0.936,
                 cin3=0.936,
@@ -1018,6 +1019,7 @@ def get_treatment_pars(screen=None):
         ),
         ablative=dict(
             efficacy=dict(
+                hpv=0,
                 cin1=0.81,
                 cin2=0.81,
                 cin3=0.81,

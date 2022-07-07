@@ -54,6 +54,7 @@ class PeopleMeta(sc.prettyobj):
         self.states = [
             'susceptible',
             'infectious',
+            'hpv', # hpv in absence of any CIN
             'cin1',
             'cin2',
             'cin3',

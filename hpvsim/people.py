@@ -344,6 +344,7 @@ class People(hpb.BasePeople):
         filter_inds = filters.nonzero()[0]
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
+        self.hpv[genotype, inds] = False
         return len(inds)
 
     def check_cin2(self, genotype):
@@ -491,7 +492,6 @@ class People(hpb.BasePeople):
         dt = self.pars['dt']
 
         # Deal with genotype parameters
-        prog_keys       = ['rel_cin1_prob', 'rel_cin2_prob', 'rel_cin3_prob', 'rel_cancer_prob']
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
         durpars         = genotype_pars[genotype_map[g]]['dur']
@@ -509,6 +509,7 @@ class People(hpb.BasePeople):
         # Update states, genotype info, and flows
         self.susceptible[g, inds]   = False # Adjust states - set susceptible to false
         self.infectious[g, inds]    = True # Adjust states - set infectious to true
+        self.hpv[g, inds]           = True # Adjust states - set hpv to true
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:

@@ -930,11 +930,11 @@ class Screening(Intervention):
 
         # States that will return a positive screen results
         if screen_states is None:
-            screen_states = ['infectious', 'cin1', 'cin2', 'cin3', 'cancerous']
+            screen_states = ['hpv', 'cin1', 'cin2', 'cin3', 'cancerous']
         self.screen_states = screen_states
         # States eligible for pre-cancer treatment (NB, cancer treatment is handled separately)
         if treat_states is None:
-            treat_states = ['cin1', 'cin2', 'cin3']
+            treat_states = ['hpv', 'cin1', 'cin2', 'cin3']
         self.treat_states = treat_states
 
         # Parse the screening and treatment parameters, which can be provided in different formats
@@ -1187,12 +1187,14 @@ class Screening(Intervention):
                 # Determine who will have persistent infection, give them new prognoses
                 to_persist = hpu.binomial_arr(persistence_probs)
                 persist_inds = inf_inds[to_persist]
+                sim.people['hpv'][g, persist_inds] = True  # People whose HPV persists
                 dur_hpv = (sim.t - sim.people.date_infectious[g,persist_inds])*sim['dt']
                 hpu.set_prognoses(sim.people, persist_inds, g, dur_hpv)
 
                 # Clear infection for women who clear
                 to_clear = inf_inds[~to_persist]  # Determine who will clear infection
                 sim.people['infectious'][g, to_clear] = False  # People whose HPV clears
+                sim.people['hpv'][g, to_clear] = False  # People whose HPV clears
                 sim.people.dur_disease[g, to_clear] = (sim.t - sim.people.date_infectious[g, to_clear]) * sim['dt']
                 hpi.update_peak_immunity(sim.people, to_clear, imm_pars=sim.pars, imm_source=g)
 
