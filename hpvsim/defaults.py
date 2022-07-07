@@ -57,6 +57,7 @@ class PeopleMeta(sc.prettyobj):
             'cin1',
             'cin2',
             'cin3',
+            'cin',
             'cancerous',
             'alive', # Save this as a state so we can record population sizes
             'dead_cancer',
