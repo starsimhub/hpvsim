@@ -110,6 +110,7 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['rel_trans']['cin1']   = 1 # Baseline value. Assumption, need data
     pars['rel_trans']['cin2']   = 0.2 # Assumption, need data
     pars['rel_trans']['cin3']   = 0.05 # Assumption, need data
+    pars['rel_trans']['cancerous']   = 0.05 # Assumption, need data
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov

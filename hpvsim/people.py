@@ -364,18 +364,11 @@ class People(hpb.BasePeople):
         return len(inds)
 
     def check_cancer(self, genotype):
-        '''
-        Check for new progressions to cancer
-        Once an individual has cancer they are no longer susceptible to new HPV infections or CINs and no longer infectious
-        '''
+        ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
         self.cancerous[genotype, inds] = True
-        self.cin1[:, inds] = False # No longer counted as CIN1 for this genotype. TODO: should this be done for all genotypes?
-        self.cin2[:, inds] = False # No longer counted as CIN2
-        self.cin3[:, inds] = False # No longer counted as CIN3
-        self.susceptible[:, inds] = False # TODO: wouldn't this already be false?
-        self.infectious[:, inds] = False # TODO: consider how this will affect the totals
+        self.cin3[genotype, inds] = False # No longer counted as CIN3
         return len(inds)
 
 

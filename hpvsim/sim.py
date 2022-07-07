@@ -646,6 +646,7 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cin1] *= rel_trans_pars['cin1']
         rel_trans[people.cin2] *= rel_trans_pars['cin2']
         rel_trans[people.cin3] *= rel_trans_pars['cin3']
+        rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
         # Loop over layers
         ln = 0 # Layer number
