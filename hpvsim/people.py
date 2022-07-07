@@ -74,7 +74,7 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key in ['dead_other', 'vaccinated', 'screened', 'treated']: # ALl false at the beginning
+            if key in ['dead_other', 'vaccinated', 'screened', 'treated', 'diagnosed']: # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
             elif key == 'alive':  # All true at the beginning
                 self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
@@ -344,6 +344,7 @@ class People(hpb.BasePeople):
         filter_inds = filters.nonzero()[0]
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
+        self.hpv[genotype, inds] = False
         return len(inds)
 
     def check_cin2(self, genotype):
@@ -363,18 +364,11 @@ class People(hpb.BasePeople):
         return len(inds)
 
     def check_cancer(self, genotype):
-        '''
-        Check for new progressions to cancer
-        Once an individual has cancer they are no longer susceptible to new HPV infections or CINs and no longer infectious
-        '''
+        ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
         self.cancerous[genotype, inds] = True
-        self.cin1[:, inds] = False # No longer counted as CIN1 for this genotype. TODO: should this be done for all genotypes?
-        self.cin2[:, inds] = False # No longer counted as CIN2
-        self.cin3[:, inds] = False # No longer counted as CIN3
-        self.susceptible[:, inds] = False # TODO: wouldn't this already be false?
-        self.infectious[:, inds] = False # TODO: consider how this will affect the totals
+        self.cin3[genotype, inds] = False # No longer counted as CIN3
         return len(inds)
 
 
@@ -411,6 +405,7 @@ class People(hpb.BasePeople):
         # Now reset disease states
         self.susceptible[genotype, inds] = True
         self.infectious[genotype, inds] = False
+        self.hpv[genotype, inds]  = False
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
@@ -491,12 +486,9 @@ class People(hpb.BasePeople):
         dt = self.pars['dt']
 
         # Deal with genotype parameters
-        prog_keys       = ['rel_cin1_prob', 'rel_cin2_prob', 'rel_cin3_prob', 'rel_cancer_prob']
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
         durpars         = genotype_pars[genotype_map[g]]['dur']
-        progpars        = self.pars['prognoses']
-        cinprobs        = {k: self.pars[k] * genotype_pars[genotype_map[g]][k] for k in prog_keys}
 
         # Set all dates
         base_t = self.t + offset if offset is not None else self.t
@@ -511,6 +503,7 @@ class People(hpb.BasePeople):
         # Update states, genotype info, and flows
         self.susceptible[g, inds]   = False # Adjust states - set susceptible to false
         self.infectious[g, inds]    = True # Adjust states - set infectious to true
+        self.hpv[g, inds]           = True # Adjust states - set hpv to true
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:

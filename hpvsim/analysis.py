@@ -586,7 +586,7 @@ class age_results(Analyzer):
                 # Both annual stocks and prevalence require us to calculate the current stocks.
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
                 if rkey[0] == 'n' or 'prevalence' in rkey:
-                    attr = rkey.replace('n_','').replace('_prevalence','') # Name of the actual state
+                    attr = rkey[2:] if rkey[0] == 'n' else rkey.replace('_prevalence','') # Name of the actual state
                     if attr == 'hpv': attr = 'infectious' # People with HPV are referred to as infectious in the sim
                     if attr != 'cin': # This is stored differently
                         if 'total' in rkey:

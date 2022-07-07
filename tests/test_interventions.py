@@ -211,19 +211,23 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     }
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
-    screen_prop = .5
-    hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='ablative', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=10, timepoints='2010',
-                                  prob=screen_prop)
+    screen_prop = .7
+    compliance = .9
+    cancer_compliance = 0.5
+    hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=5, timepoints='2010',
+                                  prob=screen_prop, compliance=compliance, compliance_cancer=cancer_compliance)
 
-    cyto_screening = hpv.Screening(primary_screen_test='cytology', treatment='ablative', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=10, timepoints='2010',
-                                  prob=screen_prop)
+
+    hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
+                                  prob=screen_prop, compliance=compliance, compliance_cancer=cancer_compliance)
 
     az = hpv.age_results(
-        timepoints=['2025', '2030'],
-        result_keys=['total_cin3_prevalence'] # NB< not curerntly possible to request total_cin_prevalence since sim.people.cin doesn't exist. Should add this!
+        timepoints=['2030'],
+        result_keys=['total_cin_prevalence']
     )
+
 
     sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
@@ -241,10 +245,10 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                 'interventions': [hpv_screening],
             }
         },
-        'cyto_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {cyto_screening.label}',
+        'hpv_via_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
             'pars': {
-                'interventions': [cyto_screening],
+                'interventions': [hpv_via_screening],
             }
         },
     }
@@ -268,7 +272,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(to_plot=to_plot)
-        scens.plot_age_results(plot_type=sns.boxplot)
+        # scens.plot_age_results(plot_type=sns.boxplot)
 
     return scens
 

@@ -646,6 +646,7 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cin1] *= rel_trans_pars['cin1']
         rel_trans[people.cin2] *= rel_trans_pars['cin2']
         rel_trans[people.cin3] *= rel_trans_pars['cin3']
+        rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
         # Loop over layers
         ln = 0 # Layer number
@@ -677,6 +678,9 @@ class Sim(hpb.BaseSim):
         # Index for results
         idx = int(t / self.resfreq)
 
+        # Store whether people have any grade of CIN
+        people.cin = people.cin1 + people.cin2 + people.cin3
+
         # Update counts for this time step: flows
         for key,count in people.total_flows.items():
             self.results[key][idx] += count
@@ -694,20 +698,20 @@ class Sim(hpb.BaseSim):
 
             # Create total stocks
             for key in hpd.stock_keys:
-                if key not in ['alive', 'cin', 'vaccinated']:  # These are all special cases
+                if key not in ['alive', 'vaccinated']:  # These are all special cases
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
-                if key not in ['cin', 'susceptible']:
+                if key not in ['susceptible']:
                     # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
                     self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
-            # Do total CINs separately
-            for genotype in range(ng):
-                self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
-            self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
+            # # Do total CINs separately
+            # for genotype in range(ng):
+            #     self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
+            # self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
 
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])

@@ -50,13 +50,15 @@ class PeopleMeta(sc.prettyobj):
             'current_partners', # Int by relationship type
         ]
 
-        # Set the states that a person can be in, all booleans per person and per genotype except other_dead and vaccinated
+        # Set the states that a person can be in, all booleans per person and per genotype except other_dead, screened, vaccinated and treated
         self.states = [
             'susceptible',
             'infectious',
+            'hpv', # hpv in absence of any CIN
             'cin1',
             'cin2',
             'cin3',
+            'cin',
             'cancerous',
             'alive', # Save this as a state so we can record population sizes
             'dead_cancer',
@@ -64,6 +66,7 @@ class PeopleMeta(sc.prettyobj):
             'vaccinated',
             'screened',
             'treated',
+            'diagnosed'
         ]
 
         # Immune states, by genotype/vaccine
