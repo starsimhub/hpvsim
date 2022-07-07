@@ -1014,11 +1014,10 @@ class Screening(Intervention):
     def apply(self, sim):
         '''
         This method performs the entire screen-and-treat algorithm, using the following steps:
-            1. Select people to screen
-            2. Screen them using a defined primary screening algorithm
-            3. Optionally triage them using a secondary triage algorithm
+            1. Select people to screen and screen them using a defined primary screening algorithm
+            2. Optionally triage anyone who screens positive to find those eligible for treatment
             4. Select those who will be treated, accounting for compliance
-            5. Treat those who have screened positive with a defined treatment type
+            5. Treat those who agree to treatment with defined treatment types
 
         Args:
             sim: hpv.Sim instance
@@ -1205,36 +1204,3 @@ class Screening(Intervention):
         obj = super().shrink(in_place=in_place)
         return obj
 
-
-
-
-        # # If anyone screens positive, continue
-        # if len(screen_pos):
-        #
-        #     # Step 2, filter positives from triage (if appropriate)
-        #     if triage_screen_pars is not None:
-        #         triage_probs = np.zeros(len(screen_pos))
-        #         triage_probs.fill(self.compliance)
-        #         triage_inds = hpu.true(hpu.binomial_arr(triage_probs))
-        #         triage_inds = screen_pos[triage_inds]
-        #         triage_pos = self.find_test_pos(triage_inds, triage_screen_pars, sim, screen_states)
-        #         screen_pos = triage_pos
-        #
-        #     # Step 3, determine if any of screen positives have cancer, if so diagnose, treat
-        #     cancerous_inds = hpu.true(sim.people.cancerous.any(axis=0))
-        #     diagnosed_inds = np.intersect1d(screen_pos, cancerous_inds)
-        #     sim.people.diagnosed[diagnosed_inds] = True
-        #     ca_treat_probs = np.full(len(diagnosed_inds), self.compliance_cancer, dtype=hpd.default_float)
-        #     to_treat_ca = hpu.binomial_arr(
-        #         ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
-        #     ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
-        #
-        #     # Record eventual deaths from cancer (NB, assuming no survival without treatment)
-        #     new_dur_cancer = hpu.sample(**treat_pars['radiation']['dur'], size=len(ca_treat_inds))
-        #     sim.people.date_dead_cancer[:, ca_treat_inds] += np.ceil(new_dur_cancer / sim['dt'])
-        #     screen_pos = np.setdiff1d(screen_pos, diagnosed_inds)
-        #
-        #     # Step 4, Determine who gets treated with what
-        #     treat_probs = np.full(len(screen_pos), self.compliance, dtype=hpd.default_float)
-        #     to_treat = hpu.binomial_arr(treat_probs) # Determine who actually gets treated, after accounting for compliance
-        #     treat_inds = screen_pos[to_treat]  # Indices of those who get treated
