@@ -343,10 +343,8 @@ def get_screen_choices():
     choices = {
         'hpv':  ['hpv', 'hpvdna'],
         'hpv1618': ['hpv1618', 'hpvgenotyping'],
-        'cytology': ['cytology', 'pap', 'papsmear'],
         'via': ['via', 'visualinspection'],
         'via_triage': ['via_triage'],
-        'colposcopy': ['colposcopy', 'colpo'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -359,7 +357,8 @@ def get_treatment_choices():
     choices = {
         'default': ['default', None],
         'ablative':  ['ablative', 'thermal_ablation', 'TA'],
-        'excisional': ['excisional'],
+        'excisional': ['excisional', 'leep'],
+        'radiation': ['radiation']
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -535,9 +534,9 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.dur['cin3']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.rel_beta          = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv6.rel_cin1_prob     = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cin2_prob     = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cin3_prob     = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cancer_prob   = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cin2_prob     = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cin3_prob     = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.rel_cancer_prob   = 0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv6.imm_boost         = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
@@ -549,9 +548,9 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv11.rel_cin1_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv11.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv11.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv11.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.rel_cin2_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.rel_cin3_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.rel_cancer_prob  = 0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv11.imm_boost        = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
@@ -642,8 +641,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv31=0,  # Assumption
             hpv33=0,  # Assumption
             hpv45=0,  # Assumption
-            hpv52=1.0,  # Assumption
-            hpv58=0,  # Assumption
+            hpv52=0,  # Assumption
+            hpv58=1,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
 
@@ -969,17 +968,6 @@ def get_screen_pars(screen=None):
             inadequacy=0,
         ),
 
-        cytology = dict(
-            test_positivity=dict(
-                infectious=0.11,
-                cin1=0.5405,
-                cin2=0.5941,
-                cin3=0.7551,
-                cancerous=0.984,
-            ),
-            inadequacy=0.07,
-        ),
-
         via=dict(
             test_positivity=dict(
                 infectious=0.25,
@@ -1010,43 +998,34 @@ def get_treatment_pars(screen=None):
     '''
 
     pars = dict(
+        persistence=dict(
+            hpv16=dict(dist='beta', par1=2, par2=7),
+            hpv18=dict(dist='beta', par1=2, par2=7),
+            hpv31=dict(dist='beta', par1=2, par2=7),
+            hpv33=dict(dist='beta', par1=2, par2=7),
+            hpv45=dict(dist='beta', par1=2, par2=7),
+            hpv52=dict(dist='beta', par1=2, par2=7),
+            hpv58=dict(dist='beta', par1=2, par2=7),
+            hpv6=dict(dist='beta', par1=2, par2=7),
+            hpv11=dict(dist='beta', par1=2, par2=7),
+        ),
         excisional = dict(
             efficacy=dict(
                 cin1=0.936,
                 cin2=0.936,
                 cin3=0.936,
             ),
-            persistence=dict(
-                hpv16=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv18=0.66, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv31=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv33=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv45=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv52=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv58=0.524, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv6=0.25, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv11=0.25, # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-            )
         ),
-
         ablative=dict(
             efficacy=dict(
                 cin1=0.81,
                 cin2=0.81,
                 cin3=0.81,
             ),
-            persistence=dict(
-                hpv16=0.66,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv18=0.66,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv31=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv33=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv45=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv52=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv58=0.524,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv6=0.25,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-                hpv11=0.25,  # https://obgyn.onlinelibrary.wiley.com/doi/10.1111/jog.12196
-            )
         ),
+        radiation=dict(
+            dur=dict(dist='lognormal', par1=6.0, par2=3.0)
+        )
     )
 
     return _get_from_pars(pars, key=screen)
