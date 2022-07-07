@@ -405,6 +405,7 @@ class People(hpb.BasePeople):
         # Now reset disease states
         self.susceptible[genotype, inds] = True
         self.infectious[genotype, inds] = False
+        self.hpv[genotype, inds]  = False
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
