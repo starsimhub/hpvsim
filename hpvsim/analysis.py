@@ -591,16 +591,16 @@ class age_results(Analyzer):
                 # Both annual stocks and prevalence require us to calculate the current stocks.
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
                 if rkey[0] == 'n' or 'prevalence' in rkey:
-                    attr = rkey[2:] if rkey[0] == 'n' else rkey.replace('_prevalence','') # Name of the actual state
+                    attr = rkey.replace('total_','').replace('_prevalence','') # Name of the actual state
+                    if attr[0] == 'n': attr = attr[2:]
                     if attr == 'hpv': attr = 'infectious' # People with HPV are referred to as infectious in the sim
-                    if attr != 'cin': # This is stored differently
-                        if 'total' in rkey:
-                            inds = sim.people[attr.replace('total_','')].nonzero()  # Pull out people for which this state is true
-                            self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
-                        else:
-                            for g in range(ng):
-                                inds = sim.people[attr][g,:].nonzero()
-                                self.results[date][rkey][g,:] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                    if 'total' in rkey:
+                        inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
+                        self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                    else:
+                        for g in range(ng):
+                            inds = sim.people[attr][g,:].nonzero()
+                            self.results[date][rkey][g,:] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
 
                     if 'prevalence' in rkey:
                         # Need to divide by the right denominator
