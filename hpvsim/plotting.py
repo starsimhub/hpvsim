@@ -452,7 +452,7 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
             if args.show['legend']:
                 title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum==0) # Configure the title, grid, and legend -- only show legend for first
 
-    return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+    return tidy_up(fig, figs, do_save, fig_path, do_show, args)
 
 
 def plot_scen_age_results(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
