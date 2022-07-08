@@ -74,10 +74,12 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
             'name': f'50% of cleared infection are controlled by body',
             'pars': {
                 'hpv_control_prob': 0.5,
-                'hpv_reactivation': dict(
-                    age_cutoffs=np.array([0, 30, 50]),  # Age cutoffs (lower limits)
-                    hpv_reactivation_prons=np.array([0.0, 0.05, 0.1]),
-                )
+            }
+        },
+        '100%_latency': {
+            'name': f'100% of cleared infection are controlled by body',
+            'pars': {
+                'hpv_control_prob': 1,
             }
         },
     }
