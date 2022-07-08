@@ -919,19 +919,19 @@ class Screening(Intervention):
         self.p = None  # Screening parameters
         self.timepoints = timepoints
         if screen_compliance is None: # Populate default value of probability: 1
-            screen_compliance = 0.7
+            screen_compliance = 1
         self.screen_compliance = screen_compliance
         if triage_compliance is None: # Populate default value of compliance: 1
-            triage_compliance = 0.9
+            triage_compliance = 1
         self.triage_compliance = triage_compliance
         if excision_compliance is None: # Populate default value of compliance: 1
-            excision_compliance = 0.3
+            excision_compliance = 1
         self.excision_compliance = excision_compliance
         if ablation_compliance is None: # Populate default value of compliance: 1
-            ablation_compliance = 0.65
+            ablation_compliance = 1
         self.ablation_compliance = ablation_compliance
         if cancer_compliance is None: # Populate default value of cancer referral compliance: 1
-            cancer_compliance = 0.2
+            cancer_compliance = 1
         self.cancer_compliance = cancer_compliance
         self.screen_start_age = screen_start_age
         self.screen_interval = screen_interval
