@@ -585,22 +585,22 @@ class age_results(Analyzer):
             for rkey in self.result_keys: # Loop over each result, but only stocks are calculated here
 
                 # Initialize storage
-                size = na if rkey[:5] == 'total' else (ng,na)
+                size = na if 'total' in rkey else (ng,na)
                 self.results[date][rkey] = np.zeros(size)
 
                 # Both annual stocks and prevalence require us to calculate the current stocks.
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
                 if rkey[0] == 'n' or 'prevalence' in rkey:
                     attr = rkey[2:] if rkey[0] == 'n' else rkey.replace('_prevalence','') # Name of the actual state
+                    attr = attr.replace('total_','')
                     if attr == 'hpv': attr = 'infectious' # People with HPV are referred to as infectious in the sim
-                    if attr != 'cin': # This is stored differently
-                        if 'total' in rkey:
-                            inds = sim.people[attr.replace('total_','')].nonzero()  # Pull out people for which this state is true
-                            self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
-                        else:
-                            for g in range(ng):
-                                inds = sim.people[attr][g,:].nonzero()
-                                self.results[date][rkey][g,:] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                    if 'total' in rkey:
+                        inds = sim.people[attr].any(axis=0).nonzero()[-1]  # Pull out people for which this state is true
+                        self.results[date][rkey] = np.histogram(age[inds], bins=self.edges)[0] * scale  # Bin the people
+                    else:
+                        for g in range(ng):
+                            inds = sim.people[attr][g,:].nonzero()[-1]
+                            self.results[date][rkey][g,:] = np.histogram(age[inds], bins=self.edges)[0] * scale  # Bin the people
 
                     if 'prevalence' in rkey:
                         # Need to divide by the right denominator
