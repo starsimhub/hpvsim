@@ -213,7 +213,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
     screen_prop = .7
     compliance = .9
-    cancer_compliance = 0.5
+    cancer_compliance = 0.2
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=5, timepoints='2010',
                                   prob=screen_prop, compliance=compliance, compliance_cancer=cancer_compliance)
@@ -277,6 +277,97 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     return scens
 
 
+def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test screening LTFU params')
+
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
+    verbose = .1
+    debug = 0
+    n_agents = 50e3
+
+    pars = {
+        'pop_size': n_agents,
+        'n_years': 60,
+        'burnin': 30,
+        'start': 1970,
+        'genotypes': [hpv16, hpv18],
+        'pop_scale' : 25.2e6 / n_agents,
+        'location': 'tanzania',
+        'dt': .2,
+    }
+
+    # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
+    hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=5, timepoints='2010',
+                                  screen_compliance=0.7, triage_compliance=0.9, cancer_compliance=0.2,
+                                  excision_compliance=0.2, ablation_compliance=0.7)
+
+
+    hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
+                                      screen_compliance=0.7, triage_compliance=0.9, cancer_compliance=0.2,
+                                      excision_compliance=0.2, ablation_compliance=0.7)
+
+    hpv_via_screening_more_ltfu = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage, more LTFU',
+                                      screen_compliance=0.7, triage_compliance=0.6, cancer_compliance=0.2,
+                                      excision_compliance=0.1, ablation_compliance=0.5)
+
+    az = hpv.age_results(
+        timepoints=['2030'],
+        result_keys=['total_cin_prevalence']
+    )
+
+
+    sim = hpv.Sim(pars=pars, analyzers=[az])
+    n_runs = 3
+
+    # Define the scenarios
+    scenarios = {
+        'hpv_screening': {
+            'name': f'Screen 70% of 30-50y women with {hpv_screening.label}',
+            'pars': {
+                'interventions': [hpv_screening],
+            }
+        },
+        'hpv_via_screening': {
+            'name': f'Screen 70% of 30-50y women with {hpv_via_screening.label}',
+            'pars': {
+                'interventions': [hpv_via_screening],
+            }
+        },
+        'hpv_via_screening_more_ltfu': {
+            'name': f'Screen 70% of 30-50y women with {hpv_via_screening_more_ltfu.label}',
+            'pars': {
+                'interventions': [hpv_via_screening_more_ltfu],
+            }
+        },
+    }
+
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV prevalence': [
+                'total_hpv_prevalence',
+            ],
+            'CIN prevalence': [
+                'total_cin_prevalence',
+            ],
+            'Cancers per 100,000 women': [
+                'total_cancer_incidence',
+            ],
+        }
+        scens.plot(to_plot=to_plot)
+        # scens.plot_age_results(plot_type=sns.boxplot)
+
+    return scens
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -286,7 +377,8 @@ if __name__ == '__main__':
     # sim0 = test_dynamic_pars()
     # scens1 = test_vaccinate_prob(do_plot=True)
     # scens2 = test_vaccinate_num(do_plot=True)
-    scens3 = test_screening(do_plot=True)
+    # scens3 = test_screening(do_plot=True)
+    scens4 = test_screening_ltfu(do_plot=True)
 
     sc.toc(T)
     print('Done.')
