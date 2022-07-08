@@ -953,6 +953,7 @@ def get_screen_pars(screen=None):
 
     pars = dict(
         hpv = dict(
+            by_genotype=False,
             test_positivity=dict(
                 hpv=0.75,
                 cin1=0.8415,
@@ -964,17 +965,69 @@ def get_screen_pars(screen=None):
         ),
 
         hpv1618 = dict(
+            by_genotype=True,
             test_positivity=dict(
-                hpv=0.56,
-                cin1=0.8415,
-                cin2=0.93,
-                cin3=0.984,
-                cancerous=0.984,
+                hpv=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin1=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin2=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin3=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cancerous=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
             ),
             inadequacy=0,
         ),
 
         via=dict(
+            by_genotype=False,
             test_positivity=dict(
                 hpv=0.25,
                 cin1=0.3,
@@ -985,6 +1038,7 @@ def get_screen_pars(screen=None):
             inadequacy=0,
         ),
         via_triage=dict(
+            by_genotype=False,
             test_positivity=dict(
                 hpv=0.98,
                 cin1=0.97,

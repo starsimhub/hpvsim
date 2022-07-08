@@ -1115,10 +1115,19 @@ class Screening(Intervention):
         screen_pos = []
         for state in states:
             screen_probs = np.zeros(len(screen_inds))
-            tp_inds = hpu.true(sim.people[state][:,screen_inds].any(axis=0))
-            screen_probs[tp_inds] = pars['test_positivity'][state]
-            screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-            screen_pos += list(screen_pos_inds)
+            if pars['by_genotype']:
+                for g in range(sim['n_genotypes']):
+                    tp_inds = hpu.true(sim.people[state][g, screen_inds])
+                    screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
+                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                    screen_pos += list(screen_pos_inds)
+
+            else:
+                tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
+                screen_probs[tp_inds] = pars['test_positivity'][state]
+                screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                screen_pos += list(screen_pos_inds)
+
         screen_pos = np.array(screen_pos)
         if len(screen_pos)>0:
             screen_pos = screen_inds[screen_pos]
