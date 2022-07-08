@@ -585,7 +585,7 @@ class age_results(Analyzer):
             for rkey in self.result_keys: # Loop over each result, but only stocks are calculated here
 
                 # Initialize storage
-                size = na if rkey[:5] == 'total' else (ng,na)
+                size = na if 'total' in rkey else (ng,na)
                 self.results[date][rkey] = np.zeros(size)
 
                 # Both annual stocks and prevalence require us to calculate the current stocks.
