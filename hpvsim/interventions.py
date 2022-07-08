@@ -912,7 +912,7 @@ class Screening(Intervention):
 
     def __init__(self, primary_screen_test, treatment, screen_start_age, screen_interval, screen_stop_age,
                  timepoints, screen_compliance=None, triage_compliance=None, ablation_compliance=None, excision_compliance=None,
-                 cancer_compliance=None, triage_screen_test=None, label=None,
+                 cancer_compliance=None, triage_screen_test=None, screen_fu_neg_triage=None, label=None,
                  screen_states=None, treat_states=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.label = label  # Screening label (used as a dict key)
@@ -933,6 +933,9 @@ class Screening(Intervention):
         if cancer_compliance is None: # Populate default value of cancer referral compliance: 1
             cancer_compliance = 1
         self.cancer_compliance = cancer_compliance
+        if screen_fu_neg_triage is None: # Populate default value of follow up after -ve triage: 1 year
+            screen_fu_neg_triage = 1
+        self.screen_fu_neg_triage = screen_fu_neg_triage
         self.screen_start_age = screen_start_age
         self.screen_interval = screen_interval
         self.screen_stop_age = screen_stop_age
@@ -1050,13 +1053,13 @@ class Screening(Intervention):
                     triage_probs = np.full(len(screen_pos_inds), self.triage_compliance, dtype=hpd.default_float)
                     to_triage = hpu.binomial_arr(triage_probs)
                     triage_inds = screen_pos_inds[to_triage]  # Indices of those who get treated
-                    treat_eligible_inds = self.screen(triage_inds, triage_screen_pars, sim, self.screen_states) # Determine who is eligible for treatment
+                    treat_eligible_inds = self.screen(triage_inds, triage_screen_pars, sim, self.screen_states, triage=True) # Determine who is eligible for treatment
 
                 else:
                     treat_eligible_inds = screen_pos_inds
 
                 # 3. Select people to treat and determine the method of treatment for each of them
-                ca_treat_inds, ablation_inds, excision_inds = self.select_people_treat(sim, treat_eligible_inds, treat_eligibility_pars, treat_pars)
+                ca_treat_inds, ablation_inds, excision_inds = self.select_people_treat(sim, treat_eligible_inds, treat_eligibility_pars)
 
                 # 4. Treat people
                 if len(ca_treat_inds):
@@ -1102,12 +1105,12 @@ class Screening(Intervention):
             sim.people.screened[screen_inds] = True
             sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
-            sim.people.date_next_screen[screen_inds] = sim.t + self.screen_interval/sim['dt'] #TODO: this should be different based on results? ie followup rescreen sooner
+            sim.people.date_next_screen[screen_inds] = sim.t + self.screen_interval/sim['dt']
 
         return screen_inds
 
 
-    def screen(self, screen_inds, pars, sim, states):
+    def screen(self, screen_inds, pars, sim, states, triage=False):
         ''' Screen or triage people '''
         screen_pos = []
         for state in states:
@@ -1120,10 +1123,13 @@ class Screening(Intervention):
         if len(screen_pos)>0:
             screen_pos = screen_inds[screen_pos]
 
+        if triage:
+            screen_neg = np.setdiff1d(screen_inds, screen_pos)
+            sim.people.date_next_screen[screen_neg] = sim.t + self.screen_fu_neg_triage / sim['dt'] # primary +ve/ triage -ve follow up sooner
         return screen_pos
 
 
-    def select_people_treat(self, sim, treat_eligible_inds, treat_eligibility_pars, treat_pars):
+    def select_people_treat(self, sim, treat_eligible_inds, treat_eligibility_pars):
         ''' Select people to treat and determine what kind of treatment they should receive '''
 
         # First treat cancer
@@ -1133,6 +1139,8 @@ class Screening(Intervention):
         ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
         to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
         ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
+        ca_LTFU_inds = diagnosed_inds[~to_treat_ca]
+        sim.people.date_next_screen[ca_LTFU_inds] = np.nan
 
         # Everyone remaining is eligible for precancer treatment
         preca_treat_eligible_inds = np.setdiff1d(treat_eligible_inds, diagnosed_inds) # Indices of those eligible for precancer treatment
@@ -1154,10 +1162,14 @@ class Screening(Intervention):
         ablate_treat_probs = np.full(len(ablation_eligible_inds), self.ablation_compliance, dtype=hpd.default_float)
         to_ablate = hpu.binomial_arr(ablate_treat_probs)
         ablation_inds = ablation_eligible_inds[to_ablate]  # Indices of those who get treated
+        ablate_LTFU_inds = ablation_eligible_inds[~to_ablate]
+        sim.people.date_next_screen[ablate_LTFU_inds] = np.nan
 
         excision_treat_probs = np.full(len(excision_eligible_inds), self.excision_compliance, dtype=hpd.default_float)
         to_excise = hpu.binomial_arr(excision_treat_probs)
         excision_inds = excision_eligible_inds[to_excise]  # Indices of those who get treated
+        excision_LTFU_inds = excision_eligible_inds[~to_excise]
+        sim.people.date_next_screen[excision_LTFU_inds] = np.nan
 
 
         # Set properties
