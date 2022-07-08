@@ -432,6 +432,7 @@ class age_results(Analyzer):
     Args:
         timepoints  (list): list of ints/strings/date objects, timepoints at which to generate by-age results
         results     (list): list of strings, results to generate
+        age_standardized (bool): whether or not to provide age-standardized results
         die         (bool): whether or not to raise an exception if errors are found
         kwargs      (dict): passed to Analyzer()
 
@@ -441,7 +442,7 @@ class age_results(Analyzer):
         age_results = sim['analyzers'][0]
     '''
 
-    def __init__(self, timepoints, edges=None, result_keys=None, age_labels=None, datafile=None, die=False, **kwargs):
+    def __init__(self, timepoints, edges=None, result_keys=None, age_labels=None, age_standardized=False, datafile=None, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         timepoints          = sc.promotetolist(timepoints) # Combine multiple timepoints
         self.timepoints     = timepoints
@@ -453,6 +454,8 @@ class age_results(Analyzer):
         self.dates          = None # Representations in terms of years, e.g. 2020.4, set during initialization
         self.start          = None # Store the start year of the simulation
         self.age_labels     = age_labels # Labels for the age bins - will be automatically generated if not provided
+        self.age_standard   = None
+        self.age_standardized = age_standardized # Whether or not to compute age-standardized results
         self.result_keys    = result_keys # Store the result keys
         self.results        = sc.odict() # Store the age results
         return
@@ -487,6 +490,13 @@ class age_results(Analyzer):
         self.bins = self.edges[:-1] # Don't include the last edge in the bins
         if self.age_labels is None:
             self.age_labels = [f'{int(self.bins[i])}-{int(self.bins[i+1])}' for i in range(len(self.bins)-1)]
+            self.age_labels.append(f'{int(self.bins[-1])}+')
+
+        if self.age_standardized:
+            self.age_standard = self.get_standard_population()
+            self.edges = self.age_standard[0]
+            self.bins = self.edges[:-1]  # Don't include the last edge in the bins
+            self.age_labels = [f'{int(self.bins[i])}-{int(self.bins[i + 1])}' for i in range(len(self.bins) - 1)]
             self.age_labels.append(f'{int(self.bins[-1])}+')
 
         # Handle result keys
@@ -570,10 +580,10 @@ class age_results(Analyzer):
         Returns the WHO standard population for computation of age-standardized rates
         '''
 
-        age_standard = np.array([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100],
+        age_standard = np.array([[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100],
                                 [0.08860, 0.08690, 0.086, 0.0847, 0.0822, 0.0793, 0.0761, 0.0715, 0.0659, 0.0604,
                                  0.0537, 0.0455, 0.0372, 0.0296, 0.0221, 0.0152, 0.0091, 0.0044, 0.0015, 0.0004,
-                                 0.00005])
+                                 0.00005]])
         return age_standard
 
 
