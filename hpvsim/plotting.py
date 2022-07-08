@@ -287,19 +287,19 @@ def title_grid_legend(ax, title, grid, commaticks, setylim, legend_args, show_ar
 
 
 
-def tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args):
+def tidy_up(fig, figs=None, do_save=False, fig_path=None, do_show=False, args=None):
     ''' Handle saving, figure showing, and what value to return '''
 
     figlist = sc.mergelists(fig, figs) # Usually just one figure, but here for completeness
 
     # Optionally maximize -- does not work on all systems
-    if args.show['maximize']:
+    if args is not None and hasattr(args, 'show') and args.show['maximize']:
         for f in figlist:
             sc.maximize(fig=f)
         pl.pause(0.01) # Force refresh
 
     # Use tight layout for all figures
-    if args.show['tight']:
+    if args is not None and hasattr(args, 'show') and args.show['tight']:
         for f in figlist:
             sc.figlayout(fig=f)
 
@@ -386,7 +386,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                 plot_interventions(sim, ax) # Plot the interventions
             title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
-        output = tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+        output = tidy_up(fig, figs, do_save, fig_path, do_show, args)
 
     return output
 

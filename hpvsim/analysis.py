@@ -319,7 +319,8 @@ class age_pyramid(Analyzer):
         return
 
 
-    def plot(self, m_color='#4682b4', f_color='#ee7989', fig_args=None, axis_args=None, data_args=None, percentages=True, **kwargs):
+    def plot(self, m_color='#4682b4', f_color='#ee7989', fig_args=None, axis_args=None, data_args=None,
+             percentages=True, do_save=None, fig_path=None, do_show=True, **kwargs):
         '''
         Plot the age pyramids
 
@@ -330,6 +331,9 @@ class age_pyramid(Analyzer):
             axis_args (dict): passed to pl.subplots_adjust()
             data_args (dict): 'width', 'color', and 'offset' arguments for the data
             percentages (bool): whether to plot the pyramid as percentages or numbers
+            do_save (bool): whether to save
+            fig_path (str or filepath): filepath to save to
+            do_show (bool): whether to show the figure
             kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
         '''
 
@@ -337,6 +341,7 @@ class age_pyramid(Analyzer):
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
         axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
         d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
+        all_args = sc.mergedicts(fig_args, axis_args, d_args)
 
         # Initialize
         fig = pl.figure(**fig_args)
@@ -417,8 +422,7 @@ class age_pyramid(Analyzer):
 
                     count += 1
 
-
-        return hppl.handle_show_return(figs=fig)
+        return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
 
 
 
