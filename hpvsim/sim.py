@@ -675,6 +675,17 @@ class Sim(hpb.BaseSim):
 
             ln += 1
 
+        # Determine if there are any reactivated infections on this timestep
+        for g in range(ng):
+            latent_inds = hpu.true(people.latent[g,:])
+            if len(latent_inds):
+                age_inds = np.digitize(people.age[latent_inds], self['hpv_reactivation']['age_cutoffs'])-1 # convert ages to indices
+                reactivation_probs = self['hpv_reactivation']['hpv_reactivation_probs'][age_inds]
+                is_reactivated = hpu.binomial_arr(reactivation_probs)
+                reactivated_inds = latent_inds[is_reactivated]
+                people.infect(inds=reactivated_inds, g=g, layer='reactivation')
+
+
         # Index for results
         idx = int(t / self.resfreq)
 

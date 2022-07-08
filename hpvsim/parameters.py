@@ -75,6 +75,11 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['rel_cancer_prob'] = 1.0  # Scale factor for proportion of CIN that develop into cancer
     pars['rel_death_prob'] = 1.0  # Scale factor for proportion of cancer cases that result in death
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
+    pars['hpv_control_prob'] = 0.0 # Probability that HPV is controlled latently vs. cleared
+    pars['hpv_reactivation'] = dict(
+        age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
+        hpv_reactivation_probs  = np.array([0.01,    0.05,        0.08]),      # made this up, need to parameterize somehow
+    )
 
     # Parameters used to calculate immunity
     pars['imm_init'] = dict(dist='beta', par1=5, par2=3)  # beta distribution for initial level of immunity following infection clearance

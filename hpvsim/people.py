@@ -404,16 +404,26 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('infectious', genotype)
         inds = self.check_inds_true(self.infectious[genotype,:], self.date_clearance[genotype,:], filter_inds=filter_inds)
 
+        # Determine who clears and who controls
+        latent_probs = np.full(len(inds), self.pars['hpv_control_prob'], dtype=hpd.default_float)
+        latent_bools = hpu.binomial_arr(latent_probs)
+        latent_inds = inds[latent_bools]
+        cleared_inds = inds[~latent_bools]
+
         # Now reset disease states
-        self.susceptible[genotype, inds] = True
+        self.susceptible[genotype, cleared_inds] = True
         self.infectious[genotype, inds] = False
         self.hpv[genotype, inds]  = False
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
 
+        if len(latent_inds):
+            self.latent[genotype, latent_inds] = True
+            self.date_clearance[genotype, latent_inds] = np.nan
+
         # Update immunity
-        hpimm.update_peak_immunity(self, inds, imm_pars=self.pars, imm_source=genotype)
+        hpimm.update_peak_immunity(self, cleared_inds, imm_pars=self.pars, imm_source=genotype)
 
         return
 
@@ -501,6 +511,12 @@ class People(hpb.BasePeople):
         self.total_flows['total_reinfections']  += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         for key in ['date_clearance']:
             self[key][g, inds] = np.nan
+
+        # Count reactivations
+        if layer == 'reactivation':
+            self.flows['reactivations'][g] += len(inds)
+            self.total_flows['total_reactivations'] += len(inds)
+            self.latent[g, inds] = False # Adjust states -- no longer latent
 
         # Update states, genotype info, and flows
         self.susceptible[g, inds]   = False # Adjust states - set susceptible to false
