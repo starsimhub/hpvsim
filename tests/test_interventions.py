@@ -229,8 +229,8 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                                           triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
     az = hpv.age_results(
-        timepoints=['2030'],
-        result_keys=['total_cin_prevalence']
+        timepoints=['2020'],
+        result_keys=['total_hpv_prevalence']
     )
 
 
@@ -244,24 +244,24 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             'pars': {
             }
         },
-        'hpv_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-            'pars': {
-                'interventions': [hpv_screening],
-            }
-        },
-        'hpv_via_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
-            'pars': {
-                'interventions': [hpv_via_screening],
-            }
-        },
-        'hpv_hpv1618_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
-            'pars': {
-                'interventions': [hpv_hpv1618_screening],
-            }
-        },
+        # 'hpv_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_screening],
+        #     }
+        # },
+        # 'hpv_via_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_via_screening],
+        #     }
+        # },
+        # 'hpv_hpv1618_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_hpv1618_screening],
+        #     }
+        # },
     }
 
     metapars = {'n_runs': n_runs}
@@ -283,7 +283,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(to_plot=to_plot)
-        # scens.plot_age_results(plot_type=sns.boxplot)
+        scens.plot_age_results(plot_type=sns.boxplot)
 
     return scens
 

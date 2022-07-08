@@ -527,7 +527,7 @@ def plot_scen_age_results(to_plot=None, scens=None, do_save=None, fig_path=None,
                 pnum +=1
 
 
-    return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+    return tidy_up(fig, figs, do_save, fig_path, do_show, args)
 
 
 def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, scatter_args=None,
