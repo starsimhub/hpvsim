@@ -78,7 +78,7 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['hpv_control_prob'] = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
-        hpv_reactivation_prons  = np.array([0.01,    0.05,        0.08]),      # made this up, need to parameterize somehow
+        hpv_reactivation_probs  = np.array([0.01,    0.05,        0.08]),      # made this up, need to parameterize somehow
     )
 
     # Parameters used to calculate immunity
