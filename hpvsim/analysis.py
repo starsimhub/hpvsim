@@ -546,6 +546,7 @@ class age_results(Analyzer):
         # Handle variable names (TODO, should this be centralized somewhere?)
         self.mapping = {
             'infections': ['date_infectious', 'infectious'],
+            'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
             'cin1': ['date_cin1', 'cin1'],
             'cin2': ['date_cin2', 'cin2'],
             'cin3': ['date_cin3', 'cin3'],
@@ -581,7 +582,7 @@ class age_results(Analyzer):
             age = sim.people.age # Get the age distribution
             scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
 
-            for rkey in self.result_keys: # Loop over each result
+            for rkey in self.result_keys: # Loop over each result, but only stocks are calculated here
 
                 # Initialize storage
                 size = na if rkey[:5] == 'total' else (ng,na)
@@ -638,7 +639,7 @@ class age_results(Analyzer):
                     if 'incidence' in rkey:
                         # Need to divide by the right denominator
                         if 'hpv' in rkey: # Denominator is susceptible population
-                            denom = (np.histogram(age[sim.people.susceptible.nonzero()[-1]], bins=self.edges)[0] * scale)
+                            denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=self.edges)[0] * scale)
                         else:  # Denominator is females
                             denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)
                         if 'total' not in rkey: denom = denom[None,:]
@@ -651,7 +652,8 @@ class age_results(Analyzer):
         return
 
 
-    def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8, **kwargs):
+    def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8,
+             do_save=None, fig_path=None, do_show=True, **kwargs):
         '''
         Plot the age results
 
@@ -659,7 +661,10 @@ class age_results(Analyzer):
             fig_args (dict): passed to pl.figure()
             axis_args (dict): passed to pl.subplots_adjust()
             data_args (dict): 'width', 'color', and 'offset' arguments for the data
-            percentages (bool): whether to plot the pyramid as percentages or numbers
+            width (float): width of the bars
+            do_save (bool): whether to save
+            fig_path (str or filepath): filepath to save to
+            do_show (bool): whether to show the figure
             kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
         '''
 
@@ -667,6 +672,7 @@ class age_results(Analyzer):
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
         axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
         d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
+        all_args = sc.mergedicts(fig_args, axis_args, d_args)
 
         # Initialize
         fig = pl.figure(**fig_args)
@@ -733,4 +739,5 @@ class age_results(Analyzer):
                 col_count+=1
 
 
-        return hppl.handle_show_return(figs=fig)
+        return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
+
