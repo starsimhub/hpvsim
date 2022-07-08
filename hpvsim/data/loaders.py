@@ -178,7 +178,7 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     '''
     # Load the raw data
     try:
-        df = sc.load('../data/lx.obj')
+        df = sc.load('../hpvsim/data/lx.obj')
     except ValueError as E:
         errormsg = f'Could not locate datafile with age-specific death rates by country. Please run data/get_death_data.py first.'
         raise ValueError(errormsg)
@@ -229,7 +229,7 @@ def get_birth_rates(location=None):
     '''
     # Load the raw data
     try:
-        birth_rate_data = sc.load('../data/birth_rates.obj')
+        birth_rate_data = sc.load('../hpvsim/data/birth_rates.obj')
     except ValueError as E:
         errormsg = f'Could not locate datafile with birth rates by country. Please run data/get_birth_data.py first.'
         raise ValueError(errormsg)
