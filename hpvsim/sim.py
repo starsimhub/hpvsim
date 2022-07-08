@@ -708,11 +708,6 @@ class Sim(hpb.BaseSim):
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
-            # # Do total CINs separately
-            # for genotype in range(ng):
-            #     self.results[f'n_cin'][genotype, idx] = self.results[f'n_cin1'][genotype, idx] + self.results[f'n_cin2'][genotype, idx] + self.results[f'n_cin3'][genotype, idx]
-            # self.results[f'n_total_cin'][idx] = self.results[f'n_total_cin1'][idx] + self.results[f'n_total_cin2'][idx] + self.results[f'n_total_cin3'][idx]
-
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
             self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
@@ -803,10 +798,9 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Fix the last timepoint
-        if self.t % self.resfreq != self.resfreq-1: # This means we didn't get to accumulate all points in the final year
-            for reskey in hpd.flow_keys:
-                self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-                self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+        for reskey in hpd.flow_keys:
+            self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+            self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
 
         # Scale the results
         for reskey in self.result_keys():

@@ -519,7 +519,7 @@ class Options(sc.objdict):
         # Handle other keywords
         for key,value in kwargs.items():
             if key not in pl.rcParams:
-                errormsg = f'Key "{key}" does not match any value in Covasim options or pl.rcParams'
+                errormsg = f'Key "{key}" does not match any value in HPVsim options or pl.rcParams'
                 raise sc.KeyNotFoundError(errormsg)
             elif value is not None:
                 rc[key] = value
