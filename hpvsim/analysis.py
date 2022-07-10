@@ -551,6 +551,7 @@ class age_results(Analyzer):
             'cin2': ['date_cin2', 'cin2'],
             'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
+            'cancer': ['date_cancerous', 'cancerous'],
         }
 
         # Store colors
@@ -594,6 +595,7 @@ class age_results(Analyzer):
                     attr = rkey.replace('total_','').replace('_prevalence','') # Name of the actual state
                     if attr[0] == 'n': attr = attr[2:]
                     if attr == 'hpv': attr = 'infectious' # People with HPV are referred to as infectious in the sim
+                    if attr == 'cancer': attr = 'cancerous'
                     if 'total' in rkey:
                         inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
                         self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
