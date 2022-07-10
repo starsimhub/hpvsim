@@ -235,60 +235,57 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
 
     sim = hpv.Sim(pars=pars, analyzers=[az])
-    sim.run()
-    sim.plot()
-    return sim
-    # n_runs = 3
-    #
-    # # Define the scenarios
-    # scenarios = {
-    #     'no_screening_rsa': {
-    #         'name': 'No screening',
-    #         'pars': {
-    #         }
-    #     },
-    #     # 'hpv_screening': {
-    #     #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-    #     #     'pars': {
-    #     #         'interventions': [hpv_screening],
-    #     #     }
-    #     # },
-    #     # 'hpv_via_screening': {
-    #     #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
-    #     #     'pars': {
-    #     #         'interventions': [hpv_via_screening],
-    #     #     }
-    #     # },
-    #     # 'hpv_hpv1618_screening': {
-    #     #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
-    #     #     'pars': {
-    #     #         'interventions': [hpv_hpv1618_screening],
-    #     #     }
-    #     # },
-    # }
-    #
-    # metapars = {'n_runs': n_runs}
-    #
-    # scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
-    # scens.run(verbose=verbose, debug=debug)
-    # scens.compare()
-    #
-    # if do_plot:
-    #     to_plot = {
-    #         'HPV prevalence': [
-    #             'total_hpv_prevalence',
-    #         ],
-    #         'CIN prevalence': [
-    #             'total_cin_prevalence',
-    #         ],
-    #         'Cancers per 100,000 women': [
-    #             'total_cancer_incidence',
-    #         ],
-    #     }
-    #     scens.plot(to_plot=to_plot)
-    #     scens.plot_age_results(plot_type=sns.boxplot)
-    #
-    # return scens
+    n_runs = 3
+
+    # Define the scenarios
+    scenarios = {
+        'no_screening_rsa': {
+            'name': 'No screening',
+            'pars': {
+            }
+        },
+        # 'hpv_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_screening],
+        #     }
+        # },
+        # 'hpv_via_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_via_screening],
+        #     }
+        # },
+        # 'hpv_hpv1618_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_hpv1618_screening],
+        #     }
+        # },
+    }
+
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV prevalence': [
+                'total_hpv_prevalence',
+            ],
+            'CIN prevalence': [
+                'total_cin_prevalence',
+            ],
+            'Cancers per 100,000 women': [
+                'total_cancer_incidence',
+            ],
+        }
+        scens.plot(to_plot=to_plot)
+        scens.plot_age_results(plot_type=sns.boxplot)
+
+    return scens
 
 
 def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
