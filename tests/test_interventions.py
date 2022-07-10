@@ -216,16 +216,21 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     cancer_compliance = 0.2
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=5, timepoints='2010',
-                                  prob=screen_prop, compliance=compliance, compliance_cancer=cancer_compliance)
+                                  screen_compliance=screen_prop, triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
 
     hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
-                                  prob=screen_prop, compliance=compliance, compliance_cancer=cancer_compliance)
+                                  screen_compliance=screen_prop, triage_compliance=compliance, cancer_compliance=cancer_compliance)
+
+    hpv_hpv1618_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='hpv1618', treatment='via_triage',
+                                        screen_start_age=30,screen_stop_age=50, screen_interval=10, timepoints='2010',
+                                        label='hpv primary, hpv1618 triage', screen_compliance=screen_prop,
+                                          triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
     az = hpv.age_results(
-        timepoints=['2030'],
-        result_keys=['total_cin_prevalence']
+        timepoints=['2020'],
+        result_keys=['total_hpv_prevalence']
     )
 
 
@@ -239,18 +244,24 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             'pars': {
             }
         },
-        'hpv_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-            'pars': {
-                'interventions': [hpv_screening],
-            }
-        },
-        'hpv_via_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
-            'pars': {
-                'interventions': [hpv_via_screening],
-            }
-        },
+        # 'hpv_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_screening],
+        #     }
+        # },
+        # 'hpv_via_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_via_screening],
+        #     }
+        # },
+        # 'hpv_hpv1618_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_hpv1618_screening],
+        #     }
+        # },
     }
 
     metapars = {'n_runs': n_runs}
@@ -272,7 +283,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(to_plot=to_plot)
-        # scens.plot_age_results(plot_type=sns.boxplot)
+        scens.plot_age_results(plot_type=sns.boxplot)
 
     return scens
 
@@ -377,8 +388,8 @@ if __name__ == '__main__':
     # sim0 = test_dynamic_pars()
     # scens1 = test_vaccinate_prob(do_plot=True)
     # scens2 = test_vaccinate_num(do_plot=True)
-    # scens3 = test_screening(do_plot=True)
-    scens4 = test_screening_ltfu(do_plot=True)
+    scens3 = test_screening(do_plot=True)
+    # scens4 = test_screening_ltfu(do_plot=True)
 
     sc.toc(T)
     print('Done.')

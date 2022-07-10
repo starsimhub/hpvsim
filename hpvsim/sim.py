@@ -713,7 +713,7 @@ class Sim(hpb.BaseSim):
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['susceptible']:
-                    # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
+                    # For n_infectious, n_cin1, etc, we getinterventions the total number where this state is true for at least one genotype
                     self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
@@ -876,7 +876,7 @@ class Sim(hpb.BaseSim):
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
         at_risk_females = alive_females - res['n_cancerous'].values.sum(axis=0)
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
-        demoninator = at_risk_females * scale_factor
+        demoninator = at_risk_females / scale_factor
         self.results['total_cin1_incidence'][:]    = res['total_cin1s'][:] / demoninator
         self.results['total_cin2_incidence'][:]    = res['total_cin2s'][:] / demoninator
         self.results['total_cin3_incidence'][:]    = res['total_cin3s'][:] / demoninator

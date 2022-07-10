@@ -233,8 +233,8 @@ def get_prognoses():
     prognoses = dict(
         duration_cutoffs  = np.array([0,       1,          2,          3,          4]),      # Duration cutoffs (lower limits)
         seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0]),    # Probability of seroconverting given duration of infection
-        cin1_probs        = np.array([0.015,   0.15655,    0.30800,    0.50655,    0.70]),   # Conditional probability of developing CIN1 given HPV infection
-        cin2_probs        = np.array([0.015,   0.0655,     0.3080,     0.60655,    0.90]),   # Conditional probability of developing CIN2 given CIN1
+        cin1_probs        = np.array([0.015,   0.03655,    0.06800,    0.10655,    0.50]),   # Conditional probability of developing CIN1 given HPV infection
+        cin2_probs        = np.array([0.015,   0.0355,     0.0680,     0.10655,    0.60]),   # Conditional probability of developing CIN2 given CIN1
         cin3_probs        = np.array([0.15,    0.655,      0.80,       0.855,      0.90]),   # Conditional probability of developing CIN3 given CIN2
         cancer_probs      = np.array([0.0055,  0.0655,     0.2080,     0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
         )
@@ -953,28 +953,131 @@ def get_screen_pars(screen=None):
 
     pars = dict(
         hpv = dict(
+            by_genotype=True,
             test_positivity=dict(
-                hpv=0.75,
-                cin1=0.8415,
-                cin2=0.93,
-                cin3=0.984,
-                cancerous=0.984,
+                hpv=dict(
+                    hpv16=0.75,
+                    hpv18=0.75,
+                    hpv31=0.75,
+                    hpv33=0.75,
+                    hpv45=0.75,
+                    hpv52=0.75,
+                    hpv58=0.75,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin1=dict(
+                    hpv16=0.8415,
+                    hpv18=0.8415,
+                    hpv31=0.8415,
+                    hpv33=0.8415,
+                    hpv45=0.8415,
+                    hpv52=0.8415,
+                    hpv58=0.8415,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin2=dict(
+                    hpv16=0.93,
+                    hpv18=0.93,
+                    hpv31=0.93,
+                    hpv33=0.93,
+                    hpv45=0.93,
+                    hpv52=0.93,
+                    hpv58=0.93,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin3=dict(
+                    hpv16=0.984,
+                    hpv18=0.984,
+                    hpv31=0.984,
+                    hpv33=0.984,
+                    hpv45=0.984,
+                    hpv52=0.984,
+                    hpv58=0.984,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cancerous=dict(
+                    hpv16=0.984,
+                    hpv18=0.984,
+                    hpv31=0.984,
+                    hpv33=0.984,
+                    hpv45=0.984,
+                    hpv52=0.984,
+                    hpv58=0.984,
+                    hpv6=0,
+                    hpv11=0,
+                ),
             ),
             inadequacy=0,
         ),
 
         hpv1618 = dict(
+            by_genotype=True,
             test_positivity=dict(
-                hpv=0.56,
-                cin1=0.8415,
-                cin2=0.93,
-                cin3=0.984,
-                cancerous=0.984,
+                hpv=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin1=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin2=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cin3=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
+                cancerous=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
             ),
             inadequacy=0,
         ),
 
         via=dict(
+            by_genotype=False,
             test_positivity=dict(
                 hpv=0.25,
                 cin1=0.3,
@@ -985,6 +1088,7 @@ def get_screen_pars(screen=None):
             inadequacy=0,
         ),
         via_triage=dict(
+            by_genotype=False,
             test_positivity=dict(
                 hpv=0.98,
                 cin1=0.97,
