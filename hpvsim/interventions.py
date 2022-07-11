@@ -1121,6 +1121,7 @@ class Screening(Intervention):
                     screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
                     screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
                     screen_pos += list(screen_pos_inds)
+                screen_pos = list(set(screen_pos)) # If anyone has screened positive for >1 genotype, only include them once
 
             else:
                 tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
@@ -1179,7 +1180,6 @@ class Screening(Intervention):
         excision_inds = excision_eligible_inds[to_excise]  # Indices of those who get treated
         excision_LTFU_inds = excision_eligible_inds[~to_excise]
         sim.people.date_next_screen[excision_LTFU_inds] = np.nan
-
 
         # Set properties
         treat_inds = np.concatenate([ca_treat_inds, excision_inds, ablation_inds])
