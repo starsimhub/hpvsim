@@ -581,6 +581,7 @@ class age_results(Analyzer):
     def get_standard_population(self):
         '''
         Returns the WHO standard population for computation of age-standardized rates
+        https://seer.cancer.gov/stdpopulations/world.who.html
         '''
 
         age_standard = np.array([[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100],
