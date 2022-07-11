@@ -498,6 +498,8 @@ class age_results(Analyzer):
             self.bins = self.edges[:-1]  # Don't include the last edge in the bins
             self.age_labels = [f'{int(self.bins[i])}-{int(self.bins[i + 1])}' for i in range(len(self.bins) - 1)]
             self.age_labels.append(f'{int(self.bins[-1])}+')
+        else:
+            self.age_standard = np.array([self.edges, np.full(len(self.edges), 1)])
 
         # Handle result keys
         choices = sim.result_keys()
@@ -604,6 +606,7 @@ class age_results(Analyzer):
             age = sim.people.age # Get the age distribution
             scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
 
+
             for rkey in self.result_keys: # Loop over each result, but only stocks are calculated here
 
                 # Initialize storage
@@ -641,6 +644,7 @@ class age_results(Analyzer):
             date = self.date # Stored just above for use here
             scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
             age = sim.people.age # Get the age distribution
+            age_standard = self.age_standard[1, :-1]
 
             for rkey in self.result_keys: # Loop over each result
 
@@ -648,22 +652,23 @@ class age_results(Analyzer):
                 if rkey.replace('total_', '') in hpd.flow_keys or 'incidence' in rkey:
                     attr = rkey.replace('total_','').replace('_incidence','') # Name of the actual state
                     if attr == 'hpv': attr = 'infections' # HPV is referred to as infections in the sim
+                    if attr == 'cancer': attr = 'cancers' # cancer is referred to as cancers in the sim
                     attr1 = self.mapping[attr][0] # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
                     attr2 = self.mapping[attr][1] # As above
                     if rkey[:5] == 'total': # Results across all genotypes
                         inds = ((sim.people[attr1]==sim.t)*(sim.people[attr2])).nonzero()
-                        self.results[date][rkey] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                        self.results[date][rkey] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale * age_standard  # Bin the people
                     else: # Results by genotype
                         for g in range(ng): # Loop over genotypes
                             inds = ((sim.people[attr1][g,:] == sim.t) * (sim.people[attr2][g,:])).nonzero()
-                            self.results[date][rkey][g,:] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                            self.results[date][rkey][g,:] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale * age_standard  # Bin the people
 
                     if 'incidence' in rkey:
                         # Need to divide by the right denominator
                         if 'hpv' in rkey: # Denominator is susceptible population
                             denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=self.edges)[0] * scale)
                         else:  # Denominator is females
-                            denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)
+                            denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale * 1/100000)  # scale to be per 100,000 for cancer and cin incidence
                         if 'total' not in rkey: denom = denom[None,:]
                         self.results[date][rkey] = self.results[date][rkey] / denom
 
