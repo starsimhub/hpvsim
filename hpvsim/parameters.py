@@ -37,7 +37,8 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['birth_rates']     = None      # Birth rates, loaded below
 
     # Initialization parameters
-    pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence
+    pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence by age and sex
+    pars['init_hpv_dist']   = None # Initial type distribution
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
@@ -59,8 +60,6 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['dur_pship']       = None  # Duration of partnerships in each partnership type
     pars['mixing']          = None  # Mixing matrices for storing age differences in partnerships
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
-    # pars['nonactive_by_age']= nonactive_by_age
-    # pars['nonactive']       = None 
 
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility TODO does this get used? if not remove.

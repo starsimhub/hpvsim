@@ -643,7 +643,7 @@ class age_results(Analyzer):
                         if 'hpv' in rkey: # Denominator is susceptible population
                             denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=self.edges)[0] * scale)
                         else:  # Denominator is females
-                            denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)
+                            denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)/1e5 # CIN and cancer are per 100,000 women
                         if 'total' not in rkey: denom = denom[None,:]
                         self.results[date][rkey] = self.results[date][rkey] / denom
 

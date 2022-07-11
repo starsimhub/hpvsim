@@ -237,6 +237,7 @@ default_init_prev = {
     'f'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
 }
 
+
 #%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
