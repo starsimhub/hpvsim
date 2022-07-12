@@ -87,7 +87,11 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
 
         # Get death ages
-        death_ages = get_death_ages(life_tables=sim.pars['lx'], pop_size=pop_size, age_bins=age_bins, ages=ages, sexes=sexes, dt_round_age=dt_round_age, dt=dt)
+        all_years = np.array(list(sim.pars['lx'].keys()))
+        base_year = all_years[0]
+        death_bins = sim.pars['lx'][base_year]['m'][:,0]
+        death_age_bins = np.digitize(ages, death_bins)-1
+        death_ages = get_death_ages(life_tables=sim.pars['lx'], year=sim.yearvec[sim.t], pop_size=pop_size, age_bins=death_age_bins, ages=ages, sexes=sexes, dt_round_age=dt_round_age, dt=dt)
 
         # Store output
         popdict = {}
@@ -171,21 +175,25 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     return uid, sex, debut, partners
 
 
-def get_death_ages(life_tables=None, pop_size=None, age_bins=None, ages=None, sexes=None, dt_round_age=True, dt=None):
+def get_death_ages(life_tables=None, year=None, pop_size=None, age_bins=None, ages=None, sexes=None, dt_round_age=True, dt=None):
     '''
     Get the ages at which people die
     '''
     death_ages = np.full(pop_size, np.nan, dtype=hpd.default_float)
     death_ages.fill(np.nan)
     sex_bools = {'f': 1, 'm': 0}
+    all_years = np.array(list(life_tables.keys()))
+    base_year = all_years[0]
 
-    for sex, lt in life_tables.items():
-        death_data_min = lt[:, 0]
-        death_data_max = lt[:, 1] + 1
-        death_data_range = death_data_max - death_data_min
+    for sex in ['f','m']:
+
+        death_data_min = life_tables[base_year][sex][:,0]
+        death_data_range = np.concatenate([np.diff(life_tables[base_year][sex][:,0]),[5]]) # Add an extra bucket at the end for anyone over 100
         n_by_age_bin = np.bincount((age_bins + 1) * (sexes == sex_bools[sex]))[1:]  # Find how many people of this sex are in each age bin
+        aa = np.array([life_tables[y][sex][:,1] for y in all_years])
+        lt = np.array([sc.smoothinterp(year, all_years, aa[:, aind]) for aind in range(len(death_data_min))])
         for aind, n_this_age in enumerate(n_by_age_bin):
-            death_probs = -np.diff(lt[aind:, 2] / lt[aind, 2])  # This line gets the probability of dying in each subsequent age bin for someone of this age
+            death_probs = -np.diff(lt[aind:, 0] / lt[aind, 0])  # This line gets the probability of dying in each subsequent age bin for someone of this age
             death_bins = hpu.n_multinomial(death_probs, n_this_age) + aind  # Select the death age bins
             if dt_round_age:
                 these_death_ages = death_data_min[death_bins] + np.random.randint(death_data_range[death_bins] / dt) * dt
@@ -193,6 +201,7 @@ def get_death_ages(life_tables=None, pop_size=None, age_bins=None, ages=None, se
                 these_death_ages = death_data_min[death_bins] + death_data_range[death_bins] * np.random.random(pop_size)
             filter_inds = (age_bins == aind) * (sexes == sex_bools[sex])  # Set the death ages for people of this sex & age range
             death_ages[filter_inds] = np.maximum(these_death_ages, ages[filter_inds])  # Make sure people's death age is greater than their current age
+
 
     return death_ages
 

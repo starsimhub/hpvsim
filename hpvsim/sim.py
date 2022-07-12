@@ -48,7 +48,7 @@ class Sim(hpb.BaseSim):
 
         # Update pars and load data
         self.update_pars(pars, **kwargs)   # Update the parameters, if provided
-        self.load_data(datafile, header=[0,1,2]) # Load the data, if provided
+        self.load_data(datafile) # Load the data, if provided
 
         return
 
@@ -420,7 +420,7 @@ class Sim(hpb.BaseSim):
         results['n_alive'] = init_res('Number alive')
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
         results['tfr'] = init_res('Total fatality rate', scale=False)
-        results['cbr'] = init_res('Crude birth rate', scale=False)
+        results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -605,7 +605,7 @@ class Sim(hpb.BaseSim):
 
         # Update demographics and partnerships
         old_pop_size = len(self.people)
-        new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
+        new_people = self.people.update_states_pre(t=t, year=self.yearvec[t]) # NB this also ages people, applies deaths, and generates new births
         self.people.addtoself(new_people) # New births are added to the population
 
         people = self.people # Shorten
@@ -821,9 +821,10 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Fix the last timepoint
-        for reskey in hpd.flow_keys:
-            self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-            self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+        if self.resfreq < 1:
+            for reskey in hpd.flow_keys:
+                self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+                self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
 
         # Scale the results
         for reskey in self.result_keys():

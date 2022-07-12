@@ -5,6 +5,7 @@ Load data
 #%% Housekeeping
 import numpy as np
 import sciris as sc
+import pandas as pd
 from . import country_age_data    as cad
 import re
 
@@ -45,7 +46,7 @@ def get_country_aliases():
     return country_mappings # Convert to lowercase
 
 
-def map_entries(json, location):
+def map_entries(json, location, df=None):
     '''
     Find a match between the JSON file and the provided location(s).
 
@@ -55,7 +56,10 @@ def map_entries(json, location):
     '''
 
     # The data have slightly different formats: list of dicts or just a dict
-    countries = [key.lower() for key in json.keys()]
+    if sc.checktype(json, dict):
+        countries = [key.lower() for key in json.keys()]
+    elif sc.checktype(json, 'listlike'):
+        countries = [l.lower() for l in json]
 
     # Set parameters
     if location is None:
@@ -176,17 +180,16 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     Returns:
         death_rates (dict): death rates by age and sex
     '''
+
     # Load the raw data
     try:
-        df = sc.load('../hpvsim/data/lx.obj')
+        df = sc.load('../hpvsim/hpvsim/data/raw_lxd.obj')
     except ValueError as E:
         errormsg = f'Could not locate datafile with age-specific death rates by country. Please run data/get_death_data.py first.'
         raise ValueError(errormsg)
 
-    age_groups = df['dim.AGEGROUP'].unique()
-    df = df.set_index(['dim.COUNTRY', 'dim.SEX', 'dim.AGEGROUP'])
-    dd = df.groupby(level=0).apply(lambda df: df.xs(df.name).to_dict()).to_dict()
-    raw_lx = map_entries(dd,location)[location]['Value']
+    # Figure out how this location is referred to in the data frame
+    raw_df = map_entries(df, location)[location]
 
     sex_keys = []
     if by_sex: sex_keys += ['Male','Female']
@@ -194,25 +197,17 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     sex_key_map = {'Male':'m', 'Female':'f', 'Both sexes': 'tot'}
  
     max_age = 99
+    age_groups = raw_df['AgeGrpStart'].unique()
+    years = raw_df['Time'].unique()
     result = dict()
 
     # Processing
-    for sk in sex_keys:
-        sk_out = sex_key_map[sk]
-        result[sk_out] = []
-        for age in age_groups:
-            if (sk, age) in raw_lx.keys():
-                this_lx = float(raw_lx[(sk, age)])
-                if age[2] == '+':
-                    val = [int(age[:2]), max_age, this_lx]
-                elif age[0] == '<':
-                    val = [0, int(age[1]), this_lx]
-                else:
-                    ages = re.split('-',age[:-6]) # Remove the 'years' part of the string
-                    val = [int(ages[0]), int(ages[1]), this_lx]
-                result[sk_out].append(val)
-        result[sk_out] = np.array(result[sk_out])
-        result[sk_out] = result[sk_out][result[sk_out][:, 0].argsort()]
+    for year in years:
+        result[year] = dict()
+        for sk in sex_keys:
+            sk_out = sex_key_map[sk]
+            result[year][sk_out] = np.array(raw_df[(raw_df['Time']==year) & (raw_df['Sex']== sk)][['AgeGrpStart','lx']])
+            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
 
     return result
 
@@ -229,7 +224,7 @@ def get_birth_rates(location=None):
     '''
     # Load the raw data
     try:
-        birth_rate_data = sc.load('../hpvsim/data/birth_rates.obj')
+        birth_rate_data = sc.load('../hpvsim/hpvsim/data/birth_rates.obj')
     except ValueError as E:
         errormsg = f'Could not locate datafile with birth rates by country. Please run data/get_birth_data.py first.'
         raise ValueError(errormsg)

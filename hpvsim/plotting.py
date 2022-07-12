@@ -382,6 +382,10 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         if label: label += f' - {v_label}'
                         else:     label = v_label
                         ax.plot(res_t, res.values[genotype,bi:], label=label, **args.plot, c=color)  # Plot result
+
+                if args.show['data']:
+                    plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
+
             if args.show['interventions']:
                 plot_interventions(sim, ax) # Plot the interventions
             title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend

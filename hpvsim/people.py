@@ -156,7 +156,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t, resfreq=None):
+    def update_states_pre(self, t, year=None, resfreq=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
@@ -175,7 +175,7 @@ class People(hpb.BasePeople):
         self.flows_by_sex['other_deaths_by_sex'][1] += deaths_male
 
         # Add births
-        new_births, new_people = self.add_births()
+        new_births, new_people = self.add_births(year=year)
         self.demographic_flows['births'] += new_births
 
         # Perform updates that are genotype-specific
@@ -428,7 +428,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def add_births(self):
+    def add_births(self, year=None):
         ''' Method to add births '''
         this_birth_rate = sc.smoothinterp(self.t+self.pars['start'], self.pars['birth_rates'][0], self.pars['birth_rates'][1])*self.dt
         new_births = round(this_birth_rate[0]*len(self)/1000) # Crude births per 1000
@@ -442,7 +442,7 @@ class People(hpb.BasePeople):
             'n_imm_sources': self.pars['n_imm_sources'],
             'n_partner_types': self.pars['n_partner_types']
         }
-        death_ages = hppop.get_death_ages(life_tables=self.pars['lx'], pop_size=new_births, age_bins=np.zeros(new_births, dtype=int), ages=np.zeros(new_births), sexes=sexes, dt=self['dt'])
+        death_ages = hppop.get_death_ages(life_tables=self.pars['lx'], year=year, pop_size=new_births, age_bins=np.zeros(new_births, dtype=int), ages=np.zeros(new_births), sexes=sexes, dt=self['dt'])
         new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, death_age=death_ages, debut=debuts, partners=partners, strict=False)
 
         return new_births, new_people
