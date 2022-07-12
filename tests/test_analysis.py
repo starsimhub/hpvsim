@@ -117,6 +117,20 @@ def test_age_standardization(do_plot=True):
     return sim, a
 
 
+def test_calibration():
+
+    sc.heading('Testing calibration')
+
+    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, end=2015, dt=0.5, location='south africa')
+    hpv16 = hpv.genotype('hpv16')
+    hpv18 = hpv.genotype('hpv18')
+    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], datafile='test_data/south_africa_target_data.xlsx')
+    calib_pars = dict(beta=[0.015, 0.010, 0.020])
+    calib = hpv.Calibration(sim, calib_pars, total_trials=100)
+    calib.calibrate()
+
+    return sim, calib
+
 
 #%% Run as a script
 if __name__ == '__main__':
@@ -125,8 +139,9 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
+    # sim1, a1    = test_age_results()
     # sim2, a2 = test_age_standardization()
+    sim3, calib = test_calibration()
 
     sc.toc(T)
     print('Done.')

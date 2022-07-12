@@ -3,7 +3,7 @@ Additional analysis functions that are not part of the core workflow,
 but which are useful for particular investigations.
 '''
 
-# import os
+import os
 import numpy as np
 import pylab as pl
 import pandas as pd
@@ -18,7 +18,7 @@ from .settings import options as hpo # For setting global options
 import seaborn as sns
 
 
-__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results']
+__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'Calibration']
 
 
 class Analyzer(sc.prettyobj):
@@ -705,6 +705,7 @@ class age_results(Analyzer):
         validate_recorded_dates(sim, requested_dates=self.dates, recorded_dates=self.results.keys(), die=self.die)
         if self.compute_fit:
             self.mismatch = self.compute()
+            sim.fit = self.mismatch
         return
 
 
@@ -724,9 +725,9 @@ class age_results(Analyzer):
         self.data['diffs'] = self.data['model_output'] - self.data['value']
         self.data['gofs'] = hpm.compute_gof(self.data['value'].values, self.data['model_output'].values)
         self.data['losses'] = self.data['gofs'].values * self.weights
-        mismatch = self.data['losses'].sum()
+        self.mismatch = self.data['losses'].sum()
 
-        return mismatch
+        return self.mismatch
 
 
     def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8,
@@ -821,3 +822,296 @@ class age_results(Analyzer):
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
 
 
+def import_optuna():
+    ''' A helper function to import Optuna, which is an optional dependency '''
+    try:
+        import optuna as op # Import here since it's slow
+    except ModuleNotFoundError as E: # pragma: no cover
+        errormsg = f'Optuna import failed ({str(E)}), please install first (pip install optuna)'
+        raise ModuleNotFoundError(errormsg)
+    return op
+
+
+class Calibration(Analyzer):
+    '''
+    A class to handle calibration of HPVsim simulations. Uses the Optuna hyperparameter
+    optimization library (optuna.org), which must be installed separately (via
+    pip install optuna).
+
+    Note: running a calibration does not guarantee a good fit! You must ensure that
+    you run for a sufficient number of iterations, have enough free parameters, and
+    that the parameters have wide enough bounds. Please see the tutorial on calibration
+    for more information.
+
+    Args:
+        sim          (Sim)  : the simulation to calibrate
+        calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
+        fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
+        par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_uniform
+        n_trials     (int)  : the number of trials per worker
+        n_workers    (int)  : the number of parallel workers (default: maximum
+        total_trials (int)  : if n_trials is not supplied, calculate by dividing this number by n_workers)
+        name         (str)  : the name of the database (default: 'hpvsim_calibration')
+        db_name      (str)  : the name of the database file (default: 'hpvsim_calibration.db')
+        keep_db      (bool) : whether to keep the database after calibration (default: false)
+        storage      (str)  : the location of the database (default: sqlite)
+        rand_seed    (int)  : if provided, use this random seed to initialize Optuna runs (for reproducibility)
+        label        (str)  : a label for this calibration object
+        die          (bool) : whether to stop if an exception is encountered (default: false)
+        verbose      (bool) : whether to print details of the calibration
+        kwargs       (dict) : passed to hpv.Calibration()
+
+    Returns:
+        A Calibration object
+
+    **Example**::
+
+        sim = hpv.Sim(datafile='data.csv')
+        calib_pars = dict(beta=[0.015, 0.010, 0.020])
+        calib = hpv.Calibration(sim, calib_pars, total_trials=100)
+        calib.calibrate()
+        calib.plot()
+
+    '''
+
+    def __init__(self, sim, calib_pars=None, fit_args=None, par_samplers=None,
+                 n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
+                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
+        super().__init__(label=label) # Initialize the Analyzer object
+
+        import multiprocessing as mp # Import here since it's also slow
+
+        # Handle run arguments
+        if n_trials  is None: n_trials  = 20
+        if n_workers is None: n_workers = mp.cpu_count()
+        if name      is None: name      = 'hpvsim_calibration'
+        if db_name   is None: db_name   = f'{name}.db'
+        if keep_db   is None: keep_db   = False
+        if storage   is None: storage   = f'sqlite:///{db_name}'
+        if total_trials is not None: n_trials = total_trials/n_workers
+        self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name, keep_db=keep_db, storage=storage, rand_seed=rand_seed)
+
+        # Handle other inputs
+        self.sim          = sim
+        self.calib_pars   = calib_pars
+        self.fit_args     = sc.mergedicts(fit_args)
+        self.par_samplers = sc.mergedicts(par_samplers)
+        self.die          = die
+        self.verbose      = verbose
+        self.calibrated   = False
+
+        # Create age_results intervention
+        data = self.sim.data
+        timepoints = data.year.unique()
+        keys = data.name.unique()
+        edges = np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
+        ar = age_results(timepoints=timepoints, result_keys=keys, edges=edges,
+                         datafile='test_data/south_africa_target_data.xlsx',
+                         compute_fit=True)
+        self.sim['analyzers'] += [ar]
+
+        return
+
+    def run_sim(self, calib_pars, label=None, return_sim=False):
+        ''' Create and run a simulation '''
+        sim = self.sim.copy()
+        if label: sim.label = label
+        valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
+        sim.update_pars(valid_pars)
+        if len(valid_pars) != len(calib_pars):
+            extra = set(calib_pars.keys()) - set(valid_pars.keys())
+            errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'
+            raise ValueError(errormsg)
+        try:
+            sim.run()
+
+            return sim.compute_fit()
+        except Exception as E:
+            if self.die:
+                raise E
+            else:
+                warnmsg = f'Encountered error running sim!\nParameters:\n{valid_pars}\nTraceback:\n{sc.traceback()}'
+                hpm.warn(warnmsg)
+                output = None if return_sim else np.inf
+                return output
+
+    def run_trial(self, trial):
+        ''' Define the objective for Optuna '''
+        pars = {}
+        for key, (best,low,high) in self.calib_pars.items():
+            if key in self.par_samplers: # If a custom sampler is used, get it now
+                try:
+                    sampler_fn = getattr(trial, self.par_samplers[key])
+                except Exception as E:
+                    errormsg = 'The requested sampler function is not found: ensure it is a valid attribute of an Optuna Trial object'
+                    raise AttributeError(errormsg) from E
+            else:
+                sampler_fn = trial.suggest_uniform
+            pars[key] = sampler_fn(key, low, high) # Sample from values within this range
+        mismatch = self.run_sim(pars)
+        return mismatch
+
+
+    def worker(self):
+        ''' Run a single worker '''
+        op = import_optuna()
+        if self.verbose:
+            op.logging.set_verbosity(op.logging.DEBUG)
+        else:
+            op.logging.set_verbosity(op.logging.ERROR)
+        study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
+        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials)
+        return output
+
+
+    def run_workers(self):
+        ''' Run multiple workers in parallel '''
+        if self.run_args.n_workers > 1: # Normal use case: run in parallel
+            output = sc.parallelize(self.worker, iterarg=self.run_args.n_workers)
+        else: # Special case: just run one
+            output = [self.worker()]
+        return output
+
+
+    def remove_db(self):
+        '''
+        Remove the database file if keep_db is false and the path exists.
+
+        New in version 3.1.0.
+        '''
+        if os.path.exists(self.run_args.db_name):
+            os.remove(self.run_args.db_name)
+            if self.verbose:
+                print(f'Removed existing calibration {self.run_args.db_name}')
+        return
+
+
+    def make_study(self):
+        ''' Make a study, deleting one if it already exists '''
+        op = import_optuna()
+        if not self.run_args.keep_db:
+            self.remove_db()
+        if self.run_args.rand_seed is not None:
+            sampler = op.samplers.RandomSampler(self.run_args.rand_seed)
+            sampler.reseed_rng()
+            raise NotImplementedError('Implemented but does not work')
+        else:
+            sampler = None
+        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=sampler)
+        return output
+
+
+    def calibrate(self, calib_pars=None, verbose=True, **kwargs):
+        '''
+        Actually perform calibration.
+
+        Args:
+            calib_pars (dict): if supplied, overwrite stored calib_pars
+            verbose (bool): whether to print output from each trial
+            kwargs (dict): if supplied, overwrite stored run_args (n_trials, n_workers, etc.)
+        '''
+        op = import_optuna()
+
+        # Load and validate calibration parameters
+        if calib_pars is not None:
+            self.calib_pars = calib_pars
+        if self.calib_pars is None:
+            errormsg = 'You must supply calibration parameters either when creating the calibration object or when calling calibrate().'
+            raise ValueError(errormsg)
+        self.run_args.update(kwargs) # Update optuna settings
+
+        # Run the optimization
+        t0 = sc.tic()
+        self.make_study()
+        self.run_workers()
+        self.study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
+        self.best_pars = sc.objdict(self.study.best_params)
+        self.elapsed = sc.toc(t0, output=True)
+
+        # Compare the results
+        self.initial_pars = sc.objdict({k:v[0] for k,v in self.calib_pars.items()})
+        self.par_bounds   = sc.objdict({k:np.array([v[1], v[2]]) for k,v in self.calib_pars.items()})
+        self.before = self.run_sim(calib_pars=self.initial_pars, label='Before calibration')
+        self.after  = self.run_sim(calib_pars=self.best_pars,    label='After calibration')
+        self.parse_study()
+
+        # Tidy up
+        self.calibrated = True
+        if not self.run_args.keep_db:
+            self.remove_db()
+        if verbose:
+            self.summarize()
+
+        return self
+
+
+    def summarize(self):
+        ''' Print out results from the calibration '''
+        if self.calibrated:
+            print(f'Calibration for {self.run_args.n_workers*self.run_args.n_trials} total trials completed in {self.elapsed:0.1f} s.')
+            before = self.before
+            after = self.after
+            print('\nInitial parameter values:')
+            print(self.initial_pars)
+            print('\nBest parameter values:')
+            print(self.best_pars)
+            print(f'\nMismatch before calibration: {before:n}')
+            print(f'Mismatch after calibration:  {after:n}')
+            print(f'Percent improvement:         {((before-after)/before)*100:0.1f}%')
+            return before, after
+        else:
+            print('Calibration not yet run; please run calib.calibrate()')
+            return
+
+
+    def parse_study(self):
+        '''Parse the study into a data frame -- called automatically '''
+        best = self.best_pars
+
+        print('Making results structure...')
+        results = []
+        n_trials = len(self.study.trials)
+        failed_trials = []
+        for trial in self.study.trials:
+            data = {'index':trial.number, 'mismatch': trial.value}
+            for key,val in trial.params.items():
+                data[key] = val
+            if data['mismatch'] is None:
+                failed_trials.append(data['index'])
+            else:
+                results.append(data)
+        print(f'Processed {n_trials} trials; {len(failed_trials)} failed')
+
+        keys = ['index', 'mismatch'] + list(best.keys())
+        data = sc.objdict().make(keys=keys, vals=[])
+        for i,r in enumerate(results):
+            for key in keys:
+                if key not in r:
+                    warnmsg = f'Key {key} is missing from trial {i}, replacing with default'
+                    hpm.warn(warnmsg)
+                    r[key] = best[key]
+                data[key].append(r[key])
+        self.data = data
+        self.df = pd.DataFrame.from_dict(data)
+
+        return
+
+
+    def to_json(self, filename=None):
+        '''
+        Convert the data to JSON.
+
+        New in version 3.1.1.
+        '''
+        order = np.argsort(self.df['mismatch'])
+        json = []
+        for o in order:
+            row = self.df.iloc[o,:].to_dict()
+            rowdict = dict(index=row.pop('index'), mismatch=row.pop('mismatch'), pars={})
+            for key,val in row.items():
+                rowdict['pars'][key] = val
+            json.append(rowdict)
+        if filename:
+            sc.savejson(filename, json, indent=2)
+        else:
+            return json

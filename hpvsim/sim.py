@@ -979,6 +979,13 @@ class Sim(hpb.BaseSim):
         return fig
 
 
+    def compute_fit(self):
+        '''
+        Compute fit between model and data.
+        '''
+        return self.fit
+
+
 class AlreadyRunError(RuntimeError):
     '''
     This error is raised if a simulation is run in such a way that no timesteps
