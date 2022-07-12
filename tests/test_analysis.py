@@ -69,18 +69,29 @@ def test_age_results(do_plot=True):
 
     sc.heading('Testing by-age results')
 
-    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1990, n_years=40, dt=0.5, location='south africa')
+    pars = dict(
+        pop_size=50e3,
+        pop_scale=36.8e6/50e3,
+        start=1970,
+        end=2015,
+        dt=0.5,
+        location='south africa',
+        beta=0.05,
+        hpv_control_prob=1
+    )
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
     hpv31 = hpv.genotype('hpv31')
     timepoints = ['2010']
     edges = np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.])
     az = hpv.age_results(timepoints=timepoints,
-                         result_keys=['hpv_prevalence', 'total_cancer_incidence'],
+                         result_keys=['detectable_hpv_prevalence',
+                                      # 'hpv_prevalence',
+                                      'total_cancer_incidence'
+                                      ],
                          datafile='test_data/south_africa_target_data.xlsx',
-                         compute_fit=True,
                          edges=edges)
-    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18, hpv31], analyzers=az)
+    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=az)
     sim.run()
     a = sim.get_analyzer()
 
@@ -125,7 +136,8 @@ def test_calibration():
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], datafile='test_data/south_africa_target_data.xlsx')
-    calib_pars = dict(beta=[0.015, 0.010, 0.020])
+    calib_pars = dict(beta=[0.05, 0.010, 0.20],
+                      hpv_control_prob=[0.2, 0.01, 0.5])
     calib = hpv.Calibration(sim, calib_pars, total_trials=100)
     calib.calibrate()
 
@@ -139,9 +151,9 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
+    sim1, a1    = test_age_results()
     # sim2, a2 = test_age_standardization()
-    sim3, calib = test_calibration()
+    # sim3, calib = test_calibration()
 
     sc.toc(T)
     print('Done.')

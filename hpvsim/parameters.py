@@ -78,7 +78,7 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['hpv_control_prob'] = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
-        hpv_reactivation_probs  = np.array([0.01,    0.05,        0.08]),      # made this up, need to parameterize somehow
+        hpv_reactivation_probs  = np.array([0.0001,    0.05,        0.04]),      # made this up, need to parameterize somehow
     )
 
     # Parameters used to calculate immunity
@@ -113,9 +113,9 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['rel_trans'] = {}
     pars['rel_trans']['none']   = 1 # Baseline value
     pars['rel_trans']['cin1']   = 1 # Baseline value. Assumption, need data
-    pars['rel_trans']['cin2']   = 0.2 # Assumption, need data
-    pars['rel_trans']['cin3']   = 0.05 # Assumption, need data
-    pars['rel_trans']['cancerous']   = 0.05 # Assumption, need data
+    pars['rel_trans']['cin2']   = 0.8 # Assumption, need data
+    pars['rel_trans']['cin3']   = 0.2 # Assumption, need data
+    pars['rel_trans']['cancerous']   = 0.1 # Assumption, need data
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
@@ -231,12 +231,12 @@ def get_prognoses():
     '''
 
     prognoses = dict(
-        duration_cutoffs  = np.array([0,       1,          2,          3,          4]),      # Duration cutoffs (lower limits)
-        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0]),    # Probability of seroconverting given duration of infection
-        cin1_probs        = np.array([0.015,   0.03655,    0.06800,    0.10655,    0.50]),   # Conditional probability of developing CIN1 given HPV infection
-        cin2_probs        = np.array([0.015,   0.0355,     0.0680,     0.10655,    0.60]),   # Conditional probability of developing CIN2 given CIN1
-        cin3_probs        = np.array([0.15,    0.655,      0.80,       0.855,      0.90]),   # Conditional probability of developing CIN3 given CIN2
-        cancer_probs      = np.array([0.0055,  0.0655,     0.2080,     0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
+        duration_cutoffs  = np.array([0,       1,          2,          3,          4,        5,         6]),      # Duration cutoffs (lower limits)
+        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0,      1.0,       1.0]),    # Probability of seroconverting given duration of infection
+        cin1_probs        = np.array([0.015,   0.03655,    0.36800,    0.655,      0.95,     0.99,      0.99]),   # Conditional probability of developing CIN1 given HPV infection
+        cin2_probs        = np.array([0.015,   0.0355,     0.1680,     0.20655,    0.60,     0.8,       0.85]),   # Conditional probability of developing CIN2 given CIN1
+        cin3_probs        = np.array([0.15,    0.455,      0.60,       0.655,      0.70,     0.85,      0.9]),    # Conditional probability of developing CIN3 given CIN2
+        cancer_probs      = np.array([0.0055,  0.0655,     0.2080,     0.50655,    0.95,     0.98,      1.0]),    # Conditional probability of developing cancer given CIN3
         )
 
     # Check that lengths match
@@ -442,9 +442,9 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv18.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
     pars.hpv18.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv18.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv18.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv18.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.rel_cin2_prob    = 0.75 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.rel_cin3_prob    = 0.75 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.rel_cancer_prob  = 0.75 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv18.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
@@ -956,13 +956,13 @@ def get_screen_pars(screen=None):
             by_genotype=True,
             test_positivity=dict(
                 hpv=dict(
-                    hpv16=0.75,
-                    hpv18=0.75,
-                    hpv31=0.75,
-                    hpv33=0.75,
-                    hpv45=0.75,
-                    hpv52=0.75,
-                    hpv58=0.75,
+                    hpv16=0.55,
+                    hpv18=0.55,
+                    hpv31=0.55,
+                    hpv33=0.55,
+                    hpv45=0.55,
+                    hpv52=0.55,
+                    hpv58=0.55,
                     hpv6=0,
                     hpv11=0,
                 ),

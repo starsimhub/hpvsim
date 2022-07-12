@@ -13,6 +13,7 @@ from . import misc as hpm
 from . import interventions as hpi
 from . import plotting as hppl
 from . import defaults as hpd
+from . import parameters as hppar
 # from . import run as cvr
 from .settings import options as hpo # For setting global options
 import seaborn as sns
@@ -641,23 +642,36 @@ class age_results(Analyzer):
                     if attr[0] == 'n': attr = attr[2:]
                     if attr == 'hpv': attr = 'infectious' # People with HPV are referred to as infectious in the sim
                     if attr == 'cancer': attr = 'cancerous'
-                    if 'total' in rkey:
-                        inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
-                        self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                    if attr in sim.people.keys():
+                        if 'total' in rkey:
+                            inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
+                            self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                        else:
+                            for g in range(ng):
+                                inds = sim.people[attr][g,:].nonzero()
+                                self.results[date][rkey][g,:] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+
+                        if 'prevalence' in rkey:
+                            # Need to divide by the right denominator
+                            if 'hpv' in rkey: # Denominator is whole population
+                                denom = (np.histogram(age, bins=self.edges)[0] * scale)
+                            else: # Denominator is females
+                                denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)
+                            if 'total' not in rkey: denom = denom[None,:]
+                            self.results[date][rkey] = self.results[date][rkey] / denom
                     else:
-                        for g in range(ng):
-                            inds = sim.people[attr][g,:].nonzero()
-                            self.results[date][rkey][g,:] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
-
-                    if 'prevalence' in rkey:
-                        # Need to divide by the right denominator
-                        if 'hpv' in rkey: # Denominator is whole population
+                        if 'detectable' in rkey:
+                            hpv_test_pars = hppar.get_screen_pars('hpv')
+                            for state in ['hpv', 'cin1', 'cin2', 'cin3', 'cancerous']:
+                                for g in range(ng):
+                                    hpv_pos_probs = np.zeros(len(sim.people))
+                                    tp_inds = hpu.true(sim.people[state][g, :])
+                                    hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][
+                                        sim['genotype_map'][g]]
+                                    hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
+                                    self.results[date][rkey][g, :] += np.histogram(age[hpv_pos_inds], bins=self.edges)[0] * scale  # Bin the people
                             denom = (np.histogram(age, bins=self.edges)[0] * scale)
-                        else: # Denominator is females
-                            denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)
-                        if 'total' not in rkey: denom = denom[None,:]
-                        self.results[date][rkey] = self.results[date][rkey] / denom
-
+                            self.results[date][rkey] = self.results[date][rkey] / denom
             self.date = date # Need to store the date for subsequent calcpoints
 
         # Both annual new cases and incidence require us to calculate the new cases over all
