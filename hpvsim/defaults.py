@@ -140,7 +140,7 @@ inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.c
 # Demographics
 dem_keys    = ['births',    'other_deaths']
 dem_names   = ['births',    'other deaths']
-dem_colors  = ['#000000',   '#000000']
+dem_colors  = ['#000000',   '#fcba03']
 
 # Results by sex
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
@@ -304,7 +304,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
             })
 
     # Demographic plots
-    elif which in ['demographic', 'dem', 'demography']:
+    elif which in ['demographic', 'demographics', 'dem', 'demography']:
         if is_sim:
             plots = sc.odict({
                 'Birth and death rates': [
