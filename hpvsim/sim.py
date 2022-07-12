@@ -416,7 +416,7 @@ class Sim(hpb.BaseSim):
 
         # Detectable HPV
         results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
-        results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.2,0.8,ng)))
+        results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)

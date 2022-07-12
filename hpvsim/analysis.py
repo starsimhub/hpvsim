@@ -797,8 +797,8 @@ class age_results(Analyzer):
                     if self.data is not None:
                         thisdatadf = self.data[(self.data.year == float(date))&(self.data.name == rkey)]
                         unique_genotypes = thisdatadf.genotype.unique()
-                        if len(thisdatadf)>0:
-                            barwidth /= 2 # Adjust width based on data
+                        # if len(thisdatadf)>0:
+                        #     barwidth /= 2 # Adjust width based on data
 
                     if 'total' not in rkey:
                         # Prepare plot settings
@@ -810,20 +810,23 @@ class age_results(Analyzer):
 
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
-                            ax.bar(x+xlocations[g]-barwidth, resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
+                            ax.plot(x, resdict[rkey][g,:], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
+                            # ax.bar(x+xlocations[g], resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
                             if len(thisdatadf)>0:
                                 # check if this genotype is in dataframe
                                 if self.glabels[g].upper() in unique_genotypes:
                                     ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
-                                    ax.bar(x+xlocations[g]+barwidth, ydata, color=self.result_properties[rkey].color[g], hatch='/', label=f'Data - {glabel}', width=barwidth)
+                                    ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s', label=f'Data - {glabel}')
 
                     else:
                         if (self.data is not None) and (len(thisdatadf) > 0):
-                            ax.bar(x-1/2*barwidth, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
+                            ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
+                            # ax.bar(x-1/2*barwidth, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
                             ydata = np.array(thisdatadf.value)
-                            ax.bar(x+1/2*barwidth, ydata, color=d_args.color, width=barwidth, label='Data')
+                            ax.scatter(x, ydata,  color=self.result_properties[rkey].color, marker='s', label='Data')
                         else:
-                            ax.bar(x, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
+                            # ax.bar(x, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
+                            ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
                     ax.set_xlabel('Age group')
                     ax.set_title(self.result_properties[rkey].name+' - '+date)
                     ax.legend()
@@ -913,6 +916,7 @@ class Calibration(Analyzer):
         self.die          = die
         self.verbose      = verbose
         self.calibrated   = False
+        self.results = []
 
         # Create age_results intervention
         data = self.sim.data
@@ -938,8 +942,14 @@ class Calibration(Analyzer):
             raise ValueError(errormsg)
         try:
             sim.run()
+            sim.compute_fit()
+            a = sim.get_analyzer()
+            self.results.append(a.results)
+            if return_sim:
+                return sim
+            else:
+                return sim.fit
 
-            return sim.compute_fit()
         except Exception as E:
             if self.die:
                 raise E
@@ -963,6 +973,8 @@ class Calibration(Analyzer):
                 sampler_fn = trial.suggest_uniform
             pars[key] = sampler_fn(key, low, high) # Sample from values within this range
         mismatch = self.run_sim(pars)
+        # a = sim.get_analyzer()
+        # self.results.append(a.results)
         return mismatch
 
 
@@ -1045,8 +1057,8 @@ class Calibration(Analyzer):
         # Compare the results
         self.initial_pars = sc.objdict({k:v[0] for k,v in self.calib_pars.items()})
         self.par_bounds   = sc.objdict({k:np.array([v[1], v[2]]) for k,v in self.calib_pars.items()})
-        self.before = self.run_sim(calib_pars=self.initial_pars, label='Before calibration')
-        self.after  = self.run_sim(calib_pars=self.best_pars,    label='After calibration')
+        self.before = self.run_sim(calib_pars=self.initial_pars, label='Before calibration', return_sim=True)
+        self.after  = self.run_sim(calib_pars=self.best_pars,    label='After calibration', return_sim=True)
         self.parse_study()
 
         # Tidy up
@@ -1063,8 +1075,8 @@ class Calibration(Analyzer):
         ''' Print out results from the calibration '''
         if self.calibrated:
             print(f'Calibration for {self.run_args.n_workers*self.run_args.n_trials} total trials completed in {self.elapsed:0.1f} s.')
-            before = self.before
-            after = self.after
+            before = self.before.fit
+            after = self.after.fit
             print('\nInitial parameter values:')
             print(self.initial_pars)
             print('\nBest parameter values:')

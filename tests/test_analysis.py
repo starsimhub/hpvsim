@@ -137,8 +137,8 @@ def test_calibration():
     hpv18 = hpv.genotype('hpv18')
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], datafile='test_data/south_africa_target_data.xlsx')
     calib_pars = dict(beta=[0.05, 0.010, 0.20],
-                      hpv_control_prob=[0.2, 0.01, 0.5])
-    calib = hpv.Calibration(sim, calib_pars, total_trials=100)
+                      hpv_control_prob=[.9, 0.1, 1])
+    calib = hpv.Calibration(sim, calib_pars, total_trials=50)
     calib.calibrate()
 
     return sim, calib
@@ -151,9 +151,9 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
+    # sim1, a1    = test_age_results()
     # sim2, a2 = test_age_standardization()
-    # sim3, calib = test_calibration()
+    sim3, calib = test_calibration()
 
     sc.toc(T)
     print('Done.')
