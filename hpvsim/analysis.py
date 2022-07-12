@@ -433,6 +433,7 @@ class age_results(Analyzer):
         timepoints  (list): list of ints/strings/date objects, timepoints at which to generate by-age results
         results     (list): list of strings, results to generate
         age_standardized (bool): whether or not to provide age-standardized results
+        compute_fit (bool): whether or not to compute fit between model results and data
         die         (bool): whether or not to raise an exception if errors are found
         kwargs      (dict): passed to Analyzer()
 
@@ -442,7 +443,8 @@ class age_results(Analyzer):
         age_results = sim['analyzers'][0]
     '''
 
-    def __init__(self, timepoints, edges=None, result_keys=None, age_labels=None, age_standardized=False, datafile=None, die=False, **kwargs):
+    def __init__(self, timepoints, edges=None, result_keys=None, age_labels=None, age_standardized=False, datafile=None,
+                 compute_fit=False, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         timepoints          = sc.promotetolist(timepoints) # Combine multiple timepoints
         self.timepoints     = timepoints
@@ -456,6 +458,7 @@ class age_results(Analyzer):
         self.age_labels     = age_labels # Labels for the age bins - will be automatically generated if not provided
         self.age_standard   = None
         self.age_standardized = age_standardized # Whether or not to compute age-standardized results
+        self.compute_fit    = compute_fit # Whether or not to compute fit
         self.result_keys    = result_keys # Store the result keys
         self.results        = sc.odict() # Store the age results
         return
@@ -555,6 +558,18 @@ class age_results(Analyzer):
                     data_result_keys.append(drk)
             self.data_result_keys = data_result_keys
 
+
+        if self.compute_fit:
+            if self.data is None:
+                errormsg = f'Cannot compute fit without data'
+                raise ValueError(errormsg)
+            else:
+                if 'weights' in self.data.columns:
+                    self.weights = self.data['weights'].values
+                else:
+                    self.weights = np.ones(len(self.data))
+                self.mismatch = None  # The final value
+
         # Handle variable names (TODO, should this be centralized somewhere?)
         self.mapping = {
             'infections': ['date_infectious', 'infectious'],
@@ -611,6 +626,10 @@ class age_results(Analyzer):
 
             for rkey in self.result_keys: # Loop over each result, but only stocks are calculated here
 
+                if self.compute_fit and 'total' not in rkey:
+                    thisdatadf = self.data[(self.data.year == float(date)) & (self.data.name == rkey)]
+                    unique_genotypes = thisdatadf.genotype.unique()
+                    ng = len(unique_genotypes)
                 # Initialize storage
                 size = na if 'total' in rkey else (ng,na)
                 self.results[date][rkey] = np.zeros(size)
@@ -651,6 +670,11 @@ class age_results(Analyzer):
 
             for rkey in self.result_keys: # Loop over each result
 
+                if self.compute_fit and 'total' not in rkey:
+                    thisdatadf = self.data[(self.data.year == float(date)) & (self.data.name == rkey)]
+                    unique_genotypes = thisdatadf.genotype.unique()
+                    ng = len(unique_genotypes)
+
                 # Figure out if it's a flow or incidence
                 if rkey.replace('total_', '') in hpd.flow_keys or 'incidence' in rkey:
                     attr = rkey.replace('total_','').replace('_incidence','') # Name of the actual state
@@ -679,7 +703,30 @@ class age_results(Analyzer):
     def finalize(self, sim):
         super().finalize()
         validate_recorded_dates(sim, requested_dates=self.dates, recorded_dates=self.results.keys(), die=self.die)
+        if self.compute_fit:
+            self.mismatch = self.compute()
         return
+
+
+    def compute(self):
+        res = []
+        for name, group in self.data.groupby(['name', 'genotype', 'year']):
+            key = name[0]
+            genotype = name[1].lower()
+            year = str(name[2]) + '.0'
+            if 'total' in key:
+                sim_res = list(self.results[year][key])
+                res.extend(sim_res)
+            else:
+                sim_res = list(self.results[year][key][self.glabels.index(genotype)])
+                res.extend(sim_res)
+        self.data['model_output'] = res
+        self.data['diffs'] = self.data['model_output'] - self.data['value']
+        self.data['gofs'] = hpm.compute_gof(self.data['value'].values, self.data['model_output'].values)
+        self.data['losses'] = self.data['gofs'].values * self.weights
+        mismatch = self.data['losses'].sum()
+
+        return mismatch
 
 
     def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8,
@@ -734,6 +781,7 @@ class age_results(Analyzer):
                     x = np.arange(len(self.age_labels))  # the label locations
                     if self.data is not None:
                         thisdatadf = self.data[(self.data.year == float(date))&(self.data.name == rkey)]
+                        unique_genotypes = thisdatadf.genotype.unique()
                         if len(thisdatadf)>0:
                             barwidth /= 2 # Adjust width based on data
 
@@ -749,8 +797,10 @@ class age_results(Analyzer):
                             glabel = self.glabels[g].upper()
                             ax.bar(x+xlocations[g]-barwidth, resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
                             if len(thisdatadf)>0:
-                                ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
-                                ax.bar(x+xlocations[g]+barwidth, ydata, color=self.result_properties[rkey].color[g], hatch='/', label=f'Data - {glabel}', width=barwidth)
+                                # check if this genotype is in dataframe
+                                if self.glabels[g].upper() in unique_genotypes:
+                                    ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
+                                    ax.bar(x+xlocations[g]+barwidth, ydata, color=self.result_properties[rkey].color[g], hatch='/', label=f'Data - {glabel}', width=barwidth)
 
                     else:
                         if (self.data is not None) and (len(thisdatadf) > 0):
@@ -760,7 +810,6 @@ class age_results(Analyzer):
                         else:
                             ax.bar(x, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
                     ax.set_xlabel('Age group')
-                    # ax.set_ylabel('Frequency')
                     ax.set_title(self.result_properties[rkey].name+' - '+date)
                     ax.legend()
                     row_count += n_cols
@@ -770,4 +819,5 @@ class age_results(Analyzer):
 
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
+
 
