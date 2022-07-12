@@ -822,9 +822,10 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Fix the last timepoint
-        for reskey in hpd.flow_keys:
-            self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-            self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+        if self.resfreq>1:
+            for reskey in hpd.flow_keys:
+                self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+                self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
 
         # Scale the results
         for reskey in self.result_keys():
