@@ -77,6 +77,10 @@ def map_entries(json, location):
             entry = list(json.values())[ind]
             entries[loc] = entry
         except ValueError as E:
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
             suggestions = sc.suggest(loc, countries, n=4)
             if suggestions:
                 errormsg = f'Location "{loc}" not recognized, did you mean {suggestions}? ({str(E)})'
@@ -235,6 +239,6 @@ def get_birth_rates(location=None):
         raise ValueError(errormsg)
 
     standardized = map_entries(birth_rate_data, location)
-    birth_rates, years = standardized[location], birth_rate_data['years']
+    birth_rates, years = standardized[location], birth_rate_data['Year']
     return np.array([years, birth_rates])
 
