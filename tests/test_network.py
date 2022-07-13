@@ -26,7 +26,7 @@ def test_network(do_plot=True):
                 n_years=60,
                 burnin=30,
                 dt=0.5,
-                pop_scale=25.2e6/n_agents,
+                pop_scale=13.54e6/n_agents,
                 network='default',
                 debut = dict(f=dict(dist='normal', par1=15., par2=1),
                              m=dict(dist='normal', par1=16., par2=1))
@@ -56,6 +56,7 @@ def test_network(do_plot=True):
         genotypes = [hpv16, hpv11, hpv6, hpv18],
         network='default',
         location = 'tanzania',
+        datafile=f'test_data/tanzania_data.xlsx',
         analyzers=[age_pyr, az, snap])
 
     sim.run()

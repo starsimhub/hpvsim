@@ -309,7 +309,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
         if is_sim:
             plots = sc.odict({
                 'Birth and death rates': [
-                    'tfr',
+                    'cdr',
                     'cbr',
                 ],
                 'Population size': [

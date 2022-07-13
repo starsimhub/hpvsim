@@ -419,7 +419,7 @@ class Sim(hpb.BaseSim):
         results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
         results['n_alive'] = init_res('Number alive')
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
-        results['tfr'] = init_res('Total fatality rate', scale=False)
+        results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
 
         # Time vector
@@ -901,8 +901,8 @@ class Sim(hpb.BaseSim):
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
 
         # Demographic results
-        self.results['tfr'][:]  = self.results['other_deaths'][:] / self.results['n_alive'][:]
-        self.results['cbr'][:]  = self.results['births'][:] / self.results['n_alive'][:]
+        self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])
+        self.results['cbr'][:]  = self.results['births'][:] / (self.results['n_alive'][:])
 
         # Vaccination results
         self.results['cum_vaccinated'][:] = np.cumsum(self.results['new_vaccinated'][:], axis=0)
