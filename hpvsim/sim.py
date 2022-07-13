@@ -48,7 +48,7 @@ class Sim(hpb.BaseSim):
 
         # Update pars and load data
         self.update_pars(pars, **kwargs)   # Update the parameters, if provided
-        self.load_data(datafile, header=[0,1,2]) # Load the data, if provided
+        self.load_data(datafile) # Load the data, if provided
 
         return
 
@@ -420,7 +420,7 @@ class Sim(hpb.BaseSim):
         results['n_alive'] = init_res('Number alive')
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
         results['tfr'] = init_res('Total fatality rate', scale=False)
-        results['cbr'] = init_res('Crude birth rate', scale=False)
+        results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -545,12 +545,25 @@ class Sim(hpb.BaseSim):
         hpv_probs[self.people.m_inds] = init_hpv_prev['m'][age_inds[self.people.m_inds]]
         hpv_probs[~self.people.is_active] = 0 # Blank out people who are not yet sexually active
 
-        # Get indices of people who have HPV (for now, split evenly between genotypes)
+        # Get indices of people who have HPV
         hpv_inds = hpu.true(hpu.binomial_arr(hpv_probs))
-        genotypes = np.random.randint(0, ng, len(hpv_inds))
 
-        # Figure of duration of infection and infect people. TODO: will need to redo this
+        # Determine which genotype people are infected with
+        if self['init_hpv_dist'] is None: # No type distribution provided, assume even split
+            genotypes = np.random.randint(0, ng, len(hpv_inds))
+        else:
+            # Error checking
+            if not sc.checktype(self['init_hpv_dist'], dict):
+                errormsg = f'Please provide initial HPV type distribution as a dictionary keyed by genotype, not {self["init_hpv_dist"]}'
+                raise ValueError(errormsg)
+            if set(self['init_hpv_dist'].keys())!=set(self['genotype_map'].values()):
+                errormsg = f'The HPV types provided in the initial HPV type distribution are not the same as the HPV types being simulated: {self["init_hpv_dist"].keys()} vs {self["genotype_map"].values()}.'
+                raise ValueError(errormsg)
 
+            type_dist = np.array(list(self['init_hpv_dist'].values()))
+            genotypes = hpu.choose_w(type_dist, len(hpv_inds), unique=False)
+
+        # Figure of duration of infection and infect people
         genotype_pars = self.pars['genotype_pars']
         genotype_map = self.pars['genotype_map']
 
@@ -809,9 +822,10 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Fix the last timepoint
-        for reskey in hpd.flow_keys:
-            self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-            self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+        if self.resfreq>1:
+            for reskey in hpd.flow_keys:
+                self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+                self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
 
         # Scale the results
         for reskey in self.result_keys():

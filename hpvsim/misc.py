@@ -66,9 +66,10 @@ def load_data(datafile, check_date=True, header='infer', calculate=True, **kwarg
 
     # Set the index to be the years
     if check_date:
-        if 'date' not in data.columns:
-            data.set_index(('name', 'age', 'genotype'), inplace=True)
-            data.index.names = ['date']
+        if 'year' not in data.columns:
+            errormsg = f'Required column "year" not found; columns are {data.columns}'
+            raise ValueError(errormsg)
+        data.set_index('year', inplace=True, drop=False)
 
     return data
 
