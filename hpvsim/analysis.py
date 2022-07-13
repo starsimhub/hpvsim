@@ -935,6 +935,11 @@ class Calibration(Analyzer):
         sim = self.sim.copy()
         if label: sim.label = label
         valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
+        if 'prognoses' in valid_pars.keys():
+            sim_progs = hppar.get_prognoses()
+            for prog_key, prog_val in valid_pars['prognoses'].items():
+                sim_progs[prog_key] = prog_val
+            valid_pars['prognoses'] = sim_progs
         sim.update_pars(valid_pars)
         if len(valid_pars) != len(calib_pars):
             extra = set(calib_pars.keys()) - set(valid_pars.keys())
@@ -962,16 +967,28 @@ class Calibration(Analyzer):
     def run_trial(self, trial):
         ''' Define the objective for Optuna '''
         pars = {}
-        for key, (best,low,high) in self.calib_pars.items():
-            if key in self.par_samplers: # If a custom sampler is used, get it now
-                try:
-                    sampler_fn = getattr(trial, self.par_samplers[key])
-                except Exception as E:
-                    errormsg = 'The requested sampler function is not found: ensure it is a valid attribute of an Optuna Trial object'
-                    raise AttributeError(errormsg) from E
-            else:
+        for key, val in self.calib_pars.items():
+            if isinstance(val, list):
+                low, high = val[1], val[2]
+                if key in self.par_samplers:  # If a custom sampler is used, get it now
+                    try:
+                        sampler_fn = getattr(trial, self.par_samplers[key])
+                    except Exception as E:
+                        errormsg = 'The requested sampler function is not found: ensure it is a valid attribute of an Optuna Trial object'
+                        raise AttributeError(errormsg) from E
+                else:
+                    sampler_fn = trial.suggest_uniform
+                pars[key] = sampler_fn(key, low, high)  # Sample from values within this range
+            elif isinstance(val, dict):
                 sampler_fn = trial.suggest_uniform
-            pars[key] = sampler_fn(key, low, high) # Sample from values within this range
+                pars[key] = dict()
+                for parkey, par_highlowlist in val.items():
+                    pars[key][parkey] = []
+                    for i, (best, low, high) in enumerate(par_highlowlist):
+                        sampler_key = parkey+str(i)
+                        sample = float(sampler_fn(sampler_key, low, high))
+                        pars[key][parkey].append(sample)
+
         mismatch = self.run_sim(pars)
         # a = sim.get_analyzer()
         # self.results.append(a.results)

@@ -137,8 +137,17 @@ def test_calibration():
     hpv18 = hpv.genotype('hpv18')
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], datafile='test_data/south_africa_target_data.xlsx')
     calib_pars = dict(beta=[0.05, 0.010, 0.20],
-                      hpv_control_prob=[.9, 0.1, 1])
-    calib = hpv.Calibration(sim, calib_pars, total_trials=50)
+                      hpv_control_prob=[.9, 0.1, 1],
+                      prognoses=dict(
+                          cin1_probs=[[0.015, 0.001, 0.03], [0.03655, 0.01, 0.2], [0.36800, 0.01, 0.5],
+                                        [0.655, 0.1, 0.8], [0.95, 0.5, 1], [0.99, 0.6, 1], [0.99, .6, 1]],
+                          cin2_probs=[[0.015, 0.001, 0.03], [0.03655, 0.01, 0.2], [0.36800, 0.01, 0.5],
+                                      [0.655, 0.1, 0.8], [0.95, 0.5, 1], [0.99, 0.6, 1], [0.99, .6, 1]],
+                          cin3_probs=[[0.15, 0.001, 0.3], [0.4655, 0.1, 0.6], [0.6800, 0.1, 0.75],
+                                      [0.755, 0.3, 0.9], [0.95, 0.5, 1], [0.99, 0.6, 1], [0.99, .6, 1]],
+                      ),
+                      )
+    calib = hpv.Calibration(sim, calib_pars, total_trials=10)
     calib.calibrate()
 
     return sim, calib
