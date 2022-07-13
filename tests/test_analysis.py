@@ -147,7 +147,7 @@ def test_calibration():
                                       [0.755, 0.3, 0.9], [0.95, 0.5, 1], [0.99, 0.6, 1], [0.99, .6, 1]],
                       ),
                       )
-    calib = hpv.Calibration(sim, calib_pars, total_trials=10)
+    calib = hpv.Calibration(sim, calib_pars, total_trials=50)
     calib.calibrate()
 
     return sim, calib

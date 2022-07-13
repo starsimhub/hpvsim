@@ -986,8 +986,7 @@ class Calibration(Analyzer):
                     pars[key][parkey] = []
                     for i, (best, low, high) in enumerate(par_highlowlist):
                         sampler_key = parkey+str(i)
-                        sample = float(sampler_fn(sampler_key, low, high))
-                        pars[key][parkey].append(sample)
+                        pars[key][parkey].append(sampler_fn(sampler_key, low, high))
 
         mismatch = self.run_sim(pars)
         # a = sim.get_analyzer()
