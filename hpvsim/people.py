@@ -430,7 +430,7 @@ class People(hpb.BasePeople):
 
     def add_births(self, year=None):
         ''' Method to add births '''
-        this_birth_rate = sc.smoothinterp(self.t+self.pars['start'], self.pars['birth_rates'][0], self.pars['birth_rates'][1])*self.dt
+        this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])*self.dt
         new_births = round(this_birth_rate[0]*len(self)/1000) # Crude births per 1000
 
         # Generate other characteristics of the new people

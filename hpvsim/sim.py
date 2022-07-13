@@ -551,7 +551,6 @@ class Sim(hpb.BaseSim):
         # Determine which genotype people are infected with
         if self['init_hpv_dist'] is None: # No type distribution provided, assume even split
             genotypes = np.random.randint(0, ng, len(hpv_inds))
-
         else:
             # Error checking
             if not sc.checktype(self['init_hpv_dist'], dict):
@@ -821,7 +820,7 @@ class Sim(hpb.BaseSim):
             raise AlreadyRunError('Simulation has already been finalized')
 
         # Fix the last timepoint
-        if self.resfreq < 1:
+        if self.resfreq>1:
             for reskey in hpd.flow_keys:
                 self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
                 self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale

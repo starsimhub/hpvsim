@@ -382,7 +382,10 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         if label: label += f' - {v_label}'
                         else:     label = v_label
                         ax.plot(res_t, res.values[genotype,bi:], label=label, **args.plot, c=color)  # Plot result
+<<<<<<< HEAD
 
+=======
+>>>>>>> birth-rate-projections
                 if args.show['data']:
                     plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
 

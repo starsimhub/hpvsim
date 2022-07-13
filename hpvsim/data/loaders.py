@@ -230,6 +230,8 @@ def get_birth_rates(location=None):
         raise ValueError(errormsg)
 
     standardized = map_entries(birth_rate_data, location)
-    birth_rates, years = standardized[location], birth_rate_data['years']
+    birth_rates, years = standardized[location], birth_rate_data['Year']
+    birth_rates, inds = sc.sanitize(birth_rates, returninds=True)
+    years = years[inds]
     return np.array([years, birth_rates])
 
