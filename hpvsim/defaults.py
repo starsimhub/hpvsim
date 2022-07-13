@@ -140,11 +140,7 @@ inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.c
 # Demographics
 dem_keys    = ['births',    'other_deaths']
 dem_names   = ['births',    'other deaths']
-<<<<<<< HEAD
 dem_colors  = ['#fcba03',   '#000000']
-=======
-dem_colors  = ['#000000',   '#fcba03']
->>>>>>> birth-rate-projections
 
 # Results by sex
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
