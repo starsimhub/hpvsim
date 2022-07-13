@@ -37,13 +37,8 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['birth_rates']     = None      # Birth rates, loaded below
 
     # Initialization parameters
-<<<<<<< HEAD
-    pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence by age and sex
-    pars['init_hpv_dist']   = None # Initial type distribution
-=======
     pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence
     pars['init_hpv_dist'] = None  # Initial type distribution
->>>>>>> birth-rate-projections
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation
