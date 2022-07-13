@@ -77,10 +77,6 @@ def map_entries(json, location):
             entry = list(json.values())[ind]
             entries[loc] = entry
         except ValueError as E:
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
             suggestions = sc.suggest(loc, countries, n=4)
             if suggestions:
                 errormsg = f'Location "{loc}" not recognized, did you mean {suggestions}? ({str(E)})'
