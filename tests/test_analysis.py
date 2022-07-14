@@ -65,30 +65,19 @@ def test_age_pyramids(do_plot=True):
 def test_age_results(do_plot=True):
 
     sc.heading('Testing by-age results')
-
-    pars = dict(
-        pop_size=50e3,
-        pop_scale=36.8e6/50e3,
-        start=1970,
-        end=2015,
-        dt=0.5,
-        location='south africa',
-        beta=0.05,
-        hpv_control_prob=1
-    )
+    n_agents = 50e3
+    pars = dict(pop_size=n_agents, pop_scale=25e6/n_agents, start=1980, n_years=40, dt=0.5, location='south africa')
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
-    hpv31 = hpv.genotype('hpv31')
-    timepoints = ['2010']
-    edges = np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.])
-    az = hpv.age_results(timepoints=timepoints,
-                         result_keys=['detectable_hpv_prevalence',
-                                      # 'hpv_prevalence',
-                                      'total_cancer_incidence'
-                                      ],
-                         datafile='test_data/south_africa_target_data.xlsx',
-                         edges=edges)
-    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=az)
+    az1 = hpv.age_results(timepoints=['2010'],
+                         result_keys=['hpv_prevalence'],
+                         datafile='test_data/south_africa_hpv_data.xlsx',
+                         edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]))
+    az2 = hpv.age_results(timepoints=['2019'],
+                         result_keys=['total_cancers'],
+                         datafile='test_data/south_africa_cancer_data.xlsx',
+                         edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.]))
+    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=[az1, az2])
     sim.run()
     a = sim.get_analyzer()
 
@@ -131,8 +120,8 @@ def test_calibration():
 
     pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, end=2015, dt=0.5, location='south africa',
                 init_hpv_dist=dict(
-                    hpv16=0.8,
-                    hpv18=0.2
+                    hpv16=0.9,
+                    hpv18=0.1
                 ))
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
