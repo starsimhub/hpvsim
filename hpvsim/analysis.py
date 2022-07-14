@@ -938,7 +938,7 @@ class Calibration(Analyzer):
         if 'prognoses' in valid_pars.keys():
             sim_progs = hppar.get_prognoses()
             for prog_key, prog_val in valid_pars['prognoses'].items():
-                sim_progs[prog_key] = prog_val
+                sim_progs[prog_key] = np.array(prog_val)
             valid_pars['prognoses'] = sim_progs
         sim.update_pars(valid_pars)
         if len(valid_pars) != len(calib_pars):
