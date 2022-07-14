@@ -87,32 +87,6 @@ def test_age_results(do_plot=True):
 
     return sim, a
 
-def test_age_standardization(do_plot=True):
-
-    sc.heading('Testing by-age results')
-
-    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, burnin=30, end=2050, dt=0.5, location='south africa')
-    hpv16 = hpv.genotype('hpv16')
-    hpv18 = hpv.genotype('hpv18')
-    hpv31 = hpv.genotype('hpv31')
-    timepoints = ['2020']
-    edges = np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.])
-    az = hpv.age_results(timepoints=timepoints,
-                         result_keys=['total_cancer_incidence'],
-                         age_standardized=True,
-                         # datafile='test_data/south_africa_hpv_data.xlsx',
-                         # edges=edges
-                         )
-    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18, hpv31], analyzers=az)
-    sim.run()
-    a = sim.get_analyzer()
-
-    # Check plot()
-    if do_plot:
-        fig = a.plot()
-
-    return sim, a
-
 
 def test_calibration():
 
