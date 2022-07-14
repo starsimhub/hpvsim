@@ -19,6 +19,12 @@ from .settings import options as hpo # For setting global options
 import seaborn as sns
 
 
+def tesst(*args, **kwargs):
+    print('HI I AM!')
+    sc.pr(args[1])
+    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+    return
+
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'Calibration']
 
 
@@ -209,7 +215,7 @@ class snapshot(Analyzer):
         date = key # TODO: consider ways to make this more robust
         if date in self.snapshots:
             snapshot = self.snapshots[date]
-        else: 
+        else:
             dates = ', '.join(list(self.snapshots.keys()))
             errormsg = f'Could not find snapshot date {date}: choices are {self.dates}'
             raise sc.KeyNotFoundError(errormsg)
@@ -988,10 +994,16 @@ class Calibration(Analyzer):
                         sampler_key = parkey+str(i)
                         pars[key][parkey].append(sampler_fn(sampler_key, low, high))
 
-        mismatch = self.run_sim(pars)
+        sim = self.run_sim(pars, return_sim=True)
+        # trial.set_user_attr('sim', sim) # CK: fails since not a JSON, could use sc.jsonpickle()
+        r = sim.get_analyzer().results
+        r = sc.jsonify(r)
+        trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
+        sim.shrink() # CK: Proof of principle only!!
+        trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
         # a = sim.get_analyzer()
         # self.results.append(a.results)
-        return mismatch
+        return sim.fit
 
 
     def worker(self):
@@ -1002,7 +1014,7 @@ class Calibration(Analyzer):
         else:
             op.logging.set_verbosity(op.logging.ERROR)
         study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
-        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials)
+        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None) # [tesst]
         return output
 
 
@@ -1069,6 +1081,12 @@ class Calibration(Analyzer):
         self.study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
         self.best_pars = sc.objdict(self.study.best_params)
         self.elapsed = sc.toc(t0, output=True)
+
+        # Collect analyzer results
+        self.analyzer_results = []
+        for trial in self.study.trials:
+            r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
+            self.analyzer_results.append(r)
 
         # Compare the results
         self.initial_pars = sc.objdict({k:v[0] for k,v in self.calib_pars.items()})
