@@ -266,11 +266,13 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
 
     birth_rates = hpd.default_birth_rates
     lx = hpd.default_lx
+    death_rates = hpd.default_death_rates
     if location is not None:
         if verbose:
             print(f'Loading location-specific demographic data for "{location}"')
         try:
-            lx          = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+            death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+            lx          = hpdata.get_lx(location=location, by_sex=by_sex, overall=overall)
             birth_rates = hpdata.get_birth_rates(location=location)
         except ValueError as E:
             warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
