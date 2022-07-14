@@ -824,7 +824,8 @@ class Sim(hpb.BaseSim):
             for reskey in hpd.flow_keys:
                 self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
                 self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-
+            self.results['births'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+            self.results['other_deaths'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
