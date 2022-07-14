@@ -3,9 +3,6 @@ Tests for single simulations
 '''
 
 #%% Imports and settings
-import os
-import pytest
-import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
@@ -93,6 +90,33 @@ def test_age_results(do_plot=True):
     return sim, a
 
 
+def test_calibration():
+
+    sc.heading('Testing calibration')
+
+    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, end=2015, dt=0.5, location='south africa',
+                init_hpv_dist=dict(
+                    hpv16=0.9,
+                    hpv18=0.1
+                ))
+    hpv16 = hpv.genotype('hpv16')
+    hpv18 = hpv.genotype('hpv18')
+    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], datafile='test_data/south_africa_target_data.xlsx')
+    calib_pars = dict(beta=[0.05, 0.010, 0.20],
+                      hpv_control_prob=[.9, 0.5, 1],
+                      prognoses=dict(
+                          cin1_probs=[[0.015, 0.001, 0.03], [0.3655, 0.01, 0.5], [0.36800, 0.01, 0.5],
+                                        [0.655, 0.1, 0.8], [0.95, 0.5, 1], [0.99, 0.6, 1], [0.99, .6, 1]],
+                          cin2_probs=[[0.015, 0.001, 0.03], [0.03655, 0.01, 0.2], [0.36800, 0.01, 0.5],
+                                      [0.655, 0.1, 0.8], [0.95, 0.5, 1], [0.99, 0.6, 1], [0.99, .6, 1]],
+                          cin3_probs=[[0.15, 0.001, 0.3], [0.4655, 0.1, 0.6], [0.6800, 0.1, 0.75],
+                                      [0.755, 0.3, 0.9], [0.95, 0.5, 1], [0.99, 0.6, 1], [0.99, .6, 1]],
+                      ),
+                      )
+    calib = hpv.Calibration(sim, calib_pars, total_trials=100, n_workers=4)
+    calib.calibrate()
+    calib.plot()
+    return sim, calib
 
 
 #%% Run as a script
@@ -102,7 +126,9 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
+    # sim1, a1    = test_age_results()
+    # sim2, a2 = test_age_standardization()
+    sim3, calib = test_calibration()
 
     sc.toc(T)
     print('Done.')

@@ -3,7 +3,7 @@ Additional analysis functions that are not part of the core workflow,
 but which are useful for particular investigations.
 '''
 
-# import os
+import os
 import numpy as np
 import pylab as pl
 import pandas as pd
@@ -13,12 +13,19 @@ from . import misc as hpm
 from . import interventions as hpi
 from . import plotting as hppl
 from . import defaults as hpd
+from . import parameters as hppar
 # from . import run as cvr
 from .settings import options as hpo # For setting global options
 import seaborn as sns
 
 
-__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results']
+def tesst(*args, **kwargs):
+    print('HI I AM!')
+    sc.pr(args[1])
+    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+    return
+
+__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'Calibration']
 
 
 class Analyzer(sc.prettyobj):
@@ -208,7 +215,7 @@ class snapshot(Analyzer):
         date = key # TODO: consider ways to make this more robust
         if date in self.snapshots:
             snapshot = self.snapshots[date]
-        else: 
+        else:
             dates = ', '.join(list(self.snapshots.keys()))
             errormsg = f'Could not find snapshot date {date}: choices are {self.dates}'
             raise sc.KeyNotFoundError(errormsg)
@@ -432,6 +439,8 @@ class age_results(Analyzer):
     Args:
         timepoints  (list): list of ints/strings/date objects, timepoints at which to generate by-age results
         results     (list): list of strings, results to generate
+        age_standardized (bool): whether or not to provide age-standardized results
+        compute_fit (bool): whether or not to compute fit between model results and data
         die         (bool): whether or not to raise an exception if errors are found
         kwargs      (dict): passed to Analyzer()
 
@@ -441,7 +450,8 @@ class age_results(Analyzer):
         age_results = sim['analyzers'][0]
     '''
 
-    def __init__(self, timepoints, edges=None, result_keys=None, age_labels=None, datafile=None, die=False, **kwargs):
+    def __init__(self, timepoints, edges=None, result_keys=None, age_labels=None, age_standardized=False, datafile=None,
+                 compute_fit=False, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         timepoints          = sc.promotetolist(timepoints) # Combine multiple timepoints
         self.timepoints     = timepoints
@@ -453,6 +463,9 @@ class age_results(Analyzer):
         self.dates          = None # Representations in terms of years, e.g. 2020.4, set during initialization
         self.start          = None # Store the start year of the simulation
         self.age_labels     = age_labels # Labels for the age bins - will be automatically generated if not provided
+        self.age_standard   = None
+        self.age_standardized = age_standardized # Whether or not to compute age-standardized results
+        self.compute_fit    = compute_fit # Whether or not to compute fit
         self.result_keys    = result_keys # Store the result keys
         self.results        = sc.odict() # Store the age results
         return
@@ -488,6 +501,15 @@ class age_results(Analyzer):
         if self.age_labels is None:
             self.age_labels = [f'{int(self.bins[i])}-{int(self.bins[i+1])}' for i in range(len(self.bins)-1)]
             self.age_labels.append(f'{int(self.bins[-1])}+')
+
+        if self.age_standardized:
+            self.age_standard = self.get_standard_population()
+            self.edges = self.age_standard[0]
+            self.bins = self.edges[:-1]  # Don't include the last edge in the bins
+            self.age_labels = [f'{int(self.bins[i])}-{int(self.bins[i + 1])}' for i in range(len(self.bins) - 1)]
+            self.age_labels.append(f'{int(self.bins[-1])}+')
+        else:
+            self.age_standard = np.array([self.edges, np.full(len(self.edges), 1)])
 
         # Handle result keys
         choices = sim.result_keys()
@@ -543,6 +565,18 @@ class age_results(Analyzer):
                     data_result_keys.append(drk)
             self.data_result_keys = data_result_keys
 
+
+        if self.compute_fit:
+            if self.data is None:
+                errormsg = f'Cannot compute fit without data'
+                raise ValueError(errormsg)
+            else:
+                if 'weights' in self.data.columns:
+                    self.weights = self.data['weights'].values
+                else:
+                    self.weights = np.ones(len(self.data))
+                self.mismatch = None  # The final value
+
         # Handle variable names (TODO, should this be centralized somewhere?)
         self.mapping = {
             'infections': ['date_infectious', 'infectious'],
@@ -566,6 +600,19 @@ class age_results(Analyzer):
         return
 
 
+    def get_standard_population(self):
+        '''
+        Returns the WHO standard population for computation of age-standardized rates
+        https://seer.cancer.gov/stdpopulations/world.who.html
+        '''
+
+        age_standard = np.array([[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100],
+                                [0.08860, 0.08690, 0.086, 0.0847, 0.0822, 0.0793, 0.0761, 0.0715, 0.0659, 0.0604,
+                                 0.0537, 0.0455, 0.0372, 0.0296, 0.0221, 0.0152, 0.0091, 0.0044, 0.0015, 0.0004,
+                                 0.00005]])
+        return age_standard
+
+
     def apply(self, sim):
         ''' Calculate age results '''
 
@@ -583,8 +630,13 @@ class age_results(Analyzer):
             age = sim.people.age # Get the age distribution
             scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
 
+
             for rkey in self.result_keys: # Loop over each result, but only stocks are calculated here
 
+                if self.compute_fit and 'total' not in rkey:
+                    thisdatadf = self.data[(self.data.year == float(date)) & (self.data.name == rkey)]
+                    unique_genotypes = thisdatadf.genotype.unique()
+                    ng = len(unique_genotypes)
                 # Initialize storage
                 size = na if 'total' in rkey else (ng,na)
                 self.results[date][rkey] = np.zeros(size)
@@ -596,23 +648,36 @@ class age_results(Analyzer):
                     if attr[0] == 'n': attr = attr[2:]
                     if attr == 'hpv': attr = 'infectious' # People with HPV are referred to as infectious in the sim
                     if attr == 'cancer': attr = 'cancerous'
-                    if 'total' in rkey:
-                        inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
-                        self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                    if attr in sim.people.keys():
+                        if 'total' in rkey:
+                            inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
+                            self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                        else:
+                            for g in range(ng):
+                                inds = sim.people[attr][g,:].nonzero()
+                                self.results[date][rkey][g,:] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+
+                        if 'prevalence' in rkey:
+                            # Need to divide by the right denominator
+                            if 'hpv' in rkey: # Denominator is whole population
+                                denom = (np.histogram(age, bins=self.edges)[0] * scale)
+                            else: # Denominator is females
+                                denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)
+                            if 'total' not in rkey: denom = denom[None,:]
+                            self.results[date][rkey] = self.results[date][rkey] / denom
                     else:
-                        for g in range(ng):
-                            inds = sim.people[attr][g,:].nonzero()
-                            self.results[date][rkey][g,:] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
-
-                    if 'prevalence' in rkey:
-                        # Need to divide by the right denominator
-                        if 'hpv' in rkey: # Denominator is whole population
+                        if 'detectable' in rkey:
+                            hpv_test_pars = hppar.get_screen_pars('hpv')
+                            for state in ['hpv', 'cin1', 'cin2', 'cin3', 'cancerous']:
+                                for g in range(ng):
+                                    hpv_pos_probs = np.zeros(len(sim.people))
+                                    tp_inds = hpu.true(sim.people[state][g, :])
+                                    hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][
+                                        sim['genotype_map'][g]]
+                                    hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
+                                    self.results[date][rkey][g, :] += np.histogram(age[hpv_pos_inds], bins=self.edges)[0] * scale  # Bin the people
                             denom = (np.histogram(age, bins=self.edges)[0] * scale)
-                        else: # Denominator is females
-                            denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)
-                        if 'total' not in rkey: denom = denom[None,:]
-                        self.results[date][rkey] = self.results[date][rkey] / denom
-
+                            self.results[date][rkey] = self.results[date][rkey] / denom
             self.date = date # Need to store the date for subsequent calcpoints
 
         # Both annual new cases and incidence require us to calculate the new cases over all
@@ -621,22 +686,29 @@ class age_results(Analyzer):
             date = self.date # Stored just above for use here
             scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
             age = sim.people.age # Get the age distribution
+            age_standard = self.age_standard[1, :-1]
 
             for rkey in self.result_keys: # Loop over each result
+
+                if self.compute_fit and 'total' not in rkey:
+                    thisdatadf = self.data[(self.data.year == float(date)) & (self.data.name == rkey)]
+                    unique_genotypes = thisdatadf.genotype.unique()
+                    ng = len(unique_genotypes)
 
                 # Figure out if it's a flow or incidence
                 if rkey.replace('total_', '') in hpd.flow_keys or 'incidence' in rkey:
                     attr = rkey.replace('total_','').replace('_incidence','') # Name of the actual state
                     if attr == 'hpv': attr = 'infections' # HPV is referred to as infections in the sim
+                    if attr == 'cancer': attr = 'cancers' # cancer is referred to as cancers in the sim
                     attr1 = self.mapping[attr][0] # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
                     attr2 = self.mapping[attr][1] # As above
                     if rkey[:5] == 'total': # Results across all genotypes
                         inds = ((sim.people[attr1]==sim.t)*(sim.people[attr2])).nonzero()
-                        self.results[date][rkey] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                        self.results[date][rkey] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale * age_standard  # Bin the people
                     else: # Results by genotype
                         for g in range(ng): # Loop over genotypes
                             inds = ((sim.people[attr1][g,:] == sim.t) * (sim.people[attr2][g,:])).nonzero()
-                            self.results[date][rkey][g,:] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                            self.results[date][rkey][g,:] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale * age_standard  # Bin the people
 
                     if 'incidence' in rkey:
                         # Need to divide by the right denominator
@@ -651,7 +723,31 @@ class age_results(Analyzer):
     def finalize(self, sim):
         super().finalize()
         validate_recorded_dates(sim, requested_dates=self.dates, recorded_dates=self.results.keys(), die=self.die)
+        if self.compute_fit:
+            self.mismatch = self.compute()
+            sim.fit = self.mismatch
         return
+
+
+    def compute(self):
+        res = []
+        for name, group in self.data.groupby(['name', 'genotype', 'year']):
+            key = name[0]
+            genotype = name[1].lower()
+            year = str(name[2]) + '.0'
+            if 'total' in key:
+                sim_res = list(self.results[year][key])
+                res.extend(sim_res)
+            else:
+                sim_res = list(self.results[year][key][self.glabels.index(genotype)])
+                res.extend(sim_res)
+        self.data['model_output'] = res
+        self.data['diffs'] = self.data['model_output'] - self.data['value']
+        self.data['gofs'] = hpm.compute_gof(self.data['value'].values, self.data['model_output'].values)
+        self.data['losses'] = self.data['gofs'].values * self.weights
+        self.mismatch = self.data['losses'].sum()
+
+        return self.mismatch
 
 
     def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8,
@@ -706,8 +802,9 @@ class age_results(Analyzer):
                     x = np.arange(len(self.age_labels))  # the label locations
                     if self.data is not None:
                         thisdatadf = self.data[(self.data.year == float(date))&(self.data.name == rkey)]
-                        if len(thisdatadf)>0:
-                            barwidth /= 2 # Adjust width based on data
+                        unique_genotypes = thisdatadf.genotype.unique()
+                        # if len(thisdatadf)>0:
+                        #     barwidth /= 2 # Adjust width based on data
 
                     if 'total' not in rkey:
                         # Prepare plot settings
@@ -719,20 +816,24 @@ class age_results(Analyzer):
 
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
-                            ax.bar(x+xlocations[g]-barwidth, resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
+                            ax.plot(x, resdict[rkey][g,:], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
+                            # ax.bar(x+xlocations[g], resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
                             if len(thisdatadf)>0:
-                                ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
-                                ax.bar(x+xlocations[g]+barwidth, ydata, color=self.result_properties[rkey].color[g], hatch='/', label=f'Data - {glabel}', width=barwidth)
+                                # check if this genotype is in dataframe
+                                if self.glabels[g].upper() in unique_genotypes:
+                                    ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
+                                    ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s', label=f'Data - {glabel}')
 
                     else:
                         if (self.data is not None) and (len(thisdatadf) > 0):
-                            ax.bar(x-1/2*barwidth, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
+                            ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
+                            # ax.bar(x-1/2*barwidth, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
                             ydata = np.array(thisdatadf.value)
-                            ax.bar(x+1/2*barwidth, ydata, color=d_args.color, width=barwidth, label='Data')
+                            ax.scatter(x, ydata,  color=self.result_properties[rkey].color, marker='s', label='Data')
                         else:
-                            ax.bar(x, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
+                            # ax.bar(x, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
+                            ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
                     ax.set_xlabel('Age group')
-                    # ax.set_ylabel('Frequency')
                     ax.set_title(self.result_properties[rkey].name+' - '+date)
                     ax.legend()
                     row_count += n_cols
@@ -743,3 +844,420 @@ class age_results(Analyzer):
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
 
+
+def import_optuna():
+    ''' A helper function to import Optuna, which is an optional dependency '''
+    try:
+        import optuna as op # Import here since it's slow
+    except ModuleNotFoundError as E: # pragma: no cover
+        errormsg = f'Optuna import failed ({str(E)}), please install first (pip install optuna)'
+        raise ModuleNotFoundError(errormsg)
+    return op
+
+
+class Calibration(Analyzer):
+    '''
+    A class to handle calibration of HPVsim simulations. Uses the Optuna hyperparameter
+    optimization library (optuna.org), which must be installed separately (via
+    pip install optuna).
+
+    Note: running a calibration does not guarantee a good fit! You must ensure that
+    you run for a sufficient number of iterations, have enough free parameters, and
+    that the parameters have wide enough bounds. Please see the tutorial on calibration
+    for more information.
+
+    Args:
+        sim          (Sim)  : the simulation to calibrate
+        calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
+        fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
+        par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_uniform
+        n_trials     (int)  : the number of trials per worker
+        n_workers    (int)  : the number of parallel workers (default: maximum
+        total_trials (int)  : if n_trials is not supplied, calculate by dividing this number by n_workers)
+        name         (str)  : the name of the database (default: 'hpvsim_calibration')
+        db_name      (str)  : the name of the database file (default: 'hpvsim_calibration.db')
+        keep_db      (bool) : whether to keep the database after calibration (default: false)
+        storage      (str)  : the location of the database (default: sqlite)
+        rand_seed    (int)  : if provided, use this random seed to initialize Optuna runs (for reproducibility)
+        label        (str)  : a label for this calibration object
+        die          (bool) : whether to stop if an exception is encountered (default: false)
+        verbose      (bool) : whether to print details of the calibration
+        kwargs       (dict) : passed to hpv.Calibration()
+
+    Returns:
+        A Calibration object
+
+    **Example**::
+
+        sim = hpv.Sim(datafile='data.csv')
+        calib_pars = dict(beta=[0.015, 0.010, 0.020])
+        calib = hpv.Calibration(sim, calib_pars, total_trials=100)
+        calib.calibrate()
+        calib.plot()
+
+    '''
+
+    def __init__(self, sim, calib_pars=None, fit_args=None, par_samplers=None,
+                 n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
+                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
+        super().__init__(label=label) # Initialize the Analyzer object
+
+        import multiprocessing as mp # Import here since it's also slow
+
+        # Handle run arguments
+        if n_trials  is None: n_trials  = 20
+        if n_workers is None: n_workers = mp.cpu_count()
+        if name      is None: name      = 'hpvsim_calibration'
+        if db_name   is None: db_name   = f'{name}.db'
+        if keep_db   is None: keep_db   = False
+        if storage   is None: storage   = f'sqlite:///{db_name}'
+        if total_trials is not None: n_trials = total_trials/n_workers
+        self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name, keep_db=keep_db, storage=storage, rand_seed=rand_seed)
+
+        # Handle other inputs
+        self.sim          = sim
+        self.calib_pars   = calib_pars
+        self.fit_args     = sc.mergedicts(fit_args)
+        self.par_samplers = sc.mergedicts(par_samplers)
+        self.die          = die
+        self.verbose      = verbose
+        self.calibrated   = False
+
+        # Create age_results intervention
+        data = self.sim.data
+        self.target_data = data
+        timepoints = data.year.unique()
+        keys = data.name.unique()
+        edges = np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
+        ar = age_results(timepoints=timepoints, result_keys=keys, edges=edges,
+                         datafile='test_data/south_africa_target_data.xlsx',
+                         compute_fit=True)
+        self.sim['analyzers'] += [ar]
+        self.result_keys = self.target_data.name.unique()
+        self.timepoints = self.target_data.year.unique()
+        self.result_properties = sc.objdict()
+
+        return
+
+    def run_sim(self, calib_pars, label=None, return_sim=False):
+        ''' Create and run a simulation '''
+        sim = self.sim.copy()
+        if label: sim.label = label
+        valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
+        if 'prognoses' in valid_pars.keys():
+            sim_progs = hppar.get_prognoses()
+            for prog_key, prog_val in valid_pars['prognoses'].items():
+                sim_progs[prog_key] = np.array(prog_val)
+            valid_pars['prognoses'] = sim_progs
+        sim.update_pars(valid_pars)
+        if len(valid_pars) != len(calib_pars):
+            extra = set(calib_pars.keys()) - set(valid_pars.keys())
+            errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'
+            raise ValueError(errormsg)
+        try:
+            sim.run()
+
+            if return_sim:
+                return sim
+            else:
+                return sim.fit
+
+        except Exception as E:
+            if self.die:
+                raise E
+            else:
+                warnmsg = f'Encountered error running sim!\nParameters:\n{valid_pars}\nTraceback:\n{sc.traceback()}'
+                hpm.warn(warnmsg)
+                output = None if return_sim else np.inf
+                return output
+
+    def run_trial(self, trial):
+        ''' Define the objective for Optuna '''
+        pars = {}
+        for key, val in self.calib_pars.items():
+            if isinstance(val, list):
+                low, high = val[1], val[2]
+                if key in self.par_samplers:  # If a custom sampler is used, get it now
+                    try:
+                        sampler_fn = getattr(trial, self.par_samplers[key])
+                    except Exception as E:
+                        errormsg = 'The requested sampler function is not found: ensure it is a valid attribute of an Optuna Trial object'
+                        raise AttributeError(errormsg) from E
+                else:
+                    sampler_fn = trial.suggest_uniform
+                pars[key] = sampler_fn(key, low, high)  # Sample from values within this range
+            elif isinstance(val, dict):
+                sampler_fn = trial.suggest_uniform
+                pars[key] = dict()
+                for parkey, par_highlowlist in val.items():
+                    pars[key][parkey] = []
+                    for i, (best, low, high) in enumerate(par_highlowlist):
+                        sampler_key = key + '_' + parkey + '_' + str(i)
+                        pars[key][parkey].append(sampler_fn(sampler_key, low, high))
+
+        sim = self.run_sim(pars, return_sim=True)
+        # trial.set_user_attr('sim', sim) # CK: fails since not a JSON, could use sc.jsonpickle()
+        r = sim.get_analyzer().results
+        r = sc.jsonify(r)
+        trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
+        sim.shrink() # CK: Proof of principle only!!
+        trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
+        return sim.fit
+
+
+    def worker(self):
+        ''' Run a single worker '''
+        op = import_optuna()
+        if self.verbose:
+            op.logging.set_verbosity(op.logging.DEBUG)
+        else:
+            op.logging.set_verbosity(op.logging.ERROR)
+        study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
+        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None) # [tesst]
+        return output
+
+
+    def run_workers(self):
+        ''' Run multiple workers in parallel '''
+        if self.run_args.n_workers > 1: # Normal use case: run in parallel
+            output = sc.parallelize(self.worker, iterarg=self.run_args.n_workers)
+        else: # Special case: just run one
+            output = [self.worker()]
+        return output
+
+
+    def remove_db(self):
+        '''
+        Remove the database file if keep_db is false and the path exists.
+
+        New in version 3.1.0.
+        '''
+        if os.path.exists(self.run_args.db_name):
+            os.remove(self.run_args.db_name)
+            if self.verbose:
+                print(f'Removed existing calibration {self.run_args.db_name}')
+        return
+
+
+    def make_study(self):
+        ''' Make a study, deleting one if it already exists '''
+        op = import_optuna()
+        if not self.run_args.keep_db:
+            self.remove_db()
+        if self.run_args.rand_seed is not None:
+            sampler = op.samplers.RandomSampler(self.run_args.rand_seed)
+            sampler.reseed_rng()
+            raise NotImplementedError('Implemented but does not work')
+        else:
+            sampler = None
+        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=sampler)
+        return output
+
+
+    def calibrate(self, calib_pars=None, verbose=True, **kwargs):
+        '''
+        Actually perform calibration.
+
+        Args:
+            calib_pars (dict): if supplied, overwrite stored calib_pars
+            verbose (bool): whether to print output from each trial
+            kwargs (dict): if supplied, overwrite stored run_args (n_trials, n_workers, etc.)
+        '''
+        op = import_optuna()
+
+        # Load and validate calibration parameters
+        if calib_pars is not None:
+            self.calib_pars = calib_pars
+        if self.calib_pars is None:
+            errormsg = 'You must supply calibration parameters either when creating the calibration object or when calling calibrate().'
+            raise ValueError(errormsg)
+        self.run_args.update(kwargs) # Update optuna settings
+
+        # Run the optimization
+        t0 = sc.tic()
+        self.make_study()
+        self.run_workers()
+        self.study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
+        self.best_pars = sc.objdict(self.study.best_params)
+        self.elapsed = sc.toc(t0, output=True)
+
+        # Collect analyzer results
+        # Load a single sim
+        sim = sc.jsonpickle(self.study.trials[0].user_attrs['jsonpickle_sim'])
+        self.ng = sim['pars']['n_genotypes']
+        self.glabels = [g['label'] for g in sim['pars']['genotypes']]
+        for rkey in self.result_keys:
+            self.result_properties[rkey] = sc.objdict()
+            self.result_properties[rkey].name = sim['results'][rkey]['name']
+            if 'total' in rkey:
+                rkey_new = rkey[6:]
+                self.result_properties[rkey].color = sim['results'][rkey_new]['color']['values'][0]
+            else:
+                self.result_properties[rkey].color = sim['results'][rkey]['color']['values']
+
+        self.analyzer_results = []
+        for trial in self.study.trials:
+            r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
+            self.analyzer_results.append(r)
+
+        # Compare the results
+        self.initial_pars = sc.objdict()
+        self.par_bounds = sc.objdict()
+        for key, val in self.calib_pars.items():
+            if isinstance(val, list):
+                self.initial_pars[key] = val[0]
+                self.par_bounds[key] = np.array([val[1], val[2]])
+            elif isinstance(val, dict):
+                for parkey, par_highlowlist in val.items():
+                    for i, (best, low, high) in enumerate(par_highlowlist):
+                        sampler_key = key + '_' + parkey + '_' + str(i)
+                        self.initial_pars[sampler_key] = best
+                        self.par_bounds[sampler_key] = np.array([low, high])
+        self.parse_study()
+
+        # Tidy up
+        self.calibrated = True
+        if not self.run_args.keep_db:
+            self.remove_db()
+
+        return self
+
+
+    def parse_study(self):
+        '''Parse the study into a data frame -- called automatically '''
+        best = self.best_pars
+
+        print('Making results structure...')
+        results = []
+        n_trials = len(self.study.trials)
+        failed_trials = []
+        for trial in self.study.trials:
+            data = {'index':trial.number, 'mismatch': trial.value}
+            for key,val in trial.params.items():
+                data[key] = val
+            if data['mismatch'] is None:
+                failed_trials.append(data['index'])
+            else:
+                results.append(data)
+        print(f'Processed {n_trials} trials; {len(failed_trials)} failed')
+
+        keys = ['index', 'mismatch'] + list(best.keys())
+        data = sc.objdict().make(keys=keys, vals=[])
+        for i,r in enumerate(results):
+            for key in keys:
+                if key not in r:
+                    warnmsg = f'Key {key} is missing from trial {i}, replacing with default'
+                    hpm.warn(warnmsg)
+                    r[key] = best[key]
+                data[key].append(r[key])
+        self.data = data
+        self.df = pd.DataFrame.from_dict(data)
+
+        return
+
+
+    def to_json(self, filename=None):
+        '''
+        Convert the data to JSON.
+
+        New in version 3.1.1.
+        '''
+        order = np.argsort(self.df['mismatch'])
+        json = []
+        for o in order:
+            row = self.df.iloc[o,:].to_dict()
+            rowdict = dict(index=row.pop('index'), mismatch=row.pop('mismatch'), pars={})
+            for key,val in row.items():
+                rowdict['pars'][key] = val
+            json.append(rowdict)
+        if filename:
+            sc.savejson(filename, json, indent=2)
+        else:
+            return json
+
+
+    def plot(self, fig_args=None, axis_args=None, data_args=None, do_save=None,
+             fig_path=None, do_show=True, **kwargs):
+        '''
+        Plot the calibration results
+
+        Args:
+            fig_args (dict): passed to pl.figure()
+            axis_args (dict): passed to pl.subplots_adjust()
+            data_args (dict): 'width', 'color', and 'offset' arguments for the data
+            do_save (bool): whether to save
+            fig_path (str or filepath): filepath to save to
+            do_show (bool): whether to show the figure
+            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+        '''
+
+        # Handle inputs
+        fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
+        axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
+        d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
+        all_args = sc.mergedicts(fig_args, axis_args, d_args)
+
+
+
+        # Handle what to plot
+        if not len(self.analyzer_results):
+            errormsg = f'Cannot plot since no age results were recorded (scheduled timepoints: {self.timepoints})'
+            raise ValueError(errormsg)
+        if len(self.timepoints)>1:
+            n_cols = len(self.timepoints) # One column for each requested timepoint
+            n_rows = len(self.result_keys) # One row for each requested result
+        else: # If there's only one timepoint, automatically figure out rows and columns
+            n_plots = len(self.result_keys)
+            n_rows, n_cols = sc.get_rows_cols(n_plots)
+        # Initialize
+        fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
+        pl.subplots_adjust(**axis_args)
+
+        # Make the figure(s)
+        with hpo.with_style(**kwargs):
+            for run_num, run in enumerate(self.analyzer_results):
+                for date,resdict in run.items():
+
+                    age_labels = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
+                    age_labels.append(str(int(resdict['bins'][-1]))+'+')
+
+                    row_count = 0
+
+                    for rkey in self.result_keys:
+                        ax = axes[row_count]
+
+                        # Start making plot
+                        x = np.arange(len(age_labels))  # the label locations
+                        thisdatadf = self.target_data[(self.target_data.year == float(date))&(self.target_data.name == rkey)]
+                        unique_genotypes = thisdatadf.genotype.unique()
+                        if 'total' not in rkey:
+                            for g in range(self.ng):
+                                glabel = self.glabels[g].upper()
+                                if run_num == 0:
+                                    ax.plot(x, resdict[rkey][g], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
+                                else:
+                                    ax.plot(x, resdict[rkey][g], color=self.result_properties[rkey].color[g], linestyle='--')
+                                if self.glabels[g].upper() in unique_genotypes:
+                                    ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
+                                    if run_num == 0:
+                                        ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s', label=f'Data - {glabel}')
+                                    else:
+                                        ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s')
+
+
+                        else:
+                            if run_num == 0:
+                                ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
+                                ydata = np.array(thisdatadf.value)
+                                ax.scatter(x, ydata,  color=self.result_properties[rkey].color, marker='s', label='Data')
+                            else:
+                                ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--')
+                                ydata = np.array(thisdatadf.value)
+                                ax.scatter(x, ydata, color=self.result_properties[rkey].color, marker='s')
+                        ax.set_xlabel('Age group')
+                        ax.set_title(self.result_properties[rkey].name+' - '+date)
+                        ax.legend()
+                        row_count += n_cols
+                        ax.set_xticks(x, age_labels)
+
+        return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)

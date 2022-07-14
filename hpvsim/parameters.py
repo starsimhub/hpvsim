@@ -77,7 +77,7 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['hpv_control_prob'] = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
-        hpv_reactivation_probs  = np.array([0.01,    0.05,        0.08]),      # made this up, need to parameterize somehow
+        hpv_reactivation_probs  = np.array([0.0001,    0.05,        0.04]),      # made this up, need to parameterize somehow
     )
 
     # Parameters used to calculate immunity
@@ -230,12 +230,12 @@ def get_prognoses():
     '''
 
     prognoses = dict(
-        duration_cutoffs  = np.array([0,       1,          2,          3,          4]),      # Duration cutoffs (lower limits)
-        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0]),    # Probability of seroconverting given duration of infection
-        cin1_probs        = np.array([0.015,   0.03655,    0.06800,    0.10655,    0.50]),   # Conditional probability of developing CIN1 given HPV infection
-        cin2_probs        = np.array([0.015,   0.0355,     0.0680,     0.10655,    0.60]),   # Conditional probability of developing CIN2 given CIN1
-        cin3_probs        = np.array([0.15,    0.655,      0.80,       0.855,      0.90]),   # Conditional probability of developing CIN3 given CIN2
-        cancer_probs      = np.array([0.0055,  0.0655,     0.2080,     0.50655,    0.90]),   # Conditional probability of developing cancer given CIN3
+        duration_cutoffs  = np.array([0,       1,          2,          3,          4,        5,         6]),      # Duration cutoffs (lower limits)
+        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0,      1.0,       1.0]),    # Probability of seroconverting given duration of infection
+        cin1_probs        = np.array([0.015,   0.03655,    0.36800,    0.655,      0.95,     0.99,      0.99]),   # Conditional probability of developing CIN1 given HPV infection
+        cin2_probs        = np.array([0.015,   0.0355,     0.1680,     0.20655,    0.60,     0.8,       0.85]),   # Conditional probability of developing CIN2 given CIN1
+        cin3_probs        = np.array([0.15,    0.455,      0.60,       0.655,      0.70,     0.85,      0.9]),    # Conditional probability of developing CIN3 given CIN2
+        cancer_probs      = np.array([0.0055,  0.0655,     0.2080,     0.50655,    0.95,     0.98,      1.0]),    # Conditional probability of developing cancer given CIN3
         )
 
     # Check that lengths match
@@ -944,13 +944,13 @@ def get_screen_pars(screen=None):
             by_genotype=True,
             test_positivity=dict(
                 hpv=dict(
-                    hpv16=0.75,
-                    hpv18=0.75,
-                    hpv31=0.75,
-                    hpv33=0.75,
-                    hpv45=0.75,
-                    hpv52=0.75,
-                    hpv58=0.75,
+                    hpv16=0.55,
+                    hpv18=0.55,
+                    hpv31=0.55,
+                    hpv33=0.55,
+                    hpv45=0.55,
+                    hpv52=0.55,
+                    hpv58=0.55,
                     hpv6=0,
                     hpv11=0,
                 ),
