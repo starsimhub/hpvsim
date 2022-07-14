@@ -265,29 +265,18 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
     '''
 
     birth_rates = hpd.default_birth_rates
-    lx = hpd.default_lx
+    death_rates = hpd.default_death_rates
     if location is not None:
         if verbose:
             print(f'Loading location-specific demographic data for "{location}"')
         try:
-            lx          = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+            death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
             birth_rates = hpdata.get_birth_rates(location=location)
         except ValueError as E:
             warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
             hpm.warn(warnmsg, die=die)
 
-    # Process the 85+ age group
-    for sex in ['m','f']:
-        if lx[sex][-1][0] == 85:
-            last_val = lx[sex][-1][-1] # Save the last value
-            lx[sex] = np.delete(lx[sex], -1, 0) # Remove the last row
-            # Break this 15 year age bracket into 3x 5 year age brackets
-            s85_89  = np.array([[85, 89, int(last_val*.7)]])
-            s90_99  = np.array([[90, 99, int(last_val*.7*.5)]])
-            s100    = np.array([[100, 110, 0]])
-            lx[sex] = np.concatenate([lx[sex], s85_89, s90_99, s100])
-
-    return birth_rates, lx
+    return birth_rates, death_rates
 
 
 

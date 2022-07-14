@@ -385,11 +385,11 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
-    # scens1 = test_vaccinate_prob(do_plot=True)
-    # scens2 = test_vaccinate_num(do_plot=True)
+    sim0 = test_dynamic_pars()
+    scens1 = test_vaccinate_prob(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
-    # scens4 = test_screening_ltfu(do_plot=True)
+    scens4 = test_screening_ltfu(do_plot=True)
 
     sc.toc(T)
     print('Done.')

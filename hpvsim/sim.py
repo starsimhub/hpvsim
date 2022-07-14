@@ -419,7 +419,7 @@ class Sim(hpb.BaseSim):
         results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
         results['n_alive'] = init_res('Number alive')
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
-        results['tfr'] = init_res('Total fatality rate', scale=False)
+        results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
 
         # Time vector
@@ -569,8 +569,6 @@ class Sim(hpb.BaseSim):
 
         for g in range(ng):
             durpars = genotype_pars[genotype_map[g]]['dur']
-            # dur_hpv = np.array([hpu.sample(**durpars[stage], size=len(hpv_inds)) for stage in
-            #                     ['none', 'cin1', 'cin2', 'cin3']]).sum(axis=0)
             dur_hpv = hpu.sample(**durpars['none'], size=len(hpv_inds))
             t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
             _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
@@ -606,7 +604,7 @@ class Sim(hpb.BaseSim):
 
         # Update demographics and partnerships
         old_pop_size = len(self.people)
-        new_people = self.people.update_states_pre(t=t) # NB this also ages people, applies deaths, and generates new births
+        new_people = self.people.update_states_pre(t=t, year=self.yearvec[t]) # NB this also ages people, applies deaths, and generates new births
         self.people.addtoself(new_people) # New births are added to the population
 
         people = self.people # Shorten
@@ -826,7 +824,8 @@ class Sim(hpb.BaseSim):
             for reskey in hpd.flow_keys:
                 self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
                 self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-
+            self.results['births'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
+            self.results['other_deaths'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
@@ -903,8 +902,8 @@ class Sim(hpb.BaseSim):
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
 
         # Demographic results
-        self.results['tfr'][:]  = self.results['other_deaths'][:] / self.results['n_alive'][:]
-        self.results['cbr'][:]  = self.results['births'][:] / self.results['n_alive'][:]
+        self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])
+        self.results['cbr'][:]  = self.results['births'][:] / (self.results['n_alive'][:])
 
         # Vaccination results
         self.results['cum_vaccinated'][:] = np.cumsum(self.results['new_vaccinated'][:], axis=0)
