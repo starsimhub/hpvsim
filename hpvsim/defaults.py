@@ -140,7 +140,7 @@ inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.c
 # Demographics
 dem_keys    = ['births',    'other_deaths']
 dem_names   = ['births',    'other deaths']
-dem_colors  = ['#000000',   '#fcba03']
+dem_colors  = ['#fcba03',   '#000000']
 
 # Results by sex
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
@@ -185,7 +185,7 @@ default_age_data = np.array([
 ])
 
 
-default_lx = {
+default_lx = {2020:{
     'm': np.array([
         [ 0,  4, 100000],
         [ 5,  9,  99218],
@@ -224,7 +224,7 @@ default_lx = {
         [75, 79,  75122],
         [80, 84,  64402],
         [85, 99,  49349]]),
-    }
+    }}
 
 default_death_rates = {
     'm': np.array([
@@ -279,6 +279,7 @@ default_init_prev = {
     'm'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
     'f'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
 }
+
 
 #%% Default plotting settings
 
@@ -351,7 +352,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
         if is_sim:
             plots = sc.odict({
                 'Birth and death rates': [
-                    'tfr',
+                    'cdr',
                     'cbr',
                 ],
                 'Population size': [

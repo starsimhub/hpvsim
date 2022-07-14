@@ -69,22 +69,26 @@ def test_age_results(do_plot=True):
 
     sc.heading('Testing by-age results')
 
-    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1990, n_years=40, dt=0.5, location='south africa')
+    n_agents = 50e3
+    pars = dict(pop_size=n_agents, pop_scale=25e6/n_agents, start=1980, n_years=40, dt=0.5, location='south africa')
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
-    timepoints = ['2010']
-    edges = np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.])
-    az = hpv.age_results(timepoints=timepoints,
+    az1 = hpv.age_results(timepoints=['2010'],
                          result_keys=['hpv_prevalence'],
                          datafile='test_data/south_africa_hpv_data.xlsx',
-                         edges=edges)
-    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=az)
+                         edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]))
+    az2 = hpv.age_results(timepoints=['2019'],
+                         result_keys=['total_cancers'],
+                         datafile='test_data/south_africa_cancer_data.xlsx',
+                         edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.]))
+    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=[az1, az2])
     sim.run()
-    a = sim.get_analyzer()
+    a = sim.get_analyzer(1)
 
     # Check plot()
     if do_plot:
-        fig = a.plot()
+        fig0 = sim.get_analyzer(0).plot()
+        fig1 = sim.get_analyzer(1).plot()
 
     return sim, a
 
