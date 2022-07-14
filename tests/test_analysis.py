@@ -3,9 +3,6 @@ Tests for single simulations
 '''
 
 #%% Imports and settings
-import os
-import pytest
-import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
