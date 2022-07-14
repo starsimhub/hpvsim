@@ -111,10 +111,10 @@ def make_pars(set_prognoses=False, **kwargs):
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
     pars['rel_trans']['none']   = 1 # Baseline value
-    pars['rel_trans']['cin1']   = 1 # Baseline value. Assumption, need data
-    pars['rel_trans']['cin2']   = 0.2 # Assumption, need data
-    pars['rel_trans']['cin3']   = 0.05 # Assumption, need data
-    pars['rel_trans']['cancerous']   = 0.05 # Assumption, need data
+    pars['rel_trans']['cin1']   = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cin2']   = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cin3']   = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cancerous']   = 0.5 # Baseline assumption, can be adjusted during calibration
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
@@ -417,10 +417,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv16.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv16.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv16.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv16.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv16.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv16.rel_cin1_prob    = 1.0 # DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv16.rel_cin2_prob    = 1.0 # All of these are relative to HPV 16, therefore, they are 1
+    pars.hpv16.rel_cin3_prob    = 1.0 # All of these are relative to HPV 16, therefore, they are 1
+    pars.hpv16.rel_cancer_prob  = 1.0 # All of these are relative to HPV 16, therefore, they are 1
     pars.hpv16.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
@@ -440,10 +440,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv18.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv18.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv18.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv18.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv18.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv18.rel_cin1_prob    = 0.158 # DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv18.rel_cin2_prob    = 0.010 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv18.rel_cin3_prob    = 0.008 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv18.rel_cancer_prob  = 0.008 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv18.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
@@ -461,10 +461,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv31.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv31.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv31.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv31.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv31.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv31.rel_cin1_prob    = 0.016 # DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv31.rel_cin2_prob    = 0.006 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv31.rel_cin3_prob    = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv31.rel_cancer_prob  = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv31.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
@@ -482,10 +482,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv33.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv33.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv33.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv33.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv33.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv33.rel_cin1_prob    = 0.016 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv33.rel_cin2_prob    = 0.006 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv33.rel_cin3_prob    = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv33.rel_cancer_prob  = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv33.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
@@ -503,10 +503,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv45.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv45.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv45.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv45.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv45.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv45.rel_cin1_prob    = 0.016 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv45.rel_cin2_prob    = 0.006 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv45.rel_cin3_prob    = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv45.rel_cancer_prob  = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv45.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
@@ -524,10 +524,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # Assume that par1 = shape parameter, par2 = scale parameter
                                     # https://academic.oup.com/aje/article/178/7/1161/211254
     pars.hpv52.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv52.rel_cin1_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv52.rel_cin2_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv52.rel_cin3_prob    = 1.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv52.rel_cancer_prob  = 1.0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv52.rel_cin1_prob    = 0.019 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv52.rel_cin2_prob    = 0.010 # DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv52.rel_cin3_prob    = 0.007 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv52.rel_cancer_prob  = 0.007 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv52.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv6 = sc.objdict()
