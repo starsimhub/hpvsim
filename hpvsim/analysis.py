@@ -19,6 +19,12 @@ from .settings import options as hpo # For setting global options
 import seaborn as sns
 
 
+def tesst(*args, **kwargs):
+    print('HI I AM!')
+    sc.pr(args[1])
+    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+    return
+
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'Calibration']
 
 
@@ -209,7 +215,7 @@ class snapshot(Analyzer):
         date = key # TODO: consider ways to make this more robust
         if date in self.snapshots:
             snapshot = self.snapshots[date]
-        else: 
+        else:
             dates = ', '.join(list(self.snapshots.keys()))
             errormsg = f'Could not find snapshot date {date}: choices are {self.dates}'
             raise sc.KeyNotFoundError(errormsg)
@@ -988,6 +994,7 @@ class Calibration(Analyzer):
                         sampler_key = parkey+str(i)
                         pars[key][parkey].append(sampler_fn(sampler_key, low, high))
 
+        trial.set_user_attr('TEST', 'foo')
         mismatch = self.run_sim(pars)
         # a = sim.get_analyzer()
         # self.results.append(a.results)
@@ -1002,7 +1009,7 @@ class Calibration(Analyzer):
         else:
             op.logging.set_verbosity(op.logging.ERROR)
         study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
-        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials)
+        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=[tesst])
         return output
 
 
