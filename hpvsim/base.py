@@ -1160,13 +1160,14 @@ class BasePeople(FlexPretty):
         return string
 
 
-    def keys(self):
-        ''' Returns keys for all properties of the people object '''
-        try: # Unclear wy this fails, but sometimes it does during initialization/pickling
-            keys = obj_get(self, '_keys')[:]
-        except:
-            keys = []
-        return keys
+    # CK: BROKEN DON'T USE
+    # def keys(self):
+    #     ''' Returns keys for all properties of the people object '''
+    #     try: # Unclear wy this fails, but sometimes it does during initialization/pickling
+    #         keys = obj_get(self, '_keys')[:]
+    #     except:
+    #         keys = []
+    #     return keys
 
 
     def set(self, key, value, die=True):
@@ -1330,9 +1331,9 @@ class BasePeople(FlexPretty):
         ''' Count the number of people who do not have a property for a given key '''
         return len(self[key]) - self.count(key)
 
-    # def keys(self):
-    #     ''' Returns keys for all properties of the people object '''
-    #     return self.meta.all_states[:]
+    def keys(self):
+        ''' Returns keys for all properties of the people object '''
+        return self.meta.all_states[:]
 
     def person_keys(self):
         ''' Returns keys specific to a person (e.g., their age) '''

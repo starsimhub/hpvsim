@@ -132,7 +132,7 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, end=2015, dt=0.5, location='south africa')
+    pars = dict(pop_size=10e3, pop_scale=36.8e6/20e3, start=1970, end=2015, dt=0.5, location='south africa')
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], datafile='test_data/south_africa_target_data.xlsx')
@@ -147,7 +147,7 @@ def test_calibration():
                                       [0.755, 0.3, 0.9], [0.95, 0.5, 1], [0.99, 0.6, 1], [0.99, .6, 1]],
                       ),
                       )
-    calib = hpv.Calibration(sim, calib_pars, total_trials=50)
+    calib = hpv.Calibration(sim, calib_pars, total_trials=5, n_workers=1)
     calib.calibrate()
 
     return sim, calib
