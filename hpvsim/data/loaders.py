@@ -208,22 +208,6 @@ def get_death_rates(location=None, by_sex=True, overall=False):
             result[year][sk_out] = np.array(raw_df[(raw_df['Time']==year) & (raw_df['Sex']== sk)][['AgeGrpStart','mx']])
             result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
 
-    for sk in sex_keys:
-        sk_out = sex_key_map[sk]
-        result[sk_out] = []
-        for age in age_groups:
-            this_death_rate = float(raw_death_rates[(sk, age)])
-            if age[2] == '+':
-                val = [int(age[:2]), max_age, this_death_rate]
-            elif age[0] == '<':
-                val = [0, int(age[1]), this_death_rate]
-            else:
-                ages = re.split('-', age[:-6])  # Remove the 'years' part of the string
-                val = [int(ages[0]), int(ages[1]), this_death_rate]
-            result[sk_out].append(val)
-        result[sk_out] = np.array(result[sk_out])
-        result[sk_out] = result[sk_out][result[sk_out][:, 0].argsort()]
-
     return result
 
 

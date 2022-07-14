@@ -445,7 +445,7 @@ class People(hpb.BasePeople):
 
         for sex in ['f','m']:
             aa = np.array([death_pars[y][sex][:, 1] for y in all_years])
-            mx[sex] = np.array([sc.smoothinterp(year, all_years, aa[1, aind]) for aind in range(len(age_bins))])[:,0]
+            mx[sex] = np.array([sc.smoothinterp(year, all_years, aa[:, aind]) for aind in range(len(age_bins))])[:,0]
 
         death_probs[self.f_inds] = mx['f'][age_inds[self.f_inds]]*self.dt
         death_probs[self.m_inds] = mx['m'][age_inds[self.m_inds]]*self.dt
