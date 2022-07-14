@@ -922,10 +922,10 @@ class Calibration(Analyzer):
         self.die          = die
         self.verbose      = verbose
         self.calibrated   = False
-        self.results = []
 
         # Create age_results intervention
         data = self.sim.data
+        self.target_data = data
         timepoints = data.year.unique()
         keys = data.name.unique()
         edges = np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
@@ -933,6 +933,9 @@ class Calibration(Analyzer):
                          datafile='test_data/south_africa_target_data.xlsx',
                          compute_fit=True)
         self.sim['analyzers'] += [ar]
+        self.result_keys = self.target_data.name.unique()
+        self.timepoints = self.target_data.year.unique()
+        self.result_properties = sc.objdict()
 
         return
 
@@ -953,9 +956,7 @@ class Calibration(Analyzer):
             raise ValueError(errormsg)
         try:
             sim.run()
-            sim.compute_fit()
-            a = sim.get_analyzer()
-            self.results.append(a.results)
+
             if return_sim:
                 return sim
             else:
@@ -991,7 +992,7 @@ class Calibration(Analyzer):
                 for parkey, par_highlowlist in val.items():
                     pars[key][parkey] = []
                     for i, (best, low, high) in enumerate(par_highlowlist):
-                        sampler_key = parkey+str(i)
+                        sampler_key = key + '_' + parkey + '_' + str(i)
                         pars[key][parkey].append(sampler_fn(sampler_key, low, high))
 
         sim = self.run_sim(pars, return_sim=True)
@@ -1001,8 +1002,6 @@ class Calibration(Analyzer):
         trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
         sim.shrink() # CK: Proof of principle only!!
         trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
-        # a = sim.get_analyzer()
-        # self.results.append(a.results)
         return sim.fit
 
 
@@ -1083,45 +1082,45 @@ class Calibration(Analyzer):
         self.elapsed = sc.toc(t0, output=True)
 
         # Collect analyzer results
+        # Load a single sim
+        sim = sc.jsonpickle(self.study.trials[0].user_attrs['jsonpickle_sim'])
+        self.ng = sim['pars']['n_genotypes']
+        self.glabels = [g['label'] for g in sim['pars']['genotypes']]
+        for rkey in self.result_keys:
+            self.result_properties[rkey] = sc.objdict()
+            self.result_properties[rkey].name = sim['results'][rkey]['name']
+            if 'total' in rkey:
+                rkey_new = rkey[6:]
+                self.result_properties[rkey].color = sim['results'][rkey_new]['color']['values'][0]
+            else:
+                self.result_properties[rkey].color = sim['results'][rkey]['color']['values']
+
         self.analyzer_results = []
         for trial in self.study.trials:
             r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
             self.analyzer_results.append(r)
 
         # Compare the results
-        self.initial_pars = sc.objdict({k:v[0] for k,v in self.calib_pars.items()})
-        self.par_bounds   = sc.objdict({k:np.array([v[1], v[2]]) for k,v in self.calib_pars.items()})
-        self.before = self.run_sim(calib_pars=self.initial_pars, label='Before calibration', return_sim=True)
-        self.after  = self.run_sim(calib_pars=self.best_pars,    label='After calibration', return_sim=True)
+        self.initial_pars = sc.objdict()
+        self.par_bounds = sc.objdict()
+        for key, val in self.calib_pars.items():
+            if isinstance(val, list):
+                self.initial_pars[key] = val[0]
+                self.par_bounds[key] = np.array([val[1], val[2]])
+            elif isinstance(val, dict):
+                for parkey, par_highlowlist in val.items():
+                    for i, (best, low, high) in enumerate(par_highlowlist):
+                        sampler_key = key + '_' + parkey + '_' + str(i)
+                        self.initial_pars[sampler_key] = best
+                        self.par_bounds[sampler_key] = np.array([low, high])
         self.parse_study()
 
         # Tidy up
         self.calibrated = True
         if not self.run_args.keep_db:
             self.remove_db()
-        if verbose:
-            self.summarize()
 
         return self
-
-
-    def summarize(self):
-        ''' Print out results from the calibration '''
-        if self.calibrated:
-            print(f'Calibration for {self.run_args.n_workers*self.run_args.n_trials} total trials completed in {self.elapsed:0.1f} s.')
-            before = self.before.fit
-            after = self.after.fit
-            print('\nInitial parameter values:')
-            print(self.initial_pars)
-            print('\nBest parameter values:')
-            print(self.best_pars)
-            print(f'\nMismatch before calibration: {before:n}')
-            print(f'Mismatch after calibration:  {after:n}')
-            print(f'Percent improvement:         {((before-after)/before)*100:0.1f}%')
-            return before, after
-        else:
-            print('Calibration not yet run; please run calib.calibrate()')
-            return
 
 
     def parse_study(self):
@@ -1175,3 +1174,90 @@ class Calibration(Analyzer):
             sc.savejson(filename, json, indent=2)
         else:
             return json
+
+
+    def plot(self, fig_args=None, axis_args=None, data_args=None, do_save=None,
+             fig_path=None, do_show=True, **kwargs):
+        '''
+        Plot the calibration results
+
+        Args:
+            fig_args (dict): passed to pl.figure()
+            axis_args (dict): passed to pl.subplots_adjust()
+            data_args (dict): 'width', 'color', and 'offset' arguments for the data
+            do_save (bool): whether to save
+            fig_path (str or filepath): filepath to save to
+            do_show (bool): whether to show the figure
+            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+        '''
+
+        # Handle inputs
+        fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
+        axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
+        d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
+        all_args = sc.mergedicts(fig_args, axis_args, d_args)
+
+
+
+        # Handle what to plot
+        if not len(self.analyzer_results):
+            errormsg = f'Cannot plot since no age results were recorded (scheduled timepoints: {self.timepoints})'
+            raise ValueError(errormsg)
+        if len(self.timepoints)>1:
+            n_cols = len(self.timepoints) # One column for each requested timepoint
+            n_rows = len(self.result_keys) # One row for each requested result
+        else: # If there's only one timepoint, automatically figure out rows and columns
+            n_plots = len(self.result_keys)
+            n_rows, n_cols = sc.get_rows_cols(n_plots)
+        # Initialize
+        fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
+        pl.subplots_adjust(**axis_args)
+
+        # Make the figure(s)
+        with hpo.with_style(**kwargs):
+            for run_num, run in enumerate(self.analyzer_results):
+                for date,resdict in run.items():
+
+                    age_labels = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
+                    age_labels.append(str(int(resdict['bins'][-1]))+'+')
+
+                    row_count = 0
+
+                    for rkey in self.result_keys:
+                        ax = axes[row_count]
+
+                        # Start making plot
+                        x = np.arange(len(age_labels))  # the label locations
+                        thisdatadf = self.target_data[(self.target_data.year == float(date))&(self.target_data.name == rkey)]
+                        unique_genotypes = thisdatadf.genotype.unique()
+                        if 'total' not in rkey:
+                            for g in range(self.ng):
+                                glabel = self.glabels[g].upper()
+                                if run_num == 0:
+                                    ax.plot(x, resdict[rkey][g], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
+                                else:
+                                    ax.plot(x, resdict[rkey][g], color=self.result_properties[rkey].color[g], linestyle='--')
+                                if self.glabels[g].upper() in unique_genotypes:
+                                    ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
+                                    if run_num == 0:
+                                        ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s', label=f'Data - {glabel}')
+                                    else:
+                                        ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s')
+
+
+                        else:
+                            if run_num == 0:
+                                ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
+                                ydata = np.array(thisdatadf.value)
+                                ax.scatter(x, ydata,  color=self.result_properties[rkey].color, marker='s', label='Data')
+                            else:
+                                ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--')
+                                ydata = np.array(thisdatadf.value)
+                                ax.scatter(x, ydata, color=self.result_properties[rkey].color, marker='s')
+                        ax.set_xlabel('Age group')
+                        ax.set_title(self.result_properties[rkey].name+' - '+date)
+                        ax.legend()
+                        row_count += n_cols
+                        ax.set_xticks(x, age_labels)
+
+        return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
