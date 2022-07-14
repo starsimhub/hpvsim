@@ -172,7 +172,7 @@ def test_simple_scenarios(do_plot=do_plot):
 
 
 def test_complex_scenarios(do_plot=do_plot, do_save=False, fig_path=None):
-    sc.heading('Test impact of reducing delay time for finding contacts of positives')
+    sc.heading('Test impact of changing sexual behavior')
 
     n_runs = 3
     base_pars = {

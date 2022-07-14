@@ -65,6 +65,7 @@ def test_age_pyramids(do_plot=True):
 def test_age_results(do_plot=True):
 
     sc.heading('Testing by-age results')
+
     n_agents = 50e3
     pars = dict(pop_size=n_agents, pop_scale=25e6/n_agents, start=1980, n_years=40, dt=0.5, location='south africa')
     hpv16 = hpv.genotype('hpv16')
@@ -79,11 +80,12 @@ def test_age_results(do_plot=True):
                          edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.]))
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=[az1, az2])
     sim.run()
-    a = sim.get_analyzer()
+    a = sim.get_analyzer(1)
 
     # Check plot()
     if do_plot:
-        fig = a.plot()
+        fig0 = sim.get_analyzer(0).plot()
+        fig1 = sim.get_analyzer(1).plot()
 
     return sim, a
 

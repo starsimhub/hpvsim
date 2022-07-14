@@ -156,7 +156,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t, resfreq=None):
+    def update_states_pre(self, t, year=None, resfreq=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
@@ -169,13 +169,13 @@ class People(hpb.BasePeople):
         self.increment_age()  # Let people age by one time step
 
         # Apply death rates from other causes
-        other_deaths, deaths_female, deaths_male    = self.check_death()
+        other_deaths, deaths_female, deaths_male    = self.apply_death_rates(year=year)
         self.demographic_flows['other_deaths']      += other_deaths
         self.flows_by_sex['other_deaths_by_sex'][0] += deaths_female
         self.flows_by_sex['other_deaths_by_sex'][1] += deaths_male
 
         # Add births
-        new_births, new_people = self.add_births()
+        new_births, new_people = self.add_births(year=year)
         self.demographic_flows['births'] += new_births
 
         # Perform updates that are genotype-specific
@@ -428,9 +428,43 @@ class People(hpb.BasePeople):
         return
 
 
-    def add_births(self):
+    def apply_death_rates(self, year=None):
+        '''
+        Apply death rates to remove people from the population
+        NB people are not actually removed to avoid issues with indices
+        '''
+
+        # Get age-dependent death rates
+        death_pars = self.pars['death_rates']
+        all_years = np.array(list(death_pars.keys()))
+        base_year = all_years[0]
+        age_bins = death_pars[base_year]['m'][:,0]
+        age_inds = np.digitize(self.age, age_bins)-1
+        death_probs = np.full(len(self), np.nan, dtype=hpd.default_float)
+        mx = dict()
+
+        for sex in ['f','m']:
+            aa = np.array([death_pars[y][sex][:, 1] for y in all_years])
+            mx[sex] = np.array([sc.smoothinterp(year, all_years, aa[:, aind]) for aind in range(len(age_bins))])[:,0]
+
+        death_probs[self.f_inds] = mx['f'][age_inds[self.f_inds]]*self.dt
+        death_probs[self.m_inds] = mx['m'][age_inds[self.m_inds]]*self.dt
+        death_probs[self.age > 100] = 1 # Just remove anyone >100
+
+        # Get indices of people who die of other causes, removing anyone already dead
+        death_inds = hpu.true(hpu.binomial_arr(death_probs))
+        already_dead = self.dead_other[death_inds]
+        death_inds = death_inds[~already_dead]  # Unique indices in deaths that are not already dead
+        deaths_female = len(hpu.true(self.is_female[death_inds]))
+        deaths_male = len(hpu.true(self.is_male[death_inds]))
+        other_deaths = self.make_die(death_inds, cause='other') # Apply deaths
+
+        return other_deaths, deaths_female, deaths_male
+
+
+    def add_births(self, year=None):
         ''' Method to add births '''
-        this_birth_rate = sc.smoothinterp(self.t+self.pars['start'], self.pars['birth_rates'][0], self.pars['birth_rates'][1])*self.dt
+        this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])*self.dt
         new_births = round(this_birth_rate[0]*len(self)/1000) # Crude births per 1000
 
         # Generate other characteristics of the new people
@@ -442,8 +476,7 @@ class People(hpb.BasePeople):
             'n_imm_sources': self.pars['n_imm_sources'],
             'n_partner_types': self.pars['n_partner_types']
         }
-        death_ages = hppop.get_death_ages(life_tables=self.pars['lx'], pop_size=new_births, age_bins=np.zeros(new_births, dtype=int), ages=np.zeros(new_births), sexes=sexes, dt=self['dt'])
-        new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, death_age=death_ages, debut=debuts, partners=partners, strict=False)
+        new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
 
         return new_births, new_people
 
