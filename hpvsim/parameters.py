@@ -30,7 +30,7 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Population parameters
     pars['pop_size']        = 20e3      # Number of agents
-    pars['pop_scale']       = 1         # How much to scale the population
+    pars['pop_scale']       = None      # How much to scale the population
     pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x

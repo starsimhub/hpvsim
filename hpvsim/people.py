@@ -447,14 +447,12 @@ class People(hpb.BasePeople):
             aa = np.array([death_pars[y][sex][:, 1] for y in all_years])
             mx[sex] = np.array([sc.smoothinterp(year, all_years, aa[:, aind]) for aind in range(len(age_bins))])[:,0]
 
-        death_probs[self.f_inds] = mx['f'][age_inds[self.f_inds]]*self.dt
-        death_probs[self.m_inds] = mx['m'][age_inds[self.m_inds]]*self.dt
-        death_probs[self.age > 100] = 1 # Just remove anyone >100
+        death_probs[self.is_female & self.alive] = mx['f'][age_inds[self.is_female & self.alive]]*self.dt
+        death_probs[self.is_male   & self.alive] = mx['m'][age_inds[self.is_male   & self.alive]]*self.dt
+        death_probs[(self.age>100) & self.alive] = 1 # Just remove anyone >100
 
         # Get indices of people who die of other causes, removing anyone already dead
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
-        already_dead = self.dead_other[death_inds]
-        death_inds = death_inds[~already_dead]  # Unique indices in deaths that are not already dead
         deaths_female = len(hpu.true(self.is_female[death_inds]))
         deaths_male = len(hpu.true(self.is_male[death_inds]))
         other_deaths = self.make_die(death_inds, cause='other') # Apply deaths
