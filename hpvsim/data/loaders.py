@@ -11,7 +11,7 @@ import re
 
 __all__ = ['get_country_aliases', 'map_entries', 'show_locations', 'get_age_distribution', 'get_death_rates']
 
-fp = '../hpvsim/data'
+fp = '../data'
 
 def get_country_aliases():
     ''' Define aliases for countries with odd names in the data '''
