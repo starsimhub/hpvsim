@@ -474,7 +474,7 @@ class Sim(hpb.BaseSim):
 
         # If no pop_scale has been provided, try to get it from the location
         if self['pop_scale'] is None:
-            if self['location'] is None:
+            if self['location'] is None or total_pop is None:
                 self['pop_scale'] = 1
             else:
                 self['pop_scale'] = total_pop/self['pop_size']
