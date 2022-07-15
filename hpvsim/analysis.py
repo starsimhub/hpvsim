@@ -438,7 +438,6 @@ class age_results(Analyzer):
     Constructs results by age at specified points within the sim. Can be used with data
     Args:
         result_keys  (dict): dictionary with keys of results to generate and then the timepoints and age-bins to generate each result
-        age_standardized (bool): whether or not to provide age-standardized results
         compute_fit (bool): whether or not to compute fit between model results and data
         die         (bool): whether or not to raise an exception if errors are found
         kwargs      (dict): passed to Analyzer()
@@ -449,7 +448,7 @@ class age_results(Analyzer):
         age_results = sim['analyzers'][0]
     '''
 
-    def __init__(self, result_keys, age_standardized=False, datafile=None, compute_fit=False, die=False, **kwargs):
+    def __init__(self, result_keys, datafile=None, compute_fit=False, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         self.result_keys    = sc.objdict(result_keys) # Store the result keys, ensure it's an object dict
         self.datafile       = datafile # Data file to load
@@ -458,8 +457,6 @@ class age_results(Analyzer):
         self.die            = die  # Whether or not to raise an exception
         self.dates          = None # Representations in terms of years, e.g. 2020.4, set during initialization
         self.start          = None # Store the start year of the simulation
-        self.age_standard   = None
-        self.age_standardized = age_standardized # Whether or not to compute age-standardized results
         self.compute_fit    = compute_fit # Whether or not to compute fit
 
         self.results        = sc.odict() # Store the age results
@@ -477,50 +474,7 @@ class age_results(Analyzer):
         # several consecutive timesteps
         self.dt = sim['dt']
 
-        choices = sim.result_keys()
-        for rk, rdict in self.result_keys.items():
-            if rk not in choices:
-                strm = '\n'.join(choices)
-                errormsg = f'Cannot compute age results for {rk}. Please enter one of the standard sim result_keys to the age_results analyzer; choices are {strm}.'
-                raise ValueError(errormsg)
-            else:
-                rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
-                max_hist_time = rdict.timepoints[-1]
-                max_sim_time = sim['end']
-                if max_hist_time > max_sim_time:
-                    errormsg = f'Cannot create age results for {rdict.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
-                    raise ValueError(errormsg)
-
-                rdict.calcpoints = []
-                for tp in rdict.timepoints:
-                    rdict.calcpoints += [tp+i for i in range(int(1/self.dt))]
-
-        # Handle edges, age bins, and labels
-        if self.edges is None: # Default age bins
-            self.edges = np.linspace(0,100,11)
-        self.bins = self.edges[:-1] # Don't include the last edge in the bins
-        if self.age_labels is None:
-            self.age_labels = [f'{int(self.bins[i])}-{int(self.bins[i+1])}' for i in range(len(self.bins)-1)]
-            self.age_labels.append(f'{int(self.bins[-1])}+')
-
-        if self.age_standardized:
-            self.age_standard = self.get_standard_population()
-            self.edges = self.age_standard[0]
-            self.bins = self.edges[:-1]  # Don't include the last edge in the bins
-            self.age_labels = [f'{int(self.bins[i])}-{int(self.bins[i + 1])}' for i in range(len(self.bins) - 1)]
-            self.age_labels.append(f'{int(self.bins[-1])}+')
-        else:
-            self.age_standard = np.array([self.edges, np.full(len(self.edges), 1)])
-
-        # Handle result keys
-        choices = sim.result_keys()
-        if self.result_keys is None:
-            self.result_keys = ['total_cancers'] # Defaults
-        for rk in self.result_keys:
-            if rk not in choices:
-                strm = '\n'.join(choices)
-                errormsg = f'Cannot compute age results for {rk}. Please enter one of the standard sim result_keys to the age_results analyzer; choices are {strm}.'
-                raise ValueError(errormsg)
+        self.validate_results(sim)
 
         # Store genotypes
         self.ng = sim['n_genotypes']
@@ -591,7 +545,7 @@ class age_results(Analyzer):
 
         # Store colors
         self.result_properties = sc.objdict()
-        for rkey in self.result_keys:
+        for rkey in self.result_keys.keys():
             self.result_properties[rkey] = sc.objdict()
             self.result_properties[rkey].color = sim.results[rkey].color
             self.result_properties[rkey].name = sim.results[rkey].name
@@ -600,6 +554,36 @@ class age_results(Analyzer):
 
         return
 
+
+    def validate_results(self, sim):
+        choices = sim.result_keys()
+        for rk, rdict in self.result_keys.items():
+            if rk not in choices:
+                strm = '\n'.join(choices)
+                errormsg = f'Cannot compute age results for {rk}. Please enter one of the standard sim result_keys to the age_results analyzer; choices are {strm}.'
+                raise ValueError(errormsg)
+            else:
+                rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints,
+                                                          return_date_format='str')  # Ensure timepoints and dates are in the right format
+                max_hist_time = rdict.timepoints[-1]
+                max_sim_time = sim['end']
+                if max_hist_time > max_sim_time:
+                    errormsg = f'Cannot create age results for {rdict.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
+                    raise ValueError(errormsg)
+
+                rdict.calcpoints = []
+                rdict.bins = []
+                rdict.age_labels = []
+                for tpi, tp in enumerate(rdict.timepoints):
+                    rdict.calcpoints += [tp + i for i in range(int(1 / self.dt))]
+
+                    # Handle edges, age bins, and labels
+                    if rdict.edges[tpi] is None:  # Default age bins
+                        rdict.edges[tpi] = np.linspace(0, 100, 11)
+                    rdict.bins += [rdict.edges[tpi][:-1]]  # Don't include the last edge in the bins
+                    rdict.age_labels += [f'{int(rdict.bins[tpi][i])}-{int(rdict.edges[tpi][i + 1])}' for i in
+                                           range(len(rdict.bins[tpi]) - 1)]
+                    rdict.age_labels.append(f'{int(rdict.bins[tpi][-1])}+')
 
     def get_standard_population(self):
         '''
