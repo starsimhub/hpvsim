@@ -180,15 +180,12 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     '''
     # Load the raw data
     try:
-        df1 = sc.load(f'{fp}/mx.obj')
-        df2 = sc.load(f'{fp}/mx_proj.obj')
+        df = sc.load(f'{fp}/mx.obj')
     except ValueError as E:
         errormsg = f'Could not locate datafile with age-specific death rates by country. Please run data/get_death_data.py first.'
         raise ValueError(errormsg)
 
-    raw_df1 = map_entries(df1, location)[location]
-    raw_df2 = map_entries(df2, location)[location]
-    raw_df = pd.concat([raw_df1, raw_df2])
+    raw_df = map_entries(df, location)[location]
 
     sex_keys = []
     if by_sex: sex_keys += ['Male', 'Female']
