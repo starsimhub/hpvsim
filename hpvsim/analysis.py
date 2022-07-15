@@ -437,8 +437,7 @@ class age_results(Analyzer):
     '''
     Constructs results by age at specified points within the sim. Can be used with data
     Args:
-        timepoints  (list): list of ints/strings/date objects, timepoints at which to generate by-age results
-        results     (list): list of strings, results to generate
+        result_keys  (dict): dictionary with keys of results to generate and then the timepoints and age-bins to generate each result
         age_standardized (bool): whether or not to provide age-standardized results
         compute_fit (bool): whether or not to compute fit between model results and data
         die         (bool): whether or not to raise an exception if errors are found
@@ -450,23 +449,19 @@ class age_results(Analyzer):
         age_results = sim['analyzers'][0]
     '''
 
-    def __init__(self, timepoints, edges=None, result_keys=None, age_labels=None, age_standardized=False, datafile=None,
-                 compute_fit=False, die=False, **kwargs):
+    def __init__(self, result_keys, age_standardized=False, datafile=None, compute_fit=False, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
-        timepoints          = sc.promotetolist(timepoints) # Combine multiple timepoints
-        self.timepoints     = timepoints
-        self.edges          = edges # Edges of bins
+        self.result_keys    = sc.objdict(result_keys) # Store the result keys, ensure it's an object dict
         self.datafile       = datafile # Data file to load
         self.bins           = None # Age bins, calculated from edges
         self.data           = None # Store the loaded data
         self.die            = die  # Whether or not to raise an exception
         self.dates          = None # Representations in terms of years, e.g. 2020.4, set during initialization
         self.start          = None # Store the start year of the simulation
-        self.age_labels     = age_labels # Labels for the age bins - will be automatically generated if not provided
         self.age_standard   = None
         self.age_standardized = age_standardized # Whether or not to compute age-standardized results
         self.compute_fit    = compute_fit # Whether or not to compute fit
-        self.result_keys    = result_keys # Store the result keys
+
         self.results        = sc.odict() # Store the age results
         return
 
@@ -474,25 +469,31 @@ class age_results(Analyzer):
     def initialize(self, sim):
 
         super().initialize()
-
         # Handle timepoints and dates
-        self.start = sim['start']   # Store the simulation start
-        self.end   = sim['end']     # Store simulation end
-        if self.timepoints is None:
-            self.timepoints = self.end # If no day is supplied, use the last day
-        self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
-        max_hist_time = self.timepoints[-1]
-        max_sim_time = sim['end']
-        if max_hist_time > max_sim_time:
-            errormsg = f'Cannot create age results for {self.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
-            raise ValueError(errormsg)
+        self.start = sim['start']  # Store the simulation start
+        self.end = sim['end']  # Store simulation end
 
         # Handle dt - if we're storing annual results we'll need to aggregate them over
         # several consecutive timesteps
         self.dt = sim['dt']
-        self.calcpoints = []
-        for tp in self.timepoints:
-            self.calcpoints += [tp+i for i in range(int(1/self.dt))]
+
+        choices = sim.result_keys()
+        for rk, rdict in self.result_keys.items():
+            if rk not in choices:
+                strm = '\n'.join(choices)
+                errormsg = f'Cannot compute age results for {rk}. Please enter one of the standard sim result_keys to the age_results analyzer; choices are {strm}.'
+                raise ValueError(errormsg)
+            else:
+                rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
+                max_hist_time = rdict.timepoints[-1]
+                max_sim_time = sim['end']
+                if max_hist_time > max_sim_time:
+                    errormsg = f'Cannot create age results for {rdict.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
+                    raise ValueError(errormsg)
+
+                rdict.calcpoints = []
+                for tp in rdict.timepoints:
+                    rdict.calcpoints += [tp+i for i in range(int(1/self.dt))]
 
         # Handle edges, age bins, and labels
         if self.edges is None: # Default age bins
