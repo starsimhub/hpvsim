@@ -11,7 +11,7 @@ import re
 
 __all__ = ['get_country_aliases', 'map_entries', 'show_locations', 'get_age_distribution', 'get_death_rates']
 
-fp = '../data'
+fp = '../hpvsim/data'
 
 def get_country_aliases():
     ''' Define aliases for countries with odd names in the data '''
@@ -132,12 +132,14 @@ def show_locations(location=None, output=False):
         return
 
 
-def get_age_distribution(location=None, year=None):
+def get_age_distribution(location=None, year=None, total_pop_file=None):
     '''
     Load age distribution for a given country or countries.
 
     Args:
-        location (str or list): name of the country or countries to load the age distribution for
+        location (str or list): name of the country to load the age distribution for
+        year (int): year to load the age distribution for
+        total_pop_file (str): optional filepath to save total population size for every year
 
     Returns:
         age_data (array): Numpy array of age distributions, or dict if multiple locations
@@ -162,6 +164,15 @@ def get_age_distribution(location=None, year=None):
 
     # Pull out the data
     result = np.array([raw_df["AgeGrpStart"],raw_df["AgeGrpStart"]+1,raw_df["PopTotal"]*1e3]).T # Data are stored in thousands
+
+    # Optinally save total population sizes for calibration/plotting purposes
+    if total_pop_file is not None:
+        dd = full_df.groupby("Time").sum()["PopTotal"]
+        dd = dd * 1e3
+        dd = dd.astype(int)
+        dd = dd.rename("n_alive")
+        dd = dd.rename_axis("year")
+        dd.to_csv(total_pop_file)
 
     return result
 
