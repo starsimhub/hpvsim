@@ -6,7 +6,7 @@ Load data
 import numpy as np
 import sciris as sc
 import pandas as pd
-from . import country_age_data    as cad
+import hpvsim.misc as hpm
 import re
 
 __all__ = ['get_country_aliases', 'map_entries', 'show_locations', 'get_age_distribution', 'get_death_rates']
@@ -132,38 +132,47 @@ def show_locations(location=None, output=False):
         return
 
 
-def get_age_distribution(location=None):
+def get_age_distribution(location=None, year=None, total_pop_file=None):
     '''
     Load age distribution for a given country or countries.
 
     Args:
-        location (str or list): name of the country or countries to load the age distribution for
+        location (str or list): name of the country to load the age distribution for
+        year (int): year to load the age distribution for
+        total_pop_file (str): optional filepath to save total population size for every year
 
     Returns:
         age_data (array): Numpy array of age distributions, or dict if multiple locations
     '''
 
     # Load the raw data
-    json   = sc.dcp(cad.data)
-    entries = map_entries(json, location)
+    try:
+        df = sc.load(f'{fp}/populations.obj')
+    except ValueError as E:
+        errormsg = f'Could not locate datafile with population sizes by country. Please run data/get_age_data.py first.'
+        raise ValueError(errormsg)
 
-    max_age = 99
-    result = {}
-    for loc,age_distribution in entries.items():
-        total_pop = sum(list(age_distribution.values()))
-        local_pop = []
+    # Handle year
+    if year is None:
+        warnmsg = f'No year provided for the initial population age distribution, using 2000 by default'
+        hpm.warn(warnmsg)
+        year = 2000
 
-        for age, age_pop in age_distribution.items():
-            if age[-1] == '+':
-                val = [int(age[:-1]), max_age, age_pop/total_pop]
-            else:
-                ages = age.split('-')
-                val = [int(ages[0]), int(ages[1]), age_pop/total_pop]
-            local_pop.append(val)
-        result[loc] = np.array(local_pop)
+    # Extract the age distribution for the given location and year
+    full_df = map_entries(df, location)[location]
+    raw_df = full_df[full_df["Time"] == year]
 
-    if len(result) == 1:
-        result = list(result.values())[0]
+    # Pull out the data
+    result = np.array([raw_df["AgeGrpStart"],raw_df["AgeGrpStart"]+1,raw_df["PopTotal"]*1e3]).T # Data are stored in thousands
+
+    # Optinally save total population sizes for calibration/plotting purposes
+    if total_pop_file is not None:
+        dd = full_df.groupby("Time").sum()["PopTotal"]
+        dd = dd * 1e3
+        dd = dd.astype(int)
+        dd = dd.rename("n_alive")
+        dd = dd.rename_axis("year")
+        dd.to_csv(total_pop_file)
 
     return result
 
@@ -180,15 +189,12 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     '''
     # Load the raw data
     try:
-        df1 = sc.load(f'{fp}/mx.obj')
-        df2 = sc.load(f'{fp}/mx_proj.obj')
+        df = sc.load(f'{fp}/mx.obj')
     except ValueError as E:
         errormsg = f'Could not locate datafile with age-specific death rates by country. Please run data/get_death_data.py first.'
         raise ValueError(errormsg)
 
-    raw_df1 = map_entries(df1, location)[location]
-    raw_df2 = map_entries(df2, location)[location]
-    raw_df = pd.concat([raw_df1, raw_df2])
+    raw_df = map_entries(df, location)[location]
 
     sex_keys = []
     if by_sex: sex_keys += ['Male', 'Female']

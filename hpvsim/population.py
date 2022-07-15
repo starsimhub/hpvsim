@@ -40,6 +40,8 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
     # Set inputs and defaults
     pop_size = int(sim['pop_size']) # Shorten
+    total_pop = None # Optionally created but always returned
+
     if verbose is None:
         verbose = sim['verbose']
     dt = sim['dt'] # Timestep
@@ -47,7 +49,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     # If a people object or popdict is supplied, use it
     if sim.people and not reset:
         sim.people.initialize(sim_pars=sim.pars)
-        return sim.people # If it's already there, just return
+        return sim.people, total_pop # If it's already there, just return
     elif sim.popdict and popdict is None:
         popdict = sim.popdict # Use stored one
         sim.popdict = None # Once loaded, remove
@@ -67,16 +69,17 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 print(f'Loading location-specific data for "{location}"')
             if use_age_data:
                 try:
-                    age_data = hpdata.get_age_distribution(location)
+                    age_data = hpdata.get_age_distribution(location, year=sim['start'])
                 except ValueError as E:
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
 
+        total_pop = sum(age_data[:,2]) # Return the total population
         uids, sexes, debuts, partners = set_static(pop_size, pars=sim.pars, sex_ratio=sex_ratio)
 
         # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
-        age_data_max   = age_data[:,1] + 1 # Since actually e.g. 69.999
+        age_data_max   = age_data[:,1]
         age_data_range = age_data_max - age_data_min
         age_data_prob   = age_data[:,2]
         age_data_prob   /= age_data_prob.sum() # Ensure it sums to 1
@@ -126,7 +129,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
     sc.printv(f'Created {pop_size} people, average age {people.age.mean():0.2f} years', 2, verbose)
 
-    return people
+    return people, total_pop
 
 
 def partner_count(pop_size=None, partner_pars=None):
