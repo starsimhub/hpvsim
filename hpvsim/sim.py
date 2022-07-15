@@ -69,8 +69,8 @@ class Sim(hpb.BaseSim):
         self.set_seed() # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
         self.init_immunity() # initialize information about immunity
-        self.init_results() # After initializing the genotypes, create the results structure
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
+        self.init_results() # After initializing the genotypes, create the results structure
         self.init_interventions()  # Initialize the interventions...
         self.init_analyzers()  # ...and the analyzers...
         self.validate_imm_pars()  # Once the population and interventions are initialized, validate the immunity parameters
@@ -464,13 +464,20 @@ class Sim(hpb.BaseSim):
 
         # Actually make the people
         microstructure = self['network']
-        self.people = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
+        self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])
             init_hpv_prev, age_brackets = self.validate_init_conditions(init_hpv_prev)
             self.init_states(age_brackets=age_brackets, init_hpv_prev=init_hpv_prev)
+
+        # If no pop_scale has been provided, try to get it from the location
+        if self['pop_scale'] is None:
+            if self['location'] is None:
+                self['pop_scale'] = 1
+            else:
+                self['pop_scale'] = total_pop/self['pop_size']
 
         return self
 

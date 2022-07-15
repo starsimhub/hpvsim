@@ -161,7 +161,7 @@ def get_age_distribution(location=None, year=None):
     raw_df = full_df[full_df["Time"] == year]
 
     # Pull out the data
-    result = np.array([raw_df["AgeGrpStart"],raw_df["AgeGrpStart"]+1,raw_df["PopTotal"]]).T
+    result = np.array([raw_df["AgeGrpStart"],raw_df["AgeGrpStart"]+1,raw_df["PopTotal"]*1e3]).T # Data are stored in thousands
 
     return result
 

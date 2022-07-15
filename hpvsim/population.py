@@ -72,11 +72,12 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
 
+        total_pop = sum(age_data[:,2]) # Reutn the total population
         uids, sexes, debuts, partners = set_static(pop_size, pars=sim.pars, sex_ratio=sex_ratio)
 
         # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
-        age_data_max   = age_data[:,1] + 1 # Since actually e.g. 69.999
+        age_data_max   = age_data[:,1]
         age_data_range = age_data_max - age_data_min
         age_data_prob   = age_data[:,2]
         age_data_prob   /= age_data_prob.sum() # Ensure it sums to 1
@@ -126,7 +127,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
     sc.printv(f'Created {pop_size} people, average age {people.age.mean():0.2f} years', 2, verbose)
 
-    return people
+    return people, total_pop
 
 
 def partner_count(pop_size=None, partner_pars=None):
