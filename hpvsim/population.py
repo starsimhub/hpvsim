@@ -67,7 +67,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 print(f'Loading location-specific data for "{location}"')
             if use_age_data:
                 try:
-                    age_data = hpdata.get_age_distribution(location)
+                    age_data = hpdata.get_age_distribution(location, year=sim['start'])
                 except ValueError as E:
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)

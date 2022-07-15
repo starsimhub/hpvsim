@@ -6,7 +6,7 @@ Load data
 import numpy as np
 import sciris as sc
 import pandas as pd
-from . import country_age_data    as cad
+import hpvsim.misc as hpm
 import re
 
 __all__ = ['get_country_aliases', 'map_entries', 'show_locations', 'get_age_distribution', 'get_death_rates']
@@ -132,7 +132,7 @@ def show_locations(location=None, output=False):
         return
 
 
-def get_age_distribution(location=None):
+def get_age_distribution(location=None, year=None):
     '''
     Load age distribution for a given country or countries.
 
@@ -144,26 +144,24 @@ def get_age_distribution(location=None):
     '''
 
     # Load the raw data
-    json   = sc.dcp(cad.data)
-    entries = map_entries(json, location)
+    try:
+        df = sc.load(f'{fp}/populations.obj')
+    except ValueError as E:
+        errormsg = f'Could not locate datafile with population sizes by country. Please run data/get_age_data.py first.'
+        raise ValueError(errormsg)
 
-    max_age = 99
-    result = {}
-    for loc,age_distribution in entries.items():
-        total_pop = sum(list(age_distribution.values()))
-        local_pop = []
+    # Handle year
+    if year is None:
+        warnmsg = f'No year provided for the initial population age distribution, using 2000 by default'
+        hpm.warn(warnmsg)
+        year = 2000
 
-        for age, age_pop in age_distribution.items():
-            if age[-1] == '+':
-                val = [int(age[:-1]), max_age, age_pop/total_pop]
-            else:
-                ages = age.split('-')
-                val = [int(ages[0]), int(ages[1]), age_pop/total_pop]
-            local_pop.append(val)
-        result[loc] = np.array(local_pop)
+    # Extract the age distribution for the given location and year
+    full_df = map_entries(df, location)[location]
+    raw_df = full_df[full_df["Time"] == year]
 
-    if len(result) == 1:
-        result = list(result.values())[0]
+    # Pull out the data
+    result = np.array([raw_df["AgeGrpStart"],raw_df["AgeGrpStart"]+1,raw_df["PopTotal"]]).T
 
     return result
 

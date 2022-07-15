@@ -25,8 +25,8 @@ for url, local_path in zip(urls, local_paths):
 df1 = pd.read_csv(local_paths[0])
 df2 = pd.read_csv(local_paths[1])
 
-df11 = df1[["Location", "Time", "AgeGrpStart", "PopMale", "PopFemale"]]
-df22 = df2[["Location", "Time", "AgeGrpStart", "PopMale", "PopFemale"]]
+df11 = df1[["Location", "Time", "AgeGrpStart", "PopTotal"]]
+df22 = df2[["Location", "Time", "AgeGrpStart", "PopTotal"]]
 df = pd.concat([df11, df22])
 dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
 sc.save('populations.obj',dd)
