@@ -437,8 +437,7 @@ class age_results(Analyzer):
     '''
     Constructs results by age at specified points within the sim. Can be used with data
     Args:
-        result_keys  (dict): dictionary with keys of results to generate and then the timepoints and age-bins to generate each result
-        compute_fit (bool): whether or not to compute fit between model results and data
+        result_keys  (dict): dictionary with keys of results to generate and associated timepoints/age-bins to generate each result as well as whether to compute_fit
         die         (bool): whether or not to raise an exception if errors are found
         kwargs      (dict): passed to Analyzer()
 
@@ -448,17 +447,11 @@ class age_results(Analyzer):
         age_results = sim['analyzers'][0]
     '''
 
-    def __init__(self, result_keys, datafile=None, compute_fit=False, die=False, **kwargs):
+    def __init__(self, result_keys, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         self.result_keys    = sc.objdict(result_keys) # Store the result keys, ensure it's an object dict
-        self.datafile       = datafile # Data file to load
-        self.bins           = None # Age bins, calculated from edges
-        self.data           = None # Store the loaded data
         self.die            = die  # Whether or not to raise an exception
-        self.dates          = None # Representations in terms of years, e.g. 2020.4, set during initialization
         self.start          = None # Store the start year of the simulation
-        self.compute_fit    = compute_fit # Whether or not to compute fit
-
         self.results        = sc.odict() # Store the age results
         return
 
@@ -480,57 +473,6 @@ class age_results(Analyzer):
         self.ng = sim['n_genotypes']
         self.glabels = [g.label for g in sim['genotypes']]
 
-        # Handle the data file
-        if self.datafile is not None:
-            if sc.isstring(self.datafile):
-                self.data = hpm.load_data(self.datafile, check_date=False)
-            else:
-                self.data = self.datafile # Use it directly
-                self.datafile = None
-
-            # Validate the data. Currently we only allow the same timepoints and age brackets
-            data_dates = {str(float(i)) for i in self.data.year}
-            if len(set(self.dates)-data_dates) or len(data_dates-set(self.dates)):
-                string = f'Dates provided in the age result datafile ({data_dates}) are not the same as the age result dates that were requested ({self.dates}).'
-                if self.die:
-                    raise ValueError(string)
-                else:
-                    string += '\nPlots will only show requested dates, not all dates in the datafile.'
-                    print(string)
-            self.data_dates = data_dates
-
-            # Validate the edges - must be the same as requested edges from the model output
-            data_bins = np.array(self.data.age.unique(), dtype=float)
-            if not np.array_equal(np.sort(self.bins), np.sort(data_bins)):
-                errormsg = f'Age bins provided in the age result datafile ({data_bins}) are not the same as the age result age bins that were requested ({self.edges}).'
-                raise ValueError(errormsg)
-
-            # Validate the result keys - must be the same as requested edges from the model output
-            data_result_keys_array = self.data.name.unique()
-            data_result_keys = []
-            for drk in data_result_keys_array:
-                if drk not in self.result_keys:
-                    string = f'The age result datafile contains {drk}, which is not one of the results were requested ({self.result_keys}).'
-                    if self.die:
-                        raise ValueError(string)
-                    else:
-                        string += '\nPlots will only show requested results, not all results in the datafile.'
-                        print(string)
-                else:
-                    data_result_keys.append(drk)
-            self.data_result_keys = data_result_keys
-
-
-        if self.compute_fit:
-            if self.data is None:
-                errormsg = f'Cannot compute fit without data'
-                raise ValueError(errormsg)
-            else:
-                if 'weights' in self.data.columns:
-                    self.weights = self.data['weights'].values
-                else:
-                    self.weights = np.ones(len(self.data))
-                self.mismatch = None  # The final value
 
         # Handle variable names (TODO, should this be centralized somewhere?)
         self.mapping = {
@@ -563,6 +505,7 @@ class age_results(Analyzer):
                 errormsg = f'Cannot compute age results for {rk}. Please enter one of the standard sim result_keys to the age_results analyzer; choices are {strm}.'
                 raise ValueError(errormsg)
             else:
+                self.results[rk] = sc.objdict()
                 rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints,
                                                           return_date_format='str')  # Ensure timepoints and dates are in the right format
                 max_hist_time = rdict.timepoints[-1]
@@ -572,18 +515,64 @@ class age_results(Analyzer):
                     raise ValueError(errormsg)
 
                 rdict.calcpoints = []
-                rdict.bins = []
-                rdict.age_labels = []
                 for tpi, tp in enumerate(rdict.timepoints):
                     rdict.calcpoints += [tp + i for i in range(int(1 / self.dt))]
 
-                    # Handle edges, age bins, and labels
-                    if rdict.edges[tpi] is None:  # Default age bins
-                        rdict.edges[tpi] = np.linspace(0, 100, 11)
-                    rdict.bins += [rdict.edges[tpi][:-1]]  # Don't include the last edge in the bins
-                    rdict.age_labels += [f'{int(rdict.bins[tpi][i])}-{int(rdict.edges[tpi][i + 1])}' for i in
-                                           range(len(rdict.bins[tpi]) - 1)]
-                    rdict.age_labels.append(f'{int(rdict.bins[tpi][-1])}+')
+                # Handle edges, age bins, and labels
+                rdict.age_labels = []
+                if rdict.edges is None:  # Default age bins
+                    rdict.edges = np.linspace(0, 100, 11)
+                rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
+                self.results[rk]['bins'] = rdict.bins
+                rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in range(len(rdict.bins) - 1)]
+                rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
+
+                # Handle the data file
+                if 'datafile' in rdict.keys():
+                    if sc.isstring(rdict.datafile):
+                        rdict.data = hpm.load_data(rdict.datafile, check_date=False)
+                    else:
+                        rdict.data = rdict.datafile  # Use it directly
+                        rdict.datafile = None
+
+                    # Validate the data. Currently we only allow the same timepoints and age brackets
+                    data_dates = {str(float(i)) for i in rdict.data.year}
+                    if len(set(rdict.dates) - data_dates) or len(data_dates - set(rdict.dates)):
+                        string = f'Dates provided in the age result datafile ({data_dates}) are not the same as the age result dates that were requested ({rdict.dates}).'
+                        if self.die:
+                            raise ValueError(string)
+                        else:
+                            string += '\nPlots will only show requested dates, not all dates in the datafile.'
+                            print(string)
+                    rdict.data_dates = data_dates
+
+                    # Validate the edges - must be the same as requested edges from the model output
+                    data_bins = np.array(rdict.data.age.unique(), dtype=float)
+                    if not np.array_equal(np.sort(rdict.bins), np.sort(data_bins)):
+                        errormsg = f'Age bins provided in the age result datafile ({data_bins}) are not the same as the age result age bins that were requested ({rdict.edges}).'
+                        raise ValueError(errormsg)
+
+                    # Validate the result keys - must be the same as requested edges from the model output
+                    data_result_key = rdict.data.name.unique()
+                    if data_result_key != rk:
+                        string = f'The age result datafile contains {data_result_key}, which is not one of the results were requested ({rk}).'
+                        if self.die:
+                            raise ValueError(string)
+                        else:
+                            string += '\nPlots will only show requested results, not all results in the datafile.'
+                            print(string)
+                    rdict.data_result_key = data_result_key
+
+                if 'compute_fit' in rdict.keys() and rdict.compute_fit:
+                    if rdict.data is None:
+                        errormsg = f'Cannot compute fit without data'
+                        raise ValueError(errormsg)
+                    else:
+                        if 'weights' in rdict.data.columns:
+                            rdict.weights = rdict.data['weights'].values
+                        else:
+                            rdict.weights = np.ones(len(rdict.data))
+                        rdict.mismatch = None  # The final value
 
     def get_standard_population(self):
         '''
@@ -600,58 +589,54 @@ class age_results(Analyzer):
 
     def apply(self, sim):
         ''' Calculate age results '''
-
         # Shorten variables that are used a lot
-        na = len(self.bins)
+
         ng = self.ng
+        # Go through each result key and determine if this is a timepoint where age results are requested
+        for result, result_dict in self.result_keys.items():
+            if sim.t in result_dict.timepoints:
+                na = len(result_dict.bins)
+                ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
+                date = result_dict.dates[ind]  # Create the date which will be used to key the results
+                age = sim.people.age  # Get the age distribution
+                scale = sim.rescale_vec[sim.t // sim.resfreq]  # Determine current scale factor
 
-        # This is the a timepoint where age results were requested. Start by initializing storage
-        # If the requested result is a stock, we can just calculate it for this timepoint
-        if sim.t in self.timepoints:
-            ind = sc.findinds(self.timepoints, sim.t)[0] # Get the index
-            date = self.dates[ind] # Create the date which will be used to key the results
-            self.results[date] = sc.objdict() # Initialize the dictionary for result storage
-            self.results[date]['bins'] = self.bins # Copy here for convenience
-            age = sim.people.age # Get the age distribution
-            scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
-
-
-            for rkey in self.result_keys: # Loop over each result, but only stocks are calculated here
-
-                if self.compute_fit and 'total' not in rkey:
-                    thisdatadf = self.data[(self.data.year == float(date)) & (self.data.name == rkey)]
+                if 'compute_fit' in result_dict.keys() and 'total' not in result:
+                    thisdatadf = result_dict.data[(result_dict.data.year == float(date)) & (result_dict.data.name == result)]
                     unique_genotypes = thisdatadf.genotype.unique()
                     ng = len(unique_genotypes)
-                # Initialize storage
-                size = na if 'total' in rkey else (ng,na)
-                self.results[date][rkey] = np.zeros(size)
+
+                size = na if 'total' in result else (ng, na)
+                self.results[result][date] = np.zeros(size)
 
                 # Both annual stocks and prevalence require us to calculate the current stocks.
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
-                if rkey[0] == 'n' or 'prevalence' in rkey:
-                    attr = rkey.replace('total_','').replace('_prevalence','') # Name of the actual state
+                if result[0] == 'n' or 'prevalence' in result:
+                    attr = result.replace('total_', '').replace('_prevalence', '')  # Name of the actual state
                     if attr[0] == 'n': attr = attr[2:]
-                    if attr == 'hpv': attr = 'infectious' # People with HPV are referred to as infectious in the sim
+                    if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
                     if attr == 'cancer': attr = 'cancerous'
                     if attr in sim.people.keys():
-                        if 'total' in rkey:
+                        if 'total' in result:
                             inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
-                            self.results[date][rkey] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                            self.results[result][date] = np.histogram(age[inds[-1]], bins=result_dict.edges)[
+                                                           0] * scale  # Bin the people
                         else:
                             for g in range(ng):
-                                inds = sim.people[attr][g,:].nonzero()
-                                self.results[date][rkey][g,:] = np.histogram(age[inds[-1]], bins=self.edges)[0] * scale  # Bin the people
+                                inds = sim.people[attr][g, :].nonzero()
+                                self.results[result][date][g, :] = np.histogram(age[inds[-1]], bins=result_dict.edges)[
+                                                                     0] * scale  # Bin the people
 
-                        if 'prevalence' in rkey:
+                        if 'prevalence' in result:
                             # Need to divide by the right denominator
-                            if 'hpv' in rkey: # Denominator is whole population
-                                denom = (np.histogram(age, bins=self.edges)[0] * scale)
-                            else: # Denominator is females
-                                denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)
-                            if 'total' not in rkey: denom = denom[None,:]
-                            self.results[date][rkey] = self.results[date][rkey] / denom
+                            if 'hpv' in result:  # Denominator is whole population
+                                denom = (np.histogram(age, bins=result_dict.edges)[0] * scale)
+                            else:  # Denominator is females
+                                denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[0] * scale)
+                            if 'total' not in result: denom = denom[None, :]
+                            self.results[result][date] = self.results[result][date] / denom
                     else:
-                        if 'detectable' in rkey:
+                        if 'detectable' in result:
                             hpv_test_pars = hppar.get_screen_pars('hpv')
                             for state in ['hpv', 'cin1', 'cin2', 'cin3', 'cancerous']:
                                 for g in range(ng):
@@ -660,56 +645,55 @@ class age_results(Analyzer):
                                     hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][
                                         sim['genotype_map'][g]]
                                     hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
-                                    self.results[date][rkey][g, :] += np.histogram(age[hpv_pos_inds], bins=self.edges)[0] * scale  # Bin the people
-                            denom = (np.histogram(age, bins=self.edges)[0] * scale)
-                            self.results[date][rkey] = self.results[date][rkey] / denom
-            self.date = date # Need to store the date for subsequent calcpoints
+                                    self.results[result][date][g, :] += np.histogram(age[hpv_pos_inds], bins=result_dict.edges)[
+                                                                          0] * scale  # Bin the people
+                            denom = (np.histogram(age, bins=result_dict.edges)[0] * scale)
+                            self.results[result][date] = self.results[result][date] / denom
 
-        # Both annual new cases and incidence require us to calculate the new cases over all
-        # the timepoints that belong to the requested year.
-        if sim.t in self.calcpoints:
-            date = self.date # Stored just above for use here
-            scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
-            age = sim.people.age # Get the age distribution
-            age_standard = self.age_standard[1, :-1]
+                self.date = date # Need to store the date for subsequent calcpoints
 
-            for rkey in self.result_keys: # Loop over each result
 
-                if self.compute_fit and 'total' not in rkey:
-                    thisdatadf = self.data[(self.data.year == float(date)) & (self.data.name == rkey)]
-                    unique_genotypes = thisdatadf.genotype.unique()
-                    ng = len(unique_genotypes)
+                # Both annual new cases and incidence require us to calculate the new cases over all
+                # the timepoints that belong to the requested year.
+                if sim.t in result_dict.calcpoints:
+                    date = self.date # Stored just above for use here
+                    scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
+                    age = sim.people.age # Get the age distribution
 
-                # Figure out if it's a flow or incidence
-                if rkey.replace('total_', '') in hpd.flow_keys or 'incidence' in rkey:
-                    attr = rkey.replace('total_','').replace('_incidence','') # Name of the actual state
-                    if attr == 'hpv': attr = 'infections' # HPV is referred to as infections in the sim
-                    if attr == 'cancer': attr = 'cancers' # cancer is referred to as cancers in the sim
-                    attr1 = self.mapping[attr][0] # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
-                    attr2 = self.mapping[attr][1] # As above
-                    if rkey[:5] == 'total': # Results across all genotypes
-                        inds = ((sim.people[attr1]==sim.t)*(sim.people[attr2])).nonzero()
-                        self.results[date][rkey] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale * age_standard  # Bin the people
-                    else: # Results by genotype
-                        for g in range(ng): # Loop over genotypes
-                            inds = ((sim.people[attr1][g,:] == sim.t) * (sim.people[attr2][g,:])).nonzero()
-                            self.results[date][rkey][g,:] += np.histogram(age[inds[-1]], bins=self.edges)[0] * scale * age_standard  # Bin the people
+                    # Figure out if it's a flow or incidence
+                    if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result:
+                        attr = result.replace('total_', '').replace('_incidence', '')  # Name of the actual state
+                        if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
+                        if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
+                        attr1 = self.mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
+                        attr2 = self.mapping[attr][1]  # As above
+                        if result[:5] == 'total':  # Results across all genotypes
+                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
+                            self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
+                                                            0] * scale  # Bin the people
+                        else:  # Results by genotype
+                            for g in range(ng):  # Loop over genotypes
+                                inds = ((sim.people[attr1][g, :] == sim.t) * (sim.people[attr2][g, :])).nonzero()
+                                self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
+                                                                      0] * scale  # Bin the people
 
-                    if 'incidence' in rkey:
-                        # Need to divide by the right denominator
-                        if 'hpv' in rkey: # Denominator is susceptible population
-                            denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=self.edges)[0] * scale)
-                        else:  # Denominator is females
-                            denom = (np.histogram(age[sim.people.f_inds], bins=self.edges)[0] * scale)/1e5 # CIN and cancer are per 100,000 women
-                        if 'total' not in rkey: denom = denom[None,:]
-                        self.results[date][rkey] = self.results[date][rkey] / denom
+                        if 'incidence' in result:
+                            # Need to divide by the right denominator
+                            if 'hpv' in result:  # Denominator is susceptible population
+                                denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
+                            else:  # Denominator is females
+                                denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[
+                                             0] * scale) / 1e5  # CIN and cancer are per 100,000 women
+                            if 'total' not in result: denom = denom[None, :]
+                            self.results[result][date] = self.results[result][date] / denom
 
 
     def finalize(self, sim):
         super().finalize()
-        validate_recorded_dates(sim, requested_dates=self.dates, recorded_dates=self.results.keys(), die=self.die)
-        if self.compute_fit:
-            self.mismatch = self.compute()
+        for rkey, rdict in self.result_keys.items():
+            validate_recorded_dates(sim, requested_dates=rdict.dates, recorded_dates=self.results.rkey.keys()[1:], die=self.die)
+            if 'compute_fit' in rdict.keys():
+                self.mismatch = self.compute()
             sim.fit = self.mismatch
         return
 
