@@ -1295,6 +1295,16 @@ class BasePeople(FlexPretty):
         ''' Boolean array of everyone sexually active i.e. past debut '''
         return self.age>self.debut
 
+    @property
+    def alive_inds(self):
+        ''' Boolean array of everyone alive '''
+        return self.true('alive')
+
+    @property
+    def n_alive(self):
+        ''' Number of people alive '''
+        return len(self.alive_inds)
+
     def true(self, key):
         ''' Return indices matching the condition '''
         return self[key].nonzero()[0]

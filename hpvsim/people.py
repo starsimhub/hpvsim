@@ -164,19 +164,22 @@ class People(hpb.BasePeople):
         self.dt = self.pars['dt']
         self.resfreq = resfreq if resfreq is not None else 1
 
+        # Let people age by one time step
+        self.increment_age()
+
         # Perform updates that are not genotype-specific
         if t%self.resfreq==0: self.init_flows()  # Only reinitialize flows to zero every nth step, where n is the requested result frequency
-        self.increment_age()  # Let people age by one time step
 
         # Apply death rates from other causes
         other_deaths, deaths_female, deaths_male    = self.apply_death_rates(year=year)
-        self.demographic_flows['other_deaths']      += other_deaths
-        self.flows_by_sex['other_deaths_by_sex'][0] += deaths_female
-        self.flows_by_sex['other_deaths_by_sex'][1] += deaths_male
+        self.demographic_flows['other_deaths']      = other_deaths
+        self.flows_by_sex['other_deaths_by_sex'][0] = deaths_female
+        self.flows_by_sex['other_deaths_by_sex'][1] = deaths_male
 
         # Add births
         new_births, new_people = self.add_births(year=year)
-        self.demographic_flows['births'] += new_births
+        self.demographic_flows['births'] = new_births
+        self.addtoself(new_people) # New births are added to the population
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
@@ -201,7 +204,7 @@ class People(hpb.BasePeople):
         # Before applying interventions or new infections, calculate the pool of susceptibles
         self.sus_pool = self.susceptible.nonzero()
 
-        return new_people
+        return
 
 
     #%% Methods for updating partnerships
@@ -447,11 +450,11 @@ class People(hpb.BasePeople):
             aa = np.array([death_pars[y][sex][:, 1] for y in all_years])
             mx[sex] = np.array([sc.smoothinterp(year, all_years, aa[:, aind]) for aind in range(len(age_bins))])[:,0]
 
-        death_probs[self.is_female & self.alive] = mx['f'][age_inds[self.is_female & self.alive]]*self.dt
-        death_probs[self.is_male   & self.alive] = mx['m'][age_inds[self.is_male   & self.alive]]*self.dt
+        death_probs[self.is_female & self.alive] = mx['f'][age_inds[self.is_female & self.alive]]*self['dt']
+        death_probs[self.is_male   & self.alive] = mx['m'][age_inds[self.is_male   & self.alive]]*self['dt']
         death_probs[(self.age>100) & self.alive] = 1 # Just remove anyone >100
 
-        # Get indices of people who die of other causes, removing anyone already dead
+        # Get indices of people who die of other causes
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
         deaths_female = len(hpu.true(self.is_female[death_inds]))
         deaths_male = len(hpu.true(self.is_male[death_inds]))
@@ -462,8 +465,9 @@ class People(hpb.BasePeople):
 
     def add_births(self, year=None):
         ''' Method to add births '''
-        this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])*self.dt
-        new_births = round(this_birth_rate[0]*len(self)/1000) # Crude births per 1000
+
+        this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
+        new_births = round(this_birth_rate*self['dt']*self.n_alive) # Crude births per 1000
 
         # Generate other characteristics of the new people
         uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
