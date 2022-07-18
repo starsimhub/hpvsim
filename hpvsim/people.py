@@ -554,16 +554,9 @@ class People(hpb.BasePeople):
             self.latent[g, inds] = False # Adjust states -- no longer latent
 
         # Update states, genotype info, and flows
-<<<<<<< HEAD
-        new_total_infections    = len(inds) # Count the total number of new infections
-        new_infections          = np.array([len((genotypes == g).nonzero()[0]) for g in range(ng)], dtype=np.float64) # Count the number by genotype
-        self.susceptible[genotypes, inds]   = False # Adjust states - set susceptible to false
-        self.infectious[genotypes, inds]    = True  # Adjust states - set infectious to true
-=======
         self.susceptible[g, inds]   = False # Adjust states - set susceptible to false
         self.infectious[g, inds]    = True # Adjust states - set infectious to true
         self.hpv[g, inds]           = True # Adjust states - set hpv to true
->>>>>>> main
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
