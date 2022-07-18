@@ -691,32 +691,31 @@ class age_results(Analyzer):
     def finalize(self, sim):
         super().finalize()
         for rkey, rdict in self.result_keys.items():
-            validate_recorded_dates(sim, requested_dates=rdict.dates, recorded_dates=self.results.rkey.keys()[1:], die=self.die)
+            validate_recorded_dates(sim, requested_dates=rdict.dates, recorded_dates=self.results[rkey].keys()[1:], die=self.die)
             if 'compute_fit' in rdict.keys():
-                self.mismatch = self.compute()
-            sim.fit = self.mismatch
+                self.mismatch += self.compute(rkey)
+                sim.fit += self.mismatch
         return
 
 
-    def compute(self):
+    def compute(self, key):
         res = []
-        for name, group in self.data.groupby(['name', 'genotype', 'year']):
-            key = name[0]
-            genotype = name[1].lower()
-            year = str(name[2]) + '.0'
+        for name, group in self.result_keys[key].data.groupby(['genotype', 'year']):
+            genotype = name[0].lower()
+            year = str(name[1]) + '.0'
             if 'total' in key:
-                sim_res = list(self.results[year][key])
+                sim_res = list(self.results[key][year])
                 res.extend(sim_res)
             else:
-                sim_res = list(self.results[year][key][self.glabels.index(genotype)])
+                sim_res = list(self.results[key][year][self.glabels.index(genotype)])
                 res.extend(sim_res)
-        self.data['model_output'] = res
-        self.data['diffs'] = self.data['model_output'] - self.data['value']
-        self.data['gofs'] = hpm.compute_gof(self.data['value'].values, self.data['model_output'].values)
-        self.data['losses'] = self.data['gofs'].values * self.weights
-        self.mismatch = self.data['losses'].sum()
+        self.result_keys[key].data['model_output'] = res
+        self.result_keys[key].data['diffs'] = self.result_keys[key].data['model_output'] - self.result_keys[key].data['value']
+        self.result_keys[key].data['gofs'] = hpm.compute_gof(self.result_keys[key].data['value'].values, self.result_keys[key].data['model_output'].values)
+        self.result_keys[key].data['losses'] = self.result_keys[key].data['gofs'].values * self.result_keys[key].data.weights
+        self.result_keys[key].mismatch = self.result_keys[key].data['losses'].sum()
 
-        return self.mismatch
+        return self.result_keys[key].mismatch
 
 
     def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8,
@@ -746,46 +745,37 @@ class age_results(Analyzer):
 
         # Handle what to plot
         if not len(self.results):
-            errormsg = f'Cannot plot since no age results were recorded (scheduled timepoints: {self.timepoints})'
+            errormsg = f'Cannot plot since no age results were recorded)'
             raise ValueError(errormsg)
-        if len(self.timepoints)>1:
-            n_cols = len(self.timepoints) # One column for each requested timepoint
-            n_rows = len(self.result_keys) # One row for each requested result
+        # if len(self.results)>1:
+        #     n_cols = len(self.timepoints) # One column for each requested timepoint
+        #     n_rows = len(self.result_keys) # One row for each requested result
         else: # If there's only one timepoint, automatically figure out rows and columns
-            n_plots = len(self.result_keys)
+            n_plots = len(self.results)
             n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Make the figure(s)
         with hpo.with_style(**kwargs):
             col_count=1
-            for date,resdict in self.results.items():
+            for rkey,resdict in self.results.items():
 
                 pl.subplots_adjust(**axis_args)
                 row_count = 0
 
-                for rkey in self.result_keys:
+                for date in self.result_keys[rkey]['dates']:
 
                     # Start making plot
-                    barwidth = 1 * width
                     ax = pl.subplot(n_rows, n_cols, col_count+row_count)
-                    x = np.arange(len(self.age_labels))  # the label locations
-                    if self.data is not None:
-                        thisdatadf = self.data[(self.data.year == float(date))&(self.data.name == rkey)]
+                    x = np.arange(len(self.result_keys[rkey].age_labels))  # the label locations
+                    if 'data' in self.result_keys[rkey].keys():
+                        thisdatadf = self.result_keys[rkey].data[(self.result_keys[rkey].data.year == float(date))&(self.result_keys[rkey].data.name == rkey)]
                         unique_genotypes = thisdatadf.genotype.unique()
-                        # if len(thisdatadf)>0:
-                        #     barwidth /= 2 # Adjust width based on data
 
                     if 'total' not in rkey:
                         # Prepare plot settings
-                        barwidth /= self.ng  # Adjust width based on number of genotypes (warning, this will be crowded)
-                        if (self.ng % 2) == 0:  # Incredibly complex way of automatically generating bar offsets
-                            xlocations = np.array([-(g + 1) for g in reversed(range(self.ng // 2))] + [(g + 1) for g in range(self.ng // 2)]) * .5 * barwidth
-                        else:
-                            xlocations = np.array([-2 * (g + 1) for g in reversed(range(self.ng // 2))] + [0] + [2 * (g + 1) for g in range(self.ng // 2)]) * .5 * barwidth
-
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
-                            ax.plot(x, resdict[rkey][g,:], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
+                            ax.plot(x, resdict[date][g,:], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
                             # ax.bar(x+xlocations[g], resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
                             if len(thisdatadf)>0:
                                 # check if this genotype is in dataframe
@@ -794,19 +784,19 @@ class age_results(Analyzer):
                                     ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s', label=f'Data - {glabel}')
 
                     else:
-                        if (self.data is not None) and (len(thisdatadf) > 0):
-                            ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
+                        if ('data' in self.result_keys[rkey].keys()) and (len(thisdatadf) > 0):
+                            ax.plot(x, resdict[date], color=self.result_properties[rkey].color, linestyle='--', label='Model')
                             # ax.bar(x-1/2*barwidth, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
                             ydata = np.array(thisdatadf.value)
                             ax.scatter(x, ydata,  color=self.result_properties[rkey].color, marker='s', label='Data')
                         else:
                             # ax.bar(x, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
-                            ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
+                            ax.plot(x, resdict[date], color=self.result_properties[rkey].color, linestyle='--', label='Model')
                     ax.set_xlabel('Age group')
                     ax.set_title(self.result_properties[rkey].name+' - '+date)
                     ax.legend()
                     row_count += n_cols
-                    ax.set_xticks(x, self.age_labels)
+                    ax.set_xticks(x, self.result_keys[rkey].age_labels)
 
                 col_count+=1
 

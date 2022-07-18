@@ -75,7 +75,7 @@ def test_age_results(do_plot=True):
             hpv_prevalence=sc.objdict(
                 timepoints=['2010'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
-                datafile='test_data/south_africa_hpv_data.xlsx'
+                datafile='test_data/south_africa_hpv_data.xlsx',
             ),
             total_cancers=sc.objdict(
                 timepoints=['2019'],
