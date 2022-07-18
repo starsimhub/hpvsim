@@ -46,7 +46,7 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
         if tidy:
             print(f'Removing {local_path}')
             os.remove(local_path)
-        T.toctic(label=f'Done with {year}')
+        T.toctic(label=f'  Done with {label} for {year}')
 
     df = pd.concat(dfs)
     dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
