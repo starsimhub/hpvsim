@@ -96,45 +96,6 @@ def map_entries(json, location, df=None):
     return entries
 
 
-# def show_locations(location=None, output=False):
-#     '''
-#     Print a list of available locations.
-
-#     Args:
-#         location (str): if provided, only check if this location is in the list
-#         output (bool): whether to return the list (else print)
-
-#     **Examples**::
-
-#         cv.data.show_locations() # Print a list of valid locations
-#         cv.data.show_locations('lithuania') # Check if Lithuania is a valid location
-#         cv.data.show_locations('Viet-Nam') # Check if Viet-Nam is a valid location
-#     '''
-#     country_json   = sc.dcp(cad.data)
-#     aliases        = get_country_aliases()
-
-#     age_data       = sc.mergedicts(country_json, aliases) # Countries will overwrite states, e.g. Georgia
-
-#     loclist = sc.objdict()
-#     loclist.age_distributions = sorted(list(age_data.keys()))
-
-#     if location is not None:
-#         age_available = location.lower() in [v.lower() for v in loclist.age_distributions]
-#         age_sugg = ''
-#         age_sugg = f'(closest match: {sc.suggest(location, loclist.age_distributions)})' if not age_available else ''
-#         print(f'For location "{location}":')
-#         print(f'  Population age distribution is available: {age_available} {age_sugg}')
-#         return
-
-#     if output:
-#         return loclist
-#     else:
-#         print(f'There are {len(loclist.age_distributions)} age distributions and {len(loclist.household_size_distributions)} household size distributions.')
-#         print('\nList of available locations (case insensitive):\n')
-#         sc.pp(loclist)
-#         return
-
-
 def get_age_distribution(location=None, year=None, total_pop_file=None):
     '''
     Load age distribution for a given country or countries.
