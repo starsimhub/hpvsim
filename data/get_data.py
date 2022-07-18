@@ -5,7 +5,7 @@ Download data needed for HPVsim
 import os
 import sys
 import zipfile
-import urllib.request as urllib
+# import urllib.request as urllib
 import wbgapi as wb
 import numpy as np
 import pandas as pd
@@ -33,7 +33,7 @@ def get_UN_data(file_stem, force=None, tidy=None):
         local_path = f'{file_stem}{year}.csv'
         if force or not os.path.exists(local_path):
             print(f'Downloading from {url}, this may take a while...')
-            filehandle, _ = urllib.urlretrieve(url)
+            filehandle = sc.wget(url, convert=False)
             zip_file_object = zipfile.ZipFile(filehandle, 'r')
             zip_file_object.extractall()
         else:
@@ -51,6 +51,7 @@ def get_UN_data(file_stem, force=None, tidy=None):
     dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
     sc.save('populations.obj',dd)
 
+    T.toc()
     print(f'Done: took {T.timings[:].sum():0.1f} s.')
 
     return dd
