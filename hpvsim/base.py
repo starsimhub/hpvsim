@@ -232,8 +232,8 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['cum_total_infections']
-                cancers = self.summary['cum_total_cancers']
+                infections = self.summary['total_infections']
+                cancers = self.summary['total_cancers']
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
@@ -281,6 +281,7 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
+
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 
@@ -399,7 +400,7 @@ class BaseSim(ParsObj):
                     tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
                 except:
                     try:
-                        tp_raw  = float(date)
+                        tp_raw  = float(date) # This must be float, not int, otherwise some attempts to get t will fail
                     except:
                         errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
                         raise ValueError(errormsg)
@@ -436,7 +437,7 @@ class BaseSim(ParsObj):
             return tps
 
 
-    def result_keys(self, which='total'):
+    def result_keys(self, which='all'):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
@@ -445,17 +446,17 @@ class BaseSim(ParsObj):
 
         '''
         keys = []
-        choices = ['total', 'genotype', 'all', 'by_age', 'by_sex']
-        if which in ['total', 'all']:
-            keys += [k for k,res in self.results.items() if 'total' in k and 'by_age' not in k and isinstance(res, Result)]
-        if which in ['genotype', 'all']:
-            keys += [k for k,res in self.results.items() if 'total' not in k and isinstance(res, Result)]
-        if which in ['by_age', 'all']:
-            keys += [k for k,res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
-        if which in ['by_sex', 'all']:
-            keys += [k for k,res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
-        if which not in choices: # pragma: no cover
-            errormsg = f'Choice "which" not available; choices are: {sc.strjoin(choices)}'
+        choices = ['total', 'genotype', 'all', 'by_sex']
+        if which in ['all']:
+            keys = [k for k,res in self.results.items() if isinstance(res, Result)]
+        elif which in ['total']:
+            keys = [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
+        elif which in ['genotype']:
+            keys = [k for k,res in self.results.items() if (res[:].ndim>1) and ('by_sex' not in k) and isinstance(res, Result)]
+        elif which in ['by_sex']:
+            keys = [k for k,res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
+        else:
+            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(choices)}'
             raise ValueError(errormsg)
         return keys
 
@@ -1565,21 +1566,22 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
 
         # Ensure the columns are right and add values if supplied
         for lkey, new_layer in new_contacts.items():
-            n = len(new_layer['f'])
-            if 'beta' not in new_layer.keys() or len(new_layer['beta']) != n:
-                if beta is None:
-                    beta = 1.0
-                beta = hpd.default_float(beta)
-                new_layer['beta'] = np.ones(n, dtype=hpd.default_float)*beta
+            if len(new_layer)>0:
+                n = len(new_layer['f'])
+                if 'beta' not in new_layer.keys() or len(new_layer['beta']) != n:
+                    if beta is None:
+                        beta = 1.0
+                    beta = hpd.default_float(beta)
+                    new_layer['beta'] = np.ones(n, dtype=hpd.default_float)*beta
 
-            # Create the layer if it doesn't yet exist
-            if lkey not in self.contacts:
-                self.contacts[lkey] = Layer(label=lkey)
+                # Create the layer if it doesn't yet exist
+                if lkey not in self.contacts:
+                    self.contacts[lkey] = Layer(label=lkey)
 
-            # Actually include them, and update properties if supplied
-            for col in self.contacts[lkey].keys(): # Loop over the supplied columns
-                self.contacts[lkey][col] = np.concatenate([self.contacts[lkey][col], new_layer[col]])
-            self.contacts[lkey].validate()
+                # Actually include them, and update properties if supplied
+                for col in self.contacts[lkey].keys(): # Loop over the supplied columns
+                    self.contacts[lkey][col] = np.concatenate([self.contacts[lkey][col], new_layer[col]])
+                self.contacts[lkey].validate()
 
         return
 
@@ -1644,8 +1646,11 @@ class Person(sc.prettyobj):
         self.partners           = partners # Preferred number of partners
         self.current_partners   = current_partners # Number of current partners
         self.debut              = hpd.default_float(debut) # Age of sexual debut
+<<<<<<< HEAD
         self.cells              = hpd.default_float(cells) # Proportion of cervical cells affected by dysplasia
         self.viral_load         = hpd.default_float(viral_load) # Proportion of cervical cells affected by dysplasia
+=======
+>>>>>>> main
         return
 
 
@@ -1821,6 +1826,8 @@ class Layer(FlexDict):
             'dur':   hpd.default_float, # Duration of partnership
             'start': hpd.default_int, # Date of partnership start
             'end':   hpd.default_float, # Date of partnership end
+            'age_f': hpd.default_float,  # Age of female partner
+            'age_m': hpd.default_float,  # Age of male partner
         }
         self.basekey = 'f' # Assign a base key for calculating lengths and performing other operations
         self.label = label

@@ -8,11 +8,8 @@ import pytest
 import sys
 import sciris as sc
 import numpy as np
-
-# Add module to paths and import hpvsim
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
-import hpvsim.sim as hps
+import hpvsim as hpv
+import hpvsim.utils as hpu
 
 do_plot = 1
 do_save = 0
@@ -23,7 +20,7 @@ do_save = 0
 def test_microsim():
     sc.heading('Minimal sim test')
 
-    sim = hps.Sim()
+    sim = hpv.Sim()
     pars = {
         'pop_size': 10,
         'init_hpv_prev': .1,
@@ -44,12 +41,29 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     # Settings
     seed = 1
     verbose = 1
-    from hpvsim.immunity import genotype
 
     # Create and run the simulation
-    hpv16 = genotype('HPV16')
-    hpv18 = genotype('HPV18')
-    sim = hps.Sim(end=2035, genotypes=[hpv16,hpv18])
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
+    hpv6 = hpv.genotype('HPV6')
+
+    pars = {
+        'pop_size': 50e3,
+        'start': 1990,
+        'burnin': 30,
+        'end': 2030,
+        'genotypes': [hpv16, hpv18],
+        'location': 'tanzania',
+        'dt': .2,
+    }
+
+    age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
+    doses_per_year = 2e3
+    bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year,
+                                        timepoints=['2020', '2021', '2022', '2023', '2024'],
+                                        label='bivalent 2 dose, 9-14', subtarget=age_target)
+
+    sim = hpv.Sim(pars=pars, genotypes=[hpv16,hpv18,hpv6], interventions=[bivalent_2_dose])
     sim.set_seed(seed)
 
     # Optionally plot
@@ -65,13 +79,13 @@ def test_epi():
 
     # Define baseline parameters and initialize sim
     base_pars = dict(n_years=10, dt=0.5)
-    sim = hps.Sim()
+    sim = hpv.Sim()
 
     # Define the parameters to vary
-    vary_pars   = ['beta',          'acts',         'condoms',      'debut',        'rel_cin1_prob',    'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.05, 0.5],     [10,200],       [0.1,1.0],      [15,25],        [0.1, 2],           [0.01,0.5]] # Values
-    vary_rels   = ['pos',           'pos',          'neg',          'neg',          'pos',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['infections',    'infections',   'infections',   'infections',   'cin1s',            'cin1s'] # Epi outcomes to check
+    vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'rel_cin1_prob',    'init_hpv_prev'] # Parameters
+    vary_vals   = [[0.01, 0.8],     [10,200],           [0.1,1.0],         [15,25],            [0.1, 2],           [0.01,0.8]] # Values
+    vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos',              'pos'] # Expected association with epi outcomes
+    vary_what   = ['hpv_incidence', 'hpv_incidence',    'hpv_incidence',    'hpv_incidence',    'cin1_prevalence',  'cancer_prevalence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -94,13 +108,13 @@ def test_epi():
         pars1 = sc.mergedicts(base_pars, {vpar:hi}) # Use upper parameter bound
 
         # Run the simulations and pull out the results
-        s0 = hps.Sim(pars0, label=f'{vpar} {vval[0]}').run()
-        s1 = hps.Sim(pars1, label=f'{vpar} {vval[1]}').run()
+        s0 = hpv.Sim(pars0, label=f'{vpar} {vval[0]}').run()
+        s1 = hpv.Sim(pars1, label=f'{vpar} {vval[1]}').run()
         res0 = s0.summary
         res1 = s1.summary
 
         # Check results
-        key='cum_total_'+vwhat
+        key='total_'+vwhat
         v0 = res0[key]
         v1 = res1[key]
         print(f'Checking {key:20s} ... ', end='')
@@ -118,7 +132,7 @@ def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
-    sim = hps.Sim(pop_size=100, label='test_label')
+    sim = hpv.Sim(pop_size=100, label='test_label')
     sim.reset_layer_pars()
     sim.initialize()
     sim.reset_layer_pars()
@@ -180,31 +194,18 @@ def test_result_consistency():
 
     # Create sim
     pop_size = 10e3
-    sim = hps.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
+    sim = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
     sim.run()
 
-    # Check that infections by age sum up the the correct totals
-    assert (sim.results['cum_total_infections'][:] == sim.results['cum_total_infections_by_age'][:].sum(axis=0)).all() # Check cumulative results by age are equal to cumulative results
-    assert (sim.results['new_total_infections'][:] == sim.results['new_total_infections_by_age'][:].sum(axis=0)).all() # Check new results by age are equal to new results
-
     # Check that infections by genotype sum up the the correct totals
-    assert (sim.results['new_infections'][:].sum(axis=0)==sim.results['new_total_infections'][:]).all() # Check flows by genotype are equal to total flows
+    assert (sim.results['infections'][:].sum(axis=0)==sim.results['total_infections'][:]).all() # Check flows by genotype are equal to total flows
     assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
     # Check that CINs by grade sum up the the correct totals
-    assert ((sim.results['new_total_cin1s'][:] + sim.results['new_total_cin2s'][:] + sim.results['new_total_cin3s'][:]) == sim.results['new_total_cins'][:]).all()
-    assert ((sim.results['new_cin1s'][:] + sim.results['new_cin2s'][:] + sim.results['new_cin3s'][:]) == sim.results['new_cins'][:]).all()
-
-    # Check that cancers and CINs by age sum up the the correct totals
-    assert (sim.results['new_total_cancers'][:] == sim.results['new_total_cancers_by_age'][:].sum(axis=0)).all()
-    assert (sim.results['new_total_cins'][:] == sim.results['new_total_cins_by_age'][:].sum(axis=0)).all()
-    assert (sim.results['n_total_cin_by_age'][:, :].sum(axis=0) == sim.results['n_total_cin'][:]).all()
-    assert (sim.results['n_total_cancerous_by_age'][:, :].sum(axis=0) == sim.results['n_total_cancerous'][:]).all()
+    assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
+    assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
 
     # Check demographics
-    assert (sim.results['n_alive_by_age'][:].sum(axis=0) == sim.results['n_alive'][:]).all()
-    assert (sim.results['n_alive_by_sex'][0, :] == sim.results['f_alive_by_age'][:].sum(axis=0)).all()
-    assert (sim.results['n_alive'][-1]+sim.results['cum_other_deaths'][-1]-sim.results['cum_births'][-1] == sim['pop_size'])
     assert (sim['pop_size'] == pop_size)
 
     # Check that males don't have CINs or cancers
@@ -227,14 +228,14 @@ def test_result_consistency():
 def test_location_loading():
     ''' Check that data by location can be loaded '''
 
-    sim0 = hps.Sim() # Default values
-    sim1 = hps.Sim(location='zimbabwe') # Zimbabwe values
-    sim2 = hps.Sim(location='Zimbabwe') # Location should not be case sensitive
-    assert (sim0['birth_rates'][1] != sim1['birth_rates'][1]).all() # Values for Zimbabwe should be different to default values
-    assert (sim1['birth_rates'][1] == sim2['birth_rates'][1]).all() # Values for Zimbabwe should be loaded regardless of capitalization
+    sim0 = hpv.Sim() # Default values
+    sim1 = hpv.Sim(location='zimbabwe') # Zimbabwe values
+    sim2 = hpv.Sim(location='Zimbabwe') # Location should not be case sensitive
+    assert not np.array_equal( sim0['birth_rates'][1],sim1['birth_rates'][1]) # Values for Zimbabwe should be different to default values
+    assert np.array_equal(sim1['birth_rates'][1], sim2['birth_rates'][1]) # Values for Zimbabwe should be loaded regardless of capitalization
     with pytest.warns(RuntimeWarning): # If the location doesn't exist, should use defaults
-        sim3 = hps.Sim(location='penelope') # Make sure a warning message is raised
-    assert (sim0['birth_rates'][1] == sim3['birth_rates'][1]).all() # Check that defaults have been used
+        sim3 = hpv.Sim(location='penelope') # Make sure a warning message is raised
+    assert np.array_equal(sim0['birth_rates'][1], sim3['birth_rates'][1]) # Check that defaults have been used
 
     return sim1
 
@@ -243,64 +244,35 @@ def test_resuming():
     sc.heading('Test that resuming a run works')
 
     pop_size = 10e3
-    s0 = hps.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_resume')
+    s0 = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_resume')
     s1 = s0.copy()
     s0.run()
 
     # Cannot run the same simulation multiple times
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s0.run()
 
     # If until=0 then no timesteps will be taken
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s1.run(until='2015', reset_seed=False)
     assert s1.initialized # It should still have been initialized though
     with pytest.raises(RuntimeError):
         s1.compute_summary(require_run=True) # Not ready yet
 
     s1.run(until='2020', reset_seed=False)
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s1.run(until=10, reset_seed=False) # Error if running up to the same value
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s1.run(until=5, reset_seed=False) # Error if running until a previous timestep
 
     s1.run(until='2023', reset_seed=False)
     s1.run(reset_seed=False)
-    with pytest.raises(hps.AlreadyRunError):
+    with pytest.raises(hpv.AlreadyRunError):
         s1.finalize() # Can't re-finalize a finalized sim
 
-    assert np.all(s0.results['cum_total_infections'].values == s1.results['cum_total_infections']) # Results should be identical
+    assert np.all(s0.results['total_infections'].values == s1.results['total_infections']) # Results should be identical
 
     return s1
-
-
-# def test_fileio():
-#     sc.heading('Test file saving')
-#
-#     json_path = 'test_hpvsim.json'
-#     xlsx_path = 'test_hpvsim.xlsx'
-#
-#     # Create and run the simulation
-#     sim = hps.Sim()
-#     sim['n_years'] = 5
-#     sim['pop_size'] = 1000
-#     sim.run(verbose=0)
-#
-#     # Create objects
-#     json = sim.to_json()
-#     xlsx = sim.to_excel()
-#     print(xlsx)
-#
-#     # Save files
-#     sim.to_json(json_path)
-#     sim.to_excel(xlsx_path)
-#
-#     for path in [json_path, xlsx_path]:
-#         print(f'Removing {path}')
-#         os.remove(path)
-#
-#     return json
-
 
 
 
@@ -318,7 +290,6 @@ if __name__ == '__main__':
     sim4 = test_result_consistency()
     sim5 = test_location_loading()
     sim6 = test_resuming()
-    # json = test_fileio()
 
     sc.toc(T)
     print('Done.')

@@ -12,7 +12,7 @@ import pylab as pl
 from .settings import options as hpo # To set options
 
 # Specify all externally visible functions this file defines -- other things are available as e.g. hp.defaults.default_int
-__all__ = ['default_float', 'default_int', 'get_default_colors', 'get_default_plots']
+__all__ = ['default_float', 'default_int', 'get_default_plots']
 
 
 #%% Specify what data types to use
@@ -44,6 +44,7 @@ class PeopleMeta(sc.prettyobj):
             'uid',              # Int
             'age',              # Float
             'sex',              # Float
+            'death_age',        # Float
             'debut',            # Float
             'cells',            # Float indicating % of abnormal cells, default 0
             'viral_load',       # Float
@@ -51,37 +52,48 @@ class PeopleMeta(sc.prettyobj):
             'current_partners', # Int by relationship type
         ]
 
-        # Set the states that a person can be in, all booleans per person and per genotype except other_dead
+        # Set the states that a person can be in, all booleans per person and per genotype except other_dead, screened, vaccinated and treated
         self.states = [
             'susceptible',
             'infectious',
+            'hpv', # hpv in absence of any CIN
             'cin1',
             'cin2',
             'cin3',
+            'cin',
             'cancerous',
+            'latent',
             'alive', # Save this as a state so we can record population sizes
             'dead_cancer',
             'dead_other',  # Dead from all other causes
+            'vaccinated',
+            'screened',
+            'treated',
+            'diagnosed'
         ]
 
-        # Immune states, by genotype
+        # Immune states, by genotype/vaccine
         self.imm_states = [
             'sus_imm',  # Float, by genotype
-        ]
-
-        # Immunity states, by genotype/vaccine
-        self.imm_by_source_states = [
-            'peak_imm', # Float, peak level of immunity
+            'peak_imm',  # Float, peak level of immunity
             'imm',  # Float, current immunity level
             't_imm_event',  # Int, time since immunity event
         ]
 
+        # Additional intervention states
+        self.intv_states = [
+            'doses',  # Number of doses given per person
+            'vaccine_source',  # index of vaccine that individual received
+            'screens', # Number of screens given per person
+        ]
+
         self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
-        self.dates += ['date_clearance']
+        self.dates += ['date_clearance', 'date_next_screen']
 
         # Duration of different states: these are floats per person -- used in people.py
         self.durs = [
-            'dur_hpv', # Length of time that a person has HPV DNA present. This is EITHER the period until the virus clears OR the period until viral integration
+            'dur_hpv', # Length of time that a person has HPV before progressing to CIN
+            'dur_disease', # Length of time that a person has >= HPV present
             'dur_none2cin1', # Length of time to go from no dysplasia to CIN1
             'dur_cin12cin2', # Length of time to go from CIN1 to CIN2
             'dur_cin22cin3', # Length of time to go from CIN2 to CIN3
@@ -89,12 +101,11 @@ class PeopleMeta(sc.prettyobj):
             'dur_cancer',  # Duration of cancer
         ]
 
-        self.all_states = self.person + self.states + self.imm_states + \
-                          self.imm_by_source_states + self.dates + self.durs
+        self.all_states = self.person + self.states + self.imm_states + self.intv_states + \
+                          self.dates + self.durs
 
         # Validate
-        self.state_types = ['person', 'states', 'imm_states',
-                            'imm_by_source_states', 'dates', 'durs', 'all_states']
+        self.state_types = ['person', 'states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
         for state_type in self.state_types:
             states = getattr(self, state_type)
             n_states        = len(states)
@@ -111,10 +122,9 @@ class PeopleMeta(sc.prettyobj):
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
 # the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu]
-flow_by_age = ['both',          None,           None,           None,           'total',        'total',    'total',            None]
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections',     'reactivations',     'screens',  'screened']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections',     'reactivations',     'screens',  'screened']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu,          pl.cm.Purples, pl.cm.Purples, pl.cm.Purples,]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -122,25 +132,17 @@ flow_by_age = ['both',          None,           None,           None,           
 stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
 stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
-stock_by_age = ['total',        'both',         None,           None,           None,           'total',        'total']
 
 # Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
 inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',          'cancer']
 inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN',          'cancer']
 inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
-inci_by_age = ['both',      None,           None,           None,           'total',        'total']
-
-# Results by age
-age_brackets    = np.array([15, 25, 45, 65, 150])  # TODO: consider how this will change once vaccination status is there
-age_labels      = ['0-14', '15-24', '25-44', '45-64', '65+']
-n_age_brackets  = len(age_brackets)
-by_age_colors   = sc.gridcolors(n_age_brackets)
 
 # Demographics
 dem_keys    = ['births',    'other_deaths']
 dem_names   = ['births',    'other deaths']
-dem_colors  = ['#000000',   '#000000']
+dem_colors  = ['#fcba03',   '#000000']
 
 # Results by sex
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
@@ -163,70 +165,70 @@ genotype_pars = [
 
 # Default age data, based on Seattle 2018 census data -- used in population.py
 default_age_data = np.array([
-    [ 0,  4, 0.0605],
-    [ 5,  9, 0.0607],
-    [10, 14, 0.0566],
-    [15, 19, 0.0557],
-    [20, 24, 0.0612],
-    [25, 29, 0.0843],
-    [30, 34, 0.0848],
-    [35, 39, 0.0764],
-    [40, 44, 0.0697],
-    [45, 49, 0.0701],
-    [50, 54, 0.0681],
-    [55, 59, 0.0653],
-    [60, 64, 0.0591],
-    [65, 69, 0.0453],
-    [70, 74, 0.0312],
-    [75, 79, 0.02016], # Calculated based on 0.0504 total for >=75
-    [80, 84, 0.01344],
-    [85, 89, 0.01008],
-    [90, 99, 0.00672],
+    [ 0,  4.9, 0.0605],
+    [ 5,  9.9, 0.0607],
+    [10, 14.9, 0.0566],
+    [15, 19.9, 0.0557],
+    [20, 24.9, 0.0612],
+    [25, 29.9, 0.0843],
+    [30, 34.9, 0.0848],
+    [35, 39.9, 0.0764],
+    [40, 44.9, 0.0697],
+    [45, 49.9, 0.0701],
+    [50, 54.9, 0.0681],
+    [55, 59.9, 0.0653],
+    [60, 64.9, 0.0591],
+    [65, 69.9, 0.0453],
+    [70, 74.9, 0.0312],
+    [75, 79.9, 0.02016], # Calculated based on 0.0504 total for >=75
+    [80, 84.9, 0.01344],
+    [85, 89.9, 0.01008],
+    [90, 99.9, 0.00672],
 ])
 
 
-default_death_rates = {
+default_death_rates = {2020:{
     'm': np.array([
-        [0, 1, 5.99966600e-03],
-        [1, 4, 2.51593000e-04],
-        [5, 9, 1.35127000e-04],
-        [10, 14, 1.78153000e-04],
-        [15, 19, 6.61341000e-04],
-        [20, 24, 1.30016800e-03],
-        [25, 29, 1.63925500e-03],
-        [30, 34, 1.96618300e-03],
-        [35, 39, 2.28799200e-03],
-        [40, 44, 2.63302300e-03],
-        [45, 49, 3.66449800e-03],
-        [50, 54, 5.70753600e-03],
-        [55, 59, 9.46976600e-03],
-        [60, 64, 1.34425950e-02],
-        [65, 69, 1.83650650e-02],
-        [70, 74, 2.89760800e-02],
-        [75, 79, 4.17993600e-02],
-        [80, 84, 6.58443370e-02],
-        [85, 99, 1.47244865e-01]]),
+        [0, 5.99966600e-03],
+        [1, 2.51593000e-04],
+        [5, 1.35127000e-04],
+        [10, 1.78153000e-04],
+        [15, 6.61341000e-04],
+        [20, 1.30016800e-03],
+        [25, 1.63925500e-03],
+        [30, 1.96618300e-03],
+        [35, 2.28799200e-03],
+        [40, 2.63302300e-03],
+        [45, 3.66449800e-03],
+        [50, 5.70753600e-03],
+        [55, 9.46976600e-03],
+        [60, 1.34425950e-02],
+        [65, 1.83650650e-02],
+        [70, 2.89760800e-02],
+        [75, 4.17993600e-02],
+        [80, 6.58443370e-02],
+        [85, 1.47244865e-01]]),
     'f': np.array([
-        [0, 1, 5.01953300e-03],
-        [1, 4, 2.01505000e-04],
-        [5, 9, 1.08226000e-04],
-        [10, 14, 1.25870000e-04],
-        [15, 19, 2.85938000e-04],
-        [20, 24, 4.81500000e-04],
-        [25, 29, 6.72314000e-04],
-        [30, 34, 9.84953000e-04],
-        [35, 39, 1.27814400e-03],
-        [40, 44, 1.61936000e-03],
-        [45, 49, 2.42485500e-03],
-        [50, 54, 3.86320600e-03],
-        [55, 59, 6.15726500e-03],
-        [60, 64, 8.21110500e-03],
-        [65, 69, 1.17604260e-02],
-        [70, 74, 1.86539200e-02],
-        [75, 79, 3.04550980e-02],
-        [80, 84, 5.16382510e-02],
-        [85, 99, 1.33729522e-01]])
-    }
+        [0, 5.01953300e-03],
+        [1, 2.01505000e-04],
+        [5, 1.08226000e-04],
+        [10, 1.25870000e-04],
+        [15, 2.85938000e-04],
+        [20, 4.81500000e-04],
+        [25, 6.72314000e-04],
+        [30, 9.84953000e-04],
+        [35, 1.27814400e-03],
+        [40, 1.61936000e-03],
+        [45, 2.42485500e-03],
+        [50, 3.86320600e-03],
+        [55, 6.15726500e-03],
+        [60, 8.21110500e-03],
+        [65, 1.17604260e-02],
+        [70, 1.86539200e-02],
+        [75, 3.04550980e-02],
+        [80, 5.16382510e-02],
+        [85, 1.33729522e-01]])
+    }}
 
 default_birth_rates = np.array([
     [2015, 2016, 2017, 2018, 2019],
@@ -234,18 +236,19 @@ default_birth_rates = np.array([
 ])
 
 default_init_prev = {
-    'age_brackets'  : np.array([  12,   17,   24,   34,   44,   64,   150]),
-    'm'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
-    'f'             : np.array([ 0.0, 0.05, 0.12, 0.25, 0.15, 0.05, 0.005]),
+    'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
+    'm'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
+    'f'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
 }
+
 
 #%% Default plotting settings
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
-    'cum_total_infections',
-    'cum_total_cins',
-    'cum_total_cancers',
+    'total_infections',
+    'total_cins',
+    'total_cancers',
 ]
 
 
@@ -276,7 +279,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
         is_sim = kindmap[kind] == sim_kind
 
     # Default plots -- different for sims and scenarios
-    if which in ['none', 'default']:
+    if which in ['none', 'default', 'epi']:
 
         if is_sim:
             plots = sc.odict({
@@ -285,8 +288,8 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'hpv_prevalence',
                 ],
                 'HPV incidence': [
-                    'total_hpv_incidence_by_age',
-                    # 'new_infections',
+                    'total_hpv_incidence',
+                    'hpv_incidence',
                 ],
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
@@ -297,11 +300,25 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         else: # pragma: no cover
             plots = sc.odict({
-                'Cumulative infections': [
-                    'cum_infections',
+                'HPV incidence': [
+                    'total_hpv_incidence',
                 ],
-                'New infections per day': [
-                    'new_infections',
+                'Cancers per 100,000 women': [
+                    'total_cancer_incidence',
+                    ],
+            })
+
+    # Demographic plots
+    elif which in ['demographic', 'demographics', 'dem', 'demography']:
+        if is_sim:
+            plots = sc.odict({
+                'Birth and death rates': [
+                    'cdr',
+                    'cbr',
+                ],
+                'Population size': [
+                    'n_alive',
+                    'n_alive_by_sex',
                 ],
             })
 
