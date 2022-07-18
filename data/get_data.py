@@ -53,7 +53,7 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
     sc.save(outfile, dd)
 
     T.toc(doprint=False)
-    print(f'Done: took {T.timings[:].sum():0.1f} s.')
+    print(f'Done with {label}: took {T.timings[:].sum():0.1f} s.')
 
     return dd
 
