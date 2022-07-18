@@ -1,5 +1,5 @@
 '''
-Download data needed for HPVsim
+Download data needed for HPVsim. This file needs to be run before HPVsim will work.
 '''
 
 import os
@@ -32,7 +32,7 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
         url = f'{base_url}{file_stem}{year}.zip'
         local_path = f'{file_stem}{year}.csv'
         if force or not os.path.exists(local_path):
-            print(f'Downloading from {url}, this may take a while...')
+            print(f'\nDownloading from {url}, this may take a while...')
             filehandle, _ = request.urlretrieve(url)
             zip_file_object = zipfile.ZipFile(filehandle, 'r')
             zip_file_object.extractall()
@@ -61,7 +61,7 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
 def get_age_data(force=None, tidy=None):
     ''' Import population sizes by age from UNPD '''
     columns = ["Location", "Time", "AgeGrpStart", "PopTotal"]
-    outfile = 'mx.obj'
+    outfile = 'populations.obj'
     kw = dict(label='age', file_stem=age_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
     return get_UN_data(**kw)
 
@@ -69,7 +69,7 @@ def get_age_data(force=None, tidy=None):
 def get_death_data(force=None, tidy=None):
     ''' Import age-specific death rates and population distributions from UNPD '''
     columns = ["Location", "Time", "Sex", "AgeGrpStart", "mx"]
-    outfile = 'populations.obj'
+    outfile = 'mx.obj'
     kw = dict(label='death', file_stem=death_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
     return get_UN_data(**kw)
 
@@ -83,7 +83,7 @@ def get_birth_data(start=1960, end=2020):
     for country in birth_rates['Country'].unique():
         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,2:]
     d['years'] = np.arange(start, end)
-    sc.saveobj('birth_rates.obj',d)
+    sc.saveobj('birth_rates.obj', d)
     T.toc(label='Done with birth data')
     return d
 

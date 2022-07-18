@@ -152,7 +152,7 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
     try:
         df = load_file('populations.obj')
     except Exception as E:
-        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_age_data.py first.'
+        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
         raise ValueError(errormsg) from E
 
     # Handle year
@@ -194,7 +194,7 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     try:
         df = load_file('mx.obj')
     except Exception as E:
-        errormsg = 'Could not locate datafile with age-specific death rates by country. Please run data/get_death_data.py first.'
+        errormsg = 'Could not locate datafile with age-specific death rates by country. Please run data/get_data.py first.'
         raise ValueError(errormsg) from E
 
     raw_df = map_entries(df, location)[location]
@@ -234,7 +234,7 @@ def get_birth_rates(location=None):
     try:
         birth_rate_data = load_file('birth_rates.obj')
     except Exception as E:
-        errormsg = 'Could not locate datafile with birth rates by country. Please run data/get_birth_data.py first.'
+        errormsg = 'Could not locate datafile with birth rates by country. Please run data/get_data.py first.'
         raise ValueError(errormsg) from E
 
     standardized = map_entries(birth_rate_data, location)
