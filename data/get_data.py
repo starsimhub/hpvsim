@@ -18,12 +18,12 @@ base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standar
 years = ['1950-2021', '2022-2100']
 
 
-def get_UN_data(file_stem, force=None, tidy=None):
+def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None, tidy=None):
     ''' Download data from UN Population Division '''
     if force is None: force = False
     if tidy  is None: tidy  = True
 
-    sc.heading('Downloading UN data...')
+    sc.heading(f'Downloading {label} data...')
     T = sc.timer()
     dfs = []
 
@@ -41,7 +41,7 @@ def get_UN_data(file_stem, force=None, tidy=None):
 
         # Extract the parts used in the model and save
         df = pd.read_csv(local_path)
-        df = df[["Location", "Time", "AgeGrpStart", "PopTotal"]]
+        df = df[columns]
         dfs.append(df)
         if tidy:
             print(f'Removing {local_path}')
@@ -50,7 +50,7 @@ def get_UN_data(file_stem, force=None, tidy=None):
 
     df = pd.concat(dfs)
     dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
-    sc.save('populations.obj',dd)
+    sc.save(outfile, dd)
 
     T.toc(doprint=False)
     print(f'Done: took {T.timings[:].sum():0.1f} s.')
@@ -60,24 +60,44 @@ def get_UN_data(file_stem, force=None, tidy=None):
 
 def get_age_data(force=None, tidy=None):
     ''' Import population sizes by age from UNPD '''
-    return get_UN_data(file_stem=age_stem, force=force, tidy=tidy)
+    columns = ["Location", "Time", "AgeGrpStart", "PopTotal"]
+    outfile = 'mx.obj'
+    kw = dict(label='age', file_stem=age_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    return get_UN_data(**kw)
 
 
 def get_death_data(force=None, tidy=None):
     ''' Import age-specific death rates and population distributions from UNPD '''
-    return get_UN_data(file_stem=death_stem, force=force, tidy=tidy)
+    columns = ["Location", "Time", "Sex", "AgeGrpStart", "mx"]
+    outfile = 'populations.obj'
+    kw = dict(label='death', file_stem=death_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    return get_UN_data(**kw)
 
 
 def get_birth_data(start=1960, end=2020):
     ''' Import crude birth rates from WB '''
-    sc.heading('Downloading WB birth rate data...')
+    sc.heading('Downloading World Bank birth rate data...')
+    T = sc.timer()
     birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
     d = dict()
     for country in birth_rates['Country'].unique():
         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,2:]
     d['years'] = np.arange(start, end)
     sc.saveobj('birth_rates.obj',d)
+    T.toc(label='Done with birth data')
     return d
+
+
+def parallel_downloader(which):
+    ''' Function for use with a parallel download function '''
+    if which in ['age', 'ages']:
+        get_age_data()
+    if which in ['birth', 'births']:
+        get_birth_data()
+    if which in ['death', 'deaths']:
+        get_death_data()
+    return
+
 
 
 if __name__ == '__main__':
@@ -92,11 +112,9 @@ if __name__ == '__main__':
     else:
         which = 'all'
 
-    if which in ['all', 'age', 'ages']:
-        get_age_data()
-    if which in ['all', 'birth', 'births']:
-        get_birth_data()
-    if which in ['all', 'death', 'deaths']:
-        get_death_data()
+    if which == 'all':
+        which = ['age', 'birth', 'death']
 
-    T.toc()
+    sc.parallelize(parallel_downloader, which)
+
+    T.toc('Done downloading data for HPVsim')
