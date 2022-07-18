@@ -5,7 +5,7 @@ Download data needed for HPVsim
 import os
 import sys
 import zipfile
-# import urllib.request as urllib
+from urllib import request
 import wbgapi as wb
 import numpy as np
 import pandas as pd
@@ -33,7 +33,7 @@ def get_UN_data(file_stem, force=None, tidy=None):
         local_path = f'{file_stem}{year}.csv'
         if force or not os.path.exists(local_path):
             print(f'Downloading from {url}, this may take a while...')
-            filehandle = sc.wget(url, convert=False)
+            filehandle, _ = request.urlretrieve(url)
             zip_file_object = zipfile.ZipFile(filehandle, 'r')
             zip_file_object.extractall()
         else:
@@ -44,6 +44,7 @@ def get_UN_data(file_stem, force=None, tidy=None):
         df = df[["Location", "Time", "AgeGrpStart", "PopTotal"]]
         dfs.append(df)
         if tidy:
+            print(f'Removing {local_path}')
             os.remove(local_path)
         T.toctic(label=f'Done with {year}')
 
@@ -51,7 +52,7 @@ def get_UN_data(file_stem, force=None, tidy=None):
     dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
     sc.save('populations.obj',dd)
 
-    T.toc()
+    T.toc(doprint=False)
     print(f'Done: took {T.timings[:].sum():0.1f} s.')
 
     return dd
@@ -81,6 +82,8 @@ def get_birth_data(start=1960, end=2020):
 
 if __name__ == '__main__':
 
+    T = sc.timer()
+
     if len(sys.argv) > 1:
         which = sys.argv[1]
         if which not in ['all', 'age', 'ages', 'birth', 'births', 'death', 'deaths']:
@@ -95,3 +98,5 @@ if __name__ == '__main__':
         get_birth_data()
     if which in ['all', 'death', 'deaths']:
         get_death_data()
+
+    T.toc()
