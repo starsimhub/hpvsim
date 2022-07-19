@@ -449,6 +449,7 @@ class age_results(Analyzer):
 
     def __init__(self, result_keys, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
+        self.mismatch       = 0
         self.result_keys    = sc.objdict(result_keys) # Store the result keys, ensure it's an object dict
         self.die            = die  # Whether or not to raise an exception
         self.start          = None # Store the start year of the simulation
@@ -506,22 +507,9 @@ class age_results(Analyzer):
                 raise ValueError(errormsg)
             else:
                 self.results[rk] = sc.objdict()
-                rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints,
-                                                          return_date_format='str')  # Ensure timepoints and dates are in the right format
-                max_hist_time = rdict.timepoints[-1]
-                max_sim_time = sim['end']
-                if max_hist_time > max_sim_time:
-                    errormsg = f'Cannot create age results for {rdict.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
-                    raise ValueError(errormsg)
-
-                rdict.calcpoints = []
-                for tpi, tp in enumerate(rdict.timepoints):
-                    rdict.calcpoints += [tp + i for i in range(int(1 / self.dt))]
-
-
 
                 # Handle the data file
-                # If data is provided, extract edges, age bins and labels from that
+                # If data is provided, extract timepoints, edges, age bins and labels from that
                 if 'datafile' in rdict.keys():
                     if sc.isstring(rdict.datafile):
                         rdict.data = hpm.load_data(rdict.datafile, check_date=False)
@@ -531,8 +519,10 @@ class age_results(Analyzer):
 
                     # extract edges, age bins and labels from that
                     # Handle edges, age bins, and labels
+                    rdict.timepoints = rdict.data.year.unique()
                     rdict.age_labels = []
                     rdict.edges = np.array(rdict.data.age.unique(), dtype=float)
+                    rdict.edges = np.append(rdict.edges, 100)
                     rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
                     self.results[rk]['bins'] = rdict.bins
                     rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
@@ -549,6 +539,21 @@ class age_results(Analyzer):
                     rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
                                         range(len(rdict.bins) - 1)]
                     rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
+                    if 'timepoints' not in rdict.keys():
+                        errormsg = f'Did not provide timepoints for this age analyzer'
+                        raise ValueError(errormsg)
+
+                rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints,
+                                                          return_date_format='str')  # Ensure timepoints and dates are in the right format
+                max_hist_time = rdict.timepoints[-1]
+                max_sim_time = sim['end']
+                if max_hist_time > max_sim_time:
+                    errormsg = f'Cannot create age results for {rdict.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
+                    raise ValueError(errormsg)
+
+                rdict.calcpoints = []
+                for tpi, tp in enumerate(rdict.timepoints):
+                    rdict.calcpoints += [tp + i for i in range(int(1 / self.dt))]
 
                 if 'compute_fit' in rdict.keys() and rdict.compute_fit:
                     if rdict.data is None:
@@ -559,7 +564,7 @@ class age_results(Analyzer):
                             rdict.weights = rdict.data['weights'].values
                         else:
                             rdict.weights = np.ones(len(rdict.data))
-                        rdict.mismatch = None  # The final value
+                        rdict.mismatch = 0  # The final value
 
     def get_standard_population(self):
         '''
@@ -681,7 +686,9 @@ class age_results(Analyzer):
             validate_recorded_dates(sim, requested_dates=rdict.dates, recorded_dates=self.results[rkey].keys()[1:], die=self.die)
             if 'compute_fit' in rdict.keys():
                 self.mismatch += self.compute(rkey)
-                sim.fit += self.mismatch
+
+        sim.fit = self.mismatch
+
         return
 
 
@@ -699,7 +706,7 @@ class age_results(Analyzer):
         self.result_keys[key].data['model_output'] = res
         self.result_keys[key].data['diffs'] = self.result_keys[key].data['model_output'] - self.result_keys[key].data['value']
         self.result_keys[key].data['gofs'] = hpm.compute_gof(self.result_keys[key].data['value'].values, self.result_keys[key].data['model_output'].values)
-        self.result_keys[key].data['losses'] = self.result_keys[key].data['gofs'].values * self.result_keys[key].data.weights
+        self.result_keys[key].data['losses'] = self.result_keys[key].data['gofs'].values * self.result_keys[key].weights
         self.result_keys[key].mismatch = self.result_keys[key].data['losses'].sum()
 
         return self.result_keys[key].mismatch
@@ -882,27 +889,14 @@ class Calibration(Analyzer):
             if len(targ_keys) > 1:
                 errormsg = f'Only support one set of targets per datafile, {len(targ_keys)} provided'
                 raise ValueError(errormsg)
-            result_keys[targ_keys] = dict(
+            result_keys[targ_keys[0]] = sc.objdict(
                 datafile=sc.dcp(targ),
                 compute_fit=True,
             )
 
         ar = age_results(result_keys=result_keys)
         self.sim['analyzers'] += [ar]
-
-        # target_keys = data.name.unique()
-        # for targ in target_keys:
-        #     # First figure out timepoints, then age bins, then create by-age analyzer with all
-        #     pass
-        # timepoints = data.year.unique()
-        # keys = data.name.unique()
-        # edges = np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
-        # ar = age_results(timepoints=timepoints, result_keys=keys, edges=edges,
-        #                  datafile='test_data/south_africa_target_data.xlsx',
-        #                  compute_fit=True)
-        # self.sim['analyzers'] += [ar]
-        # self.result_keys = self.target_data.name.unique()
-        # self.timepoints = self.target_data.year.unique()
+        self.results_keys = result_keys.keys()
         self.result_properties = sc.objdict()
 
         return
@@ -1054,7 +1048,7 @@ class Calibration(Analyzer):
         sim = sc.jsonpickle(self.study.trials[0].user_attrs['jsonpickle_sim'])
         self.ng = sim['pars']['n_genotypes']
         self.glabels = [g['label'] for g in sim['pars']['genotypes']]
-        for rkey in self.result_keys:
+        for rkey in self.results_keys:
             self.result_properties[rkey] = sc.objdict()
             self.result_properties[rkey].name = sim['results'][rkey]['name']
             if 'total' in rkey:
@@ -1165,17 +1159,15 @@ class Calibration(Analyzer):
         d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
         all_args = sc.mergedicts(fig_args, axis_args, d_args)
 
-
-
         # Handle what to plot
         if not len(self.analyzer_results):
-            errormsg = f'Cannot plot since no age results were recorded (scheduled timepoints: {self.timepoints})'
+            errormsg = f'Cannot plot since no age results were recorded)'
             raise ValueError(errormsg)
-        if len(self.timepoints)>1:
-            n_cols = len(self.timepoints) # One column for each requested timepoint
-            n_rows = len(self.result_keys) # One row for each requested result
+        # if len(self.timepoints)>1:
+        #     n_cols = len(self.timepoints) # One column for each requested timepoint
+        #     n_rows = len(self.result_keys) # One row for each requested result
         else: # If there's only one timepoint, automatically figure out rows and columns
-            n_plots = len(self.result_keys)
+            n_plots = len(self.results_keys)
             n_rows, n_cols = sc.get_rows_cols(n_plots)
         # Initialize
         fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
@@ -1184,46 +1176,48 @@ class Calibration(Analyzer):
         # Make the figure(s)
         with hpo.with_style(**kwargs):
             for run_num, run in enumerate(self.analyzer_results):
-                for date,resdict in run.items():
+                row_count = 0
+                for res_num, (key,resdict) in enumerate(run.items()):
+                    age_labels = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in
+                                  range(len(resdict['bins']) - 1)]
+                    age_labels.append(str(int(resdict['bins'][-1])) + '+')
 
-                    age_labels = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
-                    age_labels.append(str(int(resdict['bins'][-1]))+'+')
 
-                    row_count = 0
+                    ax = axes[row_count]
+                    x = np.arange(len(age_labels))  # the label locations
 
-                    for rkey in self.result_keys:
-                        ax = axes[row_count]
+                    for date in self.target_data[res_num].year.unique():
+                        str_date = str(date) + '.0'
 
                         # Start making plot
-                        x = np.arange(len(age_labels))  # the label locations
-                        thisdatadf = self.target_data[(self.target_data.year == float(date))&(self.target_data.name == rkey)]
+                        thisdatadf = self.target_data[res_num][(self.target_data[res_num].year == float(date))&(self.target_data[res_num].name == key)]
                         unique_genotypes = thisdatadf.genotype.unique()
-                        if 'total' not in rkey:
+                        if 'total' not in key:
                             for g in range(self.ng):
                                 glabel = self.glabels[g].upper()
                                 if run_num == 0:
-                                    ax.plot(x, resdict[rkey][g], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
+                                    ax.plot(x, resdict[str_date][g], color=self.result_properties[key].color[g], linestyle='--', label=f'Model - {glabel}')
                                 else:
-                                    ax.plot(x, resdict[rkey][g], color=self.result_properties[rkey].color[g], linestyle='--')
+                                    ax.plot(x, resdict[str_date][g], color=self.result_properties[key].color[g], linestyle='--')
                                 if self.glabels[g].upper() in unique_genotypes:
                                     ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
                                     if run_num == 0:
-                                        ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s', label=f'Data - {glabel}')
+                                        ax.scatter(x, ydata, color=self.result_properties[key].color[g], marker='s', label=f'Data - {glabel}')
                                     else:
-                                        ax.scatter(x, ydata, color=self.result_properties[rkey].color[g], marker='s')
+                                        ax.scatter(x, ydata, color=self.result_properties[key].color[g], marker='s')
 
 
                         else:
                             if run_num == 0:
-                                ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--', label='Model')
+                                ax.plot(x, resdict[str_date], color=self.result_properties[key].color, linestyle='--', label='Model')
                                 ydata = np.array(thisdatadf.value)
-                                ax.scatter(x, ydata,  color=self.result_properties[rkey].color, marker='s', label='Data')
+                                ax.scatter(x, ydata,  color=self.result_properties[key].color, marker='s', label='Data')
                             else:
-                                ax.plot(x, resdict[rkey], color=self.result_properties[rkey].color, linestyle='--')
+                                ax.plot(x, resdict[str_date], color=self.result_properties[key].color, linestyle='--')
                                 ydata = np.array(thisdatadf.value)
-                                ax.scatter(x, ydata, color=self.result_properties[rkey].color, marker='s')
+                                ax.scatter(x, ydata, color=self.result_properties[key].color, marker='s')
                         ax.set_xlabel('Age group')
-                        ax.set_title(self.result_properties[rkey].name+' - '+date)
+                        ax.set_title(self.result_properties[key].name+' - '+str_date)
                         ax.legend()
                         row_count += n_cols
                         ax.set_xticks(x, age_labels)
