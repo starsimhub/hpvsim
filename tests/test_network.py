@@ -26,7 +26,6 @@ def test_network(do_plot=True):
                 n_years=60,
                 burnin=30,
                 dt=0.5,
-                pop_scale=13.54e6/n_agents,
                 network='default',
                 debut = dict(f=dict(dist='normal', par1=15., par2=1),
                              m=dict(dist='normal', par1=16., par2=1))

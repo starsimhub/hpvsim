@@ -649,7 +649,6 @@ class Sim(hpb.BaseSim):
             effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
 
         # Shorten more variables
-        gen_betas = np.array([g['rel_beta']*beta for g in gen_pars.values()], dtype=hpd.default_float)
         inf = people.infectious
         sus = people.susceptible
         sus_imm = people.sus_imm
@@ -677,8 +676,8 @@ class Sim(hpb.BaseSim):
                 f_source_inds = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
                 m_source_inds = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
 
-                foi_frac = 1 - frac_acts[ln] * gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])  # Probability of not getting infected from any fractional acts
-                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])) ** whole_acts[ln]  # Probability of not getting infected from whole acts
+                foi_frac = 1 - frac_acts[ln] * beta * trans[:, None] * (1 - effective_condoms[ln])  # Probability of not getting infected from any fractional acts
+                foi_whole = (1 - beta * trans[:, None] * (1 - effective_condoms[ln])) ** whole_acts[ln]  # Probability of not getting infected from whole acts
                 foi = (1 - (foi_whole * foi_frac)).astype(hpd.default_float)
 
                 discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g], foi[0,:]],
