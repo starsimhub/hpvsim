@@ -41,10 +41,10 @@ if __name__ == '__main__':
     ax = axes.flatten()
     opt_pars = {}
 
-    for ai,var in enumerate(['cin1_probs', 'cin2_probs', 'cin3_probs', 'cancer_probs']):
+    for ai,var in enumerate(['cin1_probs']):#, 'cin2_probs', 'cin3_probs', 'cancer_probs']):
 
         y = prognoses[var]
-        f = f3
+        f = f2
         popt, pcov = opt.curve_fit(f, x, y, method='trf')
         opt_pars[var] = popt
         y_fit = f(x, *popt)

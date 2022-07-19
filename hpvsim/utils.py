@@ -342,7 +342,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     elif dist == 'beta':              samples = np.random.beta(a=par1, b=par2, size=size, **kwargs)
     elif dist == 'gamma':             samples = np.random.gamma(shape=par1, scale=par2, size=size, **kwargs)
     elif dist in ['lognorm', 'lognormal', 'lognorm_int', 'lognormal_int']:
-        if par1>0:
+        if (sc.isnumber(par1) and par1>0) or (sc.checktype(par1,'arraylike') and (par1>0).all()):
             mean  = np.log(par1**2 / np.sqrt(par2**2 + par1**2)) # Computes the mean of the underlying normal distribution
             sigma = np.sqrt(np.log(par2**2/par1**2 + 1)) # Computes sigma for the underlying normal distribution
             samples = np.random.lognormal(mean=mean, sigma=sigma, size=size, **kwargs)
