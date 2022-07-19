@@ -46,8 +46,6 @@ class PeopleMeta(sc.prettyobj):
             'sex',              # Float
             'death_age',        # Float
             'debut',            # Float
-            'cells',            # Float indicating % of abnormal cells, default 0
-            'viral_load',       # Float
             'partners',         # Int by relationship type
             'current_partners', # Int by relationship type
         ]

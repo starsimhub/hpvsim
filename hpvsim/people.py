@@ -69,10 +69,6 @@ class People(hpb.BasePeople):
                 self[key] = np.arange(self.pars['pop_size'], dtype=hpd.default_int)
             elif key in ['partners', 'current_partners']:
                 self[key] = np.full((self.pars['n_partner_types'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
-            elif key == 'cells':
-                self[key] = np.full(self.pars['pop_size'], 0, dtype=hpd.default_float)
-            elif key == 'viral_load':
-                self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
             else:
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
 
