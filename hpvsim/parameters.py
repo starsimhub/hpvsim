@@ -270,11 +270,17 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
         except ValueError as E:
             warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
             hpm.warn(warnmsg, die=die)
+<<<<<<< HEAD
 
     return birth_rates, death_rates
 
 
 
+=======
+    
+    return birth_rates, death_rates
+
+>>>>>>> 971aad24ef7588aff646f3efa803815706fdc7c2
 #%% Genotype/immunity parameters and functions
 
 def get_genotype_choices():
