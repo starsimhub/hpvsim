@@ -10,7 +10,7 @@ from test_sim import test_sim
 
 
 sim = test_sim(do_plot=False)
-to_profile = 'vaccinate' # Must be one of the options listed below
+to_profile = 'update_pre' # Must be one of the options listed below
 
 func_options = {
     'make_contacts': hpv.make_contacts,
@@ -26,6 +26,7 @@ func_options = {
     'get_pairs':     hpv.utils.get_discordant_pairs,
     'pair_lookup':   hpv.utils.pair_lookup_vals,
     'update_pre':    hpv.people.People.update_states_pre,
+    'death':         hpv.people.People.apply_death_rates,
     'infect':        hpv.people.People.infect,
 }
 

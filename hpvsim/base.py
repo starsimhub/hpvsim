@@ -1260,9 +1260,19 @@ class BasePeople(FlexPretty):
         return self.sex == 0
 
     @property
+    def is_female_alive(self):
+        ''' Boolean array of everyone female and alive'''
+        return ((1-self.sex) * self.alive).astype(bool)
+
+    @property
     def is_male(self):
         ''' Boolean array of everyone male '''
         return self.sex == 1
+
+    @property
+    def is_male_alive(self):
+        ''' Boolean array of everyone male and alive'''
+        return (self.sex * self.alive).astype(bool)
 
     @property
     def f_inds(self):
