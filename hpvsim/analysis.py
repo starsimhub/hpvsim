@@ -518,16 +518,10 @@ class age_results(Analyzer):
                 for tpi, tp in enumerate(rdict.timepoints):
                     rdict.calcpoints += [tp + i for i in range(int(1 / self.dt))]
 
-                # Handle edges, age bins, and labels
-                rdict.age_labels = []
-                if rdict.edges is None:  # Default age bins
-                    rdict.edges = np.linspace(0, 100, 11)
-                rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
-                self.results[rk]['bins'] = rdict.bins
-                rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in range(len(rdict.bins) - 1)]
-                rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
+
 
                 # Handle the data file
+                # If data is provided, extract edges, age bins and labels from that
                 if 'datafile' in rdict.keys():
                     if sc.isstring(rdict.datafile):
                         rdict.data = hpm.load_data(rdict.datafile, check_date=False)
@@ -535,33 +529,26 @@ class age_results(Analyzer):
                         rdict.data = rdict.datafile  # Use it directly
                         rdict.datafile = None
 
-                    # Validate the data. Currently we only allow the same timepoints and age brackets
-                    data_dates = {str(float(i)) for i in rdict.data.year}
-                    if len(set(rdict.dates) - data_dates) or len(data_dates - set(rdict.dates)):
-                        string = f'Dates provided in the age result datafile ({data_dates}) are not the same as the age result dates that were requested ({rdict.dates}).'
-                        if self.die:
-                            raise ValueError(string)
-                        else:
-                            string += '\nPlots will only show requested dates, not all dates in the datafile.'
-                            print(string)
-                    rdict.data_dates = data_dates
+                    # extract edges, age bins and labels from that
+                    # Handle edges, age bins, and labels
+                    rdict.age_labels = []
+                    rdict.edges = np.array(rdict.data.age.unique(), dtype=float)
+                    rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
+                    self.results[rk]['bins'] = rdict.bins
+                    rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
+                                            range(len(rdict.bins) - 1)]
+                    rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
 
-                    # Validate the edges - must be the same as requested edges from the model output
-                    data_bins = np.array(rdict.data.age.unique(), dtype=float)
-                    if not np.array_equal(np.sort(rdict.bins), np.sort(data_bins)):
-                        errormsg = f'Age bins provided in the age result datafile ({data_bins}) are not the same as the age result age bins that were requested ({rdict.edges}).'
-                        raise ValueError(errormsg)
-
-                    # Validate the result keys - must be the same as requested edges from the model output
-                    data_result_key = rdict.data.name.unique()
-                    if data_result_key != rk:
-                        string = f'The age result datafile contains {data_result_key}, which is not one of the results were requested ({rk}).'
-                        if self.die:
-                            raise ValueError(string)
-                        else:
-                            string += '\nPlots will only show requested results, not all results in the datafile.'
-                            print(string)
-                    rdict.data_result_key = data_result_key
+                else:
+                    # Handle edges, age bins, and labels
+                    rdict.age_labels = []
+                    if rdict.edges is None:  # Default age bins
+                        rdict.edges = np.linspace(0, 100, 11)
+                    rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
+                    self.results[rk]['bins'] = rdict.bins
+                    rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
+                                        range(len(rdict.bins) - 1)]
+                    rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
 
                 if 'compute_fit' in rdict.keys() and rdict.compute_fit:
                     if rdict.data is None:
@@ -827,6 +814,7 @@ class Calibration(Analyzer):
 
     Args:
         sim          (Sim)  : the simulation to calibrate
+        datafiles    (list) : list of datafile strings to calibrate to
         calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
         fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
         par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_uniform
@@ -856,7 +844,7 @@ class Calibration(Analyzer):
 
     '''
 
-    def __init__(self, sim, calib_pars=None, fit_args=None, par_samplers=None,
+    def __init__(self, sim, datafiles, calib_pars=None, fit_args=None, par_samplers=None,
                  n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
         super().__init__(label=label) # Initialize the Analyzer object
@@ -883,17 +871,38 @@ class Calibration(Analyzer):
         self.calibrated   = False
 
         # Create age_results intervention
-        data = self.sim.data
-        self.target_data = data
-        timepoints = data.year.unique()
-        keys = data.name.unique()
-        edges = np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
-        ar = age_results(timepoints=timepoints, result_keys=keys, edges=edges,
-                         datafile='test_data/south_africa_target_data.xlsx',
-                         compute_fit=True)
+        self.target_data = []
+        for datafile in datafiles:
+            self.target_data.append(hpm.load_data(datafile))
+
+        result_keys = sc.objdict()
+
+        for targ in self.target_data:
+            targ_keys = targ.name.unique()
+            if len(targ_keys) > 1:
+                errormsg = f'Only support one set of targets per datafile, {len(targ_keys)} provided'
+                raise ValueError(errormsg)
+            result_keys[targ_keys] = dict(
+                datafile=sc.dcp(targ),
+                compute_fit=True,
+            )
+
+        ar = age_results(result_keys=result_keys)
         self.sim['analyzers'] += [ar]
-        self.result_keys = self.target_data.name.unique()
-        self.timepoints = self.target_data.year.unique()
+
+        # target_keys = data.name.unique()
+        # for targ in target_keys:
+        #     # First figure out timepoints, then age bins, then create by-age analyzer with all
+        #     pass
+        # timepoints = data.year.unique()
+        # keys = data.name.unique()
+        # edges = np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
+        # ar = age_results(timepoints=timepoints, result_keys=keys, edges=edges,
+        #                  datafile='test_data/south_africa_target_data.xlsx',
+        #                  compute_fit=True)
+        # self.sim['analyzers'] += [ar]
+        # self.result_keys = self.target_data.name.unique()
+        # self.timepoints = self.target_data.year.unique()
         self.result_properties = sc.objdict()
 
         return
