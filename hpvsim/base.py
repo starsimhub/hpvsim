@@ -1646,11 +1646,6 @@ class Person(sc.prettyobj):
         self.partners           = partners # Preferred number of partners
         self.current_partners   = current_partners # Number of current partners
         self.debut              = hpd.default_float(debut) # Age of sexual debut
-<<<<<<< HEAD
-=======
-        self.cells              = hpd.default_float(cells) # Proportion of cervical cells affected by dysplasia
-        self.viral_load         = hpd.default_float(viral_load) # Proportion of cervical cells affected by dysplasia
->>>>>>> 971aad24ef7588aff646f3efa803815706fdc7c2
         return
 
 
