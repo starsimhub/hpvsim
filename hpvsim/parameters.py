@@ -230,12 +230,12 @@ def get_prognoses():
     '''
 
     prognoses = dict(
-        duration_cutoffs  = np.array([0,       1,          2,          3,          4,        5,         6]),      # Duration cutoffs (lower limits)
-        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0,      1.0,       1.0]),    # Probability of seroconverting given duration of infection
-        cin1_probs        = np.array([0.015,   0.03655,    0.36800,    0.655,      0.95,     0.99,      0.99]),   # Conditional probability of developing CIN1 given HPV infection
-        cin2_probs        = np.array([0.015,   0.0355,     0.1680,     0.20655,    0.60,     0.8,       0.85]),   # Conditional probability of developing CIN2 given CIN1
-        cin3_probs        = np.array([0.15,    0.455,      0.60,       0.655,      0.70,     0.85,      0.9]),    # Conditional probability of developing CIN3 given CIN2
-        cancer_probs      = np.array([0.0055,  0.0655,     0.2080,     0.50655,    0.95,     0.98,      1.0]),    # Conditional probability of developing cancer given CIN3
+        duration_cutoffs  = np.array([0,       1,          2,          3,          4,          5,          10]),      # Duration cutoffs (lower limits)
+        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0,        1.0,        1.0]),    # Probability of seroconverting given duration of infection
+        cin1_probs        = np.array([0.015,   0.3655,     0.86800,    1.0,        1.0,        1.0,        1.0]),   # Conditional probability of developing CIN1 given HPV infection
+        cin2_probs        = np.array([0.020,   0.0287,     0.0305,     0.06427,    0.1659,     0.3011,     0.4483]),   # Conditional probability of developing CIN2 given CIN1, derived from Harvard model calibration
+        cin3_probs        = np.array([0.007,   0.0097,     0.0102,     0.0219,     0.0586,     0.112,      0.1779]),   # Conditional probability of developing CIN3 given CIN2, derived from Harvard model calibration
+        cancer_probs      = np.array([0.002,   0.003,      0.0564,     0.1569,     0.2908,     0.3111,     0.5586]),   # Conditional probability of developing cancer given CIN3, derived from Harvard model calibration
         )
 
     # Check that lengths match

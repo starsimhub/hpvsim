@@ -2,6 +2,9 @@
 .idea
 .vscode
 
+# HPVsim-generated files
+*.obj
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
