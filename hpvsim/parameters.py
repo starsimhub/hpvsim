@@ -384,7 +384,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur = dict()
-    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=1.3625, par2=1.5)
+    pars.hpv16.dur['none']      = dict(dist='lognormal', par1=2.3625, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
