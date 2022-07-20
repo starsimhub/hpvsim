@@ -68,11 +68,6 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Probabilities of disease progression
-    pars['rel_cin1_prob'] = 1.0  # Scale factor for proportion of CIN cases
-    pars['rel_cin2_prob'] = 1.0  # Scale factor for proportion of CIN cases
-    pars['rel_cin3_prob'] = 1.0  # Scale factor for proportion of CIN cases
-    pars['rel_cancer_prob'] = 1.0  # Scale factor for proportion of CIN that develop into cancer
-    pars['rel_death_prob'] = 1.0  # Scale factor for proportion of cancer cases that result in death
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
     pars['hpv_control_prob'] = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation'] = dict(
@@ -278,8 +273,6 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
 
     return birth_rates, death_rates
 
-
-
 #%% Genotype/immunity parameters and functions
 
 def get_genotype_choices():
@@ -384,7 +377,7 @@ def get_genotype_pars(default=False, genotype=None):
     '''
 
     dur_dict = sc.objdict()
-    for stage in ['none', 'cin1', 'cin2', 'cin3']:
+    for stage in ['none', 'dys']:
         dur_dict[stage] = dict()
 
     pars = sc.objdict()
@@ -397,19 +390,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv16.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dur['cin2']      = dict(dist='gamma', par1=2.33, par2=6)
-                                    # Shift this to the left compared to the cin3 distribution
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv16.dur['cin3']      = dict(dist='gamma', par1=3.33, par2=6)
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv16.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv16.rel_cin1_prob    = 1.0 # DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv16.rel_cin2_prob    = 1.0 # All of these are relative to HPV 16, therefore, they are 1
-    pars.hpv16.rel_cin3_prob    = 1.0 # All of these are relative to HPV 16, therefore, they are 1
-    pars.hpv16.rel_cancer_prob  = 1.0 # All of these are relative to HPV 16, therefore, they are 1
+    pars.hpv16.dur['dys']       = dict(dist='lognormal', par1=4.0, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dysp_rate        = 1.0 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate        = 0.2 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.cancer_prob      = 0.05 # Probability of progressing to cancer once CIN3 is established
     pars.hpv16.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
@@ -420,19 +404,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv18.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
-                                    # Shift this to the left compared to cin3 distribution
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv18.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv18.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv18.rel_cin1_prob    = 0.158 # DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv18.rel_cin2_prob    = 0.010 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv18.rel_cin3_prob    = 0.008 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv18.rel_cancer_prob  = 0.008 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv18.dur['dys']       = dict(dist='lognormal', par1=2.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dysp_rate        = 1.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_rate        = 1.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.cancer_prob      = 0.01 # Probability of progressing to cancer once CIN3 is established
     pars.hpv18.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
@@ -441,19 +416,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpv31.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv31.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
-                                    # Shift this to the left compared to cin3 distribution
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv31.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv31.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv31.rel_cin1_prob    = 0.016 # DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv31.rel_cin2_prob    = 0.006 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv31.rel_cin3_prob    = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv31.rel_cancer_prob  = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv31.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv31.dysp_rate        = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv31.prog_rate        = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv31.cancer_prob      = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv31.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
@@ -462,19 +428,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpv33.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv33.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
-                                    # Shift this to the left compared to cin3 distribution
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv33.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv33.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv33.rel_cin1_prob    = 0.016 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv33.rel_cin2_prob    = 0.006 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv33.rel_cin3_prob    = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv33.rel_cancer_prob  = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv33.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=3.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv33.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv33.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv33.cancer_prob      = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv33.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
@@ -483,19 +440,10 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpv45.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv45.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
-                                    # Shift this to the left compared to cin3 distribution
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv45.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv45.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv45.rel_cin1_prob    = 0.016 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv45.rel_cin2_prob    = 0.006 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv45.rel_cin3_prob    = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv45.rel_cancer_prob  = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv45.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv45.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv45.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv45.cancer_prob      = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv45.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
@@ -504,47 +452,30 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpv52.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv52.dur['cin2']      = dict(dist='gamma', par1=6.14, par2=2.49)
-                                    # Shift this to the left compared to cin3 distribution
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv52.dur['cin3']      = dict(dist='gamma', par1=9.14, par2=2.49)
-                                    # Assume that par1 = shape parameter, par2 = scale parameter
-                                    # https://academic.oup.com/aje/article/178/7/1161/211254
-    pars.hpv52.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv52.rel_cin1_prob    = 0.019 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv52.rel_cin2_prob    = 0.010 # DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv52.rel_cin3_prob    = 0.007 #  DOI: https://doi.org/10.3390%2Fcancers12020270
-    pars.hpv52.rel_cancer_prob  = 0.007 #  DOI: https://doi.org/10.3390%2Fcancers12020270
+    pars.hpv52.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv52.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv52.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv52.cancer_prob      = 0.005 #  DOI: https://doi.org/10.3390%2Fcancers12020270
     pars.hpv52.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv6 = sc.objdict()
     pars.hpv6.dur = dict()
     pars.hpv6.dur['none']       = dict(dist='lognormal', par1=1.8245, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv6.dur['cin1']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv6.dur['cin2']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv6.dur['cin3']       = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv6.rel_beta          = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv6.rel_cin1_prob     = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cin2_prob     = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cin3_prob     = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv6.rel_cancer_prob   = 0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv6.dur['dys']       = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv6.dysp_rate        = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv6.prog_rate        = 0.01 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv6.cancer_prob      = 0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv6.imm_boost         = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur = dict()
     pars.hpv11.dur['none']      = dict(dist='lognormal', par1=1.8718, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv11.dur['cin1']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv11.dur['cin2']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv11.dur['cin3']      = dict(dist='lognormal', par1=2.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv11.rel_beta         = 1.0 # Transmission was relatively homogeneous across HPV genotypes, alpha species, and oncogenic risk categories -- doi: 10.2196/11284
-    pars.hpv11.rel_cin1_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv11.rel_cin2_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv11.rel_cin3_prob    = 0.0 # Set this value to zero for non-carcinogenic genotypes
-    pars.hpv11.rel_cancer_prob  = 0 # Set this value to zero for non-carcinogenic genotypes
+    pars.hpv11.dur['dys']       = dict(dist='lognormal', par1=4.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv11.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv11.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv11.cancer_prob      = 0 # Set this value to zero for non-carcinogenic genotypes
     pars.hpv11.imm_boost        = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')

@@ -70,6 +70,7 @@ def test_age_results(do_plot=True):
     pars = dict(pop_size=n_agents, pop_scale=25e6/n_agents, start=1980, n_years=40, dt=0.5, location='south africa')
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
+
     az1 = hpv.age_results(
         result_keys=sc.objdict(
             hpv_prevalence=sc.objdict(
@@ -85,6 +86,7 @@ def test_age_results(do_plot=True):
     )
 
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=[az1])
+
     sim.run()
     a = sim.get_analyzer(0)
 
@@ -125,9 +127,11 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # people      = test_snapshot()
+
     sim0, a0    = test_age_pyramids()
     # sim1, a1    = test_age_results()
     sim2, calib = test_calibration()
+
 
 
     sc.toc(T)
