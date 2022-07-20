@@ -1195,15 +1195,17 @@ class Calibration(Analyzer):
                         if 'total' not in key:
                             for g in range(self.ng):
                                 glabel = self.glabels[g].upper()
-                                if run_num == 0:
-                                    ax.plot(x, resdict[str_date][g], color=self.result_properties[key].color[g], linestyle='--', label=f'Model - {glabel}')
-                                else:
-                                    ax.plot(x, resdict[str_date][g], color=self.result_properties[key].color[g], linestyle='--')
-                                if self.glabels[g].upper() in unique_genotypes:
-                                    ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
+
+                                if glabel in unique_genotypes:
+                                    ydata = np.array(thisdatadf[thisdatadf.genotype == self.glabels[g].upper()].value)
                                     if run_num == 0:
-                                        ax.scatter(x, ydata, color=self.result_properties[key].color[g], marker='s', label=f'Data - {glabel}')
+                                        ax.plot(x, resdict[str_date][g], color=self.result_properties[key].color[g],
+                                                linestyle='--', label=f'Model - {glabel}')
+                                        ax.scatter(x, ydata, color=self.result_properties[key].color[g], marker='s',
+                                                   label=f'Data - {glabel}')
                                     else:
+                                        ax.plot(x, resdict[str_date][g], color=self.result_properties[key].color[g],
+                                                linestyle='--')
                                         ax.scatter(x, ydata, color=self.result_properties[key].color[g], marker='s')
 
 
