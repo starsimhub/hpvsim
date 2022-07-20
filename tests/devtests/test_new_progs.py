@@ -103,7 +103,7 @@ for g in range(ng):
 ax[0,2].set_xlabel("Pre-dysplasia/clearance duration")
 ax[0,2].set_ylabel("")
 ax[0,2].grid()
-ax[0,2].set_title("Share of women who develop\ndetectable dysplasia")
+ax[0,2].set_title("Distribution of women who develop\ndetectable dysplasia")
 
 ################################################################################
 # Post-dysplasia dynamics
@@ -121,7 +121,7 @@ ax[1,0].grid()
 ax[1,0].set_title("Distribution of dysplasia durations\nprior to integration/control")
 
 
-###### Relationship between durations and probability of detectable dysplasia
+###### Relationship between durations peak clinical severity
 cmap = plt.cm.Oranges([0.33,0.67,1])
 for g in range(ng):
     ax[1,1].plot(x, mean_peak_fn(x, genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
