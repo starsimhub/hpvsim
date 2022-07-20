@@ -414,6 +414,10 @@ class Sim(hpb.BaseSim):
         results['new_doses'] = init_res('New doses')
         results['cum_doses'] = init_res('Cumulative doses')
 
+        # Detectable HPV
+        results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
+        results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
+
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
         results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
@@ -729,11 +733,21 @@ class Sim(hpb.BaseSim):
                     for g in range(ng):
                         self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['susceptible']:
-                    # For n_infectious, n_cin1, etc, we getinterventions the total number where this state is true for at least one genotype
+                    # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
                     self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
+
+            # Compute detectable hpv prevalence
+            hpv_test_pars = hppar.get_screen_pars('hpv')
+            for state in ['hpv', 'cin1', 'cin2', 'cin3']:
+                hpv_pos_probs = np.zeros(len(people))
+                for g in range(ng):
+                    tp_inds = hpu.true(people[state][g,:])
+                    hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][self['genotype_map'][g]]
+                    hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
+                    self.results['n_detectable_hpv'][g, idx] = len(hpv_pos_inds)
 
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
@@ -876,6 +890,7 @@ class Sim(hpb.BaseSim):
         self.results['hpv_incidence'][:]        = res['infections'][:]/ res['n_susceptible'][:]
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
+        self.results['detectable_hpv_prevalence'][:] = res['n_detectable_hpv'][:] / res['n_alive'][:]
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]
@@ -995,6 +1010,13 @@ class Sim(hpb.BaseSim):
         ''' Plot the outputs of the model '''
         fig = hpplt.plot_sim(sim=self, *args, **kwargs)
         return fig
+
+
+    def compute_fit(self):
+        '''
+        Compute fit between model and data.
+        '''
+        return self.fit
 
 
 class AlreadyRunError(RuntimeError):

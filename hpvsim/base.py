@@ -7,8 +7,7 @@ can be focused on the disease-specific functionality.
 import numpy as np
 import pandas as pd
 import sciris as sc
-import datetime as dt
-#from . import version as cvv
+# import datetime as dt
 from . import utils as hpu
 from . import misc as hpm
 from . import defaults as hpd
@@ -382,7 +381,7 @@ class BaseSim(ParsObj):
 
         tps = []
         for date in dates:
-            if date in ['end', -1]: 
+            if date in ['end', -1]:
                 date = self['end']
 
             # If it's an integer, make sure it's in the sim tvec
@@ -426,9 +425,9 @@ class BaseSim(ParsObj):
         tps = np.sort(sc.promotetoarray(tps)) # Ensure they're an array and in order
 
         if return_date_format is not None:
-            if return_date_format is 'str':
+            if return_date_format == 'str':
                 return tps, np.array([str(self.yearvec[tp]) for tp in tps])
-            elif return_date_format is 'float':
+            elif return_date_format == 'float':
                 return tps, self.yearvec[tps]
             else:
                 errormsg = f'Could not understand what format to return the dates: requested {return_date_format}, options are str or float.'
@@ -1161,13 +1160,14 @@ class BasePeople(FlexPretty):
         return string
 
 
-    def keys(self):
-        ''' Returns keys for all properties of the people object '''
-        try: # Unclear wy this fails, but sometimes it does during initialization/pickling
-            keys = obj_get(self, '_keys')[:]
-        except:
-            keys = []
-        return keys
+    # CK: BROKEN DON'T USE
+    # def keys(self):
+    #     ''' Returns keys for all properties of the people object '''
+    #     try: # Unclear wy this fails, but sometimes it does during initialization/pickling
+    #         keys = obj_get(self, '_keys')[:]
+    #     except:
+    #         keys = []
+    #     return keys
 
 
     def set(self, key, value, die=True):
@@ -1204,7 +1204,7 @@ class BasePeople(FlexPretty):
             A filtered People object, which works just like a normal People object
             except only operates on a subset of indices.
         Examples:
-        active_people = people.filter(people.age > people.debut) # People object containing sexually active people 
+        active_people = people.filter(people.age > people.debut) # People object containing sexually active people
         '''
 
         # Create a new People object with the same properties as the original
@@ -1796,7 +1796,7 @@ class Layer(FlexDict):
     A small class holding a single layer of contact edges (connections) between people.
 
     The input is typically arrays including: person 1 of the connection, person 2 of
-    the connection, the weight of the connection, the duration and start/end times of 
+    the connection, the weight of the connection, the duration and start/end times of
     the connection. Connections are undirected; each person is both a source and sink.
 
     This class is usually not invoked directly by the user, but instead is called
