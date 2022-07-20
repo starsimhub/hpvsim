@@ -416,7 +416,9 @@ class Sim(hpb.BaseSim):
 
         # Detectable HPV
         results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
+        results['n_total_detectable_hpv'] = init_res('Number with detectable HPV')
         results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
+        results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence')
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
@@ -748,6 +750,7 @@ class Sim(hpb.BaseSim):
                     hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][self['genotype_map'][g]]
                     hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
                     self.results['n_detectable_hpv'][g, idx] = len(hpv_pos_inds)
+                    self.results['n_total_detectable_hpv'][idx] += len(hpv_pos_inds)
 
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
@@ -891,6 +894,7 @@ class Sim(hpb.BaseSim):
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
         self.results['detectable_hpv_prevalence'][:] = res['n_detectable_hpv'][:] / res['n_alive'][:]
+        self.results['total_detectable_hpv_prevalence'][:] = res['n_total_detectable_hpv'][:] / res['n_alive'][:]
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]
