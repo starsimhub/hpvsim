@@ -75,11 +75,11 @@ def test_age_results(do_plot=True):
     hpv18 = hpv.genotype('hpv18')
     az1 = hpv.age_results(timepoints=['2010'],
                          result_keys=['hpv_prevalence'],
-                         datafile='test_data/south_africa_hpv_data.xlsx',
+                         # datafile='test_data/south_africa_hpv_data.xlsx',
                          edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]))
     az2 = hpv.age_results(timepoints=['2019'],
                          result_keys=['total_cancers'],
-                         datafile='test_data/south_africa_cancer_data.xlsx',
+                         # datafile='test_data/south_africa_cancer_data.xlsx',
                          edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.]))
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=[az1, az2])
     sim.run()
@@ -101,8 +101,8 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
+    # sim0, a0    = test_age_pyramids()
+    sim1, a1    = test_age_results()
 
     sc.toc(T)
     print('Done.')
