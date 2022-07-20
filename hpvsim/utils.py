@@ -180,7 +180,7 @@ def set_prognoses(people, inds, g, dur_hpv):
     cancer_prob = genotype_pars[genotype_map[g]]['cancer_prob']
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
-    cin1_probs = mean_peak_fn(dur_hpv, dysp_rate)  # Probability of establishing a persistent infection
+    cin1_probs = mean_peak_fn(dur_hpv, dysp_rate) # Probability of establishing a persistent infection
     is_cin1 = binomial_arr(cin1_probs) # Boolean array of persistent infections
     cin1_inds = inds[is_cin1] # Indices of those with persistent infections
     no_cin1_inds = inds[~is_cin1] # Indices of those with transient infections
