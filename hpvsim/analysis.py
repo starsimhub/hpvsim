@@ -637,7 +637,11 @@ class age_results(Analyzer):
                                     hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][
                                         sim['genotype_map'][g]]
                                     hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
-                                    self.results[result][date][g, :] += np.histogram(age[hpv_pos_inds], bins=result_dict.edges)[
+                                    if 'total' in result:
+                                        self.results[result][date] += np.histogram(age[hpv_pos_inds], bins=result_dict.edges)[
+                                            0] * scale  # Bin the people
+                                    else:
+                                        self.results[result][date][g, :] += np.histogram(age[hpv_pos_inds], bins=result_dict.edges)[
                                                                           0] * scale  # Bin the people
                             denom = (np.histogram(age, bins=result_dict.edges)[0] * scale)
                             self.results[result][date] = self.results[result][date] / denom

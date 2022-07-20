@@ -289,7 +289,7 @@ class Sim(hpb.BaseSim):
                 age_brackets = np.array([150])
 
             else:
-                errormsg = f'Initial prevalence values of type {type(var)} not recognized, must be a dict, an array, or a float.'
+                errormsg = f'Initial prevalence values of type {type(init_hpv_prev)} not recognized, must be a dict, an array, or a float.'
                 raise ValueError(errormsg)
 
             # Now validate the arrays
