@@ -771,7 +771,7 @@ class age_results(Analyzer):
                             glabel = self.glabels[g].upper()
                             ax.plot(x, resdict[date][g,:], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
                             # ax.bar(x+xlocations[g], resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
-                            if len(thisdatadf)>0:
+                            if ('data' in self.result_keys[rkey].keys()) and (len(thisdatadf) > 0):
                                 # check if this genotype is in dataframe
                                 if self.glabels[g].upper() in unique_genotypes:
                                     ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
