@@ -900,8 +900,13 @@ class Calibration(Analyzer):
 
         ar = age_results(result_keys=result_keys)
         self.sim['analyzers'] += [ar]
+        self.sim.initialize()
         self.results_keys = result_keys.keys()
         self.result_properties = sc.objdict()
+        for rkey in self.results_keys:
+            self.result_properties[rkey] = sc.objdict()
+            self.result_properties[rkey].name = self.sim.results[rkey].name
+            self.result_properties[rkey].color = self.sim.results[rkey].color
 
         return
 
@@ -1052,14 +1057,6 @@ class Calibration(Analyzer):
         sim = sc.jsonpickle(self.study.trials[0].user_attrs['jsonpickle_sim'])
         self.ng = sim['pars']['n_genotypes']
         self.glabels = [g['label'] for g in sim['pars']['genotypes']]
-        for rkey in self.results_keys:
-            self.result_properties[rkey] = sc.objdict()
-            self.result_properties[rkey].name = sim['results'][rkey]['name']
-            if 'total' in rkey:
-                rkey_new = rkey[6:]
-                self.result_properties[rkey].color = sim['results'][rkey_new]['color']['values'][0]
-            else:
-                self.result_properties[rkey].color = sim['results'][rkey]['color']['values']
 
         self.analyzer_results = []
         for trial in self.study.trials:
