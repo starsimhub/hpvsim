@@ -442,7 +442,18 @@ class age_results(Analyzer):
         kwargs      (dict): passed to Analyzer()
 
     **Example**::
-        sim = hp.Sim(analyzers=hp.age_results(timepoints=['2015', '2020'], results=['hpv_incidence', 'total_cancers']))
+        sim = hp.Sim(analyzers=hpv.age_results(
+        result_keys=sc.objdict(
+            hpv_prevalence=sc.objdict(
+                timepoints=['1990'],
+                edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
+            ),
+            hpv_incidence=sc.objdict(
+                timepoints=['1990'],
+                edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.])
+            )
+        )
+        )
         sim.run()
         age_results = sim['analyzers'][0]
     '''
