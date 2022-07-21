@@ -3,9 +3,6 @@ Tests for single simulations
 '''
 
 #%% Imports and settings
-import os
-import pytest
-import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
@@ -73,26 +70,68 @@ def test_age_results(do_plot=True):
     pars = dict(pop_size=n_agents, pop_scale=25e6/n_agents, start=1980, n_years=40, dt=0.5, location='south africa')
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
-    az1 = hpv.age_results(timepoints=['2010'],
-                         result_keys=['hpv_prevalence'],
-                         datafile='test_data/south_africa_hpv_data.xlsx',
-                         edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]))
-    az2 = hpv.age_results(timepoints=['2019'],
-                         result_keys=['total_cancers'],
-                         datafile='test_data/south_africa_cancer_data.xlsx',
-                         edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.]))
-    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=[az1, az2])
+
+    az1 = hpv.age_results(
+        result_keys=sc.objdict(
+            hpv_prevalence=sc.objdict(
+                timepoints=['1990'],
+                edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
+                # datafile='test_data/south_africa_hpv_data.xlsx',
+            ),
+            hpv_incidence=sc.objdict(
+                timepoints=['1990'],
+                edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.])
+            )
+        )
+    )
+
+    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=[az1])
+
     sim.run()
-    a = sim.get_analyzer(1)
+    a = sim.get_analyzer(0)
+
+    to_plot = {
+        'HPV prevalence': [
+            'hpv_prevalence',
+        ],
+        'HPV incidence': [
+            'hpv_incidence',
+        ],
+        'Cervical cancer': [
+            'total_cancers',
+        ],
+    }
 
     # Check plot()
     if do_plot:
+        sim.plot(to_plot=to_plot)
         fig0 = sim.get_analyzer(0).plot()
-        fig1 = sim.get_analyzer(1).plot()
+        # fig1 = sim.get_analyzer(1).plot()
 
     return sim, a
 
 
+def test_calibration():
+
+    sc.heading('Testing calibration')
+
+    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, end=2015, dt=0.5, location='south africa',
+                init_hpv_dist=dict(
+                    hpv16=0.9,
+                    hpv18=0.1
+                ))
+    hpv16 = hpv.genotype('hpv16')
+    hpv18 = hpv.genotype('hpv18')
+    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18])
+    calib_pars = dict(beta=[0.05, 0.010, 0.20],
+                      hpv_control_prob=[.9, 0.5, 1],
+                      )
+    calib = hpv.Calibration(sim, calib_pars=calib_pars, datafiles=['test_data/south_africa_hpv_data.xlsx',
+                                         'test_data/south_africa_cancer_data.xlsx'],
+                                                 total_trials=10, n_workers=4)
+    calib.calibrate()
+    calib.plot()
+    return sim, calib
 
 
 #%% Run as a script
@@ -101,8 +140,12 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
+
+    # sim0, a0    = test_age_pyramids()
+    sim1, a1    = test_age_results()
+    # sim2, calib = test_calibration()
+
+
 
     sc.toc(T)
     print('Done.')

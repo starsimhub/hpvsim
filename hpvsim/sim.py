@@ -289,7 +289,7 @@ class Sim(hpb.BaseSim):
                 age_brackets = np.array([150])
 
             else:
-                errormsg = f'Initial prevalence values of type {type(var)} not recognized, must be a dict, an array, or a float.'
+                errormsg = f'Initial prevalence values of type {type(init_hpv_prev)} not recognized, must be a dict, an array, or a float.'
                 raise ValueError(errormsg)
 
             # Now validate the arrays
@@ -413,6 +413,12 @@ class Sim(hpb.BaseSim):
         results['cum_total_vaccinated'] = init_res('Cumulative number vaccinated')
         results['new_doses'] = init_res('New doses')
         results['cum_doses'] = init_res('Cumulative doses')
+
+        # Detectable HPV
+        results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
+        results['n_total_detectable_hpv'] = init_res('Number with detectable HPV')
+        results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
+        results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence')
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
@@ -735,6 +741,17 @@ class Sim(hpb.BaseSim):
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
+            # Compute detectable hpv prevalence
+            hpv_test_pars = hppar.get_screen_pars('hpv')
+            for state in ['hpv', 'cin1', 'cin2', 'cin3']:
+                hpv_pos_probs = np.zeros(len(people))
+                for g in range(ng):
+                    tp_inds = hpu.true(people[state][g,:])
+                    hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][self['genotype_map'][g]]
+                    hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
+                    self.results['n_detectable_hpv'][g, idx] = len(hpv_pos_inds)
+                    self.results['n_total_detectable_hpv'][idx] += len(hpv_pos_inds)
+
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
             self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
@@ -876,6 +893,8 @@ class Sim(hpb.BaseSim):
         self.results['hpv_incidence'][:]        = res['infections'][:]/ res['n_susceptible'][:]
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
+        self.results['detectable_hpv_prevalence'][:] = res['n_detectable_hpv'][:] / res['n_alive'][:]
+        self.results['total_detectable_hpv_prevalence'][:] = res['n_total_detectable_hpv'][:] / res['n_alive'][:]
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]
@@ -995,6 +1014,13 @@ class Sim(hpb.BaseSim):
         ''' Plot the outputs of the model '''
         fig = hpplt.plot_sim(sim=self, *args, **kwargs)
         return fig
+
+
+    def compute_fit(self):
+        '''
+        Compute fit between model and data.
+        '''
+        return self.fit
 
 
 class AlreadyRunError(RuntimeError):

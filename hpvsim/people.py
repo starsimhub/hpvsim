@@ -376,6 +376,8 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
         self.cancerous[genotype, inds] = True
         self.cin3[genotype, inds] = False # No longer counted as CIN3
+        self.susceptible[:, inds] = False
+        self.date_clearance[:, inds] = np.nan
         return len(inds)
 
 

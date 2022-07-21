@@ -156,7 +156,7 @@ def make_fig1():
     ax[0,0].set_xlabel("Pre-dysplasia/clearance duration")
     ax[0,0].set_ylabel("")
     ax[0,0].grid()
-    ax[0,0].set_title("Distribution of infection durations\nprior to detectable dysplasia/control")
+    ax[0,0].set_title("Distribution of infection durations\nprior to detectable dysplasia or control")
 
 
     ###### Relationship between durations and probability of detectable dysplasia
@@ -182,6 +182,7 @@ def make_fig1():
     ax[0,2].set_ylabel("")
     ax[0,2].grid()
     ax[0,2].set_title("Distribution of dysplasia durations\nprior to cancer/control")
+
 
 
     ################################################################################
