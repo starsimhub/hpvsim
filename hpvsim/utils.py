@@ -177,7 +177,7 @@ def set_prognoses(people, inds, g, dur_hpv):
     durpars = genotype_pars[genotype_map[g]]['dur']
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
-    ccut = people.pars['clinical_cutoffs'].values()
+    ccut = people.pars['clinical_cutoffs']
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
     cin1_probs = mean_peak_fn(dur_hpv, dysp_rate) # Probability of establishing a persistent infection
@@ -203,8 +203,8 @@ def set_prognoses(people, inds, g, dur_hpv):
     peaks = np.minimum(1, sample(dist='lognormal', par1=mean_peaks, par2=(1-mean_peaks)**2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
     # Determine whether CIN1 clears or progresses to CIN2
-    is_cin2 = peaks>ccut[0]
-    time_to_cin2 = ccut[0]/(peaks[is_cin2]/dur_with_dys[is_cin2])
+    is_cin2 = peaks>ccut['cin1']
+    time_to_cin2 = ccut['cin1']/(peaks[is_cin2]/dur_with_dys[is_cin2])
     cin2_inds = cin1_inds[is_cin2]
     no_cin2_inds = cin1_inds[~is_cin2]
 
@@ -223,8 +223,8 @@ def set_prognoses(people, inds, g, dur_hpv):
                                              np.ceil(time_to_cin2 / dt))  # Date they get CIN2 - minimum of any previous date and the date from the current infection
 
     # Determine whether CIN2 clears or progresses to CIN3
-    is_cin3 = peaks>ccut[1]
-    time_to_cin3 = ccut[1]/(peaks[is_cin3]/dur_with_dys[is_cin3])
+    is_cin3 = peaks>ccut['cin2']
+    time_to_cin3 = ccut['cin2']/(peaks[is_cin3]/dur_with_dys[is_cin3])
     cin3_inds = cin1_inds[is_cin3]
     no_cin3_inds = cin1_inds[~is_cin3]
 
@@ -251,16 +251,10 @@ def set_prognoses(people, inds, g, dur_hpv):
 
 
     # Determine whether CIN3 clears or progresses to invasive cervical cancer
-    is_cancer = peaks>ccut[2]
-    time_to_cancer = ccut[2]/(peaks[is_cancer]/dur_with_dys[is_cancer])
+    is_cancer = peaks>ccut['cin3']
+    time_to_cancer = ccut['cin3']/(peaks[is_cancer]/dur_with_dys[is_cancer])
     cancer_inds = cin1_inds[is_cancer]
     no_cancer_inds = cin1_inds[~is_cancer]
-
-    # # Use cancer probabilities to determine whether CIN3 clears or progresses to cancer
-    # cancer_probs = np.zeros(len(cin1_inds))
-    # cancer_probs[is_cin3] = cancer_prob
-    # is_cancer = binomial_arr(cancer_probs)
-    # cancer_inds = cin1_inds[is_cancer]
 
     # Case 2.2.2.2: Severe dysplasia progresses to cancer
     excl_inds = true(people.date_cancerous[g, cancer_inds] < people.t)  # Don't count cancers that were acquired before now
@@ -269,7 +263,7 @@ def set_prognoses(people, inds, g, dur_hpv):
                                                     people.date_cin1[g, cancer_inds] +
                                                     np.ceil(dur_with_dys[is_cancer] / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
 
-    # Record eventual deaths from cancer (NB, assuming no survival without treatment)
+    # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
     people.date_dead_cancer[g, cancer_inds] = people.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
 

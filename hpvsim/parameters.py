@@ -70,7 +70,7 @@ def make_pars(set_prognoses=False, **kwargs):
     # Probabilities of disease progression
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
-    pars['clinical_cutoffs']    = {'CIN1': 0.33, 'CIN2':0.67, 'CIN3':0.95} # Parameters the control the clinical cliassification of dysplasia
+    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.95} # Parameters the control the clinical cliassification of dysplasia
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
         hpv_reactivation_probs  = np.array([0.01,    0.05,        0.08]),      # made this up, need to parameterize somehow
@@ -395,7 +395,7 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur['dys']       = dict(dist='lognormal', par1=4.0, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv16.dysp_rate        = 1.0 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate        = 0.7 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate        = 0.4 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
@@ -419,7 +419,7 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv31.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv31.dysp_rate        = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_rate        = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv31.prog_rate        = 0.3 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv31.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
