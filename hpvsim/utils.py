@@ -210,7 +210,6 @@ def set_prognoses(people, inds, g, dur_hpv):
 
     # CASE 2.1: Mild dysplasia regresses and infection clears
     time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(no_cin2_inds))
-    # time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(no_cin2_inds))
     people.date_clearance[g, no_cin2_inds] = np.fmax(people.date_clearance[g, no_cin2_inds],
                                                      people.date_cin1[g, no_cin2_inds] +
                                                      np.ceil(dur_to_peak_dys[~is_cin2] / dt) +
@@ -231,7 +230,6 @@ def set_prognoses(people, inds, g, dur_hpv):
 
     # CASE 2.2.1: Moderate dysplasia regresses and the virus clears
     time_to_clear_cin2 = sample(**people.pars['dur_cin2_clear'], size=len(no_cin3_inds))
-    # time_to_clear_cin2 = sample(**people.pars['dur_cin2_clear'], size=len(no_cin3_inds))
     people.date_clearance[g, no_cin3_inds] = np.fmax(people.date_clearance[g, no_cin3_inds],
                                                      people.date_cin1[g, no_cin3_inds] +
                                                      np.ceil(dur_to_peak_dys[~is_cin3] / dt) +
@@ -252,7 +250,6 @@ def set_prognoses(people, inds, g, dur_hpv):
 
     # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
     time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
-    # time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
     people.date_clearance[g, no_cancer_inds] = np.fmax(people.date_clearance[g, no_cancer_inds],
                                                   people.date_cin1[g, no_cancer_inds] +
                                                   np.ceil(dur_to_peak_dys[~is_cancer] / dt) +
