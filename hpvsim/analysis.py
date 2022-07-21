@@ -644,6 +644,8 @@ class age_results(Analyzer):
                                         self.results[result][date][g, :] += np.histogram(age[hpv_pos_inds], bins=result_dict.edges)[
                                                                           0] * scale  # Bin the people
                             denom = (np.histogram(age, bins=result_dict.edges)[0] * scale)
+                            if 'total' in result:
+                                denom * ng
                             self.results[result][date] = self.results[result][date] / denom
 
                 self.date = date # Need to store the date for subsequent calcpoints
