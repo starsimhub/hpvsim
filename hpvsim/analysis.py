@@ -436,7 +436,18 @@ class age_results(Analyzer):
         kwargs      (dict): passed to Analyzer()
 
     **Example**::
-        sim = hp.Sim(analyzers=hp.age_results(timepoints=['2015', '2020'], results=['hpv_incidence', 'total_cancers']))
+        sim = hp.Sim(analyzers=hpv.age_results(
+        result_keys=sc.objdict(
+            hpv_prevalence=sc.objdict(
+                timepoints=['1990'],
+                edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
+            ),
+            hpv_incidence=sc.objdict(
+                timepoints=['1990'],
+                edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.])
+            )
+        )
+        )
         sim.run()
         age_results = sim['analyzers'][0]
     '''
@@ -559,18 +570,6 @@ class age_results(Analyzer):
                         else:
                             rdict.weights = np.ones(len(rdict.data))
                         rdict.mismatch = 0  # The final value
-
-    def get_standard_population(self):
-        '''
-        Returns the WHO standard population for computation of age-standardized rates
-        https://seer.cancer.gov/stdpopulations/world.who.html
-        '''
-
-        age_standard = np.array([[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100],
-                                [0.08860, 0.08690, 0.086, 0.0847, 0.0822, 0.0793, 0.0761, 0.0715, 0.0659, 0.0604,
-                                 0.0537, 0.0455, 0.0372, 0.0296, 0.0221, 0.0152, 0.0091, 0.0044, 0.0015, 0.0004,
-                                 0.00005]])
-        return age_standard
 
 
     def apply(self, sim):
