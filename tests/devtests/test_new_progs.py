@@ -117,57 +117,24 @@ n_samples = 10e3
 # create dataframes
 data = {}
 years = np.arange(1,11)
-cin1_shares, cin2_shares, cin3_shares, cancer_shares = [], [], [], [], []
+cin1_shares, cin2_shares, cin3_shares, cancer_shares = [], [], [], []
 all_years = []
 all_genotypes = []
 for g in range(ng):
-    sigma_pre, scale_pre = lognorm_params(durpars[g]['none']['par1'], durpars[g]['none']['par2'])
-    rv_pre = lognorm(sigma_pre, 0, scale_pre)
     sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
-    rv_post = lognorm(sigma, 0, scale)
+    r = lognorm(sigma, 0, scale)
 
     for year in years:
-
-        # Duration pre-dysplasia
-        dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
-        prop_lt_y = (rv_pre.cdf(year)-rv_pre.cdf(year-1))[0]
-        ave_val = (mean_peak_fn(year, dysp_rate) + mean_peak_fn(year-1, dysp_rate))/2
-        dys_share = prop_lt_y*ave_val
-        none_share = 1 - dys_share
-        none_shares.append(none_share)
-        new_denom = n_samples*(1-none_share)
-
-        # Duration post-dysplasia - need to integrate over all the years when dysplasia may have started
-        this_cin1, this_cin2, this_cin3, this_cancer = [], [], [], []
-        for y in range(year):
-            prop_y1 = rv_post.cdf(y)
-            prop_y0 = rv_post.cdf(y-1)
-            n_people = (prop_y1 - prop_y0)*new_denom
-            mean_peaks = mean_peak_fn(y, genotype_pars[genotype_map[g]]['prog_rate'])
-            peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=(1 - mean_peaks), size=n_people))
-            this_cin1.append(sum(peaks<0.33))
-            this_cin2.append(sum((peaks>0.33)&(peaks<0.67)))
-            this_cin3.append(sum((peaks>0.67)&(peaks<cancer_thresh)))
-            this_cancer.append(sum(peaks>cancer_thresh))
-
-        cin1_shares.append(sum(this_cin1) / new_denom)
-        cin2_shares.append(sum(this_cin2) / new_denom)
-        cin3_shares.append(sum(this_cin3) / new_denom)
-        cancer_shares.append(sum(this_cancer) / new_denom)
+        mean_peaks = mean_peak_fn(year, genotype_pars[genotype_map[g]]['prog_rate'])
+        peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=(1 - mean_peaks), size=n_samples))
+        cin1_shares.append(sum(peaks<0.33)/n_samples)
+        cin2_shares.append(sum((peaks>0.33)&(peaks<0.67))/n_samples)
+        cin3_shares.append(sum((peaks>0.67)&(peaks<cancer_thresh))/n_samples)
+        cancer_shares.append(sum(peaks>cancer_thresh)/n_samples)
         all_years.append(year)
         all_genotypes.append(genotype_map[g].upper())
-
-data = {'Year':all_years, 'Genotype':all_genotypes, 'None':none_shares, 'CIN1':cin1_shares, 'CIN2':cin2_shares, 'CIN3':cin3_shares, 'Cancer': cancer_shares}
-newsharesdf = pd.DataFrame(data)
-
-#         cin1_shares.append(sum(peaks<0.33)/n_samples)
-#         cin2_shares.append(sum((peaks>0.33)&(peaks<0.67))/n_samples)
-#         cin3_shares.append(sum((peaks>0.67)&(peaks<cancer_thresh))/n_samples)
-#         cancer_shares.append(sum(peaks>cancer_thresh)/n_samples)
-#         all_years.append(year)
-#         all_genotypes.append(genotype_map[g].upper())
-# data = {'Year':all_years, 'Genotype':all_genotypes, 'CIN1':cin1_shares, 'CIN2':cin2_shares, 'CIN3':cin3_shares, 'Cancer': cancer_shares}
-# sharesdf = pd.DataFrame(data)
+data = {'Year':all_years, 'Genotype':all_genotypes, 'CIN1':cin1_shares, 'CIN2':cin2_shares, 'CIN3':cin3_shares, 'Cancer': cancer_shares}
+sharesdf = pd.DataFrame(data)
 
 
 ################################################################################
@@ -311,7 +278,7 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    # make_fig1()
+    make_fig1()
     # make_fig2()
 
     sc.toc(T)
