@@ -70,7 +70,7 @@ def make_pars(set_prognoses=False, **kwargs):
     # Probabilities of disease progression
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
-    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.95} # Parameters the control the clinical cliassification of dysplasia
+    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
         hpv_reactivation_probs  = np.array([0.0001,    0.05,        0.04]),      # made this up, need to parameterize somehow
