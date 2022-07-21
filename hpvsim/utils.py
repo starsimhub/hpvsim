@@ -180,10 +180,10 @@ def set_prognoses(people, inds, g, dur_hpv):
     ccut = people.pars['clinical_cutoffs']
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
-    cin1_probs = mean_peak_fn(dur_hpv, dysp_rate) # Probability of establishing a persistent infection
-    is_cin1 = binomial_arr(cin1_probs) # Boolean array of persistent infections
-    cin1_inds = inds[is_cin1] # Indices of those with persistent infections
-    no_cin1_inds = inds[~is_cin1] # Indices of those with transient infections
+    cin1_probs = mean_peak_fn(dur_hpv, dysp_rate) # Probability of developing dysplasia
+    is_cin1 = binomial_arr(cin1_probs) # Boolean array of dysplasias
+    cin1_inds = inds[is_cin1] # Indices of those with dysplasia
+    no_cin1_inds = inds[~is_cin1] # Indices of those without dysplasia
 
     # CASE 1: Infection clears without causing dysplasia
     people.date_clearance[g, no_cin1_inds] = people.date_infectious[g, no_cin1_inds] \
@@ -199,7 +199,7 @@ def set_prognoses(people, inds, g, dur_hpv):
     # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
     dur_with_dys = sample(**durpars['dys'], size=len(cin1_inds))
     people.dur_hpv[g, cin1_inds] += dur_with_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
-    mean_peaks = mean_peak_fn(dur_with_dys, prog_rate) # Apply a function that maps durations + genotype-specific progressioni speed to severity
+    mean_peaks = mean_peak_fn(dur_with_dys, prog_rate) # Apply a function that maps durations + genotype-specific progression + speed to severity
     peaks = np.minimum(1, sample(dist='lognormal', par1=mean_peaks, par2=(1-mean_peaks)**2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
     # Determine whether CIN1 clears or progresses to CIN2
