@@ -209,7 +209,8 @@ def set_prognoses(people, inds, g, dur_hpv):
     no_cin2_inds = cin1_inds[~is_cin2]
 
     # CASE 2.1: Mild dysplasia regresses and infection clears
-    time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(no_cin2_inds))
+    time_to_clear_cin1 = dur_with_dys[~is_cin2]
+    # time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(no_cin2_inds))
     people.date_clearance[g, no_cin2_inds] = np.fmax(people.date_clearance[g, no_cin2_inds],
                                                      people.date_cin1[g, no_cin2_inds] +
                                                      np.ceil(dur_with_dys[~is_cin2] / dt) +
@@ -229,7 +230,8 @@ def set_prognoses(people, inds, g, dur_hpv):
     no_cin3_inds = cin1_inds[~is_cin3]
 
     # CASE 2.2.1: Moderate dysplasia regresses and the virus clears
-    time_to_clear_cin2 = sample(**people.pars['dur_cin2_clear'], size=len(no_cin3_inds))
+    time_to_clear_cin2 = dur_with_dys[~is_cin3]
+    # time_to_clear_cin2 = sample(**people.pars['dur_cin2_clear'], size=len(no_cin3_inds))
     people.date_clearance[g, no_cin3_inds] = np.fmax(people.date_clearance[g, no_cin3_inds],
                                                      people.date_cin1[g, no_cin3_inds] +
                                                      np.ceil(dur_with_dys[~is_cin3] / dt) +
@@ -240,21 +242,21 @@ def set_prognoses(people, inds, g, dur_hpv):
     people.date_cin3[g, cin3_inds[excl_inds]] = np.nan
     people.date_cin3[g, cin3_inds] = np.fmin(people.date_cin3[g, cin3_inds],
                                              people.date_cin1[g, cin3_inds] +
-                                             np.ceil(time_to_cin3 / dt))  # Date they get CIN2 - minimum of any previous date and the date from the current infection
-
-    # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
-    time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
-    people.date_clearance[g, cin3_inds] = np.fmax(people.date_clearance[g, cin3_inds],
-                                                  people.date_cin1[g, cin3_inds] +
-                                                  np.ceil(dur_with_dys[is_cin3] / dt) +
-                                                  np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
-
+                                             np.ceil(time_to_cin3 / dt))  # Date they get CIN3 - minimum of any previous date and the date from the current infection
 
     # Determine whether CIN3 clears or progresses to invasive cervical cancer
     is_cancer = peaks>ccut['cin3']
     time_to_cancer = ccut['cin3']/(peaks[is_cancer]/dur_with_dys[is_cancer])
     cancer_inds = cin1_inds[is_cancer]
     no_cancer_inds = cin1_inds[~is_cancer]
+
+    # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
+    time_to_clear_cin3 = dur_with_dys[~is_cancer]
+    # time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
+    people.date_clearance[g, no_cancer_inds] = np.fmax(people.date_clearance[g, no_cancer_inds],
+                                                  people.date_cin1[g, no_cancer_inds] +
+                                                  np.ceil(dur_with_dys[~is_cancer] / dt) +
+                                                  np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
 
     # Case 2.2.2.2: Severe dysplasia progresses to cancer
     excl_inds = true(people.date_cancerous[g, cancer_inds] < people.t)  # Don't count cancers that were acquired before now
