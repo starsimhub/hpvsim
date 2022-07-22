@@ -19,12 +19,6 @@ from .settings import options as hpo # For setting global options
 import seaborn as sns
 
 
-def tesst(*args, **kwargs):
-    print('HI I AM!')
-    sc.pr(args[1])
-    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
-    return
-
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'Calibration']
 
 
