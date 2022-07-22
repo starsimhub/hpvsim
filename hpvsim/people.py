@@ -380,6 +380,7 @@ class People(hpb.BasePeople):
         self.cin3[genotype, inds] = False # No longer counted as CIN3
         self.susceptible[:, inds] = False
         self.date_clearance[:, inds] = np.nan
+        # self.date_cancerous[:, inds] = np.nan
         return len(inds)
 
 
@@ -400,6 +401,8 @@ class People(hpb.BasePeople):
         cancer_inds = self.true_by_genotype('cancerous', genotype)
         undetected_cancer_inds = self.false_by_genotype('detected_cancer', genotype)
         filter_inds = np.intersect1d(undetected_cancer_inds, cancer_inds)
+        # if len(filter_inds):
+        #     print('i am here')
         dur_cancer = (self.t - self.date_cancerous[genotype, filter_inds])*self['dt']
         dur_cancer_inds = np.digitize(dur_cancer, self.pars['prognoses']['cancer_detection']) - 1
         detection_probs = self.pars['prognoses']['cancer_detection'][dur_cancer_inds]

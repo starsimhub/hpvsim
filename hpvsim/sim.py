@@ -421,8 +421,8 @@ class Sim(hpb.BaseSim):
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence')
 
         # Detected cancers
-        results['total_detected_cancer_incidence'] = init_res('Total detectable cancer incidence')
-        results['detected_cancer_incidence'] = init_res('Detectable cancer incidence', n_rows=ng)
+        results['total_detected_cancer_incidence'] = init_res('Total detected cancer incidence')
+        results['detected_cancer_incidence'] = init_res('Detected cancer incidence', n_rows=ng)
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
