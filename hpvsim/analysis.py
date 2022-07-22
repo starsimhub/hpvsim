@@ -746,12 +746,16 @@ class age_results(Analyzer):
         # Initialize
         fig = pl.figure(**fig_args)
 
-        # Handle what to plot
-        if not len(self.results):
+        # Figure out rows and columns
+        if len(self.results) == 0:
             errormsg = f'Cannot plot since no age results were recorded)'
             raise ValueError(errormsg)
-        else: # If there's only one timepoint, automatically figure out rows and columns
-            n_plots = len(self.results)
+        elif len(self.result_keys)==1:
+            n_plots = len(self.result_keys['dates'])
+            n_rows, n_cols = sc.get_rows_cols(n_plots)
+        else:
+            dates_per_result = [len(rk['dates']) for rk in self.result_keys.values()]
+            n_plots = sum(dates_per_result)*len(self.result_keys)
             n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Make the figure(s)
