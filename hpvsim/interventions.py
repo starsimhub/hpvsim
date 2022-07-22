@@ -1148,7 +1148,7 @@ class Screening(Intervention):
 
         # Update states and flows to reflect cancer diagnoses
         sim.people.detected_cancer[diagnosed_inds] = True
-        sim.people.flows['detected_cancers'] += len(diagnosed_inds)
+        sim.people.cancer_flows['detected_cancers'] += len(diagnosed_inds)
         sim.people.date_detected_cancer[0, diagnosed_inds] = sim.t
 
         # Treat cancers

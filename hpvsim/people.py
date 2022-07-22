@@ -74,8 +74,10 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key in ['dead_other', 'vaccinated', 'screened', 'treated', 'detected_cancer']: # ALl false at the beginning
+            if key in ['cancerous', 'dead_other', 'vaccinated', 'screened', 'treated', 'detected_cancer', 'dead_cancer']: # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
+            elif key == 'cancer_genotype':
+                self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_int)
             elif key == 'alive':  # All true at the beginning
                 self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
             elif key == 'susceptible':
@@ -85,7 +87,8 @@ class People(hpb.BasePeople):
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
-            if key in ['date_dead_other', 'date_vaccinated','date_screened', 'date_next_screen', 'date_treated']:
+            if key in ['date_dead_other', 'date_cancerous', 'date_detected_cancer', 'date_dead_cancer',
+                       'date_vaccinated','date_screened', 'date_next_screen', 'date_treated']:
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
             else:
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
@@ -140,6 +143,7 @@ class People(hpb.BasePeople):
         self.flows_by_sex       = {f'{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'                 : 0 for key in hpd.dem_keys}
         self.intv_flows         = {f'{key}'                 : 0 for key in hpd.intv_flow_keys}
+        self.cancer_flows       = {f'{key}'                 : 0 for key in hpd.cancer_flow_keys}
         return
 
 
@@ -190,21 +194,21 @@ class People(hpb.BasePeople):
             self.flows['cin1s'][g]          += self.check_cin1(g)
             self.flows['cin2s'][g]          += self.check_cin2(g)
             self.flows['cin3s'][g]          += self.check_cin3(g)
+            self.cancer_flows['cancers']    += self.check_cancer(g)
             if t%self.resfreq==0:
                 self.flows['cins'][g]       += self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
-            self.flows['cancers'][g]        += self.check_cancer(g)
-            self.flows['cancer_deaths'][g]  += self.check_cancer_deaths(g)
+
             self.check_clearance(g)
+
+        #Perform updates that are not genotype specific
+        self.cancer_flows['cancer_deaths'] += self.check_cancer_deaths()
+        self.cancer_flows['detected_cancers'] += self.check_cancer_detection()
 
         # Create total flows
         self.total_flows['total_cin1s']     += self.flows['cin1s'].sum()
         self.total_flows['total_cin2s']     += self.flows['cin2s'].sum()
         self.total_flows['total_cin3s']     += self.flows['cin3s'].sum()
         self.total_flows['total_cins']      += self.flows['cins'].sum()
-        self.total_flows['total_cancers']   += self.flows['cancers'].sum()
-        self.total_flows['total_cancer_deaths']   += self.flows['cancer_deaths'].sum()
-        self.total_flows['total_detected_cancers'] += self.flows['detected_cancers'].sum()
-        self.intv_flows['detected_cancers'] += self.check_cancer_detection()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
         self.sus_pool = self.susceptible.nonzero()
@@ -376,22 +380,22 @@ class People(hpb.BasePeople):
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
-        inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
-        self.cancerous[genotype, inds] = True
+        inds = self.check_inds(self.cancerous, self.date_cancerous, filter_inds=filter_inds)
+        self.cancerous[inds] = True
+        self.cancer_genotype[inds] = genotype
         self.cin3[genotype, inds] = False # No longer counted as CIN3
         self.susceptible[:, inds] = False
         self.date_clearance[:, inds] = np.nan
-        # self.date_cancerous[:, inds] = np.nan
         return len(inds)
 
 
-    def check_cancer_deaths(self, genotype):
+    def check_cancer_deaths(self):
         '''
         Check for new deaths from cancer
         '''
-        filter_inds = self.true_by_genotype('cancerous', genotype)
-        inds = self.check_inds(self.dead_cancer[genotype,:], self.date_dead_cancer[genotype,:], filter_inds=filter_inds)
-        self.make_die(inds, genotype=genotype, cause='cancer')
+        filter_inds = self.true('cancerous')
+        inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
+        self.make_die(inds, cause='cancer')
         return len(inds)
 
 
@@ -523,7 +527,7 @@ class People(hpb.BasePeople):
                 self[key][:, inds] = False
 
         # Reset immunity
-        for key in self.meta.imm_by_source_states:
+        for key in self.meta.imm_states:
             self[key][:, inds] = 0
 
         # Reset dates
@@ -624,13 +628,13 @@ class People(hpb.BasePeople):
         return len(inds) # For incrementing counters
 
 
-    def make_die(self, inds, genotype=None, cause=None):
+    def make_die(self, inds, cause=None):
         ''' Make people die of all other causes (background mortality) '''
 
         if cause=='other':
             self.dead_other[inds] = True
         elif cause=='cancer':
-            self.dead_cancer[genotype, inds] = True
+            self.dead_cancer[inds] = True
         else:
             errormsg = f'Cause of death must be one of "other" or "cancer", not {cause}.'
             raise ValueError(errormsg)
@@ -640,7 +644,7 @@ class People(hpb.BasePeople):
         self.cin1[:, inds] = False
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False
-        self.cancerous[:, inds] = False
+        self.cancerous[inds] = False
         self.alive[inds] = False
 
         # Remove dead people from contact network by setting the end date of any partnership they're in to now

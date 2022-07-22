@@ -424,8 +424,14 @@ class Sim(hpb.BaseSim):
         results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence')
 
-        # Detected cancers
+        # Cancer flows and stocks
+        results['n_cancerous'] = init_res('Number with cancer')
+        results['cancers'] = init_res('Cancers')
+        results['detected_cancers'] = init_res('Detected cancers')
+        results['cancer_deaths'] = init_res('Cancer deaths')
+        results['cancer_incidence'] = init_res('Cancer incidence')
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence')
+        results['cancer_mortality'] = init_res('Cancer mortality')
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
@@ -675,7 +681,7 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cin1] *= rel_trans_pars['cin1']
         rel_trans[people.cin2] *= rel_trans_pars['cin2']
         rel_trans[people.cin3] *= rel_trans_pars['cin3']
-        rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
+        rel_trans[:, people.cancerous] *= rel_trans_pars['cancerous']
 
         # Loop over layers
         ln = 0 # Layer number
@@ -724,6 +730,8 @@ class Sim(hpb.BaseSim):
         # Update counts for this time step: flows
         for key,count in people.total_flows.items():
             self.results[key][idx] += count
+        for key,count in people.cancer_flows.items():
+            self.results[key][idx] += count
         for key,count in people.demographic_flows.items():
             self.results[key][idx] += count
         for key,count in people.flows.items():
@@ -747,6 +755,8 @@ class Sim(hpb.BaseSim):
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
+
+            self.results['n_cancerous'][idx] = people.count('cancerous')
 
             # Compute detectable hpv prevalence
             hpv_test_pars = hppar.get_screen_pars('hpv')
@@ -909,12 +919,10 @@ class Sim(hpb.BaseSim):
         self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / alive_females
         self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / alive_females
         self.results['total_cin_prevalence'][:]     = res['n_total_cin'][:] / alive_females
-        self.results['total_cancer_prevalence'][:]  = res['n_total_cancerous'][:] / alive_females
         self.results['cin1_prevalence'][:]          = res['n_cin1'][:] / alive_females
         self.results['cin2_prevalence'][:]          = res['n_cin2'][:] / alive_females
         self.results['cin3_prevalence'][:]          = res['n_cin3'][:] / alive_females
         self.results['cin_prevalence'][:]           = res['n_cin'][:] / alive_females
-        self.results['cancer_prevalence'][:]        = res['n_cancerous'][:] / alive_females
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
@@ -925,7 +933,6 @@ class Sim(hpb.BaseSim):
         self.results['total_cin2_incidence'][:]    = res['total_cin2s'][:] / demoninator
         self.results['total_cin3_incidence'][:]    = res['total_cin3s'][:] / demoninator
         self.results['total_cin_incidence'][:]     = res['total_cins'][:] / demoninator
-        self.results['total_cancer_incidence'][:]  = res['total_cancers'][:] / demoninator
         self.results['cin1_incidence'][:]          = res['cin1s'][:] / demoninator
         self.results['cin2_incidence'][:]          = res['cin2s'][:] / demoninator
         self.results['cin3_incidence'][:]          = res['cin3s'][:] / demoninator
