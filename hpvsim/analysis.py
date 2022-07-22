@@ -708,7 +708,7 @@ class age_results(Analyzer):
         for name, group in self.result_keys[key].data.groupby(['genotype', 'year']):
             genotype = name[0].lower()
             year = str(name[1]) + '.0'
-            if 'total' in key:
+            if 'total' in key or 'cancer' in key:
                 sim_res = list(self.results[key][year])
                 res.extend(sim_res)
             else:
@@ -1249,7 +1249,7 @@ class Calibration(Analyzer):
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in resname:
+                    if 'total' not in resname and 'cancer' not in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
                             if glabel in unique_genotypes:
