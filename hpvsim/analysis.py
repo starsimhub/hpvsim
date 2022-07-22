@@ -640,7 +640,7 @@ class age_results(Analyzer):
                     else:
                         if 'detectable' in result:
                             hpv_test_pars = hppar.get_screen_pars('hpv')
-                            for state in ['hpv', 'cin1', 'cin2', 'cin3', 'cancerous']:
+                            for state in ['hpv', 'cin1', 'cin2', 'cin3']:
                                 for g in range(ng):
                                     hpv_pos_probs = np.zeros(len(sim.people))
                                     tp_inds = hpu.true(sim.people[state][g, :])
