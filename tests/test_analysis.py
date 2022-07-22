@@ -115,7 +115,7 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, end=2015, dt=0.5, location='south africa',
+    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, end=2020, dt=0.5, location='south africa',
                 init_hpv_dist=dict(
                     hpv16=0.9,
                     hpv18=0.1

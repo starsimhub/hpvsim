@@ -1164,12 +1164,11 @@ class Calibration(Analyzer):
         if not len(self.analyzer_results):
             errormsg = f'Cannot plot since no age results were recorded)'
             raise ValueError(errormsg)
-        # if len(self.timepoints)>1:
-        #     n_cols = len(self.timepoints) # One column for each requested timepoint
-        #     n_rows = len(self.result_keys) # One row for each requested result
-        else: # If there's only one timepoint, automatically figure out rows and columns
-            n_plots = len(self.results_keys)
+        else:
+            dates_per_result = [len([date for date in r.keys() if date != 'bins']) for r in self.analyzer_results[0].values()]
+            n_plots = sum(dates_per_result)
             n_rows, n_cols = sc.get_rows_cols(n_plots)
+
         # Initialize
         fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
         pl.subplots_adjust(**axis_args)
@@ -1177,14 +1176,14 @@ class Calibration(Analyzer):
         # Make the figure(s)
         with hpo.with_style(**kwargs):
             for run_num, run in enumerate(self.analyzer_results):
-                row_count = 0
+                plot_count = 0
                 for res_num, (key,resdict) in enumerate(run.items()):
                     age_labels = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in
                                   range(len(resdict['bins']) - 1)]
                     age_labels.append(str(int(resdict['bins'][-1])) + '+')
 
 
-                    ax = axes[row_count]
+                    ax = axes[plot_count]
                     x = np.arange(len(age_labels))  # the label locations
 
                     for date in self.target_data[res_num].year.unique():
@@ -1221,8 +1220,8 @@ class Calibration(Analyzer):
                                 ax.scatter(x, ydata, color=self.result_properties[key].color, marker='s')
                         ax.set_xlabel('Age group')
                         ax.set_title(self.result_properties[key].name+' - '+str_date)
-                        ax.legend()
-                        row_count += n_cols
+                        # ax.legend()
                         ax.set_xticks(x, age_labels)
+                        plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
