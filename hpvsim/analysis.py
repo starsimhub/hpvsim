@@ -582,7 +582,8 @@ class age_results(Analyzer):
             'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
-            'detected_cancer': ['date_detected_cancer', 'detected_cancer']
+            'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
+            'cancer_deaths': ['date_dead_cancer', 'dead_cancer'],
         }
         attr1 = mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
         attr2 = mapping[attr][1]  # As above
@@ -856,7 +857,7 @@ class Calibration(Analyzer):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, fit_args=None, par_samplers=None,
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, par_samplers=None,
                  n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
         super().__init__(label=label) # Initialize the Analyzer object
@@ -874,13 +875,14 @@ class Calibration(Analyzer):
         self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name, keep_db=keep_db, storage=storage, rand_seed=rand_seed)
 
         # Handle other inputs
-        self.sim          = sim
-        self.calib_pars   = calib_pars
-        self.fit_args     = sc.mergedicts(fit_args)
-        self.par_samplers = sc.mergedicts(par_samplers)
-        self.die          = die
-        self.verbose      = verbose
-        self.calibrated   = False
+        self.sim            = sim
+        self.calib_pars     = calib_pars
+        self.genotype_pars  = genotype_pars
+        self.fit_args       = sc.mergedicts(fit_args)
+        self.par_samplers   = sc.mergedicts(par_samplers)
+        self.die            = die
+        self.verbose        = verbose
+        self.calibrated     = False
 
         # Create age_results intervention
         self.target_data = []
@@ -911,24 +913,37 @@ class Calibration(Analyzer):
 
         return
 
-    def run_sim(self, calib_pars, label=None, return_sim=False):
+    def run_sim(self, calib_pars, genotype_pars=None, label=None, return_sim=False):
         ''' Create and run a simulation '''
         sim = self.sim.copy()
         if label: sim.label = label
-        valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
-        if 'prognoses' in valid_pars.keys():
-            sim_progs = hppar.get_prognoses()
-            for prog_key, prog_val in valid_pars['prognoses'].items():
-                sim_progs[prog_key] = np.array(prog_val)
-            valid_pars['prognoses'] = sim_progs
-        sim.update_pars(valid_pars)
-        if len(valid_pars) != len(calib_pars):
-            extra = set(calib_pars.keys()) - set(valid_pars.keys())
-            errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'
-            raise ValueError(errormsg)
+
+        # Set regular sim pars
+        if calib_pars is not None:
+            valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
+            if 'prognoses' in valid_pars.keys():
+                sim_progs = hppar.get_prognoses()
+                for prog_key, prog_val in valid_pars['prognoses'].items():
+                    sim_progs[prog_key] = np.array(prog_val)
+                valid_pars['prognoses'] = sim_progs
+            sim.update_pars(valid_pars)
+            if len(valid_pars) != len(calib_pars):
+                extra = set(calib_pars.keys()) - set(valid_pars.keys())
+                errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'
+                raise ValueError(errormsg)
+
+        # Set genotype pars
+        if genotype_pars is not None:
+            gmap = sim['genotype_map']
+            gmap_r = {v:k for k,v in gmap.items()}
+            for gname,gpardict in genotype_pars.items():
+                g = gmap_r[gname]
+                for gpar,gval in gpardict.items():
+                    sim['genotypes'][g].p[gpar] = gval
+
+        # Run the sim
         try:
             sim.run()
-
             if return_sim:
                 return sim
             else:
@@ -943,10 +958,11 @@ class Calibration(Analyzer):
                 output = None if return_sim else np.inf
                 return output
 
-    def run_trial(self, trial):
-        ''' Define the objective for Optuna '''
-        pars = {}
-        for key, val in self.calib_pars.items():
+
+    def get_pars(self, pardict=None, trial=None):
+        ''' Sample from pars, after extracting them from the structure they're provided in '''
+        pars={}
+        for key, val in pardict.items():
             if isinstance(val, list):
                 low, high = val[1], val[2]
                 if key in self.par_samplers:  # If a custom sampler is used, get it now
@@ -967,7 +983,24 @@ class Calibration(Analyzer):
                         sampler_key = key + '_' + parkey + '_' + str(i)
                         pars[key][parkey].append(sampler_fn(sampler_key, low, high))
 
-        sim = self.run_sim(pars, return_sim=True)
+        return pars
+
+
+    def run_trial(self, trial):
+        ''' Define the objective for Optuna '''
+
+        if self.genotype_pars is not None:
+            genotype_pars = {}
+            for gname, pardict in self.genotype_pars.items():
+                genotype_pars[gname] = self.get_pars(pardict, trial)
+        else:
+            genotype_pars = None
+        if self.calib_pars is not None:
+            calib_pars = self.get_pars(self.calib_pars, trial)
+        else:
+            calib_pars = None
+
+        sim = self.run_sim(calib_pars, genotype_pars, return_sim=True)
         # trial.set_user_attr('sim', sim) # CK: fails since not a JSON, could use sc.jsonpickle()
         r = sim.get_analyzer().results
         r = sc.jsonify(r)
@@ -1026,7 +1059,7 @@ class Calibration(Analyzer):
         return output
 
 
-    def calibrate(self, calib_pars=None, verbose=True, **kwargs):
+    def calibrate(self, calib_pars=None, genotype_pars=None, verbose=True, **kwargs):
         '''
         Actually perform calibration.
 
@@ -1040,8 +1073,10 @@ class Calibration(Analyzer):
         # Load and validate calibration parameters
         if calib_pars is not None:
             self.calib_pars = calib_pars
-        if self.calib_pars is None:
-            errormsg = 'You must supply calibration parameters either when creating the calibration object or when calling calibrate().'
+        if genotype_pars is not None:
+            self.genotype_pars = genotype_pars
+        if (self.calib_pars is None) and (self.genotype_pars is None):
+            errormsg = 'You must supply calibration parameters (calib_pars or genotype_pars) either when creating the calibration object or when calling calibrate().'
             raise ValueError(errormsg)
         self.run_args.update(kwargs) # Update optuna settings
 
@@ -1067,16 +1102,34 @@ class Calibration(Analyzer):
         # Compare the results
         self.initial_pars = sc.objdict()
         self.par_bounds = sc.objdict()
-        for key, val in self.calib_pars.items():
-            if isinstance(val, list):
-                self.initial_pars[key] = val[0]
-                self.par_bounds[key] = np.array([val[1], val[2]])
-            elif isinstance(val, dict):
-                for parkey, par_highlowlist in val.items():
-                    for i, (best, low, high) in enumerate(par_highlowlist):
-                        sampler_key = key + '_' + parkey + '_' + str(i)
-                        self.initial_pars[sampler_key] = best
-                        self.par_bounds[sampler_key] = np.array([low, high])
+
+        # Compare for regular sim pars
+        if self.calib_pars is not None:
+            for key, val in self.calib_pars.items():
+                if isinstance(val, list):
+                    self.initial_pars[key] = val[0]
+                    self.par_bounds[key] = np.array([val[1], val[2]])
+                elif isinstance(val, dict):
+                    for parkey, par_highlowlist in val.items():
+                        for i, (best, low, high) in enumerate(par_highlowlist):
+                            sampler_key = key + '_' + parkey + '_' + str(i)
+                            self.initial_pars[sampler_key] = best
+                            self.par_bounds[sampler_key] = np.array([low, high])
+
+        # Compare for genotype pars
+        if self.genotype_pars is not None:
+            for gname, gpardict in self.genotype_pars.items():
+                for key, val in gpardict.items():
+                    if isinstance(val, list):
+                        self.initial_pars[key] = val[0]
+                        self.par_bounds[key] = np.array([val[1], val[2]])
+                    elif isinstance(val, dict):
+                        for parkey, par_highlowlist in val.items():
+                            for i, (best, low, high) in enumerate(par_highlowlist):
+                                sampler_key = key + '_' + parkey + '_' + str(i)
+                                self.initial_pars[sampler_key] = best
+                                self.par_bounds[sampler_key] = np.array([low, high])
+
         self.parse_study()
 
         # Tidy up
