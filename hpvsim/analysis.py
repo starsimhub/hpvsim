@@ -560,7 +560,7 @@ class age_results(Analyzer):
                         rdict.mismatch = 0  # The final value
 
 
-    def convert_rname_stocks(rname):
+    def convert_rname_stocks(self, rname):
         ''' Helper function for converting stock result names to people attributes '''
         attr = rname.replace('total_', '').replace('_prevalence', '')  # Strip out terms that aren't stored in the people
         if attr[0] == 'n': attr = attr[2:] # Remove n, used to identify stocks
@@ -568,7 +568,7 @@ class age_results(Analyzer):
         if attr == 'cancer': attr = 'cancerous'
         return attr
 
-    def convert_rname_flows(rname):
+    def convert_rname_flows(self, rname):
         ''' Helper function for converting flow result names to people attributes '''
         attr = result.replace('total_', '').replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
