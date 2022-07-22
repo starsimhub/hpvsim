@@ -1172,6 +1172,7 @@ class Calibration(Analyzer):
 
         # Initialize
         fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
+        axes = axes.flatten()
         pl.subplots_adjust(**axis_args)
 
         # Pull out attributes that don't vary by run
@@ -1180,45 +1181,44 @@ class Calibration(Analyzer):
             age_labels[resname] = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
             age_labels[resname].append(str(int(resdict['bins'][-1])) + '+')
 
-        import traceback;
-        traceback.print_exc();
-        import pdb;
-        pdb.set_trace()
-
         # Make the figure
         with hpo.with_style(**kwargs):
 
+            plot_count = 0
             for rn, resname in enumerate(self.results_keys):
-                plot_count = 0
-                ax = axes[plot_count]
-                x = np.arange(len(age_labels))  # the label locations
+                x = np.arange(len(age_labels[resname]))  # the label locations
+
                 for date in all_dates[rn]:
+                    ax = axes[plot_count]
                     # Pull out data
                     thisdatadf = self.target_data[rn][(self.target_data[rn].year == float(date)) & (self.target_data[rn].name == resname)]
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in key:
+                    if 'total' not in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
                             if glabel in unique_genotypes:
                                 ydata = np.array(thisdatadf[thisdatadf.genotype == self.glabels[g].upper()].value)
-                                ax.scatter(x, ydata, color=self.result_properties[key].color[g], marker='s', label=f'Data - {glabel}')
+                                ax.scatter(x, ydata, color=self.result_properties[resname].color[g], marker='s', label=f'Data - {glabel}')
                                 for run_num, run in enumerate(self.analyzer_results):
                                     ymodel = run[resname][date][g]
-                                    label = None if run_num==0 else f'Model - {glabel}'
-                                    ax.plot(x, ymodel, color=self.result_properties[key].color[g], linestyle='--')
+                                    label = f'Model - {glabel}' if run_num==0 else None
+                                    ax.plot(x, ymodel, color=self.result_properties[resname].color[g], linestyle='--')
 
                     else:
                         ydata = np.array(thisdatadf.value)
-                        ax.scatter(x, ydata, color=self.result_properties[key].color, marker='s', label='Data')
+                        ax.scatter(x, ydata, color=self.result_properties[resname].color, marker='s', label='Data')
                         for run_num, run in enumerate(self.analyzer_results):
-                            label = None if run_num == 0 else 'Model'
-                            ax.plot(x, resdict[str_date], color=self.result_properties[key].color, linestyle='--', label=label)
+                            ymodel = run[resname][date]
+                            label = 'Model' if run_num == 0 else None
+                            ax.plot(x, ymodel, color=self.result_properties[resname].color, linestyle='--', label=label)
+
+                    # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_properties[key].name+' - '+str_date)
+                    ax.set_title(self.result_properties[resname].name+' - '+date)
                     ax.legend()
-                    ax.set_xticks(x, age_labels)
+                    ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
