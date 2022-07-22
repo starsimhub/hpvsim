@@ -115,7 +115,7 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1970, end=2020, dt=0.5, location='south africa',
+    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=2000, end=2020, dt=0.5, location='south africa',
                 init_hpv_dist=dict(
                     hpv16=0.9,
                     hpv18=0.1
@@ -128,7 +128,7 @@ def test_calibration():
                       )
     calib = hpv.Calibration(sim, calib_pars=calib_pars, datafiles=['test_data/south_africa_hpv_data.xlsx',
                                          'test_data/south_africa_cancer_data.xlsx'],
-                                                 total_trials=10, n_workers=4)
+                                                 total_trials=4, n_workers=4)
     calib.calibrate()
     calib.plot()
     return sim, calib
