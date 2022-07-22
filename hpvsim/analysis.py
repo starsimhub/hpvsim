@@ -855,7 +855,7 @@ class Calibration(Analyzer):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, fit_args=None, par_samplers=None,
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, par_samplers=None,
                  n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
         super().__init__(label=label) # Initialize the Analyzer object
@@ -873,13 +873,14 @@ class Calibration(Analyzer):
         self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name, keep_db=keep_db, storage=storage, rand_seed=rand_seed)
 
         # Handle other inputs
-        self.sim          = sim
-        self.calib_pars   = calib_pars
-        self.fit_args     = sc.mergedicts(fit_args)
-        self.par_samplers = sc.mergedicts(par_samplers)
-        self.die          = die
-        self.verbose      = verbose
-        self.calibrated   = False
+        self.sim            = sim
+        self.calib_pars     = calib_pars
+        self.genotype_pars  = genotype_pars
+        self.fit_args       = sc.mergedicts(fit_args)
+        self.par_samplers   = sc.mergedicts(par_samplers)
+        self.die            = die
+        self.verbose        = verbose
+        self.calibrated     = False
 
         # Create age_results intervention
         self.target_data = []
@@ -910,10 +911,12 @@ class Calibration(Analyzer):
 
         return
 
-    def run_sim(self, calib_pars, label=None, return_sim=False):
+    def run_sim(self, calib_pars, genotype_pars=None, label=None, return_sim=False):
         ''' Create and run a simulation '''
         sim = self.sim.copy()
         if label: sim.label = label
+
+        # Set regular sim pars
         valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
         if 'prognoses' in valid_pars.keys():
             sim_progs = hppar.get_prognoses()
@@ -925,9 +928,18 @@ class Calibration(Analyzer):
             extra = set(calib_pars.keys()) - set(valid_pars.keys())
             errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'
             raise ValueError(errormsg)
+
+        # Set genotype pars
+        gmap = sim['genotype_map']
+        gmap_r = {v:k for k,v in gmap.items()}
+        for gname,gpardict in genotype_pars.items():
+            g = gmap_r[gname]
+            for gpar,gval in gpardict.items():
+                sim['genotypes'][g].p[gpar] = gval
+
+        # Run the sim
         try:
             sim.run()
-
             if return_sim:
                 return sim
             else:
@@ -942,10 +954,11 @@ class Calibration(Analyzer):
                 output = None if return_sim else np.inf
                 return output
 
-    def run_trial(self, trial):
-        ''' Define the objective for Optuna '''
-        pars = {}
-        for key, val in self.calib_pars.items():
+
+    def get_pars(self, pardict=None, trial=None):
+        ''' Sample from pars, after extracting them from the structure they're provided in '''
+        pars={}
+        for key, val in pardict.items():
             if isinstance(val, list):
                 low, high = val[1], val[2]
                 if key in self.par_samplers:  # If a custom sampler is used, get it now
@@ -966,7 +979,18 @@ class Calibration(Analyzer):
                         sampler_key = key + '_' + parkey + '_' + str(i)
                         pars[key][parkey].append(sampler_fn(sampler_key, low, high))
 
-        sim = self.run_sim(pars, return_sim=True)
+        return pars
+
+
+    def run_trial(self, trial):
+        ''' Define the objective for Optuna '''
+
+        genotype_pars = {}
+        for gname, pardict in self.genotype_pars.items():
+            genotype_pars[gname] = self.get_pars(pardict, trial)
+        calib_pars = self.get_pars(self.calib_pars, trial)
+
+        sim = self.run_sim(calib_pars, genotype_pars, return_sim=True)
         # trial.set_user_attr('sim', sim) # CK: fails since not a JSON, could use sc.jsonpickle()
         r = sim.get_analyzer().results
         r = sc.jsonify(r)
@@ -1025,7 +1049,7 @@ class Calibration(Analyzer):
         return output
 
 
-    def calibrate(self, calib_pars=None, verbose=True, **kwargs):
+    def calibrate(self, calib_pars=None, genotype_pars=None, verbose=True, **kwargs):
         '''
         Actually perform calibration.
 
@@ -1039,8 +1063,10 @@ class Calibration(Analyzer):
         # Load and validate calibration parameters
         if calib_pars is not None:
             self.calib_pars = calib_pars
-        if self.calib_pars is None:
-            errormsg = 'You must supply calibration parameters either when creating the calibration object or when calling calibrate().'
+        if genotype_pars is not None:
+            self.genotype_pars = genotype_pars
+        if (self.calib_pars is None) and (self.genotype_pars is None):
+            errormsg = 'You must supply calibration parameters (calib_pars or genotype_pars) either when creating the calibration object or when calling calibrate().'
             raise ValueError(errormsg)
         self.run_args.update(kwargs) # Update optuna settings
 
