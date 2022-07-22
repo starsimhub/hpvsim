@@ -97,8 +97,8 @@ def test_age_results(do_plot=True):
         'HPV incidence': [
             'hpv_incidence',
         ],
-        'Cervical cancer': [
-            'total_cancers',
+        'Detected cervical cancer incidence': [
+            'total_detected_cancer_incidence',
         ],
     }
 
@@ -141,8 +141,8 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
-    sim2, calib = test_calibration()
+    sim1, a1    = test_age_results()
+    # sim2, calib = test_calibration()
 
 
 
