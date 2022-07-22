@@ -479,18 +479,6 @@ class age_results(Analyzer):
         self.ng = sim['n_genotypes']
         self.glabels = [g.label for g in sim['genotypes']]
 
-
-        # Handle variable names (TODO, should this be centralized somewhere?)
-        self.mapping = {
-            'infections': ['date_infectious', 'infectious'],
-            'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
-            'cin1': ['date_cin1', 'cin1'],
-            'cin2': ['date_cin2', 'cin2'],
-            'cin3': ['date_cin3', 'cin3'],
-            'cancers': ['date_cancerous', 'cancerous'],
-            'cancer': ['date_cancerous', 'cancerous'],
-        }
-
         # Store colors
         self.result_properties = sc.objdict()
         for rkey in self.result_keys.keys():
@@ -572,11 +560,40 @@ class age_results(Analyzer):
                         rdict.mismatch = 0  # The final value
 
 
+    def convert_rname_stocks(rname):
+        ''' Helper function for converting stock result names to people attributes '''
+        attr = rname.replace('total_', '').replace('_prevalence', '')  # Strip out terms that aren't stored in the people
+        if attr[0] == 'n': attr = attr[2:] # Remove n, used to identify stocks
+        if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
+        if attr == 'cancer': attr = 'cancerous'
+        return attr
+
+    def convert_rname_flows(rname):
+        ''' Helper function for converting flow result names to people attributes '''
+        attr = result.replace('total_', '').replace('_incidence', '')  # Name of the actual state
+        if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
+        if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
+        # Handle variable names
+        mapping = {
+            'infections': ['date_infectious', 'infectious'],
+            'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
+            'cin1': ['date_cin1', 'cin1'],
+            'cin2': ['date_cin2', 'cin2'],
+            'cin3': ['date_cin3', 'cin3'],
+            'cancers': ['date_cancerous', 'cancerous'],
+            'cancer': ['date_cancerous', 'cancerous'],
+        }
+        attr1 = mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
+        attr2 = mapping[attr][1]  # As above
+        return attr1, attr2
+
+
     def apply(self, sim):
         ''' Calculate age results '''
-        # Shorten variables that are used a lot
 
+        # Shorten variables that are used a lot
         ng = self.ng
+
         # Go through each result key and determine if this is a timepoint where age results are requested
         for result, result_dict in self.result_keys.items():
             if sim.t in result_dict.timepoints:
@@ -597,10 +614,7 @@ class age_results(Analyzer):
                 # Both annual stocks and prevalence require us to calculate the current stocks.
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
                 if result[0] == 'n' or 'prevalence' in result:
-                    attr = result.replace('total_', '').replace('_prevalence', '')  # Name of the actual state
-                    if attr[0] == 'n': attr = attr[2:]
-                    if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
-                    if attr == 'cancer': attr = 'cancerous'
+                    attr = self.convert_rname_stocks(result) # Convert to a people attribute
                     if attr in sim.people.keys():
                         if 'total' in result:
                             inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
@@ -620,6 +634,7 @@ class age_results(Analyzer):
                                 denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[0] * scale)
                             if 'total' not in result: denom = denom[None, :]
                             self.results[result][date] = self.results[result][date] / denom
+
                     else:
                         if 'detectable' in result:
                             hpv_test_pars = hppar.get_screen_pars('hpv')
@@ -637,46 +652,41 @@ class age_results(Analyzer):
                                         self.results[result][date][g, :] += np.histogram(age[hpv_pos_inds], bins=result_dict.edges)[
                                                                           0] * scale  # Bin the people
                             denom = (np.histogram(age, bins=result_dict.edges)[0] * scale)
-                            if 'total' in result:
-                                denom * ng
+                            if 'total' in result: denom = denom * ng
                             self.results[result][date] = self.results[result][date] / denom
 
                 self.date = date # Need to store the date for subsequent calcpoints
 
 
-                # Both annual new cases and incidence require us to calculate the new cases over all
-                # the timepoints that belong to the requested year.
-                if sim.t in result_dict.calcpoints:
-                    date = self.date # Stored just above for use here
-                    scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
-                    age = sim.people.age # Get the age distribution
+            # Both annual new cases and incidence require us to calculate the new cases over all
+            # the timepoints that belong to the requested year.
+            if sim.t in result_dict.calcpoints:
+                date = self.date # Stored just above for use here
+                scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
+                age = sim.people.age # Get the age distribution
 
-                    # Figure out if it's a flow or incidence
-                    if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result:
-                        attr = result.replace('total_', '').replace('_incidence', '')  # Name of the actual state
-                        if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
-                        if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
-                        attr1 = self.mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
-                        attr2 = self.mapping[attr][1]  # As above
-                        if result[:5] == 'total':  # Results across all genotypes
-                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
-                            self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                            0] * scale  # Bin the people
-                        else:  # Results by genotype
-                            for g in range(ng):  # Loop over genotypes
-                                inds = ((sim.people[attr1][g, :] == sim.t) * (sim.people[attr2][g, :])).nonzero()
-                                self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                                      0] * scale  # Bin the people
+                # Figure out if it's a flow or incidence
+                if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result:
+                    attr1, attr2 = self.convert_rname_flows(result)
+                    if result[:5] == 'total':  # Results across all genotypes
+                        inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
+                        self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
+                                                        0] * scale  # Bin the people
+                    else:  # Results by genotype
+                        for g in range(ng):  # Loop over genotypes
+                            inds = ((sim.people[attr1][g, :] == sim.t) * (sim.people[attr2][g, :])).nonzero()
+                            self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
+                                                                  0] * scale  # Bin the people
 
-                        if 'incidence' in result:
-                            # Need to divide by the right denominator
-                            if 'hpv' in result:  # Denominator is susceptible population
-                                denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
-                            else:  # Denominator is females
-                                denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[
-                                             0] * scale) / 1e5  # CIN and cancer are per 100,000 women
-                            if 'total' not in result: denom = denom[None, :]
-                            self.results[result][date] = self.results[result][date] / denom
+                    if 'incidence' in result:
+                        # Need to divide by the right denominator
+                        if 'hpv' in result:  # Denominator is susceptible population
+                            denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
+                        else:  # Denominator is females
+                            denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[
+                                         0] * scale) / 1e5  # CIN and cancer are per 100,000 women
+                        if 'total' not in result: denom = denom[None, :]
+                        self.results[result][date] = self.results[result][date] / denom
 
 
     def finalize(self, sim):
