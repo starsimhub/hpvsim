@@ -120,9 +120,9 @@ class PeopleMeta(sc.prettyobj):
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
 # the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections',     'reactivations',     'screens',  'screened']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections',     'reactivations',     'screens',  'screened']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu,          pl.cm.Purples, pl.cm.Purples, pl.cm.Purples,]
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'detected_cancers', 'cancer_deaths',    'reinfections',     'reactivations',     'screens',  'screened']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'detected cancers', 'cancer deaths',    'reinfections',     'reactivations',     'screens',  'screened']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples, pl.cm.Purples,      pl.cm.GnBu,          pl.cm.Purples, pl.cm.Purples, pl.cm.Purples,]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -235,8 +235,8 @@ default_birth_rates = np.array([
 
 default_init_prev = {
     'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
-    'm'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
-    'f'             : np.array([ 0.0, 0.05, 0.25, 0.15, 0.1, 0.05, 0.005, 0]),
+    'm'             : np.array([ 0.0, 0.05, 0.07, 0.05, 0.02, 0.01, 0.0005, 0]),
+    'f'             : np.array([ 0.0, 0.05, 0.07, 0.05, 0.02, 0.01, 0.0005, 0]),
 }
 
 

@@ -26,7 +26,6 @@ def test_network(do_plot=True):
                 n_years=60,
                 burnin=30,
                 dt=0.5,
-                pop_scale=13.54e6/n_agents,
                 network='default',
                 debut = dict(f=dict(dist='normal', par1=15., par2=1),
                              m=dict(dist='normal', par1=16., par2=1))
@@ -43,9 +42,13 @@ def test_network(do_plot=True):
         edges=np.linspace(0, 100, 21))
 
     az = hpv.age_results(
-        timepoints=['2000', '2020'],
-        result_keys=['total_infections']
+        result_keys=sc.objdict(
+            total_infections=sc.objdict(
+                timepoints=['2000', '2020'],
+            ),
+        )
     )
+
 
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
