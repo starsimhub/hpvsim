@@ -582,6 +582,7 @@ class age_results(Analyzer):
             'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
+            'detected_cancer': ['date_detected_cancer', 'detected_cancer']
         }
         attr1 = mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
         attr2 = mapping[attr][1]  # As above

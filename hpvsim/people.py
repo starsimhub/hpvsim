@@ -406,6 +406,7 @@ class People(hpb.BasePeople):
         is_detected = hpu.binomial_arr(detection_probs)
         is_detected_inds = filter_inds[is_detected]
         self.detected_cancer[genotype, is_detected_inds] = True
+        self.date_detected_cancer[genotype, is_detected_inds] = self.t
         return len(is_detected_inds)
 
 
