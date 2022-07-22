@@ -917,25 +917,27 @@ class Calibration(Analyzer):
         if label: sim.label = label
 
         # Set regular sim pars
-        valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
-        if 'prognoses' in valid_pars.keys():
-            sim_progs = hppar.get_prognoses()
-            for prog_key, prog_val in valid_pars['prognoses'].items():
-                sim_progs[prog_key] = np.array(prog_val)
-            valid_pars['prognoses'] = sim_progs
-        sim.update_pars(valid_pars)
-        if len(valid_pars) != len(calib_pars):
-            extra = set(calib_pars.keys()) - set(valid_pars.keys())
-            errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'
-            raise ValueError(errormsg)
+        if calib_pars is not None:
+            valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
+            if 'prognoses' in valid_pars.keys():
+                sim_progs = hppar.get_prognoses()
+                for prog_key, prog_val in valid_pars['prognoses'].items():
+                    sim_progs[prog_key] = np.array(prog_val)
+                valid_pars['prognoses'] = sim_progs
+            sim.update_pars(valid_pars)
+            if len(valid_pars) != len(calib_pars):
+                extra = set(calib_pars.keys()) - set(valid_pars.keys())
+                errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'
+                raise ValueError(errormsg)
 
         # Set genotype pars
-        gmap = sim['genotype_map']
-        gmap_r = {v:k for k,v in gmap.items()}
-        for gname,gpardict in genotype_pars.items():
-            g = gmap_r[gname]
-            for gpar,gval in gpardict.items():
-                sim['genotypes'][g].p[gpar] = gval
+        if genotype_pars is not None:
+            gmap = sim['genotype_map']
+            gmap_r = {v:k for k,v in gmap.items()}
+            for gname,gpardict in genotype_pars.items():
+                g = gmap_r[gname]
+                for gpar,gval in gpardict.items():
+                    sim['genotypes'][g].p[gpar] = gval
 
         # Run the sim
         try:
@@ -985,10 +987,16 @@ class Calibration(Analyzer):
     def run_trial(self, trial):
         ''' Define the objective for Optuna '''
 
-        genotype_pars = {}
-        for gname, pardict in self.genotype_pars.items():
-            genotype_pars[gname] = self.get_pars(pardict, trial)
-        calib_pars = self.get_pars(self.calib_pars, trial)
+        if self.genotype_pars is not None:
+            genotype_pars = {}
+            for gname, pardict in self.genotype_pars.items():
+                genotype_pars[gname] = self.get_pars(pardict, trial)
+        else:
+            genotype_pars = None
+        if self.calib_pars is not None:
+            calib_pars = self.get_pars(self.calib_pars, trial)
+        else:
+            calib_pars = None
 
         sim = self.run_sim(calib_pars, genotype_pars, return_sim=True)
         # trial.set_user_attr('sim', sim) # CK: fails since not a JSON, could use sc.jsonpickle()
