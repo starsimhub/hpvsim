@@ -74,7 +74,7 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key in ['dead_other', 'vaccinated', 'screened', 'treated', 'diagnosed']: # ALl false at the beginning
+            if key in ['dead_other', 'vaccinated', 'screened', 'treated', 'detected_cancer']: # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
             elif key == 'alive':  # All true at the beginning
                 self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
@@ -139,6 +139,7 @@ class People(hpb.BasePeople):
         self.total_flows        = {f'total_{key}'           : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'                 : 0 for key in hpd.dem_keys}
+        self.intv_flows         = {f'{key}'                 : 0 for key in hpd.intv_flow_keys}
         return
 
 
@@ -193,7 +194,6 @@ class People(hpb.BasePeople):
                 self.flows['cins'][g]       += self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
             self.flows['cancers'][g]        += self.check_cancer(g)
             self.flows['cancer_deaths'][g]  += self.check_cancer_deaths(g)
-            self.flows['detected_cancers'][g]+= self.check_cancer_detection(g)
             self.check_clearance(g)
 
         # Create total flows
@@ -204,6 +204,7 @@ class People(hpb.BasePeople):
         self.total_flows['total_cancers']   += self.flows['cancers'].sum()
         self.total_flows['total_cancer_deaths']   += self.flows['cancer_deaths'].sum()
         self.total_flows['total_detected_cancers'] += self.flows['detected_cancers'].sum()
+        self.intv_flows['detected_cancers'] += self.check_cancer_detection()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
         self.sus_pool = self.susceptible.nonzero()
@@ -394,22 +395,20 @@ class People(hpb.BasePeople):
         return len(inds)
 
 
-    def check_cancer_detection(self, genotype):
+    def check_cancer_detection(self):
         '''
         Check for new cancer detection
         '''
-        cancer_inds = self.true_by_genotype('cancerous', genotype)
-        undetected_cancer_inds = self.false_by_genotype('detected_cancer', genotype)
+        cancer_inds = self.true('cancerous')
+        undetected_cancer_inds = self.false('detected_cancer')
         filter_inds = np.intersect1d(undetected_cancer_inds, cancer_inds)
-        # if len(filter_inds):
-        #     print('i am here')
-        dur_cancer = (self.t - self.date_cancerous[genotype, filter_inds])*self['dt']
+        dur_cancer = (self.t - self.date_cancerous[filter_inds])*self['dt']
         dur_cancer_inds = np.digitize(dur_cancer, self.pars['prognoses']['cancer_detection']) - 1
         detection_probs = self.pars['prognoses']['cancer_detection'][dur_cancer_inds]
         is_detected = hpu.binomial_arr(detection_probs)
         is_detected_inds = filter_inds[is_detected]
-        self.detected_cancer[genotype, is_detected_inds] = True
-        self.date_detected_cancer[genotype, is_detected_inds] = self.t
+        self.detected_cancer[is_detected_inds] = True
+        self.date_detected_cancer[is_detected_inds] = self.t
         return len(is_detected_inds)
 
 

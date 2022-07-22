@@ -406,6 +406,10 @@ class Sim(hpb.BaseSim):
         for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
             results[f'{var}'] = init_res(f'{name}', color=color, n_rows=2)
 
+        # Create intv results
+        for var, name, color in zip(hpd.intv_flow_keys, hpd.intv_flow_names, hpd.intv_flow_colors):
+            results[f'{var}'] = init_res(f'{name}', color=color)
+
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
         results['new_total_vaccinated'] = init_res('Newly vaccinated')
@@ -421,8 +425,7 @@ class Sim(hpb.BaseSim):
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence')
 
         # Detected cancers
-        results['total_detected_cancer_incidence'] = init_res('Total detected cancer incidence')
-        results['detected_cancer_incidence'] = init_res('Detected cancer incidence', n_rows=ng)
+        results['detected_cancer_incidence'] = init_res('Detected cancer incidence')
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
@@ -923,13 +926,12 @@ class Sim(hpb.BaseSim):
         self.results['total_cin3_incidence'][:]    = res['total_cin3s'][:] / demoninator
         self.results['total_cin_incidence'][:]     = res['total_cins'][:] / demoninator
         self.results['total_cancer_incidence'][:]  = res['total_cancers'][:] / demoninator
-        self.results['total_detected_cancer_incidence'][:]  = res['total_detected_cancers'][:] / demoninator
         self.results['cin1_incidence'][:]          = res['cin1s'][:] / demoninator
         self.results['cin2_incidence'][:]          = res['cin2s'][:] / demoninator
         self.results['cin3_incidence'][:]          = res['cin3s'][:] / demoninator
         self.results['cin_incidence'][:]           = res['cins'][:] / demoninator
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
-        self.results['detected_cancer_incidence'][:]        = res['total_cancers'][:] / demoninator
+        self.results['detected_cancer_incidence'][:]      = res['detected_cancers'][:] / demoninator
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])

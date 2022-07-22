@@ -50,7 +50,7 @@ class PeopleMeta(sc.prettyobj):
             'current_partners', # Int by relationship type
         ]
 
-        # Set the states that a person can be in, all booleans per person and per genotype except other_dead, screened, vaccinated and treated
+        # Set the states that a person can be in, all booleans per person and per genotype except other_dead, screened, vaccinated, treated and detected_cancer
         self.states = [
             'susceptible',
             'infectious',
@@ -68,7 +68,6 @@ class PeopleMeta(sc.prettyobj):
             'vaccinated',
             'screened',
             'treated',
-            'diagnosed'
         ]
 
         # Immune states, by genotype/vaccine
@@ -121,9 +120,9 @@ class PeopleMeta(sc.prettyobj):
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
 # the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'detected_cancers', 'cancer_deaths',    'reinfections',     'reactivations',     'screens',  'screened']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'detected cancers', 'cancer deaths',    'reinfections',     'reactivations',     'screens',  'screened']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples, pl.cm.Purples,      pl.cm.GnBu,          pl.cm.Purples, pl.cm.Purples, pl.cm.Purples,]
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'cancer_deaths',    'reinfections',     'reactivations']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'cancer deaths',    'reinfections',     'reactivations']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples,      pl.cm.GnBu,          pl.cm.Purples]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -148,6 +147,10 @@ by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['total infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',                    '#000000']
 
+# Intervention-related flows (total across genotypes)
+intv_flow_keys   = ['screens',  'screened', 'vaccinations', 'vaccinated', 'cancers_detected']
+intv_flow_names  = ['screens',  'women screened', 'vaccinations', 'women vaccinated', 'cancers detected']
+intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,    pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
 
 #%%
 # Parameters that can vary by genotype (WIP)

@@ -1147,10 +1147,9 @@ class Screening(Intervention):
         diagnosed_inds = np.intersect1d(treat_eligible_inds, cancerous_inds) # Indices of those who will be diagnosed with cancer
 
         # Update states and flows to reflect cancer diagnoses
-        sim.people.detected_cancer[:, diagnosed_inds] = True
-        sim.people.flows['detected_cancers'][0] += len(diagnosed_inds)
+        sim.people.detected_cancer[diagnosed_inds] = True
+        sim.people.flows['detected_cancers'] += len(diagnosed_inds)
         sim.people.date_detected_cancer[0, diagnosed_inds] = sim.t
-        sim.people.diagnosed[diagnosed_inds] = True
 
         # Treat cancers
         ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
