@@ -1101,16 +1101,34 @@ class Calibration(Analyzer):
         # Compare the results
         self.initial_pars = sc.objdict()
         self.par_bounds = sc.objdict()
-        for key, val in self.calib_pars.items():
-            if isinstance(val, list):
-                self.initial_pars[key] = val[0]
-                self.par_bounds[key] = np.array([val[1], val[2]])
-            elif isinstance(val, dict):
-                for parkey, par_highlowlist in val.items():
-                    for i, (best, low, high) in enumerate(par_highlowlist):
-                        sampler_key = key + '_' + parkey + '_' + str(i)
-                        self.initial_pars[sampler_key] = best
-                        self.par_bounds[sampler_key] = np.array([low, high])
+
+        # Compare for regular sim pars
+        if self.calib_pars is not None:
+            for key, val in self.calib_pars.items():
+                if isinstance(val, list):
+                    self.initial_pars[key] = val[0]
+                    self.par_bounds[key] = np.array([val[1], val[2]])
+                elif isinstance(val, dict):
+                    for parkey, par_highlowlist in val.items():
+                        for i, (best, low, high) in enumerate(par_highlowlist):
+                            sampler_key = key + '_' + parkey + '_' + str(i)
+                            self.initial_pars[sampler_key] = best
+                            self.par_bounds[sampler_key] = np.array([low, high])
+
+        # Compare for genotype pars
+        if self.genotype_pars is not None:
+            for gname, gpardict in genotype_pars.items():
+                for key, val in gpardict.items():
+                    if isinstance(val, list):
+                        self.initial_pars[key] = val[0]
+                        self.par_bounds[key] = np.array([val[1], val[2]])
+                    elif isinstance(val, dict):
+                        for parkey, par_highlowlist in val.items():
+                            for i, (best, low, high) in enumerate(par_highlowlist):
+                                sampler_key = key + '_' + parkey + '_' + str(i)
+                                self.initial_pars[sampler_key] = best
+                                self.par_bounds[sampler_key] = np.array([low, high])
+
         self.parse_study()
 
         # Tidy up
