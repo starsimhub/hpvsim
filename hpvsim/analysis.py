@@ -570,7 +570,7 @@ class age_results(Analyzer):
 
     def convert_rname_flows(self, rname):
         ''' Helper function for converting flow result names to people attributes '''
-        attr = result.replace('total_', '').replace('_incidence', '')  # Name of the actual state
+        attr = rname.replace('total_', '').replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
         if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
         # Handle variable names
