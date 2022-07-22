@@ -1117,7 +1117,7 @@ class Calibration(Analyzer):
 
         # Compare for genotype pars
         if self.genotype_pars is not None:
-            for gname, gpardict in genotype_pars.items():
+            for gname, gpardict in self.genotype_pars.items():
                 for key, val in gpardict.items():
                     if isinstance(val, list):
                         self.initial_pars[key] = val[0]
