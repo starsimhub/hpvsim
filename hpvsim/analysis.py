@@ -609,7 +609,7 @@ class age_results(Analyzer):
                     unique_genotypes = thisdatadf.genotype.unique()
                     ng = len(unique_genotypes)
 
-                size = na if 'total' in result else (ng, na)
+                size = na if 'total' in result or 'cancer' in result else (ng, na)
                 self.results[result][date] = np.zeros(size)
 
                 # Both annual stocks and prevalence require us to calculate the current stocks.
@@ -669,7 +669,7 @@ class age_results(Analyzer):
                 # Figure out if it's a flow or incidence
                 if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
-                    if result[:5] == 'total':  # Results across all genotypes
+                    if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
                         inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
                         self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
                                                         0] * scale  # Bin the people
@@ -686,7 +686,7 @@ class age_results(Analyzer):
                         else:  # Denominator is females
                             denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[
                                          0] * scale) / 1e5  # CIN and cancer are per 100,000 women
-                        if 'total' not in result: denom = denom[None, :]
+                        if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
                         self.results[result][date] = self.results[result][date] / denom
 
 
@@ -772,7 +772,7 @@ class age_results(Analyzer):
                         thisdatadf = self.result_keys[rkey].data[(self.result_keys[rkey].data.year == float(date))&(self.result_keys[rkey].data.name == rkey)]
                         unique_genotypes = thisdatadf.genotype.unique()
 
-                    if 'total' not in rkey:
+                    if 'total' not in rkey and 'cancer' not in rkey:
                         # Prepare plot settings
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()

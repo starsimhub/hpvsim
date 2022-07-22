@@ -73,8 +73,8 @@ def test_age_results(do_plot=True):
 
     az1 = hpv.age_results(
         result_keys=sc.objdict(
-            hpv_prevalence=sc.objdict(
-                timepoints=['1990'],
+            cancer_incidence=sc.objdict(
+                timepoints=['2020'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
                 # datafile='test_data/south_africa_hpv_data.xlsx',
             ),
@@ -94,11 +94,11 @@ def test_age_results(do_plot=True):
         'HPV prevalence': [
             'hpv_prevalence',
         ],
-        'HPV incidence': [
-            'hpv_incidence',
+        'Cervical cancer incidence': [
+            'cancer_incidence',
         ],
         'Detected cervical cancer incidence': [
-            'total_detected_cancer_incidence',
+            'detected_cancer_incidence',
         ],
     }
 
