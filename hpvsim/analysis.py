@@ -750,26 +750,22 @@ class age_results(Analyzer):
         if len(self.results) == 0:
             errormsg = f'Cannot plot since no age results were recorded)'
             raise ValueError(errormsg)
-        elif len(self.result_keys)==1:
-            n_plots = len(self.result_keys['dates'])
-            n_rows, n_cols = sc.get_rows_cols(n_plots)
         else:
             dates_per_result = [len(rk['dates']) for rk in self.result_keys.values()]
-            n_plots = sum(dates_per_result)*len(self.result_keys)
+            n_plots = sum(dates_per_result)
             n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Make the figure(s)
         with hpo.with_style(**kwargs):
-            col_count=1
+            plot_count=1
             for rkey,resdict in self.results.items():
 
                 pl.subplots_adjust(**axis_args)
-                row_count = 0
 
                 for date in self.result_keys[rkey]['dates']:
 
                     # Start making plot
-                    ax = pl.subplot(n_rows, n_cols, col_count+row_count)
+                    ax = pl.subplot(n_rows, n_cols, plot_count)
                     x = np.arange(len(self.result_keys[rkey].age_labels))  # the label locations
                     if 'data' in self.result_keys[rkey].keys():
                         thisdatadf = self.result_keys[rkey].data[(self.result_keys[rkey].data.year == float(date))&(self.result_keys[rkey].data.name == rkey)]
@@ -796,10 +792,9 @@ class age_results(Analyzer):
                     ax.set_xlabel('Age group')
                     ax.set_title(self.result_properties[rkey].name+' - '+date)
                     ax.legend()
-                    row_count += n_cols
                     ax.set_xticks(x, self.result_keys[rkey].age_labels)
 
-                col_count+=1
+                    plot_count+=1
 
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)

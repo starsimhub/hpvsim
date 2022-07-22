@@ -140,10 +140,9 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # people      = test_snapshot()
-
     # sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
-    # sim2, calib = test_calibration()
+    # sim1, a1    = test_age_results()
+    sim2, calib = test_calibration()
 
 
 
