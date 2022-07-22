@@ -125,7 +125,7 @@ def test_calibration():
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18])
     calib_pars = dict(
         beta=[0.05, 0.010, 0.20],
-        hpv_control_prob=[.9, 0.5, 1],
+        hpv_control_prob=[.9, 0.1, 1],
     )
     genotype_pars = dict(
         hpv16=dict(

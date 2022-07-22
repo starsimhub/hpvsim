@@ -1116,18 +1116,30 @@ class Screening(Intervention):
         for state in states:
             screen_probs = np.zeros(len(screen_inds))
             if pars['by_genotype']:
-                for g in range(sim['n_genotypes']):
-                    tp_inds = hpu.true(sim.people[state][g, screen_inds])
-                    screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
+                if state != 'cancerous':
+                    for g in range(sim['n_genotypes']):
+                        tp_inds = hpu.true(sim.people[state][g, screen_inds])
+                        screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
+                        screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                        screen_pos += list(screen_pos_inds)
+                else:
+                    tp_inds = hpu.true(sim.people[state][screen_inds])
+                    screen_probs[tp_inds] = pars['test_positivity'][state]
                     screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
                     screen_pos += list(screen_pos_inds)
                 screen_pos = list(set(screen_pos)) # If anyone has screened positive for >1 genotype, only include them once
 
             else:
-                tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
-                screen_probs[tp_inds] = pars['test_positivity'][state]
-                screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                screen_pos += list(screen_pos_inds)
+                if state != 'cancerous':
+                    tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
+                    screen_probs[tp_inds] = pars['test_positivity'][state]
+                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                    screen_pos += list(screen_pos_inds)
+                else:
+                    tp_inds = hpu.true(sim.people[state][screen_inds])
+                    screen_probs[tp_inds] = pars['test_positivity'][state]
+                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                    screen_pos += list(screen_pos_inds)
 
         screen_pos = np.array(screen_pos)
         if len(screen_pos)>0:
@@ -1149,7 +1161,7 @@ class Screening(Intervention):
         # Update states and flows to reflect cancer diagnoses
         sim.people.detected_cancer[diagnosed_inds] = True
         sim.people.cancer_flows['detected_cancers'] += len(diagnosed_inds)
-        sim.people.date_detected_cancer[0, diagnosed_inds] = sim.t
+        sim.people.date_detected_cancer[diagnosed_inds] = sim.t
 
         # Treat cancers
         ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
@@ -1198,7 +1210,7 @@ class Screening(Intervention):
     def treat_cancer(self, sim, ca_treat_inds, treat_pars):
         '''Treat cancer '''
         new_dur_cancer = hpu.sample(**treat_pars['radiation']['dur'], size=len(ca_treat_inds))
-        sim.people.date_dead_cancer[:, ca_treat_inds] += np.ceil(new_dur_cancer / sim['dt'])
+        sim.people.date_dead_cancer[ca_treat_inds] += np.ceil(new_dur_cancer / sim['dt'])
         return
 
 
