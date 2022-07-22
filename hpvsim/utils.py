@@ -199,7 +199,7 @@ def set_prognoses(people, inds, g, dur_hpv):
     # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
     dur_to_peak_dys = sample(**durpars['dys'], size=len(cin1_inds))
     people.dur_hpv[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
-    mean_peaks = mean_peak_fn(dur_to_peak_dys, prog_rate) # Apply a function that maps durations + genotype-specific progression + speed to severity
+    mean_peaks = mean_peak_fn(dur_to_peak_dys, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
     peaks = np.minimum(1, sample(dist='lognormal', par1=mean_peaks, par2=(1-mean_peaks)**2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
     # Determine whether CIN1 clears or progresses to CIN2
@@ -250,9 +250,9 @@ def set_prognoses(people, inds, g, dur_hpv):
 
     # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
     time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
-    people.date_clearance[g, no_cancer_inds] = np.fmax(people.date_clearance[g, no_cancer_inds],
-                                                  people.date_cin1[g, no_cancer_inds] +
-                                                  np.ceil(dur_to_peak_dys[~is_cancer] / dt) +
+    people.date_clearance[g, cin3_inds] = np.fmax(people.date_clearance[g, cin3_inds],
+                                                  people.date_cin1[g, cin3_inds] +
+                                                  np.ceil(dur_to_peak_dys[is_cin3] / dt) +
                                                   np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
 
     # Case 2.2.2.2: Severe dysplasia progresses to cancer

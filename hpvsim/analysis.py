@@ -525,7 +525,7 @@ class age_results(Analyzer):
                 else:
                     # Handle edges, age bins, and labels
                     rdict.age_labels = []
-                    if rdict.edges is None:  # Default age bins
+                    if (not hasattr(rdict,'edges')) or rdict.edges is None:  # Default age bins
                         rdict.edges = np.linspace(0, 100, 11)
                     rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
                     self.results[rk]['bins'] = rdict.bins

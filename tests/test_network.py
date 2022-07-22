@@ -42,9 +42,13 @@ def test_network(do_plot=True):
         edges=np.linspace(0, 100, 21))
 
     az = hpv.age_results(
-        timepoints=['2000', '2020'],
-        result_keys=['total_infections']
+        result_keys=sc.objdict(
+            total_infections=sc.objdict(
+                timepoints=['2000', '2020'],
+            ),
+        )
     )
+
 
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
