@@ -193,6 +193,7 @@ class People(hpb.BasePeople):
                 self.flows['cins'][g]       += self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
             self.flows['cancers'][g]        += self.check_cancer(g)
             self.flows['cancer_deaths'][g]  += self.check_cancer_deaths(g)
+            self.flows['detected_cancers'][g]+= self.check_cancer_detection(g)
             self.check_clearance(g)
 
         # Create total flows
@@ -389,6 +390,19 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.dead_cancer[genotype,:], self.date_dead_cancer[genotype,:], filter_inds=filter_inds)
         self.make_die(inds, genotype=genotype, cause='cancer')
         return len(inds)
+
+
+    def check_cancer_detection(self, genotype):
+        '''
+        Check for new cancer detection
+        '''
+        filter_inds = self.true_by_genotype('cancerous', genotype)
+        dur_cancer = (self.t - self.date_cancerous[genotype, filter_inds])*self['dt']
+        dur_cancer_inds = np.digitize(dur_cancer, self.pars['prognoses']['cancer_detection']) - 1
+        detection_probs = self.pars['prognoses']['cancer_detection'][dur_cancer_inds]
+        is_detected = hpu.binomial_arr(detection_probs)
+
+        return len(is_detected)
 
 
     def check_death(self):
