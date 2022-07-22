@@ -70,10 +70,10 @@ def make_pars(set_prognoses=False, **kwargs):
     # Probabilities of disease progression
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
-    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.95} # Parameters the control the clinical cliassification of dysplasia
+    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
-        hpv_reactivation_probs  = np.array([0.01,    0.05,        0.08]),      # made this up, need to parameterize somehow
+        hpv_reactivation_probs  = np.array([0.0001,    0.05,        0.04]),      # made this up, need to parameterize somehow
     )
 
     # Parameters used to calculate immunity
@@ -104,7 +104,7 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1
     pars['dur_cin2_clear']  = dict(dist='lognormal', par1=1.0, par2=0.5)  # Time to clearance from CIN2
     pars['dur_cin3_clear']  = dict(dist='lognormal', par1=1.5, par2=0.5)  # Time to clearance from CIN3
-    pars['dur_cancer']      = dict(dist='lognormal', par1=6.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death
+    pars['dur_cancer']      = dict(dist='lognormal', par1=8.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death
 
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
@@ -234,6 +234,7 @@ def get_prognoses():
         cin2_probs        = np.array([0.020,   0.0287,     0.0305,     0.06427,    0.1659,     0.3011,     0.4483]),   # Conditional probability of developing CIN2 given CIN1, derived from Harvard model calibration
         cin3_probs        = np.array([0.007,   0.0097,     0.0102,     0.0219,     0.0586,     0.112,      0.1779]),   # Conditional probability of developing CIN3 given CIN2, derived from Harvard model calibration
         cancer_probs      = np.array([0.002,   0.003,      0.0564,     0.1569,     0.2908,     0.3111,     0.5586]),   # Conditional probability of developing cancer given CIN3, derived from Harvard model calibration
+        cancer_detection  = np.array([0.02,    0.05,       0.064,      0.1569,     0.1908,     0.3111,     0.5586]),   # Probability of cancer detection via symptoms given time with cancer
         )
 
     # Check that lengths match
@@ -870,13 +871,13 @@ def get_screen_pars(screen=None):
             by_genotype=True,
             test_positivity=dict(
                 hpv=dict(
-                    hpv16=0.75,
-                    hpv18=0.75,
-                    hpv31=0.75,
-                    hpv33=0.75,
-                    hpv45=0.75,
-                    hpv52=0.75,
-                    hpv58=0.75,
+                    hpv16=0.55,
+                    hpv18=0.55,
+                    hpv31=0.55,
+                    hpv33=0.55,
+                    hpv45=0.55,
+                    hpv52=0.55,
+                    hpv58=0.55,
                     hpv6=0,
                     hpv11=0,
                 ),

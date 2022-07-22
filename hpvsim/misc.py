@@ -30,7 +30,7 @@ date_range = sc.daterange
 __all__ += ['load_data', 'load', 'save', 'savefig']
 
 
-def load_data(datafile, check_date=True, header='infer', calculate=True, **kwargs):
+def load_data(datafile, check_date=False, header='infer', calculate=True, **kwargs):
     '''
     Load data for comparing to the model output, either from file or from a dataframe.
     Data is expected to be in wide format, with each row representing a year and columns
@@ -54,7 +54,7 @@ def load_data(datafile, check_date=True, header='infer', calculate=True, **kwarg
         if df_lower.endswith('csv'):
             data = pd.read_csv(full_df, header=header, **kwargs)
         elif df_lower.endswith('xlsx') or df_lower.endswith('xls'):
-            data = pd.read_excel(full_df, header=header, **kwargs)
+            data = pd.read_excel(full_df, **kwargs)
         else:
             errormsg = f'Currently loading is only supported from .csv, .xls, and .xlsx files, not "{datafile}"'
             raise NotImplementedError(errormsg)
