@@ -670,6 +670,7 @@ class age_results(Analyzer):
                 # Figure out if it's a flow or incidence
                 if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
+                    attr1, attr2 = self.convert_rname_flows(result)
                     if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
                         inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
                         self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[

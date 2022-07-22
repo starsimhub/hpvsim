@@ -408,6 +408,7 @@ class People(hpb.BasePeople):
         filter_inds = np.intersect1d(undetected_cancer_inds, cancer_inds)
         dur_cancer = (self.t - self.date_cancerous[filter_inds])*self['dt']
         dur_cancer_inds = np.digitize(dur_cancer, self.pars['prognoses']['cancer_detection']) - 1
+        dur_cancer_inds = np.where(dur_cancer_inds < 0, 0, dur_cancer_inds)
         detection_probs = self.pars['prognoses']['cancer_detection'][dur_cancer_inds]
         is_detected = hpu.binomial_arr(detection_probs)
         is_detected_inds = filter_inds[is_detected]

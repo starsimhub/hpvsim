@@ -76,11 +76,10 @@ def test_age_results(do_plot=True):
             cancer_incidence=sc.objdict(
                 timepoints=['2020'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
-                # datafile='test_data/south_africa_hpv_data.xlsx',
             ),
-            hpv_incidence=sc.objdict(
-                timepoints=['1990'],
-                edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.])
+            detected_cancer_incidence=sc.objdict(
+                timepoints=['2020'],
+                edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             )
         )
     )
@@ -104,7 +103,7 @@ def test_age_results(do_plot=True):
 
     # Check plot()
     if do_plot:
-        sim.plot(to_plot=to_plot)
+        # sim.plot(to_plot=to_plot)
         fig0 = sim.get_analyzer(0).plot()
         # fig1 = sim.get_analyzer(1).plot()
 
@@ -152,8 +151,8 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
-    sim2, calib = test_calibration()
+    sim1, a1    = test_age_results()
+    # sim2, calib = test_calibration()
 
 
 
