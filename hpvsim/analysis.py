@@ -750,9 +750,6 @@ class age_results(Analyzer):
         if not len(self.results):
             errormsg = f'Cannot plot since no age results were recorded)'
             raise ValueError(errormsg)
-        # if len(self.results)>1:
-        #     n_cols = len(self.timepoints) # One column for each requested timepoint
-        #     n_rows = len(self.result_keys) # One row for each requested result
         else: # If there's only one timepoint, automatically figure out rows and columns
             n_plots = len(self.results)
             n_rows, n_cols = sc.get_rows_cols(n_plots)
@@ -779,7 +776,6 @@ class age_results(Analyzer):
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
                             ax.plot(x, resdict[date][g,:], color=self.result_properties[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
-                            # ax.bar(x+xlocations[g], resdict[rkey][g,:], color=self.result_properties[rkey].color[g], label=f'Model - {glabel}', width=barwidth)
                             if ('data' in self.result_keys[rkey].keys()) and (len(thisdatadf) > 0):
                                 # check if this genotype is in dataframe
                                 if self.glabels[g].upper() in unique_genotypes:
@@ -789,11 +785,9 @@ class age_results(Analyzer):
                     else:
                         if ('data' in self.result_keys[rkey].keys()) and (len(thisdatadf) > 0):
                             ax.plot(x, resdict[date], color=self.result_properties[rkey].color, linestyle='--', label='Model')
-                            # ax.bar(x-1/2*barwidth, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
                             ydata = np.array(thisdatadf.value)
                             ax.scatter(x, ydata,  color=self.result_properties[rkey].color, marker='s', label='Data')
                         else:
-                            # ax.bar(x, resdict[rkey], color=self.result_properties[rkey].color, width=barwidth, label='Model')
                             ax.plot(x, resdict[date], color=self.result_properties[rkey].color, linestyle='--', label='Model')
                     ax.set_xlabel('Age group')
                     ax.set_title(self.result_properties[rkey].name+' - '+date)
@@ -851,10 +845,12 @@ class Calibration(Analyzer):
         A Calibration object
 
     **Example**::
-
-        sim = hpv.Sim(datafile='data.csv')
-        calib_pars = dict(beta=[0.015, 0.010, 0.020])
-        calib = hpv.Calibration(sim, calib_pars, total_trials=100)
+        sim = hpv.Sim(pars, genotypes=[hpv16, hpv18])
+        calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
+        calib = hpv.Calibration(sim, calib_pars=calib_pars,
+                                datafiles=['test_data/south_africa_hpv_data.xlsx',
+                                           'test_data/south_africa_cancer_data.xlsx'],
+                                total_trials=10, n_workers=4)
         calib.calibrate()
         calib.plot()
 
