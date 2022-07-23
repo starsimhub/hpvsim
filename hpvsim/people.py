@@ -401,7 +401,7 @@ class People(hpb.BasePeople):
 
     def check_cancer_detection(self):
         '''
-        Check for new cancer detection
+        Check for new cancer detection, treat subset of detected cancers
         '''
         cancer_inds = self.true('cancerous')
         undetected_cancer_inds = self.false('detected_cancer')
@@ -414,6 +414,10 @@ class People(hpb.BasePeople):
         is_detected_inds = filter_inds[is_detected]
         self.detected_cancer[is_detected_inds] = True
         self.date_detected_cancer[is_detected_inds] = self.t
+        treat_probs = np.full(len(is_detected_inds), self.pars['cancer_treat_probs'])
+        treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
+        new_dur_cancer = hpu.sample(hppar.get_treatment_pars('radiation')['dur'], size=len(treat_inds))
+        self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
         return len(is_detected_inds)
 
 
