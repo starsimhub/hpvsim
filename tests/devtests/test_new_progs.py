@@ -26,7 +26,16 @@ progs = sim['prognoses']
 genotype_pars = sim['genotype_pars']
 genotype_map = sim['genotype_map']
 durpars = [genotype_pars[genotype_map[g]]['dur'] for g in genotype_map]
-cancer_thresh = 0.95
+cancer_thresh = 0.99
+genotype_pars['hpv16'].prog_time = 4
+genotype_pars['hpv18'].prog_time = 4
+genotype_pars['hpv16'].prog_rate = 0.6
+genotype_pars['hpv18'].prog_rate = 0.8
+genotype_pars['hpv31'].prog_time = 10
+genotype_pars['hpv6'].prog_time = 15
+genotype_pars['hpv31'].prog_rate = .5
+genotype_pars['hpv6'].prog_rate = 0.5
+
 
 # Prognoses from Harvard model
 prognoses = dict(
@@ -61,6 +70,15 @@ def mean_peak_fn(x, k):
     '''
     return (2 / (1 + np.exp(-k * x))) - 1
 
+
+def mean_peak_fn2(x, xmid, k):
+    '''
+    Define a function to link the duration of dysplasia prior to control/integration
+    to the peak dysplasia prior to control/integration.
+    Currently this is modeled as the concave part of a logistic function
+    '''
+    return (1 / (1 + np.exp(-k * (x-xmid))))
+
 # Figure settings
 font_size = 26
 font_family = 'Libertinus Sans'
@@ -89,7 +107,7 @@ longx = np.linspace(0.01, 20, 1000)
 for g in range(ng):
     sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
     rv = lognorm(sigma, 0, scale)
-    dd = mean_peak_fn(longx, genotype_pars[genotype_map[g]]['prog_rate'])
+    dd = mean_peak_fn2(longx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
 
     indcin1 = sc.findinds(dd<.33)[-1]
     if (dd>.33).any():
@@ -125,8 +143,8 @@ for g in range(ng):
     r = lognorm(sigma, 0, scale)
 
     for year in years:
-        mean_peaks = mean_peak_fn(year, genotype_pars[genotype_map[g]]['prog_rate'])
-        peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=(1 - mean_peaks), size=n_samples))
+        mean_peaks = mean_peak_fn2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+        peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
         cin1_shares.append(sum(peaks<0.33)/n_samples)
         cin2_shares.append(sum((peaks>0.33)&(peaks<0.67))/n_samples)
         cin3_shares.append(sum((peaks>0.67)&(peaks<cancer_thresh))/n_samples)
@@ -193,13 +211,13 @@ def make_fig1():
     cmap = plt.cm.Oranges([0.25,0.5,0.75,1])
     n_samples = 10
     for g in range(ng):
-        ax[1,0].plot(thisx, mean_peak_fn(thisx, genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
+        ax[1,0].plot(thisx, mean_peak_fn2(thisx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
 
         if g<2:
             # Plot variation
             for year in range(1,11):
-                mean_peaks = mean_peak_fn(year, genotype_pars[genotype_map[g]]['prog_rate'])
-                peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=(1 - mean_peaks), size=n_samples))
+                mean_peaks = mean_peak_fn2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+                peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
                 ax[1,0].plot([year]*n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
     ax[1,0].set_xlabel("Post-dysplasia duration")

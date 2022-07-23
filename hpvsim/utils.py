@@ -167,6 +167,15 @@ def mean_peak_fn(x, k):
     return (2 / (1 + np.exp(-k * x))) - 1
 
 
+def mean_peak_fn2(x, x_infl, k):
+    '''
+    Define a function to link the duration of dysplasia prior to control/integration
+    to the peak dysplasia prior to control/integration.
+    Currently this is modeled as the concave part of a logistic function
+    '''
+    return (1 / (1 + np.exp(-k * (x-x_infl))))
+
+
 def set_prognoses(people, inds, g, dur_hpv):
     ''' Set disease progression '''
 
@@ -177,7 +186,9 @@ def set_prognoses(people, inds, g, dur_hpv):
     durpars = genotype_pars[genotype_map[g]]['dur']
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
+    prog_time = genotype_pars[genotype_map[g]]['prog_time']
     ccut = people.pars['clinical_cutoffs']
+    mean_peak_variance = people.pars['mean_peak_variance']
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
     cin1_probs = mean_peak_fn(dur_hpv, dysp_rate) # Probability of developing dysplasia
@@ -199,8 +210,8 @@ def set_prognoses(people, inds, g, dur_hpv):
     # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
     dur_to_peak_dys = sample(**durpars['dys'], size=len(cin1_inds))
     people.dur_hpv[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
-    mean_peaks = mean_peak_fn(dur_to_peak_dys, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
-    peaks = np.minimum(1, sample(dist='lognormal', par1=mean_peaks, par2=(1-mean_peaks)**2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
+    mean_peaks = mean_peak_fn2(dur_to_peak_dys, prog_time, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
+    peaks = np.minimum(1, sample(dist='lognormal', par1=mean_peaks, par2=mean_peak_variance)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
     # Determine whether CIN1 clears or progresses to CIN2
     is_cin2 = peaks>ccut['cin1']

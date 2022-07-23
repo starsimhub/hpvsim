@@ -96,14 +96,14 @@ def test_age_results(do_plot=True):
         'Cancer deaths': [
             'cancer_deaths',
         ],
-        'Detected cervical cancer incidence': [
-            'detected_cancer_incidence',
+        'Cervical cancer incidence': [
+            'cancer_incidence',
         ],
     }
 
     # Check plot()
     if do_plot:
-        # sim.plot(to_plot=to_plot)
+        sim.plot(to_plot=to_plot)
         fig0 = sim.get_analyzer(0).plot()
         # fig1 = sim.get_analyzer(1).plot()
 
