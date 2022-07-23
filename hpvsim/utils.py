@@ -160,8 +160,8 @@ def find_contacts(p1, p2, inds): # pragma: no cover
 
 def mean_peak_fn(x, k):
     '''
-    Define a function to link the duration of dysplasia prior to control/integration
-    to the peak dysplasia prior to control/integration.
+    Define a function to link the duration of hpv infection prior to dysplasia/control
+    to the probability of developing dysplasia.
     Currently this is modeled as the concave part of a logistic function
     '''
     return (2 / (1 + np.exp(-k * x))) - 1
@@ -169,9 +169,9 @@ def mean_peak_fn(x, k):
 
 def mean_peak_fn2(x, x_infl, k):
     '''
-    Define a function to link the duration of dysplasia prior to control/integration
-    to the peak dysplasia prior to control/integration.
-    Currently this is modeled as the concave part of a logistic function
+    Define a function to link the duration of dysplasia prior to control/cancer
+    to the peak percentage of  peak dysplasia prior to control/integration.
+
     '''
     return (1 / (1 + np.exp(-k * (x-x_infl))))
 
