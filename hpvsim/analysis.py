@@ -1262,7 +1262,7 @@ class Calibration(Analyzer):
                                 for run_num, run in enumerate(self.analyzer_results):
                                     ymodel = run[resname][date][g]
                                     label = f'Model - {glabel}' if run_num==0 else None
-                                    ax.plot(x, ymodel, color=self.result_properties[resname].color[g], linestyle='--')
+                                    ax.plot(x, ymodel, color=self.result_properties[resname].color[g], linestyle='--', label=label)
 
                     else:
                         ydata = np.array(thisdatadf.value)
