@@ -414,9 +414,9 @@ class People(hpb.BasePeople):
         is_detected_inds = filter_inds[is_detected]
         self.detected_cancer[is_detected_inds] = True
         self.date_detected_cancer[is_detected_inds] = self.t
-        treat_probs = np.full(len(is_detected_inds), self.pars['cancer_treat_probs'])
+        treat_probs = np.full(len(is_detected_inds), self.pars['cancer_treat_prob'])
         treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-        new_dur_cancer = hpu.sample(hppar.get_treatment_pars('radiation')['dur'], size=len(treat_inds))
+        new_dur_cancer = hpu.sample(**hppar.get_treatment_pars('radiation')['dur'], size=len(treat_inds))
         self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
         return len(is_detected_inds)
 

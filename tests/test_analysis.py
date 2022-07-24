@@ -74,11 +74,11 @@ def test_age_results(do_plot=True):
     az1 = hpv.age_results(
         result_keys=sc.objdict(
             cancer_deaths=sc.objdict(
-                timepoints=['2020'],
+                timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             ),
             detected_cancer_incidence=sc.objdict(
-                timepoints=['2020'],
+                timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             )
         )
