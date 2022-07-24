@@ -77,6 +77,14 @@ def test_age_results(do_plot=True):
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             ),
+            detected_cancer_deaths=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            cancer_incidence=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
             detected_cancer_incidence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
@@ -103,7 +111,7 @@ def test_age_results(do_plot=True):
 
     # Check plot()
     if do_plot:
-        sim.plot(to_plot=to_plot)
+        # sim.plot(to_plot=to_plot)
         fig0 = sim.get_analyzer(0).plot()
         # fig1 = sim.get_analyzer(1).plot()
 

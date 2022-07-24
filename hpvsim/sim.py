@@ -429,6 +429,7 @@ class Sim(hpb.BaseSim):
         results['cancers'] = init_res('Cancers')
         results['detected_cancers'] = init_res('Detected cancers')
         results['cancer_deaths'] = init_res('Cancer deaths')
+        results['detected_cancer_deaths'] = init_res('Cancer deaths')
         results['cancer_incidence'] = init_res('Cancer incidence')
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence')
         results['cancer_mortality'] = init_res('Cancer mortality')

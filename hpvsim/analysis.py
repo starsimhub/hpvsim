@@ -584,6 +584,7 @@ class age_results(Analyzer):
             'cancer': ['date_cancerous', 'cancerous'],
             'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
             'cancer_deaths': ['date_dead_cancer', 'dead_cancer'],
+            'detected_cancer_deaths': ['date_dead_cancer', 'dead_cancer']
         }
         attr1 = mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
         attr2 = mapping[attr][1]  # As above
@@ -671,7 +672,10 @@ class age_results(Analyzer):
                 if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
                     if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
-                        inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
+                        if result == 'detected_cancer_deaths':
+                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
+                        else:
+                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
                         self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
                                                         0] * scale  # Bin the people
                     else:  # Results by genotype

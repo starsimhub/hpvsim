@@ -396,6 +396,9 @@ class People(hpb.BasePeople):
         filter_inds = self.true('cancerous')
         inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
         self.make_die(inds, cause='cancer')
+
+        # check which of these were detected by symptom or screening
+        self.cancer_flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
         return len(inds)
 
 
