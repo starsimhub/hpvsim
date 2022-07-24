@@ -230,9 +230,9 @@ def get_prognoses():
     '''
 
     prognoses = dict(
-        duration_cutoffs  = np.array([0,       1,          2,          3,          4,          5,          10]),      # Duration cutoffs (lower limits)
-        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0,        1.0,        1.0]),    # Probability of seroconverting given duration of infection
-        cancer_detection  = np.array([0.0002,    0.0005,       0.00064,      0.0007569,     0.00081508,     0.0012111,     0.002586]),   # Probability of cancer detection via symptoms given time with cancer
+        duration_cutoffs=np.array([0, 1, 2, 5, 7, 9, 10]),  # Duration cutoffs (lower limits)
+        seroconvert_probs=np.array([0.25, 0.5, 0.95, 1.0, 1.0, 1.0, 1.0]), # Probability of seroconverting given duration of infection
+        cancer_detection=np.array([0.0, 0.0, 0.0, 0.0008, 0.001, 0.003, 0.01]), # Probability of cancer detection via symptoms given time with cancer
         )
 
     # Check that lengths match
