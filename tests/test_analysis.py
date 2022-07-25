@@ -73,7 +73,7 @@ def test_age_results(do_plot=True):
 
     az1 = hpv.age_results(
         result_keys=sc.objdict(
-            cancer_deaths=sc.objdict(
+            total_detectable_hpv_prevalence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             ),
@@ -159,8 +159,8 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
-    sim2, calib = test_calibration()
+    sim1, a1    = test_age_results()
+    # sim2, calib = test_calibration()
 
 
 

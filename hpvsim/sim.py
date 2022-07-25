@@ -429,10 +429,10 @@ class Sim(hpb.BaseSim):
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence')
 
         # Cancer flows and stocks
-        results['n_cancerous'] = init_res('Number with cancer', color=hpd.cancer_flow_colors[0])
-        results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0])
-        results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0])
-        results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0])
+        results['n_cancerous'] = init_res('Number with cancer', color=hpd.cancer_flow_colors[0](0.95))
+        results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
+        results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
+        results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0](0.95))
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
