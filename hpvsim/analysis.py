@@ -963,7 +963,7 @@ class Calibration(Analyzer):
                 return output
 
 
-    def get_pars(self, pardict=None, trial=None):
+    def get_pars(self, pardict=None, trial=None, gname=None):
         ''' Sample from pars, after extracting them from the structure they're provided in '''
         pars={}
         for key, val in pardict.items():
@@ -977,7 +977,11 @@ class Calibration(Analyzer):
                         raise AttributeError(errormsg) from E
                 else:
                     sampler_fn = trial.suggest_uniform
-                pars[key] = sampler_fn(key, low, high)  # Sample from values within this range
+                if gname is not None:
+                    sampler_key = gname + '_' + key
+                else:
+                    sampler_key = key
+                pars[sampler_key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
             elif isinstance(val, dict):
                 sampler_fn = trial.suggest_uniform
                 pars[key] = dict()
@@ -996,7 +1000,7 @@ class Calibration(Analyzer):
         if self.genotype_pars is not None:
             genotype_pars = {}
             for gname, pardict in self.genotype_pars.items():
-                genotype_pars[gname] = self.get_pars(pardict, trial)
+                genotype_pars[gname] = self.get_pars(pardict, trial, gname=gname)
         else:
             genotype_pars = None
         if self.calib_pars is not None:
