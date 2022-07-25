@@ -925,7 +925,7 @@ class Sim(hpb.BaseSim):
         self.results['cin3_incidence'][:]          = res['cin3s'][:] / demoninator
         self.results['cin_incidence'][:]           = res['cins'][:] / demoninator
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
-        # self.results['detected_cancer_incidence'][:]        = res['total_cancers'][:] / demoninator
+        # self.results['detected_cancer_incidence'][:] = res['total_cancers'][:] / demoninator
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])

@@ -463,7 +463,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.dur['dys']       = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dysp_rate        = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv6.prog_rate        = 0.01 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.imm_boost         = 1.0 # TODO: look for data
+    pars.hpv6.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur = dict()

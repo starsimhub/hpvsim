@@ -1146,6 +1146,8 @@ class Screening(Intervention):
         cancerous_inds = hpu.true(sim.people.cancerous.any(axis=0))
         diagnosed_inds = np.intersect1d(treat_eligible_inds, cancerous_inds)
         sim.people.diagnosed[diagnosed_inds] = True
+
+        # Treat cancers
         ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
         to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
         ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated

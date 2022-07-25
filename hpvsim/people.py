@@ -99,6 +99,17 @@ class People(hpb.BasePeople):
         for key in self.meta.intv_states:
             self[key] = np.zeros(self.pars['pop_size'], dtype=hpd.default_int)
 
+        # Store relationship information
+        nk = self.pars['n_partner_types']
+        self.rship_start_dates  = np.full((nk,self.pars['pop_size']), np.nan, dtype=hpd.default_float)
+        self.rship_end_dates    = np.full((nk,self.pars['pop_size']), np.nan, dtype=hpd.default_float)
+        self.n_rships           = np.full((nk,self.pars['pop_size']), 0, dtype=hpd.default_int)
+
+        self.lag_bins = np.linspace(0,50,51)
+        self.rship_lags = dict()
+        for lkey in self.layer_keys():
+            self.rship_lags[lkey] = np.zeros(len(self.lag_bins)-1, dtype=hpd.default_float)
+
         # Store the dtypes used in a flat dict
         self._dtypes = {key:self[key].dtype for key in self.keys()} # Assign all to float by default
         if strict:
@@ -115,6 +126,8 @@ class People(hpb.BasePeople):
             self.partners = kwargs.pop('partners') # Store the desired concurrency
         if 'current_partners' in kwargs:
             self.current_partners = kwargs.pop('current_partners') # Store current actual number - updated each step though
+            for ln,lkey in enumerate(self.layer_keys()):
+                self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
         if 'contacts' in kwargs:
             self.add_contacts(kwargs.pop('contacts')) # Also updated each step
 
@@ -223,6 +236,7 @@ class People(hpb.BasePeople):
             # Update current number of partners
             unique, counts = hpu.unique(np.concatenate([dissolved['f'],dissolved['m']]))
             self.current_partners[lno,unique] -= counts
+            self.rship_end_dates[lno,unique] = self.t
             n_dissolved[lkey] = len(dissolve_inds)
 
         return n_dissolved # Return the number of dissolved partnerships by layer
@@ -292,6 +306,10 @@ class People(hpb.BasePeople):
                 # Increment the number of current partners
                 new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
                 self.current_partners[lno,new_pship_inds] += 1
+                self.rship_start_dates[lno,new_pship_inds] = self.t
+                self.n_rships[lno,new_pship_inds] += 1
+                lags = self.rship_start_dates[lno,new_pship_inds] - self.rship_end_dates[lno,new_pship_inds]
+                self.rship_lags[lkey] += np.histogram(lags, self.lag_bins)[0]
 
                 # Handle acts: these must be scaled according to age
                 acts = hpu.sample(**self['pars']['acts'][lkey], size=len(new_pship_inds_f))
@@ -387,7 +405,7 @@ class People(hpb.BasePeople):
         Check for new deaths from cancer
         '''
         filter_inds = self.true_by_genotype('cancerous', genotype)
-        inds = self.check_inds(self.dead_cancer[genotype,:], self.date_dead_cancer[genotype,:], filter_inds=filter_inds)
+        inds = self.check_inds(self.dead_cancer[genotype, :], self.date_dead_cancer[genotype, :], filter_inds=filter_inds)
         self.make_die(inds, genotype=genotype, cause='cancer')
         return len(inds)
 
@@ -401,7 +419,6 @@ class People(hpb.BasePeople):
         dur_cancer_inds = np.digitize(dur_cancer, self.pars['prognoses']['cancer_detection']) - 1
         detection_probs = self.pars['prognoses']['cancer_detection'][dur_cancer_inds]
         is_detected = hpu.binomial_arr(detection_probs)
-
         return len(is_detected)
 
 
