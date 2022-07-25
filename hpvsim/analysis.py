@@ -1301,7 +1301,7 @@ class Calibration(Analyzer):
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_properties[resname].name+', '+int(date))
+                    ax.set_title(self.result_properties[resname].name+', '+ date)
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
