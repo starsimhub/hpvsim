@@ -138,8 +138,8 @@ def test_calibration():
 
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             datafiles=['test_data/south_africa_hpv_data.xlsx',
-                                       'test_data/south_africa_cancer_data.xlsx'],
-                            total_trials=10, n_workers=4)
+                                       'test_data/south_africa_cancer_data_2020.csv'],
+                            total_trials=8, n_workers=4)
     calib.calibrate()
     calib.plot()
     return sim, calib
