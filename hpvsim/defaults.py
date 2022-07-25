@@ -50,7 +50,7 @@ class PeopleMeta(sc.prettyobj):
             'current_partners', # Int by relationship type
         ]
 
-        # Set the states that a person can be in, all booleans per person and per genotype except other_dead, screened, vaccinated and treated
+        # Set the states that a person can be in, all booleans per person and per genotype except cancerous, detected_cancer, cancer_genotype, dead_cancer, other_dead, screened, vaccinated, treated
         self.states = [
             'susceptible',
             'infectious',
@@ -60,6 +60,8 @@ class PeopleMeta(sc.prettyobj):
             'cin3',
             'cin',
             'cancerous',
+            'detected_cancer',
+            'cancer_genotype',
             'latent',
             'alive', # Save this as a state so we can record population sizes
             'dead_cancer',
@@ -137,6 +139,11 @@ stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         
 stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
 
+# Cancer specific flows (not by genotype)
+cancer_flow_keys   = ['cancers',  'cancer_deaths', 'detected_cancers', 'detected_cancer_deaths']
+cancer_flow_names  = ['cancers',  'cancer deaths', 'detected cancers', 'detected cancer deaths']
+cancer_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,    pl.cm.Reds, pl.cm.Greens]
+
 # Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
 inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',          'cancer']
@@ -152,6 +159,11 @@ dem_colors  = ['#fcba03',   '#000000']
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['total infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',                    '#000000']
+
+# Intervention-related flows (total across genotypes)
+intv_flow_keys   = ['screens',  'screened',         'vaccinations', 'vaccinated', ]
+intv_flow_names  = ['screens',  'women screened',   'vaccinations', 'women vaccinated']
+intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,      pl.cm.Oranges,  pl.cm.Oranges]
 
 #%%
 # Parameters that can vary by genotype (WIP)
