@@ -411,8 +411,8 @@ class Sim(hpb.BaseSim):
             results[f'{var}'] = init_res(f'{name}', color=color)
 
         # Create cancer results
-        for var, name, color in zip(hpd.cancer_flow_keys, hpd.cancer_flow_names, hpd.cancer_flow_colors):
-            results[f'{var}'] = init_res(f'{name}', color=color)
+        for var, name, cmap in zip(hpd.cancer_flow_keys, hpd.cancer_flow_names, hpd.cancer_flow_colors):
+            results[f'{var}'] = init_res(f'{name}', color=cmap(0.95))
 
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
