@@ -335,7 +335,7 @@ def make_contacts(p_count=None, lkey=None, current_partners=None, mixing=None, s
     f = np.array(f, dtype=hpd.default_int)
 
     # Count how many contacts there actually are: will be different for males, should be the same for females
-    unique, count = np.unique(np.concatenate([m, f]),return_counts=True)
+    unique, count = np.unique(np.concatenate([m, f]), return_counts=True)
     actual_p_count = np.full(pop_size, 0, dtype=hpd.default_int)
     actual_p_count[unique] = count
 

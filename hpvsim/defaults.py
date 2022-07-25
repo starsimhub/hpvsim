@@ -86,6 +86,13 @@ class PeopleMeta(sc.prettyobj):
             'screens', # Number of screens given per person
         ]
 
+        # Relationship states
+        self.rship_states = [
+            'rship_start_dates',
+            'rship_end_dates',
+            'n_rships'
+        ]
+
         self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
         self.dates += ['date_clearance', 'date_next_screen']
 
@@ -101,7 +108,7 @@ class PeopleMeta(sc.prettyobj):
         ]
 
         self.all_states = self.person + self.states + self.imm_states + self.intv_states + \
-                          self.dates + self.durs
+                          self.dates + self.durs + self.rship_states
 
         # Validate
         self.state_types = ['person', 'states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
