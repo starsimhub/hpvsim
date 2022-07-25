@@ -71,13 +71,14 @@ def mean_peak_fn(x, k):
     return (2 / (1 + np.exp(-k * x))) - 1
 
 
-def mean_peak_fn2(x, xmid, k):
+def mean_peak_fn2(x, x_infl, k):
     '''
-    Define a function to link the duration of dysplasia prior to control/integration
-    to the peak dysplasia prior to control/integration.
-    Currently this is modeled as the concave part of a logistic function
+    Logistic function, constrained to pass through 0,0 and with upper asymptote
+    at 1. Accepts 2 parameters: growth rate and point of inlfexion.
     '''
-    return (1 / (1 + np.exp(-k * (x-xmid))))
+    l_asymp = -1/(1+np.exp(k*x_infl))
+    return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
+
 
 # Figure settings
 font_size = 26

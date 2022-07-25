@@ -406,22 +406,24 @@ class People(hpb.BasePeople):
         '''
         Check for new cancer detection, treat subset of detected cancers
         '''
-        cancer_inds = self.true('cancerous')
-        undetected_cancer_inds = self.false('detected_cancer')
-        filter_inds = np.intersect1d(undetected_cancer_inds, cancer_inds)
-        dur_cancer = (self.t - self.date_cancerous[filter_inds])*self['dt']
-        dur_cancer_inds = np.digitize(dur_cancer, self.pars['prognoses']['cancer_detection']) - 1
-        dur_cancer_inds = np.where(dur_cancer_inds < 0, 0, dur_cancer_inds)
-        detection_probs = self.pars['prognoses']['cancer_detection'][dur_cancer_inds]
-        is_detected = hpu.binomial_arr(detection_probs)
-        is_detected_inds = filter_inds[is_detected]
-        self.detected_cancer[is_detected_inds] = True
-        self.date_detected_cancer[is_detected_inds] = self.t
-        treat_probs = np.full(len(is_detected_inds), self.pars['cancer_treat_prob'])
-        treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-        new_dur_cancer = hpu.sample(**hppar.get_treatment_pars('radiation')['dur'], size=len(treat_inds))
-        self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
-        return len(is_detected_inds)
+        cancer_inds = self.true('cancerous') # Get everyone with cancer
+        if len(cancer_inds)==0:
+            return 0
+        else:
+            detection_probs = np.full(len(cancer_inds), self.pars['cancer_symp_detection']/self.dt, dtype=hpd.default_float) # Initialize probabilities of cancer detection
+            detection_probs[self.detected_cancer[cancer_inds]] = 0
+            is_detected = hpu.binomial_arr(detection_probs)
+            is_detected_inds = cancer_inds[is_detected]
+            if len(is_detected_inds)==0:
+                return 0
+            else:
+                self.detected_cancer[is_detected_inds] = True
+                self.date_detected_cancer[is_detected_inds] = self.t
+                treat_probs = np.full(len(is_detected_inds), self.pars['cancer_symp_treatment'])
+                treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
+                new_dur_cancer = hpu.sample(**hppar.get_treatment_pars('radiation')['dur'], size=len(treat_inds))
+                self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
+                return len(is_detected_inds)
 
 
     def check_death(self):

@@ -912,8 +912,8 @@ class Screening(Intervention):
 
     def __init__(self, primary_screen_test, treatment, screen_start_age, screen_interval, screen_stop_age,
                  timepoints, screen_compliance=None, triage_compliance=None, ablation_compliance=None, excision_compliance=None,
-                 cancer_compliance=None, triage_screen_test=None, screen_fu_neg_triage=None, label=None,
-                 screen_states=None, treat_states=None, **kwargs):
+                 cancer_compliance=None, triage_screen_test=None, screen_fu_neg_triage=None, symp_cancer_detection=None,
+                 label=None, screen_states=None, treat_states=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.label = label  # Screening label (used as a dict key)
         self.p = None  # Screening parameters
@@ -935,6 +935,8 @@ class Screening(Intervention):
         self.cancer_compliance = cancer_compliance
         if screen_fu_neg_triage is None: # Populate default value of follow up after -ve triage: 1 year
             screen_fu_neg_triage = 1
+        if symp_cancer_detection is None: # Default is no symptomatic cancer detection
+            symp_cancer_detection = 0
         self.screen_fu_neg_triage = screen_fu_neg_triage
         self.screen_start_age = screen_start_age
         self.screen_interval = screen_interval

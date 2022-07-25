@@ -9,10 +9,10 @@ from . import misc as hpm
 from . import defaults as hpd
 from .data import loaders as hpdata
 
-__all__ = ['make_pars', 'reset_layer_pars', 'get_prognoses']
+__all__ = ['make_pars', 'reset_layer_pars']
 
 
-def make_pars(set_prognoses=False, **kwargs):
+def make_pars(**kwargs):
     '''
     Create the parameters for the simulation. Typically, this function is used
     internally rather than called by the user; e.g. typical use would be to do
@@ -67,12 +67,11 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['transf2m']        = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
-    # Probabilities of disease progression
-    pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
-    pars['mean_peak_variance'] = 0.1 # Variance of lognormal distribution from which peak dysplasia is sampled
+    # Parameters for disease progression
+    pars['sero']  = 1.0 # parameter used as the growth rate within a logistic function that maps durations to seroconversion probabilities
+    pars['severity_dist'] = dict(dist='lognormal', par1=None, par2=0.1) # Distribution of individual disease severity. Par1 is set to None because the mean is determined as a function of genotype and disease duration
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
-    pars['cancer_treat_prob'] = 0.1 # probability of receiving cancer treatment given symptom detection
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
         hpv_reactivation_probs  = np.array([0.0001,    0.05,        0.04]),      # made this up, need to parameterize somehow
@@ -99,8 +98,10 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
 
-    # Screening parameters
+    # Screening and treatment parameters
     pars['screen_pars']     = dict()  # Screening method that is being used; populated during initialization
+    pars['cancer_symp_detection'] = 0.01 # Annual probability of having cancer detected via symptoms, rather than screening
+    pars['cancer_symp_treatment'] = 0.01 # Probability of receiving treatment for those with symptom-detected cancer
 
     # Durations
     pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1
@@ -128,8 +129,6 @@ def make_pars(set_prognoses=False, **kwargs):
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
     reset_layer_pars(pars)
-    if set_prognoses: # If not set here, gets set when the population is initialized
-        pars['prognoses'] = get_prognoses() # Default to duration-specific prognoses
 
     return pars
 
@@ -217,33 +216,6 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     pars['n_partner_types'] = len(par_layer_keys)
 
     return
-
-
-def get_prognoses():
-    '''
-    Return the default parameter values for prognoses
-
-    The prognosis probabilities are conditional given the previous disease state.
-
-    Returns:
-        prog_pars (dict): the dictionary of prognosis probabilities
-    '''
-
-    prognoses = dict(
-        duration_cutoffs=np.array([0, 1, 2, 5, 7, 9, 10]),  # Duration cutoffs (lower limits)
-        seroconvert_probs=np.array([0.25, 0.5, 0.95, 1.0, 1.0, 1.0, 1.0]), # Probability of seroconverting given duration of infection
-        cancer_detection=np.array([0.0, 0.0, 0.0, 0.0008, 0.001, 0.003, 0.01]), # Probability of cancer detection via symptoms given time with cancer
-        )
-
-    # Check that lengths match
-    expected_len = len(prognoses['duration_cutoffs'])
-    for key,val in prognoses.items():
-        this_len = len(prognoses[key])
-        if this_len != expected_len: # pragma: no cover
-            errormsg = f'Lengths mismatch in prognoses: {expected_len} duration bins specified, but key "{key}" has {this_len} entries'
-            raise ValueError(errormsg)
-
-    return prognoses
 
 
 def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=None):

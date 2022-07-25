@@ -160,20 +160,20 @@ def find_contacts(p1, p2, inds): # pragma: no cover
 
 def mean_peak_fn(x, k):
     '''
-    Define a function to link the duration of hpv infection prior to dysplasia/control
-    to the probability of developing dysplasia.
-    Currently this is modeled as the concave part of a logistic function
+    The concave part of a logistic function, with point of inflexion at 0,0
+    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
     '''
     return (2 / (1 + np.exp(-k * x))) - 1
 
 
-def mean_peak_fn2(x, x_infl, k):
+def mean_peak_fn2(x, x_infl, k, T=1):
     '''
-    Define a function to link the duration of dysplasia prior to control/cancer
-    to the peak percentage of  peak dysplasia prior to control/integration.
+    Logistic function, constrained to pass through 0,0 and with upper asymptote
+    at 1. Accepts 2 parameters: growth rate and point of inlfexion.
+    '''
+    l_asymp = -1/((1+T*np.exp(k*x_infl))**(1/T))
+    return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
-    '''
-    return (1 / (1 + np.exp(-k * (x-x_infl))))
 
 
 def set_prognoses(people, inds, g, dur_hpv):
@@ -188,7 +188,8 @@ def set_prognoses(people, inds, g, dur_hpv):
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
     prog_time = genotype_pars[genotype_map[g]]['prog_time']
     ccut = people.pars['clinical_cutoffs']
-    mean_peak_variance = people.pars['mean_peak_variance']
+    sev_dist = people.pars['severity_dist']['dist']
+    sev_par2 = people.pars['severity_dist']['par2']
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
     cin1_probs = mean_peak_fn(dur_hpv, dysp_rate) # Probability of developing dysplasia
@@ -211,7 +212,7 @@ def set_prognoses(people, inds, g, dur_hpv):
     dur_to_peak_dys = sample(**durpars['dys'], size=len(cin1_inds))
     people.dur_hpv[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
     mean_peaks = mean_peak_fn2(dur_to_peak_dys, prog_time, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
-    peaks = np.minimum(1, sample(dist='lognormal', par1=mean_peaks, par2=mean_peak_variance)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
+    peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
     # Determine whether CIN1 clears or progresses to CIN2
     is_cin2 = peaks>ccut['cin1']
