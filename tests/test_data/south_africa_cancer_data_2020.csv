@@ -1,0 +1,9 @@
+year,name,age,sex,genotype,value
+2019,total_cancers,0,female,total,2
+2019,total_cancers,20,female,total,121
+2019,total_cancers,30,female,total,1245
+2019,total_cancers,40,female,total,2059
+2019,total_cancers,50,female,total,1648
+2019,total_cancers,60,female,total,1169
+2019,total_cancers,70,female,total,495
+2019,total_cancers,80,female,total,206
