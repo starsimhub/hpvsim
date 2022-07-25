@@ -9,10 +9,10 @@ from . import misc as hpm
 from . import defaults as hpd
 from .data import loaders as hpdata
 
-__all__ = ['make_pars', 'reset_layer_pars', 'get_prognoses']
+__all__ = ['make_pars', 'reset_layer_pars']
 
 
-def make_pars(set_prognoses=False, **kwargs):
+def make_pars(**kwargs):
     '''
     Create the parameters for the simulation. Typically, this function is used
     internally rather than called by the user; e.g. typical use would be to do
@@ -67,8 +67,9 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['transf2m']        = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
-    # Probabilities of disease progression
-    pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
+    # Parameters for disease progression
+    pars['sero']  = 1.0 # parameter used as the growth rate within a logistic function that maps durations to seroconversion probabilities
+    pars['severity_dist'] = dict(dist='lognormal', par1=None, par2=0.1) # Distribution of individual disease severity. Par1 is set to None because the mean is determined as a function of genotype and disease duration
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
     pars['hpv_reactivation'] = dict(
@@ -97,8 +98,10 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
 
-    # Screening parameters
+    # Screening and treatment parameters
     pars['screen_pars']     = dict()  # Screening method that is being used; populated during initialization
+    pars['cancer_symp_detection'] = 0.01 # Annual probability of having cancer detected via symptoms, rather than screening
+    pars['cancer_symp_treatment'] = 0.01 # Probability of receiving treatment for those with symptom-detected cancer
 
     # Durations
     pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1
@@ -126,8 +129,6 @@ def make_pars(set_prognoses=False, **kwargs):
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
     reset_layer_pars(pars)
-    if set_prognoses: # If not set here, gets set when the population is initialized
-        pars['prognoses'] = get_prognoses() # Default to duration-specific prognoses
 
     return pars
 
@@ -215,37 +216,6 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     pars['n_partner_types'] = len(par_layer_keys)
 
     return
-
-
-def get_prognoses():
-    '''
-    Return the default parameter values for prognoses
-
-    The prognosis probabilities are conditional given the previous disease state.
-
-    Returns:
-        prog_pars (dict): the dictionary of prognosis probabilities
-    '''
-
-    prognoses = dict(
-        duration_cutoffs  = np.array([0,       1,          2,          3,          4,          5,          10]),      # Duration cutoffs (lower limits)
-        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0,        1.0,        1.0]),    # Probability of seroconverting given duration of infection
-        cin1_probs        = np.array([0.015,   0.3655,     0.86800,    1.0,        1.0,        1.0,        1.0]),   # Conditional probability of developing CIN1 given HPV infection
-        cin2_probs        = np.array([0.020,   0.0287,     0.0305,     0.06427,    0.1659,     0.3011,     0.4483]),   # Conditional probability of developing CIN2 given CIN1, derived from Harvard model calibration
-        cin3_probs        = np.array([0.007,   0.0097,     0.0102,     0.0219,     0.0586,     0.112,      0.1779]),   # Conditional probability of developing CIN3 given CIN2, derived from Harvard model calibration
-        cancer_probs      = np.array([0.002,   0.003,      0.0564,     0.1569,     0.2908,     0.3111,     0.5586]),   # Conditional probability of developing cancer given CIN3, derived from Harvard model calibration
-        cancer_detection  = np.array([0.02,    0.05,       0.064,      0.1569,     0.1908,     0.3111,     0.5586]),   # Probability of cancer detection via symptoms given time with cancer
-        )
-
-    # Check that lengths match
-    expected_len = len(prognoses['duration_cutoffs'])
-    for key,val in prognoses.items():
-        this_len = len(prognoses[key])
-        if this_len != expected_len: # pragma: no cover
-            errormsg = f'Lengths mismatch in prognoses: {expected_len} duration bins specified, but key "{key}" has {this_len} entries'
-            raise ValueError(errormsg)
-
-    return prognoses
 
 
 def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=None):
@@ -396,7 +366,8 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur['dys']       = dict(dist='lognormal', par1=4.0, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv16.dysp_rate        = 1.0 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate        = 0.4 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate        = 0.6 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_time        = 3  # Point of inflection in logistic function
     pars.hpv16.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
@@ -409,7 +380,8 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv18.dur['dys']       = dict(dist='lognormal', par1=2.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv18.dysp_rate        = 0.9 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate        = 1.0 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_time        = 6  # Point of inflection in logistic function
     pars.hpv18.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
@@ -420,7 +392,8 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv31.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv31.dysp_rate        = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_rate        = 0.3 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv31.prog_rate        = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv31.prog_time        = 10  # Point of inflection in logistic function
     pars.hpv31.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
@@ -431,7 +404,8 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv33.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=3.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv33.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv33.prog_rate        = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv33.prog_time        = 10  # Point of inflection in logistic function
     pars.hpv33.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
@@ -443,6 +417,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv45.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv45.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv45.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv45.prog_time        = 10  # Point of inflection in logistic function
     pars.hpv45.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
@@ -454,6 +429,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv52.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv52.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv52.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv52.prog_time        = 10  # Point of inflection in logistic function
     pars.hpv52.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv6 = sc.objdict()
@@ -463,7 +439,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.dur['dys']       = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dysp_rate        = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv6.prog_rate        = 0.01 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.imm_boost         = 1.0 # TODO: look for data
+    pars.hpv6.prog_time        = 30  # Point of inflection in logistic function
+    pars.hpv6.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur = dict()
@@ -472,6 +449,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.dur['dys']       = dict(dist='lognormal', par1=4.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv11.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv11.prog_time        = 30  # Point of inflection in logistic function
     pars.hpv11.imm_boost        = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
@@ -914,17 +892,7 @@ def get_screen_pars(screen=None):
                     hpv6=0,
                     hpv11=0,
                 ),
-                cancerous=dict(
-                    hpv16=0.984,
-                    hpv18=0.984,
-                    hpv31=0.984,
-                    hpv33=0.984,
-                    hpv45=0.984,
-                    hpv52=0.984,
-                    hpv58=0.984,
-                    hpv6=0,
-                    hpv11=0,
-                ),
+                cancerous=0.984,
             ),
             inadequacy=0,
         ),
@@ -976,17 +944,7 @@ def get_screen_pars(screen=None):
                     hpv6=0,
                     hpv11=0,
                 ),
-                cancerous=dict(
-                    hpv16=1,
-                    hpv18=1,
-                    hpv31=0,
-                    hpv33=0,
-                    hpv45=0,
-                    hpv52=0,
-                    hpv58=0,
-                    hpv6=0,
-                    hpv11=0,
-                ),
+                cancerous=0.984,
             ),
             inadequacy=0,
         ),

@@ -582,7 +582,9 @@ class age_results(Analyzer):
             'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
+            'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
             'cancer_deaths': ['date_dead_cancer', 'dead_cancer'],
+            'detected_cancer_deaths': ['date_dead_cancer', 'dead_cancer']
         }
         attr1 = mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
         attr2 = mapping[attr][1]  # As above
@@ -609,7 +611,7 @@ class age_results(Analyzer):
                     unique_genotypes = thisdatadf.genotype.unique()
                     ng = len(unique_genotypes)
 
-                size = na if 'total' in result else (ng, na)
+                size = na if 'total' in result or 'cancer' in result else (ng, na)
                 self.results[result][date] = np.zeros(size)
 
                 # Both annual stocks and prevalence require us to calculate the current stocks.
@@ -639,7 +641,7 @@ class age_results(Analyzer):
                     else:
                         if 'detectable' in result:
                             hpv_test_pars = hppar.get_screen_pars('hpv')
-                            for state in ['hpv', 'cin1', 'cin2', 'cin3', 'cancerous']:
+                            for state in ['hpv', 'cin1', 'cin2', 'cin3']:
                                 for g in range(ng):
                                     hpv_pos_probs = np.zeros(len(sim.people))
                                     tp_inds = hpu.true(sim.people[state][g, :])
@@ -667,10 +669,13 @@ class age_results(Analyzer):
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
-                if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result:
+                if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
-                    if result[:5] == 'total':  # Results across all genotypes
-                        inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
+                    if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
+                        if result == 'detected_cancer_deaths':
+                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
+                        else:
+                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
                         self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
                                                         0] * scale  # Bin the people
                     else:  # Results by genotype
@@ -686,7 +691,7 @@ class age_results(Analyzer):
                         else:  # Denominator is females
                             denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[
                                          0] * scale) / 1e5  # CIN and cancer are per 100,000 women
-                        if 'total' not in result: denom = denom[None, :]
+                        if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
                         self.results[result][date] = self.results[result][date] / denom
 
 
@@ -707,7 +712,7 @@ class age_results(Analyzer):
         for name, group in self.result_keys[key].data.groupby(['genotype', 'year']):
             genotype = name[0].lower()
             year = str(name[1]) + '.0'
-            if 'total' in key:
+            if 'total' in key or 'cancer' in key:
                 sim_res = list(self.results[key][year])
                 res.extend(sim_res)
             else:
@@ -772,7 +777,7 @@ class age_results(Analyzer):
                         thisdatadf = self.result_keys[rkey].data[(self.result_keys[rkey].data.year == float(date))&(self.result_keys[rkey].data.name == rkey)]
                         unique_genotypes = thisdatadf.genotype.unique()
 
-                    if 'total' not in rkey:
+                    if 'total' not in rkey and 'cancer' not in rkey:
                         # Prepare plot settings
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
@@ -958,7 +963,7 @@ class Calibration(Analyzer):
                 return output
 
 
-    def get_pars(self, pardict=None, trial=None):
+    def get_pars(self, pardict=None, trial=None, gname=None):
         ''' Sample from pars, after extracting them from the structure they're provided in '''
         pars={}
         for key, val in pardict.items():
@@ -972,7 +977,11 @@ class Calibration(Analyzer):
                         raise AttributeError(errormsg) from E
                 else:
                     sampler_fn = trial.suggest_uniform
-                pars[key] = sampler_fn(key, low, high)  # Sample from values within this range
+                if gname is not None:
+                    sampler_key = gname + '_' + key
+                else:
+                    sampler_key = key
+                pars[sampler_key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
             elif isinstance(val, dict):
                 sampler_fn = trial.suggest_uniform
                 pars[key] = dict()
@@ -991,7 +1000,7 @@ class Calibration(Analyzer):
         if self.genotype_pars is not None:
             genotype_pars = {}
             for gname, pardict in self.genotype_pars.items():
-                genotype_pars[gname] = self.get_pars(pardict, trial)
+                genotype_pars[gname] = self.get_pars(pardict, trial, gname=gname)
         else:
             genotype_pars = None
         if self.calib_pars is not None:
@@ -1120,8 +1129,9 @@ class Calibration(Analyzer):
             for gname, gpardict in self.genotype_pars.items():
                 for key, val in gpardict.items():
                     if isinstance(val, list):
-                        self.initial_pars[key] = val[0]
-                        self.par_bounds[key] = np.array([val[1], val[2]])
+                        sampler_key = gname + '_' + key
+                        self.initial_pars[sampler_key] = val[0]
+                        self.par_bounds[sampler_key] = np.array([val[1], val[2]])
                     elif isinstance(val, dict):
                         for parkey, par_highlowlist in val.items():
                             for i, (best, low, high) in enumerate(par_highlowlist):
@@ -1255,7 +1265,7 @@ class Calibration(Analyzer):
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in resname:
+                    if 'total' not in resname and 'cancer' not in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
                             # Plot data
@@ -1272,6 +1282,7 @@ class Calibration(Analyzer):
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values, 'genotypes':genotypes})
                         ax = plot_type(ax=ax, x='bins', y='values', hue="genotypes", data=modeldf, dodge=True, boxprops=dict(alpha=.3))
+
 
                     else:
                         # Plot data

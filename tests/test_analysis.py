@@ -73,14 +73,21 @@ def test_age_results(do_plot=True):
 
     az1 = hpv.age_results(
         result_keys=sc.objdict(
-            hpv_prevalence=sc.objdict(
-                timepoints=['1990'],
+            cancer_deaths=sc.objdict(
+                timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
-                # datafile='test_data/south_africa_hpv_data.xlsx',
             ),
-            hpv_incidence=sc.objdict(
-                timepoints=['1990'],
-                edges=np.array([0.,20.,30.,40.,50.,60.,70.,80.,100.])
+            detected_cancer_deaths=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            cancer_incidence=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            detected_cancer_incidence=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             )
         )
     )
@@ -94,17 +101,17 @@ def test_age_results(do_plot=True):
         'HPV prevalence': [
             'hpv_prevalence',
         ],
-        'HPV incidence': [
-            'hpv_incidence',
+        'Cancer deaths': [
+            'cancer_deaths',
         ],
-        'Cervical cancer': [
-            'total_cancers',
+        'Cervical cancer incidence': [
+            'cancer_incidence',
         ],
     }
 
     # Check plot()
     if do_plot:
-        sim.plot(to_plot=to_plot)
+        # sim.plot(to_plot=to_plot)
         fig0 = sim.get_analyzer(0).plot()
         # fig1 = sim.get_analyzer(1).plot()
 
@@ -115,7 +122,7 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=2000, end=2020, dt=0.5, location='south africa',
+    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1980, end=2020, dt=0.5, location='south africa',
                 init_hpv_dist=dict(
                     hpv16=0.9,
                     hpv18=0.1
@@ -125,7 +132,7 @@ def test_calibration():
     sim = hpv.Sim(pars, genotypes=[hpv16, hpv18])
     calib_pars = dict(
         beta=[0.05, 0.010, 0.20],
-        hpv_control_prob=[.9, 0.5, 1],
+        hpv_control_prob=[.9, 0.1, 1],
     )
     genotype_pars = dict(
         hpv16=dict(
@@ -152,8 +159,8 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
-    sim2, calib = test_calibration()
+    sim1, a1    = test_age_results()
+    # sim2, calib = test_calibration()
 
 
 
