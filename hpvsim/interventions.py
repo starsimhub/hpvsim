@@ -1116,30 +1116,18 @@ class Screening(Intervention):
         for state in states:
             screen_probs = np.zeros(len(screen_inds))
             if pars['by_genotype']:
-                if state != 'cancerous':
-                    for g in range(sim['n_genotypes']):
-                        tp_inds = hpu.true(sim.people[state][g, screen_inds])
-                        screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
-                        screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                        screen_pos += list(screen_pos_inds)
-                else:
-                    tp_inds = hpu.true(sim.people[state][screen_inds])
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
+                for g in range(sim['n_genotypes']):
+                    tp_inds = hpu.true(sim.people[state][g, screen_inds])
+                    screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
                     screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
                     screen_pos += list(screen_pos_inds)
                 screen_pos = list(set(screen_pos)) # If anyone has screened positive for >1 genotype, only include them once
 
             else:
-                if state != 'cancerous':
-                    tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
-                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                    screen_pos += list(screen_pos_inds)
-                else:
-                    tp_inds = hpu.true(sim.people[state][screen_inds])
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
-                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                    screen_pos += list(screen_pos_inds)
+                tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
+                screen_probs[tp_inds] = pars['test_positivity'][state]
+                screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                screen_pos += list(screen_pos_inds)
 
         screen_pos = np.array(screen_pos)
         if len(screen_pos)>0:
@@ -1154,21 +1142,17 @@ class Screening(Intervention):
     def select_people_treat(self, sim, treat_eligible_inds, treat_eligibility_pars):
         ''' Select people to treat and determine what kind of treatment they should receive '''
 
-        # Identify those with cancer
-        cancerous_inds = hpu.true(sim.people.cancerous.any(axis=0)) # Find indices of people with cancer
-        diagnosed_inds = np.intersect1d(treat_eligible_inds, cancerous_inds) # Indices of those who will be diagnosed with cancer
-
-        # Update states and flows to reflect cancer diagnoses
-        sim.people.detected_cancer[diagnosed_inds] = True
-        sim.people.cancer_flows['detected_cancers'] += len(diagnosed_inds)
-        sim.people.date_detected_cancer[diagnosed_inds] = sim.t
+        # First treat cancer
+        cancerous_inds = hpu.true(sim.people.cancerous.any(axis=0))
+        diagnosed_inds = np.intersect1d(treat_eligible_inds, cancerous_inds)
+        sim.people.diagnosed[diagnosed_inds] = True
 
         # Treat cancers
         ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
         to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
         ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
-        ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
-        sim.people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
+        ca_LTFU_inds = diagnosed_inds[~to_treat_ca]
+        sim.people.date_next_screen[ca_LTFU_inds] = np.nan
 
         # Everyone remaining is eligible for precancer treatment
         preca_treat_eligible_inds = np.setdiff1d(treat_eligible_inds, diagnosed_inds) # Indices of those eligible for precancer treatment
@@ -1210,7 +1194,7 @@ class Screening(Intervention):
     def treat_cancer(self, sim, ca_treat_inds, treat_pars):
         '''Treat cancer '''
         new_dur_cancer = hpu.sample(**treat_pars['radiation']['dur'], size=len(ca_treat_inds))
-        sim.people.date_dead_cancer[ca_treat_inds] += np.ceil(new_dur_cancer / sim['dt'])
+        sim.people.date_dead_cancer[:, ca_treat_inds] += np.ceil(new_dur_cancer / sim['dt'])
         return
 
 

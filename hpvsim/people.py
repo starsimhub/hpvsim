@@ -74,10 +74,8 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key in ['cancerous', 'dead_other', 'vaccinated', 'screened', 'treated', 'detected_cancer', 'dead_cancer']: # ALl false at the beginning
+            if key in ['dead_other', 'vaccinated', 'screened', 'treated', 'diagnosed']: # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
-            elif key == 'cancer_genotype':
-                self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_int)
             elif key == 'alive':  # All true at the beginning
                 self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
             elif key == 'susceptible':
@@ -87,8 +85,7 @@ class People(hpb.BasePeople):
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
-            if key in ['date_dead_other', 'date_cancerous', 'date_detected_cancer', 'date_dead_cancer',
-                       'date_vaccinated','date_screened', 'date_next_screen', 'date_treated']:
+            if key in ['date_dead_other', 'date_vaccinated','date_screened', 'date_next_screen', 'date_treated']:
                 self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
             else:
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
@@ -101,6 +98,17 @@ class People(hpb.BasePeople):
                 self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_float)
         for key in self.meta.intv_states:
             self[key] = np.zeros(self.pars['pop_size'], dtype=hpd.default_int)
+
+        # Store relationship information
+        nk = self.pars['n_partner_types']
+        self.rship_start_dates  = np.full((nk,self.pars['pop_size']), np.nan, dtype=hpd.default_float)
+        self.rship_end_dates    = np.full((nk,self.pars['pop_size']), np.nan, dtype=hpd.default_float)
+        self.n_rships           = np.full((nk,self.pars['pop_size']), 0, dtype=hpd.default_int)
+
+        self.lag_bins = np.linspace(0,50,51)
+        self.rship_lags = dict()
+        for lkey in self.layer_keys():
+            self.rship_lags[lkey] = np.zeros(len(self.lag_bins)-1, dtype=hpd.default_float)
 
         # Store the dtypes used in a flat dict
         self._dtypes = {key:self[key].dtype for key in self.keys()} # Assign all to float by default
@@ -118,6 +126,8 @@ class People(hpb.BasePeople):
             self.partners = kwargs.pop('partners') # Store the desired concurrency
         if 'current_partners' in kwargs:
             self.current_partners = kwargs.pop('current_partners') # Store current actual number - updated each step though
+            for ln,lkey in enumerate(self.layer_keys()):
+                self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
         if 'contacts' in kwargs:
             self.add_contacts(kwargs.pop('contacts')) # Also updated each step
 
@@ -142,8 +152,6 @@ class People(hpb.BasePeople):
         self.total_flows        = {f'total_{key}'           : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'{key}'                 : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'                 : 0 for key in hpd.dem_keys}
-        self.intv_flows         = {f'{key}'                 : 0 for key in hpd.intv_flow_keys}
-        self.cancer_flows       = {f'{key}'                 : 0 for key in hpd.cancer_flow_keys}
         return
 
 
@@ -194,21 +202,20 @@ class People(hpb.BasePeople):
             self.flows['cin1s'][g]          += self.check_cin1(g)
             self.flows['cin2s'][g]          += self.check_cin2(g)
             self.flows['cin3s'][g]          += self.check_cin3(g)
-            self.cancer_flows['cancers']    += self.check_cancer(g)
             if t%self.resfreq==0:
                 self.flows['cins'][g]       += self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
-
+            self.flows['cancers'][g]        += self.check_cancer(g)
+            self.flows['cancer_deaths'][g]  += self.check_cancer_deaths(g)
+            self.flows['detected_cancers'][g]+= self.check_cancer_detection(g)
             self.check_clearance(g)
-
-        #Perform updates that are not genotype specific
-        self.cancer_flows['cancer_deaths'] += self.check_cancer_deaths()
-        self.cancer_flows['detected_cancers'] += self.check_cancer_detection()
 
         # Create total flows
         self.total_flows['total_cin1s']     += self.flows['cin1s'].sum()
         self.total_flows['total_cin2s']     += self.flows['cin2s'].sum()
         self.total_flows['total_cin3s']     += self.flows['cin3s'].sum()
         self.total_flows['total_cins']      += self.flows['cins'].sum()
+        self.total_flows['total_cancers']   += self.flows['cancers'].sum()
+        self.total_flows['total_cancer_deaths']   += self.flows['cancer_deaths'].sum()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
         self.sus_pool = self.susceptible.nonzero()
@@ -229,6 +236,7 @@ class People(hpb.BasePeople):
             # Update current number of partners
             unique, counts = hpu.unique(np.concatenate([dissolved['f'],dissolved['m']]))
             self.current_partners[lno,unique] -= counts
+            self.rship_end_dates[lno,unique] = self.t
             n_dissolved[lkey] = len(dissolve_inds)
 
         return n_dissolved # Return the number of dissolved partnerships by layer
@@ -298,6 +306,10 @@ class People(hpb.BasePeople):
                 # Increment the number of current partners
                 new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
                 self.current_partners[lno,new_pship_inds] += 1
+                self.rship_start_dates[lno,new_pship_inds] = self.t
+                self.n_rships[lno,new_pship_inds] += 1
+                lags = self.rship_start_dates[lno,new_pship_inds] - self.rship_end_dates[lno,new_pship_inds]
+                self.rship_lags[lkey] += np.histogram(lags, self.lag_bins)[0]
 
                 # Handle acts: these must be scaled according to age
                 acts = hpu.sample(**self['pars']['acts'][lkey], size=len(new_pship_inds_f))
@@ -380,31 +392,27 @@ class People(hpb.BasePeople):
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
-        inds = self.check_inds(self.cancerous, self.date_cancerous, filter_inds=filter_inds)
-        self.cancerous[inds] = True
-        self.cancer_genotype[inds] = genotype
+        inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
+        self.cancerous[genotype, inds] = True
         self.cin3[genotype, inds] = False # No longer counted as CIN3
         self.susceptible[:, inds] = False
         self.date_clearance[:, inds] = np.nan
         return len(inds)
 
 
-    def check_cancer_deaths(self):
+    def check_cancer_deaths(self, genotype):
         '''
         Check for new deaths from cancer
         '''
-        filter_inds = self.true('cancerous')
-        inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
-        self.make_die(inds, cause='cancer')
-
-        # check which of these were detected by symptom or screening
-        self.cancer_flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
+        filter_inds = self.true_by_genotype('cancerous', genotype)
+        inds = self.check_inds(self.dead_cancer[genotype, :], self.date_dead_cancer[genotype, :], filter_inds=filter_inds)
+        self.make_die(inds, genotype=genotype, cause='cancer')
         return len(inds)
 
 
-    def check_cancer_detection(self):
+    def check_cancer_detection(self, genotype):
         '''
-        Check for new cancer detection, treat subset of detected cancers
+        Check for new cancer detection
         '''
         cancer_inds = self.true('cancerous') # Get everyone with cancer
         if len(cancer_inds)==0:
@@ -537,7 +545,7 @@ class People(hpb.BasePeople):
                 self[key][:, inds] = False
 
         # Reset immunity
-        for key in self.meta.imm_states:
+        for key in self.meta.imm_by_source_states:
             self[key][:, inds] = 0
 
         # Reset dates
@@ -638,13 +646,13 @@ class People(hpb.BasePeople):
         return len(inds) # For incrementing counters
 
 
-    def make_die(self, inds, cause=None):
+    def make_die(self, inds, genotype=None, cause=None):
         ''' Make people die of all other causes (background mortality) '''
 
         if cause=='other':
             self.dead_other[inds] = True
         elif cause=='cancer':
-            self.dead_cancer[inds] = True
+            self.dead_cancer[genotype, inds] = True
         else:
             errormsg = f'Cause of death must be one of "other" or "cancer", not {cause}.'
             raise ValueError(errormsg)
@@ -654,7 +662,7 @@ class People(hpb.BasePeople):
         self.cin1[:, inds] = False
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False
-        self.cancerous[inds] = False
+        self.cancerous[:, inds] = False
         self.alive[inds] = False
 
         # Remove dead people from contact network by setting the end date of any partnership they're in to now

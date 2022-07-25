@@ -175,7 +175,6 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
-
 def set_prognoses(people, inds, g, dur_hpv):
     ''' Set disease progression '''
 
@@ -186,7 +185,6 @@ def set_prognoses(people, inds, g, dur_hpv):
     durpars = genotype_pars[genotype_map[g]]['dur']
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
-    prog_time = genotype_pars[genotype_map[g]]['prog_time']
     ccut = people.pars['clinical_cutoffs']
     sev_dist = people.pars['severity_dist']['dist']
     sev_par2 = people.pars['severity_dist']['par2']
@@ -268,15 +266,15 @@ def set_prognoses(people, inds, g, dur_hpv):
                                                   np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
 
     # Case 2.2.2.2: Severe dysplasia progresses to cancer
-    excl_inds = true(people.date_cancerous[cancer_inds] < people.t)  # Don't count cancers that were acquired before now
-    people.date_cancerous[cancer_inds[excl_inds]] = np.nan
-    people.date_cancerous[cancer_inds] = np.fmin(people.date_cancerous[cancer_inds],
+    excl_inds = true(people.date_cancerous[g, cancer_inds] < people.t)  # Don't count cancers that were acquired before now
+    people.date_cancerous[g, cancer_inds[excl_inds]] = np.nan
+    people.date_cancerous[g, cancer_inds] = np.fmin(people.date_cancerous[g, cancer_inds],
                                                     people.date_cin1[g, cancer_inds] +
                                                     np.ceil(dur_to_peak_dys[is_cancer] / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
 
     # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
-    people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
+    people.date_dead_cancer[g, cancer_inds] = people.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
 
     return
 

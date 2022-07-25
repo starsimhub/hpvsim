@@ -228,23 +228,28 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                                         label='hpv primary, hpv1618 triage', screen_compliance=screen_prop,
                                           triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
+    az = hpv.age_results(
+        timepoints=['2020'],
+        result_keys=['total_hpv_prevalence']
+    )
 
-    sim = hpv.Sim(pars=pars)
+
+    sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
 
     # Define the scenarios
     scenarios = {
-        # 'no_screening_rsa': {
-        #     'name': 'No screening',
-        #     'pars': {
-        #     }
-        # },
-        'hpv_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+        'no_screening_rsa': {
+            'name': 'No screening',
             'pars': {
-                'interventions': [hpv_screening],
             }
         },
+        # 'hpv_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_screening],
+        #     }
+        # },
         # 'hpv_via_screening': {
         #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
         #     'pars': {
@@ -274,7 +279,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                 'total_cin_prevalence',
             ],
             'Cancers per 100,000 women': [
-                'cancer_incidence',
+                'total_cancer_incidence',
             ],
         }
         scens.plot(to_plot=to_plot)
@@ -320,8 +325,13 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
                                       screen_compliance=0.7, triage_compliance=0.6, cancer_compliance=0.2,
                                       excision_compliance=0.1, ablation_compliance=0.5)
 
+    az = hpv.age_results(
+        timepoints=['2030'],
+        result_keys=['total_cin_prevalence']
+    )
 
-    sim = hpv.Sim(pars=pars)
+
+    sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
 
     # Define the scenarios
@@ -375,9 +385,9 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
-    # scens1 = test_vaccinate_prob(do_plot=True)
-    # scens2 = test_vaccinate_num(do_plot=True)
+    sim0 = test_dynamic_pars()
+    scens1 = test_vaccinate_prob(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
     scens4 = test_screening_ltfu(do_plot=True)
 

@@ -26,16 +26,7 @@ progs = sim['prognoses']
 genotype_pars = sim['genotype_pars']
 genotype_map = sim['genotype_map']
 durpars = [genotype_pars[genotype_map[g]]['dur'] for g in genotype_map]
-cancer_thresh = 0.99
-genotype_pars['hpv16'].prog_time = 4
-genotype_pars['hpv18'].prog_time = 4
-genotype_pars['hpv16'].prog_rate = 0.6
-genotype_pars['hpv18'].prog_rate = 0.8
-genotype_pars['hpv31'].prog_time = 10
-genotype_pars['hpv6'].prog_time = 15
-genotype_pars['hpv31'].prog_rate = .5
-genotype_pars['hpv6'].prog_rate = 0.5
-
+cancer_thresh = 0.95
 
 # Prognoses from Harvard model
 prognoses = dict(
@@ -60,6 +51,7 @@ def lognorm_params(mode, stddev):
     shape = np.sqrt(np.log(sol))
     scale = mode * sol
     return shape, scale
+
 
 def logf1(x, k):
     '''
@@ -123,17 +115,17 @@ for g in range(ng):
         indcancer = indcin3
 
     noneshares.append(1 - shares[g])
-    cin1shares.append(((rv.cdf(longx[indcin1])-rv.cdf(longx[0]))*shares[g])[0])
-    cin2shares.append(((rv.cdf(longx[indcin2])-rv.cdf(longx[indcin1]))*shares[g])[0])
-    cin3shares.append(((rv.cdf(longx[indcin3])-rv.cdf(longx[indcin2]))*shares[g])[0])
-    cancershares.append(((rv.cdf(longx[indcancer])-rv.cdf(longx[indcin3]))*shares[g])[0])
+    cin1shares.append(((rv.cdf(longx[indcin1]) - rv.cdf(longx[0])) * shares[g])[0])
+    cin2shares.append(((rv.cdf(longx[indcin2]) - rv.cdf(longx[indcin1])) * shares[g])[0])
+    cin3shares.append(((rv.cdf(longx[indcin3]) - rv.cdf(longx[indcin2])) * shares[g])[0])
+    cancershares.append(((rv.cdf(longx[indcancer]) - rv.cdf(longx[indcin3])) * shares[g])[0])
 
 ######## Outcomes by duration of infection and genotype
 n_samples = 10e3
 
 # create dataframes
 data = {}
-years = np.arange(1,11)
+years = np.arange(1, 11)
 cin1_shares, cin2_shares, cin3_shares, cancer_shares = [], [], [], []
 all_years = []
 all_genotypes = []
@@ -150,7 +142,8 @@ for g in range(ng):
         cancer_shares.append(sum(peaks>cancer_thresh)/n_samples)
         all_years.append(year)
         all_genotypes.append(genotype_map[g].upper())
-data = {'Year':all_years, 'Genotype':all_genotypes, 'CIN1':cin1_shares, 'CIN2':cin2_shares, 'CIN3':cin3_shares, 'Cancer': cancer_shares}
+data = {'Year': all_years, 'Genotype': all_genotypes, 'CIN1': cin1_shares, 'CIN2': cin2_shares, 'CIN3': cin3_shares,
+        'Cancer': cancer_shares}
 sharesdf = pd.DataFrame(data)
 
 
@@ -201,7 +194,6 @@ def make_fig1():
     ax[0,2].set_title("Distribution of dysplasia durations\nprior to cancer/control")
 
 
-
     ################################################################################
     # Post-dysplasia dynamics
     ################################################################################
@@ -234,6 +226,7 @@ def make_fig1():
     ax[1,0].text(-0.3, 0.12, 'CIN1', fontsize=15, rotation=90)
     ax[1,0].text(-0.3, 0.45, 'CIN2', fontsize=15, rotation=90)
     ax[1,0].text(-0.3, 0.75, 'CIN3', fontsize=15, rotation=90)
+
 
     ###### Share of women who develop each CIN grade
     loc_array = np.array([-5,-4,-3,-2,-1,1,2,3,4,5])

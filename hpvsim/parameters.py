@@ -366,8 +366,7 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur['dys']       = dict(dist='lognormal', par1=4.0, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv16.dysp_rate        = 1.0 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate        = 0.6 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_time        = 3  # Point of inflection in logistic function
+    pars.hpv16.prog_rate        = 0.4 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
@@ -380,8 +379,7 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv18.dur['dys']       = dict(dist='lognormal', par1=2.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv18.dysp_rate        = 0.9 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_time        = 6  # Point of inflection in logistic function
+    pars.hpv18.prog_rate        = 1.0 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
@@ -392,8 +390,7 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv31.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv31.dysp_rate        = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_rate        = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_time        = 10  # Point of inflection in logistic function
+    pars.hpv31.prog_rate        = 0.3 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv31.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
@@ -404,8 +401,7 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv33.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=3.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv33.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_rate        = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_time        = 10  # Point of inflection in logistic function
+    pars.hpv33.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv33.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
@@ -417,7 +413,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv45.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv45.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv45.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv45.prog_time        = 10  # Point of inflection in logistic function
     pars.hpv45.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
@@ -429,7 +424,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv52.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv52.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv52.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv52.prog_time        = 10  # Point of inflection in logistic function
     pars.hpv52.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv6 = sc.objdict()
@@ -439,7 +433,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.dur['dys']       = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dysp_rate        = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv6.prog_rate        = 0.01 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.prog_time        = 30  # Point of inflection in logistic function
     pars.hpv6.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
@@ -449,7 +442,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.dur['dys']       = dict(dist='lognormal', par1=4.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv11.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv11.prog_time        = 30  # Point of inflection in logistic function
     pars.hpv11.imm_boost        = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
@@ -892,7 +884,17 @@ def get_screen_pars(screen=None):
                     hpv6=0,
                     hpv11=0,
                 ),
-                cancerous=0.984,
+                cancerous=dict(
+                    hpv16=0.984,
+                    hpv18=0.984,
+                    hpv31=0.984,
+                    hpv33=0.984,
+                    hpv45=0.984,
+                    hpv52=0.984,
+                    hpv58=0.984,
+                    hpv6=0,
+                    hpv11=0,
+                ),
             ),
             inadequacy=0,
         ),
@@ -944,7 +946,17 @@ def get_screen_pars(screen=None):
                     hpv6=0,
                     hpv11=0,
                 ),
-                cancerous=0.984,
+                cancerous=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv45=0,
+                    hpv52=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
             ),
             inadequacy=0,
         ),
