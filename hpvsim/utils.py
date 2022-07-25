@@ -162,6 +162,7 @@ def mean_peak_fn(x, k):
     '''
     Define a function to link the duration of dysplasia prior to control/integration
     to the peak dysplasia prior to control/integration.
+    Currently this is modeled as the concave part of a logistic function
     '''
     return (2 / (1 + np.exp(-k * x))) - 1
 

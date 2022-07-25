@@ -75,6 +75,8 @@ def test_age_results(do_plot=True):
         result_keys=sc.objdict(
             hpv_prevalence=sc.objdict(
                 timepoints=['1990'],
+                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+                # datafile='test_data/south_africa_hpv_data.xlsx',
             ),
             hpv_incidence=sc.objdict(
                 timepoints=['1990'],
@@ -97,7 +99,7 @@ def test_age_results(do_plot=True):
         ],
         'Cervical cancer': [
             'total_cancers',
-        ]
+        ],
     }
 
     # Check plot()

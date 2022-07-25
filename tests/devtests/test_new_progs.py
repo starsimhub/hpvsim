@@ -55,6 +55,30 @@ def logn_pdf(x, par1, par2):
     pdf = (np.exp(-(np.log(x) - mu) ** 2 / (2 * sigma ** 2)) / (x * sigma * np.sqrt(2 * np.pi)))
     return pdf
 
+
+def logn_cdf_wrong(x, par1, par2, minx=1e-3):
+    ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
+    if sc.checktype(x, 'arraylike'):
+        cdf = []
+        for xx in x:
+            cdf.append(logn_cdf(xx, par1, par2))
+        cdf = np.array(cdf)
+    elif sc.isnumber(x):
+        xsamples = np.linspace(minx, x, 100)
+        bin_width = xsamples[1]-xsamples[0]
+        pdf = logn_pdf(xsamples, par1, par2)
+        cdf = np.cumsum(pdf*bin_width)
+    return cdf
+
+
+def logn_cdf_simple(x, par1, par2, minx=1e-3):
+    ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
+    bin_width = x[1] - x[0]
+    pdf = logn_pdf(x, par1, par2)
+    cdf = bin_width*np.cumsum(pdf)
+    return cdf
+
+
 def logn_cdf(x, par1, par2, minx=1e-3):
     ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
     if sc.checktype(x,'arraylike'):
