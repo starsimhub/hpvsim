@@ -39,59 +39,18 @@ prognoses = dict(
         )
 
 #%% Helper functions
-def lognorm_params(par1, par2):
-    '''
-    Retrieve the mean and standard deviation of the normally distributed
-    logarithm of the variable
-    '''
-    mu = np.log(par1 ** 2 / np.sqrt(par2 ** 2 + par1 ** 2))  # Computes the mean of the underlying normal distribution
-    sigma = np.sqrt(np.log(par2 ** 2 / par1 ** 2 + 1))  # Computes sigma for the underlying normal distribution
-    return mu, sigma
-
-
-def logn_pdf(x, par1, par2):
-    ''' Returns the pdf of the lognormal function given the mean and std of the lognormal fn'''
-    mu, sigma = lognorm_params(par1, par2)
-    pdf = (np.exp(-(np.log(x) - mu) ** 2 / (2 * sigma ** 2)) / (x * sigma * np.sqrt(2 * np.pi)))
-    return pdf
-
-
-def logn_cdf_wrong(x, par1, par2, minx=1e-3):
-    ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
-    if sc.checktype(x, 'arraylike'):
-        cdf = []
-        for xx in x:
-            cdf.append(logn_cdf(xx, par1, par2))
-        cdf = np.array(cdf)
-    elif sc.isnumber(x):
-        xsamples = np.linspace(minx, x, 100)
-        bin_width = xsamples[1]-xsamples[0]
-        pdf = logn_pdf(xsamples, par1, par2)
-        cdf = np.cumsum(pdf*bin_width)
-    return cdf
-
-
-def logn_cdf_simple(x, par1, par2, minx=1e-3):
-    ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
-    bin_width = x[1] - x[0]
-    pdf = logn_pdf(x, par1, par2)
-    cdf = bin_width*np.cumsum(pdf)
-    return cdf
-
-
-def logn_cdf(x, par1, par2, minx=1e-3):
-    ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
-    if sc.checktype(x,'arraylike'):
-        cdf = []
-        for xe in x:
-            cdf.append(logn_cdf(xe,par1,par2))
-    elif sc.isnumber(x):
-        xarray = np.linspace(minx,x,10)
-        bin_width = xarray[1] - xarray[0]
-        pdf = logn_pdf(xarray, par1, par2)
-        cdf = bin_width*np.sum(pdf)
-
-    return cdf
+def lognorm_params(mode, stddev):
+    """
+    Given the mode and std. dev. of the log-normal distribution, this function
+    returns the shape and scale parameters for scipy's parameterization of the
+    distribution.
+    """
+    p = np.poly1d([1, -1, 0, 0, -(stddev/mode)**2])
+    r = p.roots
+    sol = r[(r.imag == 0) & (r.real > 0)].real
+    shape = np.sqrt(np.log(sol))
+    scale = mode * sol
+    return shape, scale
 
 
 # Map durations pre-dysplasia to the probability of dysplasia beginning
@@ -103,7 +62,6 @@ def mean_peak_fn(x, k):
     '''
     return (2 / (1 + np.exp(-k * x))) - 1
 
-
 # Figure settings
 font_size = 26
 font_family = 'Libertinus Sans'
@@ -114,12 +72,13 @@ x = np.linspace(0.01, 7, 700)
 
 #%% Preliminary calculations (all to be moved within an analyzer? or sim method?)
 
-##### Share of women who develop of detectable dysplasia by genotype
+###### Share of women who develop of detectable dysplasia by genotype
 shares = []
 gtypes = []
 for g in range(ng):
-    cdf = logn_cdf(x, durpars[g]['none']['par1'], durpars[g]['none']['par2'])
-    aa = np.diff(cdf)
+    sigma, scale = lognorm_params(durpars[g]['none']['par1'], durpars[g]['none']['par2'])
+    rv = lognorm(sigma, 0, scale)
+    aa = np.diff(rv.cdf(x))
     bb = mean_peak_fn(x, genotype_pars[genotype_map[g]]['dysp_rate'])[1:]
     shares.append(np.dot(aa, bb))
     gtypes.append(genotype_map[g].upper())
@@ -129,8 +88,9 @@ for g in range(ng):
 noneshares, cin1shares, cin2shares, cin3shares, cancershares = [], [], [], [], []
 longx = np.linspace(0.01, 20, 1000)
 for g in range(ng):
-    par1, par2 = durpars[g]['dys']['par1'], durpars[g]['dys']['par2']
-    dd = mean_peak_fn2(longx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+    sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+    rv = lognorm(sigma, 0, scale)
+    dd = mean_peak_fn(longx, genotype_pars[genotype_map[g]]['prog_rate'])
 
     indcin1 = sc.findinds(dd<.33)[-1]
     if (dd>.33).any():
@@ -147,35 +107,37 @@ for g in range(ng):
         indcancer = indcin3
 
     noneshares.append(1 - shares[g])
-    cin1shares.append(((logn_cdf(longx[indcin1],par1,par2)-logn_cdf(longx[0],par1,par2))*shares[g])[0])
-    cin2shares.append(((logn_cdf(longx[indcin2],par1,par2)-logn_cdf(longx[indcin1],par1,par2))*shares[g])[0])
-    cin3shares.append(((logn_cdf(longx[indcin3],par1,par2)-logn_cdf(longx[indcin2],par1,par2))*shares[g])[0])
-    cancershares.append(((logn_cdf(longx[indcancer],par1,par2)-logn_cdf(longx[indcin3],par1,par2))*shares[g])[0])
+    cin1shares.append(((rv.cdf(longx[indcin1]) - rv.cdf(longx[0])) * shares[g])[0])
+    cin2shares.append(((rv.cdf(longx[indcin2]) - rv.cdf(longx[indcin1])) * shares[g])[0])
+    cin3shares.append(((rv.cdf(longx[indcin3]) - rv.cdf(longx[indcin2])) * shares[g])[0])
+    cancershares.append(((rv.cdf(longx[indcancer]) - rv.cdf(longx[indcin3])) * shares[g])[0])
 
+######## Outcomes by duration of infection and genotype
+n_samples = 10e3
 
-# ######## Outcomes by duration of infection and genotype
-# n_samples = 10e3
-#
-# # create dataframes
-# data = {}
-# years = np.arange(1,11)
-# cin1_shares, cin2_shares, cin3_shares, cancer_shares = [], [], [], []
-# all_years = []
-# all_genotypes = []
-# for g in range(ng):
-#     par1, par2 = durpars[g]['dys']['par1'], durpars[g]['dys']['par2']
-#     for year in years:
-#         mean_peaks = mean_peak_fn2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
-#         peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=mpvar, size=n_samples))
-#         cin1_shares.append(sum(peaks<0.33)/n_samples)
-#         cin2_shares.append(sum((peaks>0.33)&(peaks<0.67))/n_samples)
-#         cin3_shares.append(sum((peaks>0.67)&(peaks<cancer_thresh))/n_samples)
-#         cancer_shares.append(sum(peaks>cancer_thresh)/n_samples)
-#         all_years.append(year)
-#         all_genotypes.append(genotype_map[g].upper())
-# data = {'Year':all_years, 'Genotype':all_genotypes, 'CIN1':cin1_shares, 'CIN2':cin2_shares, 'CIN3':cin3_shares, 'Cancer': cancer_shares}
-# sharesdf = pd.DataFrame(data)
-#
+# create dataframes
+data = {}
+years = np.arange(1, 11)
+cin1_shares, cin2_shares, cin3_shares, cancer_shares = [], [], [], []
+all_years = []
+all_genotypes = []
+for g in range(ng):
+    sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+    r = lognorm(sigma, 0, scale)
+
+    for year in years:
+        mean_peaks = mean_peak_fn(year, genotype_pars[genotype_map[g]]['prog_rate'])
+        peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=(1 - mean_peaks), size=n_samples))
+        cin1_shares.append(sum(peaks < 0.33) / n_samples)
+        cin2_shares.append(sum((peaks > 0.33) & (peaks < 0.67)) / n_samples)
+        cin3_shares.append(sum((peaks > 0.67) & (peaks < cancer_thresh)) / n_samples)
+        cancer_shares.append(sum(peaks > cancer_thresh) / n_samples)
+        all_years.append(year)
+        all_genotypes.append(genotype_map[g].upper())
+data = {'Year': all_years, 'Genotype': all_genotypes, 'CIN1': cin1_shares, 'CIN2': cin2_shares, 'CIN3': cin3_shares,
+        'Cancer': cancer_shares}
+sharesdf = pd.DataFrame(data)
+
 
 ################################################################################
 # BEGIN FIGURE 1
@@ -189,8 +151,9 @@ def make_fig1():
 
     ###### Distributions
     for g in range(ng):
-        par1, par2 = durpars[g]['none']['par1'], durpars[g]['none']['par2']
-        ax[0,0].plot(x, logn_pdf(x,par1,par2), color=colors[g], lw=2, label=genotype_map[g].upper())
+        sigma, scale = lognorm_params(durpars[g]['none']['par1'], durpars[g]['none']['par2'])
+        rv = lognorm(sigma, 0, scale)
+        ax[0,0].plot(x, rv.pdf(x), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,0].legend()
     ax[0,0].set_xlabel("Pre-dysplasia/clearance duration")
     ax[0,0].set_ylabel("")
@@ -214,8 +177,9 @@ def make_fig1():
     ###### Distributions post-dysplasia
     thisx = np.linspace(0.01, 10, 100)
     for g in range(ng):
-        par1, par2 = durpars[g]['dys']['par1'], durpars[g]['dys']['par2']
-        ax[0,2].plot(thisx, logn_pdf(thisx,par1,par2), color=colors[g], lw=2, label=genotype_map[g].upper())
+        sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+        rv = lognorm(sigma, 0, scale)
+        ax[0,2].plot(thisx, rv.pdf(thisx), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,2].set_xlabel("Post-dysplasia duration")
     ax[0,2].set_ylabel("")
     ax[0,2].grid()
@@ -230,13 +194,13 @@ def make_fig1():
     cmap = plt.cm.Oranges([0.25,0.5,0.75,1])
     n_samples = 10
     for g in range(ng):
-        ax[1,0].plot(thisx, mean_peak_fn2(thisx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
+        ax[1,0].plot(thisx, mean_peak_fn(thisx, genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
 
         if g<2:
             # Plot variation
             for year in range(1,11):
-                mean_peaks = mean_peak_fn2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
-                peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=mpvar, size=n_samples))
+                mean_peaks = mean_peak_fn(year, genotype_pars[genotype_map[g]]['prog_rate'])
+                peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=(1 - mean_peaks), size=n_samples))
                 ax[1,0].plot([year]*n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
     ax[1,0].set_xlabel("Post-dysplasia duration")
@@ -256,43 +220,43 @@ def make_fig1():
     ax[1,0].text(-0.3, 0.75, 'CIN3', fontsize=15, rotation=90)
 
 
-    # ###### Share of women who develop each CIN grade
-    # loc_array = np.array([-5,-4,-3,-2,-1,1,2,3,4,5])
-    # w = 0.08
-    # for y in years:
-    #     la = loc_array[y - 1] * w + np.sign(loc_array[y - 1])*(-1)*w/2
-    #     bottom = np.zeros(4)
-    #     for gn, grade in enumerate(['CIN1', 'CIN2', 'CIN3', 'Cancer']):
-    #         ydata = sharesdf[sharesdf['Year']==y][grade]
-    #         ax[1,1].bar(np.arange(1,ng+1)+la, ydata, width=w, color=cmap[gn], bottom=bottom, edgecolor='k', label=grade);
-    #         bottom = bottom + ydata
-    #
-    # # ax[1,1].legend()
-    # ax[1,1].set_title("Share of women with dysplasia\nby clinical grade and duration")
-    # ax[1,1].set_xlabel("")
-    # ax[1,1].set_xticks(np.arange(ng) + 1)
-    # ax[1,1].set_xticklabels(gtypes)
-    #
-    #
-    # ##### Final outcomes for women
-    # bottom = np.zeros(ng+1)
-    # all_shares = [noneshares+[sum([j*.25 for j in noneshares])],
-    #               cin1shares+[sum([j*.25 for j in cin1shares])],
-    #               cin2shares+[sum([j*.25 for j in cin2shares])],
-    #               cin3shares+[sum([j*.25 for j in cin3shares])],
-    #               cancershares+[sum([j*.25 for j in cancershares])],
-    #               ]
-    # for gn,grade in enumerate(['None', 'CIN1', 'CIN2', 'CIN3','Cancer']):
-    #     ydata = np.array(all_shares[gn])
-    #     if len(ydata.shape)>1: ydata = ydata[:,0]
-    #     color = cmap[gn-1] if gn>0 else 'gray'
-    #     ax[1,2].bar(np.arange(1,ng+2), ydata, color=color, bottom=bottom, label=grade)
-    #     bottom = bottom + ydata
-    # ax[1,2].set_xticks(np.arange(ng+1) + 1)
-    # ax[1,2].set_xticklabels(gtypes+['Average'])
-    # ax[1,2].set_ylabel("")
-    # ax[1,2].set_title("Eventual outcomes for women\n")
-    # ax[1,2].legend(bbox_to_anchor =(0.5, 1.15),loc='upper center',fontsize=15,ncol=5,frameon=False)
+    ###### Share of women who develop each CIN grade
+    loc_array = np.array([-5,-4,-3,-2,-1,1,2,3,4,5])
+    w = 0.08
+    for y in years:
+        la = loc_array[y - 1] * w + np.sign(loc_array[y - 1])*(-1)*w/2
+        bottom = np.zeros(4)
+        for gn, grade in enumerate(['CIN1', 'CIN2', 'CIN3', 'Cancer']):
+            ydata = sharesdf[sharesdf['Year']==y][grade]
+            ax[1,1].bar(np.arange(1,ng+1)+la, ydata, width=w, color=cmap[gn], bottom=bottom, edgecolor='k', label=grade);
+            bottom = bottom + ydata
+
+    # ax[1,1].legend()
+    ax[1,1].set_title("Share of women with dysplasia\nby clinical grade and duration")
+    ax[1,1].set_xlabel("")
+    ax[1,1].set_xticks(np.arange(ng) + 1)
+    ax[1,1].set_xticklabels(gtypes)
+
+
+    ##### Final outcomes for women
+    bottom = np.zeros(ng+1)
+    all_shares = [noneshares+[sum([j*.25 for j in noneshares])],
+                  cin1shares+[sum([j*.25 for j in cin1shares])],
+                  cin2shares+[sum([j*.25 for j in cin2shares])],
+                  cin3shares+[sum([j*.25 for j in cin3shares])],
+                  cancershares+[sum([j*.25 for j in cancershares])],
+                  ]
+    for gn,grade in enumerate(['None', 'CIN1', 'CIN2', 'CIN3','Cancer']):
+        ydata = np.array(all_shares[gn])
+        if len(ydata.shape)>1: ydata = ydata[:,0]
+        color = cmap[gn-1] if gn>0 else 'gray'
+        ax[1,2].bar(np.arange(1,ng+2), ydata, color=color, bottom=bottom, label=grade)
+        bottom = bottom + ydata
+    ax[1,2].set_xticks(np.arange(ng+1) + 1)
+    ax[1,2].set_xticklabels(gtypes+['Average'])
+    ax[1,2].set_ylabel("")
+    ax[1,2].set_title("Eventual outcomes for women\n")
+    ax[1,2].legend(bbox_to_anchor =(0.5, 1.15),loc='upper center',fontsize=15,ncol=5,frameon=False)
 
     fig.tight_layout()
     plt.savefig("progressions-1.png", dpi=100)
