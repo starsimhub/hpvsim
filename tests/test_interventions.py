@@ -233,6 +233,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         result_keys=['total_hpv_prevalence']
     )
 
+
     sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
 
@@ -328,6 +329,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
         timepoints=['2030'],
         result_keys=['total_cin_prevalence']
     )
+
 
     sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3

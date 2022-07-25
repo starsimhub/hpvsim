@@ -74,10 +74,8 @@ class People(hpb.BasePeople):
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
-            if key in ['dead_other', 'vaccinated', 'screened', 'treated', 'diagnosed']:  # ALl false at the beginning
+            if key in ['dead_other', 'vaccinated', 'screened', 'treated', 'diagnosed']: # ALl false at the beginning
                 self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
-            elif key == 'cancer_genotype':
-                self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_int)
             elif key == 'alive':  # All true at the beginning
                 self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
             elif key == 'susceptible':
@@ -210,10 +208,6 @@ class People(hpb.BasePeople):
             self.flows['cancer_deaths'][g]  += self.check_cancer_deaths(g)
             self.flows['detected_cancers'][g]+= self.check_cancer_detection(g)
             self.check_clearance(g)
-
-        #Perform updates that are not genotype specific
-        self.cancer_flows['cancer_deaths'] += self.check_cancer_deaths()
-        self.cancer_flows['detected_cancers'] += self.check_cancer_detection()
 
         # Create total flows
         self.total_flows['total_cin1s']     += self.flows['cin1s'].sum()
@@ -398,9 +392,8 @@ class People(hpb.BasePeople):
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
-        inds = self.check_inds(self.cancerous[genotype, :], self.date_cancerous[genotype, :], filter_inds=filter_inds)
+        inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
         self.cancerous[genotype, inds] = True
-        self.cancer_genotype[inds] = genotype
         self.cin3[genotype, inds] = False # No longer counted as CIN3
         self.susceptible[:, inds] = False
         self.date_clearance[:, inds] = np.nan
@@ -414,9 +407,6 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('cancerous', genotype)
         inds = self.check_inds(self.dead_cancer[genotype, :], self.date_dead_cancer[genotype, :], filter_inds=filter_inds)
         self.make_die(inds, genotype=genotype, cause='cancer')
-
-        # check which of these were detected by symptom or screening
-        self.cancer_flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
         return len(inds)
 
 
@@ -427,16 +417,8 @@ class People(hpb.BasePeople):
         filter_inds = self.true_by_genotype('cancerous', genotype)
         dur_cancer = (self.t - self.date_cancerous[genotype, filter_inds])*self['dt']
         dur_cancer_inds = np.digitize(dur_cancer, self.pars['prognoses']['cancer_detection']) - 1
-        dur_cancer_inds = np.where(dur_cancer_inds < 0, 0, dur_cancer_inds)
         detection_probs = self.pars['prognoses']['cancer_detection'][dur_cancer_inds]
         is_detected = hpu.binomial_arr(detection_probs)
-        is_detected_inds = filter_inds[is_detected]
-        self.detected_cancer[is_detected_inds] = True
-        self.date_detected_cancer[is_detected_inds] = self.t
-        treat_probs = np.full(len(is_detected_inds), self.pars['cancer_treat_prob'])
-        treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-        new_dur_cancer = hpu.sample(**hppar.get_treatment_pars('radiation')['dur'], size=len(treat_inds))
-        self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
         return len(is_detected)
 
 

@@ -69,10 +69,8 @@ def make_pars(set_prognoses=False, **kwargs):
 
     # Probabilities of disease progression
     pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
-    pars['mean_peak_variance'] = 0.1 # Variance of lognormal distribution from which peak dysplasia is sampled
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
-    pars['cancer_treat_prob'] = 0.1 # probability of receiving cancer treatment given symptom detection
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
         hpv_reactivation_probs  = np.array([0.0001,    0.05,        0.04]),      # made this up, need to parameterize somehow
@@ -445,7 +443,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv45.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv45.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv45.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv45.prog_time        = 10  # Point of inflection in logistic function
     pars.hpv45.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
@@ -457,7 +454,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv52.dur['dys']       = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv52.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv52.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv52.prog_time        = 10  # Point of inflection in logistic function
     pars.hpv52.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv6 = sc.objdict()
@@ -467,7 +463,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.dur['dys']       = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dysp_rate        = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv6.prog_rate        = 0.01 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.prog_time        = 30  # Point of inflection in logistic function
     pars.hpv6.imm_boost        = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
@@ -477,7 +472,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.dur['dys']       = dict(dist='lognormal', par1=4.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dysp_rate        = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv11.prog_rate        = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv11.prog_time        = 30  # Point of inflection in logistic function
     pars.hpv11.imm_boost        = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
@@ -931,6 +925,7 @@ def get_screen_pars(screen=None):
                     hpv6=0,
                     hpv11=0,
                 ),
+            ),
             inadequacy=0,
         ),
 
@@ -992,6 +987,7 @@ def get_screen_pars(screen=None):
                     hpv6=0,
                     hpv11=0,
                 ),
+            ),
             inadequacy=0,
         ),
 

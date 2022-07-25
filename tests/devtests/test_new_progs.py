@@ -26,16 +26,7 @@ progs = sim['prognoses']
 genotype_pars = sim['genotype_pars']
 genotype_map = sim['genotype_map']
 durpars = [genotype_pars[genotype_map[g]]['dur'] for g in genotype_map]
-cancer_thresh = 0.99
-genotype_pars['hpv16'].prog_time = 4
-genotype_pars['hpv18'].prog_time = 4
-genotype_pars['hpv16'].prog_rate = 0.6
-genotype_pars['hpv18'].prog_rate = 0.8
-genotype_pars['hpv31'].prog_time = 10
-genotype_pars['hpv6'].prog_time = 15
-genotype_pars['hpv31'].prog_rate = .5
-genotype_pars['hpv6'].prog_rate = 0.5
-mpvar = sim['mean_peak_variance']
+cancer_thresh = 0.95
 
 # Prognoses from Harvard model
 prognoses = dict(
@@ -48,19 +39,6 @@ prognoses = dict(
         )
 
 #%% Helper functions
-# def lognorm_params(mode, stddev):
-#     """
-#     Given the mode and std. dev. of the log-normal distribution, this function
-#     returns the shape and scale parameters for scipy's parameterization of the
-#     distribution.
-#     """
-#     p = np.poly1d([1, -1, 0, 0, -(stddev/mode)**2])
-#     r = p.roots
-#     sol = r[(r.imag == 0) & (r.real > 0)].real
-#     shape = np.sqrt(np.log(sol))
-#     scale = mode * sol
-#     return shape, scale
-
 def lognorm_params(par1, par2):
     '''
     Retrieve the mean and standard deviation of the normally distributed
@@ -76,30 +54,6 @@ def logn_pdf(x, par1, par2):
     mu, sigma = lognorm_params(par1, par2)
     pdf = (np.exp(-(np.log(x) - mu) ** 2 / (2 * sigma ** 2)) / (x * sigma * np.sqrt(2 * np.pi)))
     return pdf
-
-
-def logn_cdf_wrong(x, par1, par2, minx=1e-3):
-    ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
-    if sc.checktype(x, 'arraylike'):
-        cdf = []
-        for xx in x:
-            cdf.append(logn_cdf(xx, par1, par2))
-        cdf = np.array(cdf)
-    elif sc.isnumber(x):
-        xsamples = np.linspace(minx, x, 100)
-        bin_width = xsamples[1]-xsamples[0]
-        pdf = logn_pdf(xsamples, par1, par2)
-        cdf = np.cumsum(pdf*bin_width)
-    return cdf
-
-
-def logn_cdf_simple(x, par1, par2, minx=1e-3):
-    ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
-    bin_width = x[1] - x[0]
-    pdf = logn_pdf(x, par1, par2)
-    cdf = bin_width*np.cumsum(pdf)
-    return cdf
-
 
 def logn_cdf(x, par1, par2, minx=1e-3):
     ''' Returns the cdf of the lognormal function given the mean and std of the lognormal fn'''
@@ -125,14 +79,6 @@ def mean_peak_fn(x, k):
     '''
     return (2 / (1 + np.exp(-k * x))) - 1
 
-
-def mean_peak_fn2(x, xmid, k):
-    '''
-    Define a function to link the duration of dysplasia prior to control/integration
-    to the peak dysplasia prior to control/integration.
-    Currently this is modeled as the concave part of a logistic function
-    '''
-    return (1 / (1 + np.exp(-k * (x-xmid))))
 
 # Figure settings
 font_size = 26

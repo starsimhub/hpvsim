@@ -166,15 +166,6 @@ def mean_peak_fn(x, k):
     return (2 / (1 + np.exp(-k * x))) - 1
 
 
-def mean_peak_fn2(x, x_infl, k):
-    '''
-    Define a function to link the duration of dysplasia prior to control/cancer
-    to the peak percentage of  peak dysplasia prior to control/integration.
-
-    '''
-    return (1 / (1 + np.exp(-k * (x-x_infl))))
-
-
 def set_prognoses(people, inds, g, dur_hpv):
     ''' Set disease progression '''
 
@@ -185,9 +176,7 @@ def set_prognoses(people, inds, g, dur_hpv):
     durpars = genotype_pars[genotype_map[g]]['dur']
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
-    prog_time = genotype_pars[genotype_map[g]]['prog_time']
     ccut = people.pars['clinical_cutoffs']
-    mean_peak_variance = people.pars['mean_peak_variance']
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
     cin1_probs = mean_peak_fn(dur_hpv, dysp_rate) # Probability of developing dysplasia
