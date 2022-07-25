@@ -169,7 +169,7 @@ def logf1(x, k):
 def logf2(x, x_infl, k):
     '''
     Logistic function, constrained to pass through 0,0 and with upper asymptote
-    at 1. Accepts 2 parameters: growth rate and point of inlfexion.
+    at 1. Accepts 2 parameters: growth rate and point of inflexion.
     '''
     l_asymp = -1/(1+np.exp(k*x_infl))
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
