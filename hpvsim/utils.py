@@ -160,11 +160,20 @@ def find_contacts(p1, p2, inds): # pragma: no cover
 
 def mean_peak_fn(x, k):
     '''
-    Define a function to link the duration of dysplasia prior to control/integration
-    to the peak dysplasia prior to control/integration.
+    Define a function to link the duration of hpv infection prior to dysplasia/control
+    to the probability of developing dysplasia.
     Currently this is modeled as the concave part of a logistic function
     '''
     return (2 / (1 + np.exp(-k * x))) - 1
+
+
+def mean_peak_fn2(x, x_infl, k):
+    '''
+    Define a function to link the duration of dysplasia prior to control/cancer
+    to the peak percentage of  peak dysplasia prior to control/integration.
+
+    '''
+    return (1 / (1 + np.exp(-k * (x-x_infl))))
 
 
 def set_prognoses(people, inds, g, dur_hpv):
@@ -177,7 +186,9 @@ def set_prognoses(people, inds, g, dur_hpv):
     durpars = genotype_pars[genotype_map[g]]['dur']
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
+    prog_time = genotype_pars[genotype_map[g]]['prog_time']
     ccut = people.pars['clinical_cutoffs']
+    mean_peak_variance = people.pars['mean_peak_variance']
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
     cin1_probs = mean_peak_fn(dur_hpv, dysp_rate) # Probability of developing dysplasia
@@ -199,8 +210,8 @@ def set_prognoses(people, inds, g, dur_hpv):
     # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
     dur_to_peak_dys = sample(**durpars['dys'], size=len(cin1_inds))
     people.dur_hpv[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
-    mean_peaks = mean_peak_fn(dur_to_peak_dys, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
-    peaks = np.minimum(1, sample(dist='lognormal', par1=mean_peaks, par2=(1-mean_peaks)**2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
+    mean_peaks = mean_peak_fn2(dur_to_peak_dys, prog_time, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
+    peaks = np.minimum(1, sample(dist='lognormal', par1=mean_peaks, par2=mean_peak_variance)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
     # Determine whether CIN1 clears or progresses to CIN2
     is_cin2 = peaks>ccut['cin1']
@@ -256,15 +267,15 @@ def set_prognoses(people, inds, g, dur_hpv):
                                                   np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
 
     # Case 2.2.2.2: Severe dysplasia progresses to cancer
-    excl_inds = true(people.date_cancerous[g, cancer_inds] < people.t)  # Don't count cancers that were acquired before now
-    people.date_cancerous[g, cancer_inds[excl_inds]] = np.nan
-    people.date_cancerous[g, cancer_inds] = np.fmin(people.date_cancerous[g, cancer_inds],
+    excl_inds = true(people.date_cancerous[cancer_inds] < people.t)  # Don't count cancers that were acquired before now
+    people.date_cancerous[cancer_inds[excl_inds]] = np.nan
+    people.date_cancerous[cancer_inds] = np.fmin(people.date_cancerous[cancer_inds],
                                                     people.date_cin1[g, cancer_inds] +
                                                     np.ceil(dur_to_peak_dys[is_cancer] / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
 
     # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
-    people.date_dead_cancer[g, cancer_inds] = people.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
+    people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
 
     return
 

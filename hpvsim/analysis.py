@@ -582,7 +582,9 @@ class age_results(Analyzer):
             'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
+            'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
             'cancer_deaths': ['date_dead_cancer', 'dead_cancer'],
+            'detected_cancer_deaths': ['date_dead_cancer', 'dead_cancer']
         }
         attr1 = mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
         attr2 = mapping[attr][1]  # As above
@@ -609,7 +611,7 @@ class age_results(Analyzer):
                     unique_genotypes = thisdatadf.genotype.unique()
                     ng = len(unique_genotypes)
 
-                size = na if 'total' in result else (ng, na)
+                size = na if 'total' in result or 'cancer' in result else (ng, na)
                 self.results[result][date] = np.zeros(size)
 
                 # Both annual stocks and prevalence require us to calculate the current stocks.
@@ -639,7 +641,7 @@ class age_results(Analyzer):
                     else:
                         if 'detectable' in result:
                             hpv_test_pars = hppar.get_screen_pars('hpv')
-                            for state in ['hpv', 'cin1', 'cin2', 'cin3', 'cancerous']:
+                            for state in ['hpv', 'cin1', 'cin2', 'cin3']:
                                 for g in range(ng):
                                     hpv_pos_probs = np.zeros(len(sim.people))
                                     tp_inds = hpu.true(sim.people[state][g, :])
@@ -667,10 +669,13 @@ class age_results(Analyzer):
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
-                if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result:
+                if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
-                    if result[:5] == 'total':  # Results across all genotypes
-                        inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
+                    if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
+                        if result == 'detected_cancer_deaths':
+                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
+                        else:
+                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
                         self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
                                                         0] * scale  # Bin the people
                     else:  # Results by genotype
@@ -686,7 +691,7 @@ class age_results(Analyzer):
                         else:  # Denominator is females
                             denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[
                                          0] * scale) / 1e5  # CIN and cancer are per 100,000 women
-                        if 'total' not in result: denom = denom[None, :]
+                        if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
                         self.results[result][date] = self.results[result][date] / denom
 
 
@@ -707,7 +712,7 @@ class age_results(Analyzer):
         for name, group in self.result_keys[key].data.groupby(['genotype', 'year']):
             genotype = name[0].lower()
             year = str(name[1]) + '.0'
-            if 'total' in key:
+            if 'total' in key or 'cancer' in key:
                 sim_res = list(self.results[key][year])
                 res.extend(sim_res)
             else:
@@ -772,7 +777,7 @@ class age_results(Analyzer):
                         thisdatadf = self.result_keys[rkey].data[(self.result_keys[rkey].data.year == float(date))&(self.result_keys[rkey].data.name == rkey)]
                         unique_genotypes = thisdatadf.genotype.unique()
 
-                    if 'total' not in rkey:
+                    if 'total' not in rkey and 'cancer' not in rkey:
                         # Prepare plot settings
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
@@ -1193,7 +1198,7 @@ class Calibration(Analyzer):
 
 
     def plot(self, fig_args=None, axis_args=None, data_args=None, do_save=None,
-             fig_path=None, do_show=True, plot_type=sns.boxplot, **kwargs):
+             fig_path=None, do_show=True, **kwargs):
         '''
         Plot the calibration results
 
@@ -1238,54 +1243,34 @@ class Calibration(Analyzer):
         with hpo.with_style(**kwargs):
 
             plot_count = 0
-
             for rn, resname in enumerate(self.results_keys):
                 x = np.arange(len(age_labels[resname]))  # the label locations
 
                 for date in all_dates[rn]:
-
-                    # Initialize axis and data storage structures
                     ax = axes[plot_count]
-                    bins = []
-                    genotypes = []
-                    values = []
-
                     # Pull out data
                     thisdatadf = self.target_data[rn][(self.target_data[rn].year == float(date)) & (self.target_data[rn].name == resname)]
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in resname:
+                    if 'total' not in resname and 'cancer' not in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
-                            # Plot data
                             if glabel in unique_genotypes:
-                                ydata = np.array(thisdatadf[thisdatadf.genotype == glabel].value)
+                                ydata = np.array(thisdatadf[thisdatadf.genotype == self.glabels[g].upper()].value)
                                 ax.scatter(x, ydata, color=self.result_properties[resname].color[g], marker='s', label=f'Data - {glabel}')
-
-                            # Construct a dataframe with things in the most logical order for plotting
-                            for run_num, run in enumerate(self.analyzer_results):
-                                genotypes += [glabel]*len(x)
-                                bins += x.tolist()
-                                values += run[resname][date][g]
-
-                        # Plot model
-                        modeldf = pd.DataFrame({'bins':bins, 'values':values, 'genotypes':genotypes})
-                        ax = plot_type(ax=ax, x='bins', y='values', hue="genotypes", data=modeldf, dodge=True, boxprops=dict(alpha=.3))
+                                for run_num, run in enumerate(self.analyzer_results):
+                                    ymodel = run[resname][date][g]
+                                    label = f'Model - {glabel}' if run_num==0 else None
+                                    ax.plot(x, ymodel, color=self.result_properties[resname].color[g], linestyle='--', label=label)
 
                     else:
-                        # Plot data
                         ydata = np.array(thisdatadf.value)
                         ax.scatter(x, ydata, color=self.result_properties[resname].color, marker='s', label='Data')
-
-                        # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(self.analyzer_results):
-                            bins += x.tolist()
-                            values += run[resname][date]
-
-                        # Plot model
-                        modeldf = pd.DataFrame({'bins':bins, 'values':values})
-                        ax = plot_type(ax=ax, x='bins', y='values', data=modeldf, color=self.result_properties[resname].color, boxprops=dict(alpha=.3))
+                            ymodel = run[resname][date]
+                            label = 'Model' if run_num == 0 else None
+                            ax.plot(x, ymodel, color=self.result_properties[resname].color, linestyle='--', label=label)
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
