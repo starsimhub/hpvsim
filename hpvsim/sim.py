@@ -410,6 +410,10 @@ class Sim(hpb.BaseSim):
         for var, name, color in zip(hpd.intv_flow_keys, hpd.intv_flow_names, hpd.intv_flow_colors):
             results[f'{var}'] = init_res(f'{name}', color=color)
 
+        # Create cancer results
+        for var, name, color in zip(hpd.cancer_flow_keys, hpd.cancer_flow_names, hpd.cancer_flow_colors):
+            results[f'{var}'] = init_res(f'{name}', color=color)
+
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
         results['new_total_vaccinated'] = init_res('Newly vaccinated')
@@ -425,14 +429,10 @@ class Sim(hpb.BaseSim):
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence')
 
         # Cancer flows and stocks
-        results['n_cancerous'] = init_res('Number with cancer')
-        results['cancers'] = init_res('Cancers')
-        results['detected_cancers'] = init_res('Detected cancers')
-        results['cancer_deaths'] = init_res('Cancer deaths')
-        results['detected_cancer_deaths'] = init_res('Cancer deaths')
-        results['cancer_incidence'] = init_res('Cancer incidence')
-        results['detected_cancer_incidence'] = init_res('Detected cancer incidence')
-        results['cancer_mortality'] = init_res('Cancer mortality')
+        results['n_cancerous'] = init_res('Number with cancer', color=hpd.cancer_flow_colors[0])
+        results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0])
+        results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0])
+        results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0])
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
