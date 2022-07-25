@@ -49,22 +49,27 @@ def test_network(do_plot=True):
         )
     )
 
+
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
     )
 
     sim = hpv.Sim(
         pars,
-        genotypes = [hpv16, hpv18],
+        genotypes = [hpv16, hpv11, hpv6, hpv18],
         network='default',
         location = 'kenya',
         datafile=f'test_data/kenya_data.csv',
         analyzers=[age_pyr, az, snap])
 
     sim.run()
+    a = sim.get_analyzer(1)
 
     # Check plot()
     if do_plot:
+        fig = a.plot()
+        sim.plot()
+
         snapshot = sim.get_analyzer()
         people1990 = snapshot.snapshots[0]
         people2000 = snapshot.snapshots[1]
@@ -72,7 +77,6 @@ def test_network(do_plot=True):
         people2020 = snapshot.snapshots[3]
 
         # Plot age mixing
-        import pylab as pl
         import matplotlib as mpl
         snapshot = sim.get_analyzer()
         people2020 = snapshot.snapshots[3]
@@ -106,8 +110,7 @@ def test_network(do_plot=True):
             ax[cn].set_xlabel(f'Time between {types[cn]} relationships')
         fig.tight_layout()
         pl.savefig(f"lags.png", dpi=100)
-
-
+        
     return sim, a
 
 
