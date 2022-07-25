@@ -139,7 +139,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
     if infection:
         # Determine whether individual seroconverts based upon duration of infection
         dur_inf = people.dur_disease[imm_source, inds]
-        seroconvert_probs = hpu.mean_peak_fn(dur_inf, imm_pars['sero'])
+        seroconvert_probs = hpu.logf1(dur_inf, imm_pars['sero'])
         is_seroconvert = hpu.binomial_arr(seroconvert_probs)
 
         # Extract parameters and indices
