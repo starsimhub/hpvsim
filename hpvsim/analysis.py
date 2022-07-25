@@ -1125,8 +1125,9 @@ class Calibration(Analyzer):
             for gname, gpardict in self.genotype_pars.items():
                 for key, val in gpardict.items():
                     if isinstance(val, list):
-                        self.initial_pars[key] = val[0]
-                        self.par_bounds[key] = np.array([val[1], val[2]])
+                        sampler_key = gname + '_' + key
+                        self.initial_pars[sampler_key] = val[0]
+                        self.par_bounds[sampler_key] = np.array([val[1], val[2]])
                     elif isinstance(val, dict):
                         for parkey, par_highlowlist in val.items():
                             for i, (best, low, high) in enumerate(par_highlowlist):
