@@ -68,8 +68,7 @@ def make_pars(set_prognoses=False, **kwargs):
     pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Probabilities of disease progression
-    pars['prognoses'] = None # Arrays of prognoses by duration; this is populated later
-    pars['mean_peak_variance'] = 0.1 # Variance of lognormal distribution from which peak dysplasia is sampled
+
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
     pars['cancer_treat_prob'] = 0.1 # probability of receiving cancer treatment given symptom detection

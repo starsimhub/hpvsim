@@ -1659,12 +1659,16 @@ class Person(sc.prettyobj):
     Class for a single person. Note: this is largely deprecated since sim.people
     is now based on arrays rather than being a list of people.
     '''
-    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, partners=None, current_partners=None):
+    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, partners=None, current_partners=None,
+                 rship_start_dates=None, rship_end_dates=None, n_rships=None):
         self.uid                = uid # This person's unique identifier
         self.age                = hpd.default_float(age) # Age of the person (in years)
         self.sex                = hpd.default_int(sex) # Female (0) or male (1)
         self.partners           = partners # Preferred number of partners
         self.current_partners   = current_partners # Number of current partners
+        self.rship_start_dates  = rship_start_dates # Timepoint at which most recent relationship began
+        self.rship_end_dates    = rship_end_dates # Timepoint of most recent breakup/relationship dissolution
+        self.n_rships           = n_rships # Total number of relationships during the simulation
         self.debut              = hpd.default_float(debut) # Age of sexual debut
         return
 

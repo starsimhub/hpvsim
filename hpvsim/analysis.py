@@ -1247,30 +1247,49 @@ class Calibration(Analyzer):
                 x = np.arange(len(age_labels[resname]))  # the label locations
 
                 for date in all_dates[rn]:
+
+                    # Initialize axis and data storage structures
                     ax = axes[plot_count]
+                    bins = []
+                    genotypes = []
+                    values = []
+
                     # Pull out data
                     thisdatadf = self.target_data[rn][(self.target_data[rn].year == float(date)) & (self.target_data[rn].name == resname)]
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in resname and 'cancer' not in resname:
+                    if 'total' not in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
+                            # Plot data
                             if glabel in unique_genotypes:
-                                ydata = np.array(thisdatadf[thisdatadf.genotype == self.glabels[g].upper()].value)
+                                ydata = np.array(thisdatadf[thisdatadf.genotype == glabel].value)
                                 ax.scatter(x, ydata, color=self.result_properties[resname].color[g], marker='s', label=f'Data - {glabel}')
-                                for run_num, run in enumerate(self.analyzer_results):
-                                    ymodel = run[resname][date][g]
-                                    label = f'Model - {glabel}' if run_num==0 else None
-                                    ax.plot(x, ymodel, color=self.result_properties[resname].color[g], linestyle='--', label=label)
+
+                            # Construct a dataframe with things in the most logical order for plotting
+                            for run_num, run in enumerate(self.analyzer_results):
+                                genotypes += [glabel]*len(x)
+                                bins += x.tolist()
+                                values += run[resname][date][g]
+
+                        # Plot model
+                        modeldf = pd.DataFrame({'bins':bins, 'values':values, 'genotypes':genotypes})
+                        ax = plot_type(ax=ax, x='bins', y='values', hue="genotypes", data=modeldf, dodge=True, boxprops=dict(alpha=.3))
 
                     else:
+                        # Plot data
                         ydata = np.array(thisdatadf.value)
                         ax.scatter(x, ydata, color=self.result_properties[resname].color, marker='s', label='Data')
+
+                        # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(self.analyzer_results):
-                            ymodel = run[resname][date]
-                            label = 'Model' if run_num == 0 else None
-                            ax.plot(x, ymodel, color=self.result_properties[resname].color, linestyle='--', label=label)
+                            bins += x.tolist()
+                            values += run[resname][date]
+
+                        # Plot model
+                        modeldf = pd.DataFrame({'bins':bins, 'values':values})
+                        ax = plot_type(ax=ax, x='bins', y='values', data=modeldf, color=self.result_properties[resname].color, boxprops=dict(alpha=.3))
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
