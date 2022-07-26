@@ -410,10 +410,8 @@ class People(hpb.BasePeople):
         if len(cancer_inds)==0:
             return 0
         else:
-            old_cancer = hpu.true(self.age[cancer_inds]>70)
             detection_probs = np.full(len(cancer_inds), self.pars['cancer_symp_detection']/self.dt, dtype=hpd.default_float) # Initialize probabilities of cancer detection
             detection_probs[self.detected_cancer[cancer_inds]] = 0
-            detection_probs[old_cancer] = 0.005
             is_detected = hpu.binomial_arr(detection_probs)
             is_detected_inds = cancer_inds[is_detected]
             if len(is_detected_inds)==0:
