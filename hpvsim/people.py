@@ -411,8 +411,6 @@ class People(hpb.BasePeople):
             return 0
         else:
             old_cancer = hpu.true(self.age[cancer_inds]>70)
-            if len(old_cancer):
-                print('iamhere')
             detection_probs = np.full(len(cancer_inds), self.pars['cancer_symp_detection']/self.dt, dtype=hpd.default_float) # Initialize probabilities of cancer detection
             detection_probs[self.detected_cancer[cancer_inds]] = 0
             detection_probs[old_cancer] = 0.001
