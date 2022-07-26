@@ -943,7 +943,11 @@ class Calibration(Analyzer):
             for gname,gpardict in genotype_pars.items():
                 g = gmap_r[gname]
                 for gpar,gval in gpardict.items():
-                    sim['genotypes'][g].p[gpar] = gval
+                    if isinstance(gval,dict):
+                        for gparkey, gparval in gval.items():
+                            sim['genotypes'][g].p[gpar][gparkey] = gparval
+                    else:
+                        sim['genotypes'][g].p[gpar] = gval
 
         # Run the sim
         try:
@@ -982,14 +986,16 @@ class Calibration(Analyzer):
                 else:
                     sampler_key = key
                 pars[sampler_key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
+
             elif isinstance(val, dict):
                 sampler_fn = trial.suggest_uniform
                 pars[key] = dict()
                 for parkey, par_highlowlist in val.items():
-                    pars[key][parkey] = []
-                    for i, (best, low, high) in enumerate(par_highlowlist):
-                        sampler_key = key + '_' + parkey + '_' + str(i)
-                        pars[key][parkey].append(sampler_fn(sampler_key, low, high))
+                    if gname is not None:
+                        sampler_key = gname + '_' + key + '_' + parkey
+                    else:
+                        sampler_key = key + '_' + parkey
+                    pars[key][parkey] = sampler_fn(sampler_key, par_highlowlist[1], par_highlowlist[2])
 
         return pars
 
@@ -1119,10 +1125,9 @@ class Calibration(Analyzer):
                     self.par_bounds[key] = np.array([val[1], val[2]])
                 elif isinstance(val, dict):
                     for parkey, par_highlowlist in val.items():
-                        for i, (best, low, high) in enumerate(par_highlowlist):
-                            sampler_key = key + '_' + parkey + '_' + str(i)
-                            self.initial_pars[sampler_key] = best
-                            self.par_bounds[sampler_key] = np.array([low, high])
+                        sampler_key = key + '_' + parkey + '_'
+                        self.initial_pars[sampler_key] = par_highlowlist[0]
+                        self.par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
 
         # Compare for genotype pars
         if self.genotype_pars is not None:
@@ -1134,10 +1139,9 @@ class Calibration(Analyzer):
                         self.par_bounds[sampler_key] = np.array([val[1], val[2]])
                     elif isinstance(val, dict):
                         for parkey, par_highlowlist in val.items():
-                            for i, (best, low, high) in enumerate(par_highlowlist):
-                                sampler_key = key + '_' + parkey + '_' + str(i)
-                                self.initial_pars[sampler_key] = best
-                                self.par_bounds[sampler_key] = np.array([low, high])
+                            sampler_key = gname + '_' + key + '_' + parkey
+                            self.initial_pars[sampler_key] = par_highlowlist[0]
+                            self.par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
 
         self.parse_study()
 

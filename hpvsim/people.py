@@ -590,7 +590,8 @@ class People(hpb.BasePeople):
         # Deal with genotype parameters
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
-        durpars         = genotype_pars[genotype_map[g]]['dur']
+        dur_none        = genotype_pars[genotype_map[g]]['dur_none']
+        dur_dysp        = genotype_pars[genotype_map[g]]['dur_dysp']
 
         # Set all dates
         base_t = self.t + offset if offset is not None else self.t
@@ -632,7 +633,8 @@ class People(hpb.BasePeople):
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
-            this_dur = hpu.sample(**durpars['none'], size=len(inds))  # Duration of infection without dysplasia in years
+
+            this_dur = hpu.sample(**dur_none, size=len(inds))  # Duration of infection without dysplasia in years
             this_dur_f = self.dur_hpv[g, inds[self.is_female[inds]]]
         else:
             if len(dur) != len(inds):
