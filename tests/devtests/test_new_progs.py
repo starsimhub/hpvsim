@@ -22,7 +22,7 @@ sim.initialize()
 
 # Get parameters
 ng = sim['n_genotypes']
-progs = sim['prognoses']
+# progs = sim['prognoses']
 genotype_pars = sim['genotype_pars']
 genotype_map = sim['genotype_map']
 durpars = [genotype_pars[genotype_map[g]]['dur'] for g in genotype_map]
@@ -80,9 +80,11 @@ def logf2(x, x_infl, k):
 
 # Figure settings
 font_size = 26
-font_family = 'Libertinus Sans'
+# font_family = 'Libertinus Sans'
+sc.fonts('Libertinus Sans')
+sc.options(font='Libertinus Sans')
 plt.rcParams['font.size'] = font_size
-plt.rcParams['font.family'] = font_family
+# plt.rcParams['font.family'] = font_family
 colors = sc.gridcolors(ng)
 x = np.linspace(0.01, 7, 700)
 
@@ -211,13 +213,18 @@ def make_fig1():
     n_samples = 10
     for g in range(ng):
         ax[1,0].plot(thisx, logf2(thisx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
+        for year in range(1, 11):
+            mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'],
+                               genotype_pars[genotype_map[g]]['prog_rate'])
+            peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
+            ax[1, 0].plot([year] * n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
-        if g<2:
-            # Plot variation
-            for year in range(1,11):
-                mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
-                peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
-                ax[1,0].plot([year]*n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
+        # if g<2:
+        #     # Plot variation
+        #     for year in range(1,11):
+        #         mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+        #         peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
+        #         ax[1,0].plot([year]*n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
     ax[1,0].set_xlabel("Duration of dysplasia")
     ax[1,0].set_ylabel("")
