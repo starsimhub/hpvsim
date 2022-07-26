@@ -1159,50 +1159,68 @@ class Screening(Intervention):
         diagnosed_inds = np.intersect1d(treat_eligible_inds, cancerous_inds) # Indices of those who will be diagnosed with cancer
 
         # Update states and flows to reflect cancer diagnoses
-        sim.people.detected_cancer[diagnosed_inds] = True
         sim.people.cancer_flows['detected_cancers'] += len(diagnosed_inds)
-        sim.people.date_detected_cancer[diagnosed_inds] = sim.t
+        if len(diagnosed_inds)>0:
+            sim.people.detected_cancer[diagnosed_inds] = True
+            sim.people.date_detected_cancer[diagnosed_inds] = sim.t
 
-        # Treat cancers
-        ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
-        to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
-        ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
-        ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
-        sim.people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
+            # Treat cancers
+            ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
+            to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
+            ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
+            ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
+
+            # Set people properties
+            sim.people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
+            sim.people.treated[ca_treat_inds] = True
+            sim.people.date_treated[ca_treat_inds] = sim.t
+
+        else:
+            ca_treat_inds = np.array([], dtype=hpd.default_int)
 
         # Everyone remaining is eligible for precancer treatment
         preca_treat_eligible_inds = np.setdiff1d(treat_eligible_inds, diagnosed_inds) # Indices of those eligible for precancer treatment
 
         # Determine who is eligible for ablative vs excisional treatment
-        ablation_eligible_inds = []
-        for state in self.treat_states:
-            ablate_probs = np.zeros(len(preca_treat_eligible_inds))
-            ablate_inds = hpu.true(sim.people[state][:, preca_treat_eligible_inds].any(axis=0))
-            ablate_probs[ablate_inds] = treat_eligibility_pars['test_positivity'][state]
-            ablate_inds = hpu.true(hpu.binomial_arr(ablate_probs))
-            ablation_eligible_inds += list(ablate_inds)
+        if len(preca_treat_eligible_inds)>0:
+            ablation_eligible_inds = []
+            for state in self.treat_states:
+                ablate_probs = np.zeros(len(preca_treat_eligible_inds))
+                ablate_inds = hpu.true(sim.people[state][:, preca_treat_eligible_inds].any(axis=0))
+                ablate_probs[ablate_inds] = treat_eligibility_pars['test_positivity'][state]
+                ablate_inds = hpu.true(hpu.binomial_arr(ablate_probs))
+                ablation_eligible_inds += list(ablate_inds)
 
-        ablation_eligible_inds = np.array(ablation_eligible_inds)
-        ablation_eligible_inds = preca_treat_eligible_inds[ablation_eligible_inds]
-        excision_eligible_inds = np.setdiff1d(preca_treat_eligible_inds, ablation_eligible_inds)
+            ablation_eligible_inds = np.array(ablation_eligible_inds)
+            if len(ablation_eligible_inds)>0:
+                ablation_eligible_inds = preca_treat_eligible_inds[ablation_eligible_inds]
+            excision_eligible_inds = np.setdiff1d(preca_treat_eligible_inds, ablation_eligible_inds)
 
-        # Apply LTFU for both
-        ablate_treat_probs = np.full(len(ablation_eligible_inds), self.ablation_compliance, dtype=hpd.default_float)
-        to_ablate = hpu.binomial_arr(ablate_treat_probs)
-        ablation_inds = ablation_eligible_inds[to_ablate]  # Indices of those who get treated
-        ablate_LTFU_inds = ablation_eligible_inds[~to_ablate]
-        sim.people.date_next_screen[ablate_LTFU_inds] = np.nan
+            # Apply LTFU for both
+            if len(ablation_eligible_inds)>0:
+                ablate_treat_probs = np.full(len(ablation_eligible_inds), self.ablation_compliance, dtype=hpd.default_float)
+                to_ablate = hpu.binomial_arr(ablate_treat_probs)
+                ablation_inds = ablation_eligible_inds[to_ablate]  # Indices of those who get treated
+                ablate_LTFU_inds = ablation_eligible_inds[~to_ablate]
 
-        excision_treat_probs = np.full(len(excision_eligible_inds), self.excision_compliance, dtype=hpd.default_float)
-        to_excise = hpu.binomial_arr(excision_treat_probs)
-        excision_inds = excision_eligible_inds[to_excise]  # Indices of those who get treated
-        excision_LTFU_inds = excision_eligible_inds[~to_excise]
-        sim.people.date_next_screen[excision_LTFU_inds] = np.nan
+                sim.people.treated[ablation_inds] = True
+                sim.people.date_treated[ablation_inds] = sim.t
+                sim.people.date_next_screen[ablate_LTFU_inds] = np.nan
 
-        # Set properties
-        treat_inds = np.concatenate([ca_treat_inds, excision_inds, ablation_inds])
-        sim.people.treated[treat_inds] = True
-        sim.people.date_treated[treat_inds] = sim.t
+            else:
+                ablation_inds = np.array([])
+
+            if len(excision_eligible_inds)>0:
+                excision_treat_probs = np.full(len(excision_eligible_inds), self.excision_compliance, dtype=hpd.default_float)
+                to_excise = hpu.binomial_arr(excision_treat_probs)
+                excision_inds = excision_eligible_inds[to_excise]  # Indices of those who get treated
+                excision_LTFU_inds = excision_eligible_inds[~to_excise]
+
+                sim.people.treated[excision_inds] = True
+                sim.people.date_treated[excision_inds] = sim.t
+                sim.people.date_next_screen[excision_LTFU_inds] = np.nan
+            else:
+                excision_inds = np.array([])
 
         return ca_treat_inds, ablation_inds, excision_inds
 

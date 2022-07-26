@@ -136,11 +136,15 @@ def test_calibration():
     )
     genotype_pars = dict(
         hpv16=dict(
-            dysp_rate=[0.2, 0.5, 1.0],
-            prog_rate=[0.2, 0.5, 1.0]),
+            dysp_rate=[0.5, 0.2, 1.0],
+            prog_rate=[0.5, 0.2, 1.0],
+            dur_none = dict(par1=[1.0, 0.5, 2.5])
+        ),
         hpv18=dict(
-            dysp_rate=[0.2, 0.5, 1.0],
-            prog_rate=[0.2, 0.5, 1.0]),
+            dysp_rate=[0.5, 0.2, 1.0],
+            prog_rate=[0.5, 0.2, 1.0],
+            dur_none=dict(par1=[1.0, 0.5, 2.5])
+        )
     )
 
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
