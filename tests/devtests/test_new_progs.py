@@ -196,7 +196,7 @@ def make_fig1():
         sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
         rv = lognorm(sigma, 0, scale)
         ax[0,2].plot(thisx, rv.pdf(thisx), color=colors[g], lw=2, label=genotype_map[g].upper())
-    ax[0,2].set_xlabel("Post-dysplasia duration")
+    ax[0,2].set_xlabel("Duration of dysplasia")
     ax[0,2].set_ylabel("")
     ax[0,2].grid()
     ax[0,2].set_title("Distribution of dysplasia durations\nprior to cancer/control")
@@ -220,7 +220,7 @@ def make_fig1():
                 peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
                 ax[1,0].plot([year]*n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
-    ax[1,0].set_xlabel("Post-dysplasia duration")
+    ax[1,0].set_xlabel("Duration of dysplasia")
     ax[1,0].set_ylabel("")
     ax[1,0].grid(axis='x')
     ax[1,0].set_title("Mean peak clinical severity")

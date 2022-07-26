@@ -582,6 +582,7 @@ class age_results(Analyzer):
             'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
+            'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
             'detected_cancers': ['date_detected_cancer', 'detected_cancer'],
             'cancer_deaths': ['date_dead_cancer', 'dead_cancer'],
             'detected_cancer_deaths': ['date_dead_cancer', 'dead_cancer']
@@ -1298,7 +1299,7 @@ class Calibration(Analyzer):
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_properties[resname].name+' - '+date)
+                    ax.set_title(self.result_properties[resname].name+', '+ date)
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
