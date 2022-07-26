@@ -1159,16 +1159,17 @@ class Screening(Intervention):
         diagnosed_inds = np.intersect1d(treat_eligible_inds, cancerous_inds) # Indices of those who will be diagnosed with cancer
 
         # Update states and flows to reflect cancer diagnoses
-        sim.people.detected_cancer[diagnosed_inds] = True
         sim.people.cancer_flows['detected_cancers'] += len(diagnosed_inds)
-        sim.people.date_detected_cancer[diagnosed_inds] = sim.t
+        if len(diagnosed_inds)>0:
+            sim.people.detected_cancer[diagnosed_inds] = True
+            sim.people.date_detected_cancer[diagnosed_inds] = sim.t
 
-        # Treat cancers
-        ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
-        to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
-        ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
-        ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
-        sim.people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
+            # Treat cancers
+            ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
+            to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
+            ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
+            ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
+            sim.people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
 
         # Everyone remaining is eligible for precancer treatment
         preca_treat_eligible_inds = np.setdiff1d(treat_eligible_inds, diagnosed_inds) # Indices of those eligible for precancer treatment
