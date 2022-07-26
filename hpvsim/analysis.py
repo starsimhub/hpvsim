@@ -582,7 +582,7 @@ class age_results(Analyzer):
             'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
-            'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
+            'detected_cancers': ['date_detected_cancer', 'detected_cancer'],
             'cancer_deaths': ['date_dead_cancer', 'dead_cancer'],
             'detected_cancer_deaths': ['date_dead_cancer', 'dead_cancer']
         }
@@ -1203,7 +1203,7 @@ class Calibration(Analyzer):
 
 
     def plot(self, fig_args=None, axis_args=None, data_args=None, do_save=None,
-             fig_path=None, do_show=True, **kwargs):
+             fig_path=None, do_show=True, plot_type=sns.boxplot, **kwargs):
         '''
         Plot the calibration results
 
@@ -1264,7 +1264,7 @@ class Calibration(Analyzer):
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in resname:
+                    if 'total' not in resname and 'cancer' not in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
                             # Plot data
