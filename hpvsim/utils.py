@@ -175,7 +175,6 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
-
 def set_prognoses(people, inds, g, dur_hpv):
     ''' Set disease progression '''
 

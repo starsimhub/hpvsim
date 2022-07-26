@@ -1249,7 +1249,6 @@ class Calibration(Analyzer):
         with hpo.with_style(**kwargs):
 
             plot_count = 0
-
             for rn, resname in enumerate(self.results_keys):
                 x = np.arange(len(age_labels[resname]))  # the label locations
 
@@ -1283,7 +1282,6 @@ class Calibration(Analyzer):
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values, 'genotypes':genotypes})
                         ax = plot_type(ax=ax, x='bins', y='values', hue="genotypes", data=modeldf, dodge=True, boxprops=dict(alpha=.3))
-
 
                     else:
                         # Plot data

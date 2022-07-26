@@ -201,13 +201,12 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     pars = {
         'pop_size': n_agents,
-        'n_years': 60,
-        'burnin': 30,
-        'start': 1970,
+        'n_years': 20,
+        'burnin': 10,
+        'start': 2000,
         'genotypes': [hpv16, hpv18],
-        'pop_scale' : 25.2e6 / n_agents,
         'location': 'tanzania',
-        'dt': .2,
+        'dt': 1.,
     }
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
@@ -229,16 +228,29 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                                           triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
 
-    sim = hpv.Sim(pars=pars)
+    az = hpv.age_results(
+        result_keys=sc.objdict(
+            detected_cancer_deaths=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            detected_cancers=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
+            )
+        )
+    )
+
+    sim = hpv.Sim(pars=pars, analyzers=[az])
     n_runs = 3
 
     # Define the scenarios
     scenarios = {
-        # 'no_screening_rsa': {
-        #     'name': 'No screening',
-        #     'pars': {
-        #     }
-        # },
+        'no_screening_rsa': {
+            'name': 'No screening',
+            'pars': {
+            }
+        },
         'hpv_screening': {
             'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
             'pars': {
@@ -278,7 +290,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(to_plot=to_plot)
-        scens.plot_age_results(plot_type=sns.boxplot)
+        scens.plot_age_results(analyzer_ref=0, plot_type=sns.boxplot)
 
     return scens
 
@@ -375,9 +387,9 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
-    # scens1 = test_vaccinate_prob(do_plot=True)
-    # scens2 = test_vaccinate_num(do_plot=True)
+    sim0 = test_dynamic_pars()
+    scens1 = test_vaccinate_prob(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
     scens4 = test_screening_ltfu(do_plot=True)
 

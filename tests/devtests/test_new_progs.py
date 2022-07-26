@@ -61,6 +61,7 @@ def lognorm_params(mode, stddev):
     scale = mode * sol
     return shape, scale
 
+
 def logf1(x, k):
     '''
     The concave part of a logistic function, with point of inflexion at 0,0

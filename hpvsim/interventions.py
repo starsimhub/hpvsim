@@ -817,7 +817,7 @@ class vaccinate_num(BaseVaccination):
 
         if self._scheduled_second_doses[sim.t]:
             scheduled_second = np.fromiter(self._scheduled_second_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
-            still_alive = ~sim.people.dead_other[scheduled_second] & ~sim.people.dead_cancer[:, scheduled_second].sum(axis=0).astype(bool)
+            still_alive = ~sim.people.dead_other[scheduled_second] & ~sim.people.dead_cancer[scheduled_second].sum(axis=0).astype(bool)
             scheduled_second = scheduled_second[(sim.people.doses[scheduled_second] == 1) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
 
             # If there are more people due for a second/third dose than there are doses, vaccinate as many
