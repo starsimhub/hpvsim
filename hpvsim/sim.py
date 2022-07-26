@@ -731,7 +731,6 @@ class Sim(hpb.BaseSim):
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
 
-
         # Index for results
         idx = int(t / self.resfreq)
 
