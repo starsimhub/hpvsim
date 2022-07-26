@@ -922,6 +922,7 @@ class Scenarios(hpb.ParsObj):
         if not self.base_sim.initialized:
             self.base_sim.init_genotypes()
             self.base_sim.init_immunity()
+            self.base_sim.init_people()
             self.base_sim.init_results()
 
         # Copy quantities from the base sim to the main object

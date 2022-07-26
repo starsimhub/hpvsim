@@ -817,7 +817,7 @@ class vaccinate_num(BaseVaccination):
 
         if self._scheduled_second_doses[sim.t]:
             scheduled_second = np.fromiter(self._scheduled_second_doses[sim.t], dtype=hpd.default_int)  # Everyone scheduled today
-            still_alive = ~sim.people.dead_other[scheduled_second] & ~sim.people.dead_cancer[:, scheduled_second].sum(axis=0).astype(bool)
+            still_alive = ~sim.people.dead_other[scheduled_second] & ~sim.people.dead_cancer[scheduled_second].sum(axis=0).astype(bool)
             scheduled_second = scheduled_second[(sim.people.doses[scheduled_second] == 1) & still_alive]  # Remove anyone who's already had all doses of this vaccine, also dead people
 
             # If there are more people due for a second/third dose than there are doses, vaccinate as many
@@ -912,8 +912,8 @@ class Screening(Intervention):
 
     def __init__(self, primary_screen_test, treatment, screen_start_age, screen_interval, screen_stop_age,
                  timepoints, screen_compliance=None, triage_compliance=None, ablation_compliance=None, excision_compliance=None,
-                 cancer_compliance=None, triage_screen_test=None, screen_fu_neg_triage=None, label=None,
-                 screen_states=None, treat_states=None, **kwargs):
+                 cancer_compliance=None, triage_screen_test=None, screen_fu_neg_triage=None,
+                 label=None, screen_states=None, treat_states=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.label = label  # Screening label (used as a dict key)
         self.p = None  # Screening parameters

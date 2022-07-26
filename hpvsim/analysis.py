@@ -582,7 +582,7 @@ class age_results(Analyzer):
             'cin3': ['date_cin3', 'cin3'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
-            'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
+            'detected_cancers': ['date_detected_cancer', 'detected_cancer'],
             'cancer_deaths': ['date_dead_cancer', 'dead_cancer'],
             'detected_cancer_deaths': ['date_dead_cancer', 'dead_cancer']
         }
@@ -963,7 +963,7 @@ class Calibration(Analyzer):
                 return output
 
 
-    def get_pars(self, pardict=None, trial=None):
+    def get_pars(self, pardict=None, trial=None, gname=None):
         ''' Sample from pars, after extracting them from the structure they're provided in '''
         pars={}
         for key, val in pardict.items():
@@ -977,7 +977,11 @@ class Calibration(Analyzer):
                         raise AttributeError(errormsg) from E
                 else:
                     sampler_fn = trial.suggest_uniform
-                pars[key] = sampler_fn(key, low, high)  # Sample from values within this range
+                if gname is not None:
+                    sampler_key = gname + '_' + key
+                else:
+                    sampler_key = key
+                pars[sampler_key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
             elif isinstance(val, dict):
                 sampler_fn = trial.suggest_uniform
                 pars[key] = dict()
@@ -996,7 +1000,7 @@ class Calibration(Analyzer):
         if self.genotype_pars is not None:
             genotype_pars = {}
             for gname, pardict in self.genotype_pars.items():
-                genotype_pars[gname] = self.get_pars(pardict, trial)
+                genotype_pars[gname] = self.get_pars(pardict, trial, gname=gname)
         else:
             genotype_pars = None
         if self.calib_pars is not None:
@@ -1125,8 +1129,9 @@ class Calibration(Analyzer):
             for gname, gpardict in self.genotype_pars.items():
                 for key, val in gpardict.items():
                     if isinstance(val, list):
-                        self.initial_pars[key] = val[0]
-                        self.par_bounds[key] = np.array([val[1], val[2]])
+                        sampler_key = gname + '_' + key
+                        self.initial_pars[sampler_key] = val[0]
+                        self.par_bounds[sampler_key] = np.array([val[1], val[2]])
                     elif isinstance(val, dict):
                         for parkey, par_highlowlist in val.items():
                             for i, (best, low, high) in enumerate(par_highlowlist):
@@ -1198,7 +1203,7 @@ class Calibration(Analyzer):
 
 
     def plot(self, fig_args=None, axis_args=None, data_args=None, do_save=None,
-             fig_path=None, do_show=True, **kwargs):
+             fig_path=None, do_show=True, plot_type=sns.boxplot, **kwargs):
         '''
         Plot the calibration results
 
@@ -1259,7 +1264,7 @@ class Calibration(Analyzer):
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in resname:
+                    if 'total' not in resname and 'cancer' not in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
                             # Plot data

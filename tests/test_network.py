@@ -56,7 +56,7 @@ def test_network(do_plot=True):
 
     sim = hpv.Sim(
         pars,
-        genotypes = [hpv16, hpv11, hpv6, hpv18],
+        genotypes = [hpv16, hpv18],
         network='default',
         location = 'kenya',
         datafile=f'test_data/kenya_data.csv',
@@ -78,6 +78,7 @@ def test_network(do_plot=True):
 
         # Plot age mixing
         import matplotlib as mpl
+        import pylab as pl
         snapshot = sim.get_analyzer()
         people2020 = snapshot.snapshots[3]
         font_size = 15
@@ -99,7 +100,6 @@ def test_network(do_plot=True):
         fig.tight_layout()
         pl.savefig(f"networks.png", dpi=100)
 
-        import pylab as pl
         fig, axes = pl.subplots(nrows=1, ncols=2, figsize=(8, 2))
         ax = axes.flatten()
         types = ['casual', 'one-off']

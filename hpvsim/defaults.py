@@ -127,17 +127,15 @@ class PeopleMeta(sc.prettyobj):
 
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
-# the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'cancers',  'detected_cancers', 'cancer_deaths',    'reinfections',     'reactivations',     'screens',  'screened']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'cancers',  'detected cancers', 'cancer deaths',    'reinfections',     'reactivations',     'screens',  'screened']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds, pl.cm.Purples, pl.cm.Purples,      pl.cm.GnBu,          pl.cm.Purples, pl.cm.Purples, pl.cm.Purples,]
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections',     'reactivations']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections',     'reactivations']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu,         pl.cm.Purples,       pl.cm.Purples, pl.cm.Purples,]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
-# the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
-stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',          'cancerous']
-stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN',     'with cancer']
-stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',    ]
+stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN']
+stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
 
 # Cancer specific flows (not by genotype)
 cancer_flow_keys   = ['cancers',  'cancer_deaths', 'detected_cancers', 'detected_cancer_deaths']
@@ -309,7 +307,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
                     'cin_incidence',
-                    'total_cancer_incidence',
+                    'cancer_incidence',
                     ],
             })
 

@@ -61,23 +61,23 @@ def lognorm_params(mode, stddev):
     scale = mode * sol
     return shape, scale
 
-# Map durations pre-dysplasia to the probability of dysplasia beginning
-def mean_peak_fn(x, k):
+
+def logf1(x, k):
     '''
-    Define a function to link the duration of dysplasia prior to control/integration
-    to the peak dysplasia prior to control/integration.
-    Currently this is modeled as the concave part of a logistic function
+    The concave part of a logistic function, with point of inflexion at 0,0
+    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
     '''
     return (2 / (1 + np.exp(-k * x))) - 1
 
 
-def mean_peak_fn2(x, xmid, k):
+def logf2(x, x_infl, k):
     '''
-    Define a function to link the duration of dysplasia prior to control/integration
-    to the peak dysplasia prior to control/integration.
-    Currently this is modeled as the concave part of a logistic function
+    Logistic function, constrained to pass through 0,0 and with upper asymptote
+    at 1. Accepts 2 parameters: growth rate and point of inlfexion.
     '''
-    return (1 / (1 + np.exp(-k * (x-xmid))))
+    l_asymp = -1/(1+np.exp(k*x_infl))
+    return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
+
 
 # Figure settings
 font_size = 26
@@ -96,7 +96,7 @@ for g in range(ng):
     sigma, scale = lognorm_params(durpars[g]['none']['par1'], durpars[g]['none']['par2'])
     rv = lognorm(sigma, 0, scale)
     aa = np.diff(rv.cdf(x))
-    bb = mean_peak_fn(x, genotype_pars[genotype_map[g]]['dysp_rate'])[1:]
+    bb = logf1(x, genotype_pars[genotype_map[g]]['dysp_rate'])[1:]
     shares.append(np.dot(aa, bb))
     gtypes.append(genotype_map[g].upper())
 
@@ -107,7 +107,7 @@ longx = np.linspace(0.01, 20, 1000)
 for g in range(ng):
     sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
     rv = lognorm(sigma, 0, scale)
-    dd = mean_peak_fn2(longx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+    dd = logf2(longx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
 
     indcin1 = sc.findinds(dd<.33)[-1]
     if (dd>.33).any():
@@ -143,7 +143,7 @@ for g in range(ng):
     r = lognorm(sigma, 0, scale)
 
     for year in years:
-        mean_peaks = mean_peak_fn2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+        mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
         peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
         cin1_shares.append(sum(peaks<0.33)/n_samples)
         cin2_shares.append(sum((peaks>0.33)&(peaks<0.67))/n_samples)
@@ -181,7 +181,7 @@ def make_fig1():
     xx = prognoses['duration_cutoffs']
     yy = prognoses['cin1_probs']
     for g in range(ng):
-        ax[0,1].plot(x, mean_peak_fn(x, genotype_pars[genotype_map[g]]['dysp_rate']), color=colors[g], lw=2)
+        ax[0,1].plot(x, logf1(x, genotype_pars[genotype_map[g]]['dysp_rate']), color=colors[g], lw=2)
     ax[0,1].plot(xx[:-1], yy[:-1], 'ko', label="Values from\nHarvard model")
     ax[0,1].set_xlabel("Pre-dysplasia/clearance duration")
     ax[0,1].set_ylabel("")
@@ -211,12 +211,12 @@ def make_fig1():
     cmap = plt.cm.Oranges([0.25,0.5,0.75,1])
     n_samples = 10
     for g in range(ng):
-        ax[1,0].plot(thisx, mean_peak_fn2(thisx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
+        ax[1,0].plot(thisx, logf2(thisx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
 
         if g<2:
             # Plot variation
             for year in range(1,11):
-                mean_peaks = mean_peak_fn2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+                mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
                 peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
                 ax[1,0].plot([year]*n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 

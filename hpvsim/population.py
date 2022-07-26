@@ -119,10 +119,6 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['current_partners'] = np.array(current_partners)
         popdict['layer_keys'] = list(sim['partners'].keys())
 
-    # Ensure prognoses are set
-    if sim['prognoses'] is None:
-        sim['prognoses'] = hppar.get_prognoses()
-
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
     people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people

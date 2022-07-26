@@ -410,6 +410,10 @@ class Sim(hpb.BaseSim):
         for var, name, color in zip(hpd.intv_flow_keys, hpd.intv_flow_names, hpd.intv_flow_colors):
             results[f'{var}'] = init_res(f'{name}', color=color)
 
+        # Create cancer results
+        for var, name, cmap in zip(hpd.cancer_flow_keys, hpd.cancer_flow_names, hpd.cancer_flow_colors):
+            results[f'{var}'] = init_res(f'{name}', color=cmap(0.95))
+
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
         results['new_total_vaccinated'] = init_res('Newly vaccinated')
@@ -422,7 +426,13 @@ class Sim(hpb.BaseSim):
         results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
         results['n_total_detectable_hpv'] = init_res('Number with detectable HPV')
         results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
-        results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence')
+        results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence', color=hpd.stock_colors[0](0.95))
+
+        # Cancer flows and stocks
+        results['n_cancerous'] = init_res('Number with cancer', color=hpd.cancer_flow_colors[0](0.95))
+        results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
+        results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
+        results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0](0.95))
 
         # Cancer flows and stocks
         results['n_cancerous'] = init_res('Number with cancer')
@@ -720,7 +730,6 @@ class Sim(hpb.BaseSim):
                 is_reactivated = hpu.binomial_arr(reactivation_probs)
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
-
 
         # Index for results
         idx = int(t / self.resfreq)
