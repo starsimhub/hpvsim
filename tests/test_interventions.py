@@ -301,7 +301,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
-    debug = 0
+    debug = 1
     n_agents = 50e3
 
     pars = {
@@ -333,7 +333,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
 
 
     sim = hpv.Sim(pars=pars)
-    n_runs = 3
+    n_runs = 1
 
     # Define the scenarios
     scenarios = {
