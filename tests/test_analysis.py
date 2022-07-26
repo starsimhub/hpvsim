@@ -141,6 +141,7 @@ def test_calibration():
         hpv18=dict(
             dysp_rate=[0.2, 0.5, 1.0],
             prog_rate=[0.2, 0.5, 1.0]),
+
     )
 
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
@@ -157,9 +158,9 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
+    # people      = test_snapshot()
+    # sim0, a0    = test_age_pyramids()
+    # sim1, a1    = test_age_results()
     sim2, calib = test_calibration()
 
 
