@@ -229,16 +229,29 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                                           triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
 
+    az = hpv.age_results(
+        result_keys=sc.objdict(
+            detected_cancer_deaths=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            detected_cancers=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
+            )
+        )
+    )
+
     sim = hpv.Sim(pars=pars)
     n_runs = 3
 
     # Define the scenarios
     scenarios = {
-        # 'no_screening_rsa': {
-        #     'name': 'No screening',
-        #     'pars': {
-        #     }
-        # },
+        'no_screening_rsa': {
+            'name': 'No screening',
+            'pars': {
+            }
+        },
         'hpv_screening': {
             'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
             'pars': {
