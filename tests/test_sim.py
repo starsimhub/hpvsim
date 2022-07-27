@@ -83,7 +83,7 @@ def test_epi():
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'init_hpv_prev'] # Parameters
     vary_vals   = [[0.01, 0.99],    [10,200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['hpv_incidence', 'hpv_incidence',    'hpv_incidence',    'hpv_incidence',    'cancer_prevalence'] # Epi outcomes to check
+    vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'cancer_incidence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -112,7 +112,7 @@ def test_epi():
         res1 = s1.summary
 
         # Check results
-        key='total_'+vwhat
+        key=vwhat
         v0 = res0[key]
         v1 = res1[key]
         print(f'Checking {key:20s} ... ', end='')
