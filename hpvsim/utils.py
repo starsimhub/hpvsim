@@ -175,7 +175,6 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
-
 def set_prognoses(people, inds, g, dur_hpv):
     ''' Set disease progression '''
 
@@ -183,7 +182,7 @@ def set_prognoses(people, inds, g, dur_hpv):
     dt = people.pars['dt']
     genotype_pars = people.pars['genotype_pars']
     genotype_map = people.pars['genotype_map']
-    durpars = genotype_pars[genotype_map[g]]['dur']
+    dur_dyps  = genotype_pars[genotype_map[g]]['dur_dysp']
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
     prog_time = genotype_pars[genotype_map[g]]['prog_time']
@@ -209,7 +208,7 @@ def set_prognoses(people, inds, g, dur_hpv):
                                              np.ceil(people.dur_hpv[g, cin1_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
 
     # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
-    dur_to_peak_dys = sample(**durpars['dys'], size=len(cin1_inds))
+    dur_to_peak_dys = sample(**dur_dyps, size=len(cin1_inds))
     people.dur_hpv[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
     mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
     peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification

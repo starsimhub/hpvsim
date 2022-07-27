@@ -505,7 +505,7 @@ class MultiSim(hpb.FlexPretty):
             # Handle what to plot
             if to_plot is None:
                 kind = 'scens' if color_by_sim else 'sim'
-                to_plot = cvd.get_default_plots(kind=kind)
+                to_plot = hpd.get_default_plots(kind=kind)
 
             # Handle colors
             if colors is None:
@@ -922,6 +922,7 @@ class Scenarios(hpb.ParsObj):
         if not self.base_sim.initialized:
             self.base_sim.init_genotypes()
             self.base_sim.init_immunity()
+            self.base_sim.init_people()
             self.base_sim.init_results()
 
         # Copy quantities from the base sim to the main object

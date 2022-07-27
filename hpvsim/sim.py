@@ -433,6 +433,10 @@ class Sim(hpb.BaseSim):
         results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
         results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0](0.95))
+        results['cancers'] = init_res('Cancers', color=hpd.cancer_flow_colors[0](0.95))
+        results['detected_cancers'] = init_res('Detected cancers', color=hpd.cancer_flow_colors[0](0.95))
+        results['cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
+        results['detected_cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
@@ -595,8 +599,8 @@ class Sim(hpb.BaseSim):
         genotype_map = self.pars['genotype_map']
 
         for g in range(ng):
-            durpars = genotype_pars[genotype_map[g]]['dur']
-            dur_hpv = hpu.sample(**durpars['none'], size=len(hpv_inds))
+            dur_none = genotype_pars[genotype_map[g]]['dur_none']
+            dur_hpv = hpu.sample(**dur_none, size=len(hpv_inds))
             t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
             _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
@@ -720,7 +724,6 @@ class Sim(hpb.BaseSim):
                 is_reactivated = hpu.binomial_arr(reactivation_probs)
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
-
 
         # Index for results
         idx = int(t / self.resfreq)

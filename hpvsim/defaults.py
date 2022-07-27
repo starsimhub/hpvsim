@@ -86,6 +86,13 @@ class PeopleMeta(sc.prettyobj):
             'screens', # Number of screens given per person
         ]
 
+        # Relationship states
+        self.rship_states = [
+            'rship_start_dates',
+            'rship_end_dates',
+            'n_rships'
+        ]
+
         self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
         self.dates += ['date_clearance', 'date_next_screen']
 
@@ -101,7 +108,7 @@ class PeopleMeta(sc.prettyobj):
         ]
 
         self.all_states = self.person + self.states + self.imm_states + self.intv_states + \
-                          self.dates + self.durs
+                          self.dates + self.durs + self.rship_states
 
         # Validate
         self.state_types = ['person', 'states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
@@ -120,14 +127,12 @@ class PeopleMeta(sc.prettyobj):
 
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
-# the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
 flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections',     'reactivations']
 flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections',     'reactivations']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu,          pl.cm.Purples]
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu,         pl.cm.Purples]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
-# the by_age vector tells the sim which results should be stored by age - should have entries in [None, 'total', 'genotype', 'both']
 stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin']
 stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
