@@ -25,7 +25,7 @@ def test_network(do_plot=True):
                 start=1970,
                 n_years=60,
                 burnin=30,
-                dt=0.2,
+                dt=0.5,
                 network='default',
                 debut = dict(f=dict(dist='normal', par1=15., par2=1),
                              m=dict(dist='normal', par1=16., par2=1))
