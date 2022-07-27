@@ -627,19 +627,11 @@ class People(hpb.BasePeople):
         self.infectious[g, inds]    = True  # Adjust states - set infectious to true
         self.hpv[g, inds]           = True  # Adjust states - set hpv to true
 
-        # # STUB, START FROM HERE <<<<<<<<<<
-        # bins = self.pars['standard_pop'][0, :] # Age bins of the standard population
-        # age_inf = self.age[inds] # Ages of newly infected people
-        # age_specific_incidence = sc.safedivide(np.histogram(age_inf, bins)[0], np.histogram(self.age, bins)[0])
-        # standard_pop = self.pars['standard_pop'][1, :-1]/self.pars['standard_pop'][1, :-1].sum() # TODO MOVE THIS SOMEWHERE CENTRAL
-        # asir = np.dot(age_specific_incidence,standard_pop)
-
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
             # Create overall flows
             self.total_flows['total_infections']    += len(inds) # Add the total count to the total flow data
             self.flows['infections'][g]             += len(inds) # Add the count by genotype to the flow data
-            # self.flows['asr_hpv_incidence'][g]      += len(asir) # Add the age-specific incidence for this type
 
             # Create by-sex flows
             infs_female = len(hpu.true(self.is_female[inds]))
