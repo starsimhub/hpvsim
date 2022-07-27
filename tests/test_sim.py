@@ -45,25 +45,23 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     # Create and run the simulation
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
-    hpv6 = hpv.genotype('HPV6')
 
     pars = {
         'pop_size': 50e3,
         'start': 1990,
         'burnin': 30,
         'end': 2030,
-        'genotypes': [hpv16, hpv18],
         'location': 'tanzania',
-        'dt': .2,
+        'dt': .5,
     }
 
-    age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
-    doses_per_year = 2e3
-    bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year,
-                                        timepoints=['2020', '2021', '2022', '2023', '2024'],
-                                        label='bivalent 2 dose, 9-14', subtarget=age_target)
+    # age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
+    # doses_per_year = 2e3
+    # bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year,
+    #                                     timepoints=['2020', '2021', '2022', '2023', '2024'],
+    #                                     label='bivalent 2 dose, 9-14', subtarget=age_target)
 
-    sim = hpv.Sim(pars=pars, genotypes=[hpv16,hpv18,hpv6], interventions=[bivalent_2_dose])
+    sim = hpv.Sim(pars=pars, genotypes=[hpv16,hpv18])
     sim.set_seed(seed)
 
     # Optionally plot
@@ -283,13 +281,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
     # sim4 = test_result_consistency() # CURRENTLY BROKEN: CINs by grade to not sum to total CINs
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
 
     sc.toc(T)
     print('Done.')
