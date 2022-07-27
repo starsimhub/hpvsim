@@ -770,7 +770,7 @@ class Sim(hpb.BaseSim):
             # Update cancers and cancers by age
             self.results['n_cancerous'][idx] = people.count('cancerous')
             cases_by_age = self.results['cancers_by_age'][:, idx]
-            denom = np.histogram(self.people.age[self.people.alive&~self.people.cancerous], self.pars['standard_pop'][0,])[0]
+            denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous], self.pars['standard_pop'][0,])[0]
             age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
             standard_pop = self.pars['standard_pop'][1, :-1]
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
