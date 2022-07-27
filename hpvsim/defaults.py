@@ -129,11 +129,11 @@ class PeopleMeta(sc.prettyobj):
 # All are stored (1) by genotype and (2) as the total across genotypes
 flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections',     'reactivations']
 flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections',     'reactivations']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu,         pl.cm.Purples,       pl.cm.Purples, pl.cm.Purples,]
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu,         pl.cm.Purples]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
-stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin',    ]
+stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin']
 stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
 
@@ -144,9 +144,9 @@ cancer_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,    pl.cm.Reds, pl.cm.Greens]
 
 # Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
-inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',          'cancer']
-inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN',          'cancer']
-inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Reds]
+inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin']
+inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN']
+inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
 
 # Demographics
 dem_keys    = ['births',    'other_deaths']

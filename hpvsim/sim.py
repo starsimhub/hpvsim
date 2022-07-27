@@ -433,16 +433,10 @@ class Sim(hpb.BaseSim):
         results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
         results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0](0.95))
-
-        # Cancer flows and stocks
-        results['n_cancerous'] = init_res('Number with cancer')
-        results['cancers'] = init_res('Cancers')
-        results['detected_cancers'] = init_res('Detected cancers')
-        results['cancer_deaths'] = init_res('Cancer deaths')
-        results['detected_cancer_deaths'] = init_res('Cancer deaths')
-        results['cancer_incidence'] = init_res('Cancer incidence')
-        results['detected_cancer_incidence'] = init_res('Detected cancer incidence')
-        results['cancer_mortality'] = init_res('Cancer mortality')
+        results['cancers'] = init_res('Cancers', color=hpd.cancer_flow_colors[0](0.95))
+        results['detected_cancers'] = init_res('Detected cancers', color=hpd.cancer_flow_colors[0](0.95))
+        results['cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
+        results['detected_cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
