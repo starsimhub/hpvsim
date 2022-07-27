@@ -897,11 +897,11 @@ class Screening(Intervention):
          screen_interval     (int)       : interval between screens
          screen_stop_age     (int)       : age to stop screening
          timepoints          (int/arr)   : the day or array of days to apply the interventions
-         screen_compliance   (float)     : probability of being screened (per screen)
-         triage_compliance   (float)     : probability of coming back for triage
-         ablation_compliance (float)     : probability of coming back for ablation
-         excision_compliance (float)     : probability of coming back for excision
-         cancer_compliance   (float)     : probability of undergoing treatment if cancer is diagnosed
+         screen_compliance   (list of floats)     : probability of being screened (per screen) over time
+         triage_compliance   (list of floats)     : probability of coming back for triage over time
+         ablation_compliance (list of floats)     : probability of coming back for ablation over time
+         excision_compliance (list of floats)     : probability of coming back for excision over time
+         cancer_compliance   (list of floats)     : probability of undergoing treatment if cancer is diagnosed over time
          label               (str)       : the name of screening strategy
          kwargs (dict)      : passed to Intervention()
 
@@ -920,19 +920,19 @@ class Screening(Intervention):
         self.timepoints = timepoints
         if screen_compliance is None: # Populate default value of probability: 1
             screen_compliance = 1
-        self.screen_compliance = screen_compliance
+        self.screen_compliance = list(screen_compliance)
         if triage_compliance is None: # Populate default value of compliance: 1
             triage_compliance = 1
-        self.triage_compliance = triage_compliance
+        self.triage_compliance = list(triage_compliance)
         if excision_compliance is None: # Populate default value of compliance: 1
             excision_compliance = 1
-        self.excision_compliance = excision_compliance
+        self.excision_compliance = list(excision_compliance)
         if ablation_compliance is None: # Populate default value of compliance: 1
             ablation_compliance = 1
-        self.ablation_compliance = ablation_compliance
+        self.ablation_compliance = list(ablation_compliance)
         if cancer_compliance is None: # Populate default value of cancer referral compliance: 1
             cancer_compliance = 1
-        self.cancer_compliance = cancer_compliance
+        self.cancer_compliance = list(cancer_compliance)
         if screen_fu_neg_triage is None: # Populate default value of follow up after -ve triage: 1 year
             screen_fu_neg_triage = 1
         self.screen_fu_neg_triage = screen_fu_neg_triage
@@ -955,6 +955,14 @@ class Screening(Intervention):
         self._parse_screening_pars(screen=treatment, treatment=True)  # Populate
 
         return
+
+    def validate_screen_coverage(self):
+        '''Makes sure that screen coverage has same length as timepoints'''
+        n_timepoints = len(self.timepoints)
+        if len(self.screen_compliance) != n_timepoints:
+            print(f'{n_timepoints} timepoints provided but only {len(self.screen_compliance)} screen compliance, '
+                  f'assuming constant over time')
+        pass
 
     def _parse_screening_pars(self, screen, triage=False, treatment=False):
         ''' Unpack screening information, which may be given as a string or dict '''
