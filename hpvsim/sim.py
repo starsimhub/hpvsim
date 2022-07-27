@@ -199,10 +199,10 @@ class Sim(hpb.BaseSim):
                 raise ValueError(errormsg)
         
         # Construct other things that keep track of time
-        self.years          = sc.inclusiverange(self['start'],self['end'])
-        self.yearvec        = sc.inclusiverange(start=self['start'], stop=self['end'], step=self['dt'])
-        self.npts           = len(self.yearvec)
-        self.tvec          = np.arange(self.npts)
+        self.years      = sc.inclusiverange(self['start'],self['end'])
+        self.yearvec    = sc.inclusiverange(start=self['start'], stop=self['end']+1-self['dt'], step=self['dt']) # Includes all the timepoints in the last year
+        self.npts       = len(self.yearvec)
+        self.tvec       = np.arange(self.npts)
         
         # Handle population network data
         network_choices = ['random', 'default']
@@ -862,13 +862,6 @@ class Sim(hpb.BaseSim):
             # otherwise the scale factor will be applied multiple times
             raise AlreadyRunError('Simulation has already been finalized')
 
-        # Fix the last timepoint
-        if self.resfreq>1:
-            for reskey in hpd.flow_keys:
-                self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-                self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-            self.results['births'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-            self.results['other_deaths'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
