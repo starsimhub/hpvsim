@@ -414,6 +414,10 @@ class Sim(hpb.BaseSim):
         for var, name, cmap in zip(hpd.cancer_flow_keys, hpd.cancer_flow_names, hpd.cancer_flow_colors):
             results[f'{var}'] = init_res(f'{name}', color=cmap(0.95))
 
+        # Create by-age results using standard populations
+        results['cancers_by_age'] = init_res('Cancers by age', n_rows=len(self.pars['standard_pop'][0,:])-1)
+        results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
+
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
         results['new_total_vaccinated'] = init_res('Newly vaccinated')
@@ -745,6 +749,9 @@ class Sim(hpb.BaseSim):
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
 
+        for key,count in people.by_age_flows.items():
+            self.results[key][:,idx] += count
+
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 
@@ -760,7 +767,13 @@ class Sim(hpb.BaseSim):
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
+            # Update cancers and cancers by age
             self.results['n_cancerous'][idx] = people.count('cancerous')
+            cases_by_age = self.results['cancers_by_age'][:, idx]
+            denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous], self.pars['standard_pop'][0,])[0]
+            age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
+            standard_pop = self.pars['standard_pop'][1, :-1]
+            self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
 
             # Compute detectable hpv prevalence
             hpv_test_pars = hppar.get_screen_pars('hpv')
