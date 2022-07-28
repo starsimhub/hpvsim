@@ -192,19 +192,32 @@ def test_result_consistency():
 
     # Create sim
     pop_size = 10e3
-    sim = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
+    sim = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, genotypes=[hpv16,hpv18], label='test_results')
     sim.run()
 
     # Check that infections by genotype sum up the the correct totals
+    # This test works because sim.results['infections'] holds the total number of infections
+    # of any genotype that occured each period. Thus, sim.results['infections'] can technically
+    # be greater than the total population size, for example if half the population got infected
+    # with 2 genotypes simultaneously.
     assert (sim.results['infections'][:].sum(axis=0)==sim.results['total_infections'][:]).all() # Check flows by genotype are equal to total flows
-    assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
-    # Check that CINs by grade sum up the the correct totals: BROKEN
-    # assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
-    # assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
+    # The test below was faulty, but leaving it here (commented out) is instructive.
+    # Specifically, the total number of people infectious by genotype (sim.results['n_infectious'])
+    # doesn't necessarily sum to the number of infectious people in total (sim.results['n_total_infectious'])
+    # because of the possibility of coinfections within a sinlg person.
+    # So sim.results['n_total_infectious'] represents the total number of people who have 1+ infections
+    # whereas sim.results['n_infectious'] represents the total number of people infected with each genotype.
+    # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
+
+    # Check that CINs by grade sum up the the correct totals
+    assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
+    assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
 
     # Check that cancers by age sum to the correct totals
-    assert ((sim1.results['cancers_by_age'][:].sum(axis=0)-sim1.results['cancers'][:])<1e-3).all()
+    assert ((sim.results['cancers_by_age'][:].sum(axis=0)-sim.results['cancers'][:])<1e-3).all()
 
     # Check demographics
     assert (sim['pop_size'] == pop_size)
@@ -222,7 +235,7 @@ def test_result_consistency():
     virgins_with_hpv = (~np.isnan(sim.people.date_infectious[:,virgin_inds])).nonzero()[-1]
     assert len(virgins_with_hpv)==0
 
-    return
+    return sim
 
 
 
@@ -284,13 +297,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency() # CURRENTLY BROKEN: CINs by grade to not sum to total CINs
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
+    sim = test_result_consistency() # CURRENTLY BROKEN: CINs by grade to not sum to total CINs
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
 
     sc.toc(T)
     print('Done.')

@@ -185,14 +185,13 @@ class People(hpb.BasePeople):
         self.t = t
         self.dt = self.pars['dt']
         self.resfreq = resfreq if resfreq is not None else 1
+        self.init_flows()
 
         # Let people age by one time step
         self.increment_age()
 
         # Perform updates that are not genotype-specific
         if t%self.resfreq==0:
-
-            self.init_flows()  # Only reinitialize flows to zero every nth step, where n is the requested result frequency
 
             # Apply death rates from other causes
             other_deaths, deaths_female, deaths_male    = self.apply_death_rates(year=year)
@@ -208,25 +207,24 @@ class People(hpb.BasePeople):
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
         for g in range(ng):
-            self.flows['cin1s'][g]              += self.check_cin1(g)
-            self.flows['cin2s'][g]              += self.check_cin2(g)
-            self.flows['cin3s'][g]              += self.check_cin3(g)
-            new_cancers, cancers_by_age          = self.check_cancer(g)
+            self.flows['cin1s'][g]              = self.check_cin1(g)
+            self.flows['cin2s'][g]              = self.check_cin2(g)
+            self.flows['cin3s'][g]              = self.check_cin3(g)
+            new_cancers, cancers_by_age         = self.check_cancer(g)
             self.cancer_flows['cancers']        += new_cancers
             self.by_age_flows['cancers_by_age'] += cancers_by_age
-            if t%self.resfreq==0:
-                self.flows['cins'][g]       += self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
+            self.flows['cins'][g]               = self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
             self.check_clearance(g)
 
         # Perform updates that are not genotype specific
-        self.cancer_flows['cancer_deaths'] += self.check_cancer_deaths()
-        self.cancer_flows['detected_cancers'] += self.check_cancer_detection()
+        self.cancer_flows['cancer_deaths'] = self.check_cancer_deaths()
+        self.cancer_flows['detected_cancers'] = self.check_cancer_detection()
 
         # Create total flows
-        self.total_flows['total_cin1s']     += self.flows['cin1s'].sum()
-        self.total_flows['total_cin2s']     += self.flows['cin2s'].sum()
-        self.total_flows['total_cin3s']     += self.flows['cin3s'].sum()
-        self.total_flows['total_cins']      += self.flows['cins'].sum()
+        self.total_flows['total_cin1s'] = self.flows['cin1s'].sum()
+        self.total_flows['total_cin2s'] = self.flows['cin2s'].sum()
+        self.total_flows['total_cin3s'] = self.flows['cin3s'].sum()
+        self.total_flows['total_cins']  = self.flows['cins'].sum()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
         self.sus_pool = self.susceptible.nonzero()
@@ -407,6 +405,7 @@ class People(hpb.BasePeople):
         self.cancerous[inds] = True
         self.cancer_genotype[inds] = genotype
         self.cin3[genotype, inds] = False # No longer counted as CIN3
+        self.susceptible[:, inds] = False
         self.susceptible[:, inds] = False
         self.date_clearance[:, inds] = np.nan
 
