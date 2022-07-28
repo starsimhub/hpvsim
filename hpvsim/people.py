@@ -406,7 +406,6 @@ class People(hpb.BasePeople):
         self.cancer_genotype[inds] = genotype
         self.cin3[genotype, inds] = False # No longer counted as CIN3
         self.susceptible[:, inds] = False
-        self.susceptible[:, inds] = False
         self.date_clearance[:, inds] = np.nan
 
         # Calculations for age-standardized cancer incidence
