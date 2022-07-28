@@ -234,7 +234,7 @@ def set_prognoses(people, inds, g, dur_hpv):
                                              np.ceil(time_to_cin2 / dt))  # Date they get CIN2 - minimum of any previous date and the date from the current infection
 
     # Determine whether CIN2 clears or progresses to CIN3
-    is_cin3 = peaks>ccut['cin2']
+    is_cin3 = peaks>ccut['cin2'] # This isn't a typo: the ccut['cin2'] value is the upper bound for CIN2 classification, so anyone above this is CIN3
     time_to_cin3 = ccut['cin2']/(peaks[is_cin3]/dur_to_peak_dys[is_cin3])
     cin3_inds = cin1_inds[is_cin3]
     no_cin3_inds = cin1_inds[~is_cin3]
@@ -254,7 +254,7 @@ def set_prognoses(people, inds, g, dur_hpv):
                                              np.ceil(time_to_cin3 / dt))  # Date they get CIN3 - minimum of any previous date and the date from the current infection
 
     # Determine whether CIN3 clears or progresses to invasive cervical cancer
-    is_cancer = peaks>ccut['cin3']
+    is_cancer = peaks>ccut['cin3'] # Anyone above the upper threshold for CIN3 classification is cancerous (NB, this reflects a modeling choice and does not represent an exact biological mechanism)
     time_to_cancer = ccut['cin3']/(peaks[is_cancer]/dur_to_peak_dys[is_cancer])
     cancer_inds = cin1_inds[is_cancer]
     no_cancer_inds = cin1_inds[~is_cancer]

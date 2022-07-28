@@ -122,10 +122,14 @@ def make_pars(**kwargs):
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
 
     # Events and interventions
-    pars['interventions'] = []   # The interventions present in this simulation; populated by the user
-    pars['analyzers']     = []   # Custom analysis functions; populated by the user
-    pars['timelimit']     = None # Time limit for the simulation (seconds)
-    pars['stopping_func'] = None # A function to call to stop the sim partway through
+    pars['interventions']   = []   # The interventions present in this simulation; populated by the user
+    pars['analyzers']       = []   # Custom analysis functions; populated by the user
+    pars['timelimit']       = None # Time limit for the simulation (seconds)
+    pars['stopping_func']   = None # A function to call to stop the sim partway through
+
+    # Population distribution of the World Standard Population, used to calculate age-standardised rates (ASR) of incidence
+    pars['standard_pop']    = np.array([[  0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75,    80,    85, 100],
+                                        [.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005,   0]])
 
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)

@@ -45,25 +45,23 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     # Create and run the simulation
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
-    hpv6 = hpv.genotype('HPV6')
 
     pars = {
         'pop_size': 50e3,
         'start': 1990,
         'burnin': 30,
         'end': 2030,
-        'genotypes': [hpv16, hpv18],
         'location': 'tanzania',
-        'dt': .2,
+        'dt': .5,
     }
 
-    age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
-    doses_per_year = 2e3
-    bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year,
-                                        timepoints=['2020', '2021', '2022', '2023', '2024'],
-                                        label='bivalent 2 dose, 9-14', subtarget=age_target)
+    # age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
+    # doses_per_year = 2e3
+    # bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year,
+    #                                     timepoints=['2020', '2021', '2022', '2023', '2024'],
+    #                                     label='bivalent 2 dose, 9-14', subtarget=age_target)
 
-    sim = hpv.Sim(pars=pars, genotypes=[hpv16,hpv18,hpv6], interventions=[bivalent_2_dose])
+    sim = hpv.Sim(pars=pars, genotypes=[hpv16,hpv18])
     sim.set_seed(seed)
 
     # Optionally plot
@@ -85,7 +83,7 @@ def test_epi():
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'init_hpv_prev'] # Parameters
     vary_vals   = [[0.01, 0.99],    [10,200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['hpv_incidence', 'hpv_incidence',    'hpv_incidence',    'hpv_incidence',    'cancer_prevalence'] # Epi outcomes to check
+    vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'cancer_incidence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -114,7 +112,7 @@ def test_epi():
         res1 = s1.summary
 
         # Check results
-        key='total_'+vwhat
+        key=vwhat
         v0 = res0[key]
         v1 = res1[key]
         print(f'Checking {key:20s} ... ', end='')
@@ -194,16 +192,32 @@ def test_result_consistency():
 
     # Create sim
     pop_size = 10e3
-    sim = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_results')
+    hpv16 = hpv.genotype('HPV16')
+    hpv18 = hpv.genotype('HPV18')
+    sim = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, genotypes=[hpv16,hpv18], label='test_results')
     sim.run()
 
     # Check that infections by genotype sum up the the correct totals
+    # This test works because sim.results['infections'] holds the total number of infections
+    # of any genotype that occured each period. Thus, sim.results['infections'] can technically
+    # be greater than the total population size, for example if half the population got infected
+    # with 2 genotypes simultaneously.
     assert (sim.results['infections'][:].sum(axis=0)==sim.results['total_infections'][:]).all() # Check flows by genotype are equal to total flows
-    assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
+
+    # The test below was faulty, but leaving it here (commented out) is instructive.
+    # Specifically, the total number of people infectious by genotype (sim.results['n_infectious'])
+    # doesn't necessarily sum to the number of infectious people in total (sim.results['n_total_infectious'])
+    # because of the possibility of coinfections within a sinlg person.
+    # So sim.results['n_total_infectious'] represents the total number of people who have 1+ infections
+    # whereas sim.results['n_infectious'] represents the total number of people infected with each genotype.
+    # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
     # Check that CINs by grade sum up the the correct totals
     assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
     assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
+
+    # Check that cancers by age sum to the correct totals
+    assert ((sim.results['cancers_by_age'][:].sum(axis=0)-sim.results['cancers'][:])<1e-3).all()
 
     # Check demographics
     assert (sim['pop_size'] == pop_size)
@@ -212,7 +226,7 @@ def test_result_consistency():
     import hpvsim.utils as hpu
     male_inds = sim.people.is_male.nonzero()[0]
     males_with_cin = hpu.defined(sim.people.date_cin1[:,male_inds])
-    males_with_cancer = hpu.defined(sim.people.date_cancerous[:,male_inds])
+    males_with_cancer = hpu.defined(sim.people.date_cancerous[male_inds])
     assert len(males_with_cin)==0
     assert len(males_with_cancer)==0
 
@@ -221,7 +235,7 @@ def test_result_consistency():
     virgins_with_hpv = (~np.isnan(sim.people.date_infectious[:,virgin_inds])).nonzero()[-1]
     assert len(virgins_with_hpv)==0
 
-    return
+    return sim
 
 
 
@@ -287,7 +301,7 @@ if __name__ == '__main__':
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
     sim2 = test_epi()
     sim3 = test_flexible_inputs()
-    # sim4 = test_result_consistency() # CURRENTLY BROKEN: CINs by grade to not sum to total CINs
+    sim4 = test_result_consistency()
     sim5 = test_location_loading()
     sim6 = test_resuming()
 

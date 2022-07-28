@@ -56,7 +56,7 @@ class Sim(hpb.BaseSim):
     def load_data(self, datafile=None, **kwargs):
         ''' Load the data to calibrate against, if provided '''
         if datafile is not None: # If a data file is provided, load it
-            self.data = hpm.load_data(datafile=datafile, **kwargs)
+            self.data = hpm.load_data(datafile=datafile, check_date=True, **kwargs)
         return
 
 
@@ -199,10 +199,10 @@ class Sim(hpb.BaseSim):
                 raise ValueError(errormsg)
         
         # Construct other things that keep track of time
-        self.years          = sc.inclusiverange(self['start'],self['end'])
-        self.yearvec        = sc.inclusiverange(start=self['start'], stop=self['end'], step=self['dt'])
-        self.npts           = len(self.yearvec)
-        self.tvec          = np.arange(self.npts)
+        self.years      = sc.inclusiverange(self['start'],self['end'])
+        self.yearvec    = sc.inclusiverange(start=self['start'], stop=self['end']+1-self['dt'], step=self['dt']) # Includes all the timepoints in the last year
+        self.npts       = len(self.yearvec)
+        self.tvec       = np.arange(self.npts)
         
         # Handle population network data
         network_choices = ['random', 'default']
@@ -413,6 +413,10 @@ class Sim(hpb.BaseSim):
         # Create cancer results
         for var, name, cmap in zip(hpd.cancer_flow_keys, hpd.cancer_flow_names, hpd.cancer_flow_colors):
             results[f'{var}'] = init_res(f'{name}', color=cmap(0.95))
+
+        # Create by-age results using standard populations
+        results['cancers_by_age'] = init_res('Cancers by age', n_rows=len(self.pars['standard_pop'][0,:])-1)
+        results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
 
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
@@ -746,14 +750,16 @@ class Sim(hpb.BaseSim):
                 self.results[key][sex][idx] += count[sex]
         for key,count in people.intv_flows.items():
             self.results[key][idx] += count
+        for key,count in people.by_age_flows.items():
+            self.results[key][:,idx] += count
+
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 
             # Create total stocks
             for key in hpd.stock_keys:
-                if key not in ['alive', 'vaccinated']:  # These are all special cases
-                    for g in range(ng):
-                        self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
+                for g in range(ng):
+                    self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['susceptible']:
                     # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
                     self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
@@ -761,7 +767,13 @@ class Sim(hpb.BaseSim):
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
+            # Update cancers and cancers by age
             self.results['n_cancerous'][idx] = people.count('cancerous')
+            cases_by_age = self.results['cancers_by_age'][:, idx]
+            denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous], self.pars['standard_pop'][0,])[0]
+            age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
+            standard_pop = self.pars['standard_pop'][1, :-1]
+            self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
 
             # Compute detectable hpv prevalence
             hpv_test_pars = hppar.get_screen_pars('hpv')
@@ -863,13 +875,6 @@ class Sim(hpb.BaseSim):
             # otherwise the scale factor will be applied multiple times
             raise AlreadyRunError('Simulation has already been finalized')
 
-        # Fix the last timepoint
-        if self.resfreq>1:
-            for reskey in hpd.flow_keys:
-                self.results[reskey][:,-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-                self.results[f'total_{reskey}'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-            self.results['births'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
-            self.results['other_deaths'][-1] *= self.resfreq/(self.t % self.resfreq) # Scale
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
@@ -931,7 +936,7 @@ class Sim(hpb.BaseSim):
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
-        at_risk_females = alive_females - res['n_cancerous'].values.sum(axis=0)
+        at_risk_females = alive_females - res['n_cancerous'][:]
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
         self.results['total_cin1_incidence'][:]    = res['total_cin1s'][:] / demoninator
