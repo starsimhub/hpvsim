@@ -573,6 +573,7 @@ class age_results(Analyzer):
         attr = rname.replace('total_', '').replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
         if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
+        if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
         mapping = {
             'infections': ['date_infectious', 'infectious'],
@@ -670,7 +671,7 @@ class age_results(Analyzer):
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
-                if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result:
+                if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result or 'mortality' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
                     if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
                         if result == 'detected_cancer_deaths':
@@ -689,10 +690,16 @@ class age_results(Analyzer):
                         # Need to divide by the right denominator
                         if 'hpv' in result:  # Denominator is susceptible population
                             denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
-                        else:  # Denominator is females
-                            denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[
+                        else:  # Denominator is females at risk for cancer
+                            denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous)], bins=result_dict.edges)[
                                          0] * scale) / 1e5  # CIN and cancer are per 100,000 women
                         if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
+                        self.results[result][date] = self.results[result][date] / denom
+
+                    if 'mortality' in result:
+                        # Need to divide by the right denominator
+                        denom = (np.histogram(age[hpu.true(sim.people.cancerous)], bins=result_dict.edges)[
+                                     0] * scale) / 1e5  # per 100,000 women
                         self.results[result][date] = self.results[result][date] / denom
 
 
