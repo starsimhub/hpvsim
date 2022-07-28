@@ -297,13 +297,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
-    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
-    # sim3 = test_flexible_inputs()
-    sim = test_result_consistency() # CURRENTLY BROKEN: CINs by grade to not sum to total CINs
-    # sim5 = test_location_loading()
-    # sim6 = test_resuming()
+    sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim2 = test_epi()
+    sim3 = test_flexible_inputs()
+    sim = test_result_consistency()
+    sim5 = test_location_loading()
+    sim6 = test_resuming()
 
     sc.toc(T)
     print('Done.')
