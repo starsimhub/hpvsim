@@ -744,7 +744,8 @@ class Sim(hpb.BaseSim):
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
-
+        for key,count in people.intv_flows.items():
+            self.results[key][idx] += count
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 

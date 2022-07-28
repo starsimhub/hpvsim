@@ -896,7 +896,8 @@ class Screening(Intervention):
          screen_start_age    (int)       : age to start screening
          screen_interval     (int)       : interval between screens
          screen_stop_age     (int)       : age to stop screening
-         timepoints          (int/arr)   : the day or array of days to apply the interventions
+         screen_start_year   (str)       : the year to start screening intervention
+         screen_end_year     (str)       : the year to end screening intervention (if None, assume continues until end of simulation)
          screen_compliance   (list of floats)     : probability of being screened (per screen) over time
          triage_compliance   (list of floats)     : probability of coming back for triage over time
          ablation_compliance (list of floats)     : probability of coming back for ablation over time
@@ -911,31 +912,32 @@ class Screening(Intervention):
     '''
 
     def __init__(self, primary_screen_test, treatment, screen_start_age, screen_interval, screen_stop_age,
-                 timepoints, screen_compliance=None, triage_compliance=None, ablation_compliance=None, excision_compliance=None,
+                 screen_start_year, screen_end_year=None, screen_compliance=None, triage_compliance=None, ablation_compliance=None, excision_compliance=None,
                  cancer_compliance=None, triage_screen_test=None, screen_fu_neg_triage=None,
                  label=None, screen_states=None, treat_states=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.label = label  # Screening label (used as a dict key)
         self.p = None  # Screening parameters
-        self.timepoints = timepoints
+        self.screen_start_year = screen_start_year
+        self.screen_end_year = screen_end_year
         if screen_compliance is None: # Populate default value of probability: 1
             screen_compliance = 1
-        self.screen_compliance = list(screen_compliance)
+        self.screen_compliance = sc.promotetolist(screen_compliance)
         if triage_compliance is None: # Populate default value of compliance: 1
             triage_compliance = 1
-        self.triage_compliance = list(triage_compliance)
+        self.triage_compliance = sc.promotetolist(triage_compliance)
         if excision_compliance is None: # Populate default value of compliance: 1
             excision_compliance = 1
-        self.excision_compliance = list(excision_compliance)
+        self.excision_compliance = sc.promotetolist(excision_compliance)
         if ablation_compliance is None: # Populate default value of compliance: 1
             ablation_compliance = 1
-        self.ablation_compliance = list(ablation_compliance)
+        self.ablation_compliance = sc.promotetolist(ablation_compliance)
         if cancer_compliance is None: # Populate default value of cancer referral compliance: 1
             cancer_compliance = 1
-        self.cancer_compliance = list(cancer_compliance)
+        self.cancer_compliance = sc.promotetolist(cancer_compliance)
         if screen_fu_neg_triage is None: # Populate default value of follow up after -ve triage: 1 year
             screen_fu_neg_triage = 1
-        self.screen_fu_neg_triage = screen_fu_neg_triage
+        self.screen_fu_neg_triage = sc.promotetolist(screen_fu_neg_triage)
         self.screen_start_age = screen_start_age
         self.screen_interval = screen_interval
         self.screen_stop_age = screen_stop_age
@@ -956,13 +958,6 @@ class Screening(Intervention):
 
         return
 
-    def validate_screen_coverage(self):
-        '''Makes sure that screen coverage has same length as timepoints'''
-        n_timepoints = len(self.timepoints)
-        if len(self.screen_compliance) != n_timepoints:
-            print(f'{n_timepoints} timepoints provided but only {len(self.screen_compliance)} screen compliance, '
-                  f'assuming constant over time')
-        pass
 
     def _parse_screening_pars(self, screen, triage=False, treatment=False):
         ''' Unpack screening information, which may be given as a string or dict '''
@@ -1025,7 +1020,45 @@ class Screening(Intervention):
 
     def initialize(self, sim):
         super().initialize()
-        self.timepoints, self.dates = sim.get_t(self.timepoints,return_date_format='str')  # Ensure timepoints and dates are in the right format
+
+        if self.screen_end_year is None:
+            self.screen_end_year = str(sim['end'])
+
+        start_day, start_date = sim.get_t(self.screen_start_year, return_date_format='str')
+        end_day, end_date = sim.get_t(self.screen_end_year, return_date_format='str')
+        self.timepoints = np.arange(start_day, end_day)
+
+        n_timepoints = len(self.timepoints)
+        if len(self.screen_compliance) != n_timepoints:
+            print(f'{n_timepoints} timepoints provided but only {len(self.screen_compliance)} screen compliance, '
+                  f'assuming constant over time')
+            self.screen_compliance *= n_timepoints
+
+        if len(self.triage_compliance) != n_timepoints:
+            print(f'{n_timepoints} timepoints provided but only {len(self.triage_compliance)} triage compliance, '
+                  f'assuming constant over time')
+            self.triage_compliance *= n_timepoints
+
+        if len(self.excision_compliance) != n_timepoints:
+            print(f'{n_timepoints} timepoints provided but only {len(self.excision_compliance)} excision compliance, '
+                  f'assuming constant over time')
+            self.excision_compliance *= n_timepoints
+
+        if len(self.ablation_compliance) != n_timepoints:
+            print(f'{n_timepoints} timepoints provided but only {len(self.ablation_compliance)} ablation compliance, '
+                  f'assuming constant over time')
+            self.ablation_compliance *= n_timepoints
+
+        if len(self.cancer_compliance) != n_timepoints:
+            print(f'{n_timepoints} timepoints provided but only {len(self.cancer_compliance)} cancer tx compliance, '
+                  f'assuming constant over time')
+            self.cancer_compliance *= n_timepoints
+
+        if len(self.screen_fu_neg_triage) != n_timepoints:
+            print(f'{n_timepoints} timepoints provided but only {len(self.screen_fu_neg_triage)} screen neg fu compliance, '
+                  f'assuming constant over time')
+            self.screen_fu_neg_triage *= n_timepoints
+
         sim['screen_pars'][self.label] = self.p  # Store the parameters
         return
 
@@ -1058,7 +1091,7 @@ class Screening(Intervention):
             # 2. Optionally triage anyone who has screened positive
             if len(screen_pos_inds):
                 if triage_screen_pars is not None:
-                    triage_probs = np.full(len(screen_pos_inds), self.triage_compliance, dtype=hpd.default_float)
+                    triage_probs = np.full(len(screen_pos_inds), self.triage_compliance[self.where_in_timepoints], dtype=hpd.default_float)
                     to_triage = hpu.binomial_arr(triage_probs)
                     triage_inds = screen_pos_inds[to_triage]  # Indices of those who get treated
                     treat_eligible_inds = self.screen(triage_inds, triage_screen_pars, sim, self.screen_states, triage=True) # Determine who is eligible for treatment
@@ -1090,7 +1123,8 @@ class Screening(Intervention):
 
         screen_inds = np.array([], dtype=int)  # Initialize in case no one gets screened
 
-        if sim.t >= np.min(self.timepoints):
+        for i in find_day(self.timepoints, sim.t, interv=self, sim=sim):
+            self.where_in_timepoints = i
             screen_probs = np.zeros(len(sim.people), dtype=hpd.default_float)
 
             # Find people eligible for screening based on age
@@ -1098,8 +1132,8 @@ class Screening(Intervention):
                             (sim.people.age <= self.screen_stop_age)
 
             # Assign screening probabilities
-            screen_probs[eligible_ages & (sim.people.screens == 0)] = self.screen_compliance # First screen
-            screen_probs[eligible_ages & (sim.t == sim.people.date_next_screen)] = self.screen_compliance # Due for next screen
+            screen_probs[eligible_ages & (sim.people.screens == 0)] = self.screen_compliance[self.where_in_timepoints] # First screen
+            screen_probs[eligible_ages & (sim.t == sim.people.date_next_screen)] = self.screen_compliance[self.where_in_timepoints] # Due for next screen
 
             # Remove males and dead people
             screen_probs[~sim.people.alive]     *= 0.0  # Do not screen dead people
@@ -1110,6 +1144,8 @@ class Screening(Intervention):
             screen_inds = hpu.true(hpu.binomial_arr(screen_probs))
 
             # Set screening states and dates
+            sim.people.intv_flows['screens'] += len(screen_inds)
+            sim.people.intv_flows['screened'] += len(hpu.true(eligible_ages & (sim.people.screens == 0)))
             sim.people.screened[screen_inds] = True
             sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
@@ -1155,7 +1191,7 @@ class Screening(Intervention):
 
         if triage:
             screen_neg = np.setdiff1d(screen_inds, screen_pos)
-            sim.people.date_next_screen[screen_neg] = sim.t + self.screen_fu_neg_triage / sim['dt'] # primary +ve/ triage -ve follow up sooner
+            sim.people.date_next_screen[screen_neg] = sim.t + self.screen_fu_neg_triage[self.where_in_timepoints] / sim['dt'] # primary +ve/ triage -ve follow up sooner
         return screen_pos
 
 
@@ -1173,7 +1209,7 @@ class Screening(Intervention):
             sim.people.date_detected_cancer[diagnosed_inds] = sim.t
 
             # Treat cancers
-            ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
+            ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance[self.where_in_timepoints], dtype=hpd.default_float)
             to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
             ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
             ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
@@ -1206,7 +1242,7 @@ class Screening(Intervention):
 
             # Apply LTFU for both
             if len(ablation_eligible_inds)>0:
-                ablate_treat_probs = np.full(len(ablation_eligible_inds), self.ablation_compliance, dtype=hpd.default_float)
+                ablate_treat_probs = np.full(len(ablation_eligible_inds), self.ablation_compliance[self.where_in_timepoints], dtype=hpd.default_float)
                 to_ablate = hpu.binomial_arr(ablate_treat_probs)
                 ablation_inds = ablation_eligible_inds[to_ablate]  # Indices of those who get treated
                 ablate_LTFU_inds = ablation_eligible_inds[~to_ablate]
@@ -1219,7 +1255,7 @@ class Screening(Intervention):
                 ablation_inds = np.array([])
 
             if len(excision_eligible_inds)>0:
-                excision_treat_probs = np.full(len(excision_eligible_inds), self.excision_compliance, dtype=hpd.default_float)
+                excision_treat_probs = np.full(len(excision_eligible_inds), self.excision_compliance[self.where_in_timepoints], dtype=hpd.default_float)
                 to_excise = hpu.binomial_arr(excision_treat_probs)
                 excision_inds = excision_eligible_inds[to_excise]  # Indices of those who get treated
                 excision_LTFU_inds = excision_eligible_inds[~to_excise]
