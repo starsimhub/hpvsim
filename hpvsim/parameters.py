@@ -362,7 +362,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars = sc.objdict()
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_none     = dict(dist='lognormal', par1=2.3625, par2=0.5)
+    pars.hpv16.dur_none     = dict(dist='lognormal', par1=1.3625, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
@@ -376,7 +376,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_none     = dict(dist='lognormal', par1=2.2483, par2=0.5)
+    pars.hpv18.dur_none     = dict(dist='lognormal', par1=1.2483, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
