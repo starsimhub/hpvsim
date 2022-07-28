@@ -936,7 +936,7 @@ class Sim(hpb.BaseSim):
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
-        at_risk_females = alive_females - res['n_cancerous'].values.sum(axis=0)
+        at_risk_females = alive_females - res['n_cancerous'][:]
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
         self.results['total_cin1_incidence'][:]    = res['total_cin1s'][:] / demoninator
