@@ -372,6 +372,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.dysp_rate    = 1.0 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate    = 0.6 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_time    = 3  # Point of inflection in logistic function
+    pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
@@ -385,6 +386,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.dysp_rate    = 0.9 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_time    = 6  # Point of inflection in logistic function
+    pars.hpv18.rel_beta     = 1  # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
@@ -396,6 +398,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv31.dysp_rate    = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv31.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv31.prog_time    = 10  # Point of inflection in logistic function
+    pars.hpv31.rel_beta     = 0.5 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv31.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
@@ -407,6 +410,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv33.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv33.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv33.prog_time    = 10  # Point of inflection in logistic function
+    pars.hpv33.rel_beta     = 0.5 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv33.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
@@ -419,6 +423,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv45.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv45.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv45.prog_time    = 10  # Point of inflection in logistic function
+    pars.hpv45.rel_beta     = 0.2 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv45.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
@@ -431,6 +436,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv52.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv52.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv52.prog_time    = 10  # Point of inflection in logistic function
+    pars.hpv52.rel_beta     = 0.2 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv52.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv6 = sc.objdict()
@@ -441,6 +447,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.dysp_rate     = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv6.prog_rate     = 0.01 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv6.prog_time     = 30  # Point of inflection in logistic function
+    pars.hpv6.rel_beta      = 0.8 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv6.imm_boost     = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
@@ -451,6 +458,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv11.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv11.prog_time    = 30  # Point of inflection in logistic function
+    pars.hpv11.rel_beta     = 0.5 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv11.imm_boost    = 1.0 # TODO: look for data
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
