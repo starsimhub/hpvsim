@@ -22,8 +22,8 @@ def test_network(do_plot=True):
 
     n_agents = 50e3
     pars = dict(pop_size=n_agents,
-                start=1970,
-                n_years=60,
+                start=1975,
+                n_years=50,
                 burnin=30,
                 dt=0.5,
                 network='default',
@@ -68,48 +68,48 @@ def test_network(do_plot=True):
     # Check plot()
     if do_plot:
         fig = a.plot()
-        sim.plot()
+        sim.plot('demographics')
 
-        snapshot = sim.get_analyzer()
-        people1990 = snapshot.snapshots[0]
-        people2000 = snapshot.snapshots[1]
-        people2010 = snapshot.snapshots[2]
-        people2020 = snapshot.snapshots[3]
-
-        # Plot age mixing
-        import matplotlib as mpl
-        import pylab as pl
-        snapshot = sim.get_analyzer()
-        people2020 = snapshot.snapshots[3]
-        font_size = 15
-        font_family = 'Libertinus Sans'
-        pl.rcParams['font.size'] = font_size
-        pl.rcParams['font.family'] = font_family
-        fig, ax = pl.subplots(nrows=1, ncols=1, figsize=(5, 4))
+        # snapshot = sim.get_analyzer()
+        # people1990 = snapshot.snapshots[0]
+        # people2000 = snapshot.snapshots[1]
+        # people2010 = snapshot.snapshots[2]
+        # people2020 = snapshot.snapshots[3]
+        #
+        # # Plot age mixing
+        # import matplotlib as mpl
+        # import pylab as pl
+        # snapshot = sim.get_analyzer()
+        # people2020 = snapshot.snapshots[3]
+        # font_size = 15
+        # font_family = 'Libertinus Sans'
+        # pl.rcParams['font.size'] = font_size
+        # pl.rcParams['font.family'] = font_family
+        # fig, ax = pl.subplots(nrows=1, ncols=1, figsize=(5, 4))
+        # # ax = axes.flatten()
+        # people = people2020
+        # lkey='m'
+        # # for ai,lkey in enumerate(['m','c']):
+        # fc = people.contacts[lkey]['age_f']
+        # mc = people.contacts[lkey]['age_m']
+        # h = ax.hist2d(fc, mc, bins=np.linspace(0, 75, 16), density=True, norm=mpl.colors.LogNorm())
+        # ax.set_xlabel('Age of female partner')
+        # ax.set_ylabel('Age of male partner')
+        # fig.colorbar(h[3], ax=ax)
+        # ax.set_title('Marital age mixing')
+        # fig.tight_layout()
+        # pl.savefig(f"networks.png", dpi=100)
+        #
+        # fig, axes = pl.subplots(nrows=1, ncols=2, figsize=(8, 2))
         # ax = axes.flatten()
-        people = people2020
-        lkey='m'
-        # for ai,lkey in enumerate(['m','c']):
-        fc = people.contacts[lkey]['age_f']
-        mc = people.contacts[lkey]['age_m']
-        h = ax.hist2d(fc, mc, bins=np.linspace(0, 75, 16), density=True, norm=mpl.colors.LogNorm())
-        ax.set_xlabel('Age of female partner')
-        ax.set_ylabel('Age of male partner')
-        fig.colorbar(h[3], ax=ax)
-        ax.set_title('Marital age mixing')
-        fig.tight_layout()
-        pl.savefig(f"networks.png", dpi=100)
-
-        fig, axes = pl.subplots(nrows=1, ncols=2, figsize=(8, 2))
-        ax = axes.flatten()
-        types = ['casual', 'one-off']
-        xx = people.lag_bins[1:15]*sim['dt']
-        for cn,lkey in enumerate(['c','o']):
-            yy = people.rship_lags[lkey][:14]/sum(people.rship_lags[lkey])
-            ax[cn].bar(xx,yy, width=0.2)
-            ax[cn].set_xlabel(f'Time between {types[cn]} relationships')
-        fig.tight_layout()
-        pl.savefig(f"lags.png", dpi=100)
+        # types = ['casual', 'one-off']
+        # xx = people.lag_bins[1:15]*sim['dt']
+        # for cn,lkey in enumerate(['c','o']):
+        #     yy = people.rship_lags[lkey][:14]/sum(people.rship_lags[lkey])
+        #     ax[cn].bar(xx,yy, width=0.2)
+        #     ax[cn].set_xlabel(f'Time between {types[cn]} relationships')
+        # fig.tight_layout()
+        # pl.savefig(f"lags.png", dpi=100)
         
     return sim, a
 

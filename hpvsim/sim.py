@@ -56,7 +56,7 @@ class Sim(hpb.BaseSim):
     def load_data(self, datafile=None, **kwargs):
         ''' Load the data to calibrate against, if provided '''
         if datafile is not None: # If a data file is provided, load it
-            self.data = hpm.load_data(datafile=datafile, **kwargs)
+            self.data = hpm.load_data(datafile=datafile, check_date=True, **kwargs)
         return
 
 
