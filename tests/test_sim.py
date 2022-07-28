@@ -301,7 +301,7 @@ if __name__ == '__main__':
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
     sim2 = test_epi()
     sim3 = test_flexible_inputs()
-    sim = test_result_consistency()
+    sim4 = test_result_consistency()
     sim5 = test_location_loading()
     sim6 = test_resuming()
 
