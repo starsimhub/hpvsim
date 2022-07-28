@@ -22,8 +22,8 @@ def test_network(do_plot=True):
 
     n_agents = 50e3
     pars = dict(pop_size=n_agents,
-                start=1970,
-                n_years=60,
+                start=1975,
+                n_years=50,
                 burnin=30,
                 dt=0.5,
                 network='default',
@@ -68,7 +68,7 @@ def test_network(do_plot=True):
     # Check plot()
     if do_plot:
         fig = a.plot()
-        sim.plot()
+        sim.plot('demographics')
 
         snapshot = sim.get_analyzer()
         people1990 = snapshot.snapshots[0]
