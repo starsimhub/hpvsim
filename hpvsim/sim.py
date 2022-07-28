@@ -951,7 +951,7 @@ class Sim(hpb.BaseSim):
         self.results['detected_cancer_incidence'][:]      = res['detected_cancers'][:] / demoninator
 
         # Compute cancer mortality. Denominator is those with cancer
-        with_cancer = res['n_cancerous'][:]
+        with_cancer = res['n_cancerous'][:] + res['cancer_deaths'][:] + res['other_deaths'][:]
         scale_factor = 1e5  # Cancer mortality is displayed as rates per 100k women
         denominator = with_cancer/scale_factor
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator

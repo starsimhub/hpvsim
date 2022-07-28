@@ -90,21 +90,21 @@ def test_age_results(do_plot=True):
     a = sim.get_analyzer(0)
 
     to_plot = {
-        'HPV prevalence': [
-            'hpv_prevalence',
+        'Cervical cancers': [
+            'n_cancerous',
         ],
-        'Cancer deaths': [
+        'Cervical cancer deaths': [
             'cancer_deaths',
         ],
-        'Cervical cancer incidence': [
-            'cancer_incidence',
+        'Cervical cancer mortality': [
+            'cancer_mortality',
         ],
     }
 
     # Check plot()
     if do_plot:
-        # sim.plot(to_plot=to_plot)
-        fig0 = sim.get_analyzer(0).plot()
+        sim.plot(to_plot=to_plot)
+        # fig0 = sim.get_analyzer(0).plot()
         # fig1 = sim.get_analyzer(1).plot()
 
     return sim, a
