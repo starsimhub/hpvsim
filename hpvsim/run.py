@@ -1086,6 +1086,8 @@ class Scenarios(hpb.ParsObj):
         x = defaultdict(dict)
         genotypekeys = self.result_keys('genotype')
         sexkeys = self.result_keys('by_sex')
+        agekeys = self.result_keys('by_age')
+        totalkeys = self.result_keys('total')
         for scenkey in self.scenarios.keys():
             for reskey in self.result_keys():
                 if reskey in genotypekeys:
@@ -1098,10 +1100,9 @@ class Scenarios(hpb.ParsObj):
                         val = self.results[reskey][scenkey].best[sex, day]
                         sexkey = reskey + str(sex)  # Add variant number to the summary output
                         x[scenkey][sexkey] = int(val)
-                else:
+                elif reskey in totalkeys:
                     val = self.results[reskey][scenkey].best[day]
-                    if reskey not in ['r_eff', 'doubling_time']:
-                        val = int(val)
+                    val = int(val)
                     x[scenkey][reskey] = val
         df = pd.DataFrame.from_dict(x).astype(object)
 
