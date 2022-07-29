@@ -1266,13 +1266,14 @@ class Calibration(Analyzer):
         all_args = sc.mergedicts(fig_args, axis_args, d_args)
 
         # Get rows and columns
-        if not len(self.analyzer_results):
-            errormsg = f'Cannot plot since no age results were recorded)'
+        if not len(self.analyzer_results) and not len(self.sim_results):
+            errormsg = f'Cannot plot since no results were recorded)'
             raise ValueError(errormsg)
         else:
             all_dates = [[date for date in r.keys() if date != 'bins'] for r in self.analyzer_results[0].values()]
             dates_per_result = [len(date_list) for date_list in all_dates]
-            n_plots = sum(dates_per_result)
+            other_results = len(self.sim_results[0].keys())
+            n_plots = sum(dates_per_result) + other_results
             n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Initialize
@@ -1282,7 +1283,7 @@ class Calibration(Analyzer):
 
         # Pull out attributes that don't vary by run
         age_labels = sc.objdict()
-        for resname,resdict in zip(self.results_keys, self.analyzer_results[0].values()):
+        for resname,resdict in zip(self.age_results_keys, self.analyzer_results[0].values()):
             age_labels[resname] = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
             age_labels[resname].append(str(int(resdict['bins'][-1])) + '+')
 
@@ -1290,7 +1291,7 @@ class Calibration(Analyzer):
         with hpo.with_style(**kwargs):
 
             plot_count = 0
-            for rn, resname in enumerate(self.results_keys):
+            for rn, resname in enumerate(self.age_results_keys):
                 x = np.arange(len(age_labels[resname]))  # the label locations
 
                 for date in all_dates[rn]:
@@ -1344,5 +1345,31 @@ class Calibration(Analyzer):
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
+
+            for rn, resname in enumerate(self.sim_results_keys):
+                x = np.arange(len(self.glabels))
+                ax = axes[plot_count]
+                bins = []
+                values = []
+                thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
+                for g in range(self.ng):
+                    glabel = self.glabels[g].upper()
+                    ydata = np.array(thisdatadf[thisdatadf.genotype == glabel].value)
+                    ax.scatter(x[g], ydata, color=self.result_properties[resname].color[g], marker='s', label=f'Data - {glabel}')
+
+                    # Construct a dataframe with things in the most logical order for plotting
+                    for run_num, run in enumerate(self.sim_results):
+                        bins += x[g].tolist()
+                        values += run[resname][g]
+                # Plot model
+                modeldf = pd.DataFrame({'bins': bins, 'values': values})
+                ax = plot_type(ax=ax, x='bins', y='values', data=modeldf, dodge=True, boxprops=dict(alpha=.3))
+
+                # Set title and labels
+                ax.set_xlabel('Genotype')
+                ax.set_title(self.result_properties[resname].name + ', ' + date)
+                ax.legend()
+                ax.set_xticks(x, glabel)
+                plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
