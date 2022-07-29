@@ -705,7 +705,7 @@ class age_results(Analyzer):
                                      0] * scale + self.results[result][date] + dead_other
                         scale_factor =  1e5  # per 100,000 women
                         denom /= scale_factor
-                        self.results[result][date] = self.results[result][date] / (denom+self.results[result][date])
+                        self.results[result][date] = self.results[result][date] / denom
 
 
     def finalize(self, sim):
