@@ -482,119 +482,118 @@ def get_cross_immunity(default=False, genotype=None):
     Get the cross immunity between each genotype in a sim
     '''
     pars = dict(
-
+        # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
         hpv16 = dict(
             hpv16  = 1.0, # Default for own-immunity
-            hpv18 = 0, # Assumption
-            hpv31  = 0, # Assumption
-            hpv33 = 0, # Assumption
-            hpv45 = 0, # Assumption
-            hpv52 = 0, # Assumption
-            hpv58 = 0, # Assumption
-            hpv6 = 0, # Assumption
-            hpv11 = 0, # Assumption
+            hpv18 = 0.8, # Assumption
+            hpv31  = 0.8, # Assumption
+            hpv33 = 0.8, # Assumption
+            hpv45 = 0.8, # Assumption
+            hpv52 = 0.3, # Assumption
+            hpv58 = 0.3, # Assumption
+            hpv6 = 0.3, # Assumption
+            hpv11 = 0.3, # Assumption
         ),
 
         hpv18 = dict(
-            hpv16=0,  # Default for own-immunity
+            hpv16=0.8,  # Default for own-immunity
             hpv18=1.0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
+            hpv31=0.8,  # Assumption
+            hpv33=0.8,  # Assumption
+            hpv45=0.8,  # Assumption
+            hpv52=0.3,  # Assumption
+            hpv58=0.3,  # Assumption
+            hpv6=0.3,  # Assumption
+            hpv11=0.3,  # Assumption
         ),
 
         hpv31=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
+            hpv16=0.8,  # Default for own-immunity
+            hpv18=0.8,  # Assumption
             hpv31=1.0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
+            hpv33=0.8,  # Assumption
+            hpv45=0.8,  # Assumption
+            hpv52=0.3,  # Assumption
+            hpv58=0.3,  # Assumption
+            hpv6=0.3,  # Assumption
+            hpv11=0.3,  # Assumption
         ),
 
         hpv33=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
+            hpv16=0.8,  # Default for own-immunity
+            hpv18=0.8,  # Assumption
+            hpv31=0.8,  # Assumption
             hpv33=1.0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
+            hpv45=0.8,  # Assumption
+            hpv52=0.3,  # Assumption
+            hpv58=0.3,  # Assumption
+            hpv6=0.3,  # Assumption
+            hpv11=0.3,  # Assumption
         ),
 
         hpv45=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
+            hpv16=0.8,  # Default for own-immunity
+            hpv18=0.8,  # Assumption
+            hpv31=0.8,  # Assumption
+            hpv33=0.8,  # Assumption
             hpv45=1.0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
+            hpv52=0.3,  # Assumption
+            hpv58=0.3,  # Assumption
+            hpv6=0.3,  # Assumption
+            hpv11=0.3,  # Assumption
         ),
 
         hpv52=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
+            hpv16=0.3,  # Default for own-immunity
+            hpv18=0.3,  # Assumption
+            hpv31=0.3,  # Assumption
+            hpv33=0.3,  # Assumption
+            hpv45=0.3,  # Assumption
             hpv52=1.0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
+            hpv58=0.3,  # Assumption
+            hpv6=0.3,  # Assumption
+            hpv11=0.3,  # Assumption
 
         ),
 
         hpv58=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
+            hpv16=0.3,  # Default for own-immunity
+            hpv18=0.3,  # Assumption
+            hpv31=0.3,  # Assumption
+            hpv33=0.3,  # Assumption
+            hpv45=0.3,  # Assumption
+            hpv52=0.3,  # Assumption
             hpv58=1,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
+            hpv6=0.3,  # Assumption
+            hpv11=0.3,  # Assumption
 
         ),
 
         hpv6=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
+            hpv16=0.3,  # Default for own-immunity
+            hpv18=0.3,  # Assumption
+            hpv31=0.3,  # Assumption
+            hpv33=0.3,  # Assumption
+            hpv45=0.3,  # Assumption
+            hpv52=0.3,  # Assumption
+            hpv58=0.3,  # Assumption
             hpv6=1.0,  # Assumption
-            hpv11=0,  # Assumption
+            hpv11=0.3,  # Assumption
 
         ),
 
         hpv11=dict(
-            hpv16=0,  # Default for own-immunity
-            hpv18=0,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
+            hpv16=0.3,  # Default for own-immunity
+            hpv18=0.3,  # Assumption
+            hpv31=0.3,  # Assumption
+            hpv33=0.3,  # Assumption
+            hpv45=0.3,  # Assumption
+            hpv52=0.3,  # Assumption
+            hpv58=0.3,  # Assumption
+            hpv6=0.3,  # Assumption
             hpv11=1.0,  # Assumption
 
         ),
-
 
     )
 
