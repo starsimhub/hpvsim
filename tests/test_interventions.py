@@ -196,7 +196,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
-    debug = 0
+    debug = 1
     n_agents = 50e3
 
     pars = {

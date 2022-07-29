@@ -1029,35 +1029,11 @@ class Screening(Intervention):
         self.timepoints = np.arange(start_day, end_day)
 
         n_timepoints = len(self.timepoints)
-        if len(self.screen_compliance) != n_timepoints:
-            print(f'{n_timepoints} timepoints provided but only {len(self.screen_compliance)} screen compliance, '
-                  f'assuming constant over time')
-            self.screen_compliance *= n_timepoints
 
-        if len(self.triage_compliance) != n_timepoints:
-            print(f'{n_timepoints} timepoints provided but only {len(self.triage_compliance)} triage compliance, '
-                  f'assuming constant over time')
-            self.triage_compliance *= n_timepoints
-
-        if len(self.excision_compliance) != n_timepoints:
-            print(f'{n_timepoints} timepoints provided but only {len(self.excision_compliance)} excision compliance, '
-                  f'assuming constant over time')
-            self.excision_compliance *= n_timepoints
-
-        if len(self.ablation_compliance) != n_timepoints:
-            print(f'{n_timepoints} timepoints provided but only {len(self.ablation_compliance)} ablation compliance, '
-                  f'assuming constant over time')
-            self.ablation_compliance *= n_timepoints
-
-        if len(self.cancer_compliance) != n_timepoints:
-            print(f'{n_timepoints} timepoints provided but only {len(self.cancer_compliance)} cancer tx compliance, '
-                  f'assuming constant over time')
-            self.cancer_compliance *= n_timepoints
-
-        if len(self.screen_fu_neg_triage) != n_timepoints:
-            print(f'{n_timepoints} timepoints provided but only {len(self.screen_fu_neg_triage)} screen neg fu compliance, '
-                  f'assuming constant over time')
-            self.screen_fu_neg_triage *= n_timepoints
+        for compliance in ['screen_compliance', 'triage_compliance', 'excision_compliance', 'ablation_compliance', 'cancer_compliance', 'screen_fu_neg_triage']:
+            if len(getattr(self, compliance)) != n_timepoints:
+                print(f'{n_timepoints} timepoints provided but only {len(getattr(self, compliance))} values for {compliance}. Assuming constant over time.')
+                setattr(self, compliance, getattr(self, compliance)*n_timepoints)
 
         sim['screen_pars'][self.label] = self.p  # Store the parameters
         return
@@ -1124,6 +1100,10 @@ class Screening(Intervention):
         screen_inds = np.array([], dtype=int)  # Initialize in case no one gets screened
 
         for i in find_day(self.timepoints, sim.t, interv=self, sim=sim):
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
             self.where_in_timepoints = i
             screen_probs = np.zeros(len(sim.people), dtype=hpd.default_float)
 
