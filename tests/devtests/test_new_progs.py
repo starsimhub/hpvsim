@@ -22,19 +22,19 @@ sim.initialize()
 
 # Get parameters
 ng = sim['n_genotypes']
-progs = sim['prognoses']
 genotype_pars = sim['genotype_pars']
 genotype_map = sim['genotype_map']
-durpars = [genotype_pars[genotype_map[g]]['dur'] for g in genotype_map]
 cancer_thresh = 0.99
-genotype_pars['hpv16'].prog_time = 4
-genotype_pars['hpv18'].prog_time = 4
-genotype_pars['hpv16'].prog_rate = 0.6
+genotype_pars['hpv16'].prog_time = 8
+genotype_pars['hpv18'].prog_time = 8
+genotype_pars['hpv16'].prog_rate = 0.7
 genotype_pars['hpv18'].prog_rate = 0.8
-genotype_pars['hpv31'].prog_time = 10
+genotype_pars['hpv31'].prog_time = 15
 genotype_pars['hpv6'].prog_time = 15
-genotype_pars['hpv31'].prog_rate = .5
-genotype_pars['hpv6'].prog_rate = 0.5
+genotype_pars['hpv31'].prog_rate = .3
+genotype_pars['hpv6'].prog_rate = 0.1
+genotype_pars['hpv16'].dur_dysp['par1'] = 3.16
+genotype_pars['hpv16'].dur_none['par1'] = 1.23
 
 
 # Prognoses from Harvard model
@@ -93,7 +93,7 @@ x = np.linspace(0.01, 7, 700)
 shares = []
 gtypes = []
 for g in range(ng):
-    sigma, scale = lognorm_params(durpars[g]['none']['par1'], durpars[g]['none']['par2'])
+    sigma, scale = lognorm_params(genotype_pars[genotype_map[g]]['dur_none']['par1'], genotype_pars[genotype_map[g]]['dur_none']['par2'])
     rv = lognorm(sigma, 0, scale)
     aa = np.diff(rv.cdf(x))
     bb = logf1(x, genotype_pars[genotype_map[g]]['dysp_rate'])[1:]
@@ -105,7 +105,7 @@ for g in range(ng):
 noneshares, cin1shares, cin2shares, cin3shares, cancershares = [], [], [], [], []
 longx = np.linspace(0.01, 20, 1000)
 for g in range(ng):
-    sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+    sigma, scale = lognorm_params(genotype_pars[genotype_map[g]]['dur_dysp']['par1'], genotype_pars[genotype_map[g]]['dur_dysp']['par2'])
     rv = lognorm(sigma, 0, scale)
     dd = logf2(longx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
 
@@ -134,12 +134,12 @@ n_samples = 10e3
 
 # create dataframes
 data = {}
-years = np.arange(1,11)
+years = np.arange(1,21)
 cin1_shares, cin2_shares, cin3_shares, cancer_shares = [], [], [], []
 all_years = []
 all_genotypes = []
 for g in range(ng):
-    sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+    sigma, scale = lognorm_params(genotype_pars[genotype_map[g]]['dur_dysp']['par1'], genotype_pars[genotype_map[g]]['dur_dysp']['par2'])
     r = lognorm(sigma, 0, scale)
 
     for year in years:
@@ -167,7 +167,7 @@ def make_fig1():
 
     ###### Distributions
     for g in range(ng):
-        sigma, scale = lognorm_params(durpars[g]['none']['par1'], durpars[g]['none']['par2'])
+        sigma, scale = lognorm_params(genotype_pars[genotype_map[g]]['dur_none']['par1'], genotype_pars[genotype_map[g]]['dur_none']['par2'])
         rv = lognorm(sigma, 0, scale)
         ax[0,0].plot(x, rv.pdf(x), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,0].legend()
@@ -191,9 +191,9 @@ def make_fig1():
 
 
     ###### Distributions post-dysplasia
-    thisx = np.linspace(0.01, 10, 100)
+    thisx = np.linspace(0.01, 20, 100)
     for g in range(ng):
-        sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+        sigma, scale = lognorm_params(genotype_pars[genotype_map[g]]['dur_dysp']['par1'], genotype_pars[genotype_map[g]]['dur_dysp']['par2'])
         rv = lognorm(sigma, 0, scale)
         ax[0,2].plot(thisx, rv.pdf(thisx), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,2].set_xlabel("Duration of dysplasia")
@@ -213,12 +213,12 @@ def make_fig1():
     for g in range(ng):
         ax[1,0].plot(thisx, logf2(thisx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
 
-        if g<2:
-            # Plot variation
-            for year in range(1,11):
-                mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
-                peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
-                ax[1,0].plot([year]*n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
+        # Plot variation
+        for year in range(1, 21):
+            mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'],
+                               genotype_pars[genotype_map[g]]['prog_rate'])
+            peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
+            ax[1, 0].plot([year] * n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
     ax[1,0].set_xlabel("Duration of dysplasia")
     ax[1,0].set_ylabel("")
@@ -237,7 +237,7 @@ def make_fig1():
     ax[1,0].text(-0.3, 0.75, 'CIN3', fontsize=15, rotation=90)
 
     ###### Share of women who develop each CIN grade
-    loc_array = np.array([-5,-4,-3,-2,-1,1,2,3,4,5])
+    loc_array = np.array([-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10])
     w = 0.08
     for y in years:
         la = loc_array[y - 1] * w + np.sign(loc_array[y - 1])*(-1)*w/2
