@@ -698,10 +698,8 @@ class age_results(Analyzer):
                         if 'mortality' in result:
                             # Need to divide by the right denominator
                             # first need to find people who died of other causes today and add them back into denom
-                            inds_other = ((sim.people['date_dead_other'] == sim.t) * (sim.people['cancerous'])).nonzero()
-                            dead_other = np.histogram(age[inds_other[-1]], bins=result_dict.edges)[0] * scale
-                            denom = np.histogram(age[hpu.true(sim.people.cancerous)], bins=result_dict.edges)[
-                                         0] * scale + self.results[result][date] + dead_other
+                            denom = np.histogram(age[hpu.true(sim.people.is_female_alive)], bins=result_dict.edges)[
+                                         0] * scale
                             scale_factor =  1e5  # per 100,000 women
                             denom /= scale_factor
                             self.results[result][date] = self.results[result][date] / denom
