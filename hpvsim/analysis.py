@@ -678,34 +678,33 @@ class age_results(Analyzer):
                             inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
                         else:
                             inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
-                        self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                        0] * scale  # Bin the people
+                        self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
                             inds = ((sim.people[attr1][g, :] == sim.t) * (sim.people[attr2][g, :])).nonzero()
                             self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
                                                                   0] * scale  # Bin the people
+                    if sim.t == result_dict.calcpoints[-1]:
+                        if 'incidence' in result:
+                            # Need to divide by the right denominator
+                            if 'hpv' in result:  # Denominator is susceptible population
+                                denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
+                            else:  # Denominator is females at risk for cancer
+                                denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous)], bins=result_dict.edges)[
+                                             0] * scale) / 1e5  # CIN and cancer are per 100,000 women
+                            if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
+                            self.results[result][date] = self.results[result][date] / denom
 
-                    if 'incidence' in result:
-                        # Need to divide by the right denominator
-                        if 'hpv' in result:  # Denominator is susceptible population
-                            denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
-                        else:  # Denominator is females at risk for cancer
-                            denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous)], bins=result_dict.edges)[
-                                         0] * scale) / 1e5  # CIN and cancer are per 100,000 women
-                        if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
-                        self.results[result][date] = self.results[result][date] / denom
-
-                    if 'mortality' in result:
-                        # Need to divide by the right denominator
-                        # first need to find people who died of other causes today and add them back into denom
-                        inds_other = ((sim.people['date_dead_other'] == sim.t) * (sim.people['cancerous'])).nonzero()
-                        dead_other = np.histogram(age[inds_other[-1]], bins=result_dict.edges)[0] * scale
-                        denom = np.histogram(age[hpu.true(sim.people.cancerous)], bins=result_dict.edges)[
-                                     0] * scale + self.results[result][date] + dead_other
-                        scale_factor =  1e5  # per 100,000 women
-                        denom /= scale_factor
-                        self.results[result][date] = self.results[result][date] / denom
+                        if 'mortality' in result:
+                            # Need to divide by the right denominator
+                            # first need to find people who died of other causes today and add them back into denom
+                            inds_other = ((sim.people['date_dead_other'] == sim.t) * (sim.people['cancerous'])).nonzero()
+                            dead_other = np.histogram(age[inds_other[-1]], bins=result_dict.edges)[0] * scale
+                            denom = np.histogram(age[hpu.true(sim.people.cancerous)], bins=result_dict.edges)[
+                                         0] * scale + self.results[result][date] + dead_other
+                            scale_factor =  1e5  # per 100,000 women
+                            denom /= scale_factor
+                            self.results[result][date] = self.results[result][date] / denom
 
 
     def finalize(self, sim):
