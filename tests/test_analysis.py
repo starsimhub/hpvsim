@@ -141,7 +141,8 @@ def test_calibration():
 
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             datafiles=['test_data/south_africa_hpv_data.xlsx',
-                                       'test_data/south_africa_cancer_data_2020.csv'],
+                                       'test_data/south_africa_cancer_data_2020.csv',
+                                       'test_data/south_africa_type_distribution_cancer.csv'],
                             total_trials=8, n_workers=4)
     calib.calibrate()
     calib.plot()
@@ -155,8 +156,8 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
-    # sim2, calib = test_calibration()
+    # sim1, a1    = test_age_results()
+    sim2, calib = test_calibration()
 
 
 

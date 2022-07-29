@@ -903,7 +903,8 @@ class Calibration(Analyzer):
         for datafile in datafiles:
             self.target_data.append(hpm.load_data(datafile))
 
-        result_keys = sc.objdict()
+        sim_results = sc.objdict()
+        age_result_keys = sc.objdict()
 
         # Go through each of the target keys and determine how we are going to get the results from sim
         for targ in self.target_data:
@@ -911,17 +912,29 @@ class Calibration(Analyzer):
             if len(targ_keys) > 1:
                 errormsg = f'Only support one set of targets per datafile, {len(targ_keys)} provided'
                 raise ValueError(errormsg)
-            result_keys[targ_keys[0]] = sc.objdict(
-                datafile=sc.dcp(targ),
-                compute_fit=True,
-            )
+            if 'age' in targ.columns:
+                age_result_keys[targ_keys[0]] = sc.objdict(
+                    datafile=sc.dcp(targ),
+                    compute_fit=True,
+                )
+            else:
+                sim_results[targ_keys[0]] = sc.objdict(
+                    data=sc.dcp(targ)
+                )
 
-        ar = age_results(result_keys=result_keys)
+        ar = age_results(result_keys=age_result_keys)
         self.sim['analyzers'] += [ar]
         self.sim.initialize()
-        self.results_keys = result_keys.keys()
+        for rkey in sim_results.keys():
+            sim_results[rkey].timepoints = sim.get_t(sim_results[rkey].data.year.unique()[0], return_date_format='str')[0]//sim.resfreq
+            if 'weights' not in sim_results[rkey].data.columns:
+                sim_results[rkey].weights = np.ones(len(sim_results[rkey].data))
+        self.age_results_keys = age_result_keys.keys()
+        self.sim_results = sim_results
+        self.sim_results_keys = sim_results.keys()
+
         self.result_properties = sc.objdict()
-        for rkey in self.results_keys:
+        for rkey in self.age_results_keys + self.sim_results_keys:
             self.result_properties[rkey] = sc.objdict()
             self.result_properties[rkey].name = self.sim.results[rkey].name
             self.result_properties[rkey].color = self.sim.results[rkey].color
@@ -936,11 +949,6 @@ class Calibration(Analyzer):
         # Set regular sim pars
         if calib_pars is not None:
             valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
-            if 'prognoses' in valid_pars.keys():
-                sim_progs = hppar.get_prognoses()
-                for prog_key, prog_val in valid_pars['prognoses'].items():
-                    sim_progs[prog_key] = np.array(prog_val)
-                valid_pars['prognoses'] = sim_progs
             sim.update_pars(valid_pars)
             if len(valid_pars) != len(calib_pars):
                 extra = set(calib_pars.keys()) - set(valid_pars.keys())
@@ -1027,9 +1035,25 @@ class Calibration(Analyzer):
 
         sim = self.run_sim(calib_pars, genotype_pars, return_sim=True)
         # trial.set_user_attr('sim', sim) # CK: fails since not a JSON, could use sc.jsonpickle()
+        # Extract results we are calibrating to, a combination of by-age and sim-results
+        # First check for by-age results
         r = sim.get_analyzer().results
         r = sc.jsonify(r)
         trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
+
+        # Now compute fit for sim results and save sim results (NB THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
+        sim_results = sc.objdict()
+        for rkey in self.sim_results:
+            self.sim_results[rkey].model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
+            self.sim_results[rkey].diffs = self.sim_results[rkey].data.value - self.sim_results[rkey].model_output
+            self.sim_results[rkey].gofs = hpm.compute_gof(self.sim_results[rkey].data.value, self.sim_results[rkey].model_output)
+            self.sim_results[rkey].losses = self.sim_results[rkey].gofs * self.sim_results[rkey].weights
+            self.sim_results[rkey].mismatch = self.sim_results[rkey].losses.sum()
+            sim.fit += self.sim_results[rkey].mismatch
+            sim_results[rkey] = self.sim_results[rkey].model_output
+
+        sim_results = sc.jsonify(sim_results)
+        trial.set_user_attr('sim_results', sim_results)
         sim.shrink() # CK: Proof of principle only!!
         trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
         return sim.fit
@@ -1120,8 +1144,11 @@ class Calibration(Analyzer):
         self.glabels = [g['label'] for g in sim['pars']['genotypes']]
 
         self.analyzer_results = []
+        self.sim_results = []
         for trial in self.study.trials:
             r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
+            sim_results = trial.user_attrs['sim_results']
+            self.sim_results.append(sim_results)
             self.analyzer_results.append(r)
 
         # Compare the results

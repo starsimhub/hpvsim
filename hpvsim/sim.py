@@ -761,7 +761,7 @@ class Sim(hpb.BaseSim):
             # Create cancer type distribution
             ca_genotype_bins = np.bincount(people.cancer_genotype[people.cancer_genotype >= 0])
             if len(ca_genotype_bins):
-                for g in range(ng):
+                for g in range(len(ca_genotype_bins)):
                     self.results['n_cancerous_by_genotype'][g,idx] = ca_genotype_bins[g]
 
             # Create total stocks
