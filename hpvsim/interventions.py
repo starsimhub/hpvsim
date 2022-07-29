@@ -1100,10 +1100,6 @@ class Screening(Intervention):
         screen_inds = np.array([], dtype=int)  # Initialize in case no one gets screened
 
         for i in find_day(self.timepoints, sim.t, interv=self, sim=sim):
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
             self.where_in_timepoints = i
             screen_probs = np.zeros(len(sim.people), dtype=hpd.default_float)
 
