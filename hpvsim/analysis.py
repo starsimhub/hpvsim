@@ -905,6 +905,7 @@ class Calibration(Analyzer):
 
         result_keys = sc.objdict()
 
+        # Go through each of the target keys and determine how we are going to get the results from sim
         for targ in self.target_data:
             targ_keys = targ.name.unique()
             if len(targ_keys) > 1:
