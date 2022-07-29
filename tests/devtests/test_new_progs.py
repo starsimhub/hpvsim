@@ -22,10 +22,10 @@ sim.initialize()
 
 # Get parameters
 ng = sim['n_genotypes']
-progs = sim['prognoses']
 genotype_pars = sim['genotype_pars']
 genotype_map = sim['genotype_map']
-durpars = [genotype_pars[genotype_map[g]]['dur'] for g in genotype_map]
+dur_none = [genotype_pars[genotype_map[g]]['dur_none'] for g in genotype_map]
+dur_dysp = [genotype_pars[genotype_map[g]]['dur_dysp'] for g in genotype_map]
 cancer_thresh = 0.99
 genotype_pars['hpv16'].prog_time = 4
 genotype_pars['hpv18'].prog_time = 4
@@ -35,7 +35,6 @@ genotype_pars['hpv31'].prog_time = 10
 genotype_pars['hpv6'].prog_time = 15
 genotype_pars['hpv31'].prog_rate = .5
 genotype_pars['hpv6'].prog_rate = 0.5
-
 
 # Prognoses from Harvard model
 prognoses = dict(
@@ -93,7 +92,7 @@ x = np.linspace(0.01, 7, 700)
 shares = []
 gtypes = []
 for g in range(ng):
-    sigma, scale = lognorm_params(durpars[g]['none']['par1'], durpars[g]['none']['par2'])
+    sigma, scale = lognorm_params(dur_none[g]['par1'], dur_none[g]['par2'])
     rv = lognorm(sigma, 0, scale)
     aa = np.diff(rv.cdf(x))
     bb = logf1(x, genotype_pars[genotype_map[g]]['dysp_rate'])[1:]
@@ -105,7 +104,7 @@ for g in range(ng):
 noneshares, cin1shares, cin2shares, cin3shares, cancershares = [], [], [], [], []
 longx = np.linspace(0.01, 20, 1000)
 for g in range(ng):
-    sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+    sigma, scale = lognorm_params(dur_dysp[g]['par1'], dur_dysp[g]['par2'])
     rv = lognorm(sigma, 0, scale)
     dd = logf2(longx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
 
@@ -139,7 +138,7 @@ cin1_shares, cin2_shares, cin3_shares, cancer_shares = [], [], [], []
 all_years = []
 all_genotypes = []
 for g in range(ng):
-    sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+    sigma, scale = lognorm_params(dur_dysp[g]['par1'], dur_dysp[g]['par2'])
     r = lognorm(sigma, 0, scale)
 
     for year in years:
@@ -167,7 +166,7 @@ def make_fig1():
 
     ###### Distributions
     for g in range(ng):
-        sigma, scale = lognorm_params(durpars[g]['none']['par1'], durpars[g]['none']['par2'])
+        sigma, scale = lognorm_params(dur_none[g]['par1'], dur_none[g]['par2'])
         rv = lognorm(sigma, 0, scale)
         ax[0,0].plot(x, rv.pdf(x), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,0].legend()
@@ -193,7 +192,7 @@ def make_fig1():
     ###### Distributions post-dysplasia
     thisx = np.linspace(0.01, 10, 100)
     for g in range(ng):
-        sigma, scale = lognorm_params(durpars[g]['dys']['par1'], durpars[g]['dys']['par2'])
+        sigma, scale = lognorm_params(dur_dysp[g]['par1'], dur_dysp[g]['par2'])
         rv = lognorm(sigma, 0, scale)
         ax[0,2].plot(thisx, rv.pdf(thisx), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,2].set_xlabel("Duration of dysplasia")
