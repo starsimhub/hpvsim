@@ -372,7 +372,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
                 'total_cin_prevalence',
             ],
             'Cancers per 100,000 women': [
-                'total_cancer_incidence',
+                'cancer_incidence',
             ],
         }
         scens.plot(to_plot=to_plot)
