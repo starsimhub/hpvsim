@@ -317,7 +317,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'total_hpv_incidence',
                 ],
                 'Cancers per 100,000 women': [
-                    'total_cancer_incidence',
+                    'cancer_incidence',
                     ],
             })
 

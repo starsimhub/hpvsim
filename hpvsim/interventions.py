@@ -1265,6 +1265,8 @@ class Screening(Intervention):
                 sim.people.date_next_screen[excision_LTFU_inds] = np.nan
             else:
                 excision_inds = np.array([])
+        else:
+            ablation_inds, excision_inds = np.array([]), np.array([])
 
         return ca_treat_inds, ablation_inds, excision_inds
 
