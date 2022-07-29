@@ -485,10 +485,10 @@ def get_cross_immunity(default=False, genotype=None):
         # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
         hpv16 = dict(
             hpv16  = 1.0, # Default for own-immunity
-            hpv18 = 0.8, # Assumption
-            hpv31  = 0.8, # Assumption
-            hpv33 = 0.8, # Assumption
-            hpv45 = 0.8, # Assumption
+            hpv18 = 0.5, # Assumption
+            hpv31  = 0.5, # Assumption
+            hpv33 = 0.5, # Assumption
+            hpv45 = 0.5, # Assumption
             hpv52 = 0.3, # Assumption
             hpv58 = 0.3, # Assumption
             hpv6 = 0.3, # Assumption
@@ -496,11 +496,11 @@ def get_cross_immunity(default=False, genotype=None):
         ),
 
         hpv18 = dict(
-            hpv16=0.8,  # Default for own-immunity
+            hpv16=0.5,  # Default for own-immunity
             hpv18=1.0,  # Assumption
-            hpv31=0.8,  # Assumption
-            hpv33=0.8,  # Assumption
-            hpv45=0.8,  # Assumption
+            hpv31=0.5,  # Assumption
+            hpv33=0.5,  # Assumption
+            hpv45=0.5,  # Assumption
             hpv52=0.3,  # Assumption
             hpv58=0.3,  # Assumption
             hpv6=0.3,  # Assumption
@@ -508,11 +508,11 @@ def get_cross_immunity(default=False, genotype=None):
         ),
 
         hpv31=dict(
-            hpv16=0.8,  # Default for own-immunity
-            hpv18=0.8,  # Assumption
+            hpv16=0.5,  # Default for own-immunity
+            hpv18=0.5,  # Assumption
             hpv31=1.0,  # Assumption
-            hpv33=0.8,  # Assumption
-            hpv45=0.8,  # Assumption
+            hpv33=0.5,  # Assumption
+            hpv45=0.5,  # Assumption
             hpv52=0.3,  # Assumption
             hpv58=0.3,  # Assumption
             hpv6=0.3,  # Assumption
@@ -520,11 +520,11 @@ def get_cross_immunity(default=False, genotype=None):
         ),
 
         hpv33=dict(
-            hpv16=0.8,  # Default for own-immunity
-            hpv18=0.8,  # Assumption
-            hpv31=0.8,  # Assumption
+            hpv16=0.5,  # Default for own-immunity
+            hpv18=0.5,  # Assumption
+            hpv31=0.5,  # Assumption
             hpv33=1.0,  # Assumption
-            hpv45=0.8,  # Assumption
+            hpv45=0.5,  # Assumption
             hpv52=0.3,  # Assumption
             hpv58=0.3,  # Assumption
             hpv6=0.3,  # Assumption
@@ -532,10 +532,10 @@ def get_cross_immunity(default=False, genotype=None):
         ),
 
         hpv45=dict(
-            hpv16=0.8,  # Default for own-immunity
-            hpv18=0.8,  # Assumption
-            hpv31=0.8,  # Assumption
-            hpv33=0.8,  # Assumption
+            hpv16=0.5,  # Default for own-immunity
+            hpv18=0.5,  # Assumption
+            hpv31=0.5,  # Assumption
+            hpv33=0.5,  # Assumption
             hpv45=1.0,  # Assumption
             hpv52=0.3,  # Assumption
             hpv58=0.3,  # Assumption
