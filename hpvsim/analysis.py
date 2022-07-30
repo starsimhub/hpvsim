@@ -1278,6 +1278,8 @@ class Calibration(Analyzer):
 
         # Initialize
         fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
+        for ax in axes.flat[n_plots:]:
+            ax.set_visible(False)
         axes = axes.flatten()
         pl.subplots_adjust(**axis_args)
 
@@ -1341,7 +1343,7 @@ class Calibration(Analyzer):
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_properties[resname].name+', '+ date)
+                    ax.set_title(self.result_properties[resname].name+', '+ date.replace('.0', ''))
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
