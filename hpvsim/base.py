@@ -451,7 +451,7 @@ class BaseSim(ParsObj):
         elif which in ['total']:
             keys = [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
         elif which in ['genotype']:
-            keys = [k for k,res in self.results.items() if (res[:].ndim>1) and ('by_sex' not in k) and isinstance(res, Result)]
+            keys = [k for k,res in self.results.items() if (res[:].ndim>1) and ('by_sex' not in k) and ('by_age' not in k) and isinstance(res, Result)]
         elif which in ['by_sex']:
             keys = [k for k,res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
         else:
