@@ -1352,24 +1352,23 @@ class Calibration(Analyzer):
                 bins = []
                 values = []
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
-                for g in range(self.ng):
-                    glabel = self.glabels[g].upper()
-                    ydata = np.array(thisdatadf[thisdatadf.genotype == glabel].value)
-                    ax.scatter(x[g], ydata, color=self.result_properties[resname].color[g], marker='s', label=f'Data - {glabel}')
+                ydata = np.array(thisdatadf.value)
+                ax.scatter(x, ydata, color=self.result_properties[resname].color[0], marker='s', label=f'Data')
 
-                    # Construct a dataframe with things in the most logical order for plotting
-                    for run_num, run in enumerate(self.sim_results):
-                        bins += x[g].tolist()
-                        values += run[resname][g]
+                # Construct a dataframe with things in the most logical order for plotting
+                for run_num, run in enumerate(self.sim_results):
+                    bins += x.tolist()
+                    values += run[resname]
                 # Plot model
                 modeldf = pd.DataFrame({'bins': bins, 'values': values})
                 ax = plot_type(ax=ax, x='bins', y='values', data=modeldf, dodge=True, boxprops=dict(alpha=.3))
 
                 # Set title and labels
+                date = thisdatadf.year[0]
                 ax.set_xlabel('Genotype')
-                ax.set_title(self.result_properties[resname].name + ', ' + date)
+                ax.set_title(self.result_properties[resname].name + ', ' + str(date))
                 ax.legend()
-                ax.set_xticks(x, glabel)
+                ax.set_xticks(x, self.glabels)
                 plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
