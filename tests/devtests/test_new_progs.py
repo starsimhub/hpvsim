@@ -15,9 +15,11 @@ from scipy.stats import lognorm
 # Create sim to get baseline prognoses parameters
 hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
-hpv6 = hpv.genotype('HPV6')
+# hpv6 = hpv.genotype('HPV6')
 hpv31 = hpv.genotype('HPV31')
-sim = hpv.Sim(genotypes=[hpv16,hpv18,hpv6,hpv31])
+sim = hpv.Sim(genotypes=[hpv16,hpv18,
+                         # hpv6,
+                         hpv31])
 sim.initialize()
 
 # Get parameters
@@ -30,9 +32,9 @@ genotype_pars['hpv18'].prog_time = 8
 genotype_pars['hpv16'].prog_rate = 0.7
 genotype_pars['hpv18'].prog_rate = 0.8
 genotype_pars['hpv31'].prog_time = 15
-genotype_pars['hpv6'].prog_time = 15
+# genotype_pars['hpv6'].prog_time = 15
 genotype_pars['hpv31'].prog_rate = .3
-genotype_pars['hpv6'].prog_rate = 0.1
+# genotype_pars['hpv6'].prog_rate = 0.1
 genotype_pars['hpv16'].dur_dysp['par1'] = 3.16
 genotype_pars['hpv16'].dur_none['par1'] = 1.23
 
@@ -81,6 +83,8 @@ def logf2(x, x_infl, k):
 
 # Figure settings
 font_size = 26
+sc.fonts(add=sc.thisdir(aspath=True) / 'Libertinus Sans')
+sc.options(font='Libertinus Sans')
 font_family = 'Libertinus Sans'
 plt.rcParams['font.size'] = font_size
 plt.rcParams['font.family'] = font_family
@@ -171,10 +175,10 @@ def make_fig1():
         rv = lognorm(sigma, 0, scale)
         ax[0,0].plot(x, rv.pdf(x), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,0].legend()
-    ax[0,0].set_xlabel("Pre-dysplasia/clearance duration")
+    ax[0,0].set_xlabel("Pre-dysplasia/control duration")
     ax[0,0].set_ylabel("")
     ax[0,0].grid()
-    ax[0,0].set_title("Distribution of infection durations\nprior to detectable dysplasia or control")
+    ax[0,0].set_title("Distribution of infection durations\nprior to dysplasia or control")
 
 
     ###### Relationship between durations and probability of detectable dysplasia
@@ -183,11 +187,11 @@ def make_fig1():
     for g in range(ng):
         ax[0,1].plot(x, logf1(x, genotype_pars[genotype_map[g]]['dysp_rate']), color=colors[g], lw=2)
     ax[0,1].plot(xx[:-1], yy[:-1], 'ko', label="Values from\nHarvard model")
-    ax[0,1].set_xlabel("Pre-dysplasia/clearance duration")
+    ax[0,1].set_xlabel("Pre-dysplasia/control duration")
     ax[0,1].set_ylabel("")
     ax[0,1].grid()
     ax[0,1].legend(fontsize=15, frameon=False)
-    ax[0,1].set_title("Probability of developing\ndetectable dysplasia by duration")
+    ax[0,1].set_title("Probability of developing\ndysplasia by duration")
 
 
     ###### Distributions post-dysplasia
@@ -238,10 +242,10 @@ def make_fig1():
 
     ###### Share of women who develop each CIN grade
     loc_array = np.array([-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10])
-    w = 0.08
+    w = 0.04
     for y in years:
         la = loc_array[y - 1] * w + np.sign(loc_array[y - 1])*(-1)*w/2
-        bottom = np.zeros(4)
+        bottom = np.zeros(3)
         for gn, grade in enumerate(['CIN1', 'CIN2', 'CIN3', 'Cancer']):
             ydata = sharesdf[sharesdf['Year']==y][grade]
             ax[1,1].bar(np.arange(1,ng+1)+la, ydata, width=w, color=cmap[gn], bottom=bottom, edgecolor='k', label=grade);
@@ -256,11 +260,11 @@ def make_fig1():
 
     ##### Final outcomes for women
     bottom = np.zeros(ng+1)
-    all_shares = [noneshares+[sum([j*.25 for j in noneshares])],
-                  cin1shares+[sum([j*.25 for j in cin1shares])],
-                  cin2shares+[sum([j*.25 for j in cin2shares])],
-                  cin3shares+[sum([j*.25 for j in cin3shares])],
-                  cancershares+[sum([j*.25 for j in cancershares])],
+    all_shares = [noneshares+[sum([j*.33 for j in noneshares])],
+                  cin1shares+[sum([j*.33 for j in cin1shares])],
+                  cin2shares+[sum([j*.33 for j in cin2shares])],
+                  cin3shares+[sum([j*.33 for j in cin3shares])],
+                  cancershares+[sum([j*.33 for j in cancershares])],
                   ]
     for gn,grade in enumerate(['None', 'CIN1', 'CIN2', 'CIN3','Cancer']):
         ydata = np.array(all_shares[gn])
