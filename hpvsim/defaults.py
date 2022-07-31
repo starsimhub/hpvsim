@@ -163,16 +163,6 @@ intv_flow_keys   = ['screens',  'screened',         'vaccinations', 'vaccinated'
 intv_flow_names  = ['screens',  'women screened',   'vaccinations', 'women vaccinated']
 intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,      pl.cm.Oranges,  pl.cm.Oranges]
 
-#%%
-# Parameters that can vary by genotype (WIP)
-genotype_pars = [
-    'rel_beta',
-    'rel_cin1_prob',
-    'rel_cin2_prob',
-    'rel_cin3_prob',
-    'rel_cancer_prob',
-    'rel_death_prob'
-]
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
 
