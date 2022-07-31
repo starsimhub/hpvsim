@@ -1098,6 +1098,8 @@ class Scenarios(hpb.ParsObj):
                         val = self.results[reskey][scenkey].best[sex, day]
                         sexkey = reskey + str(sex)  # Add variant number to the summary output
                         x[scenkey][sexkey] = int(val)
+                elif reskey == 'cancers_by_age':
+                    pass
                 else:
                     val = self.results[reskey][scenkey].best[day]
                     if reskey not in ['r_eff', 'doubling_time']:

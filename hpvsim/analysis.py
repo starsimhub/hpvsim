@@ -1041,7 +1041,7 @@ class Calibration(Analyzer):
         r = sc.jsonify(r)
         trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
 
-        # Now compute fit for sim results and save sim results (NB THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
+        # Now compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
         for rkey in self.sim_results:
             self.sim_results[rkey].model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
