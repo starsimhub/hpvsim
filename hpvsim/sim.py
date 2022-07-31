@@ -442,7 +442,7 @@ class Sim(hpb.BaseSim):
         results['detected_cancers'] = init_res('Detected cancers', color=hpd.cancer_flow_colors[0](0.95))
         results['cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
         results['detected_cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
-        results['cancer_type_distribution'] = init_res('HPV type distribution in cancer', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
+        results['cancer_type_distribution'] = init_res('HPV type distribution in cancer', n_rows=ng, color=hpd.inci_colors[0](np.linspace(0.9,0.5,ng)))
 
         # Other results
         results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
