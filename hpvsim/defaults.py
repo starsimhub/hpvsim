@@ -70,11 +70,11 @@ class PeopleMeta(sc.prettyobj):
     # Set the properties of a person
     person = [
         State('uid',default_int),              # Int
-        State('age',default_float),            # Float
-        State('sex',default_int),              # Float
-        State('debut',default_float),         # Float
-        State('partners', default_int, shape='n_partner_types'),  # Int by relationship type
-        State('current_partners', default_int, 0, 'n_partner_types'),  # Int by relationship type
+        State('age',default_float, np.nan),            # Float
+        State('sex',default_float, np.nan),              # Float
+        State('debut',default_float, np.nan),         # Float
+        State('partners', default_float, np.nan, shape='n_partner_types'),  # Int by relationship type
+        State('current_partners', default_float, np.nan, 'n_partner_types'),  # Int by relationship type
     ]
 
     # Set the states that a person can be in, all booleans per person and per genotype except cancerous, detected_cancer, cancer_genotype, dead_cancer, other_dead, screened, vaccinated, treated
@@ -88,7 +88,7 @@ class PeopleMeta(sc.prettyobj):
         State('cin', bool, False, 'n_genotypes'),
         State('cancerous', bool, False),
         State('detected_cancer', bool, False),
-        State('cancer_genotype', default_int, -1),
+        State('cancer_genotype', default_int, -2147483648),
         State('latent', bool, False,'n_genotypes'),
         State('alive', bool, True), # Save this as a state so we can record population sizes
         State('dead_cancer', bool, False),
@@ -122,11 +122,11 @@ class PeopleMeta(sc.prettyobj):
         State('n_rships', default_int, 0, shape='n_partner_types'),
     ]
 
-    dates = [State(f'date_{state.name}', default_float, shape=state.shape) for state in states if state != 'alive']  # Convert each state into a date
+    dates = [State(f'date_{state.name}', default_float, np.nan, shape=state.shape) for state in states if state != 'alive']  # Convert each state into a date
 
     dates += [
         State('date_clearance', default_float, np.nan, shape='n_genotypes'),
-        State('date_next_screen', default_float, 0),
+        State('date_next_screen', default_float, np.nan),
     ]
 
     # Duration of different states: these are floats per person -- used in people.py
