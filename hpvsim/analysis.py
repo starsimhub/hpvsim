@@ -1266,14 +1266,18 @@ class Calibration(Analyzer):
         d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
         all_args = sc.mergedicts(fig_args, axis_args, d_args)
 
+        # Pull out results to use
+        analyzer_results = sc.dcp(self.analyzer_results)
+        sim_results = sc.dcp(self.sim_results)
+
         # Get rows and columns
-        if not len(self.analyzer_results) and not len(self.sim_results):
+        if not len(analyzer_results) and not len(sim_results):
             errormsg = f'Cannot plot since no results were recorded)'
             raise ValueError(errormsg)
         else:
-            all_dates = [[date for date in r.keys() if date != 'bins'] for r in self.analyzer_results[0].values()]
+            all_dates = [[date for date in r.keys() if date != 'bins'] for r in analyzer_results[0].values()]
             dates_per_result = [len(date_list) for date_list in all_dates]
-            other_results = len(self.sim_results[0].keys())
+            other_results = len(sim_results[0].keys())
             n_plots = sum(dates_per_result) + other_results
             n_rows, n_cols = sc.get_rows_cols(n_plots)
 
@@ -1286,7 +1290,7 @@ class Calibration(Analyzer):
 
         # Pull out attributes that don't vary by run
         age_labels = sc.objdict()
-        for resname,resdict in zip(self.age_results_keys, self.analyzer_results[0].values()):
+        for resname,resdict in zip(self.age_results_keys, analyzer_results[0].values()):
             age_labels[resname] = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
             age_labels[resname].append(str(int(resdict['bins'][-1])) + '+')
 
@@ -1294,8 +1298,8 @@ class Calibration(Analyzer):
         if top_results is not None:
             self.df = self.df.sort_values(by=['mismatch'])
             index_to_plot = self.df.iloc[0:top_results, 0].values
-            self.analyzer_results = [self.analyzer_results[i] for i in index_to_plot]
-            self.sim_results = [self.sim_results[i] for i in index_to_plot]
+            analyzer_results = [analyzer_results[i] for i in index_to_plot]
+            sim_results = [sim_results[i] for i in index_to_plot]
 
         # Make the figure
         with hpo.with_style(**kwargs):
@@ -1326,7 +1330,7 @@ class Calibration(Analyzer):
                                 ax.scatter(x, ydata, color=self.result_properties[resname].color[g], marker='s', label=f'Data - {glabel}')
 
                             # Construct a dataframe with things in the most logical order for plotting
-                            for run_num, run in enumerate(self.analyzer_results):
+                            for run_num, run in enumerate(analyzer_results):
                                 genotypes += [glabel]*len(x)
                                 bins += x.tolist()
                                 values += run[resname][date][g]
@@ -1341,7 +1345,7 @@ class Calibration(Analyzer):
                         ax.scatter(x, ydata, color=self.result_properties[resname].color, marker='s', label='Data')
 
                         # Construct a dataframe with things in the most logical order for plotting
-                        for run_num, run in enumerate(self.analyzer_results):
+                        for run_num, run in enumerate(analyzer_results):
                             bins += x.tolist()
                             values += run[resname][date]
 
@@ -1366,7 +1370,7 @@ class Calibration(Analyzer):
                 ax.scatter(x, ydata, color=self.result_properties[resname].color[0], marker='s', label=f'Data')
 
                 # Construct a dataframe with things in the most logical order for plotting
-                for run_num, run in enumerate(self.sim_results):
+                for run_num, run in enumerate(sim_results):
                     bins += x.tolist()
                     values += run[resname]
                 # Plot model
