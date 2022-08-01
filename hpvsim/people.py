@@ -185,14 +185,15 @@ class People(hpb.BasePeople):
         n_dissolved = dict()
 
         for lno,lkey in enumerate(self.layer_keys()):
-            dissolve_inds = hpu.true(self.t*self.pars['dt']>self.contacts[lkey]['end']) # Get the partnerships due to end
-            dissolved = self.contacts[lkey].pop_inds(dissolve_inds) # Remove them from the contacts list
+            layer = self.contacts[lkey]
+            to_dissolve = (~self['alive'][layer['m']]) | (~self['alive'][layer['f']]) | ( (self.t*self.pars['dt']) > layer['end'])
+            dissolved = layer.pop_inds(to_dissolve) # Remove them from the contacts list
 
             # Update current number of partners
             unique, counts = hpu.unique(np.concatenate([dissolved['f'],dissolved['m']]))
             self.current_partners[lno,unique] -= counts
             self.rship_end_dates[lno, unique] = self.t
-            n_dissolved[lkey] = len(dissolve_inds)
+            n_dissolved[lkey] = len(dissolved['f'])
 
         return n_dissolved # Return the number of dissolved partnerships by layer
 
@@ -647,14 +648,6 @@ class People(hpb.BasePeople):
         self.cancerous[inds] = False
         self.alive[inds] = False
 
-        # Remove dead people from contact network by setting the end date of any partnership they're in to now
-        for contacts in self.contacts.values():
-            m_inds = hpu.findinds(contacts['m'], inds)
-            f_inds = hpu.findinds(contacts['f'], inds)
-            pships_to_end = contacts.pop_inds(np.concatenate([f_inds, m_inds]))
-            pships_to_end['end']*=0+self.t # Reset end date to now
-            contacts.append(pships_to_end)
-            
         return len(inds)
 
 
