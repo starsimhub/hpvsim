@@ -240,7 +240,7 @@ class People(hpb.BasePeople):
                 # Draw male partners based on mixing matrices if provided
                 if mixing is not None:
                     bins = mixing[lkey][:, 0]
-                    m_active_inds = hpu.true(self.is_active*self.is_male) # Males eligible to be selected
+                    m_active_inds = hpu.true(self.is_active & self.is_male) # Males eligible to be selected
                     age_bins_f = np.digitize(self.age[new_pship_inds_f], bins=bins) - 1 # Age bins of females that are entering new relationships
                     age_bins_m = np.digitize(self.age[m_active_inds], bins=bins) - 1 # Age bins of eligible males
                     bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
@@ -249,8 +249,9 @@ class People(hpb.BasePeople):
                     for ab,nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
                         male_dist = mixing[lkey][:, ab+1]  # Get the distribution of ages of the male partners of females of this age
                         this_weighting = weighting[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
-                        selected_males = hpu.choose_w(this_weighting, nm, unique=False)  # Select males
-                        new_pship_inds_m += m_active_inds[selected_males].tolist()  # Extract the indices of the selected males and add them to the contact list
+                        nonzero_weighting = hpu.true(this_weighting != 0)
+                        selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
+                        new_pship_inds_m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
                     new_pship_inds_m = np.array(new_pship_inds_m)
 
                 # Otherwise, do rough age assortativity
