@@ -456,15 +456,16 @@ class People(hpb.BasePeople):
         base_year = all_years[0]
         age_bins = death_pars[base_year]['m'][:,0]
         age_inds = np.digitize(self.age, age_bins)-1
-        death_probs = np.full(len(self), np.nan, dtype=hpd.default_float)
+        death_probs = np.empty(len(self), dtype=hpd.default_float)
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
         mx_f = death_pars[nearest_year]['f'][:,1]
         mx_m = death_pars[nearest_year]['m'][:,1]
 
-        death_probs[self.is_female_alive] = mx_f[age_inds[self.is_female_alive]]
-        death_probs[self.is_male_alive] = mx_f[age_inds[self.is_male_alive]]
-        death_probs[(self.age>100) & self.alive] = 1 # Just remove anyone >100
+        death_probs[self.is_female] = mx_f[age_inds[self.is_female]]
+        death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
+        death_probs[self.age>100] = 1 # Just remove anyone >100
+        death_probs[~self.alive] = 0
 
         # Get indices of people who die of other causes
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
