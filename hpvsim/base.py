@@ -1328,7 +1328,7 @@ class BasePeople(FlexPretty):
     @property
     def is_active(self):
         ''' Boolean array of everyone sexually active i.e. past debut '''
-        return self.age>self.debut
+        return (self.age>self.debut) & (self.alive)
 
     @property
     def alive_inds(self):
