@@ -29,7 +29,7 @@ def make_pars(**kwargs):
     pars = {}
 
     # Population parameters
-    pars['pop_size']        = 20e3      # Number of agents
+    pars['n_agents']        = 20e3      # Number of agents
     pars['pop_scale']       = None      # How much to scale the population
     pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle

@@ -39,7 +39,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     '''
 
     # Set inputs and defaults
-    pop_size = int(sim['pop_size']) # Shorten
+    n_agents = int(sim['n_agents']) # Shorten
     total_pop = None # Optionally created but always returned
 
     if verbose is None:
@@ -56,7 +56,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
     if popdict is None:
 
-        pop_size = int(sim['pop_size']) # Number of people
+        n_agents = int(sim['n_agents']) # Number of people
 
         # Load age data by country if available, or use defaults.
         # Other demographic data like mortality and fertility are also available by
@@ -75,7 +75,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     hpm.warn(warnmsg)
 
         total_pop = sum(age_data[:,2]) # Return the total population
-        uids, sexes, debuts, partners = set_static(pop_size, pars=sim.pars, sex_ratio=sex_ratio)
+        uids, sexes, debuts, partners = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
 
         # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
@@ -83,11 +83,11 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         age_data_range = age_data_max - age_data_min
         age_data_prob   = age_data[:,2]
         age_data_prob   /= age_data_prob.sum() # Ensure it sums to 1
-        age_bins        = hpu.n_multinomial(age_data_prob, pop_size) # Choose age bins
+        age_bins        = hpu.n_multinomial(age_data_prob, n_agents) # Choose age bins
         if dt_round_age:
             ages = age_data_min[age_bins] + np.random.randint(age_data_range[age_bins]/dt)*dt # Uniformly distribute within this age bin
         else:
-            ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(pop_size) # Uniformly distribute within this age bin
+            ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(n_agents) # Uniformly distribute within this age bin
 
         # Store output
         popdict = {}
@@ -123,16 +123,16 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     validate_popdict(popdict, sim.pars, verbose=verbose)
     people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
 
-    sc.printv(f'Created {pop_size} people, average age {people.age.mean():0.2f} years', 2, verbose)
+    sc.printv(f'Created {n_agents} agents, average age {people.age.mean():0.2f} years', 2, verbose)
 
     return people, total_pop
 
 
-def partner_count(pop_size=None, partner_pars=None):
+def partner_count(n_agents=None, partner_pars=None):
     '''
     Assign each person a preferred number of concurrent partners for each layer
     Args:
-        pop_size    (int)   : number of people
+        n_agents    (int)   : number of agents
         layer_keys  (list)  : list of layers
         means       (dict)  : dictionary keyed by layer_keys with mean number of partners per layer
         sample      (bool)  : whether or not to sample the number of partners
@@ -146,7 +146,7 @@ def partner_count(pop_size=None, partner_pars=None):
 
     # Set the number of partners
     for lkey,ppars in partner_pars.items():
-        p_count = hpu.sample(**ppars, size=pop_size) + 1
+        p_count = hpu.sample(**ppars, size=n_agents) + 1
         partners.append(p_count)
         
     return np.array(partners)
@@ -162,7 +162,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut           = np.full(new_n, np.nan, dtype=hpd.default_float)
     debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
-    partners        = partner_count(pop_size=new_n, partner_pars=pars['partners'])
+    partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
     return uid, sex, debut, partners
 
 
@@ -182,7 +182,7 @@ def validate_popdict(popdict, pars, verbose=True):
     # Check keys and lengths
     required_keys = ['uid', 'age', 'sex', 'debut']
     popdict_keys = popdict.keys()
-    pop_size = pars['pop_size']
+    n_agents = pars['n_agents']
     for key in required_keys:
 
         if key not in popdict_keys:
@@ -190,8 +190,8 @@ def validate_popdict(popdict, pars, verbose=True):
             sc.KeyNotFoundError(errormsg)
 
         actual_size = len(popdict[key])
-        if actual_size != pop_size:
-            errormsg = f'Could not use supplied popdict since key {key} has length {actual_size}, but all keys must have length {pop_size}'
+        if actual_size != n_agents:
+            errormsg = f'Could not use supplied popdict since key {key} has length {actual_size}, but all keys must have length {n_agents}'
             raise ValueError(errormsg)
 
         isnan = np.isnan(popdict[key]).sum()
@@ -266,10 +266,10 @@ def make_contacts(p_count=None, lkey=None, current_partners=None, mixing=None, s
     m = [] # Initialize the male partners
 
     # Define indices; TODO fix or centralize this
-    pop_size        = len(sexes)
+    n_agents        = len(sexes)
     f_inds          = hpu.false(sexes)
     m_inds          = hpu.true(sexes)
-    all_inds        = np.arange(pop_size)
+    all_inds        = np.arange(n_agents)
 
     # Find active males and females
     f_active_inds = hpu.true((sexes == 0) * (ages > debuts))
@@ -332,7 +332,7 @@ def make_contacts(p_count=None, lkey=None, current_partners=None, mixing=None, s
 
     # Count how many contacts there actually are: will be different for males, should be the same for females
     unique, count = np.unique(np.concatenate([m, f]),return_counts=True)
-    actual_p_count = np.full(pop_size, 0, dtype=hpd.default_int)
+    actual_p_count = np.full(n_agents, 0, dtype=hpd.default_int)
     actual_p_count[unique] = count
 
     # Scale number of acts by age of couple

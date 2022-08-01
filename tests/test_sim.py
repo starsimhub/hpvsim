@@ -22,7 +22,7 @@ def test_microsim():
 
     sim = hpv.Sim()
     pars = {
-        'pop_size': 10,
+        'n_agents': 10,
         'init_hpv_prev': .1,
         'n_years': 2,
         }
@@ -47,7 +47,7 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     hpv18 = hpv.genotype('HPV18')
 
     pars = {
-        'pop_size': 50e3,
+        'n_agents': 50e3,
         'start': 1990,
         'burnin': 30,
         'end': 2030,
@@ -130,16 +130,16 @@ def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
-    sim = hpv.Sim(pop_size=100, label='test_label')
+    sim = hpv.Sim(n_agents=100, label='test_label')
     sim.reset_layer_pars()
     sim.initialize()
     sim.reset_layer_pars()
 
     # Test validation
-    sim['pop_size'] = 'invalid'
+    sim['n_agents'] = 'invalid'
     with pytest.raises(ValueError):
         sim.validate_pars()
-    sim['pop_size'] = 100 # Restore
+    sim['n_agents'] = 100 # Restore
 
     # Handle missing start
     sim['start'] = None
@@ -191,10 +191,10 @@ def test_result_consistency():
     ''' Check that results by subgroup sum to the correct totals'''
 
     # Create sim
-    pop_size = 10e3
+    n_agents = 10e3
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
-    sim = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, genotypes=[hpv16,hpv18], label='test_results')
+    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, genotypes=[hpv16,hpv18], label='test_results')
     sim.run()
 
     # Check that infections by genotype sum up the the correct totals
@@ -220,7 +220,7 @@ def test_result_consistency():
     assert ((sim.results['cancers_by_age'][:].sum(axis=0)-sim.results['cancers'][:])<1e-3).all()
 
     # Check demographics
-    assert (sim['pop_size'] == pop_size)
+    assert (sim['n_agents'] == n_agents)
 
     # Check that males don't have CINs or cancers
     import hpvsim.utils as hpu
@@ -257,8 +257,8 @@ def test_location_loading():
 def test_resuming():
     sc.heading('Test that resuming a run works')
 
-    pop_size = 10e3
-    s0 = hpv.Sim(pop_size=pop_size, n_years=10, dt=0.5, label='test_resume')
+    n_agents = 10e3
+    s0 = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, label='test_resume')
     s1 = s0.copy()
     s0.run()
 
@@ -297,13 +297,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
+    # sim4 = test_result_consistency()
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
 
     sc.toc(T)
     print('Done.')

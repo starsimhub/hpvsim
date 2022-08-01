@@ -34,7 +34,7 @@ class People(hpb.BasePeople):
     Please see the BasePeople class for additional methods.
 
     Args:
-        pars (dict): the sim parameters, e.g. sim.pars -- alternatively, if a number, interpreted as pop_size
+        pars (dict): the sim parameters, e.g. sim.pars -- alternatively, if a number, interpreted as n_agents
         strict (bool): whether or not to only create keys that are already in self.meta.person; otherwise, let any key be set
         kwargs (dict): the actual data, e.g. from a popdict, being specified
 
@@ -66,47 +66,47 @@ class People(hpb.BasePeople):
         # Set person properties -- all floats except for UID
         for key in self.meta.person:
             if key == 'uid':
-                self[key] = np.arange(self.pars['pop_size'], dtype=hpd.default_int)
+                self[key] = np.arange(self.pars['n_agents'], dtype=hpd.default_int)
             elif key in ['partners', 'current_partners']:
-                self[key] = np.full((self.pars['n_partner_types'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
+                self[key] = np.full((self.pars['n_partner_types'], self.pars['n_agents']), np.nan, dtype=hpd.default_float)
             else:
-                self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
+                self[key] = np.full(self.pars['n_agents'], np.nan, dtype=hpd.default_float)
 
         # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
         for key in self.meta.states:
             if key in ['cancerous', 'dead_other', 'vaccinated', 'screened', 'treated', 'detected_cancer', 'dead_cancer']: # ALl false at the beginning
-                self[key] = np.full(self.pars['pop_size'], False, dtype=bool)
+                self[key] = np.full(self.pars['n_agents'], False, dtype=bool)
             elif key == 'cancer_genotype':
-                self[key] = np.full(self.pars['pop_size'], -1, dtype=hpd.default_int)
+                self[key] = np.full(self.pars['n_agents'], -1, dtype=hpd.default_int)
             elif key == 'alive':  # All true at the beginning
-                self[key] = np.full(self.pars['pop_size'], True, dtype=bool)
+                self[key] = np.full(self.pars['n_agents'], True, dtype=bool)
             elif key == 'susceptible':
-                self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), True, dtype=bool)
+                self[key] = np.full((self.pars['n_genotypes'], self.pars['n_agents']), True, dtype=bool)
             else:
-                self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), False, dtype=bool)
+                self[key] = np.full((self.pars['n_genotypes'], self.pars['n_agents']), False, dtype=bool)
 
         # Set dates and durations -- both floats
         for key in self.meta.dates + self.meta.durs:
             if key in ['date_dead_other', 'date_cancerous', 'date_detected_cancer', 'date_dead_cancer',
                        'date_vaccinated','date_screened', 'date_next_screen', 'date_treated']:
-                self[key] = np.full(self.pars['pop_size'], np.nan, dtype=hpd.default_float)
+                self[key] = np.full(self.pars['n_agents'], np.nan, dtype=hpd.default_float)
             else:
-                self[key] = np.full((self.pars['n_genotypes'], self.pars['pop_size']), np.nan, dtype=hpd.default_float)
+                self[key] = np.full((self.pars['n_genotypes'], self.pars['n_agents']), np.nan, dtype=hpd.default_float)
 
         # Set genotype states, which store info about which genotype a person is exposed to
         for key in self.meta.imm_states:  # Everyone starts out with no immunity; TODO, reconsider this
             if key == 't_imm_event':
-                self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_int)
+                self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_int)
             else:
-                self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_float)
+                self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_float)
         for key in self.meta.intv_states:
-            self[key] = np.zeros(self.pars['pop_size'], dtype=hpd.default_int)
+            self[key] = np.zeros(self.pars['n_agents'], dtype=hpd.default_int)
 
         # Store relationship information
         nk = self.pars['n_partner_types']
-        self.rship_start_dates  = np.full((nk,self.pars['pop_size']), np.nan, dtype=hpd.default_float)
-        self.rship_end_dates    = np.full((nk,self.pars['pop_size']), np.nan, dtype=hpd.default_float)
-        self.n_rships           = np.full((nk,self.pars['pop_size']), 0, dtype=hpd.default_int)
+        self.rship_start_dates  = np.full((nk,self.pars['n_agents']), np.nan, dtype=hpd.default_float)
+        self.rship_end_dates    = np.full((nk,self.pars['n_agents']), np.nan, dtype=hpd.default_float)
+        self.n_rships           = np.full((nk,self.pars['n_agents']), 0, dtype=hpd.default_int)
         self.lag_bins = np.linspace(0,50,51)
         self.rship_lags = dict()
         for lkey in self.layer_keys():
@@ -538,7 +538,7 @@ class People(hpb.BasePeople):
         uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
         pars = {
             'dt': self['dt'],
-            'pop_size': new_births,
+            'n_agents': new_births,
             'n_genotypes': self.pars['n_genotypes'],
             'n_imm_sources': self.pars['n_imm_sources'],
             'n_partner_types': self.pars['n_partner_types'],

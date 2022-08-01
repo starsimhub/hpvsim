@@ -21,7 +21,7 @@ def test_network(do_plot=True):
     sc.heading('Testing new network structure')
 
     n_agents = 50e3
-    pars = dict(pop_size=n_agents,
+    pars = dict(n_agents=n_agents,
                 start=1975,
                 n_years=50,
                 burnin=30,

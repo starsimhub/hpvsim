@@ -159,9 +159,9 @@ class Sim(hpb.BaseSim):
         self.pars['n_imm_sources'] = self.pars['n_genotypes'] + len(self.pars['vaccine_map'])
         for key in self.people.meta.imm_states:
             if key == 't_imm_event':
-                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_int)
+                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_int)
             else:
-                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_float)
+                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_float)
 
         return
 
@@ -174,7 +174,7 @@ class Sim(hpb.BaseSim):
         '''
 
         # Handle types
-        for key in ['pop_size']:
+        for key in ['n_agents']:
             try:
                 self[key] = int(self[key])
             except Exception as E:
@@ -488,7 +488,7 @@ class Sim(hpb.BaseSim):
             resetstr= ''
             if self.people:
                 resetstr = ' (resetting people)' if reset else ' (warning: not resetting sim.people)'
-            print(f'Initializing sim{resetstr} with {self["pop_size"]:0n} people')
+            print(f'Initializing sim{resetstr} with {self["n_agents"]:0n} agents')
         if self.popfile and self.popdict is None: # If there's a popdict, we initialize it
             self.load_population(init_people=False)
 
@@ -507,7 +507,7 @@ class Sim(hpb.BaseSim):
             if self['location'] is None or total_pop is None:
                 self['pop_scale'] = 1
             else:
-                self['pop_scale'] = total_pop/self['pop_size']
+                self['pop_scale'] = total_pop/self['n_agents']
 
         return self
 
