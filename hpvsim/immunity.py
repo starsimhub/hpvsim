@@ -114,6 +114,9 @@ def init_immunity(sim, create=False):
 
         sim['immunity'] = immunity
 
+    # Ensure a user-provided immunity matrix is the right type
+
+    sim['immunity'] = sim['immunity'].astype('float32')
     return
 
 

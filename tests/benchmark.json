@@ -4,7 +4,7 @@
     "run": 2.322
   },
   "parameters": {
-    "pop_size": 20000,
+    "n_agents": 20000,
     "n_genotypes": 2,
     "n_years": 40
   },

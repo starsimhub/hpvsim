@@ -159,9 +159,9 @@ class Sim(hpb.BaseSim):
         self.pars['n_imm_sources'] = self.pars['n_genotypes'] + len(self.pars['vaccine_map'])
         for key in self.people.meta.imm_states:
             if key == 't_imm_event':
-                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_int)
+                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_int)
             else:
-                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['pop_size']), dtype=hpd.default_float)
+                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_float)
 
         return
 
@@ -174,7 +174,7 @@ class Sim(hpb.BaseSim):
         '''
 
         # Handle types
-        for key in ['pop_size']:
+        for key in ['n_agents']:
             try:
                 self[key] = int(self[key])
             except Exception as E:
@@ -434,6 +434,7 @@ class Sim(hpb.BaseSim):
 
         # Cancer flows and stocks
         results['n_cancerous'] = init_res('Number with cancer', color=hpd.cancer_flow_colors[0](0.95))
+        results['n_cancerous_by_genotype'] = init_res('Number with cancer, by attributable genotype', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
         results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
         results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0](0.95))
@@ -441,10 +442,9 @@ class Sim(hpb.BaseSim):
         results['detected_cancers'] = init_res('Detected cancers', color=hpd.cancer_flow_colors[0](0.95))
         results['cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
         results['detected_cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
+        results['cancer_type_distribution'] = init_res('HPV type distribution in cancer', n_rows=ng, color=hpd.inci_colors[0](np.linspace(0.9,0.5,ng)))
 
         # Other results
-        results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
-        results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
         results['n_alive'] = init_res('Number alive')
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
         results['cdr'] = init_res('Crude death rate', scale=False)
@@ -486,7 +486,7 @@ class Sim(hpb.BaseSim):
             resetstr= ''
             if self.people:
                 resetstr = ' (resetting people)' if reset else ' (warning: not resetting sim.people)'
-            print(f'Initializing sim{resetstr} with {self["pop_size"]:0n} people')
+            print(f'Initializing sim{resetstr} with {self["n_agents"]:0n} agents')
         if self.popfile and self.popdict is None: # If there's a popdict, we initialize it
             self.load_population(init_people=False)
 
@@ -505,7 +505,7 @@ class Sim(hpb.BaseSim):
             if self['location'] is None or total_pop is None:
                 self['pop_scale'] = 1
             else:
-                self['pop_scale'] = total_pop/self['pop_size']
+                self['pop_scale'] = total_pop/self['n_agents']
 
         return self
 
@@ -658,9 +658,9 @@ class Sim(hpb.BaseSim):
             has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
             if len(has_imm):
                 hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
-            hpimm.check_immunity(people)
         else:
             people.imm = people.peak_imm
+        hpimm.check_immunity(people)
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
@@ -756,6 +756,12 @@ class Sim(hpb.BaseSim):
 
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
+
+            # Create cancer type distribution
+            ca_genotype_bins = np.bincount(people.cancer_genotype[people.cancer_genotype >= 0])
+            if len(ca_genotype_bins):
+                for g in range(len(ca_genotype_bins)):
+                    self.results['n_cancerous_by_genotype'][g,idx] = ca_genotype_bins[g]
 
             # Create total stocks
             for key in hpd.stock_keys:
@@ -950,6 +956,14 @@ class Sim(hpb.BaseSim):
         self.results['cin_incidence'][:]           = res['cins'][:] / demoninator
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
         self.results['detected_cancer_incidence'][:]      = res['detected_cancers'][:] / demoninator
+
+        # Compute cancer mortality. Denominator is all women alive with cancer
+        denominator = alive_females/scale_factor
+        self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
+
+        # Compute HPV type distribution. Denominator is all women with cancer
+        cinds = res['n_cancerous'][:]>0 # Indices where there is some cancer present
+        self.results['cancer_type_distribution'][:,cinds] = res['n_cancerous_by_genotype'][:,cinds]/res['n_cancerous'][cinds]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])

@@ -18,21 +18,8 @@ do_save = 0
 hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
 
-base_pars = {
-    'pop_size': 50e3,
-    'start': 1985,
-    'burnin': 30,
-    'end': 2050,
-    'genotypes': [hpv16, hpv18],
-    'location': 'tanzania',
-    'dt': .2,
-}
-
 
 #%% Define the tests
-
-
-
 def test_latency(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test latency')
 
@@ -43,12 +30,11 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
     n_agents = 50e3
 
     pars = {
-        'pop_size': n_agents,
+        'n_agents': n_agents,
         'n_years': 60,
         'burnin': 30,
         'start': 1970,
         'genotypes': [hpv16, hpv18],
-        'pop_scale' : 25.2e6 / n_agents,
         'location': 'tanzania',
         'dt': .2,
     }

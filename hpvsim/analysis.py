@@ -472,6 +472,7 @@ class age_results(Analyzer):
         # Handle dt - if we're storing annual results we'll need to aggregate them over
         # several consecutive timesteps
         self.dt = sim['dt']
+        self.resfreq = sim.resfreq
 
         self.validate_results(sim)
 
@@ -573,6 +574,7 @@ class age_results(Analyzer):
         attr = rname.replace('total_', '').replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
         if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
+        if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
         mapping = {
             'infections': ['date_infectious', 'infectious'],
@@ -622,13 +624,11 @@ class age_results(Analyzer):
                     if attr in sim.people.keys():
                         if 'total' in result:
                             inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
-                            self.results[result][date] = np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                           0] * scale  # Bin the people
+                            self.results[result][date] = np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
                         else:
                             for g in range(ng):
                                 inds = sim.people[attr][g, :].nonzero()
-                                self.results[result][date][g, :] = np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                                     0] * scale  # Bin the people
+                                self.results[result][date][g, :] = np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
 
                         if 'prevalence' in result:
                             # Need to divide by the right denominator
@@ -660,6 +660,7 @@ class age_results(Analyzer):
                             self.results[result][date] = self.results[result][date] / denom
 
                 self.date = date # Need to store the date for subsequent calcpoints
+                self.timepoint = sim.t # Need to store the timepoints for subsequent calcpoints
 
 
             # Both annual new cases and incidence require us to calculate the new cases over all
@@ -670,30 +671,38 @@ class age_results(Analyzer):
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
-                if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result:
+                if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result or 'mortality' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
                     if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
                         if result == 'detected_cancer_deaths':
                             inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
                         else:
                             inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
-                        self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                        0] * scale  # Bin the people
+                        self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
                             inds = ((sim.people[attr1][g, :] == sim.t) * (sim.people[attr2][g, :])).nonzero()
-                            self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                                  0] * scale  # Bin the people
+                            self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
 
-                    if 'incidence' in result:
-                        # Need to divide by the right denominator
-                        if 'hpv' in result:  # Denominator is susceptible population
-                            denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
-                        else:  # Denominator is females
-                            denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[
-                                         0] * scale) / 1e5  # CIN and cancer are per 100,000 women
-                        if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
-                        self.results[result][date] = self.results[result][date] / denom
+                    # Figure out if this is the last timepoint in the year we're calculating results for
+                    if sim.t == self.timepoint+self.resfreq-1:
+                        if 'incidence' in result:
+                            # Need to divide by the right denominator
+                            if 'hpv' in result:  # Denominator is susceptible population
+                                denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
+                            else:  # Denominator is females at risk for cancer
+                                denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous)], bins=result_dict.edges)[
+                                             0] * scale) / 1e5  # CIN and cancer are per 100,000 women
+                            if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
+                            self.results[result][date] = self.results[result][date] / denom
+
+                        if 'mortality' in result:
+                            # Need to divide by the right denominator
+                            # first need to find people who died of other causes today and add them back into denom
+                            denom = np.histogram(age[hpu.true(sim.people.is_female_alive)], bins=result_dict.edges)[0] * scale
+                            scale_factor =  1e5  # per 100,000 women
+                            denom /= scale_factor
+                            self.results[result][date] = self.results[result][date] / denom
 
 
     def finalize(self, sim):
@@ -894,24 +903,38 @@ class Calibration(Analyzer):
         for datafile in datafiles:
             self.target_data.append(hpm.load_data(datafile))
 
-        result_keys = sc.objdict()
+        sim_results = sc.objdict()
+        age_result_keys = sc.objdict()
 
+        # Go through each of the target keys and determine how we are going to get the results from sim
         for targ in self.target_data:
             targ_keys = targ.name.unique()
             if len(targ_keys) > 1:
                 errormsg = f'Only support one set of targets per datafile, {len(targ_keys)} provided'
                 raise ValueError(errormsg)
-            result_keys[targ_keys[0]] = sc.objdict(
-                datafile=sc.dcp(targ),
-                compute_fit=True,
-            )
+            if 'age' in targ.columns:
+                age_result_keys[targ_keys[0]] = sc.objdict(
+                    datafile=sc.dcp(targ),
+                    compute_fit=True,
+                )
+            else:
+                sim_results[targ_keys[0]] = sc.objdict(
+                    data=sc.dcp(targ)
+                )
 
-        ar = age_results(result_keys=result_keys)
+        ar = age_results(result_keys=age_result_keys)
         self.sim['analyzers'] += [ar]
         self.sim.initialize()
-        self.results_keys = result_keys.keys()
+        for rkey in sim_results.keys():
+            sim_results[rkey].timepoints = sim.get_t(sim_results[rkey].data.year.unique()[0], return_date_format='str')[0]//sim.resfreq
+            if 'weights' not in sim_results[rkey].data.columns:
+                sim_results[rkey].weights = np.ones(len(sim_results[rkey].data))
+        self.age_results_keys = age_result_keys.keys()
+        self.sim_results = sim_results
+        self.sim_results_keys = sim_results.keys()
+
         self.result_properties = sc.objdict()
-        for rkey in self.results_keys:
+        for rkey in self.age_results_keys + self.sim_results_keys:
             self.result_properties[rkey] = sc.objdict()
             self.result_properties[rkey].name = self.sim.results[rkey].name
             self.result_properties[rkey].color = self.sim.results[rkey].color
@@ -926,11 +949,6 @@ class Calibration(Analyzer):
         # Set regular sim pars
         if calib_pars is not None:
             valid_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
-            if 'prognoses' in valid_pars.keys():
-                sim_progs = hppar.get_prognoses()
-                for prog_key, prog_val in valid_pars['prognoses'].items():
-                    sim_progs[prog_key] = np.array(prog_val)
-                valid_pars['prognoses'] = sim_progs
             sim.update_pars(valid_pars)
             if len(valid_pars) != len(calib_pars):
                 extra = set(calib_pars.keys()) - set(valid_pars.keys())
@@ -1017,9 +1035,25 @@ class Calibration(Analyzer):
 
         sim = self.run_sim(calib_pars, genotype_pars, return_sim=True)
         # trial.set_user_attr('sim', sim) # CK: fails since not a JSON, could use sc.jsonpickle()
+        # Extract results we are calibrating to, a combination of by-age and sim-results
+        # First check for by-age results
         r = sim.get_analyzer().results
         r = sc.jsonify(r)
         trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
+
+        # Now compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
+        sim_results = sc.objdict()
+        for rkey in self.sim_results:
+            self.sim_results[rkey].model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
+            self.sim_results[rkey].diffs = self.sim_results[rkey].data.value - self.sim_results[rkey].model_output
+            self.sim_results[rkey].gofs = hpm.compute_gof(self.sim_results[rkey].data.value, self.sim_results[rkey].model_output)
+            self.sim_results[rkey].losses = self.sim_results[rkey].gofs * self.sim_results[rkey].weights
+            self.sim_results[rkey].mismatch = self.sim_results[rkey].losses.sum()
+            sim.fit += self.sim_results[rkey].mismatch
+            sim_results[rkey] = self.sim_results[rkey].model_output
+
+        sim_results = sc.jsonify(sim_results)
+        trial.set_user_attr('sim_results', sim_results)
         sim.shrink() # CK: Proof of principle only!!
         trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
         return sim.fit
@@ -1110,8 +1144,11 @@ class Calibration(Analyzer):
         self.glabels = [g['label'] for g in sim['pars']['genotypes']]
 
         self.analyzer_results = []
+        self.sim_results = []
         for trial in self.study.trials:
             r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
+            sim_results = trial.user_attrs['sim_results']
+            self.sim_results.append(sim_results)
             self.analyzer_results.append(r)
 
         # Compare the results
@@ -1229,23 +1266,26 @@ class Calibration(Analyzer):
         all_args = sc.mergedicts(fig_args, axis_args, d_args)
 
         # Get rows and columns
-        if not len(self.analyzer_results):
-            errormsg = f'Cannot plot since no age results were recorded)'
+        if not len(self.analyzer_results) and not len(self.sim_results):
+            errormsg = f'Cannot plot since no results were recorded)'
             raise ValueError(errormsg)
         else:
             all_dates = [[date for date in r.keys() if date != 'bins'] for r in self.analyzer_results[0].values()]
             dates_per_result = [len(date_list) for date_list in all_dates]
-            n_plots = sum(dates_per_result)
+            other_results = len(self.sim_results[0].keys())
+            n_plots = sum(dates_per_result) + other_results
             n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Initialize
         fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
+        for ax in axes.flat[n_plots:]:
+            ax.set_visible(False)
         axes = axes.flatten()
         pl.subplots_adjust(**axis_args)
 
         # Pull out attributes that don't vary by run
         age_labels = sc.objdict()
-        for resname,resdict in zip(self.results_keys, self.analyzer_results[0].values()):
+        for resname,resdict in zip(self.age_results_keys, self.analyzer_results[0].values()):
             age_labels[resname] = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
             age_labels[resname].append(str(int(resdict['bins'][-1])) + '+')
 
@@ -1253,7 +1293,7 @@ class Calibration(Analyzer):
         with hpo.with_style(**kwargs):
 
             plot_count = 0
-            for rn, resname in enumerate(self.results_keys):
+            for rn, resname in enumerate(self.age_results_keys):
                 x = np.arange(len(age_labels[resname]))  # the label locations
 
                 for date in all_dates[rn]:
@@ -1303,9 +1343,34 @@ class Calibration(Analyzer):
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_properties[resname].name+', '+ date)
+                    ax.set_title(self.result_properties[resname].name+', '+ date.replace('.0', ''))
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
+
+            for rn, resname in enumerate(self.sim_results_keys):
+                x = np.arange(len(self.glabels))
+                ax = axes[plot_count]
+                bins = []
+                values = []
+                thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
+                ydata = np.array(thisdatadf.value)
+                ax.scatter(x, ydata, color=self.result_properties[resname].color[0], marker='s', label=f'Data')
+
+                # Construct a dataframe with things in the most logical order for plotting
+                for run_num, run in enumerate(self.sim_results):
+                    bins += x.tolist()
+                    values += run[resname]
+                # Plot model
+                modeldf = pd.DataFrame({'bins': bins, 'values': values})
+                ax = plot_type(ax=ax, x='bins', y='values', data=modeldf, dodge=True, boxprops=dict(alpha=.3))
+
+                # Set title and labels
+                date = thisdatadf.year[0]
+                ax.set_xlabel('Genotype')
+                ax.set_title(self.result_properties[resname].name + ', ' + str(date))
+                ax.legend()
+                ax.set_xticks(x, self.glabels)
+                plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
