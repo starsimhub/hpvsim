@@ -34,86 +34,133 @@ else:
 
 #%% Define all properties of people
 
+class State():
+    def __init__(self, name, dtype, fill_value=None, shape=None):
+        """
+
+        :param name:
+        :param dtype:
+        :param fill_value:
+        :param shape: If not none, set to match a string in `pars` containing the dimensionality e.g., `n_genotypes`)
+
+        """
+        self.name = name
+        self.dtype = dtype
+        self.fill_value = fill_value
+        self.shape = shape
+
+    def new(self, pars, n):
+        array_shape = n if self.shape is None else (pars[self.shape], n)
+
+        if self.fill_value is None:
+            return np.empty(array_shape, dtype=self.dtype)
+        elif self.fill_value == 0:
+            return np.zeros(array_shape, dtype=self.dtype)
+        else:
+            return np.full(array_shape, dtype=self.dtype, fill_value=self.fill_value)
+
+
 class PeopleMeta(sc.prettyobj):
     ''' For storing all the keys relating to a person and people '''
 
-    def __init__(self):
+    # (attribute, nrows, dtype, default value)
+    # If the default value is None, then the array will not be initialized - this is faster and can
+    # be used for variables where the People object explicitly supplies the values e.g. age
 
-        # Set the properties of a person
-        self.person = [
-            'uid',              # Int
-            'age',              # Float
-            'sex',              # Float
-            'death_age',        # Float
-            'debut',            # Float
-            'partners',         # Int by relationship type
-            'current_partners', # Int by relationship type
-        ]
+    # Set the properties of a person
+    person = [
+        State('uid',default_int),              # Int
+        State('age',default_float),            # Float
+        State('sex',default_int),              # Float
+        State('debut',default_float),         # Float
+        State('partners', default_int, shape='n_partner_types'),  # Int by relationship type
+        State('current_partners', default_int, 0, 'n_partner_types'),  # Int by relationship type
+    ]
 
-        # Set the states that a person can be in, all booleans per person and per genotype except cancerous, detected_cancer, cancer_genotype, dead_cancer, other_dead, screened, vaccinated, treated
-        self.states = [
-            'susceptible',
-            'infectious',
-            'hpv', # hpv in absence of any CIN
-            'cin1',
-            'cin2',
-            'cin3',
-            'cin',
-            'cancerous',
-            'detected_cancer',
-            'cancer_genotype',
-            'latent',
-            'alive', # Save this as a state so we can record population sizes
-            'dead_cancer',
-            'dead_other',  # Dead from all other causes
-            'vaccinated',
-            'screened',
-            'treated',
-        ]
+    # Set the states that a person can be in, all booleans per person and per genotype except cancerous, detected_cancer, cancer_genotype, dead_cancer, other_dead, screened, vaccinated, treated
+    states = [
+        State('susceptible', bool, True, 'n_genotypes'),
+        State('infectious', bool, False, 'n_genotypes'),
+        State('hpv', bool, False, 'n_genotypes'), # hpv in absence of any CIN
+        State('cin1', bool, False, 'n_genotypes'),
+        State('cin2', bool, False, 'n_genotypes'),
+        State('cin3', bool, False, 'n_genotypes'),
+        State('cin', bool, False, 'n_genotypes'),
+        State('cancerous', bool, False),
+        State('detected_cancer', bool, False),
+        State('cancer_genotype', default_int, -1),
+        State('latent', bool, False,'n_genotypes'),
+        State('alive', bool, True), # Save this as a state so we can record population sizes
+        State('dead_cancer', bool, False),
+        State('dead_other', bool, False),  # Dead from all other causes
+        State('vaccinated', bool, False),
+        State('screened', bool, False),
+        State('treated', bool, False)
+    ]
 
-        # Immune states, by genotype/vaccine
-        self.imm_states = [
-            'sus_imm',  # Float, by genotype
-            'peak_imm',  # Float, peak level of immunity
-            'imm',  # Float, current immunity level
-            't_imm_event',  # Int, time since immunity event
-        ]
+    # Set genotype states, which store info about which genotype a person is exposed to
 
-        # Additional intervention states
-        self.intv_states = [
-            'doses',  # Number of doses given per person
-            'vaccine_source',  # index of vaccine that individual received
-            'screens', # Number of screens given per person
-        ]
+    # Immune states, by genotype/vaccine
+    imm_states = [
+        State('sus_imm', default_float, 0,'n_imm_sources'),  # Float, by genotype
+        State('peak_imm', default_float, 0,'n_imm_sources'),  # Float, peak level of immunity
+        State('imm', default_float, 0,'n_imm_sources'),  # Float, current immunity level
+        State('t_imm_event', default_int, 0,'n_imm_sources'),  # Int, time since immunity event
+    ]
 
-        # Relationship states
-        self.rship_states = [
-            'rship_start_dates',
-            'rship_end_dates',
-            'n_rships'
-        ]
+    # Additional intervention states
+    intv_states = [
+        State('doses',default_int, 0),  # Number of doses given per person
+        State('vaccine_source',default_int, 0),  # index of vaccine that individual received
+        State('screens',default_int, 0),  # Number of screens given per person
+    ]
 
-        self.dates = [f'date_{state}' for state in self.states if state != 'alive'] # Convert each state into a date
-        self.dates += ['date_clearance', 'date_next_screen']
+    # Relationship states
+    rship_states = [
+        State('rship_start_dates', default_float, np.nan, shape='n_partner_types'),
+        State('rship_end_dates', default_float, np.nan, shape='n_partner_types'),
+        State('n_rships', default_int, 0, shape='n_partner_types'),
+    ]
 
-        # Duration of different states: these are floats per person -- used in people.py
-        self.durs = [
-            'dur_hpv', # Length of time that a person has HPV before progressing to CIN
-            'dur_disease', # Length of time that a person has >= HPV present
-            'dur_none2cin1', # Length of time to go from no dysplasia to CIN1
-            'dur_cin12cin2', # Length of time to go from CIN1 to CIN2
-            'dur_cin22cin3', # Length of time to go from CIN2 to CIN3
-            'dur_cin2cancer',# Length of time to go from CIN3 to cancer
-            'dur_cancer',  # Duration of cancer
-        ]
+    dates = [State(f'date_{state.name}', default_float, shape=state.shape) for state in states if state != 'alive']  # Convert each state into a date
 
-        self.all_states = self.person + self.states + self.imm_states + self.intv_states + \
-                          self.dates + self.durs + self.rship_states
+    dates += [
+        State('date_clearance', default_float, np.nan, shape='n_genotypes'),
+        State('date_next_screen', default_float, 0),
+    ]
 
+    # Duration of different states: these are floats per person -- used in people.py
+    durs = [
+        State('dur_hpv', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV before progressing to CIN
+        State('dur_disease', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has >= HPV present
+        State('dur_none2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
+        State('dur_cin12cin2', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN1 to CIN2
+        State('dur_cin22cin3', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN2 to CIN3
+        State('dur_cin2cancer', default_float, np.nan, shape='n_genotypes'),# Length of time to go from CIN3 to cancer
+        State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
+    ]
+
+    all_states = person + states + imm_states + intv_states + dates + durs + rship_states
+
+    @classmethod
+    def validate(cls):
+        """
+        Check that states are valid
+
+        This check should be performed when PeopleMeta is consumed (i.e., typically in the People() constructor)
+        so that any run-time modifications to the states by the end user get accounted for in validation
+
+        Presently, the only validation check is that the state names are unique, but in principle other
+        aspects of the states could be checked too
+
+        :return: None if states are valid
+        :raises: ValueError if states are not valid
+
+        """
         # Validate
-        self.state_types = ['person', 'states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
-        for state_type in self.state_types:
-            states = getattr(self, state_type)
+        state_types = ['person', 'states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
+        for state_type in state_types:
+            states = getattr(cls, state_type)
             n_states        = len(states)
             n_unique_states = len(set(states))
             if n_states != n_unique_states: # pragma: no cover
