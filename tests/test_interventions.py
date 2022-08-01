@@ -196,7 +196,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
-    debug = 0
+    debug = 1
     n_agents = 50e3
 
     pars = {
@@ -214,18 +214,18 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     compliance = .9
     cancer_compliance = 0.2
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=5, timepoints='2010',
+                                  screen_stop_age=50, screen_interval=5, screen_start_year='2010',
                                   screen_compliance=screen_prop, triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
-
-    hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
+    screen_prop = [.015, .025, .05, .1, .2, .3, 0.4, .5, .6, .7]
+    hpv_screening_scaleup = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
+                                  screen_stop_age=50, screen_interval=10, screen_start_year='2010', label='hpv primary, via triage',
                                   screen_compliance=screen_prop, triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
-    hpv_hpv1618_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='hpv1618', treatment='via_triage',
-                                        screen_start_age=30,screen_stop_age=50, screen_interval=10, timepoints='2010',
-                                        label='hpv primary, hpv1618 triage', screen_compliance=screen_prop,
-                                          triage_compliance=compliance, cancer_compliance=cancer_compliance)
+    # hpv_hpv1618_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='hpv1618', treatment='via_triage',
+    #                                     screen_start_age=30,screen_stop_age=50, screen_interval=10, screen_start_year='2010',
+    #                                     label='hpv primary, hpv1618 triage', screen_compliance=screen_prop,
+    #                                       triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
 
     az = hpv.age_results(
@@ -246,23 +246,23 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     # Define the scenarios
     scenarios = {
-        'no_screening_rsa': {
-            'name': 'No screening',
-            'pars': {
-            }
-        },
-        'hpv_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-            'pars': {
-                'interventions': [hpv_screening],
-            }
-        },
-        # 'hpv_via_screening': {
-        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_via_screening.label}',
+        # 'no_screening_rsa': {
+        #     'name': 'No screening',
         #     'pars': {
-        #         'interventions': [hpv_via_screening],
         #     }
         # },
+        # 'hpv_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
+        #     'pars': {
+        #         'interventions': [hpv_screening],
+        #     }
+        # },
+        'hpv_screening_scaleup': {
+            'name': f'Screen scaleup from{screen_prop[0] * 100}% to {screen_prop[-1] * 100}% of 30-50y women with {hpv_screening_scaleup.label}',
+            'pars': {
+                'interventions': [hpv_screening_scaleup],
+            }
+        },
         # 'hpv_hpv1618_screening': {
         #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
         #     'pars': {
@@ -287,6 +287,9 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
             ],
             'Cancers per 100,000 women': [
                 'cancer_incidence',
+            ],
+            'Screened': [
+                'screened',
             ],
         }
         scens.plot(to_plot=to_plot)
@@ -372,7 +375,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
                 'total_cin_prevalence',
             ],
             'Cancers per 100,000 women': [
-                'total_cancer_incidence',
+                'cancer_incidence',
             ],
         }
         scens.plot(to_plot=to_plot)
@@ -389,7 +392,7 @@ if __name__ == '__main__':
     # sim0 = test_dynamic_pars()
     scens1 = test_vaccinate_prob(do_plot=True)
     # scens2 = test_vaccinate_num(do_plot=True)
-    # scens3 = test_screening(do_plot=True)
+    scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True)
 
     sc.toc(T)

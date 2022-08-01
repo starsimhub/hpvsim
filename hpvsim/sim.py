@@ -749,7 +749,8 @@ class Sim(hpb.BaseSim):
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
-
+        for key,count in people.intv_flows.items():
+            self.results[key][idx] += count
         for key,count in people.by_age_flows.items():
             self.results[key][:,idx] += count
 
