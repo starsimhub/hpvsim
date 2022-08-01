@@ -208,16 +208,16 @@ class People(hpb.BasePeople):
 
             # Intialize storage
             new_pships[lkey] = dict()
-            new_pship_probs = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship. This will be used for males, and for females if no layer_probs are provided
-            new_pship_probs[~self.is_active] *= 0  # Blank out people not yet active
-            underpartnered = (self.current_partners[lno, :] < self.partners[lno,:]) + (np.isnan(self.current_partners[lno,:])*self.is_active)  # Whether or not people are underpartnered in this layer, also selects newly active people
-            new_pship_probs[underpartnered] *= pref_weight  # Increase weight for those who are underpartnerned
+            new_pship_probs = np.zeros(len(self)) # Begin by assigning everyone equal probability of forming a new relationship. This will be used for males, and for females if no layer_probs are provided
+            new_pship_probs[self.is_active] = 1  # Blank out people not yet active
+            underpartnered = self.is_active & (self.current_partners[lno, :] < self.partners[lno,:])
+            new_pship_probs[underpartnered] = pref_weight  # Increase weight for those who are underpartnerned
 
             if layer_probs is not None: # If layer probabilities have been provided, we use them to select females by age
                 bins = layer_probs[lkey][0, :] # Extract age bins
                 other_layers = np.delete(np.arange(len(self.layer_keys())),lno) # Indices of all other layers but this one
                 already_partnered = (self.current_partners[other_layers,:]>0).sum(axis=0) # Whether or not people already partnered in other layers
-                f_eligible = self.is_active * self.is_female * ~already_partnered * underpartnered # Females who are underpartnered in this layer and aren't already partnered in other layers are eligible to be selected
+                f_eligible = self.is_female & ~already_partnered & underpartnered # Females who are underpartnered in this layer and aren't already partnered in other layers are eligible to be selected
                 f_eligible_inds = hpu.true(f_eligible)
                 age_bins_f = np.digitize(self.age[f_eligible_inds], bins=bins) - 1  # Age bins of eligible females
                 bin_range_f = np.unique(age_bins_f)  # Range of bins

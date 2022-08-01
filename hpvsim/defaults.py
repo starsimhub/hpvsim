@@ -74,7 +74,7 @@ class PeopleMeta(sc.prettyobj):
         State('sex',default_float, np.nan),              # Float
         State('debut',default_float, np.nan),         # Float
         State('partners', default_float, np.nan, shape='n_partner_types'),  # Int by relationship type
-        State('current_partners', default_float, np.nan, 'n_partner_types'),  # Int by relationship type
+        State('current_partners', default_float, 0, 'n_partner_types'),  # Int by relationship type
     ]
 
     # Set the states that a person can be in, all booleans per person and per genotype except cancerous, detected_cancer, cancer_genotype, dead_cancer, other_dead, screened, vaccinated, treated
