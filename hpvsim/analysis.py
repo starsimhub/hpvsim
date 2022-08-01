@@ -1244,12 +1244,13 @@ class Calibration(Analyzer):
             return json
 
 
-    def plot(self, fig_args=None, axis_args=None, data_args=None, do_save=None,
+    def plot(self, top_results=None, fig_args=None, axis_args=None, data_args=None, do_save=None,
              fig_path=None, do_show=True, plot_type=sns.boxplot, **kwargs):
         '''
         Plot the calibration results
 
         Args:
+            top_results (int): number of results to plot. if None, plot them all
             fig_args (dict): passed to pl.figure()
             axis_args (dict): passed to pl.subplots_adjust()
             data_args (dict): 'width', 'color', and 'offset' arguments for the data
@@ -1288,6 +1289,13 @@ class Calibration(Analyzer):
         for resname,resdict in zip(self.age_results_keys, self.analyzer_results[0].values()):
             age_labels[resname] = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
             age_labels[resname].append(str(int(resdict['bins'][-1])) + '+')
+
+        # determine how many results to plot
+        if top_results is not None:
+            self.df = self.df.sort_values(by=['mismatch'])
+            index_to_plot = self.df.iloc[0:top_results, 0].values
+            self.analyzer_results = [self.analyzer_results[i] for i in index_to_plot]
+            self.sim_results = [self.sim_results[i] for i in index_to_plot]
 
         # Make the figure
         with hpo.with_style(**kwargs):
