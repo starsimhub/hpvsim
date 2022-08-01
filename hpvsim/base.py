@@ -1386,6 +1386,9 @@ class BasePeople(FlexPretty):
         ''' Returns keys for different states of a person (e.g., symptomatic) '''
         return [state.name for state in self.meta.imm_states]
 
+    def intv_keys(self):
+        return [state.name for state in self.meta.intv_states]
+
     def date_keys(self):
         ''' Returns keys for different event dates (e.g., date a person became symptomatic) '''
         return [state.name for state in self.meta.dates]
