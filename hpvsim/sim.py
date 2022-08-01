@@ -963,7 +963,7 @@ class Sim(hpb.BaseSim):
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution. Denominator is all women with cancer
-        self.results['cancer_type_distribution'][:] = res['n_cancerous_by_genotype'][:]/res['n_cancerous'][:]
+        self.results['cancer_type_distribution'][:] = sc.safedivide(res['n_cancerous_by_genotype'][:],res['n_cancerous'][:])
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])
