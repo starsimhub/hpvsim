@@ -36,10 +36,10 @@ def test_age_pyramids(do_plot=True):
     sc.heading('Testing age pyramids')
 
     n_agents = 50e3
-    pars = dict(pop_size=n_agents, start=2000, n_years=30, dt=0.5)
+    pars = dict(n_agents=n_agents, start=2000, n_years=30, dt=0.5)
 
     # Loop over countries and their population sizes in the year 2000
-    for country,total_pop in zip(['south_africa', 'australia'], [45e6,17e6]):
+    for country in ['south_africa', 'australia']:
 
         age_pyr = hpv.age_pyramid(
             timepoints=['2010', '2020'],
@@ -49,7 +49,6 @@ def test_age_pyramids(do_plot=True):
         sim = hpv.Sim(
             pars,
             location = country.replace('_',' '),
-            pop_scale=total_pop/n_agents,
             analyzers=age_pyr)
 
         sim.run()
@@ -67,7 +66,7 @@ def test_age_results(do_plot=True):
     sc.heading('Testing by-age results')
 
     n_agents = 50e3
-    pars = dict(pop_size=n_agents, pop_scale=25e6/n_agents, start=1980, n_years=40, dt=0.5, location='south africa')
+    pars = dict(n_agents=n_agents, start=1980, n_years=40, dt=0.5, location='south africa')
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
 
@@ -114,7 +113,7 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(pop_size=50e3, pop_scale=36.8e6/20e3, start=1980, end=2020, dt=0.5, location='south africa',
+    pars = dict(n_agents=50e3, start=1980, end=2020, dt=0.5, location='south africa',
                 init_hpv_dist=dict(
                     hpv16=0.9,
                     hpv18=0.1
@@ -154,10 +153,10 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    # people      = test_snapshot()
-    # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
-    sim2, calib = test_calibration()
+    people      = test_snapshot()
+    sim0, a0    = test_age_pyramids()
+    sim1, a1    = test_age_results()
+    # sim2, calib = test_calibration()
 
 
 

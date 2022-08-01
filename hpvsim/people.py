@@ -143,9 +143,6 @@ class People(hpb.BasePeople):
             else:
                 self[key] = value
 
-        if 'death_age' in kwargs:
-            self.date_dead_other = ((self.death_age-self.age)/self.pars['dt']).astype(int)
-
         return
 
 
