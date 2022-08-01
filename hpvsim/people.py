@@ -173,7 +173,7 @@ class People(hpb.BasePeople):
         self.total_flows['total_cins']  = self.flows['cins'].sum()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
-        self.sus_pool = self.susceptible.nonzero()
+        self.sus_pool = self.susceptible.all(axis=0) # True for people with no infection at the start of the timestep
 
         return
 
