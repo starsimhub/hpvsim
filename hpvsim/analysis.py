@@ -472,6 +472,7 @@ class age_results(Analyzer):
         # Handle dt - if we're storing annual results we'll need to aggregate them over
         # several consecutive timesteps
         self.dt = sim['dt']
+        self.resfreq = sim.resfreq
 
         self.validate_results(sim)
 
@@ -623,13 +624,11 @@ class age_results(Analyzer):
                     if attr in sim.people.keys():
                         if 'total' in result:
                             inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
-                            self.results[result][date] = np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                           0] * scale  # Bin the people
+                            self.results[result][date] = np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
                         else:
                             for g in range(ng):
                                 inds = sim.people[attr][g, :].nonzero()
-                                self.results[result][date][g, :] = np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                                     0] * scale  # Bin the people
+                                self.results[result][date][g, :] = np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
 
                         if 'prevalence' in result:
                             # Need to divide by the right denominator
@@ -661,6 +660,7 @@ class age_results(Analyzer):
                             self.results[result][date] = self.results[result][date] / denom
 
                 self.date = date # Need to store the date for subsequent calcpoints
+                self.timepoint = sim.t # Need to store the timepoints for subsequent calcpoints
 
 
             # Both annual new cases and incidence require us to calculate the new cases over all
@@ -682,9 +682,10 @@ class age_results(Analyzer):
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
                             inds = ((sim.people[attr1][g, :] == sim.t) * (sim.people[attr2][g, :])).nonzero()
-                            self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[
-                                                                  0] * scale  # Bin the people
-                    if sim.t == result_dict.calcpoints[-1]:
+                            self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
+
+                    # Figure out if this is the last timepoint in the year we're calculating results for
+                    if sim.t == self.timepoint+self.resfreq-1:
                         if 'incidence' in result:
                             # Need to divide by the right denominator
                             if 'hpv' in result:  # Denominator is susceptible population
@@ -698,8 +699,7 @@ class age_results(Analyzer):
                         if 'mortality' in result:
                             # Need to divide by the right denominator
                             # first need to find people who died of other causes today and add them back into denom
-                            denom = np.histogram(age[hpu.true(sim.people.is_female_alive)], bins=result_dict.edges)[
-                                         0] * scale
+                            denom = np.histogram(age[hpu.true(sim.people.is_female_alive)], bins=result_dict.edges)[0] * scale
                             scale_factor =  1e5  # per 100,000 women
                             denom /= scale_factor
                             self.results[result][date] = self.results[result][date] / denom

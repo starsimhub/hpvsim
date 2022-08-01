@@ -14,7 +14,6 @@ import hpvsim as hpv
 do_plot = 1
 do_save = 0
 
-
 #%% Define the tests
 def test_network(do_plot=True):
 
