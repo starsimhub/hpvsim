@@ -259,10 +259,10 @@ class People(hpb.BasePeople):
                     new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
 
                 # Increment the number of current partners
-                new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
-                self.current_partners[lno,new_pship_inds] += 1
+                new_pship_inds, counts = hpu.unique(np.concatenate([new_pship_inds_f, new_pship_inds_m]))
+                self.current_partners[lno, new_pship_inds] += counts
                 self.rship_start_dates[lno,new_pship_inds] = self.t
-                self.n_rships[lno,new_pship_inds] += 1
+                self.n_rships[lno,new_pship_inds] += counts
                 lags = self.rship_start_dates[lno,new_pship_inds] - self.rship_end_dates[lno,new_pship_inds]
                 self.rship_lags[lkey] += np.histogram(lags, self.lag_bins)[0]
 
