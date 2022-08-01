@@ -110,7 +110,7 @@ class People(hpb.BasePeople):
 
     def increment_age(self):
         ''' Let people age by one timestep '''
-        self.age += self.dt
+        self.age[:] += self.dt
         return
 
 
@@ -498,6 +498,7 @@ class People(hpb.BasePeople):
         # Grow the arrays
         self._grow(new_births)
         self['uid'][-new_births:] = uids
+        self['age'][-new_births:] = 0
         self['sex'][-new_births:] = sexes
         self['debut'][-new_births:] = debuts
         self['partners'][:,-new_births:] = partners
