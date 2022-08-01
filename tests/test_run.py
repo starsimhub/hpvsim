@@ -12,7 +12,7 @@ do_plot = 1
 do_save = 0
 debug   = 1
 verbose = 0
-pop_size = 500
+n_agents = 500
 hpv.options.set(interactive=False) # Assume not running interactively
 
 
@@ -25,7 +25,7 @@ def test_singlerun():
     sim = hpv.Sim(verbose=verbose)
     sim['n_years'] = 10
     sim['dt'] = 0.5
-    sim['pop_size'] = 1000
+    sim['n_agents'] = 1000
     sim = hpv.single_run(sim=sim, **iterpars)
 
     return sim
@@ -40,24 +40,24 @@ def test_multirun(do_plot=do_plot): # If being run via pytest, turn off
     iterpars = {'beta': [0.015, 0.025, 0.035],
                 'rel_cin1_prob': [0.1, 1.0, 5.0],
                 }
-    sim = hpv.Sim(n_years=n_years, pop_size=pop_size)
+    sim = hpv.Sim(n_years=n_years, n_agents=n_agents)
     sims = hpv.multi_run(sim=sim, iterpars=iterpars, verbose=verbose)
 
     # Method 2 -- run a list of sims
     simlist = []
     for i in range(len(iterpars['beta'])):
-        sim = hpv.Sim(n_years=n_years, pop_size=pop_size, beta=iterpars['beta'][i], rel_cin1_prob=iterpars['rel_cin1_prob'][i])
+        sim = hpv.Sim(n_years=n_years, n_agents=n_agents, beta=iterpars['beta'][i], rel_cin1_prob=iterpars['rel_cin1_prob'][i])
         simlist.append(sim)
     sims2 = hpv.multi_run(sim=simlist, verbose=verbose)
 
     # Method 3 -- shortcut for parallelization
-    s1 = hpv.Sim(n_years=n_years, pop_size=pop_size)
+    s1 = hpv.Sim(n_years=n_years, n_agents=n_agents)
     s2 = s1.copy()
     s1,s2 = hpv.parallel(s1, s2).sims
     assert np.allclose(s1.summary[:], s2.summary[:], rtol=0, atol=0, equal_nan=True)
 
     # Run in serial for debugging
-    hpv.multi_run(sim=hpv.Sim(n_years=n_years, pop_size=pop_size), n_runs=2, parallel=False)
+    hpv.multi_run(sim=hpv.Sim(n_years=n_years, n_agents=n_agents), n_runs=2, parallel=False)
 
     if do_plot:
         for sim in sims + sims2:
@@ -72,7 +72,7 @@ def test_multisim_reduce(do_plot=do_plot): # If being run via pytest, turn off
     n_runs = 3
     init_hpv_prev = 0.1
 
-    sim = hpv.Sim(pop_size=pop_size, init_hpv_prev=init_hpv_prev)
+    sim = hpv.Sim(n_agents=n_agents, init_hpv_prev=init_hpv_prev)
     msim = hpv.MultiSim(sim, n_runs=n_runs, noise=0.1)
     msim.run(verbose=verbose, reduce=True)
 
@@ -89,14 +89,14 @@ def test_multisim_combine(do_plot=do_plot): # If being run via pytest, turn off
     init_hpv_prev = 0.1
 
     print('Running first sim...')
-    sim = hpv.Sim(pop_size=pop_size, init_hpv_prev=init_hpv_prev, verbose=verbose)
+    sim = hpv.Sim(n_agents=n_agents, init_hpv_prev=init_hpv_prev, verbose=verbose)
     msim = hpv.MultiSim(sim)
     msim.run(n_runs=n_runs, keep_people=True)
     sim1 = msim.combine(output=True)
-    assert sim1['pop_size'] == pop_size*n_runs
+    assert sim1['n_agents'] == n_agents*n_runs
 
     print('Running second sim, results should be similar but not identical (stochastic differences)...')
-    sim2 = hpv.Sim(pop_size=pop_size*n_runs, init_hpv_prev=init_hpv_prev)
+    sim2 = hpv.Sim(n_agents=n_agents*n_runs, init_hpv_prev=init_hpv_prev)
     sim2.run(verbose=verbose)
 
     if do_plot:
@@ -115,7 +115,7 @@ def test_multisim_advanced():
     # Creat the sims/msims
     sims = sc.objdict()
     for i in range(4):
-        sims[f's{i}'] = hpv.Sim(label=f'Sim {i}', pop_size=pop_size, beta=0.01*i)
+        sims[f's{i}'] = hpv.Sim(label=f'Sim {i}', n_agents=n_agents, beta=0.01*i)
 
     m1 = hpv.MultiSim(sims=[sims.s0, sims.s1])
     m2 = hpv.MultiSim(sims=[sims.s2, sims.s3])
@@ -149,7 +149,7 @@ def test_multisim_advanced():
 
 def test_simple_scenarios(do_plot=do_plot):
     sc.heading('Simple scenarios test')
-    basepars = {'pop_size':pop_size}
+    basepars = {'n_agents':n_agents}
 
     json_path = 'scen_test.json'
     xlsx_path = 'scen_test.xlsx'
@@ -176,7 +176,7 @@ def test_complex_scenarios(do_plot=do_plot, do_save=False, fig_path=None):
 
     n_runs = 3
     base_pars = {
-      'pop_size': pop_size,
+      'n_agents': n_agents,
       'network': 'basic',
       }
 
