@@ -19,7 +19,7 @@ hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
 
 base_pars = {
-    'pop_size': 50e3,
+    'n_agents': 50e3,
     'start': 1985,
     'burnin': 30,
     'end': 2050,
@@ -35,7 +35,7 @@ def test_dynamic_pars():
     sc.heading('Test dynamics pars intervention')
 
     pars = {
-        'pop_size': 10e3,
+        'n_agents': 10e3,
         'n_years': 10,
     }
 
@@ -200,7 +200,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     n_agents = 50e3
 
     pars = {
-        'pop_size': n_agents,
+        'n_agents': n_agents,
         'n_years': 20,
         'burnin': 10,
         'start': 2000,
@@ -305,7 +305,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
     n_agents = 50e3
 
     pars = {
-        'pop_size': n_agents,
+        'n_agents': n_agents,
         'n_years': 20,
         'burnin': 10,
         'start': 2000,
@@ -386,11 +386,11 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
+    sim0 = test_dynamic_pars()
     # scens1 = test_vaccinate_prob(do_plot=True)
     # scens2 = test_vaccinate_num(do_plot=True)
     # scens3 = test_screening(do_plot=True)
-    scens4 = test_screening_ltfu(do_plot=True)
+    # scens4 = test_screening_ltfu(do_plot=True)
 
     sc.toc(T)
     print('Done.')
