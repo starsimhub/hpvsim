@@ -662,8 +662,8 @@ class Sim(hpb.BaseSim):
                 hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
         else:
             people.imm = people.peak_imm
-
         hpimm.check_immunity(people)
+
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
         for lkey, layer in contacts.items():

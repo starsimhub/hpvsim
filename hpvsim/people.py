@@ -94,7 +94,7 @@ class People(hpb.BasePeople):
                 self[key] = np.full((self.pars['n_genotypes'], self.pars['n_agents']), np.nan, dtype=hpd.default_float)
 
         # Set genotype states, which store info about which genotype a person is exposed to
-        for key in self.meta.imm_states:  # Everyone starts out with no immunity; TODO, reconsider this
+        for key in self.meta.imm_states:  # Everyone starts out with no immunity
             if key == 't_imm_event':
                 self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_int)
             else:
