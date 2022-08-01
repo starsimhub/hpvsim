@@ -418,6 +418,10 @@ class Sim(hpb.BaseSim):
         results['cancers_by_age'] = init_res('Cancers by age', n_rows=len(self.pars['standard_pop'][0,:])-1)
         results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
 
+        # Type distributions by cytology
+        for var, name in zip(hpd.type_keys, hpd.type_names):
+            results[var] = init_res(name, n_rows=ng, color='#b61500')
+
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
         results['new_total_vaccinated'] = init_res('Newly vaccinated')
@@ -432,17 +436,12 @@ class Sim(hpb.BaseSim):
         results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence', color=hpd.stock_colors[0](0.95))
 
-        # Cancer flows and stocks
+        # Cancer stocks
         results['n_cancerous'] = init_res('Number with cancer', color=hpd.cancer_flow_colors[0](0.95))
         results['n_cancerous_by_genotype'] = init_res('Number with cancer, by attributable genotype', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
         results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
         results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0](0.95))
-        results['cancers'] = init_res('Cancers', color=hpd.cancer_flow_colors[0](0.95))
-        results['detected_cancers'] = init_res('Detected cancers', color=hpd.cancer_flow_colors[0](0.95))
-        results['cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
-        results['detected_cancer_deaths'] = init_res('Cancer deaths', color=hpd.cancer_flow_colors[0](0.95))
-        results['cancer_type_distribution'] = init_res('HPV type distribution in cancer', n_rows=ng, color=hpd.inci_colors[0](np.linspace(0.9,0.5,ng)))
 
         # Other results
         results['n_alive'] = init_res('Number alive')
@@ -957,13 +956,17 @@ class Sim(hpb.BaseSim):
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
         self.results['detected_cancer_incidence'][:]      = res['detected_cancers'][:] / demoninator
 
-        # Compute cancer mortality. Denominator is all women alive with cancer
+        # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
-        # Compute HPV type distribution. Denominator is all women with cancer
+        # Compute HPV type distribution by cytology
+        res['none_types'][:,(res['n_total_infectious'][:]>0)] = res['n_infectious'][:,(res['n_total_infectious'][:]>0)]/res['n_total_infectious'][(res['n_total_infectious'][:]>0)]
+        res['cin1_types'][:,(res['n_total_cin1'][:]>0)] = res['n_cin1'][:,(res['n_total_cin1'][:]>0)]/res['n_total_cin1'][(res['n_total_cin1'][:]>0)]
+        res['cin2_types'][:,(res['n_total_cin2'][:]>0)] = res['n_cin2'][:,(res['n_total_cin2'][:]>0)]/res['n_total_cin2'][(res['n_total_cin2'][:]>0)]
+        res['cin3_types'][:,(res['n_total_cin3'][:]>0)] = res['n_cin3'][:,(res['n_total_cin3'][:]>0)]/res['n_total_cin3'][(res['n_total_cin3'][:]>0)]
         cinds = res['n_cancerous'][:]>0 # Indices where there is some cancer present
-        self.results['cancer_type_distribution'][:,cinds] = res['n_cancerous_by_genotype'][:,cinds]/res['n_cancerous'][cinds]
+        self.results['cancer_types'][:,(res['n_cancerous'][:]>0)] = res['n_cancerous_by_genotype'][:,(res['n_cancerous'][:]>0)]/res['n_cancerous'][(res['n_cancerous'][:]>0)]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])

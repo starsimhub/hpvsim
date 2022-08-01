@@ -127,9 +127,9 @@ class PeopleMeta(sc.prettyobj):
 
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections',     'reactivations']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections',     'reactivations']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu,         pl.cm.Purples]
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -162,6 +162,10 @@ by_sex_colors  = ['#000000',                    '#000000']
 intv_flow_keys   = ['screens',  'screened',         'vaccinations', 'vaccinated', ]
 intv_flow_names  = ['screens',  'women screened',   'vaccinations', 'women vaccinated']
 intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,      pl.cm.Oranges,  pl.cm.Oranges]
+
+# Type distributions by cytology
+type_keys  = ['none_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
+type_names = ['HPV type distribution, normal cytology', 'HPV type distribution, CIN1 lesions', 'HPV type distribution, CIN2 lesions', 'HPV type distribution, CIN3 lesions', 'HPV type distribution, cervical cancer']
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
