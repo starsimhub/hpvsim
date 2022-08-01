@@ -33,7 +33,7 @@ class People(hpb.BasePeople):
     Please see the BasePeople class for additional methods.
 
     Args:
-        pars (dict): the sim parameters, e.g. sim.pars -- alternatively, if a number, interpreted as pop_size
+        pars (dict): the sim parameters, e.g. sim.pars -- alternatively, if a number, interpreted as n_agents
         strict (bool): whether or not to only create keys that are already in self.meta.person; otherwise, let any key be set
         kwargs (dict): the actual data, e.g. from a popdict, being specified
 
@@ -648,6 +648,7 @@ class People(hpb.BasePeople):
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False
         self.cancerous[inds] = False
+        self.cancer_genotype[inds] = -1
         self.alive[inds] = False
 
         return len(inds)

@@ -27,7 +27,7 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
 
     # Define the parameters
     pars = dict(
-        pop_size      = 20e3,         # Population size
+        n_agents      = 20e3,         # Population size
         n_years       = 40,           # Number of years to simulate
         verbose       = 0,            # Don't print details of the run
         rand_seed     = 2,            # Set a non-default seed
@@ -110,7 +110,7 @@ def test_benchmark(do_save=do_save, repeats=1, verbose=True):
                 'run':        round(t_run,  n_decimals),
                 },
             'parameters': {
-                'pop_size': sim['pop_size'],
+                'n_agents': sim['n_agents'],
                 'n_genotypes': sim['n_genotypes'],
                 'n_years':   sim['n_years'],
                 },

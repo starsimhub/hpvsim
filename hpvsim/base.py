@@ -250,9 +250,9 @@ class BaseSim(ParsObj):
             else:
                 end = self['start'] +  self['n_years']
 
-            pop_size = self['pop_size']
+            n_agents = self['n_agents']
             network = self['network']
-            string   = f'Sim({labelstr}; {start} to {end}; pop: {pop_size:n} {network}; epi: {results})'
+            string   = f'Sim({labelstr}; {start} to {end}; pop: {n_agents:n} {network}; epi: {results})'
 
         # ...but if anything goes wrong, return the default with a warning
         except Exception as E: # pragma: no cover
@@ -271,7 +271,7 @@ class BaseSim(ParsObj):
 
             # Define aliases
             mapping = dict(
-                n_agents = 'pop_size',
+                n_agents = 'n_agents',
             )
             for key1,key2 in mapping.items():
                 if key1 in pars:
@@ -324,7 +324,7 @@ class BaseSim(ParsObj):
     def scaled_pop_size(self):
         ''' Get the total population size, i.e. the number of agents times the scale factor -- if it fails, assume none '''
         try:
-            return self['pop_size']*self['pop_scale']
+            return self['n_agents']*self['pop_scale']
         except:  # pragma: no cover # If it's None or missing
             return 0
 
@@ -927,7 +927,7 @@ class BasePeople(FlexPretty):
 
         # Private variables relaying to dynamic allocation
         self._data = sc.odict()
-        self._n = self.pars['pop_size']  # Number of agents (initial)
+        self._n = self.pars['n_agents']  # Number of agents (initial)
         self._s = self._n # Underlying array sizes
 
         # Initialize underlying storage and map arrays
@@ -936,7 +936,7 @@ class BasePeople(FlexPretty):
         self._map_arrays()
 
         # Assign UIDs
-        self['uid'][:] = np.arange(self.pars['pop_size'])
+        self['uid'][:] = np.arange(self.pars['n_agents'])
 
         return
 
@@ -962,7 +962,7 @@ class BasePeople(FlexPretty):
             else:
                 pars = {}
         elif sc.isnumber(pars): # Interpret as a population size
-            pars = {'pop_size':pars} # Ensure it's a dictionary
+            pars = {'n_agents':pars} # Ensure it's a dictionary
 
         # Copy from old parameters to new parameters
         if isinstance(orig_pars, dict):
@@ -970,11 +970,11 @@ class BasePeople(FlexPretty):
                 if k not in pars:
                     pars[k] = v
 
-        # Do minimal validation -- needed here since pop_size should be converted to an int when first set
-        if 'pop_size' not in pars:
-            errormsg = f'The parameter "pop_size" must be included in a population; keys supplied were:\n{sc.newlinejoin(pars.keys())}'
+        # Do minimal validation -- needed here since n_agents should be converted to an int when first set
+        if 'n_agents' not in pars:
+            errormsg = f'The parameter "n_agents" must be included in a population; keys supplied were:\n{sc.newlinejoin(pars.keys())}'
             raise sc.KeyNotFoundError(errormsg)
-        pars['pop_size'] = int(pars['pop_size'])
+        pars['n_agents'] = int(pars['n_agents'])
         pars.setdefault('location', None)
         self.pars = pars # Actually store the pars
         return
@@ -993,7 +993,7 @@ class BasePeople(FlexPretty):
         # Check that parameters match
         if sim_pars is not None:
             mismatches = {}
-            keys = ['pop_size', 'network', 'location'] # These are the keys used in generating the population
+            keys = ['n_agents', 'network', 'location'] # These are the keys used in generating the population
             for key in keys:
                 sim_v = sim_pars.get(key)
                 ppl_v = self.pars.get(key)
@@ -1037,11 +1037,11 @@ class BasePeople(FlexPretty):
     def _resize_arrays(self, new_size=None, keys=None):
         ''' Resize arrays if any mismatches are found '''
 
-        # Handle None or tuple input (representing and pop_size)
+        # Handle None or tuple input (representing and n_agents)
         if new_size is None:
             new_size = len(self)
-        pop_size = new_size if not isinstance(new_size, tuple) else new_size[1]
-        self.pars['pop_size'] = pop_size
+        n_agents = new_size if not isinstance(new_size, tuple) else new_size[1]
+        self.pars['n_agents'] = n_agents
 
         # Reset sizes
         if keys is None:
@@ -1143,7 +1143,7 @@ class BasePeople(FlexPretty):
                 raise NotImplementedError(errormsg)
 
         # Validate
-        newpeople.pars['pop_size'] += people2.pars['pop_size']
+        newpeople.pars['n_agents'] += people2.pars['n_agents']
         newpeople.validate()
 
         # Reassign UIDs so they're unique
@@ -1462,9 +1462,9 @@ class BasePeople(FlexPretty):
         ''' Convert a list of people back into a People object '''
 
         # Handle population size
-        pop_size = len(people)
+        n_agents = len(people)
         if resize:
-            self._resize_arrays(new_size=pop_size)
+            self._resize_arrays(new_size=n_agents)
 
         # Iterate over people -- slow!
         for p,person in enumerate(people):
@@ -1482,7 +1482,7 @@ class BasePeople(FlexPretty):
 
             import covasim as cv
             import networkx as nx
-            sim = cv.Sim(pop_size=50, pop_type='hybrid', contacts=dict(h=3, s=10, w=10, c=5)).run()
+            sim = cv.Sim(n_agents=50, pop_type='hybrid', contacts=dict(h=3, s=10, w=10, c=5)).run()
             G = sim.people.to_graph()
             nodes = G.nodes(data=True)
             edges = G.edges(keys=True)
@@ -1814,7 +1814,7 @@ class Contacts(FlexDict):
         **Example**::
 
             import networkx as nx
-            sim = cv.Sim(pop_size=50, pop_type='hybrid').run()
+            sim = hpv.Sim(n_agents=50, pop_type='hybrid').run()
             G = sim.people.contacts.to_graph()
             nx.draw(G)
         '''
@@ -2019,7 +2019,7 @@ class Layer(FlexDict):
         **Example**::
 
             import networkx as nx
-            sim = cv.Sim(pop_size=20, pop_type='hybrid').run()
+            sim = hpv.Sim(n_agents=20, pop_type='hybrid').run()
             G = sim.people.contacts['h'].to_graph()
             nx.draw(G)
         '''
@@ -2088,14 +2088,14 @@ class Layer(FlexDict):
             frac (float): the fraction of contacts to update on each timestep
         '''
         # Choose how many contacts to make
-        pop_size   = len(people) # Total number of people
+        n_agents   = len(people) # Total number of agents
         n_contacts = len(self) # Total number of contacts
         n_new = int(np.round(n_contacts*frac)) # Since these get looped over in both directions later
         inds = hpu.choose(n_contacts, n_new)
 
         # Create the contacts, not skipping self-connections
-        self['f'][inds]   = np.array(hpu.choose_r(max_n=pop_size, n=n_new), dtype=hpd.default_int) # Choose with replacement
-        self['m'][inds]   = np.array(hpu.choose_r(max_n=pop_size, n=n_new), dtype=hpd.default_int)
+        self['f'][inds]   = np.array(hpu.choose_r(max_n=n_agents, n=n_new), dtype=hpd.default_int) # Choose with replacement
+        self['m'][inds]   = np.array(hpu.choose_r(max_n=n_agents, n=n_new), dtype=hpd.default_int)
         self['beta'][inds] = np.ones(n_new, dtype=hpd.default_float)
         return
 

@@ -15,25 +15,28 @@ from scipy.stats import lognorm
 # Create sim to get baseline prognoses parameters
 hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
-hpv6 = hpv.genotype('HPV6')
+# hpv6 = hpv.genotype('HPV6')
 hpv31 = hpv.genotype('HPV31')
-sim = hpv.Sim(genotypes=[hpv16,hpv18,hpv6,hpv31])
+sim = hpv.Sim(genotypes=[hpv16,hpv18,
+                         # hpv6,
+                         hpv31])
 sim.initialize()
 
 # Get parameters
 ng = sim['n_genotypes']
 genotype_pars = sim['genotype_pars']
 genotype_map = sim['genotype_map']
-durpars = [genotype_pars[genotype_map[g]]['dur'] for g in genotype_map]
 cancer_thresh = 0.99
-genotype_pars['hpv16'].prog_time = 4
-genotype_pars['hpv18'].prog_time = 3
-genotype_pars['hpv16'].prog_rate = 1
-genotype_pars['hpv18'].prog_rate = 1
-genotype_pars['hpv31'].prog_time = 10
-genotype_pars['hpv6'].prog_time = 15
-genotype_pars['hpv31'].prog_rate = .5
-genotype_pars['hpv6'].prog_rate = 0.5
+genotype_pars['hpv16'].prog_time = 8
+genotype_pars['hpv18'].prog_time = 8
+genotype_pars['hpv16'].prog_rate = 0.7
+genotype_pars['hpv18'].prog_rate = 0.8
+genotype_pars['hpv31'].prog_time = 15
+# genotype_pars['hpv6'].prog_time = 15
+genotype_pars['hpv31'].prog_rate = .3
+# genotype_pars['hpv6'].prog_rate = 0.1
+genotype_pars['hpv16'].dur_dysp['par1'] = 3.16
+genotype_pars['hpv16'].dur_none['par1'] = 1.23
 
 # Prognoses from Harvard model
 prognoses = dict(
@@ -79,9 +82,9 @@ def logf2(x, x_infl, k):
 
 # Figure settings
 font_size = 26
-# font_family = 'Libertinus Sans'
-sc.fonts('Libertinus Sans')
+sc.fonts(add=sc.thisdir(aspath=True) / 'Libertinus Sans')
 sc.options(font='Libertinus Sans')
+font_family = 'Libertinus Sans'
 plt.rcParams['font.size'] = font_size
 # plt.rcParams['font.family'] = font_family
 colors = sc.gridcolors(ng)
@@ -93,7 +96,7 @@ x = np.linspace(0.01, 7, 700)
 shares = []
 gtypes = []
 for g in range(ng):
-    sigma, scale = lognorm_params(dur_none[g]['par1'], dur_none[g]['par2'])
+    sigma, scale = lognorm_params(genotype_pars[genotype_map[g]]['dur_none']['par1'], genotype_pars[genotype_map[g]]['dur_none']['par2'])
     rv = lognorm(sigma, 0, scale)
     aa = np.diff(rv.cdf(x))
     bb = logf1(x, genotype_pars[genotype_map[g]]['dysp_rate'])[1:]
@@ -134,7 +137,7 @@ n_samples = 10e3
 
 # create dataframes
 data = {}
-years = np.arange(1,11)
+years = np.arange(1,21)
 cin1_shares, cin2_shares, cin3_shares, cancer_shares = [], [], [], []
 all_years = []
 all_genotypes = []
@@ -171,10 +174,10 @@ def make_fig1():
         rv = lognorm(sigma, 0, scale)
         ax[0,0].plot(x, rv.pdf(x), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,0].legend()
-    ax[0,0].set_xlabel("Pre-dysplasia/clearance duration")
+    ax[0,0].set_xlabel("Pre-dysplasia/control duration")
     ax[0,0].set_ylabel("")
     ax[0,0].grid()
-    ax[0,0].set_title("Distribution of infection durations\nprior to detectable dysplasia or control")
+    ax[0,0].set_title("Distribution of infection durations\nprior to dysplasia or control")
 
 
     ###### Relationship between durations and probability of detectable dysplasia
@@ -183,15 +186,15 @@ def make_fig1():
     for g in range(ng):
         ax[0,1].plot(x, logf1(x, genotype_pars[genotype_map[g]]['dysp_rate']), color=colors[g], lw=2)
     ax[0,1].plot(xx[:-1], yy[:-1], 'ko', label="Values from\nHarvard model")
-    ax[0,1].set_xlabel("Pre-dysplasia/clearance duration")
+    ax[0,1].set_xlabel("Pre-dysplasia/control duration")
     ax[0,1].set_ylabel("")
     ax[0,1].grid()
     ax[0,1].legend(fontsize=15, frameon=False)
-    ax[0,1].set_title("Probability of developing\ndetectable dysplasia by duration")
+    ax[0,1].set_title("Probability of developing\ndysplasia by duration")
 
 
     ###### Distributions post-dysplasia
-    thisx = np.linspace(0.01, 10, 100)
+    thisx = np.linspace(0.01, 20, 100)
     for g in range(ng):
         sigma, scale = lognorm_params(dur_dysp[g]['par1'], dur_dysp[g]['par2'])
         rv = lognorm(sigma, 0, scale)
@@ -212,18 +215,12 @@ def make_fig1():
     n_samples = 10
     for g in range(ng):
         ax[1,0].plot(thisx, logf2(thisx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
-        for year in range(1, 11):
+        # Plot variation
+        for year in range(1, 21):
             mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'],
                                genotype_pars[genotype_map[g]]['prog_rate'])
             peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
             ax[1, 0].plot([year] * n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
-
-        # if g<2:
-        #     # Plot variation
-        #     for year in range(1,11):
-        #         mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
-        #         peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
-        #         ax[1,0].plot([year]*n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
     ax[1,0].set_xlabel("Duration of dysplasia")
     ax[1,0].set_ylabel("")
@@ -242,11 +239,11 @@ def make_fig1():
     ax[1,0].text(-0.3, 0.75, 'CIN3', fontsize=15, rotation=90)
 
     ###### Share of women who develop each CIN grade
-    loc_array = np.array([-5,-4,-3,-2,-1,1,2,3,4,5])
-    w = 0.08
+    loc_array = np.array([-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10])
+    w = 0.04
     for y in years:
         la = loc_array[y - 1] * w + np.sign(loc_array[y - 1])*(-1)*w/2
-        bottom = np.zeros(4)
+        bottom = np.zeros(3)
         for gn, grade in enumerate(['CIN1', 'CIN2', 'CIN3', 'Cancer']):
             ydata = sharesdf[sharesdf['Year']==y][grade]
             ax[1,1].bar(np.arange(1,ng+1)+la, ydata, width=w, color=cmap[gn], bottom=bottom, edgecolor='k', label=grade);
@@ -261,11 +258,11 @@ def make_fig1():
 
     ##### Final outcomes for women
     bottom = np.zeros(ng+1)
-    all_shares = [noneshares+[sum([j*.25 for j in noneshares])],
-                  cin1shares+[sum([j*.25 for j in cin1shares])],
-                  cin2shares+[sum([j*.25 for j in cin2shares])],
-                  cin3shares+[sum([j*.25 for j in cin3shares])],
-                  cancershares+[sum([j*.25 for j in cancershares])],
+    all_shares = [noneshares+[sum([j*.33 for j in noneshares])],
+                  cin1shares+[sum([j*.33 for j in cin1shares])],
+                  cin2shares+[sum([j*.33 for j in cin2shares])],
+                  cin3shares+[sum([j*.33 for j in cin3shares])],
+                  cancershares+[sum([j*.33 for j in cancershares])],
                   ]
     for gn,grade in enumerate(['None', 'CIN1', 'CIN2', 'CIN3','Cancer']):
         ydata = np.array(all_shares[gn])

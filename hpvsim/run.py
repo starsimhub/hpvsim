@@ -352,9 +352,9 @@ class MultiSim(hpb.FlexPretty):
         for s,sim in enumerate(self.sims[1:]): # Skip the first one
             if combined_sim.people: # If the people are there, add them and increment the population size accordingly
                 combined_sim.people += sim.people
-                combined_sim['pop_size'] = combined_sim.people.pars['pop_size']
+                combined_sim['n_agents'] = combined_sim.people.pars['n_agents']
             else: # If not, manually update population size
-                combined_sim['pop_size'] += sim['pop_size']  # Record the number of people
+                combined_sim['n_agents'] += sim['n_agents']  # Record the number of agents
             for key in sim.result_keys():
                 vals = sim.results[key].values
                 if vals.shape[-1] != combined_sim.res_npts:
