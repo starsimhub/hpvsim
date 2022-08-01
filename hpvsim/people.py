@@ -75,9 +75,9 @@ class People(hpb.BasePeople):
 
         # Handle partners and contacts
         if 'partners' in kwargs:
-            self.partners = kwargs.pop('partners') # Store the desired concurrency
+            self.partners[:] = kwargs.pop('partners') # Store the desired concurrency
         if 'current_partners' in kwargs:
-            self.current_partners = kwargs.pop('current_partners') # Store current actual number - updated each step though
+            self.current_partners[:] = kwargs.pop('current_partners') # Store current actual number - updated each step though
             for ln,lkey in enumerate(self.layer_keys()):
                 self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
         if 'contacts' in kwargs:
@@ -87,6 +87,8 @@ class People(hpb.BasePeople):
         for key,value in kwargs.items():
             if strict:
                 self.set(key, value)
+            elif key in self._data:
+                self[key][:] = value
             else:
                 self[key] = value
 

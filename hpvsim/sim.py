@@ -644,7 +644,7 @@ class Sim(hpb.BaseSim):
                 hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
             hpimm.check_immunity(people)
         else:
-            people.imm = people.peak_imm
+            people.imm[:] = people.peak_imm
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
@@ -718,7 +718,7 @@ class Sim(hpb.BaseSim):
         idx = int(t / self.resfreq)
 
         # Store whether people have any grade of CIN
-        people.cin = people.cin1 + people.cin2 + people.cin3
+        people.cin[:] = people.cin1 + people.cin2 + people.cin3
 
         # Update counts for this time step: flows
         for key,count in people.total_flows.items():

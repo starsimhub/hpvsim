@@ -1091,10 +1091,9 @@ class BasePeople(FlexPretty):
 
         for k in self.keys():
             if self._data[k].ndim == 2:
-                self[k] = self._data[k][:, :self._n]
+                super().__setattr__(k, self._data[k][:, :self._n])
             else:
-                self[k] = self._data[k][:self._n]
-
+                super().__setattr__(k, self._data[k][:self._n])
 
     def __getitem__(self, key):
         ''' Allow people['attr'] instead of getattr(people, 'attr')
@@ -1112,6 +1111,14 @@ class BasePeople(FlexPretty):
             errormsg = f'Key "{key}" is not a current attribute of people, and the people object is locked; see people.unlock()'
             raise AttributeError(errormsg)
         return self.__setattr__(key, value)
+
+
+    def __setattr__(self, key, value):
+        if hasattr(self, '_data') and key in self._data:
+            # Prevent accidentally overwriting a view with an actual array - if this happens, the updated values will
+            # be lost the next time the arrays are resized
+            raise Exception('Cannot assign directly to a dynamic array view - must index into the view instead e.g. `people.uid[:]=`')
+        super().__setattr__(key, value)
 
 
     def __iter__(self):
@@ -1196,8 +1203,7 @@ class BasePeople(FlexPretty):
 
 
     def set(self, key, value, die=True):
-        self[key][:] = value # nb. this will raise an exception the shapes don't match, and will automatically cast the value to the existing type
-
+        self[key][:] = value[:] # nb. this will raise an exception the shapes don't match, and will automatically cast the value to the existing type
 
 
     def get(self, key):
@@ -1430,7 +1436,7 @@ class BasePeople(FlexPretty):
     def person(self, ind):
         ''' Method to create person from the people '''
         p = Person()
-        for key in self.meta.all_states:
+        for key in self.keys():
             data = self[key]
             if data.ndim == 1:
                 val = data[ind]
