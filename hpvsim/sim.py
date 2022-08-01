@@ -445,8 +445,6 @@ class Sim(hpb.BaseSim):
         results['cancer_type_distribution'] = init_res('HPV type distribution in cancer', n_rows=ng, color=hpd.inci_colors[0](np.linspace(0.9,0.5,ng)))
 
         # Other results
-        results['r_eff'] = init_res('Effective reproduction number', scale=False, n_rows=ng)
-        results['doubling_time'] = init_res('Doubling time', scale=False, n_rows=ng)
         results['n_alive'] = init_res('Number alive')
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
         results['cdr'] = init_res('Crude death rate', scale=False)
@@ -963,7 +961,8 @@ class Sim(hpb.BaseSim):
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution. Denominator is all women with cancer
-        self.results['cancer_type_distribution'][:] = sc.safedivide(res['n_cancerous_by_genotype'][:],res['n_cancerous'][:])
+        cinds = res['n_cancerous'][:]>0 # indices where there is some cancer present
+        self.results['cancer_type_distribution'][:,cinds] = res['n_cancerous_by_genotype'][:,cinds]/res['n_cancerous'][cinds]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])
