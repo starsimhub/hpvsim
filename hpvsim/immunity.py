@@ -202,7 +202,7 @@ def check_immunity(people):
 
     '''
     immunity = people.pars['immunity'] # cross-immunity/own-immunity scalars to be applied to immunity level
-    people.sus_imm = np.dot(immunity,people.imm) # Dot product gives immunity to all genotypes
+    people.sus_imm[:] = np.dot(immunity,people.imm) # Dot product gives immunity to all genotypes
     return
 
 

@@ -7,7 +7,6 @@ the transitions between states (e.g., from susceptible to infected).
 import numpy as np
 import sciris as sc
 from collections import defaultdict
-from . import version as hpv
 from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
@@ -49,64 +48,14 @@ class People(hpb.BasePeople):
     def __init__(self, pars, strict=True, **kwargs):
         
         # Initialize the BasePeople, which also sets things up for filtering  
-        super().__init__()
+        super().__init__(pars)
 
         # Handle pars and settings
-        self.set_pars(pars)
-        self.version = hpv.__version__ # Store version info
 
         # Other initialization
-        self.t = 0 # Keep current simulation time
-        self._lock = False # Prevent further modification of keys
-        self.meta = hpd.PeopleMeta() # Store list of keys and dtypes
-        self.contacts = None
         self.init_contacts() # Initialize the contacts
         self.infection_log = [] # Record of infections - keys for ['source','target','date','layer']
 
-        # Set person properties -- all floats except for UID
-        for key in self.meta.person:
-            if key == 'uid':
-                self[key] = np.arange(self.pars['n_agents'], dtype=hpd.default_int)
-            elif key in ['partners', 'current_partners']:
-                self[key] = np.full((self.pars['n_partner_types'], self.pars['n_agents']), np.nan, dtype=hpd.default_float)
-            else:
-                self[key] = np.full(self.pars['n_agents'], np.nan, dtype=hpd.default_float)
-
-        # Set health states -- only susceptible is true by default -- booleans except exposed by genotype which should return the genotype that ind is exposed to
-        for key in self.meta.states:
-            if key in ['cancerous', 'dead_other', 'vaccinated', 'screened', 'treated', 'detected_cancer', 'dead_cancer']: # ALl false at the beginning
-                self[key] = np.full(self.pars['n_agents'], False, dtype=bool)
-            elif key == 'cancer_genotype':
-                self[key] = np.full(self.pars['n_agents'], -1, dtype=hpd.default_int)
-            elif key == 'alive':  # All true at the beginning
-                self[key] = np.full(self.pars['n_agents'], True, dtype=bool)
-            elif key == 'susceptible':
-                self[key] = np.full((self.pars['n_genotypes'], self.pars['n_agents']), True, dtype=bool)
-            else:
-                self[key] = np.full((self.pars['n_genotypes'], self.pars['n_agents']), False, dtype=bool)
-
-        # Set dates and durations -- both floats
-        for key in self.meta.dates + self.meta.durs:
-            if key in ['date_dead_other', 'date_cancerous', 'date_detected_cancer', 'date_dead_cancer',
-                       'date_vaccinated','date_screened', 'date_next_screen', 'date_treated']:
-                self[key] = np.full(self.pars['n_agents'], np.nan, dtype=hpd.default_float)
-            else:
-                self[key] = np.full((self.pars['n_genotypes'], self.pars['n_agents']), np.nan, dtype=hpd.default_float)
-
-        # Set genotype states, which store info about which genotype a person is exposed to
-        for key in self.meta.imm_states:  # Everyone starts out with no immunity
-            if key == 't_imm_event':
-                self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_int)
-            else:
-                self[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_float)
-        for key in self.meta.intv_states:
-            self[key] = np.zeros(self.pars['n_agents'], dtype=hpd.default_int)
-
-        # Store relationship information
-        nk = self.pars['n_partner_types']
-        self.rship_start_dates  = np.full((nk,self.pars['n_agents']), np.nan, dtype=hpd.default_float)
-        self.rship_end_dates    = np.full((nk,self.pars['n_agents']), np.nan, dtype=hpd.default_float)
-        self.n_rships           = np.full((nk,self.pars['n_agents']), 0, dtype=hpd.default_int)
         self.lag_bins = np.linspace(0,50,51)
         self.rship_lags = dict()
         for lkey in self.layer_keys():
@@ -115,8 +64,6 @@ class People(hpb.BasePeople):
         # Store age bins for standard population, used for age-standardized incidence calculations
         self.asr_bins = self.pars['standard_pop'][0, :] # Age bins of the standard population
 
-        # Store the dtypes used in a flat dict
-        self._dtypes = {key:self[key].dtype for key in self.keys()} # Assign all to float by default
         if strict:
             self.lock() # If strict is true, stop further keys from being set (does not affect attributes)
 
@@ -128,9 +75,9 @@ class People(hpb.BasePeople):
 
         # Handle partners and contacts
         if 'partners' in kwargs:
-            self.partners = kwargs.pop('partners') # Store the desired concurrency
+            self.partners[:] = kwargs.pop('partners') # Store the desired concurrency
         if 'current_partners' in kwargs:
-            self.current_partners = kwargs.pop('current_partners') # Store current actual number - updated each step though
+            self.current_partners[:] = kwargs.pop('current_partners') # Store current actual number - updated each step though
             for ln,lkey in enumerate(self.layer_keys()):
                 self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
         if 'contacts' in kwargs:
@@ -140,6 +87,8 @@ class People(hpb.BasePeople):
         for key,value in kwargs.items():
             if strict:
                 self.set(key, value)
+            elif key in self._data:
+                self[key][:] = value
             else:
                 self[key] = value
 
@@ -163,7 +112,7 @@ class People(hpb.BasePeople):
 
     def increment_age(self):
         ''' Let people age by one timestep '''
-        self.age += self.dt
+        self.age[:] += self.dt
         return
 
 
@@ -197,9 +146,9 @@ class People(hpb.BasePeople):
             self.flows_by_sex['other_deaths_by_sex'][1] = deaths_male
 
             # Add births
-            new_births, new_people = self.add_births(year=year)
+            new_births = self.add_births(year=year)
             self.demographic_flows['births'] = new_births
-            self.addtoself(new_people) # New births are added to the population
+            # self.addtoself(new_people) # New births are added to the population
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
@@ -224,7 +173,7 @@ class People(hpb.BasePeople):
         self.total_flows['total_cins']  = self.flows['cins'].sum()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
-        self.sus_pool = self.susceptible.nonzero()
+        self.sus_pool = self.susceptible.all(axis=0) # True for people with no infection at the start of the timestep
 
         return
 
@@ -236,14 +185,15 @@ class People(hpb.BasePeople):
         n_dissolved = dict()
 
         for lno,lkey in enumerate(self.layer_keys()):
-            dissolve_inds = hpu.true(self.t*self.pars['dt']>self.contacts[lkey]['end']) # Get the partnerships due to end
-            dissolved = self.contacts[lkey].pop_inds(dissolve_inds) # Remove them from the contacts list
+            layer = self.contacts[lkey]
+            to_dissolve = (~self['alive'][layer['m']]) | (~self['alive'][layer['f']]) | ( (self.t*self.pars['dt']) > layer['end'])
+            dissolved = layer.pop_inds(to_dissolve) # Remove them from the contacts list
 
             # Update current number of partners
             unique, counts = hpu.unique(np.concatenate([dissolved['f'],dissolved['m']]))
             self.current_partners[lno,unique] -= counts
             self.rship_end_dates[lno, unique] = self.t
-            n_dissolved[lkey] = len(dissolve_inds)
+            n_dissolved[lkey] = len(dissolved['f'])
 
         return n_dissolved # Return the number of dissolved partnerships by layer
 
@@ -259,16 +209,16 @@ class People(hpb.BasePeople):
 
             # Intialize storage
             new_pships[lkey] = dict()
-            new_pship_probs = np.ones(len(self)) # Begin by assigning everyone equal probability of forming a new relationship. This will be used for males, and for females if no layer_probs are provided
-            new_pship_probs[~self.is_active] *= 0  # Blank out people not yet active
-            underpartnered = (self.current_partners[lno, :] < self.partners[lno,:]) + (np.isnan(self.current_partners[lno,:])*self.is_active)  # Whether or not people are underpartnered in this layer, also selects newly active people
-            new_pship_probs[underpartnered] *= pref_weight  # Increase weight for those who are underpartnerned
+            new_pship_probs = np.zeros(len(self)) # Begin by assigning everyone equal probability of forming a new relationship. This will be used for males, and for females if no layer_probs are provided
+            new_pship_probs[self.is_active] = 1  # Blank out people not yet active
+            underpartnered = self.is_active & (self.current_partners[lno, :] < self.partners[lno,:])
+            new_pship_probs[underpartnered] = pref_weight  # Increase weight for those who are underpartnerned
 
             if layer_probs is not None: # If layer probabilities have been provided, we use them to select females by age
                 bins = layer_probs[lkey][0, :] # Extract age bins
                 other_layers = np.delete(np.arange(len(self.layer_keys())),lno) # Indices of all other layers but this one
-                already_partnered = (self.current_partners[other_layers,:]>0).sum(axis=0) # Whether or not people already partnered in other layers
-                f_eligible = self.is_active * self.is_female * ~already_partnered * underpartnered # Females who are underpartnered in this layer and aren't already partnered in other layers are eligible to be selected
+                already_partnered = self.current_partners[other_layers,:].any(axis=0)  # Whether or not people already partnered in other layers
+                f_eligible = self.is_female & ~already_partnered & underpartnered # Females who are underpartnered in this layer and aren't already partnered in other layers are eligible to be selected
                 f_eligible_inds = hpu.true(f_eligible)
                 age_bins_f = np.digitize(self.age[f_eligible_inds], bins=bins) - 1  # Age bins of eligible females
                 bin_range_f = np.unique(age_bins_f)  # Range of bins
@@ -290,7 +240,7 @@ class People(hpb.BasePeople):
                 # Draw male partners based on mixing matrices if provided
                 if mixing is not None:
                     bins = mixing[lkey][:, 0]
-                    m_active_inds = hpu.true(self.is_active*self.is_male) # Males eligible to be selected
+                    m_active_inds = hpu.true(self.is_active & self.is_male) # Males eligible to be selected
                     age_bins_f = np.digitize(self.age[new_pship_inds_f], bins=bins) - 1 # Age bins of females that are entering new relationships
                     age_bins_m = np.digitize(self.age[m_active_inds], bins=bins) - 1 # Age bins of eligible males
                     bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
@@ -299,8 +249,9 @@ class People(hpb.BasePeople):
                     for ab,nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
                         male_dist = mixing[lkey][:, ab+1]  # Get the distribution of ages of the male partners of females of this age
                         this_weighting = weighting[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
-                        selected_males = hpu.choose_w(this_weighting, nm, unique=False)  # Select males
-                        new_pship_inds_m += m_active_inds[selected_males].tolist()  # Extract the indices of the selected males and add them to the contact list
+                        nonzero_weighting = hpu.true(this_weighting != 0)
+                        selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
+                        new_pship_inds_m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
                     new_pship_inds_m = np.array(new_pship_inds_m)
 
                 # Otherwise, do rough age assortativity
@@ -310,10 +261,10 @@ class People(hpb.BasePeople):
                     new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
 
                 # Increment the number of current partners
-                new_pship_inds      = np.concatenate([new_pship_inds_f, new_pship_inds_m])
-                self.current_partners[lno,new_pship_inds] += 1
+                new_pship_inds, counts = hpu.unique(np.concatenate([new_pship_inds_f, new_pship_inds_m]))
+                self.current_partners[lno, new_pship_inds] += counts
                 self.rship_start_dates[lno,new_pship_inds] = self.t
-                self.n_rships[lno,new_pship_inds] += 1
+                self.n_rships[lno,new_pship_inds] += counts
                 lags = self.rship_start_dates[lno,new_pship_inds] - self.rship_end_dates[lno,new_pship_inds]
                 self.rship_lags[lkey] += np.histogram(lags, self.lag_bins)[0]
 
@@ -506,15 +457,16 @@ class People(hpb.BasePeople):
         base_year = all_years[0]
         age_bins = death_pars[base_year]['m'][:,0]
         age_inds = np.digitize(self.age, age_bins)-1
-        death_probs = np.full(len(self), np.nan, dtype=hpd.default_float)
+        death_probs = np.empty(len(self), dtype=hpd.default_float)
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
         mx_f = death_pars[nearest_year]['f'][:,1]
         mx_m = death_pars[nearest_year]['m'][:,1]
 
-        death_probs[self.is_female_alive] = mx_f[age_inds[self.is_female_alive]]
-        death_probs[self.is_male_alive] = mx_f[age_inds[self.is_male_alive]]
-        death_probs[(self.age>100) & self.alive] = 1 # Just remove anyone >100
+        death_probs[self.is_female] = mx_f[age_inds[self.is_female]]
+        death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
+        death_probs[self.age>100] = 1 # Just remove anyone >100
+        death_probs[~self.alive] = 0
 
         # Get indices of people who die of other causes
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
@@ -525,25 +477,38 @@ class People(hpb.BasePeople):
         return other_deaths, deaths_female, deaths_male
 
 
-    def add_births(self, year=None):
-        ''' Method to add births '''
+    def add_births(self, year=None, new_births=None):
+        """
+        Add more people to the population
 
-        this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
-        new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
+        Specify either the year from which to retrieve the birth rate, or the absolute number
+        of new people to add. Must specify one or the other. People are added in-place to the
+        current `People` instance
+
+        :param year:
+        :param new_births:
+        :returns: Number of new agents added
+
+        """
+
+        assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
+
+        if new_births is None:
+            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
+            new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
 
         # Generate other characteristics of the new people
         uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
-        pars = {
-            'dt': self['dt'],
-            'n_agents': new_births,
-            'n_genotypes': self.pars['n_genotypes'],
-            'n_imm_sources': self.pars['n_imm_sources'],
-            'n_partner_types': self.pars['n_partner_types'],
-            'standard_pop': self.pars['standard_pop'],
-        }
-        new_people = People(pars=pars, uid=uids, age=np.zeros(new_births), sex=sexes, debut=debuts, partners=partners, strict=False)
 
-        return new_births, new_people
+        # Grow the arrays
+        self._grow(new_births)
+        self['uid'][-new_births:] = uids
+        self['age'][-new_births:] = 0
+        self['sex'][-new_births:] = sexes
+        self['debut'][-new_births:] = debuts
+        self['partners'][:,-new_births:] = partners
+
+        return new_births
 
 
     #%% Methods to make events occur (death, infection, others TBC)
@@ -686,14 +651,6 @@ class People(hpb.BasePeople):
         self.cancer_genotype[inds] = -1
         self.alive[inds] = False
 
-        # Remove dead people from contact network by setting the end date of any partnership they're in to now
-        for contacts in self.contacts.values():
-            m_inds = hpu.findinds(contacts['m'], inds)
-            f_inds = hpu.findinds(contacts['f'], inds)
-            pships_to_end = contacts.pop_inds(np.concatenate([f_inds, m_inds]))
-            pships_to_end['end']*=0+self.t # Reset end date to now
-            contacts.append(pships_to_end)
-            
         return len(inds)
 
 

@@ -73,7 +73,6 @@ class Sim(hpb.BaseSim):
         self.init_results() # After initializing the genotypes, create the results structure
         self.init_interventions()  # Initialize the interventions...
         self.init_analyzers()  # ...and the analyzers...
-        self.validate_imm_pars()  # Once the population and interventions are initialized, validate the immunity parameters
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
         self.complete      = False
@@ -149,22 +148,6 @@ class Sim(hpb.BaseSim):
 
         return
 
-    def validate_imm_pars(self):
-        '''
-        Handle immunity parameters, since they need to be validated after the population and intervention
-        creation, rather than before.
-        '''
-
-        # Handle sources, as we need to init the people and interventions first
-        self.pars['n_imm_sources'] = self.pars['n_genotypes'] + len(self.pars['vaccine_map'])
-        for key in self.people.meta.imm_states:
-            if key == 't_imm_event':
-                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_int)
-            else:
-                self.people[key] = np.zeros((self.pars['n_imm_sources'], self.pars['n_agents']), dtype=hpd.default_float)
-
-        return
-
 
     def validate_pars(self, validate_layers=True):
         '''
@@ -229,6 +212,9 @@ class Sim(hpb.BaseSim):
         if not sc.isnumber(self['verbose']): # pragma: no cover
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
+
+        # Set the number of immunity sources
+        self['n_imm_sources'] = len(self['genotypes']) + len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
 
         return
 
@@ -327,7 +313,6 @@ class Sim(hpb.BaseSim):
         len_map = len(self['genotype_map'])
         assert len_pars == len_map, f"genotype_pars and genotype_map must be the same length, but they're not: {len_pars} ≠ {len_map}"
         self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
-        self['n_imm_sources'] = len_pars
 
         return
 
@@ -658,7 +643,7 @@ class Sim(hpb.BaseSim):
             if len(has_imm):
                 hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
         else:
-            people.imm = people.peak_imm
+            people.imm[:] = people.peak_imm
         hpimm.check_immunity(people)
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
@@ -733,7 +718,7 @@ class Sim(hpb.BaseSim):
         idx = int(t / self.resfreq)
 
         # Store whether people have any grade of CIN
-        people.cin = people.cin1 + people.cin2 + people.cin3
+        people.cin[:] = people.cin1 + people.cin2 + people.cin3
 
         # Update counts for this time step: flows
         for key,count in people.total_flows.items():
