@@ -689,7 +689,7 @@ class age_results(Analyzer):
                         if 'incidence' in result:
                             # Need to divide by the right denominator
                             if 'hpv' in result:  # Denominator is susceptible population
-                                denom = (np.histogram(age[sim.people.sus_pool[-1]], bins=result_dict.edges)[0] * scale)
+                                denom = (np.histogram(age[sim.people.sus_pool], bins=result_dict.edges)[0] * scale)
                             else:  # Denominator is females at risk for cancer
                                 denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous)], bins=result_dict.edges)[
                                              0] * scale) / 1e5  # CIN and cancer are per 100,000 women
