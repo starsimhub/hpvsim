@@ -217,7 +217,7 @@ class People(hpb.BasePeople):
             if layer_probs is not None: # If layer probabilities have been provided, we use them to select females by age
                 bins = layer_probs[lkey][0, :] # Extract age bins
                 other_layers = np.delete(np.arange(len(self.layer_keys())),lno) # Indices of all other layers but this one
-                already_partnered = (self.current_partners[other_layers,:]>0).sum(axis=0) # Whether or not people already partnered in other layers
+                already_partnered = self.current_partners[other_layers,:].any(axis=0)  # Whether or not people already partnered in other layers
                 f_eligible = self.is_female & ~already_partnered & underpartnered # Females who are underpartnered in this layer and aren't already partnered in other layers are eligible to be selected
                 f_eligible_inds = hpu.true(f_eligible)
                 age_bins_f = np.digitize(self.age[f_eligible_inds], bins=bins) - 1  # Age bins of eligible females
