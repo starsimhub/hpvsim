@@ -170,8 +170,8 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
 
     # Specify defaults for basic sexual network with marital, casual, and one-off partners
     layer_defaults['default'] = dict(
-        partners    = dict(m=dict(dist='poisson', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
-                           c=dict(dist='poisson', par1=0.05), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
+        partners    = dict(m=dict(dist='poisson', par1=0.1), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
+                           c=dict(dist='poisson', par1=0.5), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
                            o=dict(dist='poisson', par1=0.0),), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 one-off partner at a time. Can be set to zero since these relationships only last a single timestep
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts per year for people at sexual peak
                             c=dict(dist='neg_binomial', par1=10, par2=5), # Default number of acts per year for people at sexual peak
@@ -180,8 +180,8 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
                             c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
                             o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
         # layer_probs = dict(m=0.7, c=0.4, o=0.05),   # Default proportion of the population in each layer
-        dur_pship   = dict(m=dict(dist='normal_pos', par1=10,par2=3),
-                           c=dict(dist='normal_pos', par1=2, par2=1),
+        dur_pship   = dict(m=dict(dist='normal_pos', par1=8,par2=3),
+                           c=dict(dist='normal_pos', par1=1, par2=1),
                            o=dict(dist='normal_pos', par1=0.1, par2=0.05)),
         condoms     = dict(m=0.01, c=0.5, o=0.6),  # Default proportion of acts in which condoms are used
     )
@@ -649,14 +649,14 @@ def get_mixing(network=None):
             [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
             [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
             [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [15,    0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [20,    0,  0, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [25,    0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [30,    0,  0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
-            [35,    0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
-            [40,    0,  0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0,  1,  1, 1,  1.0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .5,  1,  1, 1,  1.0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0,  0,  1,  1,  1, 1.0,  1.0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  0,  .5,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0,  0,  .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0,  0,  .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
             [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
-            [50,    0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0,  0.5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
             [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
             [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
             [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
@@ -687,13 +687,13 @@ def get_mixing(network=None):
         layer_probs = dict(
             m=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  0.04,   0.2,  0.6,  0.8,  0.8,  0.8,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
-                [ 0,  0,  0.01,  0.01,  0.2,  0.6,  0.8,  0.9,  0.90,  0.90,  0.90,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
+                [ 0,  0,  0.04,   0.1,  0.1,  0.5,  0.6,  0.7,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
+                [ 0,  0,  0.01,  0.01,  0.1,  0.5,  0.6,  0.7,  0.70,  0.70,  0.70,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
             ),
             c=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  0.10,   0.6,  0.3,  0.1,  0.1,  0.1,   0.1,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
-                [ 0,  0,  0.05,   0.5,  0.5,  0.3,  0.4,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
+                [ 0,  0,  0.10,   0.7,  0.8,  0.6,  0.6,  0.5,   0.2,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
+                [ 0,  0,  0.05,   0.7,  0.8,  0.6,  0.6,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
             ),
             o=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],

@@ -23,7 +23,7 @@ def test_network(do_plot=True):
     pars = dict(n_agents=n_agents,
                 start=1975,
                 n_years=50,
-                burnin=30,
+                # burnin=30,
                 dt=0.5,
                 network='default',
                 debut = dict(f=dict(dist='normal', par1=15., par2=1),
@@ -33,12 +33,18 @@ def test_network(do_plot=True):
     # hpv11   = hpv.genotype('HPV11')
     hpv16   = hpv.genotype('HPV16')
     hpv18   = hpv.genotype('HPV18')
+    pars['beta'] = 1
+    pars['init_hpv_prev'] = {
+        'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
+        'm'             : np.array([ 0.0, 0.95, 0.9, 0.75, 0.1, 0.05, 0.005, 0]),
+        'f'             : np.array([ 0.0, 0.95, 0.9, 0.75, 0.1, 0.05, 0.005, 0]),
+    }
 
     # Loop over countries and their population sizes in the year 2000
-    age_pyr = hpv.age_pyramid(
-        timepoints=['2020'],
-        datafile=f'test_data/kenya_age_pyramid.csv',
-        edges=np.linspace(0, 100, 21))
+    # age_pyr = hpv.age_pyramid(
+    #     timepoints=['2020'],
+    #     datafile=f'test_data/kenya_age_pyramid.csv',
+    #     edges=np.linspace(0, 100, 21))
 
     az = hpv.age_results(
         result_keys=sc.objdict(
@@ -58,17 +64,34 @@ def test_network(do_plot=True):
         genotypes = [hpv16, hpv18],
         network='default',
         location = 'kenya',
-        datafile=f'test_data/kenya_data.csv',
-        analyzers=[age_pyr, az, snap])
+        # datafile=f'test_data/kenya_data.csv',
+        analyzers=[
+            # age_pyr,
+            az, snap])
 
     sim.run()
     a = sim.get_analyzer(1)
 
+    to_plot = {
+        'HPV prevalence': [
+            'hpv_prevalence',
+        ],
+        'CIN prevalence': [
+            'cin_prevalence',
+        ],
+        'Cervical cancer incidence': [
+            'cancer_incidence',
+        ],
+        'Cervical cancer mortality': [
+            'cancer_mortality',
+        ],
+    }
+
     # Check plot()
     if do_plot:
-        fig = a.plot()
-        sim.plot('demographics')
-
+        # fig = a.plot()
+        # sim.plot('demographics')
+        sim.plot(to_plot=to_plot)
         snapshot = sim.get_analyzer()
         people1990 = snapshot.snapshots[0]
         people2000 = snapshot.snapshots[1]
@@ -87,7 +110,7 @@ def test_network(do_plot=True):
         fig, ax = pl.subplots(nrows=1, ncols=1, figsize=(5, 4))
         # ax = axes.flatten()
         people = people2020
-        lkey='m'
+        lkey='c'
         # for ai,lkey in enumerate(['m','c']):
         fc = people.contacts[lkey]['age_f']
         mc = people.contacts[lkey]['age_m']
@@ -95,7 +118,7 @@ def test_network(do_plot=True):
         ax.set_xlabel('Age of female partner')
         ax.set_ylabel('Age of male partner')
         fig.colorbar(h[3], ax=ax)
-        ax.set_title('Marital age mixing')
+        ax.set_title('Casual age mixing')
         fig.tight_layout()
         pl.savefig(f"networks.png", dpi=100)
 
