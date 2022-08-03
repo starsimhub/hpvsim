@@ -22,7 +22,7 @@ def test_microsim():
 
     sim = hpv.Sim()
     pars = {
-        'n_agents': 10,
+        'n_agents': 100,
         'init_hpv_prev': .1,
         'n_years': 2,
         }
@@ -231,7 +231,7 @@ def test_result_consistency():
     assert len(males_with_cancer)==0
 
     # Check that people younger than debut don't have HPV
-    virgin_inds = (~sim.people.is_active).nonzero()[-1]
+    virgin_inds = (sim.people.is_virgin).nonzero()[-1]
     virgins_with_hpv = (~np.isnan(sim.people.date_infectious[:,virgin_inds])).nonzero()[-1]
     assert len(virgins_with_hpv)==0
 

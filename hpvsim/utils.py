@@ -175,7 +175,7 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
-def set_prognoses(people, inds, g, dur_hpv):
+def set_prognoses(people, inds, g, dur_none):
     ''' Set disease progression '''
 
     # Get parameters that will be used later
@@ -191,25 +191,25 @@ def set_prognoses(people, inds, g, dur_hpv):
     sev_par2 = people.pars['severity_dist']['par2']
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
-    cin1_probs = logf1(dur_hpv, dysp_rate) # Probability of developing dysplasia
+    cin1_probs = logf1(dur_none, dysp_rate) # Probability of developing dysplasia
     is_cin1 = binomial_arr(cin1_probs) # Boolean array of dysplasias
     cin1_inds = inds[is_cin1] # Indices of those with dysplasia
     no_cin1_inds = inds[~is_cin1] # Indices of those without dysplasia
 
     # CASE 1: Infection clears without causing dysplasia
     people.date_clearance[g, no_cin1_inds] = people.date_infectious[g, no_cin1_inds] \
-                                             + np.ceil(people.dur_hpv[g, no_cin1_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+                                             + np.ceil(people.dur_none[g, no_cin1_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
     # CASE 2: Infection progresses to mild dysplasia (CIN1)
     excl_inds = true(people.date_cin1[g, cin1_inds] < people.t)  # Don't count CIN1s that were acquired before now
     people.date_cin1[g, cin1_inds[excl_inds]] = np.nan
     people.date_cin1[g, cin1_inds] = np.fmin(people.date_cin1[g, cin1_inds],
                                              people.date_infectious[g, cin1_inds] +
-                                             np.ceil(people.dur_hpv[g, cin1_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
+                                             np.ceil(people.dur_none[g, cin1_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
 
     # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
     dur_to_peak_dys = sample(**dur_dyps, size=len(cin1_inds))
-    people.dur_hpv[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
+    people.dur_none[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
     mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
     peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
