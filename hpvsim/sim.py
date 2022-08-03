@@ -755,12 +755,7 @@ class Sim(hpb.BaseSim):
             # Create total stocks
             for key in hpd.stock_keys:
                 for g in range(ng):
-                    try: self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
-                    except:
-                        import traceback;
-                        traceback.print_exc();
-                        import pdb;
-                        pdb.set_trace()
+                    self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['susceptible']:
                     # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
                     self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
