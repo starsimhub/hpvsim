@@ -956,7 +956,7 @@ class Sim(hpb.BaseSim):
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution by cytology
-        res['none_types'][:,(res['n_total_infectious'][:]>0)] = res['n_infectious'][:,(res['n_total_infectious'][:]>0)]/res['n_total_infectious'][(res['n_total_infectious'][:]>0)]
+        res['none_types'][:,(res['n_total_none'][:]>0)] = res['n_none'][:,(res['n_total_none'][:]>0)]/res['n_total_none'][(res['n_total_none'][:]>0)]
         res['cin1_types'][:,(res['n_total_cin1'][:]>0)] = res['n_cin1'][:,(res['n_total_cin1'][:]>0)]/res['n_total_cin1'][(res['n_total_cin1'][:]>0)]
         res['cin2_types'][:,(res['n_total_cin2'][:]>0)] = res['n_cin2'][:,(res['n_total_cin2'][:]>0)]/res['n_total_cin2'][(res['n_total_cin2'][:]>0)]
         res['cin3_types'][:,(res['n_total_cin3'][:]>0)] = res['n_cin3'][:,(res['n_total_cin3'][:]>0)]/res['n_total_cin3'][(res['n_total_cin3'][:]>0)]
