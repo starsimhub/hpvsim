@@ -38,7 +38,7 @@ def test_multirun(do_plot=do_plot): # If being run via pytest, turn off
 
     # Method 1 -- Note: this runs 3 simulations, not 3x3!
     iterpars = {'beta': [0.015, 0.025, 0.035],
-                'rel_cin1_prob': [0.1, 1.0, 5.0],
+                'hpv_control_prob': [0.0, 0.5, 1.0],
                 }
     sim = hpv.Sim(n_years=n_years, n_agents=n_agents)
     sims = hpv.multi_run(sim=sim, iterpars=iterpars, verbose=verbose)
@@ -46,7 +46,7 @@ def test_multirun(do_plot=do_plot): # If being run via pytest, turn off
     # Method 2 -- run a list of sims
     simlist = []
     for i in range(len(iterpars['beta'])):
-        sim = hpv.Sim(n_years=n_years, n_agents=n_agents, beta=iterpars['beta'][i], rel_cin1_prob=iterpars['rel_cin1_prob'][i])
+        sim = hpv.Sim(n_years=n_years, n_agents=n_agents, beta=iterpars['beta'][i], hpv_control_prob=iterpars['hpv_control_prob'][i])
         simlist.append(sim)
     sims2 = hpv.multi_run(sim=simlist, verbose=verbose)
 
