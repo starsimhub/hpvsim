@@ -505,7 +505,7 @@ class BaseVaccination(Intervention):
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
             sim['immunity'] = immunity
             sc.promotetolist(sim['imm_boost']).append(sc.promotetolist(self.p['imm_boost'])) # This line happens in-place
-            sim.people.set_pars(sim.pars)
+            # sim.people.set_pars(sim.pars)
 
         return
 

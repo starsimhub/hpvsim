@@ -48,7 +48,6 @@ def test_network(do_plot=True):
         )
     )
 
-
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
     )
@@ -109,7 +108,17 @@ def test_network(do_plot=True):
             ax[cn].set_xlabel(f'Time between {types[cn]} relationships')
         fig.tight_layout()
         pl.savefig(f"lags.png", dpi=100)
-        
+
+        import matplotlib as mpl
+        import pylab as pl
+        fig, axes = pl.subplots(nrows=3, ncols=2, figsize=(12, 8))
+        ax = axes.flatten()
+        for ai, type in enumerate(['none_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']):
+            ax[ai].stackplot(sim.results.year[35:], sim.results[type][:,35:], labels=[g.upper() for g in sim['genotype_map'].values()])
+            if ai==0: ax[ai].legend()
+        fig.tight_layout()
+        pl.savefig(f"distributions.png", dpi=100)
+
     return sim, a
 
 

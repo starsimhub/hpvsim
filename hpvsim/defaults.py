@@ -81,7 +81,7 @@ class PeopleMeta(sc.prettyobj):
     states = [
         State('susceptible', bool, True, 'n_genotypes'),
         State('infectious', bool, False, 'n_genotypes'),
-        State('hpv', bool, False, 'n_genotypes'), # hpv in absence of any CIN
+        State('none', bool, False, 'n_genotypes'), # HPV without dysplasia
         State('cin1', bool, False, 'n_genotypes'),
         State('cin2', bool, False, 'n_genotypes'),
         State('cin3', bool, False, 'n_genotypes'),
@@ -131,7 +131,7 @@ class PeopleMeta(sc.prettyobj):
 
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
-        State('dur_hpv', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV before progressing to CIN
+        State('dur_none', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
         State('dur_disease', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has >= HPV present
         State('dur_none2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
         State('dur_cin12cin2', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN1 to CIN2
@@ -174,15 +174,15 @@ class PeopleMeta(sc.prettyobj):
 
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections',     'reactivations']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections',     'reactivations']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu,         pl.cm.Purples]
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections', 'reactivations']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections', 'reactivations']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu, pl.cm.Purples]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
-stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin']
-stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN']
-stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
+stock_keys   = ['susceptible',  'infectious',   'none',                 'cin1',         'cin2',         'cin3',         'cin']
+stock_names  = ['susceptible',  'infectious',   'without dysplasia',    'with CIN1',    'with CIN2',    'with CIN3',    'with CIN']
+stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.GnBu,             pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
 
 # Cancer specific flows (not by genotype)
 cancer_flow_keys   = ['cancers',  'cancer_deaths', 'detected_cancers', 'detected_cancer_deaths']
@@ -209,6 +209,10 @@ by_sex_colors  = ['#000000',                    '#000000']
 intv_flow_keys   = ['screens',  'screened',         'vaccinations', 'vaccinated', ]
 intv_flow_names  = ['screens',  'women screened',   'vaccinations', 'women vaccinated']
 intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,      pl.cm.Oranges,  pl.cm.Oranges]
+
+# Type distributions by cytology
+type_keys  = ['none_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
+type_names = ['HPV type distribution, normal cytology', 'HPV type distribution, CIN1 lesions', 'HPV type distribution, CIN2 lesions', 'HPV type distribution, CIN3 lesions', 'HPV type distribution, cervical cancer']
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
