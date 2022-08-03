@@ -213,9 +213,6 @@ class Sim(hpb.BaseSim):
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
 
-        # Set the number of immunity sources
-        self['n_imm_sources'] = len(self['genotypes']) + len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
-
         return
 
 
@@ -313,6 +310,9 @@ class Sim(hpb.BaseSim):
         len_map = len(self['genotype_map'])
         assert len_pars == len_map, f"genotype_pars and genotype_map must be the same length, but they're not: {len_pars} ≠ {len_map}"
         self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
+
+        # Set the number of immunity sources
+        self['n_imm_sources'] = len(self['genotypes']) + len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
 
         return
 

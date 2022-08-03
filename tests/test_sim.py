@@ -22,7 +22,7 @@ def test_microsim():
 
     sim = hpv.Sim()
     pars = {
-        'n_agents': 10,
+        'n_agents': 100,
         'init_hpv_prev': .1,
         'n_years': 2,
         }
@@ -231,7 +231,7 @@ def test_result_consistency():
     assert len(males_with_cancer)==0
 
     # Check that people younger than debut don't have HPV
-    virgin_inds = (~sim.people.is_active).nonzero()[-1]
+    virgin_inds = ((sim.people.age<sim.people.debut) & sim.people.alive).nonzero()[-1]
     virgins_with_hpv = (~np.isnan(sim.people.date_infectious[:,virgin_inds])).nonzero()[-1]
     assert len(virgins_with_hpv)==0
 
@@ -297,13 +297,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
     sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
 
     sc.toc(T)
     print('Done.')

@@ -497,16 +497,17 @@ class People(hpb.BasePeople):
             this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
             new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
 
-        # Generate other characteristics of the new people
-        uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
+        if new_births>0:
+            # Generate other characteristics of the new people
+            uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
 
-        # Grow the arrays
-        self._grow(new_births)
-        self['uid'][-new_births:] = uids
-        self['age'][-new_births:] = 0
-        self['sex'][-new_births:] = sexes
-        self['debut'][-new_births:] = debuts
-        self['partners'][:,-new_births:] = partners
+            # Grow the arrays
+            self._grow(new_births)
+            self['uid'][-new_births:] = uids
+            self['age'][-new_births:] = 0
+            self['sex'][-new_births:] = sexes
+            self['debut'][-new_births:] = debuts
+            self['partners'][:,-new_births:] = partners
 
         return new_births
 
