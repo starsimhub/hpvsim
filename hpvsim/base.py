@@ -1076,13 +1076,7 @@ class BasePeople(FlexPretty):
         if (self._n + n) > self._s:
             n_new = int(self._s / 2)  # 50% growth
             for state in self.meta.all_states:
-                try:
-                    self._data[state.name] = np.concatenate([self._data[state.name], state.new(self.pars, n_new)], axis=self._data[state.name].ndim-1)
-                except:
-                    import traceback;
-                    traceback.print_exc();
-                    import pdb;
-                    pdb.set_trace()
+                self._data[state.name] = np.concatenate([self._data[state.name], state.new(self.pars, n_new)], axis=self._data[state.name].ndim-1)
             self._s += n_new
         self._n += n
         self._map_arrays()
