@@ -69,14 +69,16 @@ class Sim(hpb.BaseSim):
         self.set_seed() # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
         self.init_immunity() # initialize information about immunity
+        self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_results() # After initializing the genotypes, create the results structure
-        self.init_interventions()  # Initialize the interventions...
         self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
         self.complete      = False
         self.results_ready = False
+
+
         return self
 
 
@@ -312,7 +314,7 @@ class Sim(hpb.BaseSim):
         self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
 
         # Set the number of immunity sources
-        self['n_imm_sources'] = len(self['genotypes']) + len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
+        self['n_imm_sources'] = len(self['genotypes'])
 
         return
 
@@ -504,6 +506,9 @@ class Sim(hpb.BaseSim):
         for i,intervention in enumerate(self['interventions']):
             if isinstance(intervention, hpi.Intervention):
                 intervention.initialize(self)
+
+        # Set the number of immunity sources
+        self['n_imm_sources'] += len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
         return
 
 
@@ -750,7 +755,12 @@ class Sim(hpb.BaseSim):
             # Create total stocks
             for key in hpd.stock_keys:
                 for g in range(ng):
-                    self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
+                    try: self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
+                    except:
+                        import traceback;
+                        traceback.print_exc();
+                        import pdb;
+                        pdb.set_trace()
                 if key not in ['susceptible']:
                     # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
                     self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
@@ -768,7 +778,7 @@ class Sim(hpb.BaseSim):
 
             # Compute detectable hpv prevalence
             hpv_test_pars = hppar.get_screen_pars('hpv')
-            for state in ['hpv', 'cin1', 'cin2', 'cin3']:
+            for state in ['none', 'cin1', 'cin2', 'cin3']:
                 hpv_pos_probs = np.zeros(len(people))
                 for g in range(ng):
                     tp_inds = hpu.true(people[state][g,:])

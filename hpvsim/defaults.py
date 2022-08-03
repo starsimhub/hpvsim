@@ -81,7 +81,7 @@ class PeopleMeta(sc.prettyobj):
     states = [
         State('susceptible', bool, True, 'n_genotypes'),
         State('infectious', bool, False, 'n_genotypes'),
-        State('hpv', bool, False, 'n_genotypes'), # hpv in absence of any CIN
+        State('none', bool, False, 'n_genotypes'), # HPV without dysplasia
         State('cin1', bool, False, 'n_genotypes'),
         State('cin2', bool, False, 'n_genotypes'),
         State('cin3', bool, False, 'n_genotypes'),
@@ -131,7 +131,7 @@ class PeopleMeta(sc.prettyobj):
 
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
-        State('dur_hpv', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV before progressing to CIN
+        State('dur_none', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
         State('dur_disease', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has >= HPV present
         State('dur_none2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
         State('dur_cin12cin2', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN1 to CIN2
@@ -180,9 +180,9 @@ flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
-stock_keys   = ['susceptible',  'infectious',   'cin1',         'cin2',         'cin3',         'cin']
-stock_names  = ['susceptible',  'infectious',   'with CIN1',    'with CIN2',    'with CIN3',    'with CIN']
-stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
+stock_keys   = ['susceptible',  'infectious',   'none',                 'cin1',         'cin2',         'cin3',         'cin']
+stock_names  = ['susceptible',  'infectious',   'without dysplasia',    'with CIN1',    'with CIN2',    'with CIN3',    'with CIN']
+stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.GnBu,             pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
 
 # Cancer specific flows (not by genotype)
 cancer_flow_keys   = ['cancers',  'cancer_deaths', 'detected_cancers', 'detected_cancer_deaths']

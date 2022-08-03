@@ -12,6 +12,7 @@ from . import misc as hpm
 from . import base as hpb
 from . import sim as hps
 from . import plotting as hppl
+from . import interventions as hpi
 from .settings import options as hpo
 
 
@@ -922,6 +923,7 @@ class Scenarios(hpb.ParsObj):
         if not self.base_sim.initialized:
             self.base_sim.init_genotypes()
             self.base_sim.init_immunity()
+            self.base_sim.init_interventions()
             self.base_sim.init_people()
             self.base_sim.init_results()
 
@@ -1004,6 +1006,11 @@ class Scenarios(hpb.ParsObj):
 
             # Update the parameters, if provided, and re-initialize aspects of the simulation
             scen_sim.update_pars(allpars)
+            # If vaccination is provided, we need to re-initialize the people because the number of immunity sources is different
+            if 'interventions' in allpars.keys():
+                vaxintvs = [x for x in allpars['interventions'] if isinstance(x, hpi.BaseVaccination)]
+                if len(vaxintvs)>0:
+                    scen_sim.people = None # Set to None so they get re-initialized - WARNING, should be a better way to do this
             scen_sim.initialized = False # Ensure it gets re-initialized
 
             run_args = dict(n_runs=self['n_runs'], noise=self['noise'], noisepar=self['noisepar'], keep_people=keep_people, verbose=verbose)
