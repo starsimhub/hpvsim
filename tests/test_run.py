@@ -193,11 +193,11 @@ def test_complex_scenarios(do_plot=do_plot, do_save=False, fig_path=None):
         'high': {
             'name': 'Higher-risk sexual behavior',
             'pars': {
-                'acts': dict(r=dict(dist='neg_binomial', par1=120, par2=40),
+                'acts': dict(m=dict(dist='neg_binomial', par1=120, par2=40),
                              c=dict(dist='neg_binomial', par1=20, par2=5),
                              o=dict(dist='neg_binomial', par1=20, par2=5),
                              ),
-                'condoms': dict(r=0, c=0.1, o=0.1),
+                'condoms': dict(m=0, c=0.1, o=0.1),
                 'debut': dict(f=dict(dist='normal', par1=14, par2=2),
                               m=dict(dist='normal', par1=14, par2=2))
             }
@@ -205,11 +205,11 @@ def test_complex_scenarios(do_plot=do_plot, do_save=False, fig_path=None):
         'low': {
             'name': 'Lower-risk sexual behavior',
             'pars': {
-                'acts': dict(r=dict(dist='neg_binomial', par1=40, par2=10),
+                'acts': dict(m=dict(dist='neg_binomial', par1=40, par2=10),
                              c=dict(dist='neg_binomial', par1=2, par2=1),
                              o=dict(dist='neg_binomial', par1=1, par2=1),
                              ),
-                'condoms': dict(r=0.5, c=0.9, o=0.9),
+                'condoms': dict(m=0.5, c=0.9, o=0.9),
                 'debut': dict(f=dict(dist='normal', par1=20, par2=2),
                               m=dict(dist='normal', par1=21, par2=2))
             }
@@ -238,7 +238,7 @@ if __name__ == '__main__':
     sim1   = test_singlerun()
     sims2  = test_multirun(do_plot=do_plot)
     msim1  = test_multisim_reduce(do_plot=do_plot)
-    msim2  = test_multisim_combine(do_plot=do_plot)
+    msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
     m1,m2  = test_multisim_advanced()
     scens1 = test_simple_scenarios(do_plot=do_plot)
     scens2 = test_complex_scenarios(do_plot=do_plot)
