@@ -1012,7 +1012,7 @@ def get_treatment_pars(screen=None):
         ),
         excisional=dict(
             efficacy=dict(
-                hpv=0,
+                none=0,
                 cin1=0.936,
                 cin2=0.936,
                 cin3=0.936,
