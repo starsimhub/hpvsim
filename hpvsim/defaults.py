@@ -174,9 +174,9 @@ class PeopleMeta(sc.prettyobj):
 
 # Flows: we count new and cumulative totals for each
 # All are stored (1) by genotype and (2) as the total across genotypes
-flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections']
-flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections']
-flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu]
+flow_keys   = ['infections',    'cin1s',        'cin2s',        'cin3s',        'cins',         'reinfections', 'reactivations']
+flow_names  = ['infections',    'CIN1s',        'CIN2s',        'CIN3s',        'CINs',         'reinfections', 'reactivations']
+flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.GnBu, pl.cm.Purples]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
