@@ -1331,6 +1331,11 @@ class BasePeople(FlexPretty):
         return (self.age>self.debut) & (self.alive)
 
     @property
+    def is_virgin(self):
+        ''' Boolean array of everyone not yet sexually active i.e. pre debut '''
+        return (self.age<self.debut) & (self.alive)
+
+    @property
     def alive_inds(self):
         ''' Boolean array of everyone alive '''
         return self.true('alive')
