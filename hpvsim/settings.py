@@ -519,7 +519,7 @@ class Options(sc.objdict):
         # Handle other keywords
         for key,value in kwargs.items():
             if key not in pl.rcParams:
-                errormsg = f'Key "{key}" does not match any value in Covasim options or pl.rcParams'
+                errormsg = f'Key "{key}" does not match any value in HPVsim options or pl.rcParams'
                 raise sc.KeyNotFoundError(errormsg)
             elif value is not None:
                 rc[key] = value
@@ -602,5 +602,4 @@ def load_fonts(folder=None, rebuild=False, verbose=False, **kwargs):
 
 
 # Create the options on module load, and load the fonts
-load_fonts()
 options = Options()

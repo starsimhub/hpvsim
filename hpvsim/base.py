@@ -7,14 +7,17 @@ can be focused on the disease-specific functionality.
 import numpy as np
 import pandas as pd
 import sciris as sc
-import datetime as dt
-#from . import version as cvv
+# import datetime as dt
 from . import utils as hpu
 from . import misc as hpm
 from . import defaults as hpd
 from . import parameters as hppar
-obj_get = object.__getattribute__ # Alias the default getattribute method
-obj_set = object.__setattr__
+from .version import __version__
+
+
+
+# obj_get = object.__getattribute__ # Alias the default getattribute method
+# obj_set = object.__setattr__
 
 # # Specify all externally visible classes this file defines
 # __all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', 'Contacts', 'Layer']
@@ -232,8 +235,8 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['cum_total_infections']
-                cancers = self.summary['cum_total_cancers']
+                infections = self.summary['total_infections']
+                cancers = self.summary['cancers']
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
@@ -247,9 +250,9 @@ class BaseSim(ParsObj):
             else:
                 end = self['start'] +  self['n_years']
 
-            pop_size = self['pop_size']
+            n_agents = self['n_agents']
             network = self['network']
-            string   = f'Sim({labelstr}; {start} to {end}; pop: {pop_size:n} {network}; epi: {results})'
+            string   = f'Sim({labelstr}; {start} to {end}; pop: {n_agents:n} {network}; epi: {results})'
 
         # ...but if anything goes wrong, return the default with a warning
         except Exception as E: # pragma: no cover
@@ -268,7 +271,7 @@ class BaseSim(ParsObj):
 
             # Define aliases
             mapping = dict(
-                n_agents = 'pop_size',
+                n_agents = 'n_agents',
             )
             for key1,key2 in mapping.items():
                 if key1 in pars:
@@ -281,6 +284,7 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
+
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 
@@ -320,7 +324,7 @@ class BaseSim(ParsObj):
     def scaled_pop_size(self):
         ''' Get the total population size, i.e. the number of agents times the scale factor -- if it fails, assume none '''
         try:
-            return self['pop_size']*self['pop_scale']
+            return self['n_agents']*self['pop_scale']
         except:  # pragma: no cover # If it's None or missing
             return 0
 
@@ -381,7 +385,7 @@ class BaseSim(ParsObj):
 
         tps = []
         for date in dates:
-            if date in ['end', -1]: 
+            if date in ['end', -1]:
                 date = self['end']
 
             # If it's an integer, make sure it's in the sim tvec
@@ -399,7 +403,7 @@ class BaseSim(ParsObj):
                     tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
                 except:
                     try:
-                        tp_raw  = float(date)
+                        tp_raw  = float(date) # This must be float, not int, otherwise some attempts to get t will fail
                     except:
                         errormsg = f'Could not understand the provided date {date}; try specifying it as a float or in a format understood by sc.readdate().'
                         raise ValueError(errormsg)
@@ -425,9 +429,9 @@ class BaseSim(ParsObj):
         tps = np.sort(sc.promotetoarray(tps)) # Ensure they're an array and in order
 
         if return_date_format is not None:
-            if return_date_format is 'str':
+            if return_date_format == 'str':
                 return tps, np.array([str(self.yearvec[tp]) for tp in tps])
-            elif return_date_format is 'float':
+            elif return_date_format == 'float':
                 return tps, self.yearvec[tps]
             else:
                 errormsg = f'Could not understand what format to return the dates: requested {return_date_format}, options are str or float.'
@@ -436,7 +440,7 @@ class BaseSim(ParsObj):
             return tps
 
 
-    def result_keys(self, which='total'):
+    def result_keys(self, which='all'):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
@@ -445,17 +449,19 @@ class BaseSim(ParsObj):
 
         '''
         keys = []
-        choices = ['total', 'genotype', 'all', 'by_age', 'by_sex']
-        if which in ['total', 'all']:
-            keys += [k for k,res in self.results.items() if 'total' in k and 'by_age' not in k and isinstance(res, Result)]
-        if which in ['genotype', 'all']:
-            keys += [k for k,res in self.results.items() if 'total' not in k and isinstance(res, Result)]
-        if which in ['by_age', 'all']:
-            keys += [k for k,res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
-        if which in ['by_sex', 'all']:
-            keys += [k for k,res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
-        if which not in choices: # pragma: no cover
-            errormsg = f'Choice "which" not available; choices are: {sc.strjoin(choices)}'
+        choices = ['total', 'genotype', 'all', 'by_sex', 'by_age']
+        if which in ['all']:
+            keys = [k for k,res in self.results.items() if isinstance(res, Result)]
+        elif which in ['total']:
+            keys = [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
+        elif which in ['by_sex']:
+            keys = [k for k, res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
+        elif which in ['by_age']:
+            keys = [k for k, res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
+        elif which in ['genotype']:
+            keys = [k for k,res in self.results.items() if (res[:].ndim>1) and ('by_sex' not in k) and ('by_age' not in k) and isinstance(res, Result)]
+        else:
+            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(choices)}'
             raise ValueError(errormsg)
         return keys
 
@@ -901,10 +907,37 @@ class BasePeople(FlexPretty):
     whereas this class exists to handle the less interesting implementation details.
     '''
 
-    def __init__(self):
+    def __init__(self, pars):
         ''' Initialize essential attributes used for filtering '''
-        obj_set(self, '_keys', []) # Since getattribute is overwritten
-        obj_set(self, '_inds', None)
+        # obj_set(self, '_keys', []) # Since getattribute is overwritten
+        # obj_set(self, '_inds', None)
+
+        # Set meta attribute here, because BasePeople methods expect it to exist
+        self.meta = hpd.PeopleMeta  # Store list of keys and dtypes
+        self.meta.validate()
+
+        # Define lock attribute here, since BasePeople.lock()/unlock() requires it
+        self._lock = False # Prevent further modification of keys
+
+        # Load other attributes
+        self.set_pars(pars)
+        self.version = __version__ # Store version info
+        self.contacts = None
+        self.t = 0 # Keep current simulation time
+
+        # Private variables relaying to dynamic allocation
+        self._data = sc.odict()
+        self._n = self.pars['n_agents']  # Number of agents (initial)
+        self._s = self._n # Underlying array sizes
+
+        # Initialize underlying storage and map arrays
+        for state in self.meta.all_states:
+            self._data[state.name] = state.new(pars, self._n)
+        self._map_arrays()
+
+        # Assign UIDs
+        self['uid'][:] = np.arange(self.pars['n_agents'])
+
         return
 
 
@@ -929,7 +962,7 @@ class BasePeople(FlexPretty):
             else:
                 pars = {}
         elif sc.isnumber(pars): # Interpret as a population size
-            pars = {'pop_size':pars} # Ensure it's a dictionary
+            pars = {'n_agents':pars} # Ensure it's a dictionary
 
         # Copy from old parameters to new parameters
         if isinstance(orig_pars, dict):
@@ -937,11 +970,11 @@ class BasePeople(FlexPretty):
                 if k not in pars:
                     pars[k] = v
 
-        # Do minimal validation -- needed here since pop_size should be converted to an int when first set
-        if 'pop_size' not in pars:
-            errormsg = f'The parameter "pop_size" must be included in a population; keys supplied were:\n{sc.newlinejoin(pars.keys())}'
+        # Do minimal validation -- needed here since n_agents should be converted to an int when first set
+        if 'n_agents' not in pars:
+            errormsg = f'The parameter "n_agents" must be included in a population; keys supplied were:\n{sc.newlinejoin(pars.keys())}'
             raise sc.KeyNotFoundError(errormsg)
-        pars['pop_size'] = int(pars['pop_size'])
+        pars['n_agents'] = int(pars['n_agents'])
         pars.setdefault('location', None)
         self.pars = pars # Actually store the pars
         return
@@ -960,7 +993,7 @@ class BasePeople(FlexPretty):
         # Check that parameters match
         if sim_pars is not None:
             mismatches = {}
-            keys = ['pop_size', 'network', 'location'] # These are the keys used in generating the population
+            keys = ['n_agents', 'network', 'location'] # These are the keys used in generating the population
             for key in keys:
                 sim_v = sim_pars.get(key)
                 ppl_v = self.pars.get(key)
@@ -1004,11 +1037,11 @@ class BasePeople(FlexPretty):
     def _resize_arrays(self, new_size=None, keys=None):
         ''' Resize arrays if any mismatches are found '''
 
-        # Handle None or tuple input (representing and pop_size)
+        # Handle None or tuple input (representing and n_agents)
         if new_size is None:
             new_size = len(self)
-        pop_size = new_size if not isinstance(new_size, tuple) else new_size[1]
-        self.pars['pop_size'] = pop_size
+        n_agents = new_size if not isinstance(new_size, tuple) else new_size[1]
+        self.pars['n_agents'] = n_agents
 
         # Reset sizes
         if keys is None:
@@ -1031,19 +1064,45 @@ class BasePeople(FlexPretty):
         self._lock = False
         return
 
+    def _grow(self, n):
+        """
+        Increase the number of agents stored
+
+        Automatically reallocate underlying arrays if required
+
+        :param n: Number of new agents to add
+        :return:
+        """
+        if (self._n + n) > self._s:
+            n_new = int(self._s / 2)  # 50% growth
+            for state in self.meta.all_states:
+                self._data[state.name] = np.concatenate([self._data[state.name], state.new(self.pars, n_new)], axis=self._data[state.name].ndim-1)
+            self._s += n_new
+        self._n += n
+        self._map_arrays()
+
+    def _map_arrays(self):
+        """
+        Set main simulation attributes to be views of the underlying data
+
+        This method should be called whenever the number of agents required changes
+        (regardless of whether or not the underlying arrays have been resized)
+        """
+
+        for k in self.keys():
+            if self._data[k].ndim == 2:
+                super().__setattr__(k, self._data[k][:, :self._n])
+            else:
+                super().__setattr__(k, self._data[k][:self._n])
 
     def __getitem__(self, key):
         ''' Allow people['attr'] instead of getattr(people, 'attr')
             If the key is an integer, alias `people.person()` to return a `Person` instance
         '''
-        try:
-            return self.__getattribute__(key) # Key difference here compare to covasim, which allows filtering to work
-        except: # pragma: no cover
-            if isinstance(key, int):
-                return self.person(key)
-            else:
-                errormsg = f'Key "{key}" is not a valid attribute of people'
-                raise AttributeError(errormsg)
+        if isinstance(key, int):
+            return self.person(key)
+        else:
+            return self.__getattribute__(key)
 
 
     def __setitem__(self, key, value):
@@ -1051,42 +1110,15 @@ class BasePeople(FlexPretty):
         if self._lock and key not in self.__dict__: # pragma: no cover
             errormsg = f'Key "{key}" is not a current attribute of people, and the people object is locked; see people.unlock()'
             raise AttributeError(errormsg)
-        self.__dict__[key] = value
-        return
+        return self.__setattr__(key, value)
 
 
-    def _is_filtered(self, attr):
-        ''' Determine if a given attribute is filtered (e.g. people.age is, people.inds isn't) '''
-        is_filtered = (self._inds is not None and attr in self._keys)
-        return is_filtered
-
-
-    def __getattribute__(self, attr):
-        ''' For array quantities, handle filtering '''
-        output  = obj_get(self, attr)
-        if attr[0] == '_': # Short-circuit for built-in methods to save time
-            return output
-        else:
-            try: # Unclear why this fails, but sometimes it does during initialization/pickling
-                keys = obj_get(self, '_keys')
-            except:
-                keys = []
-            if attr not in keys:
-                return output
-            else:
-                if self._is_filtered(attr):
-                    output = output[self.inds]
-        return output
-
-
-    def __setattr__(self, attr, value):
-        ''' Ditto '''
-        if self._is_filtered(attr):
-            array = obj_get(self, attr)
-            array[self.inds] = value
-        else:   # If not initialized, rely on the default behavior
-            obj_set(self, attr, value)
-        return
+    def __setattr__(self, key, value):
+        if hasattr(self, '_data') and key in self._data:
+            # Prevent accidentally overwriting a view with an actual array - if this happens, the updated values will
+            # be lost the next time the arrays are resized
+            raise Exception('Cannot assign directly to a dynamic array view - must index into the view instead e.g. `people.uid[:]=`')
+        super().__setattr__(key, value)
 
 
     def __iter__(self):
@@ -1111,7 +1143,7 @@ class BasePeople(FlexPretty):
                 raise NotImplementedError(errormsg)
 
         # Validate
-        newpeople.pars['pop_size'] += people2.pars['pop_size']
+        newpeople.pars['n_agents'] += people2.pars['n_agents']
         newpeople.validate()
 
         # Reassign UIDs so they're unique
@@ -1160,24 +1192,18 @@ class BasePeople(FlexPretty):
         return string
 
 
-    def keys(self):
-        ''' Returns keys for all properties of the people object '''
-        try: # Unclear wy this fails, but sometimes it does during initialization/pickling
-            keys = obj_get(self, '_keys')[:]
-        except:
-            keys = []
-        return keys
+    # CK: BROKEN DON'T USE
+    # def keys(self):
+    #     ''' Returns keys for all properties of the people object '''
+    #     try: # Unclear wy this fails, but sometimes it does during initialization/pickling
+    #         keys = obj_get(self, '_keys')[:]
+    #     except:
+    #         keys = []
+    #     return keys
 
 
     def set(self, key, value, die=True):
-        ''' Ensure sizes and dtypes match '''
-        current = self[key]
-        value = np.array(value, dtype=self._dtypes[key]) # Ensure it's the right type
-        if die and len(value) != len(current): # pragma: no cover
-            errormsg = f'Length of new array {key} does not match current ({len(value)} vs. {len(current)})'
-            raise IndexError(errormsg)
-        self[key] = value
-        return
+        self[key][:] = value[:] # nb. this will raise an exception the shapes don't match, and will automatically cast the value to the existing type
 
 
     def get(self, key):
@@ -1192,66 +1218,66 @@ class BasePeople(FlexPretty):
 
 
     #%% Filtering methods
-    def filter(self, criteria=None, inds=None):
-        '''
-        Store indices to allow for easy filtering of the People object.
-        Adapted from FPsim
-        Args:
-            criteria (array): a boolean array for the filtering critria
-            inds (array): alternatively, explicitly filter by these indices
-        Returns:
-            A filtered People object, which works just like a normal People object
-            except only operates on a subset of indices.
-        Examples:
-        active_people = people.filter(people.age > people.debut) # People object containing sexually active people 
-        '''
-
-        # Create a new People object with the same properties as the original
-        filtered = object.__new__(self.__class__) # Create a new People instance
-        BasePeople.__init__(filtered) # Perform essential initialization
-        filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
-
-        # Perform the filtering
-        if criteria is None: # No filtering: reset
-            filtered._inds = None
-            if inds is not None: # Unless indices are supplied directly, in which case use them
-                filtered._inds = inds
-        else: # Main use case: perform filtering
-            if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
-                new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
-            elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
-                new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
-            else:
-                errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
-                raise ValueError(errormsg)
-            if filtered.inds is None: # Not yet filtered: use the indices directly
-                filtered._inds = new_inds
-            else: # Already filtered: map them back onto the original People indices
-                filtered._inds = filtered.inds[new_inds]
-
-        return filtered
-
-
-    def unfilter(self):
-        '''
-        An easy way of unfiltering the People object, returning the original.
-        '''
-        unfiltered = self.filter(criteria=None)
-        return unfiltered
-
-
-    @property
-    def inds(self):
-        ''' Alias to self._inds to prevent accidental overwrite & increase speed '''
-        return self._inds
-
-    @property
-    def len_inds(self):
-        ''' Alias to len(self) '''
-        if self._inds is not None:
-            return len(self._inds)
-        else:
-            return len(self)
+    # def filter(self, criteria=None, inds=None):
+    #     '''
+    #     Store indices to allow for easy filtering of the People object.
+    #     Adapted from FPsim
+    #     Args:
+    #         criteria (array): a boolean array for the filtering critria
+    #         inds (array): alternatively, explicitly filter by these indices
+    #     Returns:
+    #         A filtered People object, which works just like a normal People object
+    #         except only operates on a subset of indices.
+    #     Examples:
+    #     active_people = people.filter(people.age > people.debut) # People object containing sexually active people
+    #     '''
+    #
+    #     # Create a new People object with the same properties as the original
+    #     filtered = object.__new__(self.__class__) # Create a new People instance
+    #     BasePeople.__init__(filtered) # Perform essential initialization
+    #     filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
+    #
+    #     # Perform the filtering
+    #     if criteria is None: # No filtering: reset
+    #         filtered._inds = None
+    #         if inds is not None: # Unless indices are supplied directly, in which case use them
+    #             filtered._inds = inds
+    #     else: # Main use case: perform filtering
+    #         if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
+    #             new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
+    #         elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
+    #             new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
+    #         else:
+    #             errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
+    #             raise ValueError(errormsg)
+    #         if filtered.inds is None: # Not yet filtered: use the indices directly
+    #             filtered._inds = new_inds
+    #         else: # Already filtered: map them back onto the original People indices
+    #             filtered._inds = filtered.inds[new_inds]
+    #
+    #     return filtered
+    #
+    #
+    # def unfilter(self):
+    #     '''
+    #     An easy way of unfiltering the People object, returning the original.
+    #     '''
+    #     unfiltered = self.filter(criteria=None)
+    #     return unfiltered
+    #
+    #
+    # @property
+    # def inds(self):
+    #     ''' Alias to self._inds to prevent accidental overwrite & increase speed '''
+    #     return self._inds
+    #
+    # @property
+    # def len_inds(self):
+    #     ''' Alias to len(self) '''
+    #     if self._inds is not None:
+    #         return len(self._inds)
+    #     else:
+    #         return len(self)
 
     @property
     def is_female(self):
@@ -1259,9 +1285,19 @@ class BasePeople(FlexPretty):
         return self.sex == 0
 
     @property
+    def is_female_alive(self):
+        ''' Boolean array of everyone female and alive'''
+        return ((1-self.sex) * self.alive).astype(bool)
+
+    @property
     def is_male(self):
         ''' Boolean array of everyone male '''
         return self.sex == 1
+
+    @property
+    def is_male_alive(self):
+        ''' Boolean array of everyone male and alive'''
+        return (self.sex * self.alive).astype(bool)
 
     @property
     def f_inds(self):
@@ -1292,7 +1328,22 @@ class BasePeople(FlexPretty):
     @property
     def is_active(self):
         ''' Boolean array of everyone sexually active i.e. past debut '''
-        return self.age>self.debut
+        return (self.age>self.debut) & (self.alive)
+
+    @property
+    def is_virgin(self):
+        ''' Boolean array of everyone not yet sexually active i.e. pre debut '''
+        return (self.age<self.debut) & (self.alive)
+
+    @property
+    def alive_inds(self):
+        ''' Boolean array of everyone alive '''
+        return self.true('alive')
+
+    @property
+    def n_alive(self):
+        ''' Number of people alive '''
+        return len(self.alive_inds)
 
     def true(self, key):
         ''' Return indices matching the condition '''
@@ -1332,23 +1383,30 @@ class BasePeople(FlexPretty):
 
     def keys(self):
         ''' Returns keys for all properties of the people object '''
-        return self.meta.all_states[:]
+        return [state.name for state in self.meta.all_states]
 
     def person_keys(self):
         ''' Returns keys specific to a person (e.g., their age) '''
-        return self.meta.person[:]
+        return [state.name for state in self.meta.person]
 
     def state_keys(self):
         ''' Returns keys for different states of a person (e.g., symptomatic) '''
-        return self.meta.states[:]
+        return [state.name for state in self.meta.states]
+
+    def imm_keys(self):
+        ''' Returns keys for different states of a person (e.g., symptomatic) '''
+        return [state.name for state in self.meta.imm_states]
+
+    def intv_keys(self):
+        return [state.name for state in self.meta.intv_states]
 
     def date_keys(self):
         ''' Returns keys for different event dates (e.g., date a person became symptomatic) '''
-        return self.meta.dates[:]
+        return [state.name for state in self.meta.dates]
 
     def dur_keys(self):
         ''' Returns keys for different durations (e.g., the duration from exposed to infectious) '''
-        return self.meta.durs[:]
+        return [state.name for state in self.meta.durs]
 
     def layer_keys(self):
         ''' Get the available contact keys -- try contacts first, then acts '''
@@ -1383,7 +1441,7 @@ class BasePeople(FlexPretty):
     def person(self, ind):
         ''' Method to create person from the people '''
         p = Person()
-        for key in self.meta.all_states:
+        for key in self.keys():
             data = self[key]
             if data.ndim == 1:
                 val = data[ind]
@@ -1409,9 +1467,9 @@ class BasePeople(FlexPretty):
         ''' Convert a list of people back into a People object '''
 
         # Handle population size
-        pop_size = len(people)
+        n_agents = len(people)
         if resize:
-            self._resize_arrays(new_size=pop_size)
+            self._resize_arrays(new_size=n_agents)
 
         # Iterate over people -- slow!
         for p,person in enumerate(people):
@@ -1429,7 +1487,7 @@ class BasePeople(FlexPretty):
 
             import covasim as cv
             import networkx as nx
-            sim = cv.Sim(pop_size=50, pop_type='hybrid', contacts=dict(h=3, s=10, w=10, c=5)).run()
+            sim = cv.Sim(n_agents=50, pop_type='hybrid', contacts=dict(h=3, s=10, w=10, c=5)).run()
             G = sim.people.to_graph()
             nodes = G.nodes(data=True)
             edges = G.edges(keys=True)
@@ -1565,21 +1623,22 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
 
         # Ensure the columns are right and add values if supplied
         for lkey, new_layer in new_contacts.items():
-            n = len(new_layer['f'])
-            if 'beta' not in new_layer.keys() or len(new_layer['beta']) != n:
-                if beta is None:
-                    beta = 1.0
-                beta = hpd.default_float(beta)
-                new_layer['beta'] = np.ones(n, dtype=hpd.default_float)*beta
+            if len(new_layer)>0:
+                n = len(new_layer['f'])
+                if 'beta' not in new_layer.keys() or len(new_layer['beta']) != n:
+                    if beta is None:
+                        beta = 1.0
+                    beta = hpd.default_float(beta)
+                    new_layer['beta'] = np.ones(n, dtype=hpd.default_float)*beta
 
-            # Create the layer if it doesn't yet exist
-            if lkey not in self.contacts:
-                self.contacts[lkey] = Layer(label=lkey)
+                # Create the layer if it doesn't yet exist
+                if lkey not in self.contacts:
+                    self.contacts[lkey] = Layer(label=lkey)
 
-            # Actually include them, and update properties if supplied
-            for col in self.contacts[lkey].keys(): # Loop over the supplied columns
-                self.contacts[lkey][col] = np.concatenate([self.contacts[lkey][col], new_layer[col]])
-            self.contacts[lkey].validate()
+                # Actually include them, and update properties if supplied
+                for col in self.contacts[lkey].keys(): # Loop over the supplied columns
+                    self.contacts[lkey][col] = np.concatenate([self.contacts[lkey][col], new_layer[col]])
+                self.contacts[lkey].validate()
 
         return
 
@@ -1637,15 +1696,17 @@ class Person(sc.prettyobj):
     Class for a single person. Note: this is largely deprecated since sim.people
     is now based on arrays rather than being a list of people.
     '''
-    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, partners=None, current_partners=None):
+    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, partners=None, current_partners=None,
+                 rship_start_dates=None, rship_end_dates=None, n_rships=None):
         self.uid                = uid # This person's unique identifier
         self.age                = hpd.default_float(age) # Age of the person (in years)
         self.sex                = hpd.default_int(sex) # Female (0) or male (1)
         self.partners           = partners # Preferred number of partners
         self.current_partners   = current_partners # Number of current partners
+        self.rship_start_dates  = rship_start_dates # Timepoint at which most recent relationship began
+        self.rship_end_dates    = rship_end_dates # Timepoint of most recent breakup/relationship dissolution
+        self.n_rships           = n_rships # Total number of relationships during the simulation
         self.debut              = hpd.default_float(debut) # Age of sexual debut
-        # self.infected = [] #: Record the UIDs of all people this person infected
-        # self.infected_by = None #: Store the UID of the person who caused the infection. If None but person is infected, then it was an externally seeded infection
         return
 
 
@@ -1758,7 +1819,7 @@ class Contacts(FlexDict):
         **Example**::
 
             import networkx as nx
-            sim = cv.Sim(pop_size=50, pop_type='hybrid').run()
+            sim = hpv.Sim(n_agents=50, pop_type='hybrid').run()
             G = sim.people.contacts.to_graph()
             nx.draw(G)
         '''
@@ -1776,7 +1837,7 @@ class Layer(FlexDict):
     A small class holding a single layer of contact edges (connections) between people.
 
     The input is typically arrays including: person 1 of the connection, person 2 of
-    the connection, the weight of the connection, the duration and start/end times of 
+    the connection, the weight of the connection, the duration and start/end times of
     the connection. Connections are undirected; each person is both a source and sink.
 
     This class is usually not invoked directly by the user, but instead is called
@@ -1821,6 +1882,8 @@ class Layer(FlexDict):
             'dur':   hpd.default_float, # Duration of partnership
             'start': hpd.default_int, # Date of partnership start
             'end':   hpd.default_float, # Date of partnership end
+            'age_f': hpd.default_float,  # Age of female partner
+            'age_m': hpd.default_float,  # Age of male partner
         }
         self.basekey = 'f' # Assign a base key for calculating lengths and performing other operations
         self.label = label
@@ -1961,7 +2024,7 @@ class Layer(FlexDict):
         **Example**::
 
             import networkx as nx
-            sim = cv.Sim(pop_size=20, pop_type='hybrid').run()
+            sim = hpv.Sim(n_agents=20, pop_type='hybrid').run()
             G = sim.people.contacts['h'].to_graph()
             nx.draw(G)
         '''
@@ -2030,14 +2093,14 @@ class Layer(FlexDict):
             frac (float): the fraction of contacts to update on each timestep
         '''
         # Choose how many contacts to make
-        pop_size   = len(people) # Total number of people
+        n_agents   = len(people) # Total number of agents
         n_contacts = len(self) # Total number of contacts
         n_new = int(np.round(n_contacts*frac)) # Since these get looped over in both directions later
         inds = hpu.choose(n_contacts, n_new)
 
         # Create the contacts, not skipping self-connections
-        self['f'][inds]   = np.array(hpu.choose_r(max_n=pop_size, n=n_new), dtype=hpd.default_int) # Choose with replacement
-        self['m'][inds]   = np.array(hpu.choose_r(max_n=pop_size, n=n_new), dtype=hpd.default_int)
+        self['f'][inds]   = np.array(hpu.choose_r(max_n=n_agents, n=n_new), dtype=hpd.default_int) # Choose with replacement
+        self['m'][inds]   = np.array(hpu.choose_r(max_n=n_agents, n=n_new), dtype=hpd.default_int)
         self['beta'][inds] = np.ones(n_new, dtype=hpd.default_float)
         return
 

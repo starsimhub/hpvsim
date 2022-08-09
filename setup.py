@@ -1,29 +1,49 @@
+import os
+import runpy
 from setuptools import setup, find_packages
-from setuptools.extension import Extension
-import hpvsim.version
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-    ext_name = "hpvsim"
+# Get version
+cwd = os.path.abspath(os.path.dirname(__file__))
+versionpath = os.path.join(cwd, 'hpvsim', 'version.py')
+version = runpy.run_path(versionpath)['__version__']
 
-with open('requirements.txt') as requirements_file:
-    requirements = requirements_file.read().split("\n")
+# Get the documentation
+with open(os.path.join(cwd, 'README.rst'), "r") as f:
+    long_description = f.read()
+
+CLASSIFIERS = [
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python :: 3.9",
+]
 
 setup(
-    name=ext_name,
-    version=hpvsim.version.__version__,
-    author="Jamie Cohen",
-    author_email="jcohen@idmod.org",
-    description="IDM's agent-based HPV transmission model",
+    name="hpvsim",
+    version=version,
+    author="Robyn Stuart, Jamie Cohen, Mariah Boudreau, Cliff Kerr, Daniel Klein, Hao Hu",
+    author_email="robyn.stuart@gatesfoundation.org",
+    description="HPVsim: Human Papillomavirus Simulator",
     long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/amath-idm/hpvsim",
-    packages=setuptools.find_packages(exclude=["data"]),
+    long_description_content_type="text/x-rst",
+    url='http://hpvsim.org',
+    keywords=["HPV", "agent-based model", "simulation"],
+    platforms=["OS Independent"],
+    classifiers=CLASSIFIERS,
+    packages=find_packages(),
     include_package_data=True,
-    install_requires=requirements,
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: Creative Commons International",
-        "Operating System :: OS Independent",
-    ]
+    install_requires=[
+        'numpy',
+        'numba',
+        'scipy',
+        'pandas', 
+        'sciris',
+        'matplotlib',
+        'seaborn',
+        'wbgapi',
+    ],
 )

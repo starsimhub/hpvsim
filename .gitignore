@@ -1,3 +1,13 @@
+<<<<<<< HEAD
+=======
+# Other files
+.idea
+.vscode
+
+# HPVsim-generated files
+*.obj
+
+>>>>>>> c7282853b875bc74f4c04d932d7efbe216ac48a3
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -64,13 +74,20 @@ db.sqlite3-journal
 # Flask stuff:
 instance/
 .webassets-cache
+<<<<<<< HEAD
+=======
+*.out
+>>>>>>> c7282853b875bc74f4c04d932d7efbe216ac48a3
 
 # Scrapy stuff:
 .scrapy
 
 # Sphinx documentation
 docs/_build/
+<<<<<<< HEAD
 docs/hpvsim.*
+=======
+>>>>>>> c7282853b875bc74f4c04d932d7efbe216ac48a3
 
 # PyBuilder
 target/
@@ -128,3 +145,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+<<<<<<< HEAD
+=======
+
+# Node.js and NPM
+node_modules
+>>>>>>> c7282853b875bc74f4c04d932d7efbe216ac48a3

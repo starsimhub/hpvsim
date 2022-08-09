@@ -36,28 +36,41 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 @nb.njit(              (nbbool[:,:],    nbbool[:,:],    nbbool[:]), cache=cache, parallel=safe_parallel)
 def get_sources_targets(inf,           sus,            sex):
     ''' Get indices of sources, i.e. people with current infections '''
-    f_sus = (sus * ~sex).nonzero()
-    m_sus = (sus * sex).nonzero()
-    f_inf = (inf * ~sex).nonzero()
-    m_inf = (inf * sex).nonzero()
-    return f_inf, m_inf, f_sus, m_sus
+    sus_genotypes, sus_inds = (sus * sex).nonzero()
+    inf_genotypes, inf_inds = (inf * sex).nonzero()
+    return inf_genotypes, inf_inds, sus_genotypes, sus_inds
 
 
-@nb.njit(parallel=safe_parallel)
-def pair_lookup_vals(contacts_array, people_inds, genotypes, n):
-    lookup = np.empty(n, nbfloat)
-    lookup.fill(np.nan)
+@nb.njit(           (nbint[:],       nb.int64[:], nb.int64[:],  nbint), cache=cache, parallel=safe_parallel)
+def pair_lookup_vals(contacts_array, people_inds, genotypes,    n):
+    ft = hpd.default_float # nbfloat
+    lookup = np.empty(n, ft) # Create a lookup array consisting of length len(people)
+    lookup.fill(np.nan) # Fill it with NaNs
     lookup[people_inds[::-1]] = genotypes[::-1]
     res_val = lookup[contacts_array]
     mask = ~np.isnan(res_val)
     return mask, res_val
 
-@nb.njit(parallel=safe_parallel)
+
+@nb.njit(      (nbint[:],       nb.int64[:], nbint), cache=cache,parallel=safe_parallel)
 def pair_lookup(contacts_array, people_inds, n):
     lookup = np.full(n, False)
     lookup[people_inds[::-1]] = True
     res_val = lookup[contacts_array]
     return res_val
+
+@nb.njit(cache=cache, parallel=safe_parallel)
+def unique(arr):
+    '''
+    Find the unique elements and counts in an array.
+    Equivalent to np.unique(return_counts=True) but ~5x faster, and
+    only works for arrays of positive integers.
+    '''
+    counts = np.bincount(arr.ravel())
+    unique = np.flatnonzero(counts)
+    counts = counts[unique]
+    return unique, counts
+
 
 @nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isin( arr,      search_inds):
@@ -70,31 +83,40 @@ def isin( arr,      search_inds):
             result[i] = True
     return result
 
+
 @nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
 def findinds(arr,       vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
     return isin(arr,vals).nonzero()[0]
 
 
-@nb.njit()
-def get_discordant_pairs(f_inf_inds, m_inf_inds, f_sus_inds, m_sus_inds, f, m, n):
+@nb.njit(               (nb.int64[:],   nb.int64[:],    nb.int64[:], nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
+def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p2,       n):
     '''
     Construct discordant partnerships
     '''
-    f_source_pships, f_genotypes = pair_lookup_vals(f, f_inf_inds[1], f_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    m_source_pships, m_genotypes = pair_lookup_vals(m, m_inf_inds[1], m_inf_inds[0], n) # Pull out the indices of partnerships in which the female is infected, as well as the genotypes
-    f_sus_pships = pair_lookup(f, f_sus_inds[1], n) # Pull out the indices of partnerships in which the female is susceptible, as well as the genotypes
-    m_sus_pships = pair_lookup(m, m_sus_inds[1], n) # ... same thing for males
-    f_genotypes = f_genotypes[(~np.isnan(f_genotypes)*m_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
-    m_genotypes = m_genotypes[(~np.isnan(m_genotypes)*f_sus_pships).nonzero()[0]].astype(hpd.default_int) # ... and again for males
-    f_source_pships = f_source_pships * m_sus_pships # Remove partnerships where both partners have an infection with the same genotype
-    m_source_pships = m_source_pships * f_sus_pships # ... same thing for males
-    f_source_inds = f_source_pships.nonzero()[0] # Indices of partnerships where the female has an infection
-    m_source_inds = m_source_pships.nonzero()[0] # Indices of partnerships where the male has an infection and the female does not
-    return f_source_inds, f_genotypes, m_source_inds, m_genotypes
+
+    p1_source_pships, p1_genotypes = pair_lookup_vals(p1, p1_inf_inds, p1_inf_gens, n) # Pull out the indices of partnerships in which p1 is infected, as well as the genotypes they're infected with
+    p2_sus_pships = pair_lookup(p2, p2_sus_inds, n) # ... pull out the indices of partnerships in which p2 is susceptible
+    p1_genotypes = p1_genotypes[(~np.isnan(p1_genotypes)*p2_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
+    p1_source_pships = p1_source_pships * p2_sus_pships # Remove partnerships where both partners have an infection with the same genotype
+    p1_source_inds = p1_source_pships.nonzero()[0] # Indices of partnerships where the p1 has an infection and p2 is susceptible
+    return p1_source_inds, p1_genotypes
 
 
-@nb.njit(             (nbfloat[:],  nbint[:]), cache=cache, parallel=safe_parallel)
+@nb.njit(                (nb.int64[:],  nb.int64[:],    nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
+def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
+    '''
+    Construct discordant partnerships
+    '''
+    p1_source_pships    = pair_lookup(p1, p1_inf_inds, n) # Pull out the indices of partnerships in which p1 is infected
+    p2_sus_pships       = pair_lookup(p2, p2_sus_inds, n) # ... pull out the indices of partnerships in which p2 is susceptible
+    p1_source_pships    = p1_source_pships * p2_sus_pships # Remove partnerships where both partners have an infection with the same genotype
+    p1_source_inds      = p1_source_pships.nonzero()[0] # Indices of partnerships where the p1 has an infection and p2 is susceptible
+    return p1_source_inds
+
+
+@nb.njit(             (nb.float32[:],  nbint[:]), cache=cache, parallel=safe_parallel)
 def compute_infections(betas,       targets):
     '''
     Compute who infects whom
@@ -136,6 +158,127 @@ def find_contacts(p1, p2, inds): # pragma: no cover
     return pairing_partners
 
 
+def logf1(x, k):
+    '''
+    The concave part of a logistic function, with point of inflexion at 0,0
+    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
+    '''
+    return (2 / (1 + np.exp(-k * x))) - 1
+
+
+def logf2(x, x_infl, k):
+    '''
+    Logistic function, constrained to pass through 0,0 and with upper asymptote
+    at 1. Accepts 2 parameters: growth rate and point of inflexion.
+    '''
+    l_asymp = -1/(1+np.exp(k*x_infl))
+    return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
+
+
+def set_prognoses(people, inds, g, dur_none):
+    ''' Set disease progression '''
+
+    # Get parameters that will be used later
+    dt = people.pars['dt']
+    genotype_pars = people.pars['genotype_pars']
+    genotype_map = people.pars['genotype_map']
+    dur_dyps  = genotype_pars[genotype_map[g]]['dur_dysp']
+    dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
+    prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
+    prog_time = genotype_pars[genotype_map[g]]['prog_time']
+    ccut = people.pars['clinical_cutoffs']
+    sev_dist = people.pars['severity_dist']['dist']
+    sev_par2 = people.pars['severity_dist']['par2']
+
+    # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
+    cin1_probs = logf1(dur_none, dysp_rate) # Probability of developing dysplasia
+    is_cin1 = binomial_arr(cin1_probs) # Boolean array of dysplasias
+    cin1_inds = inds[is_cin1] # Indices of those with dysplasia
+    no_cin1_inds = inds[~is_cin1] # Indices of those without dysplasia
+
+    # CASE 1: Infection clears without causing dysplasia
+    people.date_clearance[g, no_cin1_inds] = people.date_infectious[g, no_cin1_inds] \
+                                             + np.ceil(people.dur_none[g, no_cin1_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+
+    # CASE 2: Infection progresses to mild dysplasia (CIN1)
+    excl_inds = true(people.date_cin1[g, cin1_inds] < people.t)  # Don't count CIN1s that were acquired before now
+    people.date_cin1[g, cin1_inds[excl_inds]] = np.nan
+    people.date_cin1[g, cin1_inds] = np.fmin(people.date_cin1[g, cin1_inds],
+                                             people.date_infectious[g, cin1_inds] +
+                                             np.ceil(people.dur_none[g, cin1_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
+
+    # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
+    dur_to_peak_dys = sample(**dur_dyps, size=len(cin1_inds))
+    people.dur_none[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
+    mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
+    peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
+
+    # Determine whether CIN1 clears or progresses to CIN2
+    is_cin2 = peaks>ccut['cin1']
+    time_to_cin2 = ccut['cin1']/(peaks[is_cin2]/dur_to_peak_dys[is_cin2])
+    cin2_inds = cin1_inds[is_cin2]
+    no_cin2_inds = cin1_inds[~is_cin2]
+
+    # CASE 2.1: Mild dysplasia regresses and infection clears
+    time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(no_cin2_inds))
+    people.date_clearance[g, no_cin2_inds] = np.fmax(people.date_clearance[g, no_cin2_inds],
+                                                     people.date_cin1[g, no_cin2_inds] +
+                                                     np.ceil(dur_to_peak_dys[~is_cin2] / dt) +
+                                                     np.ceil(time_to_clear_cin1 / dt))
+
+    # CASE 2.2: Mild dysplasia progresses to moderate (CIN1 to CIN2)
+    excl_inds = true(people.date_cin2[g, cin2_inds] < people.t)  # Don't count CIN2s that were acquired before now
+    people.date_cin2[g, cin2_inds[excl_inds]] = np.nan
+    people.date_cin2[g, cin2_inds] = np.fmin(people.date_cin2[g, cin2_inds],
+                                             people.date_cin1[g, cin2_inds] +
+                                             np.ceil(time_to_cin2 / dt))  # Date they get CIN2 - minimum of any previous date and the date from the current infection
+
+    # Determine whether CIN2 clears or progresses to CIN3
+    is_cin3 = peaks>ccut['cin2'] # This isn't a typo: the ccut['cin2'] value is the upper bound for CIN2 classification, so anyone above this is CIN3
+    time_to_cin3 = ccut['cin2']/(peaks[is_cin3]/dur_to_peak_dys[is_cin3])
+    cin3_inds = cin1_inds[is_cin3]
+    no_cin3_inds = cin1_inds[~is_cin3]
+
+    # CASE 2.2.1: Moderate dysplasia regresses and the virus clears
+    time_to_clear_cin2 = sample(**people.pars['dur_cin2_clear'], size=len(no_cin3_inds))
+    people.date_clearance[g, no_cin3_inds] = np.fmax(people.date_clearance[g, no_cin3_inds],
+                                                     people.date_cin1[g, no_cin3_inds] +
+                                                     np.ceil(dur_to_peak_dys[~is_cin3] / dt) +
+                                                     np.ceil(time_to_clear_cin2 / dt))  # Date they clear CIN2
+
+    # CASE 2.2.2: Moderate dysplasia progresses to severe (CIN2 to CIN3)
+    excl_inds = true(people.date_cin3[g, cin3_inds] < people.t)  # Don't count CIN2s that were acquired before now
+    people.date_cin3[g, cin3_inds[excl_inds]] = np.nan
+    people.date_cin3[g, cin3_inds] = np.fmin(people.date_cin3[g, cin3_inds],
+                                             people.date_cin1[g, cin3_inds] +
+                                             np.ceil(time_to_cin3 / dt))  # Date they get CIN3 - minimum of any previous date and the date from the current infection
+
+    # Determine whether CIN3 clears or progresses to invasive cervical cancer
+    is_cancer = peaks>ccut['cin3'] # Anyone above the upper threshold for CIN3 classification is cancerous (NB, this reflects a modeling choice and does not represent an exact biological mechanism)
+    time_to_cancer = ccut['cin3']/(peaks[is_cancer]/dur_to_peak_dys[is_cancer])
+    cancer_inds = cin1_inds[is_cancer]
+    no_cancer_inds = cin1_inds[~is_cancer]
+
+    # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
+    time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
+    people.date_clearance[g, cin3_inds] = np.fmax(people.date_clearance[g, cin3_inds],
+                                                  people.date_cin1[g, cin3_inds] +
+                                                  np.ceil(dur_to_peak_dys[is_cin3] / dt) +
+                                                  np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
+
+    # Case 2.2.2.2: Severe dysplasia progresses to cancer
+    excl_inds = true(people.date_cancerous[cancer_inds] < people.t)  # Don't count cancers that were acquired before now
+    people.date_cancerous[cancer_inds[excl_inds]] = np.nan
+    people.date_cancerous[cancer_inds] = np.fmin(people.date_cancerous[cancer_inds],
+                                                    people.date_cin1[g, cancer_inds] +
+                                                    np.ceil(dur_to_peak_dys[is_cancer] / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
+
+    # Record eventual deaths from cancer (assuming no survival without treatment)
+    dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
+    people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
+
+    return
+
 
 #%% Sampling and seed methods
 
@@ -156,6 +299,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     - 'poisson'       : Poisson distribution with rate=par1 (par2 is not used); mean and variance are equal to par1
     - 'neg_binomial'  : negative binomial distribution with mean=par1 and k=par2; converges to Poisson with k=∞
     - 'beta'          : beta distribution with alpha=par1 and beta=par2;
+    - 'gamma'         : gamma distribution with shape=par1 and scale=par2;
 
     Args:
         dist (str):   the distribution to sample from
@@ -197,6 +341,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
         'poisson',
         'neg_binomial',
         'beta',
+        'gamma',
     ]
 
     # Ensure it's an integer
@@ -212,8 +357,9 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     elif dist == 'poisson':           samples = n_poisson(rate=par1, n=size, **kwargs) # Use Numba version below for speed
     elif dist == 'neg_binomial':      samples = n_neg_binomial(rate=par1, dispersion=par2, n=size, **kwargs) # Use custom version below
     elif dist == 'beta':              samples = np.random.beta(a=par1, b=par2, size=size, **kwargs)
+    elif dist == 'gamma':             samples = np.random.gamma(shape=par1, scale=par2, size=size, **kwargs)
     elif dist in ['lognorm', 'lognormal', 'lognorm_int', 'lognormal_int']:
-        if par1>0:
+        if (sc.isnumber(par1) and par1>0) or (sc.checktype(par1,'arraylike') and (par1>0).all()):
             mean  = np.log(par1**2 / np.sqrt(par2**2 + par1**2)) # Computes the mean of the underlying normal distribution
             sigma = np.sqrt(np.log(par2**2/par1**2 + 1)) # Computes sigma for the underlying normal distribution
             samples = np.random.lognormal(mean=mean, sigma=sigma, size=size, **kwargs)

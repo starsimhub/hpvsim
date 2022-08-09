@@ -1,20 +1,18 @@
 '''
 Core plotting functions for simulations, multisims, and scenarios.
-
-Also includes Plotly-based plotting functions to supplement the Matplotlib based
-ones that are of the Sim and Scenarios objects. Intended mostly for use with the
-webapp.
 '''
 
 import numpy as np
 import pylab as pl
 import sciris as sc
+import pandas as pd
+import seaborn as sns
 from . import misc as hpm
 from . import defaults as hpd
 from .settings import options as hpo
 
 
-# __all__ = ['plot_sim', 'plot_scens', 'plot_result', 'plot_compare', 'plot_people', 'plotly_sim', 'plotly_people', 'plotly_animate']
+__all__ = ['plot_sim', 'plot_scens', 'plot_scen_age_results', 'plot_result', 'plot_people']
 
 
 #%% Plotting helper functions
@@ -134,7 +132,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
 
     # If not specified or specified as another string, load defaults
     if to_plot is None or isinstance(to_plot, str):
-        to_plot = hpd.get_default_plots(to_plot, kind=kind, sim=sim)
+        to_plot = hpd.get_default_plots(which=to_plot, kind=kind, sim=sim)
 
     # If a list of keys has been supplied or constructed
     if isinstance(to_plot, list):
@@ -148,7 +146,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
             else:
                 invalid += reskey
         if len(invalid):
-            errormsg = f'The following key(s) are invalid:\n{sc.strjoin(invalid)}\n\nValid main keys are:\n{sc.strjoin(reskeys)}\n\nValid genotype keys are:\n{sc.strjoin(varkeys)}'
+            errormsg = f'The following key(s) are invalid:\n{sc.strjoin(invalid)}\n\nValid main keys are:\n{sc.strjoin(reskeys)}\n\nValid genotype keys are:\n{sc.strjoin(genkeys)}'
             raise sc.KeyNotFoundError(errormsg)
 
     to_plot = sc.odict(sc.dcp(to_plot)) # In case it's supplied as a dict
@@ -185,7 +183,7 @@ def create_figs(args, sep_figs, fig=None, ax=None):
     return fig, figs
 
 
-def create_subplots(figs, fig, shareax, n_rows, n_cols, pnum, fig_args, sep_figs, log_scale, title):
+def create_subplots(figs, fig, shareax, n_rows, n_cols, pnum, fig_args, sep_figs, log_scale, title=None):
     ''' Create subplots and set logarithmic scale '''
 
     # Try to find axes by label, if they've already been defined -- this is to avoid the deprecation warning of reusing axes
@@ -288,57 +286,20 @@ def title_grid_legend(ax, title, grid, commaticks, setylim, legend_args, show_ar
     return
 
 
-def reset_ticks(ax, sim=None, date_args=None, start_day=None, n_cols=1):
-    ''' Set the tick marks, using dates by default '''
 
-    # Handle options
-    date_args = sc.objdict(date_args) # Ensure it's not a regular dict
-    if start_day is None and sim is not None:
-        start_day = sim['start_day']
-
-    # Set xticks as dates
-    d_args = {k:date_args.pop(k) for k in ['as_dates', 'dateformat']} # Pop these to handle separately
-    if d_args['as_dates']:
-        if d_args['dateformat'] is None and n_cols >= 3: # Change default date format if more than 2 columns are shown
-            d_args['dateformat'] = 'concise'
-        if d_args['dateformat'] in ['covasim', 'sciris', 'auto', 'matplotlib', 'concise', 'brief']: # Handle date formatter rather than date format
-            style, dateformat = d_args['dateformat'], None # Swap argument order
-            style = style.replace('covasim', 'sciris') # In case any users are confused about what "default" is
-        else:
-            dateformat, style = d_args['dateformat'], 'sciris' # Otherwise, treat dateformat as a date format
-        sc.dateformatter(ax=ax, style=style, dateformat=dateformat, **date_args) # Actually format the axis with dates, rotation, etc.
-    else:
-        # Handle start and end days
-        xmin,xmax = ax.get_xlim()
-        if date_args.start:
-            xmin = float(sc.day(date_args.start, start_date=start_day)) # Keep original type (float)
-        if date_args.end:
-            xmax = float(sc.day(date_args.end, start_date=start_day))
-        ax.set_xlim([xmin, xmax])
-
-        # Set the x-axis intervals
-        if date_args.interval:
-            ax.set_xticks(np.arange(xmin, xmax+1, date_args.interval))
-
-    # Restore date args
-    date_args.update(d_args)
-
-    return
-
-
-def tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args):
+def tidy_up(fig, figs=None, do_save=False, fig_path=None, do_show=False, args=None):
     ''' Handle saving, figure showing, and what value to return '''
 
     figlist = sc.mergelists(fig, figs) # Usually just one figure, but here for completeness
 
     # Optionally maximize -- does not work on all systems
-    if args.show['maximize']:
+    if args is not None and hasattr(args, 'show') and args.show['maximize']:
         for f in figlist:
             sc.maximize(fig=f)
         pl.pause(0.01) # Force refresh
 
     # Use tight layout for all figures
-    if args.show['tight']:
+    if args is not None and hasattr(args, 'show') and args.show['tight']:
         for f in figlist:
             sc.figlayout(fig=f)
 
@@ -372,7 +333,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
          show_args=None, style_args=None, n_cols=None, grid=True, commaticks=True,
          setylim=True, log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False,
-         fig=None, ax=None, **kwargs):
+         fig=None, ax=None, plot_burnin=False, **kwargs):
     ''' Plot the results of a single simulation -- see Sim.plot() for documentation '''
 
     # Handle inputs
@@ -381,36 +342,37 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
     to_plot, n_cols, n_rows = handle_to_plot('sim', to_plot, n_cols, sim=sim)
 
     # Do the plotting
+    bi = 0 if plot_burnin else int(sim['burnin'])
     with hpo.with_style(args.style):
         fig, figs = create_figs(args, sep_figs, fig, ax)
-        total_keys = [k for k in sim.result_keys() if 'total' in k]
-        age_keys = sim.result_keys('by_age')
+        total_keys = sim.result_keys('total') # Consider a more robust way to do this
+        sex_keys = sim.result_keys('by_sex')
         for pnum,title,keylabels in to_plot.enumitems():
             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
             for resnum,reskey in enumerate(keylabels):
-                res_t = sim.results['year']
+                res_t = sim.results['year'][bi:]
                 res = sim.results[reskey]
                 if reskey in total_keys:
                     color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
                     label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
-                    ax.plot(res_t, res.values, label=label, **args.plot, c=color)  # Plot result
-                elif reskey in age_keys:
-                    n_ages = hpd.n_age_brackets # TODO: this should be taken from the sim, not defaults
-                    age_colors = sc.gridcolors(n_ages)
-                    for age in range(n_ages):
+                    ax.plot(res_t, res.values[bi:], label=label, **args.plot, c=color)  # Plot result
+                elif reskey in sex_keys:
+                    n_sexes = 2
+                    sex_colors = ['#4679A2', '#A24679']
+                    sex_labels = ['males', 'females']
+                    for sex in range(n_sexes):
                         # Colors and labels
-                        v_color = age_colors[age]
-                        v_label = hpd.age_labels[age] # TODO this should also come from the sim
+                        v_color = sex_colors[sex]
+                        v_label = sex_labels[sex]  # TODO this should also come from the sim
                         color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
                         label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label:
                             label += f' - {v_label}'
                         else:
                             label = v_label
-                        ax.plot(res_t, res.values[age, :], label=label, **args.plot, c=color)  # Plot result
+                        ax.plot(res_t, res.values[sex, bi:], label=label, **args.plot, c=color)  # Plot result
                 else:
                     ng = sim['n_genotypes']
-                    # genotype_colors = sc.gridcolors(ng)
                     for genotype in range(ng):
                         # Colors and labels
                         v_color = res.color[genotype]
@@ -419,115 +381,198 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label: label += f' - {v_label}'
                         else:     label = v_label
-                        ax.plot(res_t, res.values[genotype,:], label=label, **args.plot, c=color)  # Plot result
-            #     if args.show['data']:
-            #         plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
-            #     if args.show['ticks']:
-            #         reset_ticks(ax, sim, args.date, n_cols=n_cols) # Optionally reset tick marks (useful for e.g. plotting weeks/months)
-            # if args.show['interventions']:
-            #     plot_interventions(sim, ax) # Plot the interventions
+                        ax.plot(res_t, res.values[genotype,bi:], label=label, **args.plot, c=color)  # Plot result
+
+                if args.show['data']:
+                    plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
+
+            if args.show['interventions']:
+                plot_interventions(sim, ax) # Plot the interventions
             title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
-        output = tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+        output = tidy_up(fig, figs, do_save, fig_path, do_show, args)
 
     return output
 
 
-# def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
-#          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
-#          show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
-#          log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None, **kwargs):
-#     ''' Plot the results of a scenario -- see Scenarios.plot() for documentation '''
+def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
+         scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
+         show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
+         log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None,
+         plot_burnin=False,**kwargs):
+    ''' Plot the results of a scenario -- see Scenarios.plot() for documentation '''
 
-#     # Handle inputs
-#     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
-#                    legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
-#     to_plot, n_cols, n_rows = handle_to_plot('scens', to_plot, n_cols, sim=scens.base_sim, check_ready=False) # Since this sim isn't run
+    # Handle inputs
+    args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
+                   legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
+    to_plot, n_cols, n_rows = handle_to_plot('scens', to_plot, n_cols, sim=scens.base_sim, check_ready=False) # Since this sim isn't run
 
-#     # Do the plotting
-#     with cvo.with_style(args.style):
-#         fig, figs = create_figs(args, sep_figs, fig, ax)
-#         default_colors = sc.gridcolors(ncolors=len(scens.sims))
-#         for pnum,title,reskeys in to_plot.enumitems():
-#             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
-#             reskeys = sc.promotetolist(reskeys) # In case it's a string
-#             for reskey in reskeys:
-#                 res_t = scens.datevec
-#                 resdata = scens.results[reskey]
-#                 for snum,scenkey,scendata in resdata.enumitems():
-#                     sim = scens.sims[scenkey][0] # Pull out the first sim in the list for this scenario
-#                     genotype_keys = sim.result_keys('genotype')
-#                     if reskey in genotype_keys:
-#                         ns = sim['n_genotypes']
-#                         genotype_colors = sc.gridcolors(ns)
-#                         for genotype in range(ns):
-#                             res_y = scendata.best[genotype,:]
-#                             color = genotype_colors[genotype]  # Choose the color
-#                             label = 'wild type' if genotype == 0 else sim['genotypes'][genotype - 1].label
-#                             ax.fill_between(res_t, scendata.low[genotype,:], scendata.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
-#                             ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
-#                             if args.show['data']:
-#                                 plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
-#                     else:
-#                         res_y = scendata.best
-#                         color = set_line_options(colors, scenkey, snum, default_colors[snum])  # Choose the color
-#                         label = set_line_options(labels, scenkey, snum, scendata.name)  # Choose the label
-#                         ax.fill_between(res_t, scendata.low, scendata.high, color=color, **args.fill)  # Create the uncertainty bound
-#                         ax.plot(res_t, res_y, label=label, c=color, **args.plot)  # Plot the actual line
-#                         if args.show['data']:
-#                             plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
+    # Do the plotting
+    with hpo.with_style(args.style):
+        fig, figs = create_figs(args, sep_figs, fig, ax)
+        default_colors = sc.gridcolors(ncolors=len(scens.sims))
+        for pnum,title,reskeys in to_plot.enumitems():
+            ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
+            reskeys = sc.promotetolist(reskeys) # In case it's a string
+            for reskey in reskeys:
+                res_t = scens.res_yearvec
+                resdata = scens.results[reskey]
+                for snum,scenkey,scendata in resdata.enumitems():
+                    sim = scens.sims[scenkey][0] # Pull out the first sim in the list for this scenario
+                    bi = 0 if plot_burnin else int(sim['burnin'])
+                    genotypekeys = sim.result_keys('genotype')
+                    sexkeys = sim.result_keys('by_sex')
+                    if reskey in genotypekeys:
+                        ng = sim['n_genotypes']
+                        genotype_colors = sc.gridcolors(ng)
+                        for genotype in range(ng):
+                            res_y = scendata.best
+                            color = genotype_colors[genotype]
+                            label = sim['genotypes'][genotype].label.upper()
+                            ax.fill_between(res_t, scendata.low[genotype,:], scendata.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
+                            ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
+                    elif reskey in sexkeys:
+                        n_sexes = 2
+                        sex_colors = ['#4679A2', '#A24679']
+                        sex_labels = ['males', 'females']
+                        for sex in range(n_sexes):
+                            # Colors and labels
+                            v_label = sex_labels[sex]  # TODO this should also come from the sim
+                            res_y = scendata.best[sex, :]
+                            color = sex_colors[sex]
+                            label = res.name + sex_labels[sex]
+                            ax.fill_between(res_t[bi:], scendata.low[genotype, bi:], scendata.high[genotype, bi:],
+                                            color=color, **args.fill)  # Create the uncertainty bound
+                            ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
+                    else:
+                        res_y = scendata.best
+                        color = set_line_options(colors, scenkey, snum, default_colors[snum])  # Choose the color
+                        label = set_line_options(labels, scenkey, snum, scendata.name)  # Choose the label
+                        ax.fill_between(res_t[bi:], scendata.low[bi:], scendata.high[bi:], color=color, **args.fill)  # Create the uncertainty bound
+                        ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
 
-#                     if args.show['interventions']:
-#                         plot_interventions(sim, ax) # Plot the interventions
-#                     if args.show['ticks']:
-#                         reset_ticks(ax, sim, args.date) # Optionally reset tick marks (useful for e.g. plotting weeks/months)
-#             if args.show['legend']:
-#                 title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum==0) # Configure the title, grid, and legend -- only show legend for first
+                    if args.show['interventions']:
+                        plot_interventions(sim, ax) # Plot the interventions
+            if args.show['legend']:
+                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum==0) # Configure the title, grid, and legend -- only show legend for first
 
-#     return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+    return tidy_up(fig, figs, do_save, fig_path, do_show, args)
 
 
-# def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, scatter_args=None,
-#                 date_args=None, style_args=None, grid=False, commaticks=True, setylim=True, color=None, label=None,
-#                 do_show=None, do_save=False, fig_path=None, fig=None, ax=None, **kwargs):
-#     ''' Plot a single result -- see ``cv.Sim.plot_result()`` for documentation '''
+def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
+         scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
+         show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
+         log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None,
+         plot_burnin=False, plot_type=sns.boxplot, **kwargs):
+    ''' Plot age results of a scenario'''
 
-#     # Handle inputs
-#     sep_figs = False # Only one figure
-#     fig_args  = sc.mergedicts({'figsize':(8,5)}, fig_args)
-#     axis_args = sc.mergedicts({'top': 0.95}, axis_args)
-#     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args,
-#                        date_args=date_args, style_args=style_args, **kwargs)
+    # Handle inputs
+    args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
+                   legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
 
-#     # Gather results
-#     res = sim.results[key]
-#     res_t = sim.results['date']
-#     if color is None:
-#         color = res.color
+    # Get the analyzer details from the base sim
+    base_analyzer = scens.sims[0][0].get_analyzer(analyzer_ref)
+    if not len(base_analyzer.results):
+        errormsg = f'Cannot plot since no age results were recorded.'
+        raise ValueError(errormsg)
+    base_res = base_analyzer.results[0]
 
-#     # Do the plotting
-#     with cvo.with_style(args.style):
-#         fig, figs = create_figs(args, sep_figs, fig, ax)
+    result_keys   = base_analyzer.result_keys.keys()
+    all_dates = [[date for date in r.keys() if date != 'bins'] for r in base_analyzer.results.values()]
+    dates_per_result = [len(date_list) for date_list in all_dates]
+    n_plots = sum(dates_per_result)
+    n_rows, n_cols = sc.get_rows_cols(n_plots)
 
-#         # Reuse the figure, if available
-#         if ax is None: # Otherwise, make a new one
-#             try:
-#                 ax = fig.axes[0]
-#             except:
-#                 ax = fig.add_subplot(111, label='ax1')
+    # Construct dataframe for result storage
+    to_plot = {k:base_analyzer.result_properties[k].name for k in result_keys}
+    n_runs = scens['n_runs']
+    n_results = n_plots
 
-#         if label is None:
-#             label = res.name
-#         if res.low is not None and res.high is not None:
-#             ax.fill_between(res_t, res.low, res.high, color=color, **args.fill) # Create the uncertainty bound
+    # Do the plotting
+    with hpo.with_style(args.style):
+        fig, figs = create_figs(args, sep_figs, fig, ax)
 
-#         ax.plot(res_t, res.values, c=color, label=label, **args.plot)
-#         plot_data(sim, ax, key, args.scatter, color=color) # Plot the data
-#         plot_interventions(sim, ax) # Plot the interventions
-#         title_grid_legend(ax, res.name, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
-#         reset_ticks(ax, sim, args.date) # Optionally reset tick marks (useful for e.g. plotting weeks/months)
+        pnum = 0
+        age_labels = {}
+        for rn,reskey in enumerate(result_keys):
+            age_bins = base_analyzer.results[reskey]['bins']
+            age_labels[reskey] = [str(int(age_bins[i])) + '-' + str(int(age_bins[i + 1])) for i in range(len(age_bins) - 1)]
+            age_labels[reskey].append(str(int(age_bins[-1])) + '+')
 
-#     return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+            for tp in all_dates[rn]:
+
+                # Construct a dataframe with things in the most logical order for plotting
+                bins = []
+                scen_names = []
+                values = []
+                n_bins = len(base_res['bins'])
+                for bno, bin in enumerate(base_res['bins']):
+                    for sno in range(len(scens.scenarios)):
+                        for rep in range(n_runs):
+                            bins.append(bin)
+                            scen_key = scens.sims.keys()[sno]
+                            scen_names.append(scens.scenarios[scen_key]['name'])
+                            values.append(scens.sims[sno][rep].get_analyzer(analyzer_ref).results[reskey][tp][bno])
+                replicates = np.arange(n_runs).tolist() * n_bins * len(scens.scenarios)
+                resdict = dict(bin=bins, scen_name=scen_names, replicate=replicates, value=values)
+                resdf = pd.DataFrame(resdict)
+
+                # Start plot
+                ax = pl.subplot(n_rows, n_cols, pnum+1)
+                ax = plot_type(ax=ax, x="bin", y="value", hue="scen_name", data=resdf, dodge=True)
+                ax.legend([], [], frameon=False) # Temporarily turn off legend
+                title = f'{base_analyzer.result_properties[reskey].name} - {int(float(tp))}'
+                if args.show['legend']:
+                    title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum == 0)  # Configure the title, grid, and legend -- only show legend for first
+                ax.set_xlabel("Age group")
+                ax.set_xticklabels(age_labels[reskey])
+                ax.set_ylabel("")
+                pnum +=1
+
+
+    return tidy_up(fig, figs, do_save, fig_path, do_show, args)
+
+
+def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, scatter_args=None,
+                date_args=None, style_args=None, grid=False, commaticks=True, setylim=True, color=None, label=None,
+                do_show=None, do_save=False, fig_path=None, fig=None, ax=None, plot_burnin=False, **kwargs):
+    ''' Plot a single result -- see ``hpv.Sim.plot_result()`` for documentation '''
+
+    # Handle inputs
+    sep_figs = False # Only one figure
+    fig_args  = sc.mergedicts({'figsize':(8,5)}, fig_args)
+    axis_args = sc.mergedicts({'top': 0.95}, axis_args)
+    args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args,
+                       date_args=date_args, style_args=style_args, **kwargs)
+
+    # Gather results
+    res = sim.results[key]
+    res_t = sim.results['year']
+    bi = 0 if plot_burnin else int(sim['burnin'])
+    if color is None:
+        color = res.color
+
+    # Do the plotting
+    with hpo.with_style(args.style):
+        fig, figs = create_figs(args, sep_figs, fig, ax)
+
+        # Reuse the figure, if available
+        if ax is None: # Otherwise, make a new one
+            try:
+                ax = fig.axes[0]
+            except:
+                ax = fig.add_subplot(111, label='ax1')
+
+        if label is None:
+            label = res.name
+        if res.low is not None and res.high is not None:
+            ax.fill_between(res_t[bi:], res.low[bi:], res.high[bi:], color=color, **args.fill) # Create the uncertainty bound
+
+        ax.plot(res_t[bi:], res.values[bi:], c=color, label=label, **args.plot)
+        plot_interventions(sim, ax) # Plot the interventions
+        title_grid_legend(ax, res.name, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
+
+    return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
 
 
 # def plot_compare(df, log_scale=True, fig_args=None, axis_args=None, style_args=None, grid=False,

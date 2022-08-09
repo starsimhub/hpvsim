@@ -5,10 +5,16 @@ Load data
 #%% Housekeeping
 import numpy as np
 import sciris as sc
-from . import country_age_data    as cad
-import re
+from .. import misc as hpm
 
-__all__ = ['get_country_aliases', 'map_entries', 'show_locations', 'get_age_distribution', 'get_death_rates']
+__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_death_rates']
+
+
+def load_file(filename):
+    ''' Load a data file from the local data folder '''
+    path = sc.path(sc.thisdir()) / filename
+    obj = sc.load(path)
+    return obj
 
 
 def get_country_aliases():
@@ -45,7 +51,7 @@ def get_country_aliases():
     return country_mappings # Convert to lowercase
 
 
-def map_entries(json, location):
+def map_entries(json, location, df=None):
     '''
     Find a match between the JSON file and the provided location(s).
 
@@ -55,7 +61,10 @@ def map_entries(json, location):
     '''
 
     # The data have slightly different formats: list of dicts or just a dict
-    countries = [key.lower() for key in json.keys()]
+    if sc.checktype(json, dict):
+        countries = [key.lower() for key in json.keys()]
+    elif sc.checktype(json, 'listlike'):
+        countries = [l.lower() for l in json]
 
     # Set parameters
     if location is None:
@@ -87,78 +96,47 @@ def map_entries(json, location):
     return entries
 
 
-def show_locations(location=None, output=False):
-    '''
-    Print a list of available locations.
-
-    Args:
-        location (str): if provided, only check if this location is in the list
-        output (bool): whether to return the list (else print)
-
-    **Examples**::
-
-        cv.data.show_locations() # Print a list of valid locations
-        cv.data.show_locations('lithuania') # Check if Lithuania is a valid location
-        cv.data.show_locations('Viet-Nam') # Check if Viet-Nam is a valid location
-    '''
-    country_json   = sc.dcp(cad.data)
-    aliases        = get_country_aliases()
-
-    age_data       = sc.mergedicts(country_json, aliases) # Countries will overwrite states, e.g. Georgia
-
-    loclist = sc.objdict()
-    loclist.age_distributions = sorted(list(age_data.keys()))
-
-    if location is not None:
-        age_available = location.lower() in [v.lower() for v in loclist.age_distributions]
-        age_sugg = ''
-        hh_sugg = ''
-        age_sugg = f'(closest match: {sc.suggest(location, loclist.age_distributions)})' if not age_available else ''
-        print(f'For location "{location}":')
-        print(f'  Population age distribution is available: {age_available} {age_sugg}')
-        return
-
-    if output:
-        return loclist
-    else:
-        print(f'There are {len(loclist.age_distributions)} age distributions and {len(loclist.household_size_distributions)} household size distributions.')
-        print('\nList of available locations (case insensitive):\n')
-        sc.pp(loclist)
-        return
-
-
-def get_age_distribution(location=None):
+def get_age_distribution(location=None, year=None, total_pop_file=None):
     '''
     Load age distribution for a given country or countries.
 
     Args:
-        location (str or list): name of the country or countries to load the age distribution for
+        location (str or list): name of the country to load the age distribution for
+        year (int): year to load the age distribution for
+        total_pop_file (str): optional filepath to save total population size for every year
 
     Returns:
         age_data (array): Numpy array of age distributions, or dict if multiple locations
     '''
 
     # Load the raw data
-    json   = sc.dcp(cad.data)
-    entries = map_entries(json, location)
+    try:
+        df = load_file('populations.obj')
+    except Exception as E:
+        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+        raise ValueError(errormsg) from E
 
-    max_age = 99
-    result = {}
-    for loc,age_distribution in entries.items():
-        total_pop = sum(list(age_distribution.values()))
-        local_pop = []
+    # Handle year
+    if year is None:
+        warnmsg = 'No year provided for the initial population age distribution, using 2000 by default'
+        hpm.warn(warnmsg)
+        year = 2000
 
-        for age, age_pop in age_distribution.items():
-            if age[-1] == '+':
-                val = [int(age[:-1]), max_age, age_pop/total_pop]
-            else:
-                ages = age.split('-')
-                val = [int(ages[0]), int(ages[1]), age_pop/total_pop]
-            local_pop.append(val)
-        result[loc] = np.array(local_pop)
+    # Extract the age distribution for the given location and year
+    full_df = map_entries(df, location)[location]
+    raw_df = full_df[full_df["Time"] == year]
 
-    if len(result) == 1:
-        result = list(result.values())[0]
+    # Pull out the data
+    result = np.array([raw_df["AgeGrpStart"],raw_df["AgeGrpStart"]+1,raw_df["PopTotal"]*1e3]).T # Data are stored in thousands
+
+    # Optinally save total population sizes for calibration/plotting purposes
+    if total_pop_file is not None:
+        dd = full_df.groupby("Time").sum()["PopTotal"]
+        dd = dd * 1e3
+        dd = dd.astype(int)
+        dd = dd.rename("n_alive")
+        dd = dd.rename_axis("year")
+        dd.to_csv(total_pop_file)
 
     return result
 
@@ -166,52 +144,39 @@ def get_age_distribution(location=None):
 def get_death_rates(location=None, by_sex=True, overall=False):
     '''
     Load death rates for a given country or countries.
-
     Args:
         location (str or list): name of the country or countries to load the age distribution for
         by_sex (bool): whether to rates by sex
         overall (bool): whether to load total rate
-
-
     Returns:
         death_rates (dict): death rates by age and sex
     '''
     # Load the raw data
     try:
-        df = sc.load('../data/age_specific_death_rates.obj')
-    except ValueError as E:
-        errormsg = f'Could not locate datafile with age-specific death rates by country. Please run data/get_death_data.py first.'
-        raise ValueError(errormsg)
+        df = load_file('mx.obj')
+    except Exception as E:
+        errormsg = 'Could not locate datafile with age-specific death rates by country. Please run data/get_data.py first.'
+        raise ValueError(errormsg) from E
 
-    age_groups = df['dim.AGEGROUP'].unique()
-    df = df.set_index(['dim.COUNTRY', 'dim.SEX', 'dim.AGEGROUP'])
-    dd = df.groupby(level=0).apply(lambda df: df.xs(df.name).to_dict()).to_dict()
-    raw_death_rates = map_entries(dd,location)[location]['Value']
+    raw_df = map_entries(df, location)[location]
 
     sex_keys = []
-    if by_sex: sex_keys += ['Male','Female']
+    if by_sex: sex_keys += ['Male', 'Female']
     if overall: sex_keys += ['Both sexes']
-    sex_key_map = {'Male':'m', 'Female':'f', 'Both sexes': 'tot'}
- 
-    max_age = 99
+    sex_key_map = {'Male': 'm', 'Female': 'f', 'Both sexes': 'tot'}
+
+    # max_age = 99
+    # age_groups = raw_df['AgeGrpStart'].unique()
+    years = raw_df['Time'].unique()
     result = dict()
 
     # Processing
-    for sk in sex_keys:
-        sk_out = sex_key_map[sk]
-        result[sk_out] = []
-        for age in age_groups:
-            this_death_rate = float(raw_death_rates[(sk, age)])
-            if age[2] == '+':
-                val = [int(age[:2]), max_age, this_death_rate]
-            elif age[0] == '<':
-                val = [0, int(age[1]), this_death_rate]
-            else:
-                ages = re.split('-',age[:-6]) # Remove the 'years' part of the string
-                val = [int(ages[0]), int(ages[1]), this_death_rate]
-            result[sk_out].append(val)
-        result[sk_out] = np.array(result[sk_out])
-        result[sk_out] = result[sk_out][result[sk_out][:, 0].argsort()]
+    for year in years:
+        result[year] = dict()
+        for sk in sex_keys:
+            sk_out = sex_key_map[sk]
+            result[year][sk_out] = np.array(raw_df[(raw_df['Time']==year) & (raw_df['Sex']== sk)][['AgeGrpStart','mx']])
+            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
 
     return result
 
@@ -228,12 +193,14 @@ def get_birth_rates(location=None):
     '''
     # Load the raw data
     try:
-        birth_rate_data = sc.load('../data/birth_rates.obj')
-    except ValueError as E:
-        errormsg = f'Could not locate datafile with birth rates by country. Please run data/get_birth_data.py first.'
-        raise ValueError(errormsg)
+        birth_rate_data = load_file('birth_rates.obj')
+    except Exception as E:
+        errormsg = 'Could not locate datafile with birth rates by country. Please run data/get_data.py first.'
+        raise ValueError(errormsg) from E
 
     standardized = map_entries(birth_rate_data, location)
     birth_rates, years = standardized[location], birth_rate_data['years']
+    birth_rates, inds = sc.sanitize(birth_rates, returninds=True)
+    years = years[inds]
     return np.array([years, birth_rates])
 
