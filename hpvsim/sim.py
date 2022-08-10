@@ -154,6 +154,7 @@ class Sim(hpb.BaseSim):
     def validate_pars(self, validate_layers=True):
         '''
         Some parameters can take multiple types; this makes them consistent.
+
         Args:
             validate_layers (bool): whether to validate layer parameters as well via validate_layer_pars() -- usually yes, except during initialization
         '''
@@ -1061,6 +1062,6 @@ class AlreadyRunError(RuntimeError):
     This error is raised if a simulation is run in such a way that no timesteps
     will be taken. This error is a distinct type so that it can be safely caught
     and ignored if required, but it is anticipated that most of the time, calling
-    sim.run() and not taking any timesteps, would be an inadvertent error.
+    :py:func:`Sim.run` and not taking any timesteps, would be an inadvertent error.
     '''
     pass

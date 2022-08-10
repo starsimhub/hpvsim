@@ -5,3 +5,4 @@ sphinxcontrib-napoleon~=0.7
 sphinxcontrib-programoutput~=0.16
 sphinx~=4.4.0
 sphinxext.remoteliteralinclude
+numpy==1.22

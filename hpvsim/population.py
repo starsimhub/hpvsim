@@ -23,7 +23,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     '''
     Make the people for the simulation.
 
-    Usually called via ``sim.initialize()``.
+    Usually called via :py:func:`hpvsim.sim.Sim.initialize`.
 
     Args:
         sim      (Sim)  : the simulation object; population parameters are taken from the sim object
@@ -131,6 +131,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 def partner_count(n_agents=None, partner_pars=None):
     '''
     Assign each person a preferred number of concurrent partners for each layer
+    
     Args:
         n_agents    (int)   : number of agents
         layer_keys  (list)  : list of layers

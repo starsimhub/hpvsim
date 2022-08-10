@@ -29,7 +29,7 @@ class Analyzer(sc.prettyobj):
     default -- for example, pulling states out of sim.people on a particular timestep
     before it gets updated in the next timestep.
 
-    To retrieve a particular analyzer from a sim, use sim.get_analyzer().
+    To retrieve a particular analyzer from a sim, use ``sim.get_analyzer()``.
 
     Args:
         label (str): a label for the Analyzer (used for ease of identification)
@@ -65,7 +65,7 @@ class Analyzer(sc.prettyobj):
         '''
         Finalize analyzer
 
-        This method is run once as part of `sim.finalize()` enabling the analyzer to perform any
+        This method is run once as part of ``sim.finalize()`` enabling the analyzer to perform any
         final operations after the simulation is complete (e.g. rescaling)
         '''
         if self.finalized:
@@ -88,7 +88,7 @@ class Analyzer(sc.prettyobj):
 
     def shrink(self, in_place=False):
         '''
-        Remove any excess stored data from the intervention; for use with sim.shrink().
+        Remove any excess stored data from the intervention; for use with ``sim.shrink()``.
 
         Args:
             in_place (bool): whether to shrink the intervention (else shrink a copy)
@@ -152,12 +152,12 @@ class snapshot(Analyzer):
     '''
     Analyzer that takes a "snapshot" of the sim.people array at specified points
     in time, and saves them to itself. To retrieve them, you can either access
-    the dictionary directly, or use the get() method.
+    the dictionary directly, or use the ``get()`` method.
 
     Args:
         timepoints  (list): list of ints/strings/date objects, the days on which to take the snapshot
         die         (bool): whether or not to raise an exception if a date is not found (default true)
-        kwargs      (dict): passed to Analyzer()
+        kwargs      (dict): passed to :py:class:`Analyzer`
 
 
     **Example**::
@@ -220,6 +220,7 @@ class snapshot(Analyzer):
 class age_pyramid(Analyzer):
     '''
     Constructs an age/sex pyramid at specified points within the sim. Can be used with data
+
     Args:
         timepoints  (list): list of ints/strings/date objects, the days on which to take the snapshot
         die         (bool): whether or not to raise an exception if a date is not found (default true)
@@ -227,6 +228,7 @@ class age_pyramid(Analyzer):
 
 
     **Example**::
+
         sim = cv.Sim(analyzers=hp.age_pyramid('2015', '2020'))
         sim.run()
         age_pyramid = sim['analyzers'][0]
@@ -430,12 +432,14 @@ class age_pyramid(Analyzer):
 class age_results(Analyzer):
     '''
     Constructs results by age at specified points within the sim. Can be used with data
+
     Args:
         result_keys  (dict): dictionary with keys of results to generate and associated timepoints/age-bins to generate each result as well as whether to compute_fit
         die         (bool): whether or not to raise an exception if errors are found
-        kwargs      (dict): passed to Analyzer()
+        kwargs      (dict): passed to :py:class:`Analyzer`
 
     **Example**::
+
         sim = hp.Sim(analyzers=hpv.age_results(
         result_keys=sc.objdict(
             hpv_prevalence=sc.objdict(
@@ -860,6 +864,7 @@ class Calibration(Analyzer):
         A Calibration object
 
     **Example**::
+
         sim = hpv.Sim(pars, genotypes=[hpv16, hpv18])
         calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
         calib = hpv.Calibration(sim, calib_pars=calib_pars,
@@ -1257,7 +1262,7 @@ class Calibration(Analyzer):
             do_save (bool): whether to save
             fig_path (str or filepath): filepath to save to
             do_show (bool): whether to show the figure
-            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+            kwargs (dict): passed to :py:func:`hpvsim.options.with_style`; see that function for choices
         '''
 
         # Handle inputs

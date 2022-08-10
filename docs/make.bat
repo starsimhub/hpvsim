@@ -47,6 +47,8 @@ if "%1" == "help" (
 if "%1" == "clean" (
 	for /d %%i in (%BUILDDIR%\*) do rmdir /q /s %%i
 	del /q /s %BUILDDIR%\*
+	del hpvsim*.rst >nul 2>&1
+	del modules.rst >nul 2>&1
 	goto end
 )
 
@@ -77,7 +79,6 @@ if errorlevel 9009 (
 if "%1" == "generate-api" (
     del modules.rst >nul 2>&1
     sphinx-apidoc -f -e -M -o . ../hpvsim
-    move /Y hpvsim.rst modules.rst
 	goto end
 )
 

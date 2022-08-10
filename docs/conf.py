@@ -53,12 +53,15 @@ extensions = [
     'sphinxcontrib.programoutput',
     'sphinx_copybutton', # button do copy code--comment out if the icon is too big
     'sphinx.ext.intersphinx', #linking to related docsets
-    'sphinxext.remoteliteralinclude'
+    'sphinxext.remoteliteralinclude',
+    # automatic section names so linking between section is easy
+    'sphinx.ext.autosectionlabel'
 ]
 
 autodoc_default_options = {
     'member-order': 'bysource',
     'members': None,
+    'special-members': '__init__',
     'exclude-members': '__all__'
 }
 
@@ -115,7 +118,11 @@ language = None
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # suppress warnings for multiple possible Python references in the namespace
-# suppress_warnings = ['ref.python']
+
+suppress_warnings = [
+    'autosectionlabel.*',
+]
+
 pygments_style = 'sphinx'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
@@ -239,6 +246,7 @@ texinfo_documents = [
 intersphinx_mapping = {'python': ('https://docs.python.org/3', None),
                        'emod_api': ('https://docs.idmod.org/projects/emod-api/en/latest', None),
                        'idmtools': ('https://docs.idmod.org/projects/idmtools/en/latest', None),
-                       'fpsim': ('https://docs.idmod.org/projects/fpsim/en/latest', None)
+                       'fpsim': ('https://docs.idmod.org/projects/fpsim/en/latest', None),
+                       'sciris': ('https://sciris.readthedocs.io/en/latest/', None)
                        }
 
