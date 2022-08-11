@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 # Other files
 .idea
 .vscode
@@ -7,7 +5,6 @@
 # HPVsim-generated files
 *.obj
 
->>>>>>> c7282853b875bc74f4c04d932d7efbe216ac48a3
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -145,9 +142,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-<<<<<<< HEAD
-=======
 
 # Node.js and NPM
 node_modules
->>>>>>> c7282853b875bc74f4c04d932d7efbe216ac48a3
+
