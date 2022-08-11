@@ -22,10 +22,9 @@ formats:
 python:
    version: 3.8
    install:
-      - requirements: docs/requirements.txt
       - method: setuptools
         path: .     
-        
+      - requirements: docs/requirements.txt        
 # Optionally rank topics in search results, between -10 (lower) and 10 (higher).
 # 0 is normal rank, not no rank
 
