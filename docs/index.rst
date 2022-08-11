@@ -2,8 +2,7 @@
 |hpv_l| documentation
 =====================
 
-|hpv_s| is a stochastic agent-based simulator, written in Python, for exploring and analyzing human papilloma 
-virus (HPV) transmission. 
+|hpv_s| is a stochastic agent-based simulator, written in Python, for exploring and analyzing human papillomavirus (HPV) transmission. 
 
 
 Full contents
@@ -12,6 +11,6 @@ Full contents
 .. toctree::
    :maxdepth: 4
 
-   installation
+   overview
    whats-new
    modules
