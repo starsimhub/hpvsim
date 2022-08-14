@@ -66,17 +66,27 @@ def test_age_results(do_plot=True):
     sc.heading('Testing by-age results')
 
     n_agents = 50e3
-    pars = dict(n_agents=n_agents, start=1980, n_years=40, dt=0.5, location='south africa')
+    pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='kenya')
     hpv16 = hpv.genotype('hpv16')
     hpv18 = hpv.genotype('hpv18')
+    pars['beta'] = .5
 
+    pars['init_hpv_prev'] = {
+        'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
+        'm'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
+        'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
+    }
     az1 = hpv.age_results(
         result_keys=sc.objdict(
-            cancer_mortality=sc.objdict(
+            hpv_prevalence=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            cancer_incidence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             ),
-            cancer_deaths=sc.objdict(
+            cancer_mortality=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             )
@@ -89,11 +99,14 @@ def test_age_results(do_plot=True):
     a = sim.get_analyzer(0)
 
     to_plot = {
-        'Cervical cancers': [
-            'n_cancerous',
+        'HPV prevalence': [
+            'hpv_prevalence',
         ],
-        'Cervical cancer deaths': [
-            'cancer_deaths',
+        'CIN prevalence': [
+            'cin_prevalence',
+        ],
+        'Cervical cancer incidence': [
+            'cancer_incidence',
         ],
         'Cervical cancer mortality': [
             'cancer_mortality',
@@ -103,7 +116,7 @@ def test_age_results(do_plot=True):
     # Check plot()
     if do_plot:
         sim.plot(to_plot=to_plot)
-        # fig0 = sim.get_analyzer(0).plot()
+        fig0 = sim.get_analyzer(0).plot()
         # fig1 = sim.get_analyzer(1).plot()
 
     return sim, a
@@ -155,8 +168,8 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
+    # people      = test_snapshot()
+    # sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
     # sim2, calib = test_calibration()
 
