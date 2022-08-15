@@ -376,7 +376,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                     for genotype in range(ng):
                         # Colors and labels
                         v_color = res.color[genotype]
-                        v_label = sim['genotypes'][genotype].label.lower().replace('hpv','')
+                        v_label = sim['genotypes'][genotype]
                         color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
                         label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label: label += f' - {v_label}'
@@ -428,7 +428,7 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
                         for genotype in range(ng):
                             res_y = scendata.best
                             color = genotype_colors[genotype]
-                            label = sim['genotypes'][genotype].label.upper()
+                            label = sim['genotypes'][genotype]
                             ax.fill_between(res_t, scendata.low[genotype,:], scendata.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
                             ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
                     elif reskey in sexkeys:

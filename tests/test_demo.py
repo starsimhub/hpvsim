@@ -27,6 +27,7 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
                 dt=.5,
                 network='default',
                 location=location,
+                genotypes=[16,18,35,58,45,18,52],
                 verbose=0.1
                 )
 

@@ -478,7 +478,7 @@ class age_results(Analyzer):
 
         # Store genotypes
         self.ng = sim['n_genotypes']
-        self.glabels = [g.label for g in sim['genotypes']]
+        self.glabels = [g.upper() for g in sim['genotype_map'].values()]
 
         # Store colors
         self.result_properties = sc.objdict()
@@ -720,12 +720,16 @@ class age_results(Analyzer):
     def compute(self, key):
         res = []
         for name, group in self.result_keys[key].data.groupby(['genotype', 'year']):
-            genotype = name[0].lower()
+            genotype = name[0]
             year = str(name[1]) + '.0'
             if 'total' in key or 'cancer' in key:
                 sim_res = list(self.results[key][year])
                 res.extend(sim_res)
             else:
+                import traceback;
+                traceback.print_exc();
+                import pdb;
+                pdb.set_trace()
                 sim_res = list(self.results[key][year][self.glabels.index(genotype)])
                 res.extend(sim_res)
         self.result_keys[key].data['model_output'] = res
@@ -860,7 +864,7 @@ class Calibration(Analyzer):
         A Calibration object
 
     **Example**::
-        sim = hpv.Sim(pars, genotypes=[hpv16, hpv18])
+        sim = hpv.Sim(pars, genotypes=[16, 18])
         calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
         calib = hpv.Calibration(sim, calib_pars=calib_pars,
                                 datafiles=['test_data/south_africa_hpv_data.xlsx',
@@ -964,9 +968,9 @@ class Calibration(Analyzer):
                 for gpar,gval in gpardict.items():
                     if isinstance(gval,dict):
                         for gparkey, gparval in gval.items():
-                            sim['genotypes'][g].p[gpar][gparkey] = gparval
+                            sim['genotype_pars'][g][gpar][gparkey] = gparval
                     else:
-                        sim['genotypes'][g].p[gpar] = gval
+                        sim['genotype_pars'][g][gpar] = gval
 
         # Run the sim
         try:
@@ -988,7 +992,7 @@ class Calibration(Analyzer):
 
     def get_pars(self, pardict=None, trial=None, gname=None):
         ''' Sample from pars, after extracting them from the structure they're provided in '''
-        pars={}
+        pars = {}
         for key, val in pardict.items():
             if isinstance(val, list):
                 low, high = val[1], val[2]
@@ -1004,7 +1008,7 @@ class Calibration(Analyzer):
                     sampler_key = gname + '_' + key
                 else:
                     sampler_key = key
-                pars[sampler_key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
+                pars[key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
 
             elif isinstance(val, dict):
                 sampler_fn = trial.suggest_uniform
@@ -1037,6 +1041,7 @@ class Calibration(Analyzer):
         # trial.set_user_attr('sim', sim) # CK: fails since not a JSON, could use sc.jsonpickle()
         # Extract results we are calibrating to, a combination of by-age and sim-results
         # First check for by-age results
+
         r = sim.get_analyzer().results
         r = sc.jsonify(r)
         trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
@@ -1141,7 +1146,7 @@ class Calibration(Analyzer):
         # Load a single sim
         sim = sc.jsonpickle(self.study.trials[0].user_attrs['jsonpickle_sim'])
         self.ng = sim['pars']['n_genotypes']
-        self.glabels = [g['label'] for g in sim['pars']['genotypes']]
+        self.glabels = [g.upper() for g in sim['pars']['genotype_map'].values()]
 
         self.analyzer_results = []
         self.sim_results = []

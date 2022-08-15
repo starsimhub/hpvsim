@@ -89,7 +89,7 @@ def make_pars(**kwargs):
     # all genotype properties get populated by user in init_genotypes()
     pars['genotypes']       = []  # Genotypes of the virus; populated by the user below
     pars['genotype_map']    = dict()  # Reverse mapping from number to genotype key
-    pars['genotype_pars']   = dict()  # Populated just below
+    pars['genotype_pars']   = sc.objdict()  # Populated just below
 
     # Genotype parameters
     pars['n_genotypes']     = 1 # The number of genotypes circulating in the population

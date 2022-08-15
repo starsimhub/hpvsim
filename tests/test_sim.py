@@ -25,6 +25,7 @@ def test_microsim():
         'n_agents': 100,
         'init_hpv_prev': .1,
         'n_years': 2,
+        'genotypes': [16,18],
         }
     sim.update_pars(pars)
     sim.run()
@@ -43,9 +44,6 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     verbose = 1
 
     # Create and run the simulation
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
-
     pars = {
         'n_agents': 50e3,
         'start': 1990,
@@ -53,6 +51,7 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
         'end': 2030,
         'location': 'tanzania',
         'dt': .5,
+        'genotypes': [16,18]
     }
 
     # age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
@@ -61,7 +60,7 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     #                                     timepoints=['2020', '2021', '2022', '2023', '2024'],
     #                                     label='bivalent 2 dose, 9-14', subtarget=age_target)
 
-    sim = hpv.Sim(pars=pars, genotypes=[hpv16,hpv18])
+    sim = hpv.Sim(pars=pars)
     sim.set_seed(seed)
 
     # Optionally plot
@@ -192,9 +191,7 @@ def test_result_consistency():
 
     # Create sim
     n_agents = 10e3
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
-    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, genotypes=[hpv16,hpv18], label='test_results')
+    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, genotypes=['hpv16','hpv18'], label='test_results')
     sim.run()
 
     # Check that infections by genotype sum up the the correct totals
