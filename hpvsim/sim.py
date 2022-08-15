@@ -406,8 +406,8 @@ class Sim(hpb.BaseSim):
         results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
 
         # Type distributions by cytology
-        for var, name in zip(hpd.type_keys, hpd.type_names):
-            results[var] = init_res(name, n_rows=ng, color='#b61500')
+        for var, name, cmap in zip(hpd.type_keys, hpd.type_names, hpd.type_colors):
+            results[var] = init_res(name, n_rows=ng, color=cmap(np.linspace(0.2,0.8,ng)))
 
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
