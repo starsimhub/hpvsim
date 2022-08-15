@@ -43,7 +43,7 @@ def test_age_pyramids(do_plot=True):
 
         age_pyr = hpv.age_pyramid(
             timepoints=['2010', '2020'],
-            datafile=f'test_data/{country}_age_pyramid.xlsx',
+            datafile=f'test_data/{country}_age_pyramid.csv',
             edges=np.linspace(0, 100, 21))
 
         sim = hpv.Sim(
@@ -67,8 +67,6 @@ def test_age_results(do_plot=True):
 
     n_agents = 50e3
     pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='kenya')
-    hpv16 = hpv.genotype('hpv16')
-    hpv18 = hpv.genotype('hpv18')
     pars['beta'] = .5
 
     pars['init_hpv_prev'] = {
@@ -93,7 +91,7 @@ def test_age_results(do_plot=True):
         )
     )
 
-    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18], analyzers=[az1])
+    sim = hpv.Sim(pars, genotypes=[16, 18], analyzers=[az1])
 
     sim.run()
     a = sim.get_analyzer(0)
@@ -131,9 +129,7 @@ def test_calibration():
                     hpv16=0.9,
                     hpv18=0.1
                 ))
-    hpv16 = hpv.genotype('hpv16')
-    hpv18 = hpv.genotype('hpv18')
-    sim = hpv.Sim(pars, genotypes=[hpv16, hpv18])
+    sim = hpv.Sim(pars, genotypes=[16,18])
     calib_pars = dict(
         beta=[0.05, 0.010, 0.20],
         hpv_control_prob=[.9, 0.1, 1],
@@ -153,11 +149,11 @@ def test_calibration():
 
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             datafiles=[
-                                'test_data/south_africa_hpv_data.xlsx',
+                                'test_data/south_africa_hpv_data.csv',
                                 'test_data/south_africa_cancer_data_2020.csv',
                                 # 'test_data/south_africa_type_distribution_cancer.csv'
                             ],
-                            total_trials=8, n_workers=4)
+                            total_trials=2, n_workers=1)
     calib.calibrate()
     calib.plot(top_results=4)
     return sim, calib
@@ -170,8 +166,8 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
-    # sim2, calib = test_calibration()
+    # sim1, a1    = test_age_results()
+    sim2, calib = test_calibration()
 
 
 

@@ -41,20 +41,18 @@ class genotype(sc.prettyobj):
     def parse(self, genotype=None):
         ''' Unpack genotype information, which must be given as a string '''
 
+        choices, mapping = hppar.get_genotype_choices()
+        known_genotype_pars = hppar.get_genotype_pars()
+
         if isinstance(genotype, str):
 
-            choices, mapping = hppar.get_genotype_choices()
-            known_genotype_pars = hppar.get_genotype_pars()
-
             label = genotype.lower()
-
             if label in mapping:
                 label = mapping[label]
                 genotype_pars = known_genotype_pars[label]
             else:
                 errormsg = f'The selected genotype "{genotype}" is not implemented; choices are:\n{sc.pp(choices, doprint=False)}'
                 raise NotImplementedError(errormsg)
-
 
         else:
             errormsg = f'Could not understand {type(genotype)}, please specify as a predefined genotype:\n{sc.pp(choices, doprint=False)}'

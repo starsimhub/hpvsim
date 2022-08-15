@@ -89,7 +89,7 @@ def make_pars(**kwargs):
     # all genotype properties get populated by user in init_genotypes()
     pars['genotypes']       = []  # Genotypes of the virus; populated by the user below
     pars['genotype_map']    = dict()  # Reverse mapping from number to genotype key
-    pars['genotype_pars']   = dict()  # Populated just below
+    pars['genotype_pars']   = sc.objdict()  # Populated just below
 
     # Genotype parameters
     pars['n_genotypes']     = 1 # The number of genotypes circulating in the population
@@ -386,7 +386,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.dysp_rate    = 1.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate    = 1.02 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_time    = 7.82  # Point of inflection in logistic function
-    pars.hpv18.rel_beta     = 0.7228  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv18.rel_beta     = 0.72  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
@@ -398,7 +398,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv31.dysp_rate    = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv31.prog_rate    = 0.179 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv31.prog_time    = 14.12  # Point of inflection in logistic function
-    pars.hpv31.rel_beta     = 0.9355728046226204 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv31.rel_beta     = 0.94 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv31.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
@@ -408,10 +408,19 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
     pars.hpv33.dur_dysp     = dict(dist='lognormal', par1=14.12, par2=3.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv33.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_rate    = 0.23565745824841802 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv33.prog_rate    = 0.24 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv33.prog_time    = 8.46  # Point of inflection in logistic function
     pars.hpv33.rel_beta     = 0.26 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv33.imm_boost    = 1.0 # TODO: look for data
+
+    pars.hpv35 = sc.objdict()
+    pars.hpv35.dur_none     = dict(dist='lognormal', par1=2.5, par2=1.0)
+    pars.hpv35 .dur_dysp     = dict(dist='lognormal', par1=4.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv35.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv35.prog_rate    = 0.25 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv35.prog_time    = 7.5  # Point of inflection in logistic function
+    pars.hpv35.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv35.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
     pars.hpv45.dur = dict()

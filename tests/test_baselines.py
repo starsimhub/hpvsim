@@ -21,17 +21,13 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     plot the sim by default.
     '''
 
-    # Define the genotypes
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
-
     # Define the parameters
     pars = dict(
-        n_agents      = 20e3,         # Population size
-        n_years       = 40,           # Number of years to simulate
-        verbose       = 0,            # Don't print details of the run
-        rand_seed     = 2,            # Set a non-default seed
-        genotypes     = [hpv16, hpv18], # Include the two genotypes of greatest general interest
+        n_agents      = 20e3,       # Population size
+        n_years       = 40,         # Number of years to simulate
+        verbose       = 0,          # Don't print details of the run
+        rand_seed     = 2,          # Set a non-default seed
+        genotypes     = [16, 18],   # Include the two genotypes of greatest general interest
     )
 
     # Create the sim

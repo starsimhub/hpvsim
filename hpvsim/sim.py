@@ -294,16 +294,29 @@ class Sim(hpb.BaseSim):
         if self._orig_pars and 'genotypes' in self._orig_pars:
             self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
 
-        for i, genotype in enumerate(self['genotypes']):
-            if isinstance(genotype, hpimm.genotype):
-                if not genotype.initialized:
-                    genotype.initialize(self)
+        genotype_options = hppar.get_genotype_pars().keys()
+
+        for i, g in enumerate(self['genotypes']):
+
+            # Genotypes can be provided in different formats. Here we convert them to hpv.genotype objects
+            if sc.isnumber(g): g = f'hpv{g}' # Convert e.g. 16 to hpv16
+            if sc.checktype(g,str):
+                if not g in genotype_options:
+                    errormsg = f'Genotype {i} ({g}) is not one of the inbuilt options.'
+                    raise ValueError(errormsg)
+                else:
+                    g = hpimm.genotype(g)
+
+            # Initialize genotypes
+            if isinstance(g, hpimm.genotype):
+                if not g.initialized:
+                    g.initialize(self)
             else:  # pragma: no cover
-                errormsg = f'Genotype {i} ({genotype}) is not a hp.genotype object; please create using cv.genotype()'
+                errormsg = f'Cannot understand genotype {i} ({g}). Please provide it as an integer, string, or hpv.genotype object.'
                 raise TypeError(errormsg)
 
         if not len(self['genotypes']):
-            print('No genotypes provided, will assume only simulating HPV 16 by default')
+            print('No genotypes provided, will assume only simulating HPV16 by default')
             hpv16 = hpimm.genotype('hpv16')
             hpv16.initialize(self)
             self['genotypes'] = [hpv16]
@@ -406,8 +419,8 @@ class Sim(hpb.BaseSim):
         results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
 
         # Type distributions by cytology
-        for var, name in zip(hpd.type_keys, hpd.type_names):
-            results[var] = init_res(name, n_rows=ng, color='#b61500')
+        for var, name, cmap in zip(hpd.type_keys, hpd.type_names, hpd.type_colors):
+            results[var] = init_res(name, n_rows=ng, color=cmap(np.linspace(0.2,0.8,ng)))
 
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
