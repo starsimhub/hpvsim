@@ -48,6 +48,14 @@ prognoses = dict(
         cancer_probs      = np.array([0.002,   0.003,      0.0564,     0.1569,     0.2908,     0.3111,     0.5586]),   # Conditional probability of developing cancer given CIN3, derived from Harvard model calibration
         )
 
+# Shorten duration names
+dur_none = [genotype_pars[genotype_map[g]]['dur_none'] for g in range(ng)]
+dur_dysp = [genotype_pars[genotype_map[g]]['dur_dysp'] for g in range(ng)]
+dysp_rate = [genotype_pars[genotype_map[g]]['dysp_rate'] for g in range(ng)]
+prog_time = [genotype_pars[genotype_map[g]]['prog_time'] for g in range(ng)]
+prog_rate = [genotype_pars[genotype_map[g]]['prog_rate'] for g in range(ng)]
+
+
 #%% Helper functions
 def lognorm_params(mode, stddev):
     """
@@ -86,7 +94,6 @@ sc.fonts(add=sc.thisdir(aspath=True) / 'Libertinus Sans')
 sc.options(font='Libertinus Sans')
 font_family = 'Libertinus Sans'
 plt.rcParams['font.size'] = font_size
-# plt.rcParams['font.family'] = font_family
 colors = sc.gridcolors(ng)
 x = np.linspace(0.01, 7, 700)
 
@@ -96,10 +103,10 @@ x = np.linspace(0.01, 7, 700)
 shares = []
 gtypes = []
 for g in range(ng):
-    sigma, scale = lognorm_params(genotype_pars[genotype_map[g]]['dur_none']['par1'], genotype_pars[genotype_map[g]]['dur_none']['par2'])
+    sigma, scale = lognorm_params(dur_none[g]['par1'], dur_none[g]['par2'])
     rv = lognorm(sigma, 0, scale)
     aa = np.diff(rv.cdf(x))
-    bb = logf1(x, genotype_pars[genotype_map[g]]['dysp_rate'])[1:]
+    bb = logf1(x, dysp_rate[g])[1:]
     shares.append(np.dot(aa, bb))
     gtypes.append(genotype_map[g].upper())
 
@@ -110,7 +117,7 @@ longx = np.linspace(0.01, 20, 1000)
 for g in range(ng):
     sigma, scale = lognorm_params(dur_dysp[g]['par1'], dur_dysp[g]['par2'])
     rv = lognorm(sigma, 0, scale)
-    dd = logf2(longx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+    dd = logf2(longx, prog_time[g], prog_rate[g])
 
     indcin1 = sc.findinds(dd<.33)[-1]
     if (dd>.33).any():
@@ -146,7 +153,7 @@ for g in range(ng):
     r = lognorm(sigma, 0, scale)
 
     for year in years:
-        mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate'])
+        mean_peaks = logf2(year, prog_time[g], prog_rate[g])
         peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
         cin1_shares.append(sum(peaks<0.33)/n_samples)
         cin2_shares.append(sum((peaks>0.33)&(peaks<0.67))/n_samples)
@@ -184,7 +191,7 @@ def make_fig1():
     xx = prognoses['duration_cutoffs']
     yy = prognoses['cin1_probs']
     for g in range(ng):
-        ax[0,1].plot(x, logf1(x, genotype_pars[genotype_map[g]]['dysp_rate']), color=colors[g], lw=2)
+        ax[0,1].plot(x, logf1(x, dysp_rate[g]), color=colors[g], lw=2)
     ax[0,1].plot(xx[:-1], yy[:-1], 'ko', label="Values from\nHarvard model")
     ax[0,1].set_xlabel("Pre-dysplasia/control duration")
     ax[0,1].set_ylabel("")
@@ -214,11 +221,10 @@ def make_fig1():
     cmap = plt.cm.Oranges([0.25,0.5,0.75,1])
     n_samples = 10
     for g in range(ng):
-        ax[1,0].plot(thisx, logf2(thisx, genotype_pars[genotype_map[g]]['prog_time'], genotype_pars[genotype_map[g]]['prog_rate']), color=colors[g], lw=2, label=genotype_map[g].upper())
+        ax[1,0].plot(thisx, logf2(thisx, prog_time[g], prog_rate[g]), color=colors[g], lw=2, label=genotype_map[g].upper())
         # Plot variation
         for year in range(1, 21):
-            mean_peaks = logf2(year, genotype_pars[genotype_map[g]]['prog_time'],
-                               genotype_pars[genotype_map[g]]['prog_rate'])
+            mean_peaks = logf2(year, prog_time[g], prog_rate[g])
             peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
             ax[1, 0].plot([year] * n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
