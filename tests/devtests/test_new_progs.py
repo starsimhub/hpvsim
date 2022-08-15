@@ -270,7 +270,7 @@ def make_fig1():
                   cin3shares+[sum([j*.33 for j in cin3shares])],
                   cancershares+[sum([j*.33 for j in cancershares])],
                   ]
-    for gn,grade in enumerate(['None', 'CIN1', 'CIN2', 'CIN3','Cancer']):
+    for gn,grade in enumerate(['None', 'CIN1', 'CIN2', 'CIN3', 'Cancer']):
         ydata = np.array(all_shares[gn])
         if len(ydata.shape)>1: ydata = ydata[:,0]
         color = cmap[gn-1] if gn>0 else 'gray'
@@ -291,9 +291,6 @@ def make_fig1():
 ################################################################################
 def make_fig2():
     fig, ax = plt.subplots(1, 3, figsize=(24, 8))
-
-    # To plot today -- cancers, cancers by age, cancers by type, etc
-
 
 
     fig.tight_layout()

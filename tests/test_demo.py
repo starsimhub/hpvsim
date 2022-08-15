@@ -31,8 +31,8 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
                 )
 
     # Initial conditions
-    pars['init_hpv_dist'] = {'hpv16':.2, 'hpv18': .2, 'hpv31': .1,
-                             'hpv33': .1, 'hpv45': .2, 'hpv52': .2}
+    pars['init_hpv_dist'] = {'hpv16': .347, 'hpv35': .174, 'hpv58': .121,
+                             'hpv45': .116, 'hpv18': .114, 'hpv52': .097}
     pars['init_hpv_prev'] = {
         'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
         'm'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
@@ -53,48 +53,45 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
 
     # # Set up genotype pars
     # HPV 16 #
-    hpv16.p.dysp_rate = 1.5
-    hpv16.p.prog_rate = .567
-    hpv16.p.prog_time = 6.23
-    hpv16.p.dur_dysp['par1'] = 7.59
-    hpv16.p.dur_none['par1'] = 2.35
+    # hpv16.p.prog_rate = .567
+    # hpv16.p.prog_time = 6.23
+    # hpv16.p.dur_dysp['par1'] = 7.59
+    # hpv16.p.dur_none['par1'] = 2.35
+    #
+    # # HPV 18 #
+    # hpv18.p.dysp_rate = 1.2
+    # hpv18.p.prog_rate = 0.956
+    # hpv18.p.prog_time = 5.189
+    # hpv18.p.dur_dysp['par1'] = 5.627
+    # hpv18.p.dur_none['par1'] = 2.76
+    # hpv18.p.rel_beta = 0.7228
+    #
+    # # HPV 31 #
+    # hpv31.p.prog_rate = 0.17948958373918267
+    # hpv31.p.prog_time = 14.12136294913353
+    # hpv31.p.dur_dysp['par1'] = 1.353471867503286
+    # hpv31.p.rel_beta = 0.9355728046226204
+    #
+    # # HPV 33 #
+    # hpv33.p.prog_rate = 0.23565745824841802
+    # hpv33.p.prog_time = 8.4648
+    # hpv33.p.dur_dysp['par1'] = 14.12136294913353
+    # hpv33.p.rel_beta = 0.26010781379830755
+    #
+    # # HPV 45 #
+    # hpv45.p.dysp_rate = 1.2
+    # hpv45.p.prog_rate = 0.9499
+    # hpv45.p.prog_time = 7.3
+    # hpv45.p.dur_dysp['par1'] = 3.575
+    # hpv45.p.dur_none['par1'] = 1.639
+    # hpv45.p.rel_beta = 0.77
+    #
+    # # HPV 52 #
+    # hpv52.p.prog_rate = 0.484
+    # hpv52.p.prog_time = 4.24
+    # hpv52.p.dur_dysp['par1'] = 2.35
+    # hpv52.p.rel_beta = 0.623
 
-    # HPV 18 #
-    hpv18.p.dysp_rate = 1.2
-    hpv18.p.prog_rate = 0.956
-    hpv18.p.prog_time = 5.189
-    hpv18.p.dur_dysp['par1'] = 5.627
-    hpv18.p.dur_none['par1'] = 2.76
-    hpv18.p.rel_beta = 0.7228
-
-    # HPV 31 #
-    hpv31.p.prog_rate = 0.17948958373918267
-    hpv31.p.prog_time = 14.12136294913353
-    hpv31.p.dur_dysp['par1'] = 1.353471867503286
-    hpv31.p.rel_beta = 0.9355728046226204
-
-    # HPV 33 #
-    hpv33.p.prog_rate = 0.23565745824841802
-    hpv33.p.prog_time = 8.4648
-    hpv33.p.dur_dysp['par1'] = 14.12136294913353
-    hpv33.p.rel_beta = 0.26010781379830755
-
-    # HPV 45 #
-    hpv45.p.dysp_rate = 1.2
-    hpv45.p.prog_rate = 0.9499
-    hpv45.p.prog_time = 7.3
-    hpv45.p.dur_dysp['par1'] = 3.575
-    hpv45.p.dur_none['par1'] = 1.639
-    hpv45.p.rel_beta = 0.77
-
-    # HPV 52 #
-    hpv52.p.prog_rate = 0.484
-    hpv52.p.prog_time = 4.24
-    hpv52.p.dur_dysp['par1'] = 2.35
-    hpv52.p.rel_beta = 0.623
-
-    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99}
-    pars['dur_cancer'] = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death
 
     az = hpv.age_results(
         result_keys=sc.objdict(
