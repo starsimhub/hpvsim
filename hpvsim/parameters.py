@@ -435,6 +435,16 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv45.rel_beta     = 0.77 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv45.imm_boost    = 1.0 # TODO: look for data
 
+    pars.hpv51 = sc.objdict()
+    pars.hpv51.dur = dict()
+    pars.hpv51.dur_none     = dict(dist='lognormal', par1=2.0, par2=1.0)
+    pars.hpv51.dur_dysp     = dict(dist='lognormal', par1=1.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv51.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv51.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv51.prog_time    = 8.  # Point of inflection in logistic function
+    pars.hpv51.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv51.imm_boost    = 1.0 # TODO: look for data
+
     pars.hpv52 = sc.objdict()
     pars.hpv52.dur = dict()
     pars.hpv52.dur_none     = dict(dist='lognormal', par1=2.3491, par2=1.0)
@@ -447,6 +457,16 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv52.prog_time    = 8.96  # Point of inflection in logistic function
     pars.hpv52.rel_beta     = 0.623 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv52.imm_boost    = 1.0 # TODO: look for data
+
+    pars.hpv56 = sc.objdict()
+    pars.hpv56.dur = dict()
+    pars.hpv56.dur_none     = dict(dist='lognormal', par1=2.0, par2=1.0)
+    pars.hpv56.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv56.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv56.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv56.prog_time    = 10  # Point of inflection in logistic function
+    pars.hpv56.rel_beta     = 0.6 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv56.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv58 = sc.objdict()
     pars.hpv58.dur = dict()
