@@ -726,10 +726,6 @@ class age_results(Analyzer):
                 sim_res = list(self.results[key][year])
                 res.extend(sim_res)
             else:
-                import traceback;
-                traceback.print_exc();
-                import pdb;
-                pdb.set_trace()
                 sim_res = list(self.results[key][year][self.glabels.index(genotype)])
                 res.extend(sim_res)
         self.result_keys[key].data['model_output'] = res

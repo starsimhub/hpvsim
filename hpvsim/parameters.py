@@ -266,8 +266,11 @@ def get_genotype_choices():
         'hpv11': ['hpv11', '11'],
         'hpv31': ['hpv31', '31'],
         'hpv33': ['hpv33', '33'],
+        'hpv35': ['hpv35', '35'],
         'hpv45': ['hpv45', '45'],
+        'hpv51': ['hpv51', '51'],
         'hpv52': ['hpv52', '52'],
+        'hpv56': ['hpv56', '56'],
         'hpv58': ['hpv58', '58'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
@@ -519,8 +522,11 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18 = high_imm,
             hpv31  = high_imm,
             hpv33 = high_imm,
+            hpv35 = high_imm,
             hpv45 = high_imm,
+            hpv51 = med_imm,
             hpv52 = med_imm,
+            hpv56 = med_imm,
             hpv58 = med_imm,
             hpv6 = med_imm,
             hpv11 = med_imm,
@@ -531,8 +537,11 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=1.0,  # Default for own-immunity
             hpv31=high_imm,
             hpv33=high_imm,
+            hpv35=high_imm,
             hpv45=high_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -543,8 +552,11 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=high_imm,
             hpv31=1.0,  # Default for own-immunity
             hpv33=high_imm,
+            hpv35=high_imm,
             hpv45=high_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -555,8 +567,26 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=high_imm,
             hpv31=high_imm,
             hpv33=1.0,  # Default for own-immunity
+            hpv35=high_imm,
             hpv45=high_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
+            hpv58=med_imm,
+            hpv6=med_imm,
+            hpv11=med_imm,
+        ),
+
+        hpv35=dict(
+            hpv16=high_imm,
+            hpv18=high_imm,
+            hpv31=high_imm,
+            hpv33=high_imm,
+            hpv35=1.0,  # Default for own-immunity
+            hpv45=high_imm,
+            hpv51=med_imm,
+            hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -567,8 +597,26 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=high_imm,
             hpv31=high_imm,
             hpv33=high_imm,
+            hpv35=high_imm,
             hpv45=1.0,  # Default for own-immunity
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
+            hpv58=med_imm,
+            hpv6=med_imm,
+            hpv11=med_imm,
+        ),
+
+        hpv51=dict(
+            hpv16=med_imm,
+            hpv18=med_imm,
+            hpv31=med_imm,
+            hpv33=med_imm,
+            hpv35=med_imm,
+            hpv45=med_imm,
+            hpv51=1.0,  # Default for own-immunity
+            hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -579,8 +627,26 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=med_imm,
             hpv31=med_imm,
             hpv33=med_imm,
+            hpv35=med_imm,
             hpv45=med_imm,
+            hpv51=med_imm,
             hpv52=1.0,  # Default for own-immunity
+            hpv56=med_imm,
+            hpv58=med_imm,
+            hpv6=med_imm,
+            hpv11=med_imm,
+        ),
+
+        hpv56=dict(
+            hpv16=med_imm,
+            hpv18=med_imm,
+            hpv31=med_imm,
+            hpv33=med_imm,
+            hpv35=med_imm,
+            hpv45=med_imm,
+            hpv51=med_imm,
+            hpv52=med_imm,
+            hpv56=1.0,  # Default for own-immunity
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -591,20 +657,27 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=med_imm,
             hpv31=med_imm,
             hpv33=med_imm,
+            hpv35=med_imm,
             hpv45=med_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
-            hpv58=1,  # Default for own-immunity
+            hpv56=med_imm,
+            hpv58=1.0,  # Default for own-immunity
             hpv6=med_imm,
             hpv11=med_imm,
         ),
+
 
         hpv6=dict(
             hpv16=med_imm,
             hpv18=med_imm,
             hpv31=med_imm,
             hpv33=med_imm,
+            hpv35=med_imm,
             hpv45=med_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=1.0,  # Default for own-immunity
             hpv11=med_imm,
@@ -615,8 +688,11 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=med_imm,
             hpv31=med_imm,
             hpv33=med_imm,
+            hpv35=med_imm,
             hpv45=med_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=1.0,  # Default for own-immunity
@@ -778,8 +854,11 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv18=1,  # Assumption
             hpv31=0,  # Assumption
             hpv33=0,  # Assumption
+            hpv35=0,  # Assumption
             hpv45=0,  # Assumption
+            hpv51=0,  # Assumption
             hpv52=0,  # Assumption
+            hpv56=0,  # Assumption
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
@@ -802,8 +881,11 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv18=1,  # Assumption
             hpv31=0,  # Assumption
             hpv33=0,  # Assumption
+            hpv35=0,  # Assumption
             hpv45=0,  # Assumption
+            hpv51=0,  # Assumption
             hpv52=0,  # Assumption
+            hpv56=0,  # Assumption
             hpv58=0,  # Assumption
             hpv6=1,  # Assumption
             hpv11=1,  # Assumption
@@ -814,8 +896,11 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv18=1,  # Assumption
             hpv31=1,  # Assumption
             hpv33=1,  # Assumption
+            hpv35=0,  # Assumption
             hpv45=1,  # Assumption
+            hpv51=0,  # Assumption
             hpv52=1,  # Assumption
+            hpv56=0,  # Assumption
             hpv58=1,  # Assumption
             hpv6=1,  # Assumption
             hpv11=1,  # Assumption
@@ -900,8 +985,11 @@ def get_screen_pars(screen=None):
                     hpv18=0.55,
                     hpv31=0.55,
                     hpv33=0.55,
+                    hpv35=0.55,
                     hpv45=0.55,
+                    hpv51=0.55,
                     hpv52=0.55,
+                    hpv56=0.55,
                     hpv58=0.55,
                     hpv6=0,
                     hpv11=0,
@@ -911,8 +999,11 @@ def get_screen_pars(screen=None):
                     hpv18=0.8415,
                     hpv31=0.8415,
                     hpv33=0.8415,
+                    hpv35=0.8415,
                     hpv45=0.8415,
+                    hpv51=0.8415,
                     hpv52=0.8415,
+                    hpv56=0.8415,
                     hpv58=0.8415,
                     hpv6=0,
                     hpv11=0,
@@ -922,8 +1013,11 @@ def get_screen_pars(screen=None):
                     hpv18=0.93,
                     hpv31=0.93,
                     hpv33=0.93,
+                    hpv35=0.93,
                     hpv45=0.93,
+                    hpv51=0.93,
                     hpv52=0.93,
+                    hpv56=0.93,
                     hpv58=0.93,
                     hpv6=0,
                     hpv11=0,
@@ -933,8 +1027,11 @@ def get_screen_pars(screen=None):
                     hpv18=0.984,
                     hpv31=0.984,
                     hpv33=0.984,
+                    hpv35=0.984,
                     hpv45=0.984,
+                    hpv51=0.984,
                     hpv52=0.984,
+                    hpv56=0.984,
                     hpv58=0.984,
                     hpv6=0,
                     hpv11=0,
@@ -952,8 +1049,11 @@ def get_screen_pars(screen=None):
                     hpv18=1,
                     hpv31=0,
                     hpv33=0,
+                    hpv35=0,
                     hpv45=0,
+                    hpv51=0,
                     hpv52=0,
+                    hpv56=0,
                     hpv58=0,
                     hpv6=0,
                     hpv11=0,
@@ -963,8 +1063,11 @@ def get_screen_pars(screen=None):
                     hpv18=1,
                     hpv31=0,
                     hpv33=0,
+                    hpv35=0,
                     hpv45=0,
+                    hpv51=0,
                     hpv52=0,
+                    hpv56=0,
                     hpv58=0,
                     hpv6=0,
                     hpv11=0,
@@ -974,8 +1077,11 @@ def get_screen_pars(screen=None):
                     hpv18=1,
                     hpv31=0,
                     hpv33=0,
+                    hpv35=0,
                     hpv45=0,
+                    hpv51=0,
                     hpv52=0,
+                    hpv56=0,
                     hpv58=0,
                     hpv6=0,
                     hpv11=0,
@@ -985,8 +1091,11 @@ def get_screen_pars(screen=None):
                     hpv18=1,
                     hpv31=0,
                     hpv33=0,
+                    hpv35=0,
                     hpv45=0,
+                    hpv51=0,
                     hpv52=0,
+                    hpv56=0,
                     hpv58=0,
                     hpv6=0,
                     hpv11=0,
@@ -1033,8 +1142,11 @@ def get_treatment_pars(screen=None):
             hpv18=dict(dist='beta', par1=2, par2=7),
             hpv31=dict(dist='beta', par1=2, par2=7),
             hpv33=dict(dist='beta', par1=2, par2=7),
+            hpv35=dict(dist='beta', par1=2, par2=7),
             hpv45=dict(dist='beta', par1=2, par2=7),
+            hpv51=dict(dist='beta', par1=2, par2=7),
             hpv52=dict(dist='beta', par1=2, par2=7),
+            hpv56=dict(dist='beta', par1=2, par2=7),
             hpv58=dict(dist='beta', par1=2, par2=7),
             hpv6=dict(dist='beta', par1=2, par2=7),
             hpv11=dict(dist='beta', par1=2, par2=7),
