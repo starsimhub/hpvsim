@@ -869,8 +869,11 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv18=1,  # Assumption
             hpv31=0.5,  # Assumption
             hpv33=0.5,  # Assumption
+            hpv35=0.5,  # Assumption
             hpv45=0.5,  # Assumption
+            hpv51=0.3,  # Assumption
             hpv52=0.3,  # Assumption
+            hpv56=0.3,  # Assumption
             hpv58=0.3,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
