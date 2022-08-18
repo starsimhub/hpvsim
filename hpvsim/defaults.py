@@ -2,7 +2,6 @@
 Set the defaults across each of the different files.
 
 TODO: review/merge this across the different *sims
-
 '''
 
 import numpy as np
@@ -402,7 +401,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
     elif which == 'all': # pragma: no cover
         plots = sim.result_keys('all')
 
-    # Show an overview 
+    # Show an overview
     elif 'overview' in which: # pragma: no cover
         plots = sc.dcp(overview_plots)
 

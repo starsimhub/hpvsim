@@ -437,10 +437,9 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
                         sex_labels = ['males', 'females']
                         for sex in range(n_sexes):
                             # Colors and labels
-                            v_label = sex_labels[sex]  # TODO this should also come from the sim
                             res_y = scendata.best[sex, :]
                             color = sex_colors[sex]
-                            label = res.name + sex_labels[sex]
+                            label = reskey + sex_labels[sex]
                             ax.fill_between(res_t[bi:], scendata.low[genotype, bi:], scendata.high[genotype, bi:],
                                             color=color, **args.fill)  # Create the uncertainty bound
                             ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
@@ -473,7 +472,7 @@ def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None
     # Get the analyzer details from the base sim
     base_analyzer = scens.sims[0][0].get_analyzer(analyzer_ref)
     if not len(base_analyzer.results):
-        errormsg = f'Cannot plot since no age results were recorded.'
+        errormsg = 'Cannot plot since no age results were recorded.'
         raise ValueError(errormsg)
     base_res = base_analyzer.results[0]
 
@@ -484,9 +483,7 @@ def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None
     n_rows, n_cols = sc.get_rows_cols(n_plots)
 
     # Construct dataframe for result storage
-    to_plot = {k:base_analyzer.result_properties[k].name for k in result_keys}
     n_runs = scens['n_runs']
-    n_results = n_plots
 
     # Do the plotting
     with hpo.with_style(args.style):
