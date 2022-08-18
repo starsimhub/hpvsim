@@ -255,7 +255,7 @@ def set_prognoses(people, inds, g, dur_none):
 
     # Determine whether CIN3 clears or progresses to invasive cervical cancer
     is_cancer = peaks>ccut['cin3'] # Anyone above the upper threshold for CIN3 classification is cancerous (NB, this reflects a modeling choice and does not represent an exact biological mechanism)
-    time_to_cancer = ccut['cin3']/(peaks[is_cancer]/dur_to_peak_dys[is_cancer]) # TODO: remove or use
+    time_to_cancer = ccut['cin3']/(peaks[is_cancer]/dur_to_peak_dys[is_cancer])
     cancer_inds = cin1_inds[is_cancer]
 
     # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
@@ -270,7 +270,7 @@ def set_prognoses(people, inds, g, dur_none):
     people.date_cancerous[cancer_inds[excl_inds]] = np.nan
     people.date_cancerous[cancer_inds] = np.fmin(people.date_cancerous[cancer_inds],
                                                     people.date_cin1[g, cancer_inds] +
-                                                    np.ceil(dur_to_peak_dys[is_cancer] / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
+                                                    np.ceil(time_to_cancer / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
 
     # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
