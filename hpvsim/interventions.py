@@ -561,7 +561,6 @@ class BaseVaccination(Intervention):
             imm_source = len(sim['genotype_map']) + self.index
             hpi.update_peak_immunity(sim.people, vacc_inds, self.p, imm_source, infection=False)
 
-            factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
             idx = int(sim.t / sim.resfreq)
             sim.results['new_vaccinated'][self.immunity_inds, idx] += len(first_vacc_inds)
             sim.results['new_total_vaccinated'][idx] += len(first_vacc_inds)
@@ -914,9 +913,10 @@ class Screening(Intervention):
     def __init__(self, primary_screen_test, treatment, screen_start_age, screen_interval, screen_stop_age,
                  screen_start_year, screen_end_year=None, screen_compliance=None, triage_compliance=None, ablation_compliance=None, excision_compliance=None,
                  cancer_compliance=None, triage_screen_test=None, screen_fu_neg_triage=None,
-                 label=None, screen_states=None, treat_states=None, **kwargs):
+                 label=None, screen_states=None, treat_states=None, verbose=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.label = label  # Screening label (used as a dict key)
+        self.verbose = verbose
         self.p = None  # Screening parameters
         self.screen_start_year = screen_start_year
         self.screen_end_year = screen_end_year
@@ -1085,6 +1085,10 @@ class Screening(Intervention):
                     ablation_treated_inds = self.treat_precancer(sim, ablation_inds, treat_pars, method='ablative')
                 if len(excision_inds):
                     excision_treated_inds = self.treat_precancer(sim, excision_inds, treat_pars, method='excisional')
+
+                if self.verbose:
+                    string = f'On step {sim.t}: {len(ca_treated_inds)} were CA treated, {len(ablation_treated_inds)} were ablation treated, and {len(excision_treated_inds)} were excision treated'
+                    print(string)
 
         return
 

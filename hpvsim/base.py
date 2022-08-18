@@ -7,7 +7,6 @@ can be focused on the disease-specific functionality.
 import numpy as np
 import pandas as pd
 import sciris as sc
-# import datetime as dt
 from . import utils as hpu
 from . import misc as hpm
 from . import defaults as hpd
@@ -15,12 +14,8 @@ from . import parameters as hppar
 from .version import __version__
 
 
-
-# obj_get = object.__getattribute__ # Alias the default getattribute method
-# obj_set = object.__setattr__
-
-# # Specify all externally visible classes this file defines
-# __all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', 'Contacts', 'Layer']
+# Specify all externally visible classes this file defines
+__all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', 'Contacts', 'Layer']
 
 
 #%% Define simulation classes
