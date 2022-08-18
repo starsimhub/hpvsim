@@ -3,19 +3,17 @@ Defines functions for making the population.
 '''
 
 #%% Imports
-from re import U
-import numpy as np # Needed for a few things not provided by pl
+import numpy as np
 import sciris as sc
 from . import utils as hpu
 from . import misc as hpm
 from . import data as hpdata
 from . import defaults as hpd
-from . import parameters as hppar
 from . import people as hpppl
 
 
-# # Specify all externally visible functions this file defines
-# __all__ = ['make_people', 'make_randpop', 'make_random_contacts']
+# Specify all externally visible functions this file defines
+__all__ = ['make_people', 'make_contacts']
 
 
 def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
@@ -60,7 +58,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
         # Load age data by country if available, or use defaults.
         # Other demographic data like mortality and fertility are also available by
-        # country, but these are loaded directly into the sim since they are not 
+        # country, but these are loaded directly into the sim since they are not
         # stored as part of the people.
         age_data = hpd.default_age_data
         location = sim['location']
@@ -98,7 +96,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['partners'] = partners
 
         # Create the contacts
-        active_inds = hpu.true(ages>debuts)     # Indices of sexually experienced people
+        # active_inds = hpu.true(ages>debuts)     # Indices of sexually experienced people
         if microstructure in ['random', 'default']:
             contacts = dict()
             current_partners = []
@@ -111,7 +109,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 contacts[lkey]['acts'] += 1 # To avoid zeros
                 current_partners.append(cp)
                 lno += 1
-        else: 
+        else:
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
             raise NotImplementedError(errormsg)
 
@@ -148,7 +146,7 @@ def partner_count(n_agents=None, partner_pars=None):
     for lkey,ppars in partner_pars.items():
         p_count = hpu.sample(**ppars, size=n_agents) + 1
         partners.append(p_count)
-        
+
     return np.array(partners)
 
 
@@ -267,8 +265,6 @@ def make_contacts(p_count=None, lkey=None, current_partners=None, mixing=None, s
 
     # Define indices; TODO fix or centralize this
     n_agents        = len(sexes)
-    f_inds          = hpu.false(sexes)
-    m_inds          = hpu.true(sexes)
     all_inds        = np.arange(n_agents)
 
     # Find active males and females

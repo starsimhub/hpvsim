@@ -6,7 +6,6 @@ the transitions between states (e.g., from susceptible to infected).
 #%% Imports
 import numpy as np
 import sciris as sc
-from collections import defaultdict
 from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
@@ -46,8 +45,8 @@ class People(hpb.BasePeople):
     '''
 
     def __init__(self, pars, strict=True, **kwargs):
-        
-        # Initialize the BasePeople, which also sets things up for filtering  
+
+        # Initialize the BasePeople, which also sets things up for filtering
         super().__init__(pars)
 
         # Handle pars and settings
@@ -565,7 +564,6 @@ class People(hpb.BasePeople):
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
         dur_none        = genotype_pars[genotype_map[g]]['dur_none']
-        dur_dysp        = genotype_pars[genotype_map[g]]['dur_dysp']
 
         # Set all dates
         base_t = self.t + offset if offset is not None else self.t
@@ -607,7 +605,6 @@ class People(hpb.BasePeople):
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
-
             this_dur = hpu.sample(**dur_none, size=len(inds))  # Duration of infection without dysplasia in years
             this_dur_f = self.dur_none[g, inds[self.is_female[inds]]]
         else:

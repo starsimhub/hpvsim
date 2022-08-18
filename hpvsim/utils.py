@@ -31,7 +31,7 @@ if hpo.numba_parallel not in [0, 1, 2, '0', '1', '2', 'none', 'safe', 'full']:
 cache = hpo.numba_cache # Turning this off can help switching parallelization options
 
 
-#%% The core functions 
+#%% The core functions
 
 @nb.njit(              (nbbool[:,:],    nbbool[:,:],    nbbool[:]), cache=cache, parallel=safe_parallel)
 def get_sources_targets(inf,           sus,            sex):
@@ -78,7 +78,7 @@ def isin( arr,      search_inds):
     n = len(arr)
     result = np.full(n, False)
     set_search_inds = set(search_inds)
-    for i in nb.prange(n): 
+    for i in nb.prange(n):
         if arr[i] in set_search_inds:
             result[i] = True
     return result
@@ -257,7 +257,6 @@ def set_prognoses(people, inds, g, dur_none):
     is_cancer = peaks>ccut['cin3'] # Anyone above the upper threshold for CIN3 classification is cancerous (NB, this reflects a modeling choice and does not represent an exact biological mechanism)
     time_to_cancer = ccut['cin3']/(peaks[is_cancer]/dur_to_peak_dys[is_cancer])
     cancer_inds = cin1_inds[is_cancer]
-    no_cancer_inds = cin1_inds[~is_cancer]
 
     # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
     time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
@@ -271,7 +270,7 @@ def set_prognoses(people, inds, g, dur_none):
     people.date_cancerous[cancer_inds[excl_inds]] = np.nan
     people.date_cancerous[cancer_inds] = np.fmin(people.date_cancerous[cancer_inds],
                                                     people.date_cin1[g, cancer_inds] +
-                                                    np.ceil(dur_to_peak_dys[is_cancer] / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
+                                                    np.ceil(time_to_cancer / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
 
     # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))

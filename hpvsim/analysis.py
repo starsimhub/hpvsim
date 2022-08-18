@@ -10,7 +10,6 @@ import pandas as pd
 import sciris as sc
 from . import utils as hpu
 from . import misc as hpm
-from . import interventions as hpi
 from . import plotting as hppl
 from . import defaults as hpd
 from . import parameters as hppar
@@ -389,8 +388,7 @@ class age_pyramid(Analyzer):
                     xlabels = [f'{abs(i):.2f}' for i in xticks]
                 else:
                     xlabels = [f'{sc.sigfig(abs(i), sigfigs=2, SI=True)}' for i in xticks]
-                ax.set_xticks(xticks)
-                ax.set_xticklabels(xlabels)
+                pl.xticks(xticks, xlabels)
                 ax.set_title(f'{date}')
                 count +=1
 
@@ -417,8 +415,7 @@ class age_pyramid(Analyzer):
                             xlabels = [f'{abs(i):.2f}' for i in xticks]
                         else:
                             xlabels = [f'{sc.sigfig(abs(i), sigfigs=2, SI=True)}' for i in xticks]
-                        ax.set_xticks(xticks)
-                        ax.set_xticklabels(xlabels)
+                        pl.xticks(xticks, xlabels)
                         ax.set_title(f'{date} - data')
 
                     count += 1
@@ -534,7 +531,7 @@ class age_results(Analyzer):
                                         range(len(rdict.bins) - 1)]
                     rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
                     if 'timepoints' not in rdict.keys():
-                        errormsg = f'Did not provide timepoints for this age analyzer'
+                        errormsg = 'Did not provide timepoints for this age analyzer'
                         raise ValueError(errormsg)
 
                 rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints,
@@ -551,7 +548,7 @@ class age_results(Analyzer):
 
                 if 'compute_fit' in rdict.keys() and rdict.compute_fit:
                     if rdict.data is None:
-                        errormsg = f'Cannot compute fit without data'
+                        errormsg = 'Cannot compute fit without data'
                         raise ValueError(errormsg)
                     else:
                         if 'weights' in rdict.data.columns:
@@ -764,7 +761,7 @@ class age_results(Analyzer):
 
         # Figure out rows and columns
         if len(self.results) == 0:
-            errormsg = f'Cannot plot since no age results were recorded)'
+            errormsg = 'Cannot plot since no age results were recorded)'
             raise ValueError(errormsg)
         else:
             dates_per_result = [len(rk['dates']) for rk in self.result_keys.values()]
@@ -808,7 +805,7 @@ class age_results(Analyzer):
                     ax.set_xlabel('Age group')
                     ax.set_title(self.result_properties[rkey].name+' - '+date)
                     ax.legend()
-                    ax.set_xticks(x, self.result_keys[rkey].age_labels)
+                    pl.xticks(x, self.result_keys[rkey].age_labels)
 
                     plot_count+=1
 
@@ -1273,7 +1270,7 @@ class Calibration(Analyzer):
 
         # Get rows and columns
         if not len(analyzer_results) and not len(sim_results):
-            errormsg = f'Cannot plot since no results were recorded)'
+            errormsg = 'Cannot plot since no results were recorded)'
             raise ValueError(errormsg)
         else:
             all_dates = [[date for date in r.keys() if date != 'bins'] for r in analyzer_results[0].values()]
@@ -1358,7 +1355,7 @@ class Calibration(Analyzer):
                     ax.set_xlabel('Age group')
                     ax.set_title(self.result_properties[resname].name+', '+ date.replace('.0', ''))
                     ax.legend()
-                    ax.set_xticks(x, age_labels[resname])
+                    pl.xticks(x, age_labels[resname])
                     plot_count += 1
 
             for rn, resname in enumerate(self.sim_results_keys):
@@ -1368,7 +1365,7 @@ class Calibration(Analyzer):
                 values = []
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
-                ax.scatter(x, ydata, color=self.result_properties[resname].color[0], marker='s', label=f'Data')
+                ax.scatter(x, ydata, color=self.result_properties[resname].color[0], marker='s', label='Data')
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
@@ -1383,7 +1380,7 @@ class Calibration(Analyzer):
                 ax.set_xlabel('Genotype')
                 ax.set_title(self.result_properties[resname].name + ', ' + str(date))
                 ax.legend()
-                ax.set_xticks(x, self.glabels)
+                pl.xticks(x, self.glabels)
                 plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
