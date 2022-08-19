@@ -83,56 +83,51 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     instant_vx = hpv.vaccinate_prob(vaccine='bivalent', label='80% from 2020', timepoints=vx_years,
                                        subtarget=instant_age_subtarget)
 
-    sim = hpv.Sim(pars=base_pars, interventions=[scale_up_vx])
-    sim.run()
+    n_runs = 1
+    sim = hpv.Sim(pars=base_pars)
 
-    return sim
+    # Define the scenarios
+    scenarios = {
+        'no_vx': {
+            'name': 'No vaccination',
+            'pars': {
+            }
+        },
+        'vx': {
+            'name': 'Scale-up to 80% by 2030',
+            'pars': {
+                'interventions': [scale_up_vx]
+            }
+        },
+        'faster_vx': {
+            'name': '80% from 2020',
+            'pars': {
+                'interventions': [instant_vx]
+            }
+        },
+    }
 
-    # n_runs = 1
-    # sim = hpv.Sim(pars=base_pars)
-    #
-    # # Define the scenarios
-    # scenarios = {
-    #     'no_vx': {
-    #         'name': 'No vaccination',
-    #         'pars': {
-    #         }
-    #     },
-    #     'vx': {
-    #         'name': 'Scale-up to 80% by 2030',
-    #         'pars': {
-    #             'interventions': [scale_up_vx]
-    #         }
-    #     },
-    #     'faster_vx': {
-    #         'name': '80% from 2020',
-    #         'pars': {
-    #             'interventions': [instant_vx]
-    #         }
-    #     },
-    # }
-    #
-    # metapars = {'n_runs': n_runs}
-    #
-    # scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
-    # scens.run(verbose=verbose, debug=debug)
-    # scens.compare()
-    #
-    # if do_plot:
-    #     to_plot = {
-    #         'HPV incidence': [
-    #             'total_hpv_incidence',
-    #         ],
-    #         'CIN prevalence': [
-    #             'total_cin_prevalence',
-    #         ],
-    #         'Number vaccinated': [
-    #             'cum_total_vaccinated',
-    #         ],
-    #     }
-    #     scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
-    #
-    # return scens
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV incidence': [
+                'total_hpv_incidence',
+            ],
+            'CIN prevalence': [
+                'total_cin_prevalence',
+            ],
+            'Number vaccinated': [
+                'cum_total_vaccinated',
+            ],
+        }
+        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
+
+    return scens
 
 
 
