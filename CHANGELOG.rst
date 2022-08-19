@@ -9,6 +9,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.2.1 (2022-08-19)
+--------------------------
+- Improves calibration to enable support for MySQL.
+- Fixes plotting bug.
+- *GitHub info*: PR `253 <https://github.com/amath-idm/hpvsim/pull/253>`__
+
+
 Version 0.2.0 (2022-08-19)
 --------------------------
 - Fixed tests and data loading logic.
