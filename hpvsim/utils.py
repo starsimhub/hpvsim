@@ -67,7 +67,7 @@ def pair_lookup(contacts_array, people_inds, n):
     res_val = lookup[contacts_array]
     return res_val
 
-# @nb.njit(cache=cache, parallel=safe_parallel)
+@nb.njit(cache=cache, parallel=safe_parallel)
 def unique(arr):
     '''
     Find the unique elements and counts in an array.
@@ -80,7 +80,7 @@ def unique(arr):
     return unique, counts
 
 
-# @nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
+@nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isin( arr,      search_inds):
     ''' Find search_inds in arr. Like np.isin() but faster '''
     n = len(arr)
@@ -92,7 +92,7 @@ def isin( arr,      search_inds):
     return result
 
 
-# @nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
+@nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
 def findinds(arr,       vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
     return isin(arr,vals).nonzero()[0]
