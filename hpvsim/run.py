@@ -1019,7 +1019,7 @@ class Scenarios(hpb.ParsObj):
             if debug:
                 print('Running in debug mode (not parallelized)')
                 run_args.pop('n_runs', None) # Remove n_runs argument, not used for a single run
-                scen_sims = [single_run(scen_sim, **run_args, **kwargs)]
+                scen_sims = [single_run(scen_sim, **run_args, **kwargs)]*self['n_runs'] # Ensure it has correct length -- WARNING, kludgy
             else:
                 scen_sims = multi_run(scen_sim, **run_args, **kwargs) # This is where the sims actually get run
 

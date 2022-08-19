@@ -21,7 +21,7 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
-    debug = 1
+    debug = 0
     n_agents = 10e3
 
     pars = {
