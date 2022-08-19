@@ -11,7 +11,7 @@ import pylab as pl
 import sciris as sc
 import collections as co
 from pathlib import Path
-from distutils.version import LooseVersion
+from distutils.version import LooseVersion # TODO: deprecated, remove
 from . import version as hpv
 from .settings import options as hpo
 

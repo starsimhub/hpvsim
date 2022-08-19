@@ -4,7 +4,6 @@ Define core Sim classes
 
 # Imports
 import numpy as np
-import pandas as pd
 import sciris as sc
 from . import base as hpb
 from . import misc as hpm
@@ -14,9 +13,9 @@ from . import population as hppop
 from . import parameters as hppar
 from . import analysis as hpa
 from . import plotting as hpplt
-from .settings import options as hpo
 from . import immunity as hpimm
 from . import interventions as hpi
+from .settings import options as hpo
 
 
 # Define the model
@@ -180,15 +179,15 @@ class Sim(hpb.BaseSim):
             if self['n_years']:
                 self['end'] = self['start'] + self['n_years']
             else:
-                errormsg = f'You must supply one of n_years and end."'
+                errormsg = 'You must supply one of n_years and end."'
                 raise ValueError(errormsg)
-        
+
         # Construct other things that keep track of time
         self.years      = sc.inclusiverange(self['start'],self['end'])
         self.yearvec    = sc.inclusiverange(start=self['start'], stop=self['end']+1-self['dt'], step=self['dt']) # Includes all the timepoints in the last year
         self.npts       = len(self.yearvec)
         self.tvec       = np.arange(self.npts)
-        
+
         # Handle population network data
         network_choices = ['random', 'default']
         choice = self['network']
@@ -548,23 +547,6 @@ class Sim(hpb.BaseSim):
                 analyzer.finalize(self)
 
 
-    def reset_layer_pars(self, layer_keys=None, force=False):
-        '''
-        Reset the parameters to match the population.
-
-        Args:
-            layer_keys (list): override the default layer keys (use stored keys by default)
-            force (bool): reset the parameters even if they already exist
-        '''
-        if layer_keys is None:
-            if self.people is not None: # If people exist
-                layer_keys = self.people.contacts.keys()
-            elif self.popdict is not None:
-                layer_keys = self.popdict['layer_keys']
-        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
-        return
-
-
     def init_states(self, age_brackets=None, init_hpv_prev=None, init_cin_prev=None, init_cancer_prev=None):
         '''
         Initialize prior immunity and seed infections
@@ -672,7 +654,7 @@ class Sim(hpb.BaseSim):
 
             # Get the number of acts per timestep for this partnership type
             acts = layer['acts'] * dt
-            fa, wa = np.modf(layer['acts'] * dt)
+            fa, wa = np.modf(acts)
             frac_acts.append(fa)
             whole_acts.append(wa.astype(hpd.default_int))
             effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
@@ -969,7 +951,7 @@ class Sim(hpb.BaseSim):
         res['cin2_types'][:,(res['n_total_cin2'][:]>0)] = res['n_cin2'][:,(res['n_total_cin2'][:]>0)]/res['n_total_cin2'][(res['n_total_cin2'][:]>0)]
         res['cin3_types'][:,(res['n_total_cin3'][:]>0)] = res['n_cin3'][:,(res['n_total_cin3'][:]>0)]/res['n_total_cin3'][(res['n_total_cin3'][:]>0)]
         cinds = res['n_cancerous'][:]>0 # Indices where there is some cancer present
-        self.results['cancer_types'][:,(res['n_cancerous'][:]>0)] = res['n_cancerous_by_genotype'][:,(res['n_cancerous'][:]>0)]/res['n_cancerous'][(res['n_cancerous'][:]>0)]
+        self.results['cancer_types'][:,cinds] = res['n_cancerous_by_genotype'][:,cinds]/res['n_cancerous'][cinds]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])

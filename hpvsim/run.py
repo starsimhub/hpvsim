@@ -21,7 +21,7 @@ __all__ = ['make_metapars', 'MultiSim', 'Scenarios', 'single_run', 'multi_run', 
 
 
 
-def make_metapars(): 
+def make_metapars():
     ''' Create default metaparameters for a Scenarios run '''
     metapars = sc.objdict(
         n_runs    = 3, # Number of parallel runs; change to 3 for quick, 10 for real
@@ -1093,7 +1093,6 @@ class Scenarios(hpb.ParsObj):
         x = defaultdict(dict)
         genotypekeys = self.result_keys('genotype')
         sexkeys = self.result_keys('by_sex')
-        agekeys = self.result_keys('by_age')
         totalkeys = self.result_keys('total')
         for scenkey in self.scenarios.keys():
             for reskey in self.result_keys():
