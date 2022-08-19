@@ -1,21 +1,15 @@
-import sciris as sc
-sc.options(dpi=150)
-
-t = sc.timer()
-from .version import __version__, __versiondate__; t.tt('version')
-from .settings      import *; t.tt('settings')
-from .defaults      import *; t.tt('defaults')
-from .misc          import *; t.tt('misc')
-from .parameters    import *; t.tt('parameters')
-from .utils         import *; t.tt('utils')
-from .plotting      import *; t.tt('plotting')
-from .base          import *; t.tt('base')
-from .people        import *; t.tt('people')
-from .population    import *; t.tt('population')
-from .interventions import *; t.tt('interventions')
-from .immunity      import *; t.tt('immunity')
-from .analysis      import *; t.tt('analysis')
-from .sim           import *; t.tt('sim')
-from .run           import *; t.tt('run')
-
-t.plot()
+from .version import __version__, __versiondate__
+from .settings      import *
+from .defaults      import *
+from .misc          import *
+from .parameters    import *
+from .utils         import *
+from .plotting      import *
+from .base          import *
+from .people        import *
+from .population    import *
+from .interventions import *
+from .immunity      import *
+from .analysis      import *
+from .sim           import *
+from .run           import *
