@@ -50,7 +50,7 @@ def find_day(arr, t=None, interv=None, sim=None, which='first'):
     return inds
 
 
-def get_subtargets(subtarget, sim):
+def get_subtargets(subtarget, sim, t_ind=None):
     '''
     A small helper function to see if subtargeting is a list of indices to use,
     or a function that needs to be called. If a function, it must take a single
@@ -65,7 +65,7 @@ def get_subtargets(subtarget, sim):
 
     # Validation
     if callable(subtarget):
-        subtarget = subtarget(sim)
+        subtarget = subtarget(sim, t_ind)
 
     if 'inds' not in subtarget: # pragma: no cover
         errormsg = f'The subtarget dict must have keys "inds" and "vals", but you supplied {subtarget}'
@@ -672,7 +672,8 @@ class vaccinate_prob(BaseVaccination):
 
                 # Apply any subtargeting
                 if self.subtarget is not None:
-                    subtarget_inds, subtarget_vals = get_subtargets(self.subtarget, sim)
+                    t_ind = sc.findinds(sim.t, self.timepoints)[0]
+                    subtarget_inds, subtarget_vals = get_subtargets(self.subtarget, sim, t_ind)
                     vacc_probs[subtarget_inds] = subtarget_vals  # People being explicitly subtargeted
 
                 vacc_inds = hpu.true(hpu.binomial_arr(vacc_probs))  # Calculate who actually gets vaccinated
