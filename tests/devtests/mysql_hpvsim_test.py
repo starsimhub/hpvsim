@@ -2,6 +2,7 @@ import hpvsim as hpv
 import sciris as sc
 
 
+do_plot = False
 storage = "mysql://hpvsim_user@localhost/hpvsim_db"
 name = "hpvsim-example-calibration"
 
@@ -43,7 +44,8 @@ def test_calibration():
                             name=name,
                             total_trials=2, n_workers=1)
     calib.calibrate()
-    calib.plot(top_results=4)
+    if do_plot:
+        calib.plot(top_results=4)
     return sim, calib
 
 
