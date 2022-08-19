@@ -4,12 +4,17 @@ Numerical utilities for running hpvsim.
 
 #%% Housekeeping
 
+import sciris as sc # For additional utilities
+
+t = sc.timer()
+
 import numba as nb # For faster computations
 import numpy as np # For numerics
 import random # Used only for resetting the seed
-import sciris as sc # For additional utilities
 from .settings import options as hpo # To set options
 from . import defaults as hpd # To set default types
+
+t.tt('utils imports')
 
 
 # What functions are externally visible -- note, this gets populated in each section below
@@ -28,8 +33,11 @@ rand_parallel = hpo.numba_parallel in full_opts
 if hpo.numba_parallel not in [0, 1, 2, '0', '1', '2', 'none', 'safe', 'full']:
     errormsg = f'Numba parallel must be "none", "safe", or "full", not "{hpo.numba_parallel}"'
     raise ValueError(errormsg)
-cache = hpo.numba_cache # Turning this off can help switching parallelization options
+cache = True#hpo.numba_cache # Turning this off can help switching parallelization options
 
+print('CACHE IS', cache)
+
+t.tt('utils prelim')
 
 #%% The core functions
 
@@ -59,7 +67,7 @@ def pair_lookup(contacts_array, people_inds, n):
     res_val = lookup[contacts_array]
     return res_val
 
-@nb.njit(cache=cache, parallel=safe_parallel)
+# @nb.njit(cache=cache, parallel=safe_parallel)
 def unique(arr):
     '''
     Find the unique elements and counts in an array.
@@ -72,7 +80,7 @@ def unique(arr):
     return unique, counts
 
 
-@nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
+# @nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
 def isin( arr,      search_inds):
     ''' Find search_inds in arr. Like np.isin() but faster '''
     n = len(arr)
@@ -84,13 +92,13 @@ def isin( arr,      search_inds):
     return result
 
 
-@nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
+# @nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
 def findinds(arr,       vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
     return isin(arr,vals).nonzero()[0]
 
 
-@nb.njit(               (nb.int64[:],   nb.int64[:],    nb.int64[:], nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
+# @nb.njit(               (nb.int64[:],   nb.int64[:],    nb.int64[:], nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
 def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p2,       n):
     '''
     Construct discordant partnerships
@@ -104,7 +112,7 @@ def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p
     return p1_source_inds, p1_genotypes
 
 
-@nb.njit(                (nb.int64[:],  nb.int64[:],    nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
+# @nb.njit(                (nb.int64[:],  nb.int64[:],    nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
 def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
     '''
     Construct discordant partnerships
@@ -116,7 +124,7 @@ def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
     return p1_source_inds
 
 
-@nb.njit(             (nb.float32[:],  nbint[:]), cache=cache, parallel=safe_parallel)
+# @nb.njit(             (nb.float32[:],  nbint[:]), cache=cache, parallel=safe_parallel)
 def compute_infections(betas,       targets):
     '''
     Compute who infects whom
@@ -127,7 +135,7 @@ def compute_infections(betas,       targets):
     return target_inds
 
 
-@nb.njit(          (nbfloat[:,:],   nbint,  nbint[:,:],  nbint[:],  nbfloat[:], nbfloat[:,:]), cache=cache)
+# @nb.njit(          (nbfloat[:,:],   nbint,  nbint[:,:],  nbint[:],  nbfloat[:], nbfloat[:,:]), cache=cache)
 def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    peak_imm):
     '''
     Step immunity levels forward in time
@@ -139,7 +147,7 @@ def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    
     return imm
 
 
-@nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
+# @nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
 def find_contacts(p1, p2, inds): # pragma: no cover
     """
     Numba for Layer.find_contacts()
@@ -278,6 +286,8 @@ def set_prognoses(people, inds, g, dur_none):
 
     return
 
+
+t.tt('utils core')
 
 #%% Sampling and seed methods
 
@@ -434,6 +444,8 @@ def set_seed(seed=None):
 
     return
 
+
+t.tt('utils sample')
 
 #%% Probabilities -- mostly not jitted since performance gain is minimal
 
@@ -620,6 +632,7 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
     return np.random.choice(n_choices, n_samples, p=probs, replace=not(unique))
 
 
+t.tt('utils prob')
 
 #%% Simple array operations
 
@@ -831,3 +844,5 @@ def find_cutoff(duration_cutoffs, duration):
     Find which duration bin each ind belongs to.
     '''
     return np.nonzero(duration_cutoffs <= duration)[0][-1]  # Index of the duration bin to use
+
+t.tt('utils array (end)')
