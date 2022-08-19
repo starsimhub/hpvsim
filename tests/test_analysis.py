@@ -9,6 +9,7 @@ import hpvsim as hpv
 
 do_plot = 1
 do_save = 0
+n_agents = 5e3
 
 
 #%% Define the tests
@@ -35,7 +36,6 @@ def test_age_pyramids(do_plot=True):
 
     sc.heading('Testing age pyramids')
 
-    n_agents = 50e3
     pars = dict(n_agents=n_agents, start=2000, n_years=30, dt=0.5)
 
     # Loop over countries and their population sizes in the year 2000
@@ -65,7 +65,6 @@ def test_age_results(do_plot=True):
 
     sc.heading('Testing by-age results')
 
-    n_agents = 50e3
     pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='kenya')
     pars['beta'] = .5
 
@@ -124,7 +123,7 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(n_agents=5e3, start=1980, end=2020, dt=0.5, location='south africa',
+    pars = dict(n_agents=n_agents, start=1980, end=2020, dt=0.5, location='south africa',
                 init_hpv_dist=dict(
                     hpv16=0.9,
                     hpv18=0.1
@@ -166,8 +165,8 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
-    sim2, calib = test_calibration()
+    sim1, a1    = test_age_results()
+    # sim2, calib = test_calibration()
 
 
 
