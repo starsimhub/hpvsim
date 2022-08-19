@@ -1055,8 +1055,8 @@ class Calibration(Analyzer):
 
         sim_results = sc.jsonify(sim_results)
         trial.set_user_attr('sim_results', sim_results)
-        sim.shrink() # CK: Proof of principle only!!
-        trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
+        # sim.shrink() # CK: Proof of principle only!!
+        # trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
         return sim.fit
 
 
@@ -1087,6 +1087,14 @@ class Calibration(Analyzer):
 
         New in version 3.1.0.
         '''
+        try:
+            op = import_optuna()
+            op.delete_study(study_name=self.run_args.name, storage=self.run_args.storage)
+            if self.verbose:
+                print(f'Deleted study {self.run_args.name} in {self.run_args.storage}')
+        except Exception as E:
+            print('Could not delete study, skipping...')
+            print(str(E))
         if os.path.exists(self.run_args.db_name):
             os.remove(self.run_args.db_name)
             if self.verbose:
@@ -1140,9 +1148,9 @@ class Calibration(Analyzer):
 
         # Collect analyzer results
         # Load a single sim
-        sim = sc.jsonpickle(self.study.trials[0].user_attrs['jsonpickle_sim'])
-        self.ng = sim['pars']['n_genotypes']
-        self.glabels = [g.upper() for g in sim['pars']['genotype_map'].values()]
+        sim = self.sim # TODO: make sure this is OK #sc.jsonpickle(self.study.trials[0].user_attrs['jsonpickle_sim'])
+        self.ng = sim['n_genotypes']
+        self.glabels = [g.upper() for g in sim['genotype_map'].values()]
 
         self.analyzer_results = []
         self.sim_results = []
