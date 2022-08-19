@@ -3,15 +3,10 @@ Tests for single simulations
 '''
 
 #%% Imports and settings
-import os
-import pytest
-import sys
-import sciris as sc
 import numpy as np
+import sciris as sc
 import seaborn as sns
 import hpvsim as hpv
-import hpvsim.parameters as hpvpar
-import hpvsim.utils as hpu
 
 do_plot = 1
 do_save = 0
@@ -27,7 +22,7 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 0
-    n_agents = 50e3
+    n_agents = 5e3
 
     pars = {
         'n_agents': n_agents,
@@ -41,8 +36,10 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
 
 
     az = hpv.age_results(
-        timepoints=['2030'],
-        result_keys=['total_cin_prevalence']
+        dict(total_cin_prevalence=dict(
+            timepoints=['2030'],
+            edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
+        )),
     )
 
 
@@ -57,13 +54,13 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
             }
         },
         '50%_latency': {
-            'name': f'50% of cleared infection are controlled by body',
+            'name': '50% of cleared infection are controlled by body',
             'pars': {
                 'hpv_control_prob': 0.5,
             }
         },
         '100%_latency': {
-            'name': f'100% of cleared infection are controlled by body',
+            'name': '100% of cleared infection are controlled by body',
             'pars': {
                 'hpv_control_prob': 1,
             }
@@ -85,7 +82,7 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
                 'total_cin_prevalence',
             ],
             'Cancers per 100,000 women': [
-                'total_cancer_incidence',
+                'cancer_incidence',
             ],
         }
         scens.plot(to_plot=to_plot)

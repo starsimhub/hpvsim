@@ -491,6 +491,7 @@ class age_results(Analyzer):
     def validate_results(self, sim):
         choices = sim.result_keys()
         for rk, rdict in self.result_keys.items():
+            rdict = sc.objdict(rdict)
             if rk not in choices:
                 strm = '\n'.join(choices)
                 errormsg = f'Cannot compute age results for {rk}. Please enter one of the standard sim result_keys to the age_results analyzer; choices are {strm}.'
@@ -598,6 +599,7 @@ class age_results(Analyzer):
 
         # Go through each result key and determine if this is a timepoint where age results are requested
         for result, result_dict in self.result_keys.items():
+            result_dict = sc.objdict(result_dict)
             if sim.t in result_dict.timepoints:
                 na = len(result_dict.bins)
                 ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
