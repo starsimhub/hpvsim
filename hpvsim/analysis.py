@@ -13,9 +13,7 @@ from . import misc as hpm
 from . import plotting as hppl
 from . import defaults as hpd
 from . import parameters as hppar
-# from . import run as cvr
 from .settings import options as hpo # For setting global options
-import seaborn as sns
 
 
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'Calibration']
@@ -336,6 +334,7 @@ class age_pyramid(Analyzer):
             do_show (bool): whether to show the figure
             kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
         '''
+        import seaborn as sns # Import here since slow
 
         # Handle inputs
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
@@ -1243,7 +1242,7 @@ class Calibration(Analyzer):
 
 
     def plot(self, top_results=None, fig_args=None, axis_args=None, data_args=None, do_save=None,
-             fig_path=None, do_show=True, plot_type=sns.boxplot, **kwargs):
+             fig_path=None, do_show=True, plot_type='sns.boxplot', **kwargs):
         '''
         Plot the calibration results
 
@@ -1257,6 +1256,11 @@ class Calibration(Analyzer):
             do_show (bool): whether to show the figure
             kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
         '''
+
+        # Import Seaborn here since slow
+        if plot_type.startswith('sns'):
+            import seaborn as sns
+            plot_func = getattr(sns, plot_type.split('.')[1])
 
         # Handle inputs
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
@@ -1335,7 +1339,7 @@ class Calibration(Analyzer):
 
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values, 'genotypes':genotypes})
-                        ax = plot_type(ax=ax, x='bins', y='values', hue="genotypes", data=modeldf, dodge=True, boxprops=dict(alpha=.3))
+                        ax = plot_func(ax=ax, x='bins', y='values', hue="genotypes", data=modeldf, dodge=True, boxprops=dict(alpha=.3))
 
                     else:
                         # Plot data
@@ -1349,7 +1353,7 @@ class Calibration(Analyzer):
 
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values})
-                        ax = plot_type(ax=ax, x='bins', y='values', data=modeldf, color=self.result_properties[resname].color, boxprops=dict(alpha=.3))
+                        ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, color=self.result_properties[resname].color, boxprops=dict(alpha=.3))
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
@@ -1373,7 +1377,7 @@ class Calibration(Analyzer):
                     values += run[resname]
                 # Plot model
                 modeldf = pd.DataFrame({'bins': bins, 'values': values})
-                ax = plot_type(ax=ax, x='bins', y='values', data=modeldf, dodge=True, boxprops=dict(alpha=.3))
+                ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, dodge=True, boxprops=dict(alpha=.3))
 
                 # Set title and labels
                 date = thisdatadf.year[0]

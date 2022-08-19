@@ -6,7 +6,6 @@ import numpy as np
 import pylab as pl
 import sciris as sc
 import pandas as pd
-import seaborn as sns
 from . import misc as hpm
 from . import defaults as hpd
 from .settings import options as hpo
@@ -462,8 +461,13 @@ def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None
          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
          show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
          log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None,
-         plot_burnin=False, plot_type=sns.boxplot, **kwargs):
+         plot_burnin=False, plot_type='sns.boxplot', **kwargs):
     ''' Plot age results of a scenario'''
+
+    # Import Seaborn here since slow
+    if plot_type.startswith('sns'):
+        import seaborn as sns
+        plot_func = getattr(sns, plot_type.split('.')[1])
 
     # Handle inputs
     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
@@ -516,7 +520,7 @@ def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None
 
                 # Start plot
                 ax = pl.subplot(n_rows, n_cols, pnum+1)
-                ax = plot_type(ax=ax, x="bin", y="value", hue="scen_name", data=resdf, dodge=True)
+                ax = plot_func(ax=ax, x="bin", y="value", hue="scen_name", data=resdf, dodge=True)
                 ax.legend([], [], frameon=False) # Temporarily turn off legend
                 title = f'{base_analyzer.result_properties[reskey].name} - {int(float(tp))}'
                 if args.show['legend']:
