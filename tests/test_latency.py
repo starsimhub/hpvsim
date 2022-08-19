@@ -21,8 +21,8 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
-    debug = 0
-    n_agents = 5e3
+    debug = 1
+    n_agents = 10e3
 
     pars = {
         'n_agents': n_agents,
@@ -31,13 +31,13 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
         'start': 1970,
         'genotypes': [hpv16, hpv18],
         'location': 'tanzania',
-        'dt': .2,
+        'dt': 1.0,
     }
 
 
     az = hpv.age_results(
-        dict(total_cin_prevalence=dict(
-            timepoints=['2030'],
+        sc.objdict(total_cin_prevalence=sc.objdict(
+            timepoints=['2025'],
             edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
         )),
     )

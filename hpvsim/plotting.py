@@ -473,9 +473,11 @@ def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None
     ''' Plot age results of a scenario'''
 
     # Import Seaborn here since slow
-    if plot_type.startswith('sns'):
+    if sc.isstring(plot_type) and plot_type.startswith('sns'):
         import seaborn as sns
         plot_func = getattr(sns, plot_type.split('.')[1])
+    else:
+        plot_func = plot_type
 
     # Handle inputs
     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,

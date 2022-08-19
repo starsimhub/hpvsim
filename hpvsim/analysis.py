@@ -460,30 +460,34 @@ class age_results(Analyzer):
 
     def initialize(self, sim):
 
-        super().initialize()
-        # Handle timepoints and dates
-        self.start = sim['start']  # Store the simulation start
-        self.end = sim['end']  # Store simulation end
+        if not self.initialized:
 
-        # Handle dt - if we're storing annual results we'll need to aggregate them over
-        # several consecutive timesteps
-        self.dt = sim['dt']
-        self.resfreq = sim.resfreq
+            super().initialize()
+            # Handle timepoints and dates
+            self.start = sim['start']  # Store the simulation start
+            self.end = sim['end']  # Store simulation end
 
-        self.validate_results(sim)
+            # Handle dt - if we're storing annual results we'll need to aggregate them over
+            # several consecutive timesteps
+            self.dt = sim['dt']
+            self.resfreq = sim.resfreq
 
-        # Store genotypes
-        self.ng = sim['n_genotypes']
-        self.glabels = [g.upper() for g in sim['genotype_map'].values()]
+            self.validate_results(sim)
 
-        # Store colors
-        self.result_properties = sc.objdict()
-        for rkey in self.result_keys.keys():
-            self.result_properties[rkey] = sc.objdict()
-            self.result_properties[rkey].color = sim.results[rkey].color
-            self.result_properties[rkey].name = sim.results[rkey].name
+            # Store genotypes
+            self.ng = sim['n_genotypes']
+            self.glabels = [g.upper() for g in sim['genotype_map'].values()]
 
-        self.initialized = True
+            # Store colors
+            self.result_properties = sc.objdict()
+            for rkey in self.result_keys.keys():
+                self.result_properties[rkey] = sc.objdict()
+                self.result_properties[rkey].color = sim.results[rkey].color
+                self.result_properties[rkey].name = sim.results[rkey].name
+
+            self.initialized = True
+        else:
+            print('Warning, already initialized')
 
         return
 
@@ -491,7 +495,6 @@ class age_results(Analyzer):
     def validate_results(self, sim):
         choices = sim.result_keys()
         for rk, rdict in self.result_keys.items():
-            rdict = sc.objdict(rdict)
             if rk not in choices:
                 strm = '\n'.join(choices)
                 errormsg = f'Cannot compute age results for {rk}. Please enter one of the standard sim result_keys to the age_results analyzer; choices are {strm}.'
@@ -599,7 +602,6 @@ class age_results(Analyzer):
 
         # Go through each result key and determine if this is a timepoint where age results are requested
         for result, result_dict in self.result_keys.items():
-            result_dict = sc.objdict(result_dict)
             if sim.t in result_dict.timepoints:
                 na = len(result_dict.bins)
                 ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
@@ -1260,9 +1262,11 @@ class Calibration(Analyzer):
         '''
 
         # Import Seaborn here since slow
-        if plot_type.startswith('sns'):
+        if sc.isstring(plot_type) and plot_type.startswith('sns'):
             import seaborn as sns
             plot_func = getattr(sns, plot_type.split('.')[1])
+        else:
+            plot_func = plot_type
 
         # Handle inputs
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)

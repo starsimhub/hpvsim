@@ -921,11 +921,12 @@ class Scenarios(hpb.ParsObj):
         self.base_sim.update_pars(self.basepars)
         self.base_sim.validate_pars()
         if not self.base_sim.initialized:
-            self.base_sim.init_genotypes()
-            self.base_sim.init_immunity()
-            self.base_sim.init_interventions()
-            self.base_sim.init_people()
-            self.base_sim.init_results()
+            self.base_sim.initialize(reset=True) # TODO: This breaks things, need to figure out how to avoid!!
+        #     self.base_sim.init_genotypes()
+        #     self.base_sim.init_immunity()
+        #     self.base_sim.init_interventions()
+        #     self.base_sim.init_people()
+        #     self.base_sim.init_results()
 
         # Copy quantities from the base sim to the main object
         self.npts       = self.base_sim.npts
@@ -1000,6 +1001,7 @@ class Scenarios(hpb.ParsObj):
             # Create and run the simulations
             print_heading(f'Multirun for {scenkey}')
             scen_sim = sc.dcp(self.base_sim)
+            scen_sim.initialize(reset=True)
             scen_sim.scenkey = scenkey
             scen_sim.label = scenname
             scen_sim.scen = scen
