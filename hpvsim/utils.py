@@ -524,7 +524,7 @@ def n_multinomial(probs, n): # No speed gain from Numba
     return np.searchsorted(np.cumsum(probs), np.random.random(n))
 
 
-# @nb.njit((nbfloat,), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
+@nb.njit((nbfloat,), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
 def poisson(rate):
     '''
     A Poisson trial.
@@ -539,7 +539,7 @@ def poisson(rate):
     return np.random.poisson(rate, 1)[0]
 
 
-# @nb.njit((nbfloat, nbint), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
+@nb.njit((nbfloat, nbint), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
 def n_poisson(rate, n):
     '''
     An array of Poisson trials.
@@ -576,7 +576,7 @@ def n_neg_binomial(rate, dispersion, n, step=1): # Numba not used due to incompa
     return samples
 
 
-# @nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
+@nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
 def choose(max_n, n):
     '''
     Choose a subset of items (e.g., people) without replacement.
@@ -592,7 +592,7 @@ def choose(max_n, n):
     return np.random.choice(max_n, n, replace=False)
 
 
-# @nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
+@nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
 def choose_r(max_n, n):
     '''
     Choose a subset of items (e.g., people), with replacement.
