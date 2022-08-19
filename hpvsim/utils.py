@@ -4,17 +4,12 @@ Numerical utilities for running hpvsim.
 
 #%% Housekeeping
 
-import sciris as sc # For additional utilities
-
-t = sc.timer()
-
 import numba as nb # For faster computations
 import numpy as np # For numerics
 import random # Used only for resetting the seed
+import sciris as sc # For additional utilities
 from .settings import options as hpo # To set options
 from . import defaults as hpd # To set default types
-
-t.tt('utils imports')
 
 
 # What functions are externally visible -- note, this gets populated in each section below
@@ -33,11 +28,8 @@ rand_parallel = hpo.numba_parallel in full_opts
 if hpo.numba_parallel not in [0, 1, 2, '0', '1', '2', 'none', 'safe', 'full']:
     errormsg = f'Numba parallel must be "none", "safe", or "full", not "{hpo.numba_parallel}"'
     raise ValueError(errormsg)
-cache = True#hpo.numba_cache # Turning this off can help switching parallelization options
+cache = hpo.numba_cache # Turning this off can help switching parallelization options
 
-print('CACHE IS', cache)
-
-t.tt('utils prelim')
 
 #%% The core functions
 
@@ -287,8 +279,6 @@ def set_prognoses(people, inds, g, dur_none):
     return
 
 
-t.tt('utils core')
-
 #%% Sampling and seed methods
 
 __all__ += ['sample', 'get_pdf', 'set_seed']
@@ -444,8 +434,6 @@ def set_seed(seed=None):
 
     return
 
-
-t.tt('utils sample')
 
 #%% Probabilities -- mostly not jitted since performance gain is minimal
 
@@ -632,7 +620,6 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
     return np.random.choice(n_choices, n_samples, p=probs, replace=not(unique))
 
 
-t.tt('utils prob')
 
 #%% Simple array operations
 
@@ -844,5 +831,3 @@ def find_cutoff(duration_cutoffs, duration):
     Find which duration bin each ind belongs to.
     '''
     return np.nonzero(duration_cutoffs <= duration)[0][-1]  # Index of the duration bin to use
-
-t.tt('utils array (end)')
