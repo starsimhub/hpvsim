@@ -383,7 +383,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                     for genotype in range(ng):
                         # Colors and labels
                         v_color = res.color[genotype]
-                        v_label = sim['genotypes'][genotype]
+                        v_label = sim['genotypes'][genotype].label
                         color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
                         label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label: label += f' - {v_label}'
