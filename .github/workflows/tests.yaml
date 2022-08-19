@@ -20,8 +20,6 @@ jobs:
           architecture: x64
       - name: Install HPVsim
         run:  pip install -e .
-      - name: Download data
-        run: python -c 'import hpvsim as hpv; hpv.data.get_data()'
       - name: Install tests
         run: pip install pytest pytest-parallel
       - name: Run all tests
