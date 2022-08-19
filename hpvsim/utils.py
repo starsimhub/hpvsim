@@ -124,7 +124,7 @@ def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
     return p1_source_inds
 
 
-# @nb.njit(             (nb.float32[:],  nbint[:]), cache=cache, parallel=safe_parallel)
+@nb.njit(             (nb.float32[:],  nbint[:]), cache=cache, parallel=safe_parallel)
 def compute_infections(betas,       targets):
     '''
     Compute who infects whom
@@ -135,7 +135,7 @@ def compute_infections(betas,       targets):
     return target_inds
 
 
-# @nb.njit(          (nbfloat[:,:],   nbint,  nbint[:,:],  nbint[:],  nbfloat[:], nbfloat[:,:]), cache=cache)
+@nb.njit(          (nbfloat[:,:],   nbint,  nbint[:,:],  nbint[:],  nbfloat[:], nbfloat[:,:]), cache=cache)
 def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    peak_imm):
     '''
     Step immunity levels forward in time
@@ -147,7 +147,7 @@ def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    
     return imm
 
 
-# @nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
+@nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
 def find_contacts(p1, p2, inds): # pragma: no cover
     """
     Numba for Layer.find_contacts()
@@ -524,7 +524,7 @@ def n_multinomial(probs, n): # No speed gain from Numba
     return np.searchsorted(np.cumsum(probs), np.random.random(n))
 
 
-@nb.njit((nbfloat,), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
+# @nb.njit((nbfloat,), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
 def poisson(rate):
     '''
     A Poisson trial.
@@ -539,7 +539,7 @@ def poisson(rate):
     return np.random.poisson(rate, 1)[0]
 
 
-@nb.njit((nbfloat, nbint), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
+# @nb.njit((nbfloat, nbint), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
 def n_poisson(rate, n):
     '''
     An array of Poisson trials.
@@ -576,7 +576,7 @@ def n_neg_binomial(rate, dispersion, n, step=1): # Numba not used due to incompa
     return samples
 
 
-@nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
+# @nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
 def choose(max_n, n):
     '''
     Choose a subset of items (e.g., people) without replacement.
@@ -592,7 +592,7 @@ def choose(max_n, n):
     return np.random.choice(max_n, n, replace=False)
 
 
-@nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
+# @nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
 def choose_r(max_n, n):
     '''
     Choose a subset of items (e.g., people), with replacement.
