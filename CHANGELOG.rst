@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.2.0 (2022-08-19)
+--------------------------
+- Fixed tests and data loading logic.
+- *GitHub info*: PR `251 <https://github.com/amath-idm/hpvsim/pull/251>`__
+
+
 Version 0.1.0 (2022-08-01)
 --------------------------
 - Updated calibration.
