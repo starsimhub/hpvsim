@@ -3,13 +3,10 @@ Tests for single simulations
 '''
 
 #%% Imports and settings
-import os
-import pytest
-import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
-import hpvsim.utils as hpu
+import pytest
 
 do_plot = 1
 do_save = 0
@@ -45,7 +42,7 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
 
     # Create and run the simulation
     pars = {
-        'n_agents': 50e3,
+        'n_agents': 5e3,
         'start': 1990,
         'burnin': 30,
         'end': 2030,
@@ -80,7 +77,7 @@ def test_epi():
 
     # Define the parameters to vary
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.01, 0.99],    [10,200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
+    vary_vals   = [[0.01, 0.99],    [1, 200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
     vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'cancer_incidence'] # Epi outcomes to check
 
@@ -190,7 +187,7 @@ def test_result_consistency():
     ''' Check that results by subgroup sum to the correct totals'''
 
     # Create sim
-    n_agents = 10e3
+    n_agents = 1e3
     sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, genotypes=['hpv16','hpv18'], label='test_results')
     sim.run()
 
@@ -220,10 +217,9 @@ def test_result_consistency():
     assert (sim['n_agents'] == n_agents)
 
     # Check that males don't have CINs or cancers
-    import hpvsim.utils as hpu
     male_inds = sim.people.is_male.nonzero()[0]
-    males_with_cin = hpu.defined(sim.people.date_cin1[:,male_inds])
-    males_with_cancer = hpu.defined(sim.people.date_cancerous[male_inds])
+    males_with_cin = hpv.defined(sim.people.date_cin1[:,male_inds])
+    males_with_cancer = hpv.defined(sim.people.date_cancerous[male_inds])
     assert len(males_with_cin)==0
     assert len(males_with_cancer)==0
 
@@ -254,7 +250,7 @@ def test_location_loading():
 def test_resuming():
     sc.heading('Test that resuming a run works')
 
-    n_agents = 10e3
+    n_agents = 5e3
     s0 = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, label='test_resume')
     s1 = s0.copy()
     s0.run()
