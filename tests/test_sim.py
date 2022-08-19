@@ -33,7 +33,7 @@ def test_microsim():
     return sim
 
 
-def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
+def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest, turn off
     sc.heading('Basic sim test')
 
     # Settings
@@ -50,6 +50,7 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
         'dt': .5,
         'genotypes': [16,18]
     }
+    pars = sc.mergedicts(pars, kwargs)
 
     # age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
     # doses_per_year = 2e3
