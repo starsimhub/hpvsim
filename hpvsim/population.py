@@ -288,7 +288,7 @@ def make_contacts(p_count=None, lkey=None, current_partners=None, mixing=None, s
         for ab in bin_range_f: # Loop over age bins
             these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f==ab]) # Select females according to their participation rate in this layer
             f_contacts += these_f_contacts.tolist()
-        f_contacts = np.array(f_contacts)
+        f_contacts = np.array(f_contacts, dtype=int)
 
     else:
         age_order = ages[f_active_inds].argsort()  # We sort the contacts by age so they get matched to partners of similar age
