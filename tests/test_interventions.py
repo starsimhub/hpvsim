@@ -18,8 +18,10 @@ do_save = 0
 hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
 
+n_agents = [5e3,50e3][0] # Swap between sizes
+
 base_pars = {
-    'n_agents': 50e3,
+    'n_agents': n_agents,
     'start': 1990,
     'burnin': 30,
     'end': 2050,
@@ -35,7 +37,7 @@ def test_dynamic_pars():
     sc.heading('Test dynamics pars intervention')
 
     pars = {
-        'n_agents': 10e3,
+        'n_agents': n_agents,
         'n_years': 10,
     }
 
@@ -197,7 +199,6 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 1
-    n_agents = 50e3
 
     pars = {
         'n_agents': n_agents,
@@ -306,7 +307,6 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 1
-    n_agents = 50e3
 
     pars = {
         'n_agents': n_agents,
