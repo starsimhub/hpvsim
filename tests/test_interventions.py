@@ -3,15 +3,15 @@ Tests for single simulations
 '''
 
 #%% Imports and settings
-import os
-import pytest
-import sys
+# import os
+# import sys
 import sciris as sc
 import numpy as np
 import seaborn as sns
 import hpvsim as hpv
-import hpvsim.parameters as hpvpar
+# import hpvsim.parameters as hpvpar
 import hpvsim.utils as hpu
+import pytest
 
 do_plot = 1
 do_save = 0
@@ -298,6 +298,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     return scens
 
 
+@pytest.mark.skip
 def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test screening LTFU params')
 
