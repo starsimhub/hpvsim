@@ -3,14 +3,10 @@ Tests for single simulations
 '''
 
 #%% Imports and settings
-# import os
-# import sys
 import sciris as sc
 import numpy as np
 import seaborn as sns
 import hpvsim as hpv
-# import hpvsim.parameters as hpvpar
-import hpvsim.utils as hpu
 import pytest
 
 do_plot = 1
@@ -18,7 +14,7 @@ do_save = 0
 hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
 
-n_agents = [5e3,50e3][0] # Swap between sizes
+n_agents = [2e3,50e3][0] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,
@@ -138,7 +134,7 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
     debug = 0
 
     # Model an intervention to roll out prophylactic vaccination with a given number of doses over time
-    age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give vaccine to people who have had 2 doses
+    age_target = {'inds': lambda sim: hpv.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give vaccine to people who have had 2 doses
     doses_per_year = 6e3
     bivalent_1_dose = hpv.vaccinate_num(vaccine='bivalent_1dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029'], label='bivalent 1 dose, 9-14', subtarget=age_target)
     bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029'], label='bivalent 2 dose, 9-14', subtarget=age_target)
