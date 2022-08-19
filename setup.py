@@ -41,7 +41,7 @@ setup(
         'numba',
         'scipy',
         'pandas', 
-        'sciris',
+        'sciris>=2.0.0',
         'matplotlib',
         'seaborn',
         'wbgapi',
