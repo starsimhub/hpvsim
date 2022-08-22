@@ -9,6 +9,7 @@ import pandas as pd
 import sciris as sc
 from . import misc as hpm
 from . import plotting as hppl
+from . import analysis as hpa
 from .settings import options as hpo # For setting global options
 
 
@@ -120,7 +121,7 @@ class Calibration(sc.prettyobj):
                     data=sc.dcp(targ)
                 )
 
-        ar = age_results(result_keys=age_result_keys)
+        ar = hpa.age_results(result_keys=age_result_keys)
         self.sim['analyzers'] += [ar]
         self.sim.initialize()
         for rkey in sim_results.keys():
