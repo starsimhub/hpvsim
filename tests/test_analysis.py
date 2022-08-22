@@ -159,6 +159,58 @@ def test_calibration():
     return sim, calib
 
 
+def test_reduce_analyzers():
+
+    sc.heading('Test reducing analyzers')
+
+    # Test averaging
+    locations = ['kenya', 'tanzania']
+    age_pyramids = []
+    age_results = []
+    pars = dict(n_agents=10e3, start=2000, n_years=30, dt=0.5)
+
+    for location in locations:
+
+        age_pyr = hpv.age_pyramid(
+            timepoints=['2020'],
+            datafile=f'test_data/{location}_age_pyramid.csv',
+            edges=np.linspace(0, 100, 21))
+
+        az = hpv.age_results(
+            result_keys=sc.objdict(
+                cancer_incidence=sc.objdict(
+                    timepoints=['2020'],
+                    datafile=f'test_data/{location}_cancer_cases.csv',
+                    edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
+                ),
+                cancer_mortality=sc.objdict(
+                    timepoints=['2020'],
+                    datafile=f'test_data/{location}_cancer_deaths.csv',
+                    edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
+                )
+            )
+        )
+
+        sim = hpv.Sim(
+            pars,
+            location=location,
+            analyzers=[age_pyr, az])
+
+        sim.run()
+
+        age_pyr = sim.get_analyzer(0)
+        age_pyramids.append(age_pyr)
+        age_res = sim.get_analyzer(1)
+        age_results.append(age_res)
+
+    # reduced_analyzer = hpv.age_pyramid.reduce(age_pyramids)
+    reduced_analyzer = hpv.age_results.reduce(age_results)
+
+    return reduced_analyzer, sim
+
+
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -167,7 +219,8 @@ if __name__ == '__main__':
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
     # sim1, a1    = test_age_results()
-    sim2, calib = test_calibration()
+    # sim2, calib = test_calibration()
+    reduced_analyzer, sim = test_reduce_analyzers()
 
 
 

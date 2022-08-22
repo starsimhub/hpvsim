@@ -298,6 +298,13 @@ class MultiSim(hpb.FlexPretty):
                 results[reskey].low = np.quantile(raw[reskey], q=quantiles['low'], axis=axis)
                 results[reskey].high = np.quantile(raw[reskey], q=quantiles['high'], axis=axis)
 
+
+        # Deal with analyzers
+        reduced_analyzers = []
+        for ai,analyzer in enumerate(reduced_sim['analyzers']): # Loop over each type of analyzer
+            analyzer_list = [sim['analyzers'][ai] for sim in self.sims]
+            reduced_analyzers += [analyzer.reduce(analyzer_list)]
+
         # Compute and store final results
         reduced_sim.compute_summary()
         self.orig_base_sim = self.base_sim
@@ -305,6 +312,7 @@ class MultiSim(hpb.FlexPretty):
         self.results = reduced_sim.results
         self.summary = reduced_sim.summary
         self.which = 'reduced'
+        self.analyzers = reduced_analyzers
 
         if output:
             return self.base_sim
@@ -724,8 +732,8 @@ class MultiSim(hpb.FlexPretty):
 
         **Examples**::
 
-            m1 = hp.MultiSim(cv.Sim(label='sim1'), initialize=True)
-            m2 = hp.MultiSim(cv.Sim(label='sim2'), initialize=True)
+            m1 = hp.MultiSim(hp.Sim(label='sim1'), initialize=True)
+            m2 = hp.MultiSim(hp.Sim(label='sim2'), initialize=True)
             m3 = hp.MultiSim.merge(m1, m2)
             m3.run()
             m1b, m2b = m3.split()
