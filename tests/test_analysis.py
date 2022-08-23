@@ -1,5 +1,5 @@
 '''
-Tests for single simulations
+Tests for analyzers
 '''
 
 #%% Imports and settings
@@ -9,6 +9,7 @@ import hpvsim as hpv
 
 do_plot = 1
 do_save = 0
+n_agents = 5e3
 
 
 #%% Define the tests
@@ -35,7 +36,6 @@ def test_age_pyramids(do_plot=True):
 
     sc.heading('Testing age pyramids')
 
-    n_agents = 50e3
     pars = dict(n_agents=n_agents, start=2000, n_years=30, dt=0.5)
 
     # Loop over countries and their population sizes in the year 2000
@@ -65,7 +65,6 @@ def test_age_results(do_plot=True):
 
     sc.heading('Testing by-age results')
 
-    n_agents = 50e3
     pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='kenya')
     pars['beta'] = .5
 
@@ -120,44 +119,6 @@ def test_age_results(do_plot=True):
     return sim, a
 
 
-def test_calibration():
-
-    sc.heading('Testing calibration')
-
-    pars = dict(n_agents=50e3, start=1980, end=2020, dt=0.5, location='south africa',
-                init_hpv_dist=dict(
-                    hpv16=0.9,
-                    hpv18=0.1
-                ))
-    sim = hpv.Sim(pars, genotypes=[16,18])
-    calib_pars = dict(
-        beta=[0.05, 0.010, 0.20],
-        hpv_control_prob=[.9, 0.1, 1],
-    )
-    genotype_pars = dict(
-        hpv16=dict(
-            dysp_rate=[0.5, 0.2, 1.0],
-            prog_rate=[0.5, 0.2, 1.0],
-            dur_none = dict(par1=[1.0, 0.5, 2.5])
-        ),
-        hpv18=dict(
-            dysp_rate=[0.5, 0.2, 1.0],
-            prog_rate=[0.5, 0.2, 1.0],
-            dur_none=dict(par1=[1.0, 0.5, 2.5])
-        )
-    )
-
-    calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
-                            datafiles=[
-                                'test_data/south_africa_hpv_data.csv',
-                                'test_data/south_africa_cancer_data_2020.csv',
-                                # 'test_data/south_africa_type_distribution_cancer.csv'
-                            ],
-                            total_trials=2, n_workers=1)
-    calib.calibrate()
-    calib.plot(top_results=4)
-    return sim, calib
-
 
 def test_reduce_analyzers():
 
@@ -167,7 +128,7 @@ def test_reduce_analyzers():
     locations = ['kenya', 'tanzania']
     age_pyramids = []
     age_results = []
-    pars = dict(n_agents=10e3, start=2000, n_years=30, dt=0.5)
+    pars = dict(n_agents=5e3, start=2000, n_years=30, dt=0.5)
 
     for location in locations:
 
@@ -206,7 +167,7 @@ def test_reduce_analyzers():
     # reduced_analyzer = hpv.age_pyramid.reduce(age_pyramids)
     reduced_analyzer = hpv.age_results.reduce(age_results)
 
-    return reduced_analyzer, sim
+    return sim, reduced_analyzer
 
 
 
@@ -216,13 +177,10 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    # people      = test_snapshot()
-    # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
-    # sim2, calib = test_calibration()
-    reduced_analyzer, sim = test_reduce_analyzers()
-
-
+    people      = test_snapshot()
+    sim0, a0    = test_age_pyramids()
+    sim1, a1    = test_age_results()
+    sim2, a2    = test_reduce_analyzers()
 
     sc.toc(T)
     print('Done.')

@@ -6,7 +6,6 @@ import numpy as np
 import pylab as pl
 import sciris as sc
 import pandas as pd
-import seaborn as sns
 from . import misc as hpm
 from . import defaults as hpd
 from .settings import options as hpo
@@ -39,6 +38,14 @@ def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None
         for kw in keys:
             if kw in default.keys():
                 default[kw] = kwargs.pop(kw)
+
+    # Handle what to show
+    show_keys = ['data', 'ticks', 'interventions', 'legend']
+    if show_args in [True, False]: # Handle all on or all off
+        show_bool = show_args
+        show_args = dict()
+        for k in show_keys:
+            show_args[k] = show_bool
 
     # Merge arguments together
     args = sc.objdict()
@@ -376,7 +383,11 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                     for genotype in range(ng):
                         # Colors and labels
                         v_color = res.color[genotype]
-                        v_label = sim['genotypes'][genotype]
+                        geno_obj = sim['genotypes'][genotype]
+                        if sc.isnumber(geno_obj): # TODO: figure out why this is sometimes an int and sometimes an obj
+                            v_label = str(geno_obj)
+                        else:
+                            v_label = geno_obj.label
                         color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
                         label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
                         if label: label += f' - {v_label}'
@@ -462,8 +473,15 @@ def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None
          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
          show_args=None, style_args=None, n_cols=None, grid=False, commaticks=True, setylim=True,
          log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False, fig=None, ax=None,
-         plot_burnin=False, plot_type=sns.boxplot, **kwargs):
+         plot_burnin=False, plot_type='sns.boxplot', **kwargs):
     ''' Plot age results of a scenario'''
+
+    # Import Seaborn here since slow
+    if sc.isstring(plot_type) and plot_type.startswith('sns'):
+        import seaborn as sns
+        plot_func = getattr(sns, plot_type.split('.')[1])
+    else:
+        plot_func = plot_type
 
     # Handle inputs
     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
@@ -516,7 +534,7 @@ def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None
 
                 # Start plot
                 ax = pl.subplot(n_rows, n_cols, pnum+1)
-                ax = plot_type(ax=ax, x="bin", y="value", hue="scen_name", data=resdf, dodge=True)
+                ax = plot_func(ax=ax, x="bin", y="value", hue="scen_name", data=resdf, dodge=True)
                 ax.legend([], [], frameon=False) # Temporarily turn off legend
                 title = f'{base_analyzer.result_properties[reskey].name} - {int(float(tp))}'
                 if args.show['legend']:

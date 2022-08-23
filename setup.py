@@ -25,7 +25,7 @@ CLASSIFIERS = [
 setup(
     name="hpvsim",
     version=version,
-    author="Robyn Stuart, Jamie Cohen, Mariah Boudreau, Cliff Kerr, Daniel Klein, Hao Hu",
+    author="Robyn Stuart, Jamie Cohen, Cliff Kerr, Romesh Abeysuriya, Mariah Boudreau, Daniel Klein, Hao Hu",
     author_email="robyn.stuart@gatesfoundation.org",
     description="HPVsim: Human Papillomavirus Simulator",
     long_description=long_description,
@@ -41,9 +41,10 @@ setup(
         'numba',
         'scipy',
         'pandas', 
-        'sciris',
+        'sciris>=2.0.0',
         'matplotlib',
         'seaborn',
         'wbgapi',
+        'optuna',
     ],
 )
