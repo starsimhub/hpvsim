@@ -1070,6 +1070,82 @@ class Screening(Intervention):
         return
 
 
+    def select_people_treat(self, sim, treat_eligible_inds, treat_eligibility_pars):
+        ''' Select people to treat and determine what kind of treatment they should receive '''
+
+        # Identify those with cancer
+        cancerous_inds = hpu.true(sim.people.cancerous.any(axis=0)) # Find indices of people with cancer
+        diagnosed_inds = np.intersect1d(treat_eligible_inds, cancerous_inds) # Indices of those who will be diagnosed with cancer
+
+        # Update states and flows to reflect cancer diagnoses
+        sim.people.cancer_flows['detected_cancers'] += len(diagnosed_inds)
+        if len(diagnosed_inds)>0:
+            sim.people.detected_cancer[diagnosed_inds] = True
+            sim.people.date_detected_cancer[diagnosed_inds] = sim.t
+
+            # Treat cancers
+            ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance[self.where_in_timepoints], dtype=hpd.default_float)
+            to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
+            ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
+            ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
+
+            # Set people properties
+            sim.people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
+            sim.people.treated[ca_treat_inds] = True
+            sim.people.date_treated[ca_treat_inds] = sim.t
+
+        else:
+            ca_treat_inds = np.array([], dtype=hpd.default_int)
+
+        # Everyone remaining is eligible for precancer treatment
+        preca_treat_eligible_inds = np.setdiff1d(treat_eligible_inds, diagnosed_inds) # Indices of those eligible for precancer treatment
+
+        # Determine who is eligible for ablative vs excisional treatment
+        if len(preca_treat_eligible_inds)>0:
+            ablation_eligible_inds = []
+            for state in self.treat_states:
+                ablate_probs = np.zeros(len(preca_treat_eligible_inds))
+                ablate_inds = hpu.true(sim.people[state][:, preca_treat_eligible_inds].any(axis=0))
+                ablate_probs[ablate_inds] = treat_eligibility_pars['test_positivity'][state]
+                ablate_inds = hpu.true(hpu.binomial_arr(ablate_probs))
+                ablation_eligible_inds += list(ablate_inds)
+
+            ablation_eligible_inds = np.array(ablation_eligible_inds)
+            if len(ablation_eligible_inds)>0:
+                ablation_eligible_inds = preca_treat_eligible_inds[ablation_eligible_inds]
+            excision_eligible_inds = np.setdiff1d(preca_treat_eligible_inds, ablation_eligible_inds)
+
+            # Apply LTFU for both
+            if len(ablation_eligible_inds)>0:
+                ablate_treat_probs = np.full(len(ablation_eligible_inds), self.ablation_compliance[self.where_in_timepoints], dtype=hpd.default_float)
+                to_ablate = hpu.binomial_arr(ablate_treat_probs)
+                ablation_inds = ablation_eligible_inds[to_ablate]  # Indices of those who get treated
+                ablate_LTFU_inds = ablation_eligible_inds[~to_ablate]
+
+                sim.people.treated[ablation_inds] = True
+                sim.people.date_treated[ablation_inds] = sim.t
+                sim.people.date_next_screen[ablate_LTFU_inds] = np.nan
+
+            else:
+                ablation_inds = np.array([])
+
+            if len(excision_eligible_inds)>0:
+                excision_treat_probs = np.full(len(excision_eligible_inds), self.excision_compliance[self.where_in_timepoints], dtype=hpd.default_float)
+                to_excise = hpu.binomial_arr(excision_treat_probs)
+                excision_inds = excision_eligible_inds[to_excise]  # Indices of those who get treated
+                excision_LTFU_inds = excision_eligible_inds[~to_excise]
+
+                sim.people.treated[excision_inds] = True
+                sim.people.date_treated[excision_inds] = sim.t
+                sim.people.date_next_screen[excision_LTFU_inds] = np.nan
+            else:
+                excision_inds = np.array([])
+        else:
+            ablation_inds, excision_inds = np.array([]), np.array([])
+
+        return ca_treat_inds, ablation_inds, excision_inds
+
+
     def select_people_screen(self, sim):
         """
         Return an array of indices of people to screen
@@ -1157,8 +1233,8 @@ class Screening(Intervention):
         obj = super().shrink(in_place=in_place)
         return obj
 
-#%% Screening
-__all__ += ['BaseTreatment']
+#%% Treatment
+__all__ += ['BaseTreatment', 'treat_precancer', 'treat_cancer', 'therapeutic_vaccine']
 
 class BaseTreatment(Intervention):
     '''
@@ -1168,54 +1244,23 @@ class BaseTreatment(Intervention):
     Treatment involves a series of standard operations to modify the trajectories of `hpv.People`.
 
     Args:
-         treatment           (dict/str)  : the test used to determine if ablative or excisional treatment is used
-         ablation_compliance (list of floats)     : probability of coming back for ablation over time
-         excision_compliance (list of floats)     : probability of coming back for excision over time
-         cancer_compliance   (list of floats)     : probability of undergoing treatment if cancer is diagnosed over time
-         label               (str)       : the name of screening strategy
          kwargs (dict)      : passed to Intervention()
 
     '''
 
-    def __init__(self, treatment, ablation_compliance=None, excision_compliance=None,
-                 cancer_compliance=None, label=None, screen_states=None, treat_states=None, **kwargs):
+    def __init__(self, treat_states=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
-        self.label = label  # Screening label (used as a dict key)
-        self.p = None  # Screening parameters
-        if excision_compliance is None: # Populate default value of compliance: 1
-            excision_compliance = 1
-        self.excision_compliance = sc.promotetolist(excision_compliance)
-        if ablation_compliance is None: # Populate default value of compliance: 1
-            ablation_compliance = 1
-        self.ablation_compliance = sc.promotetolist(ablation_compliance)
-        if cancer_compliance is None: # Populate default value of cancer referral compliance: 1
-            cancer_compliance = 1
-        self.cancer_compliance = sc.promotetolist(cancer_compliance)
 
         # States eligible for pre-cancer treatment (NB, cancer treatment is handled separately)
         if treat_states is None:
             treat_states = ['none', 'cin1', 'cin2', 'cin3']
         self.treat_states = treat_states
 
-        # Parse the treatment parameters, which can be provided in different formats
-        self._parse_treatment_pars(treatment=treatment)  # Populate
-
-        return
-
-
-    def _parse_treatment_pars(self, treatment):
-        ''' Unpack treatment information '''
-
-        treat_pars = hppar.get_treatment_pars()
-        self.p = sc.mergedicts(self.p, {'treatment': sc.objdict(treat_pars)})
-
         return
 
 
     def initialize(self, sim):
         super().initialize()
-
-        sim['treat_pars'][self.label] = self.p  # Store the parameters
         return
 
 
@@ -1352,3 +1397,102 @@ class BaseTreatment(Intervention):
         obj = super().shrink(in_place=in_place)
         return obj
 
+
+
+class treat_precancer(BaseTreatment):
+    '''
+    Apply ablative or excisional treatment to a screened population.
+
+    Args:
+        label (str)     : label for intervention
+        ablation_compliance (list of floats)     : probability of coming back for ablation over time
+        excision_compliance (list of floats)     : probability of coming back for excisional tx over time
+        kwargs (dict)   : passed to Intervention()
+    '''
+
+    def __init__(self, ablation_compliance=None, excision_compliance=None, label=None, **kwargs):
+        super().__init__(label=label, **kwargs)
+        if label is None:
+            label = 'precancer_tx'
+        self.label = label
+        if ablation_compliance is None:
+            ablation_compliance = 1
+        self.ablation_compliance = sc.promotetolist(ablation_compliance)
+        if excision_compliance is None:
+            excision_compliance = 1
+        self.excision_compliance = sc.promotetolist(excision_compliance)
+        self.p = dict(
+            via_triage=dict(
+                test_positivity=dict(
+                    none=0.98,
+                    cin1=0.97,
+                    cin2=0.89,
+                    cin3=0.79,
+                    cancerous=0.4,
+                )
+            ),
+            persistence=dict(
+                hpv16=dict(dist='beta', par1=2, par2=7),
+                hpv18=dict(dist='beta', par1=2, par2=7),
+                hpv31=dict(dist='beta', par1=2, par2=7),
+                hpv33=dict(dist='beta', par1=2, par2=7),
+                hpv45=dict(dist='beta', par1=2, par2=7),
+                hpv52=dict(dist='beta', par1=2, par2=7),
+                hpv58=dict(dist='beta', par1=2, par2=7),
+                hpv6=dict(dist='beta', par1=2, par2=7),
+                hpv11=dict(dist='beta', par1=2, par2=7),
+            ),
+            excisional=dict(
+                efficacy=dict(
+                    none=0,
+                    cin1=0.936,
+                    cin2=0.936,
+                    cin3=0.936,
+                ),
+            ),
+            ablative=dict(
+                efficacy=dict(
+                    none=0,
+                    cin1=0.81,
+                    cin2=0.81,
+                    cin3=0.81,
+                ),
+            ),
+        )
+        return
+
+    def initialize(self, sim):
+        super().initialize()
+        sim['treat_pars'][self.label] = self.p  # Store the parameters
+
+
+
+class treat_cancer(BaseTreatment):
+    '''
+    Apply treatment to women with cancer.
+
+    Args:
+        label (str)     : label for intervention
+        cancer_compliance (list of floats)     : probability of coming back for cancer treatment over time
+
+        kwargs (dict)   : passed to Intervention()
+    '''
+
+    def __init__(self, cancer_compliance=None, label=None, **kwargs):
+        super().__init__(label=label, **kwargs)
+        if label is None:
+            label = 'cancer_tx'
+        self.label = label
+        if cancer_compliance is None:
+            cancer_compliance = 1
+        self.cancer_compliance = sc.promotetolist(cancer_compliance)
+        self.p = dict(
+            radiation=dict(
+                dur=dict(dist='lognormal', par1=6.0, par2=3.0)
+            )
+        )
+        return
+
+    def initialize(self, sim):
+        super().initialize()
+        sim['treat_pars'][self.label] = self.p  # Store the parameters
