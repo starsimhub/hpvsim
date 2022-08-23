@@ -49,11 +49,11 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',  # Add a link to the Python source code for classes, functions etc.
-    'plantweb.directive', # for plantuml diagrams
+    # 'plantweb.directive', # for plantuml diagrams
     'sphinxcontrib.programoutput',
     'sphinx_copybutton', # button do copy code--comment out if the icon is too big
     'sphinx.ext.intersphinx', #linking to related docsets
-    'sphinxext.remoteliteralinclude',
+    # 'sphinxext.remoteliteralinclude',
     # automatic section names so linking between section is easy
     'sphinx.ext.autosectionlabel'
 ]
@@ -110,7 +110,7 @@ author = 'Institute for Disease Modeling'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+# language = None
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.

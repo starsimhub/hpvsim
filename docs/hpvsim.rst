@@ -22,6 +22,7 @@ Submodules
 
    hpvsim.analysis
    hpvsim.base
+   hpvsim.calibration
    hpvsim.defaults
    hpvsim.immunity
    hpvsim.interventions
