@@ -1,7 +1,7 @@
 '''
 Set the defaults across each of the different files.
 
-TODO: review/merge this across the different *sims
+TODO: review/merge this across the different starsims
 '''
 
 import numpy as np

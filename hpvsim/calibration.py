@@ -59,6 +59,7 @@ class Calibration(sc.prettyobj):
         A Calibration object
 
     **Example**::
+    
         sim = hpv.Sim(pars, genotypes=[16, 18])
         calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
         calib = hpv.Calibration(sim, calib_pars=calib_pars,
