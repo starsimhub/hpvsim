@@ -10,13 +10,18 @@ import wbgapi as wb
 import numpy as np
 import pandas as pd
 import sciris as sc
+from . import loaders
 
 # Set parameters
+quick_url = 'https://github.com/amath-idm/hpvsim_data/blob/main/hpvsim_data.zip?raw=true'
 age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
 death_stem = 'WPP2022_Life_Table_Abridged_Medium_'
 base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/'
 years = ['1950-2021', '2022-2100']
 
+thisdir = sc.path(sc.thisdir())
+
+__all__ = ['get_data', 'quick_download', 'check_downloaded', 'remove_data']
 
 def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None, tidy=None):
     ''' Download data from UN Population Division '''
@@ -50,7 +55,7 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
 
     df = pd.concat(dfs)
     dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
-    sc.save(outfile, dd)
+    sc.save(thisdir/outfile, dd)
 
     T.toc(doprint=False)
     print(f'Done with {label}: took {T.timings[:].sum():0.1f} s.')
@@ -83,7 +88,7 @@ def get_birth_data(start=1960, end=2020):
     for country in birth_rates['Country'].unique():
         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,2:]
     d['years'] = np.arange(start, end)
-    sc.saveobj('birth_rates.obj', d)
+    sc.saveobj(thisdir/'birth_rates.obj', d)
     T.toc(label='Done with birth data')
     return d
 
@@ -99,9 +104,9 @@ def parallel_downloader(which):
     return
 
 
-
-if __name__ == '__main__':
-
+def get_data():
+    ''' Download data '''
+    sc.heading('Downloading HPVsim data, please be patient...')
     T = sc.timer()
 
     if len(sys.argv) > 1:
@@ -115,6 +120,51 @@ if __name__ == '__main__':
     if which == 'all':
         which = ['age', 'birth', 'death']
 
+    # Actually download
     sc.parallelize(parallel_downloader, which)
-
     T.toc('Done downloading data for HPVsim')
+
+    return
+
+
+def quick_download(verbose=True, init=False):
+    ''' Download pre-processed data files '''
+    if verbose:
+        sc.heading('Downloading preprocessed HPVsim data')
+        if init:
+            print('Note: this automatic download only happens once, when HPVsim is first run.\n\n')
+    filepath = thisdir/'tmp_hpvsim_data.zip'
+    sc.download(url=quick_url, filename=filepath, convert=False, verbose=verbose)
+    sc.loadzip(filepath, outfolder=thisdir)
+    sc.rmpath(filepath)
+    if verbose:
+        print('\nData downloaded.')
+    return
+
+
+def check_downloaded(verbose=False):
+    ''' Check if data is downloaded '''
+    exists = dict()
+    for key,fn in loaders.files.items():
+        exists[key] = os.path.exists(fn)
+        if verbose:
+            print(f'Checking {fn}: {exists[key]}')
+    result = all(list(exists.values()))
+    if verbose:
+        if result:
+            print('All files exist')
+        else:
+            print('At least one file missing')
+    return result
+
+
+def remove_data(verbose=True, **kwargs):
+    ''' Remove downloaded data; arguments passed to sc.rmpath() '''
+    if verbose: sc.heading('Removing HPVsim data files')
+    for key,fn in loaders.files.items():
+        sc.rmpath(fn, verbose=verbose, **kwargs)
+    if verbose: print('Data files removed.')
+    return
+
+if __name__ == '__main__':
+    quick_download()

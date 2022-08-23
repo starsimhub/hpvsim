@@ -1,0 +1,33 @@
+name: HPVsim CI workflow
+on: [pull_request]
+
+jobs:
+  install_and_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        python-version: [ '3.9' ]
+    name: Install and test
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@master
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+      - name: Install HPVsim
+        run:  pip install -e .
+      - name: Install tests
+        run: pip install pytest pytest-parallel
+      - name: Run all tests
+        working-directory: ./tests
+        run: pytest test_*.py --workers=auto --durations=0 --junitxml=test-results.xml # Run actual tests
+      - name: Upload test results
+        uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: test_results
+          path: tests/test-results.xml

@@ -3,9 +3,6 @@ Create a demo project
 '''
 
 #%% Imports and settings
-import os
-import pytest
-import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
@@ -21,19 +18,19 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
 
     sc.heading('Creating a demo project')
 
-    pars = dict(n_agents=50e3,
+    pars = dict(n_agents=5e3,
                 start=1950,
                 end=2020,
                 dt=.5,
                 network='default',
                 location=location,
-                genotypes=[16,18,35,58,45,18,52],
+                genotypes=[16,18,35,45,52,58],
                 verbose=0.1
                 )
 
     # Initial conditions
-    pars['init_hpv_dist'] = {'hpv16': .347, 'hpv35': .174, 'hpv58': .121,
-                             'hpv45': .116, 'hpv18': .114, 'hpv52': .097}
+    pars['init_hpv_dist'] = {'hpv16': .347, 'hpv18': .114, 'hpv35': .174,
+                             'hpv45': .116, 'hpv52': .097, 'hpv58': .121}
     pars['init_hpv_prev'] = {
         'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
         'm'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
@@ -45,12 +42,12 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
     pars['beta'] = 0.217
 
     # Initialize genotypes
-    hpv33   = hpv.genotype('HPV33')
-    hpv45   = hpv.genotype('HPV45')
-    hpv18    = hpv.genotype('HPV18')
     hpv16   = hpv.genotype('HPV16')
-    hpv31   = hpv.genotype('HPV31')
+    hpv18   = hpv.genotype('HPV18')
+    hpv35   = hpv.genotype('HPV35')
+    hpv45   = hpv.genotype('HPV45')
     hpv52   = hpv.genotype('HPV52')
+    hpv58   = hpv.genotype('HPV58')
 
     # # Set up genotype pars
     # HPV 16 #
@@ -114,7 +111,7 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
     )
 
     analyzers = [az]
-    genotypes = [hpv16, hpv18, hpv31, hpv33, hpv45, hpv52]
+    genotypes = [hpv16, hpv18, hpv35, hpv45, hpv52, hpv58]
     interventions = []
 
     # Create sim
