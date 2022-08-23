@@ -256,8 +256,8 @@ class Calibration(sc.prettyobj):
             sim.fit += self.sim_results[rkey].mismatch
             sim_results[rkey] = self.sim_results[rkey].model_output
 
-        sim_results = sc.jsonify(sim_results)
-        trial.set_user_attr('sim_results', sim_results)
+        # sim_results = sc.jsonify(sim_results)
+        # trial.set_user_attr('sim_results', sim_results)
         # sim.shrink() # CK: Proof of principle only!!
         # trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
         return sim.fit
