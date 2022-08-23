@@ -63,16 +63,16 @@ def make_pars(**kwargs):
 
     # Basic disease transmission parameters
     pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility TODO does this get used? if not remove.
-    pars['beta']            = 0.05  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']            = 0.25  # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']        = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Parameters for disease progression
-    pars['sero']  = 1.0 # parameter used as the growth rate within a logistic function that maps durations to seroconversion probabilities
+    pars['sero']  = 2.5 # parameter used as the growth rate within a logistic function that maps durations to seroconversion probabilities
     pars['severity_dist'] = dict(dist='lognormal', par1=None, par2=0.1) # Distribution of individual disease severity. Par1 is set to None because the mean is determined as a function of genotype and disease duration
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
     pars['cancer_treat_prob'] = 0.1 # probability of receiving cancer treatment given symptom detection
-    pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
+    pars['hpv_control_prob']    = 0.44 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
         hpv_reactivation_probs  = np.array([0.0001,    0.05,        0.04]),      # made this up, need to parameterize somehow
@@ -89,7 +89,7 @@ def make_pars(**kwargs):
     # all genotype properties get populated by user in init_genotypes()
     pars['genotypes']       = []  # Genotypes of the virus; populated by the user below
     pars['genotype_map']    = dict()  # Reverse mapping from number to genotype key
-    pars['genotype_pars']   = dict()  # Populated just below
+    pars['genotype_pars']   = sc.objdict()  # Populated just below
 
     # Genotype parameters
     pars['n_genotypes']     = 1 # The number of genotypes circulating in the population
@@ -108,7 +108,7 @@ def make_pars(**kwargs):
     pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1
     pars['dur_cin2_clear']  = dict(dist='lognormal', par1=1.0, par2=0.5)  # Time to clearance from CIN2
     pars['dur_cin3_clear']  = dict(dist='lognormal', par1=1.5, par2=0.5)  # Time to clearance from CIN3
-    pars['dur_cancer']      = dict(dist='lognormal', par1=8.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death
+    pars['dur_cancer']      = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death
 
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
@@ -170,8 +170,8 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
 
     # Specify defaults for basic sexual network with marital, casual, and one-off partners
     layer_defaults['default'] = dict(
-        partners    = dict(m=dict(dist='poisson', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
-                           c=dict(dist='poisson', par1=0.05), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
+        partners    = dict(m=dict(dist='poisson', par1=0.1), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
+                           c=dict(dist='poisson', par1=0.5), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
                            o=dict(dist='poisson', par1=0.0),), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 one-off partner at a time. Can be set to zero since these relationships only last a single timestep
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts per year for people at sexual peak
                             c=dict(dist='neg_binomial', par1=10, par2=5), # Default number of acts per year for people at sexual peak
@@ -180,8 +180,8 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
                             c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
                             o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
         # layer_probs = dict(m=0.7, c=0.4, o=0.05),   # Default proportion of the population in each layer
-        dur_pship   = dict(m=dict(dist='normal_pos', par1=10,par2=3),
-                           c=dict(dist='normal_pos', par1=2, par2=1),
+        dur_pship   = dict(m=dict(dist='normal_pos', par1=8,par2=3),
+                           c=dict(dist='normal_pos', par1=1, par2=1),
                            o=dict(dist='normal_pos', par1=0.1, par2=0.05)),
         condoms     = dict(m=0.01, c=0.5, o=0.6),  # Default proportion of acts in which condoms are used
     )
@@ -266,8 +266,11 @@ def get_genotype_choices():
         'hpv11': ['hpv11', '11'],
         'hpv31': ['hpv31', '31'],
         'hpv33': ['hpv33', '33'],
+        'hpv35': ['hpv35', '35'],
         'hpv45': ['hpv45', '45'],
+        'hpv51': ['hpv51', '51'],
         'hpv52': ['hpv52', '52'],
+        'hpv56': ['hpv56', '56'],
         'hpv58': ['hpv58', '58'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
@@ -362,31 +365,31 @@ def get_genotype_pars(default=False, genotype=None):
     pars = sc.objdict()
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_none     = dict(dist='lognormal', par1=2.3625, par2=0.5)
+    pars.hpv16.dur_none     = dict(dist='lognormal', par1=2.618, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dysp_rate    = 1.0 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate    = 0.6 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_time    = 3  # Point of inflection in logistic function
+    pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=4.5, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dysp_rate    = 1.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate    = 0.79 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_time    = 4.4  # Point of inflection in logistic function
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_none     = dict(dist='lognormal', par1=2.2483, par2=0.5)
+    pars.hpv18.dur_none     = dict(dist='lognormal', par1=2.16, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=2.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dysp_rate    = 0.9 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_time    = 6  # Point of inflection in logistic function
-    pars.hpv18.rel_beta     = 0.612  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3.16, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dysp_rate    = 1.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_rate    = 1.02 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_time    = 7.82  # Point of inflection in logistic function
+    pars.hpv18.rel_beta     = 0.72  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
@@ -394,11 +397,11 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpv31.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv31.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv31.dysp_rate    = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_time    = 10  # Point of inflection in logistic function
-    pars.hpv31.rel_beta     = 0.66 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv31.prog_rate    = 0.179 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv31.prog_time    = 14.12  # Point of inflection in logistic function
+    pars.hpv31.rel_beta     = 0.94 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv31.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
@@ -406,25 +409,44 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpv33.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=3.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv33.dur_dysp     = dict(dist='lognormal', par1=14.12, par2=3.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv33.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_time    = 10  # Point of inflection in logistic function
-    pars.hpv33.rel_beta     = 0.2 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv33.prog_rate    = 0.24 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv33.prog_time    = 8.46  # Point of inflection in logistic function
+    pars.hpv33.rel_beta     = 0.26 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv33.imm_boost    = 1.0 # TODO: look for data
+
+    pars.hpv35 = sc.objdict()
+    pars.hpv35.dur_none     = dict(dist='lognormal', par1=2.5, par2=1.0)
+    pars.hpv35 .dur_dysp     = dict(dist='lognormal', par1=4.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv35.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv35.prog_rate    = 0.25 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv35.prog_time    = 7.5  # Point of inflection in logistic function
+    pars.hpv35.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv35.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
     pars.hpv45.dur = dict()
-    pars.hpv45.dur_none     = dict(dist='lognormal', par1=2.0213, par2=1.0)
+    pars.hpv45.dur_none     = dict(dist='lognormal', par1=2.84, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpv45.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv45.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv45.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv45.prog_time    = 10  # Point of inflection in logistic function
-    pars.hpv45.rel_beta     = 0.7 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv45.dur_dysp     = dict(dist='lognormal', par1=3.776, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv45.dysp_rate    = 1.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv45.prog_rate    = 0.925 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv45.prog_time    = 3.46  # Point of inflection in logistic function
+    pars.hpv45.rel_beta     = 0.77 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv45.imm_boost    = 1.0 # TODO: look for data
+
+    pars.hpv51 = sc.objdict()
+    pars.hpv51.dur = dict()
+    pars.hpv51.dur_none     = dict(dist='lognormal', par1=2.0, par2=1.0)
+    pars.hpv51.dur_dysp     = dict(dist='lognormal', par1=1.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv51.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv51.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv51.prog_time    = 8.  # Point of inflection in logistic function
+    pars.hpv51.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv51.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
     pars.hpv52.dur = dict()
@@ -432,12 +454,22 @@ def get_genotype_pars(default=False, genotype=None):
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
-    pars.hpv52.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv52.dur_dysp     = dict(dist='lognormal', par1=1.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv52.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv52.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv52.prog_time    = 10  # Point of inflection in logistic function
-    pars.hpv52.rel_beta     = 0.8 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv52.prog_rate    = 0.526 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv52.prog_time    = 8.96  # Point of inflection in logistic function
+    pars.hpv52.rel_beta     = 0.623 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv52.imm_boost    = 1.0 # TODO: look for data
+
+    pars.hpv56 = sc.objdict()
+    pars.hpv56.dur = dict()
+    pars.hpv56.dur_none     = dict(dist='lognormal', par1=2.0, par2=1.0)
+    pars.hpv56.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv56.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv56.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv56.prog_time    = 10  # Point of inflection in logistic function
+    pars.hpv56.rel_beta     = 0.6 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv56.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv58 = sc.objdict()
     pars.hpv58.dur = dict()
@@ -490,8 +522,11 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18 = high_imm,
             hpv31  = high_imm,
             hpv33 = high_imm,
+            hpv35 = high_imm,
             hpv45 = high_imm,
+            hpv51 = med_imm,
             hpv52 = med_imm,
+            hpv56 = med_imm,
             hpv58 = med_imm,
             hpv6 = med_imm,
             hpv11 = med_imm,
@@ -502,8 +537,11 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=1.0,  # Default for own-immunity
             hpv31=high_imm,
             hpv33=high_imm,
+            hpv35=high_imm,
             hpv45=high_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -514,8 +552,11 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=high_imm,
             hpv31=1.0,  # Default for own-immunity
             hpv33=high_imm,
+            hpv35=high_imm,
             hpv45=high_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -526,8 +567,26 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=high_imm,
             hpv31=high_imm,
             hpv33=1.0,  # Default for own-immunity
+            hpv35=high_imm,
             hpv45=high_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
+            hpv58=med_imm,
+            hpv6=med_imm,
+            hpv11=med_imm,
+        ),
+
+        hpv35=dict(
+            hpv16=high_imm,
+            hpv18=high_imm,
+            hpv31=high_imm,
+            hpv33=high_imm,
+            hpv35=1.0,  # Default for own-immunity
+            hpv45=high_imm,
+            hpv51=med_imm,
+            hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -538,8 +597,26 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=high_imm,
             hpv31=high_imm,
             hpv33=high_imm,
+            hpv35=high_imm,
             hpv45=1.0,  # Default for own-immunity
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
+            hpv58=med_imm,
+            hpv6=med_imm,
+            hpv11=med_imm,
+        ),
+
+        hpv51=dict(
+            hpv16=med_imm,
+            hpv18=med_imm,
+            hpv31=med_imm,
+            hpv33=med_imm,
+            hpv35=med_imm,
+            hpv45=med_imm,
+            hpv51=1.0,  # Default for own-immunity
+            hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -550,8 +627,26 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=med_imm,
             hpv31=med_imm,
             hpv33=med_imm,
+            hpv35=med_imm,
             hpv45=med_imm,
+            hpv51=med_imm,
             hpv52=1.0,  # Default for own-immunity
+            hpv56=med_imm,
+            hpv58=med_imm,
+            hpv6=med_imm,
+            hpv11=med_imm,
+        ),
+
+        hpv56=dict(
+            hpv16=med_imm,
+            hpv18=med_imm,
+            hpv31=med_imm,
+            hpv33=med_imm,
+            hpv35=med_imm,
+            hpv45=med_imm,
+            hpv51=med_imm,
+            hpv52=med_imm,
+            hpv56=1.0,  # Default for own-immunity
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
@@ -562,20 +657,27 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=med_imm,
             hpv31=med_imm,
             hpv33=med_imm,
+            hpv35=med_imm,
             hpv45=med_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
-            hpv58=1,  # Default for own-immunity
+            hpv56=med_imm,
+            hpv58=1.0,  # Default for own-immunity
             hpv6=med_imm,
             hpv11=med_imm,
         ),
+
 
         hpv6=dict(
             hpv16=med_imm,
             hpv18=med_imm,
             hpv31=med_imm,
             hpv33=med_imm,
+            hpv35=med_imm,
             hpv45=med_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=1.0,  # Default for own-immunity
             hpv11=med_imm,
@@ -586,8 +688,11 @@ def get_cross_immunity(default=False, genotype=None):
             hpv18=med_imm,
             hpv31=med_imm,
             hpv33=med_imm,
+            hpv35=med_imm,
             hpv45=med_imm,
+            hpv51=med_imm,
             hpv52=med_imm,
+            hpv56=med_imm,
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=1.0,  # Default for own-immunity
@@ -649,14 +754,14 @@ def get_mixing(network=None):
             [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
             [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
             [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [15,    0,  0,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [20,    0,  0, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [25,    0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [30,    0,  0,  0,  0,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
-            [35,    0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
-            [40,    0,  0,  0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0,  1,  1, 1,  1.0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .5,  1,  1, 1,  1.0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0,  0,  1,  1,  1, 1.0,  1.0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  0,  .5,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0,  0,  .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0,  0,  .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
             [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
-            [50,    0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0,  0.5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
             [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
             [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
             [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
@@ -687,13 +792,13 @@ def get_mixing(network=None):
         layer_probs = dict(
             m=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  0.04,   0.2,  0.6,  0.8,  0.8,  0.8,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
-                [ 0,  0,  0.01,  0.01,  0.2,  0.6,  0.8,  0.9,  0.90,  0.90,  0.90,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
+                [ 0,  0,  0.04,   0.1,  0.1,  0.5,  0.6,  0.7,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
+                [ 0,  0,  0.01,  0.01,  0.1,  0.5,  0.6,  0.7,  0.70,  0.70,  0.70,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
             ),
             c=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  0.10,   0.6,  0.3,  0.1,  0.1,  0.1,   0.1,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
-                [ 0,  0,  0.05,   0.5,  0.5,  0.3,  0.4,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
+                [ 0,  0,  0.10,   0.7,  0.8,  0.6,  0.6,  0.5,   0.2,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
+                [ 0,  0,  0.05,   0.7,  0.8,  0.6,  0.6,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
             ),
             o=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
@@ -749,8 +854,11 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv18=1,  # Assumption
             hpv31=0,  # Assumption
             hpv33=0,  # Assumption
+            hpv35=0,  # Assumption
             hpv45=0,  # Assumption
+            hpv51=0,  # Assumption
             hpv52=0,  # Assumption
+            hpv56=0,  # Assumption
             hpv58=0,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
@@ -761,8 +869,11 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv18=1,  # Assumption
             hpv31=0.5,  # Assumption
             hpv33=0.5,  # Assumption
+            hpv35=0.5,  # Assumption
             hpv45=0.5,  # Assumption
+            hpv51=0.3,  # Assumption
             hpv52=0.3,  # Assumption
+            hpv56=0.3,  # Assumption
             hpv58=0.3,  # Assumption
             hpv6=0,  # Assumption
             hpv11=0,  # Assumption
@@ -773,8 +884,11 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv18=1,  # Assumption
             hpv31=0,  # Assumption
             hpv33=0,  # Assumption
+            hpv35=0,  # Assumption
             hpv45=0,  # Assumption
+            hpv51=0,  # Assumption
             hpv52=0,  # Assumption
+            hpv56=0,  # Assumption
             hpv58=0,  # Assumption
             hpv6=1,  # Assumption
             hpv11=1,  # Assumption
@@ -785,8 +899,11 @@ def get_vaccine_genotype_pars(default=False, vaccine=None):
             hpv18=1,  # Assumption
             hpv31=1,  # Assumption
             hpv33=1,  # Assumption
+            hpv35=0,  # Assumption
             hpv45=1,  # Assumption
+            hpv51=0,  # Assumption
             hpv52=1,  # Assumption
+            hpv56=0,  # Assumption
             hpv58=1,  # Assumption
             hpv6=1,  # Assumption
             hpv11=1,  # Assumption
@@ -871,8 +988,11 @@ def get_screen_pars(screen=None):
                     hpv18=0.55,
                     hpv31=0.55,
                     hpv33=0.55,
+                    hpv35=0.55,
                     hpv45=0.55,
+                    hpv51=0.55,
                     hpv52=0.55,
+                    hpv56=0.55,
                     hpv58=0.55,
                     hpv6=0,
                     hpv11=0,
@@ -882,8 +1002,11 @@ def get_screen_pars(screen=None):
                     hpv18=0.8415,
                     hpv31=0.8415,
                     hpv33=0.8415,
+                    hpv35=0.8415,
                     hpv45=0.8415,
+                    hpv51=0.8415,
                     hpv52=0.8415,
+                    hpv56=0.8415,
                     hpv58=0.8415,
                     hpv6=0,
                     hpv11=0,
@@ -893,8 +1016,11 @@ def get_screen_pars(screen=None):
                     hpv18=0.93,
                     hpv31=0.93,
                     hpv33=0.93,
+                    hpv35=0.93,
                     hpv45=0.93,
+                    hpv51=0.93,
                     hpv52=0.93,
+                    hpv56=0.93,
                     hpv58=0.93,
                     hpv6=0,
                     hpv11=0,
@@ -904,8 +1030,11 @@ def get_screen_pars(screen=None):
                     hpv18=0.984,
                     hpv31=0.984,
                     hpv33=0.984,
+                    hpv35=0.984,
                     hpv45=0.984,
+                    hpv51=0.984,
                     hpv52=0.984,
+                    hpv56=0.984,
                     hpv58=0.984,
                     hpv6=0,
                     hpv11=0,
@@ -923,8 +1052,11 @@ def get_screen_pars(screen=None):
                     hpv18=1,
                     hpv31=0,
                     hpv33=0,
+                    hpv35=0,
                     hpv45=0,
+                    hpv51=0,
                     hpv52=0,
+                    hpv56=0,
                     hpv58=0,
                     hpv6=0,
                     hpv11=0,
@@ -934,8 +1066,11 @@ def get_screen_pars(screen=None):
                     hpv18=1,
                     hpv31=0,
                     hpv33=0,
+                    hpv35=0,
                     hpv45=0,
+                    hpv51=0,
                     hpv52=0,
+                    hpv56=0,
                     hpv58=0,
                     hpv6=0,
                     hpv11=0,
@@ -945,8 +1080,11 @@ def get_screen_pars(screen=None):
                     hpv18=1,
                     hpv31=0,
                     hpv33=0,
+                    hpv35=0,
                     hpv45=0,
+                    hpv51=0,
                     hpv52=0,
+                    hpv56=0,
                     hpv58=0,
                     hpv6=0,
                     hpv11=0,
@@ -956,8 +1094,11 @@ def get_screen_pars(screen=None):
                     hpv18=1,
                     hpv31=0,
                     hpv33=0,
+                    hpv35=0,
                     hpv45=0,
+                    hpv51=0,
                     hpv52=0,
+                    hpv56=0,
                     hpv58=0,
                     hpv6=0,
                     hpv11=0,
@@ -1004,8 +1145,11 @@ def get_treatment_pars(screen=None):
             hpv18=dict(dist='beta', par1=2, par2=7),
             hpv31=dict(dist='beta', par1=2, par2=7),
             hpv33=dict(dist='beta', par1=2, par2=7),
+            hpv35=dict(dist='beta', par1=2, par2=7),
             hpv45=dict(dist='beta', par1=2, par2=7),
+            hpv51=dict(dist='beta', par1=2, par2=7),
             hpv52=dict(dist='beta', par1=2, par2=7),
+            hpv56=dict(dist='beta', par1=2, par2=7),
             hpv58=dict(dist='beta', par1=2, par2=7),
             hpv6=dict(dist='beta', par1=2, par2=7),
             hpv11=dict(dist='beta', par1=2, par2=7),

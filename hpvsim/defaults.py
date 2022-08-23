@@ -1,8 +1,7 @@
 '''
 Set the defaults across each of the different files.
 
-TODO: review/merge this across the different \*sims
-
+TODO: review/merge this across the different starsims
 '''
 
 import numpy as np
@@ -213,6 +212,7 @@ intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,      pl.cm.Oranges,  pl.cm.Orange
 # Type distributions by cytology
 type_keys  = ['none_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
 type_names = ['HPV type distribution, normal cytology', 'HPV type distribution, CIN1 lesions', 'HPV type distribution, CIN2 lesions', 'HPV type distribution, CIN3 lesions', 'HPV type distribution, cervical cancer']
+type_colors = [pl.cm.GnBu, pl.cm.Oranges, pl.cm.Oranges,  pl.cm.Oranges, pl.cm.Reds]
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
@@ -401,7 +401,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
     elif which == 'all': # pragma: no cover
         plots = sim.result_keys('all')
 
-    # Show an overview 
+    # Show an overview
     elif 'overview' in which: # pragma: no cover
         plots = sc.dcp(overview_plots)
 

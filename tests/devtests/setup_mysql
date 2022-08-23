@@ -1,0 +1,43 @@
+#!/bin/bash
+# Set up a MySQL database, usually for use with Optuna.
+# Usage:
+#  ./setup_mysql hpvsim # Creates user hpvsim_user, database hpvsim_db
+
+if [ $# -gt 0 ]; then
+   name=$1
+else
+   name='covasim'
+fi
+
+if [ $# -gt 1 ]; then
+   user=$2
+else
+   user=$name
+fi
+
+full_db=$name"_db"
+username=$name"_user"
+
+echo "Setting up MySQL for user '"$username"', database '"$full_db"'..."
+
+echo "Commands:"
+cmd1="CREATE DATABASE IF NOT EXISTS $full_db"
+cmd2="CREATE USER '"$username"'@'localhost' IDENTIFIED BY ''"
+cmd3="GRANT ALL PRIVILEGES ON $full_db.* TO '"$username"'@'localhost'"
+echo "$cmd1"
+echo "$cmd2"
+echo "$cmd3"
+
+# Install
+# sudo apt remove -y mysql-server # May be needed if already installed
+# sudo apt autoremove -y
+sudo apt install -y mysql-server
+sudo apt install -y libmysqlclient-dev
+pip install mysqlclient
+
+# Run commands
+sudo mysql -v -u root -e "$cmd1"
+sudo mysql -v -u root -e "$cmd2"
+sudo mysql -v -u root -e "$cmd3"
+
+echo 'Done.'

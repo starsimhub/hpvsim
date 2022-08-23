@@ -13,3 +13,14 @@ from .immunity      import *
 from .analysis      import *
 from .sim           import *
 from .run           import *
+from .calibration   import *
+
+# Import data and check
+from . import data
+if not data.check_downloaded():
+    try:
+        data.quick_download(init=True)
+    except:
+        import sciris as sc
+        errormsg = f"Warning: couldn't download data:\n\n{sc.traceback()}\nProceeding anyway..."
+        print(errormsg)

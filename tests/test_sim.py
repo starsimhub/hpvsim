@@ -3,13 +3,10 @@ Tests for single simulations
 '''
 
 #%% Imports and settings
-import os
-import pytest
-import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
-import hpvsim.utils as hpu
+import pytest
 
 do_plot = 1
 do_save = 0
@@ -25,6 +22,7 @@ def test_microsim():
         'n_agents': 100,
         'init_hpv_prev': .1,
         'n_years': 2,
+        'genotypes': [16,18],
         }
     sim.update_pars(pars)
     sim.run()
@@ -35,7 +33,7 @@ def test_microsim():
     return sim
 
 
-def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
+def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest, turn off
     sc.heading('Basic sim test')
 
     # Settings
@@ -43,17 +41,16 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     verbose = 1
 
     # Create and run the simulation
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
-
     pars = {
-        'n_agents': 50e3,
+        'n_agents': 5e3,
         'start': 1990,
         'burnin': 30,
         'end': 2030,
         'location': 'tanzania',
         'dt': .5,
+        'genotypes': [16,18]
     }
+    pars = sc.mergedicts(pars, kwargs)
 
     # age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
     # doses_per_year = 2e3
@@ -61,7 +58,7 @@ def test_sim(do_plot=False, do_save=False): # If being run via pytest, turn off
     #                                     timepoints=['2020', '2021', '2022', '2023', '2024'],
     #                                     label='bivalent 2 dose, 9-14', subtarget=age_target)
 
-    sim = hpv.Sim(pars=pars, genotypes=[hpv16,hpv18])
+    sim = hpv.Sim(pars=pars)
     sim.set_seed(seed)
 
     # Optionally plot
@@ -81,7 +78,7 @@ def test_epi():
 
     # Define the parameters to vary
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.01, 0.99],    [10,200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
+    vary_vals   = [[0.01, 0.99],    [1, 200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
     vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'cancer_incidence'] # Epi outcomes to check
 
@@ -191,10 +188,8 @@ def test_result_consistency():
     ''' Check that results by subgroup sum to the correct totals'''
 
     # Create sim
-    n_agents = 10e3
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
-    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, genotypes=[hpv16,hpv18], label='test_results')
+    n_agents = 1e3
+    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, genotypes=['hpv16','hpv18'], label='test_results')
     sim.run()
 
     # Check that infections by genotype sum up the the correct totals
@@ -223,10 +218,9 @@ def test_result_consistency():
     assert (sim['n_agents'] == n_agents)
 
     # Check that males don't have CINs or cancers
-    import hpvsim.utils as hpu
     male_inds = sim.people.is_male.nonzero()[0]
-    males_with_cin = hpu.defined(sim.people.date_cin1[:,male_inds])
-    males_with_cancer = hpu.defined(sim.people.date_cancerous[male_inds])
+    males_with_cin = hpv.defined(sim.people.date_cin1[:,male_inds])
+    males_with_cancer = hpv.defined(sim.people.date_cancerous[male_inds])
     assert len(males_with_cin)==0
     assert len(males_with_cancer)==0
 
@@ -257,7 +251,7 @@ def test_location_loading():
 def test_resuming():
     sc.heading('Test that resuming a run works')
 
-    n_agents = 10e3
+    n_agents = 5e3
     s0 = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, label='test_resume')
     s1 = s0.copy()
     s0.run()

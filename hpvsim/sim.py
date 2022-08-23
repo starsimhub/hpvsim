@@ -4,7 +4,6 @@ Define core Sim classes
 
 # Imports
 import numpy as np
-import pandas as pd
 import sciris as sc
 from . import base as hpb
 from . import misc as hpm
@@ -14,9 +13,9 @@ from . import population as hppop
 from . import parameters as hppar
 from . import analysis as hpa
 from . import plotting as hpplt
-from .settings import options as hpo
 from . import immunity as hpimm
 from . import interventions as hpi
+from .settings import options as hpo
 
 
 # Define the model
@@ -181,15 +180,15 @@ class Sim(hpb.BaseSim):
             if self['n_years']:
                 self['end'] = self['start'] + self['n_years']
             else:
-                errormsg = f'You must supply one of n_years and end."'
+                errormsg = 'You must supply one of n_years and end."'
                 raise ValueError(errormsg)
-        
+
         # Construct other things that keep track of time
         self.years      = sc.inclusiverange(self['start'],self['end'])
         self.yearvec    = sc.inclusiverange(start=self['start'], stop=self['end']+1-self['dt'], step=self['dt']) # Includes all the timepoints in the last year
         self.npts       = len(self.yearvec)
         self.tvec       = np.arange(self.npts)
-        
+
         # Handle population network data
         network_choices = ['random', 'default']
         choice = self['network']
@@ -295,16 +294,29 @@ class Sim(hpb.BaseSim):
         if self._orig_pars and 'genotypes' in self._orig_pars:
             self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
 
-        for i, genotype in enumerate(self['genotypes']):
-            if isinstance(genotype, hpimm.genotype):
-                if not genotype.initialized:
-                    genotype.initialize(self)
+        genotype_options = hppar.get_genotype_pars().keys()
+
+        for i, g in enumerate(self['genotypes']):
+
+            # Genotypes can be provided in different formats. Here we convert them to hpv.genotype objects
+            if sc.isnumber(g): g = f'hpv{g}' # Convert e.g. 16 to hpv16
+            if sc.checktype(g,str):
+                if not g in genotype_options:
+                    errormsg = f'Genotype {i} ({g}) is not one of the inbuilt options.'
+                    raise ValueError(errormsg)
+                else:
+                    g = hpimm.genotype(g)
+
+            # Initialize genotypes
+            if isinstance(g, hpimm.genotype):
+                if not g.initialized:
+                    g.initialize(self)
             else:  # pragma: no cover
-                errormsg = f'Genotype {i} ({genotype}) is not a hp.genotype object; please create using cv.genotype()'
+                errormsg = f'Cannot understand genotype {i} ({g}). Please provide it as an integer, string, or hpv.genotype object.'
                 raise TypeError(errormsg)
 
         if not len(self['genotypes']):
-            print('No genotypes provided, will assume only simulating HPV 16 by default')
+            print('No genotypes provided, will assume only simulating HPV16 by default')
             hpv16 = hpimm.genotype('hpv16')
             hpv16.initialize(self)
             self['genotypes'] = [hpv16]
@@ -407,8 +419,8 @@ class Sim(hpb.BaseSim):
         results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
 
         # Type distributions by cytology
-        for var, name in zip(hpd.type_keys, hpd.type_names):
-            results[var] = init_res(name, n_rows=ng, color='#b61500')
+        for var, name, cmap in zip(hpd.type_keys, hpd.type_names, hpd.type_colors):
+            results[var] = init_res(name, n_rows=ng, color=cmap(np.linspace(0.2,0.8,ng)))
 
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
@@ -536,23 +548,6 @@ class Sim(hpb.BaseSim):
                 analyzer.finalize(self)
 
 
-    def reset_layer_pars(self, layer_keys=None, force=False):
-        '''
-        Reset the parameters to match the population.
-
-        Args:
-            layer_keys (list): override the default layer keys (use stored keys by default)
-            force (bool): reset the parameters even if they already exist
-        '''
-        if layer_keys is None:
-            if self.people is not None: # If people exist
-                layer_keys = self.people.contacts.keys()
-            elif self.popdict is not None:
-                layer_keys = self.popdict['layer_keys']
-        hppar.reset_layer_pars(self.pars, layer_keys=layer_keys, force=force)
-        return
-
-
     def init_states(self, age_brackets=None, init_hpv_prev=None, init_cin_prev=None, init_cancer_prev=None):
         '''
         Initialize prior immunity and seed infections
@@ -660,7 +655,7 @@ class Sim(hpb.BaseSim):
 
             # Get the number of acts per timestep for this partnership type
             acts = layer['acts'] * dt
-            fa, wa = np.modf(layer['acts'] * dt)
+            fa, wa = np.modf(acts)
             frac_acts.append(fa)
             whole_acts.append(wa.astype(hpd.default_int))
             effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
@@ -846,7 +841,7 @@ class Sim(hpb.BaseSim):
             # Print progress
             if verbose:
                 simlabel = f'"{self.label}": ' if self.label else ''
-                string = f'  Running {simlabel}{self.yearvec[self.t]} ({self.t:2.0f}/{self.npts}) ({elapsed:0.2f} s) '
+                string = f'  Running {simlabel}{self.yearvec[self.t]:0.1f} ({self.t:2.0f}/{self.npts}) ({elapsed:0.2f} s) '
                 if verbose >= 2:
                     sc.heading(string)
                 elif verbose>0:
@@ -957,7 +952,7 @@ class Sim(hpb.BaseSim):
         res['cin2_types'][:,(res['n_total_cin2'][:]>0)] = res['n_cin2'][:,(res['n_total_cin2'][:]>0)]/res['n_total_cin2'][(res['n_total_cin2'][:]>0)]
         res['cin3_types'][:,(res['n_total_cin3'][:]>0)] = res['n_cin3'][:,(res['n_total_cin3'][:]>0)]/res['n_total_cin3'][(res['n_total_cin3'][:]>0)]
         cinds = res['n_cancerous'][:]>0 # Indices where there is some cancer present
-        self.results['cancer_types'][:,(res['n_cancerous'][:]>0)] = res['n_cancerous_by_genotype'][:,(res['n_cancerous'][:]>0)]/res['n_cancerous'][(res['n_cancerous'][:]>0)]
+        self.results['cancer_types'][:,cinds] = res['n_cancerous_by_genotype'][:,cinds]/res['n_cancerous'][cinds]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])
