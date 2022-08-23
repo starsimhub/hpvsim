@@ -1,7 +1,10 @@
-plantweb
-sphinx-copybutton
+pytest
 sphinx-rtd-theme
 sphinxcontrib-napoleon
-sphinxcontrib-programoutput
 sphinx
-sphinxext.remoteliteralinclude
+ipykernel
+nbsphinx
+pandoc
+pypandoc
+optuna
+seaborn

@@ -55,8 +55,8 @@ clean: # The -f is to ignore missing files, not to force remove
 
 # Generates the API doc
 generate-api:
-	-rm modules.rst
 	sphinx-apidoc -f -e -M -o . ../hpvsim
+	mv hpvsim.rst modules.rst
 
 .PHONY: html
 html: 
