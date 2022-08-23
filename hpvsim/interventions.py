@@ -877,14 +877,14 @@ class vaccinate_num(BaseVaccination):
         return vacc_inds
 
 
-#%% Screening and treatment
+#%% Screening
 __all__ += ['Screening']
 
 class Screening(Intervention):
     '''
-    Screen, triage, and treat a subset of the population.
+    Screen/triage a subset of the population.
 
-    This base class implements the mechanism of screening people to identify and treat pre-cancerous lesions.
+    This base class implements the mechanism of screening people to identify pre-cancerous lesions.
     Screening involves a series of standard operations to modify the trajectories of `hpv.People`. Screening algorithms
     can vary in complexity along the dimensions of primary screening modalities, triage modalities,
     interval between screens and follow-up protocol, loss-to-follow-up, test characteristics, and efficacies.
@@ -892,7 +892,7 @@ class Screening(Intervention):
     Args:
          primary_screen_test (dict/str)  : the screening test to use as a primary filtering method
          triage_screen_test  (dict/str)  : the screening test to use as a triage (or None)
-         treatment           (dict/str)  : the test used to determine if ablative or excisional treatment is used
+         treatment_intervention (intv)   : a treatment intervention object
          screen_start_age    (int)       : age to start screening
          screen_interval     (int)       : interval between screens
          screen_stop_age     (int)       : age to stop screening
@@ -900,9 +900,6 @@ class Screening(Intervention):
          screen_end_year     (str)       : the year to end screening intervention (if None, assume continues until end of simulation)
          screen_compliance   (list of floats)     : probability of being screened (per screen) over time
          triage_compliance   (list of floats)     : probability of coming back for triage over time
-         ablation_compliance (list of floats)     : probability of coming back for ablation over time
-         excision_compliance (list of floats)     : probability of coming back for excision over time
-         cancer_compliance   (list of floats)     : probability of undergoing treatment if cancer is diagnosed over time
          label               (str)       : the name of screening strategy
          kwargs (dict)      : passed to Intervention()
 
@@ -911,13 +908,14 @@ class Screening(Intervention):
 
     '''
 
-    def __init__(self, primary_screen_test, treatment, screen_start_age, screen_interval, screen_stop_age,
-                 screen_start_year, screen_end_year=None, screen_compliance=None, triage_compliance=None, ablation_compliance=None, excision_compliance=None,
-                 cancer_compliance=None, triage_screen_test=None, screen_fu_neg_triage=None,
+    def __init__(self, primary_screen_test, treatment_intervention, screen_start_age, screen_interval, screen_stop_age,
+                 screen_start_year, screen_end_year=None, screen_compliance=None, triage_compliance=None,
+                 triage_screen_test=None, screen_fu_neg_triage=None,
                  label=None, screen_states=None, treat_states=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.label = label  # Screening label (used as a dict key)
         self.p = None  # Screening parameters
+        self.treatment_intervention = treatment_intervention
         self.screen_start_year = screen_start_year
         self.screen_end_year = screen_end_year
         if screen_compliance is None: # Populate default value of probability: 1
@@ -926,15 +924,6 @@ class Screening(Intervention):
         if triage_compliance is None: # Populate default value of compliance: 1
             triage_compliance = 1
         self.triage_compliance = sc.promotetolist(triage_compliance)
-        if excision_compliance is None: # Populate default value of compliance: 1
-            excision_compliance = 1
-        self.excision_compliance = sc.promotetolist(excision_compliance)
-        if ablation_compliance is None: # Populate default value of compliance: 1
-            ablation_compliance = 1
-        self.ablation_compliance = sc.promotetolist(ablation_compliance)
-        if cancer_compliance is None: # Populate default value of cancer referral compliance: 1
-            cancer_compliance = 1
-        self.cancer_compliance = sc.promotetolist(cancer_compliance)
         if screen_fu_neg_triage is None: # Populate default value of follow up after -ve triage: 1 year
             screen_fu_neg_triage = 1
         self.screen_fu_neg_triage = sc.promotetolist(screen_fu_neg_triage)
@@ -946,20 +935,15 @@ class Screening(Intervention):
         if screen_states is None:
             screen_states = ['none', 'cin1', 'cin2', 'cin3', 'cancerous']
         self.screen_states = screen_states
-        # States eligible for pre-cancer treatment (NB, cancer treatment is handled separately)
-        if treat_states is None:
-            treat_states = ['none', 'cin1', 'cin2', 'cin3']
-        self.treat_states = treat_states
 
         # Parse the screening and treatment parameters, which can be provided in different formats
         self._parse_screening_pars(screen=primary_screen_test)  # Populate
         self._parse_screening_pars(screen=triage_screen_test, triage=True)  # Populate
-        self._parse_screening_pars(screen=treatment, treatment=True)  # Populate
 
         return
 
 
-    def _parse_screening_pars(self, screen, triage=False, treatment=False):
+    def _parse_screening_pars(self, screen, triage=False):
         ''' Unpack screening information, which may be given as a string or dict '''
 
         # Option 1: screening can be chosen from a list of pre-defined screening strategies
@@ -1007,11 +991,7 @@ class Screening(Intervention):
                 self.p = sc.mergedicts(self.p, {'triage': None})
             else:
                 self.p = sc.mergedicts(self.p, {'triage': sc.objdict(screen_pars)})
-        if treatment:
-            self.p = sc.mergedicts(self.p, {'treatment_eligibility': sc.objdict(screen_pars)})
-            treat_pars = hppar.get_treatment_pars()
-            self.p = sc.mergedicts(self.p, {'treatment': sc.objdict(treat_pars)})
-        if treatment is False and triage is False:
+        else:
             # Set label and parameters
             self.p = {'primary': sc.objdict(screen_pars)}
 
@@ -1030,7 +1010,7 @@ class Screening(Intervention):
 
         n_timepoints = len(self.timepoints)
 
-        for compliance in ['screen_compliance', 'triage_compliance', 'excision_compliance', 'ablation_compliance', 'cancer_compliance', 'screen_fu_neg_triage']:
+        for compliance in ['screen_compliance', 'triage_compliance', 'screen_fu_neg_triage']:
             if len(getattr(self, compliance)) != n_timepoints:
                 print(f'{n_timepoints} timepoints provided but only {len(getattr(self, compliance))} values for {compliance}. Assuming constant over time.')
                 setattr(self, compliance, getattr(self, compliance)*n_timepoints)
@@ -1056,8 +1036,9 @@ class Screening(Intervention):
         # parameters that will be used below
         primary_screen_pars = self.p['primary']
         triage_screen_pars = self.p['triage']
-        treat_pars = self.p['treatment']
-        treat_eligibility_pars = self.p['treatment_eligibility']
+        treatment_intervention = self.treatment_intervention
+        treat_pars = treatment_intervention.p
+        treat_eligibility_pars = treat_pars['via_triage']
 
         # 1. Select people to screen and screen them
         to_screen_inds = self.select_people_screen(sim)
@@ -1080,11 +1061,11 @@ class Screening(Intervention):
 
                 # 4. Treat people
                 if len(ca_treat_inds):
-                    ca_treated_inds = self.treat_cancer(sim, ca_treat_inds, treat_pars)
+                    ca_treated_inds = treatment_intervention.treat_cancer(sim, ca_treat_inds, treat_pars)
                 if len(ablation_inds):
-                    ablation_treated_inds = self.treat_precancer(sim, ablation_inds, treat_pars, method='ablative')
+                    ablation_treated_inds = treatment_intervention.treat_precancer(sim, ablation_inds, treat_pars, method='ablative')
                 if len(excision_inds):
-                    excision_treated_inds = self.treat_precancer(sim, excision_inds, treat_pars, method='excisional')
+                    excision_treated_inds = treatment_intervention.treat_precancer(sim, excision_inds, treat_pars, method='excisional')
 
         return
 
@@ -1169,6 +1150,73 @@ class Screening(Intervention):
             screen_neg = np.setdiff1d(screen_inds, screen_pos)
             sim.people.date_next_screen[screen_neg] = sim.t + self.screen_fu_neg_triage[self.where_in_timepoints] / sim['dt'] # primary +ve/ triage -ve follow up sooner
         return screen_pos
+
+
+    def shrink(self, in_place=True):
+        ''' Shrink vaccination intervention '''
+        obj = super().shrink(in_place=in_place)
+        return obj
+
+#%% Screening
+__all__ += ['BaseTreatment']
+
+class BaseTreatment(Intervention):
+    '''
+    Treat a subset of the population.
+
+    This base class implements the mechanism of treating infection, pre-cancerous lesions, and cancer.
+    Treatment involves a series of standard operations to modify the trajectories of `hpv.People`.
+
+    Args:
+         treatment           (dict/str)  : the test used to determine if ablative or excisional treatment is used
+         ablation_compliance (list of floats)     : probability of coming back for ablation over time
+         excision_compliance (list of floats)     : probability of coming back for excision over time
+         cancer_compliance   (list of floats)     : probability of undergoing treatment if cancer is diagnosed over time
+         label               (str)       : the name of screening strategy
+         kwargs (dict)      : passed to Intervention()
+
+    '''
+
+    def __init__(self, treatment, ablation_compliance=None, excision_compliance=None,
+                 cancer_compliance=None, label=None, screen_states=None, treat_states=None, **kwargs):
+        super().__init__(**kwargs) # Initialize the Intervention object
+        self.label = label  # Screening label (used as a dict key)
+        self.p = None  # Screening parameters
+        if excision_compliance is None: # Populate default value of compliance: 1
+            excision_compliance = 1
+        self.excision_compliance = sc.promotetolist(excision_compliance)
+        if ablation_compliance is None: # Populate default value of compliance: 1
+            ablation_compliance = 1
+        self.ablation_compliance = sc.promotetolist(ablation_compliance)
+        if cancer_compliance is None: # Populate default value of cancer referral compliance: 1
+            cancer_compliance = 1
+        self.cancer_compliance = sc.promotetolist(cancer_compliance)
+
+        # States eligible for pre-cancer treatment (NB, cancer treatment is handled separately)
+        if treat_states is None:
+            treat_states = ['none', 'cin1', 'cin2', 'cin3']
+        self.treat_states = treat_states
+
+        # Parse the treatment parameters, which can be provided in different formats
+        self._parse_treatment_pars(treatment=treatment)  # Populate
+
+        return
+
+
+    def _parse_treatment_pars(self, treatment):
+        ''' Unpack treatment information '''
+
+        treat_pars = hppar.get_treatment_pars()
+        self.p = sc.mergedicts(self.p, {'treatment': sc.objdict(treat_pars)})
+
+        return
+
+
+    def initialize(self, sim):
+        super().initialize()
+
+        sim['treat_pars'][self.label] = self.p  # Store the parameters
+        return
 
 
     def select_people_treat(self, sim, treat_eligible_inds, treat_eligibility_pars):
@@ -1300,7 +1348,7 @@ class Screening(Intervention):
 
 
     def shrink(self, in_place=True):
-        ''' Shrink vaccination intervention '''
+        ''' Shrink treatment intervention '''
         obj = super().shrink(in_place=in_place)
         return obj
 

@@ -101,6 +101,7 @@ def make_pars(**kwargs):
 
     # Screening and treatment parameters
     pars['screen_pars']     = dict()  # Screening method that is being used; populated during initialization
+    pars['treat_pars'] = dict()  # Treatment method that is being used; populated during initialization
     pars['cancer_symp_detection'] = 0.01 # Annual probability of having cancer detected via symptoms, rather than screening
     pars['cancer_symp_treatment'] = 0.01 # Probability of receiving treatment for those with symptom-detected cancer
 
@@ -1002,12 +1003,21 @@ def get_screen_pars(screen=None):
 
     return _get_from_pars(pars, key=screen)
 
-def get_treatment_pars(screen=None):
+def get_treatment_pars(treatment=None):
     '''
     Define the parameters for each treatment method
     '''
 
     pars = dict(
+        via_triage=dict(
+            test_positivity=dict(
+                none=0.98,
+                cin1=0.97,
+                cin2=0.89,
+                cin3=0.79,
+                cancerous=0.4,
+            )
+        ),
         persistence=dict(
             hpv16=dict(dist='beta', par1=2, par2=7),
             hpv18=dict(dist='beta', par1=2, par2=7),
@@ -1040,4 +1050,4 @@ def get_treatment_pars(screen=None):
         )
     )
 
-    return _get_from_pars(pars, key=screen)
+    return _get_from_pars(pars, key=treatment)
