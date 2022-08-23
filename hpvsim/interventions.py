@@ -65,7 +65,7 @@ def get_subtargets(subtarget, sim, t_ind=None):
 
     # Validation
     if callable(subtarget):
-        subtarget = subtarget(sim, t_ind)
+        subtarget = subtarget(sim)
 
     if 'inds' not in subtarget: # pragma: no cover
         errormsg = f'The subtarget dict must have keys "inds" and "vals", but you supplied {subtarget}'
@@ -374,7 +374,7 @@ class dynamic_pars(Intervention):
 
 
 #%% Vaccination
-__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_num']
+__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_routine', 'vaccinate_num']
 
 class BaseVaccination(Intervention):
     '''
@@ -671,8 +671,7 @@ class vaccinate_prob(BaseVaccination):
 
                 # Apply any subtargeting
                 if self.subtarget is not None:
-                    t_ind = sc.findinds(sim.t, self.timepoints)[0]
-                    subtarget_inds, subtarget_vals = get_subtargets(self.subtarget, sim, t_ind)
+                    subtarget_inds, subtarget_vals = get_subtargets(self.subtarget, sim)
                     vacc_probs[subtarget_inds] = subtarget_vals  # People being explicitly subtargeted
 
                 vacc_inds = hpu.true(hpu.binomial_arr(vacc_probs))  # Calculate who actually gets vaccinated
@@ -699,7 +698,7 @@ class vaccinate_prob(BaseVaccination):
         return vacc_inds
 
 
-class vaccinate_routine(hpv.vaccinate_prob):
+class vaccinate_routine(vaccinate_prob):
 
     def __init__(self, *args, age_range, coverage, **kwargs):
         super().__init__(*args, **kwargs, subtarget=self.subtarget_function)
