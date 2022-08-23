@@ -699,6 +699,21 @@ class vaccinate_prob(BaseVaccination):
         return vacc_inds
 
 
+class vaccinate_routine(hpv.vaccinate_prob):
+
+    def __init__(self, *args, age_range, coverage, **kwargs):
+        super().__init__(*args, **kwargs, subtarget=self.subtarget_function)
+        self.age_range = age_range
+        self.coverage = sc.promotetoarray(coverage)
+        if len(self.coverage) == 1:
+            self.coverage = self.coverage * np.ones_like(self.timepoints)
+
+    def subtarget_function(self, sim):
+        inds = sc.findinds((sim.people.age >= self.age_range[0]) & (sim.people.age <self.age_range[1]))
+        coverage = self.coverage[self.timepoints==sim.t][0]
+        return {'vals': coverage*np.ones_like(inds), 'inds': inds}
+
+
 class vaccinate_num(BaseVaccination):
     '''
     This vaccine intervention allocates vaccines in a pre-computed order of
