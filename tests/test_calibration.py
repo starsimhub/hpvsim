@@ -45,7 +45,7 @@ def test_calibration():
                                 'test_data/south_africa_cancer_data_2020.csv',
                                 # 'test_data/south_africa_type_distribution_cancer.csv'
                             ],
-                            total_trials=2, n_workers=1)
+                            total_trials=5, n_workers=2)
     calib.calibrate()
     calib.plot(top_results=4)
     return sim, calib

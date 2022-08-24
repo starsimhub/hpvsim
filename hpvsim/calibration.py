@@ -84,7 +84,7 @@ class Calibration(sc.prettyobj):
         if db_name   is None: db_name   = f'{name}.db'
         if keep_db   is None: keep_db   = False
         if storage   is None: storage   = f'sqlite:///{db_name}'
-        if total_trials is not None: n_trials = total_trials/n_workers
+        if total_trials is not None: n_trials = int(np.ceil(total_trials/n_workers))
         self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name, keep_db=keep_db, storage=storage, rand_seed=rand_seed)
 
         # Handle other inputs
@@ -138,6 +138,9 @@ class Calibration(sc.prettyobj):
             self.result_properties[rkey] = sc.objdict()
             self.result_properties[rkey].name = self.sim.results[rkey].name
             self.result_properties[rkey].color = self.sim.results[rkey].color
+
+        # Temporarily store a filename
+        self.tmp_filename = 'tmp_calibration_%05i.obj'
 
         return
 
@@ -219,7 +222,7 @@ class Calibration(sc.prettyobj):
         return pars
 
 
-    def run_trial(self, trial):
+    def run_trial(self, trial, save=True):
         ''' Define the objective for Optuna '''
 
         if self.genotype_pars is not None:
@@ -260,6 +263,13 @@ class Calibration(sc.prettyobj):
         # trial.set_user_attr('sim_results', sim_results)
         # sim.shrink() # CK: Proof of principle only!!
         # trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
+
+        # Really kludgy way to store results
+        if save:
+            results = dict(sim=sim_results, analyzer=sim.get_analyzer().results)
+            filename = self.tmp_filename % trial.number
+            sc.save(filename, results)
+
         return sim.fit
 
 
@@ -320,7 +330,7 @@ class Calibration(sc.prettyobj):
         return output
 
 
-    def calibrate(self, calib_pars=None, genotype_pars=None, verbose=True, **kwargs):
+    def calibrate(self, calib_pars=None, genotype_pars=None, verbose=True, load=True, tidyup=True, **kwargs):
         '''
         Actually perform calibration.
 
@@ -363,6 +373,30 @@ class Calibration(sc.prettyobj):
         #     sim_results = trial.user_attrs['sim_results']
         #     self.sim_results.append(sim_results)
         #     self.analyzer_results.append(r)
+
+        # Replace with something else, this is fragile
+        self.analyzer_results = []
+        self.sim_results = []
+        if load:
+            print('Loading saved results...')
+            for trial in self.study.trials:
+                n = trial.number
+                try:
+                    filename = self.tmp_filename % trial.number
+                    results = sc.load(filename)
+                    self.sim_results.append(results['sim'])
+                    self.analyzer_results.append(results['analyzer'])
+                    if tidyup:
+                        try:
+                            os.remove(filename)
+                            print(f'    Removed temporary file {filename}')
+                        except Exception as E:
+                            errormsg = f'Could not remove {filename}: {str(E)}'
+                            print(errormsg)
+                    print(f'  Loaded trial {n}')
+                except Exception as E:
+                    errormsg = f'Warning, could not load trial {n}: {str(E)}'
+                    print(errormsg)
 
         # Compare the results
         self.initial_pars = sc.objdict()
