@@ -212,11 +212,10 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     ablation_compliance=0.5
     excision_compliance=0.2
     cancer_compliance = 0.1
-    pre_cancer_tx = hpv.treat_precancer(ablation_compliance=ablation_compliance, excision_compliance=cancer_compliance)
-    cancer_tx = hpv.treat_cancer(cancer_compliance=cancer_compliance)
+    treatment = hpv.StandardTreatmentPathway(ablation_compliance=ablation_compliance, excision_compliance=excision_compliance,
+                                             cancer_compliance=cancer_compliance)
     hpv_screening = hpv.Screening(primary_screen_test='hpv', screen_start_age=30, screen_stop_age=50, screen_interval=5,
-                                  screen_start_year='2010', screen_compliance=screen_prop, pre_cancer_tx=pre_cancer_tx,
-                                  cancer_tx=cancer_tx)
+                                  screen_start_year='2010', screen_compliance=screen_prop, treatment_pathway=treatment)
 
     # screen_prop = [.015, .025, .05, .1, .2, .3, 0.4, .5, .6, .7]
     # hpv_screening_scaleup = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,

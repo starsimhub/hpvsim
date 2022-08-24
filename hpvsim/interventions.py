@@ -1158,7 +1158,7 @@ class Screening(Intervention):
 
 
 #%% Treatment
-__all__ += ['RadiationTherapy','PrecancerTreatment','ExcisionTreatment','AblativeTreatment','TherapeuticVaccine']
+__all__ += ['StandardTreatmentPathway', 'RadiationTherapy','PrecancerTreatment','ExcisionTreatment','AblativeTreatment','TherapeuticVaccine']
 
 class Product():
     """
@@ -1263,6 +1263,11 @@ class AblativeTreatment(PrecancerTreatment):
     )
 
 
+class TherapeuticVaccine(Product):
+    def administer(self, people, inds):
+        pass # do something
+
+
 class RadiationTherapy(Product):
     # Cancer treatment product
     def __init__(self, dur=None):
@@ -1279,10 +1284,10 @@ class RadiationTherapy(Product):
 class StandardTreatmentPathway(Product):
     # A standard treatment pathway - kind of a meta-product that represents the normal algorithm and dispatches treatments to specific products
 
-    def __init__(self, ablation_compliance, excision_compliance, cancer_compliance, cancer_product, ablation_product, excision_product):
+    def __init__(self, ablation_compliance, excision_compliance, cancer_compliance, cancer_product=None, ablation_product=None, excision_product=None):
         self.ablation_compliance = ablation_compliance # probability of coming back for ablation
         self.excision_compliance = excision_compliance # probability of coming back for excision
-        self.cancer_compliance = excision_compliance # probability of coming back for cancer treatment
+        self.cancer_compliance = cancer_compliance # probability of coming back for cancer treatment
         self.cancer_product = cancer_product or RadiationTherapy()
         self.ablation_product = ablation_product or AblativeTreatment()
         self.excision_product = excision_product or ExcisionTreatment()
@@ -1306,7 +1311,7 @@ class StandardTreatmentPathway(Product):
             ca_treat_inds = np.array([], dtype=hpd.default_int)
 
         # Everyone remaining is eligible for precancer treatment
-        preca_treat_eligible_inds = np.setdiff1d(inds, diagnosed_inds) # Indices of those eligible for precancer treatment
+        preca_treat_eligible_inds = np.setdiff1d(inds, ca_treat_inds) # Indices of those eligible for precancer treatment
 
         # Determine who is eligible for ablative vs excisional treatment
         if len(preca_treat_eligible_inds)>0:
