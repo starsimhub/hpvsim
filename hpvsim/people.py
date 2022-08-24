@@ -398,6 +398,8 @@ class People(hpb.BasePeople):
                 treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
                 new_dur_cancer = hpu.sample(**hppar.get_treatment_pars('radiation')['dur'], size=len(treat_inds))
                 self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
+                self.treated[treat_inds] = True
+                self.date_treated[treat_inds] = self.t
                 return len(is_detected_inds)
 
 

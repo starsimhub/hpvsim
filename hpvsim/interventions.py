@@ -1158,7 +1158,7 @@ class Screening(Intervention):
 
 
 #%% Treatment
-__all__ += ['StandardTreatmentPathway', 'RadiationTherapy','PrecancerTreatment','ExcisionTreatment','AblativeTreatment','TherapeuticVaccine']
+__all__ += ['StandardTreatmentPathway', 'RadiationTherapy', 'PrecancerTreatment', 'ExcisionTreatment', 'AblativeTreatment', 'TherapeuticVaccine']
 
 class Product():
     """
