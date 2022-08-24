@@ -355,13 +355,14 @@ class Calibration(sc.prettyobj):
         self.ng = sim['n_genotypes']
         self.glabels = [g.upper() for g in sim['genotype_map'].values()]
 
-        self.analyzer_results = []
-        self.sim_results = []
-        for trial in self.study.trials:
-            r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
-            sim_results = trial.user_attrs['sim_results']
-            self.sim_results.append(sim_results)
-            self.analyzer_results.append(r)
+        # Replace with something else, this is fragile
+        # self.analyzer_results = []
+        # self.sim_results = []
+        # for trial in self.study.trials:
+        #     r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
+        #     sim_results = trial.user_attrs['sim_results']
+        #     self.sim_results.append(sim_results)
+        #     self.analyzer_results.append(r)
 
         # Compare the results
         self.initial_pars = sc.objdict()
@@ -436,7 +437,7 @@ class Calibration(sc.prettyobj):
         return
 
 
-    def to_json(self, filename=None):
+    def to_json(self, filename=None, indent=2, **kwargs):
         '''
         Convert the data to JSON.
 
@@ -450,8 +451,9 @@ class Calibration(sc.prettyobj):
             for key,val in row.items():
                 rowdict['pars'][key] = val
             json.append(rowdict)
+        self.json = json
         if filename:
-            sc.savejson(filename, json, indent=2)
+            return sc.savejson(filename, json, indent=indent, **kwargs)
         else:
             return json
 
