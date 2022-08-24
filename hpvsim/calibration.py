@@ -348,7 +348,7 @@ class Calibration(sc.prettyobj):
         self.make_study()
         self.run_workers()
         study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
-        # self.best_pars = sc.objdict(study.best_params)
+        self.best_pars = sc.objdict(study.best_params)
         self.elapsed = sc.toc(t0, output=True)
 
         # Collect analyzer results
@@ -400,13 +400,13 @@ class Calibration(sc.prettyobj):
         self.df = pd.DataFrame.from_dict(data)
 
         # If requested, run the sim with the best parameters
-        if self.run_best: self.run_best_sims()
+        if self.run_best>0: self.run_best_sims(run_best=self.run_best)
 
         return
 
 
     @staticmethod
-    def run_best_sims(df, top_results=None):
+    def run_best_sims(df, run_best=None):
         '''
         Run the sim with the best trial parameters
         Args:
