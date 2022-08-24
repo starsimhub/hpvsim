@@ -627,7 +627,7 @@ class Calibration(sc.prettyobj):
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
                     bins += x.tolist()
-                    values += run[resname]
+                    values += list(run[resname])
                 # Plot model
                 modeldf = pd.DataFrame({'bins': bins, 'values': values})
                 ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, dodge=True, boxprops=dict(alpha=.3))
