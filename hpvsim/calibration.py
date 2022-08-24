@@ -588,7 +588,7 @@ class Calibration(sc.prettyobj):
                             for run_num, run in enumerate(analyzer_results):
                                 genotypes += [glabel]*len(x)
                                 bins += x.tolist()
-                                values += run[resname][date][g]
+                                values += list(run[resname][date][g])
 
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values, 'genotypes':genotypes})
@@ -602,7 +602,7 @@ class Calibration(sc.prettyobj):
                         # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(analyzer_results):
                             bins += x.tolist()
-                            values += run[resname][date]
+                            values += list(run[resname][date])
 
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values})
