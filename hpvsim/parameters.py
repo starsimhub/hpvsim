@@ -1141,45 +1141,6 @@ def get_treatment_pars(treatment=None):
     '''
 
     pars = dict(
-        via_triage=dict(
-            test_positivity=dict(
-                none=0.98,
-                cin1=0.97,
-                cin2=0.89,
-                cin3=0.79,
-                cancerous=0.4,
-            )
-        ),
-        persistence=dict(
-            hpv16=dict(dist='beta', par1=2, par2=7),
-            hpv18=dict(dist='beta', par1=2, par2=7),
-            hpv31=dict(dist='beta', par1=2, par2=7),
-            hpv33=dict(dist='beta', par1=2, par2=7),
-            hpv35=dict(dist='beta', par1=2, par2=7),
-            hpv45=dict(dist='beta', par1=2, par2=7),
-            hpv51=dict(dist='beta', par1=2, par2=7),
-            hpv52=dict(dist='beta', par1=2, par2=7),
-            hpv56=dict(dist='beta', par1=2, par2=7),
-            hpv58=dict(dist='beta', par1=2, par2=7),
-            hpv6=dict(dist='beta', par1=2, par2=7),
-            hpv11=dict(dist='beta', par1=2, par2=7),
-        ),
-        excisional=dict(
-            efficacy=dict(
-                none=0,
-                cin1=0.936,
-                cin2=0.936,
-                cin3=0.936,
-            ),
-        ),
-        ablative=dict(
-            efficacy=dict(
-                none=0,
-                cin1=0.81,
-                cin2=0.81,
-                cin3=0.81,
-            ),
-        ),
         radiation=dict(
             dur=dict(dist='lognormal', par1=6.0, par2=3.0)
         )

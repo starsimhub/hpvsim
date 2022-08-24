@@ -94,7 +94,8 @@ class PeopleMeta(sc.prettyobj):
         State('dead_other', bool, False),  # Dead from all other causes
         State('vaccinated', bool, False),
         State('screened', bool, False),
-        State('treated', bool, False)
+        State('treated', bool, False),
+        State('tx_vaccinated', bool, False)
     ]
 
     # Set genotype states, which store info about which genotype a person is exposed to
@@ -112,6 +113,7 @@ class PeopleMeta(sc.prettyobj):
         State('doses',default_int, 0),  # Number of doses given per person
         State('vaccine_source',default_int, 0),  # index of vaccine that individual received
         State('screens',default_int, 0),  # Number of screens given per person
+        State('txvx_doses', default_int, 0) # Number of therapeutic vaccine doses given per person
     ]
 
     # Relationship states
