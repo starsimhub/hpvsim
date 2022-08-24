@@ -59,6 +59,7 @@ class Calibration(sc.prettyobj):
         A Calibration object
 
     **Example**::
+
         sim = hpv.Sim(pars, genotypes=[16, 18])
         calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
         calib = hpv.Calibration(sim, calib_pars=calib_pars,
@@ -237,9 +238,12 @@ class Calibration(sc.prettyobj):
         # Extract results we are calibrating to, a combination of by-age and sim-results
         # First check for by-age results
 
-        r = sim.get_analyzer().results
-        r = sc.jsonify(r)
-        trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
+        # r = sim.get_analyzer().results
+        # r = sc.jsonify(r)
+        # trial.set_user_attr('analyzer_results', r) # CK: TODO: will fail with more than 1 analyzer
+
+        # Better implentation:
+        # sc.save(f'analyzer_results_{trial}.obj', r)
 
         # Now compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
@@ -252,8 +256,8 @@ class Calibration(sc.prettyobj):
             sim.fit += self.sim_results[rkey].mismatch
             sim_results[rkey] = self.sim_results[rkey].model_output
 
-        sim_results = sc.jsonify(sim_results)
-        trial.set_user_attr('sim_results', sim_results)
+        # sim_results = sc.jsonify(sim_results)
+        # trial.set_user_attr('sim_results', sim_results)
         # sim.shrink() # CK: Proof of principle only!!
         # trial.set_user_attr('jsonpickle_sim', sc.jsonpickle(sim))
         return sim.fit

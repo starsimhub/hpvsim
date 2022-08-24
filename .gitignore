@@ -78,6 +78,8 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/modules.rst
+docs/hpvsim.*.rst
 
 # PyBuilder
 target/
@@ -138,3 +140,4 @@ dmypy.json
 
 # Node.js and NPM
 node_modules
+
