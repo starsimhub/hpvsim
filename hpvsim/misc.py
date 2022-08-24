@@ -11,7 +11,7 @@ import pylab as pl
 import sciris as sc
 import collections as co
 from pathlib import Path
-from distutils.version import LooseVersion
+from distutils.version import LooseVersion # TODO: deprecated, remove
 from . import version as hpv
 from .settings import options as hpo
 
@@ -133,9 +133,9 @@ def savefig(filename=None, comments=None, fig=None, **kwargs):
     Wrapper for Matplotlib's ``pl.savefig()`` function which automatically stores
     Covasim metadata in the figure.
 
-    By default, saves (git) information from both the Covasim version and the calling
+    By default, saves (git) information from both the HPVsim version and the calling
     function. Additional comments can be added to the saved file as well. These can
-    be retrieved via ``cv.get_png_metadata()`` (or ``sc.loadmetadata``). Metadata can
+    be retrieved via ``cv.get_png_metadata()`` (or :py:func:`sciris.sc_plotting.loadmetadata`). Metadata can
     also be stored for PDF, but cannot be automatically retrieved.
 
     Args:

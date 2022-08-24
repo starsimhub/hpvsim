@@ -7,7 +7,17 @@ import numpy as np
 import sciris as sc
 from .. import misc as hpm
 
-__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_death_rates']
+__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_death_rates', 'get_birth_rates']
+
+
+thisdir = sc.path(sc.thisdir())
+files = sc.objdict()
+files.age_dist = 'populations.obj'
+files.birth = 'birth_rates.obj'
+files.death = 'mx.obj'
+
+for k,v in files.items():
+    files[k] = thisdir / v
 
 
 def load_file(filename):
@@ -111,7 +121,7 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
 
     # Load the raw data
     try:
-        df = load_file('populations.obj')
+        df = load_file(files.age_dist)
     except Exception as E:
         errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
         raise ValueError(errormsg) from E
@@ -153,7 +163,7 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     '''
     # Load the raw data
     try:
-        df = load_file('mx.obj')
+        df = load_file(files.death)
     except Exception as E:
         errormsg = 'Could not locate datafile with age-specific death rates by country. Please run data/get_data.py first.'
         raise ValueError(errormsg) from E
@@ -193,7 +203,7 @@ def get_birth_rates(location=None):
     '''
     # Load the raw data
     try:
-        birth_rate_data = load_file('birth_rates.obj')
+        birth_rate_data = load_file(files.birth)
     except Exception as E:
         errormsg = 'Could not locate datafile with birth rates by country. Please run data/get_data.py first.'
         raise ValueError(errormsg) from E
@@ -203,4 +213,3 @@ def get_birth_rates(location=None):
     birth_rates, inds = sc.sanitize(birth_rates, returninds=True)
     years = years[inds]
     return np.array([years, birth_rates])
-

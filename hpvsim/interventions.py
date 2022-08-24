@@ -96,6 +96,7 @@ __all__ = ['Intervention']
 class Intervention:
     '''
     Base class for interventions.
+
     Args:
         label       (str): a label for the intervention (used for plotting, and for ease of identification)
         show_label (bool): whether or not to include the label in the legend
@@ -300,6 +301,7 @@ class dynamic_pars(Intervention):
         kwargs (dict): passed to Intervention()
 
     **Examples**::
+
         interv = hp.dynamic_pars(condoms=dict(timepoints=10, vals={'c':0.9})) # Increase condom use amount casual partners to 90%
         interv = hp.dynamic_pars({'beta':{'timepoints':[10, 15], 'vals':[0.005, 0.015]}, # At timepoint 10, reduce beta, then increase it again
                                   'debut':{'timepoints':10, 'vals':dict(f=dict(dist='normal', par1=20, par2=2.1), m=dict(dist='normal', par1=19.6, par2=1.8))}}) # Increase mean age of sexual debut
@@ -386,6 +388,7 @@ class BaseVaccination(Intervention):
 
     Some quantities are tracked during execution for reporting after running the simulation.
     These are:
+
         - ``doses``:             the number of vaccine doses per person
 
     Args:
@@ -394,9 +397,10 @@ class BaseVaccination(Intervention):
         kwargs  (dict)     : passed to Intervention()
 
     If ``vaccine`` is supplied as a dictionary, it must have the following parameters:
+
         - ``imm_init``:  the initial immunity level (higher = more protection)
 
-    See ``parameters.py`` for additional examples of these parameters.
+    See :py:mod:`parameters` for additional examples of these parameters.
 
     '''
 
@@ -561,7 +565,6 @@ class BaseVaccination(Intervention):
             imm_source = len(sim['genotype_map']) + self.index
             hpi.update_peak_immunity(sim.people, vacc_inds, self.p, imm_source, infection=False)
 
-            factor = sim['pop_scale'] # Scale up by pop_scale, but then down by the current rescale_vec, which gets applied again when results are finalized TODO- not using rescale vec yet
             idx = int(sim.t / sim.resfreq)
             sim.results['new_vaccinated'][self.immunity_inds, idx] += len(first_vacc_inds)
             sim.results['new_total_vaccinated'][idx] += len(first_vacc_inds)
@@ -709,15 +712,18 @@ class vaccinate_num(BaseVaccination):
         label        (str): if vaccine is supplied as a dict, the name of the vaccine
         subtarget  (dict): subtarget intervention to people with particular indices
         num_doses: Specify the number of doses per timepoint. This can take three forms
+
             - A scalar number of doses per timepoint
             - A dict keyed by year/date with the number of doses e.g. ``{2010:10000, '2021-05-01':20000}``.
               Any dates are converted to simulation days in `initialize()` which will also copy the
               dictionary passed in.
             - A callable that takes in a ``hpv.Sim`` and returns a scalar number of doses. For example,
               ``def doses(sim): return 100 if sim.t > 10 else 0`` would be suitable
+
         **kwargs: Additional arguments passed to ``hpv.BaseVaccination``
 
     **Example**::
+
         bivalent = hpv.vaccinate_num(vaccine='bivalent', num_doses=1e6, timepoints=2020)
         hpv.Sim(interventions=bivalent).run().plot()
     '''
@@ -904,6 +910,7 @@ class Screening(Intervention):
          kwargs (dict)      : passed to Intervention()
 
     If ``primary_screen_test`` and/or ``triage_screen_test`` is supplied as a dictionary, it must have the following parameters:
+
         - ``test_positivity``   : dictionary of probability of testing positive given each stage (i.e., NONE, CIN1, CIN2)
 
     '''
@@ -911,9 +918,10 @@ class Screening(Intervention):
     def __init__(self, primary_screen_test,  screen_start_age, screen_interval, screen_stop_age,
                  screen_start_year, screen_end_year=None, screen_compliance=None, triage_compliance=None,
                  triage_screen_test=None, screen_fu_neg_triage=None, pre_cancer_tx_intervention=None, cancer_tx_intervention=None,
-                 label=None, screen_states=None, **kwargs):
+                 label=None, screen_states=None, verbose=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.label = label  # Screening label (used as a dict key)
+        self.verbose = verbose
         self.p = None  # Screening parameters
         self.pre_cancer_tx_intervention = pre_cancer_tx_intervention
         self.cancer_tx_intervention = cancer_tx_intervention
@@ -940,6 +948,7 @@ class Screening(Intervention):
         # Parse the screening and treatment parameters, which can be provided in different formats
         self._parse_screening_pars(screen=primary_screen_test)  # Populate
         self._parse_screening_pars(screen=triage_screen_test, triage=True)  # Populate
+        self._parse_screening_pars(screen=treatment, treatment=True)  # Populate
 
         return
 
@@ -1023,13 +1032,15 @@ class Screening(Intervention):
     def apply(self, sim):
         '''
         This method performs the entire screen-and-treat algorithm, using the following steps:
+
             1. Select people to screen and screen them using a defined primary screening algorithm
             2. Optionally triage anyone who screens positive to find those eligible for treatment
-            4. Select those who will be treated, accounting for compliance
-            5. Treat those who agree to treatment with defined treatment types
+            3. Select those who will be treated, accounting for compliance
+            4. Treat those who agree to treatment with defined treatment types
 
         Args:
             sim: hpv.Sim instance
+
         Returns:
             TBC
         '''
@@ -1068,6 +1079,10 @@ class Screening(Intervention):
                     ablation_treated_inds = pre_cancer_tx_intervention.treat_precancer(sim, ablation_inds, treat_pars, method='ablative')
                 if len(excision_inds):
                     excision_treated_inds = pre_cancer_tx_intervention.treat_precancer(sim, excision_inds, treat_pars, method='excisional')
+
+                if self.verbose:
+                    string = f'On step {sim.t}: {len(ca_treated_inds)} were CA treated, {len(ablation_treated_inds)} were ablation treated, and {len(excision_treated_inds)} were excision treated'
+                    print(string)
 
         return
 

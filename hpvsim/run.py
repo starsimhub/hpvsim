@@ -21,7 +21,7 @@ __all__ = ['make_metapars', 'MultiSim', 'Scenarios', 'single_run', 'multi_run', 
 
 
 
-def make_metapars(): 
+def make_metapars():
     ''' Create default metaparameters for a Scenarios run '''
     metapars = sc.objdict(
         n_runs    = 3, # Number of parallel runs; change to 3 for quick, 10 for real
@@ -921,11 +921,12 @@ class Scenarios(hpb.ParsObj):
         self.base_sim.update_pars(self.basepars)
         self.base_sim.validate_pars()
         if not self.base_sim.initialized:
-            self.base_sim.init_genotypes()
-            self.base_sim.init_immunity()
-            self.base_sim.init_interventions()
-            self.base_sim.init_people()
-            self.base_sim.init_results()
+            self.base_sim.initialize(reset=True) # TODO: This breaks things, need to figure out how to avoid!!
+        #     self.base_sim.init_genotypes()
+        #     self.base_sim.init_immunity()
+        #     self.base_sim.init_interventions()
+        #     self.base_sim.init_people()
+        #     self.base_sim.init_results()
 
         # Copy quantities from the base sim to the main object
         self.npts       = self.base_sim.npts
@@ -1000,6 +1001,7 @@ class Scenarios(hpb.ParsObj):
             # Create and run the simulations
             print_heading(f'Multirun for {scenkey}')
             scen_sim = sc.dcp(self.base_sim)
+            scen_sim.initialize(reset=True)
             scen_sim.scenkey = scenkey
             scen_sim.label = scenname
             scen_sim.scen = scen
@@ -1017,7 +1019,7 @@ class Scenarios(hpb.ParsObj):
             if debug:
                 print('Running in debug mode (not parallelized)')
                 run_args.pop('n_runs', None) # Remove n_runs argument, not used for a single run
-                scen_sims = [single_run(scen_sim, **run_args, **kwargs)]
+                scen_sims = [single_run(scen_sim, **run_args, **kwargs)]*self['n_runs'] # Ensure it has correct length -- WARNING, kludgy
             else:
                 scen_sims = multi_run(scen_sim, **run_args, **kwargs) # This is where the sims actually get run
 
@@ -1093,7 +1095,6 @@ class Scenarios(hpb.ParsObj):
         x = defaultdict(dict)
         genotypekeys = self.result_keys('genotype')
         sexkeys = self.result_keys('by_sex')
-        agekeys = self.result_keys('by_age')
         totalkeys = self.result_keys('total')
         for scenkey in self.scenarios.keys():
             for reskey in self.result_keys():
