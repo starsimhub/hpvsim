@@ -355,13 +355,13 @@ class Calibration(sc.prettyobj):
         self.ng = sim['n_genotypes']
         self.glabels = [g.upper() for g in sim['genotype_map'].values()]
 
-        self.analyzer_results = []
-        self.sim_results = []
-        for trial in self.study.trials:
-            r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
-            sim_results = trial.user_attrs['sim_results']
-            self.sim_results.append(sim_results)
-            self.analyzer_results.append(r)
+        # self.analyzer_results = []
+        # self.sim_results = []
+        # for trial in self.study.trials:
+        #     r = trial.user_attrs['analyzer_results'] # CK: TODO: make more general
+        #     sim_results = trial.user_attrs['sim_results']
+        #     self.sim_results.append(sim_results)
+        #     self.analyzer_results.append(r)
 
         # Compare the results
         self.initial_pars = sc.objdict()
