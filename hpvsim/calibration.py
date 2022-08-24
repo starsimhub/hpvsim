@@ -355,8 +355,8 @@ class Calibration(sc.prettyobj):
         t0 = sc.tic()
         self.make_study()
         self.run_workers()
-        self.study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
-        self.best_pars = sc.objdict(self.study.best_params)
+        study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
+        self.best_pars = sc.objdict(study.best_params)
         self.elapsed = sc.toc(t0, output=True)
 
         # Collect analyzer results
@@ -379,7 +379,7 @@ class Calibration(sc.prettyobj):
         self.sim_results = []
         if load:
             print('Loading saved results...')
-            for trial in self.study.trials:
+            for trial in study.trials:
                 n = trial.number
                 try:
                     filename = self.tmp_filename % trial.number
@@ -428,7 +428,7 @@ class Calibration(sc.prettyobj):
                             self.initial_pars[sampler_key] = par_highlowlist[0]
                             self.par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
 
-        self.parse_study()
+        self.parse_study(study)
 
         # Tidy up
         self.calibrated = True
@@ -438,15 +438,15 @@ class Calibration(sc.prettyobj):
         return self
 
 
-    def parse_study(self):
+    def parse_study(self, study):
         '''Parse the study into a data frame -- called automatically '''
         best = self.best_pars
 
         print('Making results structure...')
         results = []
-        n_trials = len(self.study.trials)
+        n_trials = len(study.trials)
         failed_trials = []
-        for trial in self.study.trials:
+        for trial in study.trials:
             data = {'index':trial.number, 'mismatch': trial.value}
             for key,val in trial.params.items():
                 data[key] = val
