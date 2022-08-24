@@ -1264,6 +1264,14 @@ class AblativeTreatment(PrecancerTreatment):
 
 
 class TherapeuticVaccine(Product):
+    doses = 2
+    efficacy = dict(
+        none=0.9,
+        cin1=0.8,
+        cin2=0.6,
+        cin3=0.5,
+    )
+
     def administer(self, people, inds):
         pass # do something
 
