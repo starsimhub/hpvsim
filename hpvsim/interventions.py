@@ -1292,6 +1292,7 @@ class StandardTreatmentPathway(Product):
         self.ablation_product = ablation_product or AblativeTreatment()
         self.excision_product = excision_product or ExcisionTreatment()
         self.test_positivity = {'none': 0.98, 'cin1': 0.97, 'cin2': 0.89,'cin3': 0.79, 'cancerous': 0.4} # eligibility for ablation vs excision
+        self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
 
     def administer(self, people, inds):
         ''' Determine what kind of treatment they should receive and administer it '''
@@ -1336,8 +1337,6 @@ class StandardTreatmentPathway(Product):
                 ablate_LTFU_inds = ablation_eligible_inds[~to_ablate]
                 self.ablation_product.administer(people, ablation_inds)
                 people.date_next_screen[ablate_LTFU_inds] = np.nan
-            else:
-                ablation_inds = np.array([])
 
             if len(excision_eligible_inds)>0:
                 excision_treat_probs = np.full(len(excision_eligible_inds), self.excision_compliance, dtype=hpd.default_float)
@@ -1346,13 +1345,6 @@ class StandardTreatmentPathway(Product):
                 excision_LTFU_inds = excision_eligible_inds[~to_excise]
                 self.excision_product.administer(people, excision_inds)
                 people.date_next_screen[excision_LTFU_inds] = np.nan
-            else:
-                excision_inds = np.array([])
-        else:
-            ablation_inds, excision_inds = np.array([]), np.array([])
-
-        self.ablation_product.administer(people, ablation_inds)
-        self.excision_product.administer(people, excision_inds)
 
         return
 
