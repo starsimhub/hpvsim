@@ -290,7 +290,9 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         inds = sc.findinds((sim.people.age >= 25) & (sim.people.age <=30) & (sim.people.is_female))
         return {'vals': [txvx_prop for _ in inds], 'inds': inds}
 
-    txvx = hpv.TherapeuticVaccination(LTFU= 0.1, timepoints='2030', subtarget=age_subtarget)
+    years = np.arange(2030, 2050)
+    coverage = [0.7]*len(years)
+    txvx = hpv.routine_therapeutic(LTFU= 0.1, timepoints=years, age_range=(25,30), coverage=coverage)
 
     # screen_prop = [.015, .025, .05, .1, .2, .3, 0.4, .5, .6, .7]
     # hpv_screening_scaleup = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
@@ -326,18 +328,18 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         #     'pars': {
         #     }
         # },
-        'hpv_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-            'pars': {
-                'interventions': [hpv_screening],
-            }
-        },
-        # 'hpv_screening_txvx': {
-        #     'name': f'Screening with therapeutic vaccine in 2030',
+        # 'hpv_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
         #     'pars': {
-        #         'interventions': [hpv_screening, txvx],
+        #         'interventions': [hpv_screening],
         #     }
         # },
+        'hpv_screening_txvx': {
+            'name': f'Screening with therapeutic vaccine in 2030',
+            'pars': {
+                'interventions': [hpv_screening, txvx],
+            }
+        },
         # 'hpv_hpv1618_screening': {
         #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
         #     'pars': {
@@ -463,10 +465,10 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_dynamic_pars()
-    scens0 = test_complex_vax(do_plot=True)
-    scens1 = test_vaccinate_prob(do_plot=True)
-    scens2 = test_vaccinate_num(do_plot=True)
+    # sim0 = test_dynamic_pars()
+    # scens0 = test_complex_vax(do_plot=True)
+    # scens1 = test_vaccinate_prob(do_plot=True)
+    # scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True)
 

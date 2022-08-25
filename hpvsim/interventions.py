@@ -1476,7 +1476,7 @@ class StandardTreatmentPathway(Product):
         return
 
 
-__all__ += ['TherapeuticVaccination']
+__all__ += ['TherapeuticVaccination', 'routine_therapeutic']
 
 
 class TherapeuticVaccination(Intervention):
@@ -1488,14 +1488,14 @@ class TherapeuticVaccination(Intervention):
 
         '''
 
-    def __init__(self, prob=None, LTFU=None, timepoints=None, doses=None, interval=None, efficacy=None, subtarget=None, **kwargs):
+    def __init__(self, timepoints, prob=None, LTFU=None,  doses=None, interval=None, efficacy=None, subtarget=None, **kwargs):
         super().__init__(**kwargs)  # Initialize the Intervention object
         self.subtarget = subtarget
         if prob is None: # Populate default value of probability: 1 if no subtargeting, 0 if subtargeting
             prob = 1.0 if subtarget is None else 0.0
         self.prob      = prob
         self.LTFU = LTFU
-        self.timepoints = timepoints or '2030'
+        self.timepoints = timepoints
         self.doses = doses or 2
         self.interval = interval or 0.5  # Interval between doses in years
         self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
@@ -1582,7 +1582,7 @@ class TherapeuticVaccination(Intervention):
         # Find those who are getting second dose today
         second_dose_inds = np.setdiff1d(inds, first_dose_inds)
 
-        # Deliver vaccine and update prognoses
+        # Deliver vaccine and update prognoses TODO: immune response in those without infection/lesion
         for inds_to_treat, dose in zip([first_dose_inds, second_dose_inds], [0,1]):
             for state in self.treat_states:
                 for g in range(ng):
@@ -1645,3 +1645,18 @@ class TherapeuticVaccination(Intervention):
         if len(inds):
             inds = self.administer(sim.people, inds)
         return inds
+
+
+class routine_therapeutic(TherapeuticVaccination):
+
+    def __init__(self, *args, age_range, coverage, **kwargs):
+        super().__init__(*args, **kwargs, subtarget=self.subtarget_function)
+        self.age_range = age_range
+        self.coverage = sc.promotetoarray(coverage)
+        if len(self.coverage) == 1:
+            self.coverage = self.coverage * np.ones_like(self.timepoints)
+
+    def subtarget_function(self, sim):
+        inds = sc.findinds((sim.people.age >= self.age_range[0]) & (sim.people.age < self.age_range[1]) & (sim.people.is_female))
+        coverage = self.coverage[self.timepoints == sim.t][0]
+        return {'vals': coverage * np.ones_like(inds), 'inds': inds}
