@@ -258,18 +258,18 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         #     'pars': {
         #     }
         # },
-        # 'hpv_screening': {
-        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-        #     'pars': {
-        #         'interventions': [hpv_screening],
-        #     }
-        # },
-        'hpv_screening_txvx': {
-            'name': f'Screening with therapeutic vaccine in 2030',
+        'hpv_screening': {
+            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
             'pars': {
-                'interventions': [hpv_screening, txvx],
+                'interventions': [hpv_screening],
             }
         },
+        # 'hpv_screening_txvx': {
+        #     'name': f'Screening with therapeutic vaccine in 2030',
+        #     'pars': {
+        #         'interventions': [hpv_screening, txvx],
+        #     }
+        # },
         # 'hpv_hpv1618_screening': {
         #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
         #     'pars': {

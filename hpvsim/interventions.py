@@ -1024,6 +1024,8 @@ class Screening(Intervention):
                 setattr(self, compliance, getattr(self, compliance)*n_timepoints)
 
         sim['screen_pars'][self.label] = self.p  # Store the parameters
+        if self.treatment.cancer_product is not None:
+            sim['treat_pars']['cancer_treatment'] = {'dur':self.treatment.cancer_product.dur}
         return
 
 

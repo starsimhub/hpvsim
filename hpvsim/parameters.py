@@ -1134,16 +1134,3 @@ def get_screen_pars(screen=None):
     )
 
     return _get_from_pars(pars, key=screen)
-
-def get_treatment_pars(treatment=None):
-    '''
-    Define the parameters for each treatment method
-    '''
-
-    pars = dict(
-        radiation=dict(
-            dur=dict(dist='lognormal', par1=6.0, par2=3.0)
-        )
-    )
-
-    return _get_from_pars(pars, key=treatment)
