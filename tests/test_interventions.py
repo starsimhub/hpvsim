@@ -251,7 +251,7 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
-        scens.plot_age_results()
+        # scens.plot_age_results()
 
     return scens
 
@@ -384,6 +384,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
+                                  screen_start_year=2020,
                                   screen_stop_age=50, screen_interval=5, timepoints='2010',
                                   screen_compliance=0.7, triage_compliance=0.9, cancer_compliance=0.2,
                                   excision_compliance=0.2, ablation_compliance=0.7)
@@ -392,12 +393,12 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
     hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
                                       screen_compliance=0.7, triage_compliance=0.9, cancer_compliance=0.2,
-                                      excision_compliance=0.2, ablation_compliance=0.7)
+                                      excision_compliance=0.2, ablation_compliance=0.7,screen_start_year=2020,)
 
     hpv_via_screening_more_ltfu = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
                                   screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage, more LTFU',
                                       screen_compliance=0.7, triage_compliance=0.6, cancer_compliance=0.2,
-                                      excision_compliance=0.1, ablation_compliance=0.5)
+                                      excision_compliance=0.1, ablation_compliance=0.5,screen_start_year=2020,)
 
 
     sim = hpv.Sim(pars=pars)
