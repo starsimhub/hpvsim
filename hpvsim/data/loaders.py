@@ -27,7 +27,7 @@ def load_file(filename):
     return obj
 
 
-def get_country_aliases():
+def get_country_aliases(wb=False):
     ''' Define aliases for countries with odd names in the data '''
     country_mappings = {
        'Bolivia':        'Bolivia (Plurinational State of)',
@@ -58,10 +58,12 @@ def get_country_aliases():
        'Vietnam':        'Viet Nam',
         }
 
+    if wb: country_mappings['DRC'] = 'Congo, Dem. Rep.' # Slightly different aliases for WB data
+
     return country_mappings # Convert to lowercase
 
 
-def map_entries(json, location, df=None):
+def map_entries(json, location, df=None, wb=False):
     '''
     Find a match between the JSON file and the provided location(s).
 
@@ -83,7 +85,7 @@ def map_entries(json, location, df=None):
         location = sc.promotetolist(location)
 
     # Define a mapping for common mistakes
-    mapping = get_country_aliases()
+    mapping = get_country_aliases(wb=wb)
     mapping = {key.lower(): val.lower() for key, val in mapping.items()}
 
     entries = {}
@@ -208,7 +210,7 @@ def get_birth_rates(location=None):
         errormsg = 'Could not locate datafile with birth rates by country. Please run data/get_data.py first.'
         raise ValueError(errormsg) from E
 
-    standardized = map_entries(birth_rate_data, location)
+    standardized = map_entries(birth_rate_data, location, wb=True)
     birth_rates, years = standardized[location], birth_rate_data['years']
     birth_rates, inds = sc.sanitize(birth_rates, returninds=True)
     years = years[inds]

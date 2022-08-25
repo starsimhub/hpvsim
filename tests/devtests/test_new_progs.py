@@ -92,7 +92,6 @@ def logf2(x, x_infl, k):
 font_size = 26
 sc.fonts(add=sc.thisdir(aspath=True) / 'Libertinus Sans')
 sc.options(font='Libertinus Sans')
-font_family = 'Libertinus Sans'
 plt.rcParams['font.size'] = font_size
 colors = sc.gridcolors(ng)
 x = np.linspace(0.01, 7, 700)

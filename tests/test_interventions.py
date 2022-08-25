@@ -23,7 +23,7 @@ base_pars = {
     'end': 2050,
     'genotypes': [hpv16, hpv18],
     'location': 'tanzania',
-    'dt': 1.,
+    'dt': .5,
 }
 
 
@@ -54,6 +54,74 @@ def test_dynamic_pars():
     sim = hpv.Sim(pars=pars, interventions=[condom_int, debut_int])
     sim.run()
     return sim
+
+
+
+def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test complex roll-out of prophylactic vaccine')
+
+    verbose = .1
+    debug = 0
+
+    # Model an intervention to roll out prophylactic vaccination
+    # Routine vaccination
+    routine_years = np.arange(2020, base_pars['end'], dtype=int)
+    routine_values = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
+    routine_vx = hpv.vaccinate_routine(vaccine='bivalent', label='Routine', age_range=(9, 10), coverage=routine_values, timepoints=routine_years)
+
+    # Campaign vaccination
+    campaign_years = np.arange(2020, 2022, dtype=int)
+    campaign_values = 0.5
+    campaign_vx = hpv.vaccinate_routine(vaccine='bivalent', label='Campaign', age_range=(9, 24), coverage=campaign_values, timepoints=campaign_years)
+    interventions = [routine_vx, campaign_vx]
+
+    n_runs = 1
+    sim = hpv.Sim(pars=base_pars)
+
+    # Define the scenarios
+    scenarios = {
+        'no_vx': {
+            'name': 'No vaccination',
+            'pars': {
+            }
+        },
+        'routine_vx': {
+            'name': 'Routine vax: scale-up to 80% of 9yos by 2030',
+            'pars': {
+                'interventions': [routine_vx]
+            }
+        },
+        'campaign_vx': {
+            'name': 'Campaign vax: 50% of 9-24yos in 2020-2022',
+            'pars': {
+                'interventions': [campaign_vx]
+            }
+        },
+    }
+
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV incidence': [
+                'total_hpv_incidence',
+            ],
+            'CIN prevalence': [
+                'total_cin_prevalence',
+            ],
+            'Number vaccinated': [
+                'cum_total_vaccinated',
+            ],
+        }
+        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
+
+    return scens
+
+
 
 
 def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
@@ -183,7 +251,7 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
             ],
         }
         scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
-        scens.plot_age_results()
+        # scens.plot_age_results()
 
     return scens
 
@@ -306,7 +374,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
 
     pars = {
         'n_agents': n_agents,
-        'n_years': 20,
+        'n_years': 25,
         'burnin': 10,
         'start': 2000,
         'genotypes': [hpv16, hpv18],
@@ -316,21 +384,20 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
     hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=5, timepoints='2010',
+                                  screen_start_year=2020,
+                                  screen_stop_age=50, screen_interval=5,
                                   screen_compliance=0.7, triage_compliance=0.9, cancer_compliance=0.2,
                                   excision_compliance=0.2, ablation_compliance=0.7)
 
-
     hpv_via_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage',
+                                  screen_stop_age=50, screen_interval=10, label='hpv primary, via triage',
                                       screen_compliance=0.7, triage_compliance=0.9, cancer_compliance=0.2,
-                                      excision_compliance=0.2, ablation_compliance=0.7)
+                                      excision_compliance=0.2, ablation_compliance=0.7,screen_start_year=2020,)
 
     hpv_via_screening_more_ltfu = hpv.Screening(primary_screen_test='hpv', triage_screen_test='via', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=10, timepoints='2010', label='hpv primary, via triage, more LTFU',
+                                  screen_stop_age=50, screen_interval=10, label='hpv primary, via triage, more LTFU',
                                       screen_compliance=0.7, triage_compliance=0.6, cancer_compliance=0.2,
-                                      excision_compliance=0.1, ablation_compliance=0.5)
-
+                                      excision_compliance=0.1, ablation_compliance=0.5,screen_start_year=2020,)
 
     sim = hpv.Sim(pars=pars)
     n_runs = 1
@@ -386,9 +453,10 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
+    sim0 = test_dynamic_pars()
+    scens0 = test_complex_vax(do_plot=True)
     scens1 = test_vaccinate_prob(do_plot=True)
-    # scens2 = test_vaccinate_num(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True)
 
