@@ -23,7 +23,7 @@ base_pars = {
     'end': 2050,
     'genotypes': [hpv16, hpv18],
     'location': 'tanzania',
-    'dt': 1.,
+    'dt': .5,
 }
 
 
@@ -54,6 +54,80 @@ def test_dynamic_pars():
     sim = hpv.Sim(pars=pars, interventions=[condom_int, debut_int])
     sim.run()
     return sim
+
+
+
+def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test complex roll-out of prophylactic vaccine')
+
+    verbose = .1
+    debug = 0
+
+    # Model an intervention to roll out prophylactic vaccination
+    vx_years = np.arange(2020, base_pars['end'], dtype=int)
+    vx_prop = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
+    def age_subtarget(sim, t_ind):
+        ''' Select people who are eligible for vaccination at a given time index '''
+        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <10))
+        return {'vals': [vx_prop[t_ind] for _ in inds], 'inds': inds}
+
+    def instant_age_subtarget(sim):
+        ''' Select people who are eligible for vaccination '''
+        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <10))
+        return {'vals': [0.8 for _ in inds], 'inds': inds}
+
+    scale_up_vx = hpv.vaccinate_prob(vaccine='bivalent', label='Scale-up to 80% by 2030', timepoints=vx_years,
+                                       subtarget=age_subtarget)
+    instant_vx = hpv.vaccinate_prob(vaccine='bivalent', label='80% from 2020', timepoints=vx_years,
+                                       subtarget=instant_age_subtarget)
+
+    n_runs = 1
+    sim = hpv.Sim(pars=base_pars)
+
+    # Define the scenarios
+    scenarios = {
+        'no_vx': {
+            'name': 'No vaccination',
+            'pars': {
+            }
+        },
+        'vx': {
+            'name': 'Scale-up to 80% by 2030',
+            'pars': {
+                'interventions': [scale_up_vx]
+            }
+        },
+        'faster_vx': {
+            'name': '80% from 2020',
+            'pars': {
+                'interventions': [instant_vx]
+            }
+        },
+    }
+
+    metapars = {'n_runs': n_runs}
+
+    scens = hpv.Scenarios(sim=sim, metapars=metapars, scenarios=scenarios)
+    scens.run(verbose=verbose, debug=debug)
+    scens.compare()
+
+    if do_plot:
+        to_plot = {
+            'HPV incidence': [
+                'total_hpv_incidence',
+            ],
+            'CIN prevalence': [
+                'total_cin_prevalence',
+            ],
+            'Number vaccinated': [
+                'cum_total_vaccinated',
+            ],
+        }
+        scens.plot(do_save=do_save, to_plot=to_plot, fig_path=fig_path)
+
+    return scens
+
+
 
 
 def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
@@ -387,9 +461,10 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_dynamic_pars()
-    scens1 = test_vaccinate_prob(do_plot=True)
+    scens0 = test_complex_vax(do_plot=True)
+    # scens1 = test_vaccinate_prob(do_plot=True)
     # scens2 = test_vaccinate_num(do_plot=True)
-    scens3 = test_screening(do_plot=True)
+    # scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True)
 
     sc.toc(T)

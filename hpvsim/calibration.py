@@ -47,6 +47,7 @@ class Calibration(sc.prettyobj):
         n_workers    (int)  : the number of parallel workers (default: maximum
         total_trials (int)  : if n_trials is not supplied, calculate by dividing this number by n_workers)
         name         (str)  : the name of the database (default: 'hpvsim_calibration')
+        run_best     (int)  : number of top parameter set to run after calibration is finished (default 0)
         db_name      (str)  : the name of the database file (default: 'hpvsim_calibration.db')
         keep_db      (bool) : whether to keep the database after calibration (default: false)
         storage      (str)  : the location of the database (default: sqlite)
@@ -74,7 +75,8 @@ class Calibration(sc.prettyobj):
 
     def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, par_samplers=None,
                  n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
-                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
+                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True,
+                 run_best=None):
 
         import multiprocessing as mp # Import here since it's also slow
 
@@ -93,6 +95,7 @@ class Calibration(sc.prettyobj):
         self.sim            = sim
         self.calib_pars     = calib_pars
         self.genotype_pars  = genotype_pars
+        self.run_best       = run_best # Whether to run the best sims once the trials are done
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
         self.die            = die
@@ -206,10 +209,24 @@ class Calibration(sc.prettyobj):
 
     def trial_pars_to_sim_pars(self, trial_pars=None, return_full=True):
         '''
-        Create genotype_pars and pars dicts from the trial parameters
+        Create genotype_pars and pars dicts from the trial parameters.
+        Note: not used during self.calibrate.
         Args:
             trial_pars (dict): dictionary of parameters from a single trial. If not provided, best parameters will be used
             return_full (bool): whether to return a unified par dict ready for use in a sim, or the sim pars and genotype pars separately
+
+        Example:
+            sim = hpv.Sim(genotypes=[16, 18])
+            calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
+            genotype_pars = dict(hpv16=dict(prog_time=[3, 3, 10]))
+            calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars
+                                datafiles=['test_data/south_africa_hpv_data.xlsx',
+                                           'test_data/south_africa_cancer_data.xlsx'],
+                                total_trials=10, n_workers=4)
+            calib.calibrate()
+            new_pars = calib.trial_pars_to_sim_pars() # Returns best parameters from calibration in a format ready for sim running
+            sim.update_pars(new_pars)
+            sim.run()
         '''
 
         # Initialize
@@ -333,7 +350,7 @@ class Calibration(sc.prettyobj):
 
         sim = self.run_sim(calib_pars, genotype_pars, return_sim=True)
 
-        # Now compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
+        # Compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
         for rkey in self.sim_results:
             model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
@@ -481,7 +498,8 @@ class Calibration(sc.prettyobj):
 
     def parse_study(self, study):
         '''Parse the study into a data frame -- called automatically '''
-        best = self.best_pars
+        best = study.best_params
+        self.best_pars = best
 
         print('Making results structure...')
         results = []
@@ -509,14 +527,15 @@ class Calibration(sc.prettyobj):
         self.data = data
         self.df = pd.DataFrame.from_dict(data)
 
+        # If requested, run the sim with the best parameters
+        if self.run_best>0: self.run_best_sims(run_best=self.run_best)
+
         return
 
 
     def to_json(self, filename=None, indent=2, **kwargs):
         '''
         Convert the data to JSON.
-
-        New in version 3.1.1.
         '''
         order = np.argsort(self.df['mismatch'])
         json = []
@@ -589,13 +608,6 @@ class Calibration(sc.prettyobj):
         for resname,resdict in zip(self.age_results_keys, analyzer_results[0].values()):
             age_labels[resname] = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
             age_labels[resname].append(str(int(resdict['bins'][-1])) + '+')
-
-        # determine how many results to plot
-        if top_results is not None:
-            self.df = self.df.sort_values(by=['mismatch'])
-            index_to_plot = self.df.iloc[0:top_results, 0].values
-            analyzer_results = [analyzer_results[i] for i in index_to_plot]
-            sim_results = [sim_results[i] for i in index_to_plot]
 
         # Make the figure
         with hpo.with_style(**kwargs):

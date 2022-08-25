@@ -94,6 +94,16 @@ class Analyzer(sc.prettyobj):
         else:
             return sc.dcp(self)
 
+    @staticmethod
+    def reduce(analyzers, use_mean=False):
+        '''
+        Create an analyzer from a list of analyzers, using
+        Args:
+            analyzers: list of analyzers
+            use_mean (bool): whether to use medians (the default) or means to create the reduced analyzer
+        '''
+        raise NotImplementedError
+
 
     def to_json(self):
         '''
@@ -316,6 +326,78 @@ class age_pyramid(Analyzer):
         super().finalize()
         validate_recorded_dates(sim, requested_dates=self.dates, recorded_dates=self.age_pyramids.keys(), die=self.die)
         return
+
+
+    @staticmethod
+    def reduce(analyzers, use_mean=False, bounds=None, quantiles=None):
+        ''' Create an averaged age pyramid from a list of age pyramid analyzers '''
+
+        # Process inputs for statistical calculations
+        if use_mean:
+            if bounds is None:
+                bounds = 2
+        else:
+            if quantiles is None:
+                quantiles = {'low':0.1, 'high':0.9}
+            if not isinstance(quantiles, dict):
+                try:
+                    quantiles = {'low':float(quantiles[0]), 'high':float(quantiles[1])}
+                except Exception as E:
+                    errormsg = f'Could not figure out how to convert {quantiles} into a quantiles object: must be a dict with keys low, high or a 2-element array ({str(E)})'
+                    raise ValueError(errormsg)
+
+        # Check that a list of analyzers has been provided
+        if not isinstance(analyzers, list):
+            errormsg = 'age_pyramid.reduce() expects a list of age pyramid analyzers'
+            raise TypeError(errormsg)
+
+        # Check that everything in the list is an analyzer of the right type
+        for analyzer in analyzers:
+            if not isinstance(analyzer, age_pyramid):
+                errormsg = 'All items in the list of analyzers provided to age_pyramid.reduce must be age pyramids'
+                raise TypeError(errormsg)
+
+        # Check that all the analyzers have the same timepoints and age bins
+        base_analyzer = analyzers[0]
+        for analyzer in analyzers:
+            if not np.array_equal(analyzer.timepoints, base_analyzer.timepoints):
+                errormsg = 'The list of analyzers provided to age_pyramid.reduce have different timepoints.'
+                raise TypeError(errormsg)
+            if not np.array_equal(analyzer.edges, base_analyzer.edges):
+                errormsg = 'The list of analyzers provided to age_pyramid.reduce have different age bin edges.'
+                raise TypeError(errormsg)
+
+        # Initialize the reduced analyzer
+        reduced_analyzer = sc.dcp(base_analyzer)
+        reduced_analyzer.age_pyramids = sc.objdict() # Remove the age pyramids so we can rebuild them
+
+        # Aggregate the list of analyzers
+        raw = {}
+        for date,tp in zip(base_analyzer.dates, base_analyzer.timepoints):
+            raw[date] = {}
+            # raw[date]['bins'] = analyzer.age_pyramids[date]['bins']
+            reduced_analyzer.age_pyramids[date] = sc.objdict()
+            reduced_analyzer.age_pyramids[date]['bins'] = analyzer.age_pyramids[date]['bins']
+            for sk in ['f','m']:
+                raw[date][sk] = np.zeros((len(base_analyzer.age_pyramids[date]['bins']), len(analyzers)))
+                for a, analyzer in enumerate(analyzers):
+                    vals = analyzer.age_pyramids[date][sk]
+                    raw[date][sk][:, a] = vals
+
+                # Summarizing the aggregated list
+                reduced_analyzer.age_pyramids[date][sk] = sc.objdict()
+                if use_mean:
+                    r_mean = np.mean(raw[date][sk], axis=1)
+                    r_std = np.std(raw[date][sk], axis=1)
+                    reduced_analyzer.age_pyramids[date][sk].best    = r_mean
+                    reduced_analyzer.age_pyramids[date][sk].low     = r_mean - bounds * r_std
+                    reduced_analyzer.age_pyramids[date][sk].high    = r_mean + bounds * r_std
+                else:
+                    reduced_analyzer.age_pyramids[date][sk].best    = np.quantile(raw[date][sk], q=0.5, axis=1)
+                    reduced_analyzer.age_pyramids[date][sk].low     = np.quantile(raw[date][sk], q=quantiles['low'], axis=1)
+                    reduced_analyzer.age_pyramids[date][sk].high    = np.quantile(raw[date][sk], q=quantiles['high'], axis=1)
+
+        return reduced_analyzer
 
 
     def plot(self, m_color='#4682b4', f_color='#ee7989', fig_args=None, axis_args=None, data_args=None,
@@ -720,6 +802,86 @@ class age_results(Analyzer):
         return
 
 
+    @staticmethod
+    def reduce(analyzers, use_mean=False, bounds=None, quantiles=None):
+        ''' Create an averaged age result from a list of age result analyzers '''
+
+        # Process inputs for statistical calculations
+        if use_mean:
+            if bounds is None:
+                bounds = 2
+        else:
+            if quantiles is None:
+                quantiles = {'low':0.1, 'high':0.9}
+            if not isinstance(quantiles, dict):
+                try:
+                    quantiles = {'low':float(quantiles[0]), 'high':float(quantiles[1])}
+                except Exception as E:
+                    errormsg = f'Could not figure out how to convert {quantiles} into a quantiles object: must be a dict with keys low, high or a 2-element array ({str(E)})'
+                    raise ValueError(errormsg)
+
+        # Check that a list of analyzers has been provided
+        if not isinstance(analyzers, list):
+            errormsg = 'age_results.reduce() expects a list of age_results analyzers'
+            raise TypeError(errormsg)
+
+        # Check that everything in the list is an analyzer of the right type
+        for analyzer in analyzers:
+            if not isinstance(analyzer, age_results):
+                errormsg = 'All items in the list of analyzers provided to age_results.reduce must be age_results instances'
+                raise TypeError(errormsg)
+
+        # Check that all the analyzers have the same timepoints and age bins
+        base_analyzer = analyzers[0]
+        for analyzer in analyzers:
+            if set(analyzer.results.keys()) != set(base_analyzer.results.keys()):
+                errormsg = 'The list of analyzers provided to age_results.reduce have different result keys.'
+                raise ValueError(errormsg)
+            for reskey in base_analyzer.results.keys():
+                if not np.array_equal(base_analyzer.result_keys[reskey]['timepoints'],analyzer.result_keys[reskey]['timepoints']):
+                    errormsg = 'The list of analyzers provided to age_results.reduce have different timepoints.'
+                    raise ValueError(errormsg)
+                if not np.array_equal(base_analyzer.result_keys[reskey]['edges'],analyzer.result_keys[reskey]['edges']):
+                    errormsg = 'The list of analyzers provided to age_pyramid.reduce have different age bin edges.'
+                    raise ValueError(errormsg)
+
+        # Initialize the reduced analyzer
+        reduced_analyzer = sc.dcp(base_analyzer)
+        reduced_analyzer.results = sc.objdict() # Remove the age results so we can rebuild them
+
+        # Aggregate the list of analyzers
+        raw = {}
+        for reskey in base_analyzer.results.keys():
+            raw[reskey] = {}
+            reduced_analyzer.results[reskey] = sc.objdict()
+            reduced_analyzer.results[reskey]['bins'] = base_analyzer.results[reskey]['bins']
+            for date,tp in zip(base_analyzer.result_keys[reskey].dates, base_analyzer.result_keys[reskey].timepoints):
+                ashape = analyzer.results[reskey][date].shape # Figure out dimensions
+                new_ashape = ashape + (len(analyzers),)
+                raw[reskey][date] = np.zeros(new_ashape)
+                for a, analyzer in enumerate(analyzers):
+                    vals = analyzer.results[reskey][date]
+                    if len(ashape) == 1:
+                        raw[reskey][date][:, a] = vals
+                    elif len(ashape) == 2:
+                        raw[reskey][date][:, :, a] = vals
+
+                # Summarizing the aggregated list
+                reduced_analyzer.results[reskey][date] = sc.objdict()
+                if use_mean:
+                    r_mean = np.mean(raw[reskey][date], axis=-1)
+                    r_std = np.std(raw[reskey][date], axis=-1)
+                    reduced_analyzer.results[reskey][date].best = r_mean
+                    reduced_analyzer.results[reskey][date].low  = r_mean - bounds * r_std
+                    reduced_analyzer.results[reskey][date].high = r_mean + bounds * r_std
+                else:
+                    reduced_analyzer.results[reskey][date].best = np.quantile(raw[reskey][date], q=0.5, axis=-1)
+                    reduced_analyzer.results[reskey][date].low  = np.quantile(raw[reskey][date], q=quantiles['low'], axis=-1)
+                    reduced_analyzer.results[reskey][date].high = np.quantile(raw[reskey][date], q=quantiles['high'], axis=-1)
+
+        return reduced_analyzer
+
+
     def compute(self, key):
         res = []
         for name, group in self.result_keys[key].data.groupby(['genotype', 'year']):
@@ -738,6 +900,14 @@ class age_results(Analyzer):
         self.result_keys[key].mismatch = self.result_keys[key].data['losses'].sum()
 
         return self.result_keys[key].mismatch
+
+
+
+    # @staticmethod
+    # def reduce(analyzers, use_mean=False, bounds=None, quantiles=None):
+    #     ''' Create an averaged age pyramid from a list of age pyramid analyzers '''
+    #
+    #     return
 
 
     def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8,

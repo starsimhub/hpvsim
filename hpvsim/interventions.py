@@ -50,7 +50,7 @@ def find_day(arr, t=None, interv=None, sim=None, which='first'):
     return inds
 
 
-def get_subtargets(subtarget, sim):
+def get_subtargets(subtarget, sim, t_ind=None):
     '''
     A small helper function to see if subtargeting is a list of indices to use,
     or a function that needs to be called. If a function, it must take a single
@@ -376,7 +376,7 @@ class dynamic_pars(Intervention):
 
 
 #%% Vaccination
-__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_num']
+__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_routine', 'vaccinate_num']
 
 class BaseVaccination(Intervention):
     '''
@@ -700,6 +700,21 @@ class vaccinate_prob(BaseVaccination):
                 vacc_inds = np.concatenate((vacc_inds, vacc_inds_dose3), axis=None)
 
         return vacc_inds
+
+
+class vaccinate_routine(vaccinate_prob):
+
+    def __init__(self, *args, age_range, coverage, **kwargs):
+        super().__init__(*args, **kwargs, subtarget=self.subtarget_function)
+        self.age_range = age_range
+        self.coverage = sc.promotetoarray(coverage)
+        if len(self.coverage) == 1:
+            self.coverage = self.coverage * np.ones_like(self.timepoints)
+
+    def subtarget_function(self, sim):
+        inds = sc.findinds((sim.people.age >= self.age_range[0]) & (sim.people.age <self.age_range[1]))
+        coverage = self.coverage[self.timepoints==sim.t][0]
+        return {'vals': coverage*np.ones_like(inds), 'inds': inds}
 
 
 class vaccinate_num(BaseVaccination):
