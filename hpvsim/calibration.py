@@ -47,7 +47,6 @@ class Calibration(sc.prettyobj):
         n_workers    (int)  : the number of parallel workers (default: maximum
         total_trials (int)  : if n_trials is not supplied, calculate by dividing this number by n_workers)
         name         (str)  : the name of the database (default: 'hpvsim_calibration')
-        run_best     (int)  : number of top parameter set to run after calibration is finished (default 0)
         db_name      (str)  : the name of the database file (default: 'hpvsim_calibration.db')
         keep_db      (bool) : whether to keep the database after calibration (default: false)
         storage      (str)  : the location of the database (default: sqlite)
@@ -75,8 +74,7 @@ class Calibration(sc.prettyobj):
 
     def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, par_samplers=None,
                  n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
-                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True,
-                 run_best=None):
+                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
 
         import multiprocessing as mp # Import here since it's also slow
 
@@ -95,7 +93,6 @@ class Calibration(sc.prettyobj):
         self.sim            = sim
         self.calib_pars     = calib_pars
         self.genotype_pars  = genotype_pars
-        self.run_best       = run_best # Whether to run the best sims once the trials are done
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
         self.die            = die
@@ -526,9 +523,6 @@ class Calibration(sc.prettyobj):
                 data[key].append(r[key])
         self.data = data
         self.df = pd.DataFrame.from_dict(data)
-
-        # If requested, run the sim with the best parameters
-        if self.run_best>0: self.run_best_sims(run_best=self.run_best)
 
         return
 
