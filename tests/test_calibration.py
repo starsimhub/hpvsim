@@ -47,7 +47,7 @@ def test_calibration():
                             ],
                             total_trials=5, n_workers=2)
     calib.calibrate()
-    calib.plot(top_results=4)
+    calib.plot(res_to_plot=4)
     return sim, calib
 
 
