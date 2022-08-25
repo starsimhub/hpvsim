@@ -64,22 +64,16 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     debug = 0
 
     # Model an intervention to roll out prophylactic vaccination
-    vx_years = np.arange(2020, base_pars['end'], dtype=int)
-    vx_prop = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
-    def age_subtarget(sim, t_ind):
-        ''' Select people who are eligible for vaccination at a given time index '''
-        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <10))
-        return {'vals': [vx_prop[t_ind] for _ in inds], 'inds': inds}
+    # Routine vaccination
+    routine_years = np.arange(2020, base_pars['end'], dtype=int)
+    routine_values = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
+    routine_vx = hpv.vaccinate_routine(vaccine='bivalent', label='Routine', age_range=(9, 10), coverage=routine_values, timepoints=routine_years)
 
-    def instant_age_subtarget(sim):
-        ''' Select people who are eligible for vaccination '''
-        inds = sc.findinds((sim.people.age >= 9) & (sim.people.age <10))
-        return {'vals': [0.8 for _ in inds], 'inds': inds}
-
-    scale_up_vx = hpv.vaccinate_prob(vaccine='bivalent', label='Scale-up to 80% by 2030', timepoints=vx_years,
-                                       subtarget=age_subtarget)
-    instant_vx = hpv.vaccinate_prob(vaccine='bivalent', label='80% from 2020', timepoints=vx_years,
-                                       subtarget=instant_age_subtarget)
+    # Campaign vaccination
+    campaign_years = np.arange(2020, 2022, dtype=int)
+    campaign_values = 0.5
+    campaign_vx = hpv.vaccinate_routine(vaccine='bivalent', label='Campaign', age_range=(9, 24), coverage=campaign_values, timepoints=campaign_years)
+    interventions = [routine_vx, campaign_vx]
 
     n_runs = 1
     sim = hpv.Sim(pars=base_pars)
@@ -91,16 +85,16 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
             'pars': {
             }
         },
-        'vx': {
-            'name': 'Scale-up to 80% by 2030',
+        'routine_vx': {
+            'name': 'Routine vax: scale-up to 80% of 9yos by 2030',
             'pars': {
-                'interventions': [scale_up_vx]
+                'interventions': [routine_vx]
             }
         },
-        'faster_vx': {
-            'name': '80% from 2020',
+        'campaign_vx': {
+            'name': 'Campaign vax: 50% of 9-24yos in 2020-2022',
             'pars': {
-                'interventions': [instant_vx]
+                'interventions': [campaign_vx]
             }
         },
     }
@@ -460,12 +454,12 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
+    sim0 = test_dynamic_pars()
     scens0 = test_complex_vax(do_plot=True)
-    # scens1 = test_vaccinate_prob(do_plot=True)
-    # scens2 = test_vaccinate_num(do_plot=True)
-    # scens3 = test_screening(do_plot=True)
-    # scens4 = test_screening_ltfu(do_plot=True)
+    scens1 = test_vaccinate_prob(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
+    scens3 = test_screening(do_plot=True)
+    scens4 = test_screening_ltfu(do_plot=True)
 
     sc.toc(T)
     print('Done.')

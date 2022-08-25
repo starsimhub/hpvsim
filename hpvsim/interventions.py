@@ -50,7 +50,7 @@ def find_day(arr, t=None, interv=None, sim=None, which='first'):
     return inds
 
 
-def get_subtargets(subtarget, sim, t_ind=None):
+def get_subtargets(subtarget, sim):
     '''
     A small helper function to see if subtargeting is a list of indices to use,
     or a function that needs to be called. If a function, it must take a single

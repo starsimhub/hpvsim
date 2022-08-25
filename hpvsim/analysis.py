@@ -902,14 +902,6 @@ class age_results(Analyzer):
         return self.result_keys[key].mismatch
 
 
-
-    # @staticmethod
-    # def reduce(analyzers, use_mean=False, bounds=None, quantiles=None):
-    #     ''' Create an averaged age pyramid from a list of age pyramid analyzers '''
-    #
-    #     return
-
-
     def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8,
              do_save=None, fig_path=None, do_show=True, **kwargs):
         '''
