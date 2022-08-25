@@ -207,11 +207,18 @@ class Calibration(sc.prettyobj):
 
 
     def trial_pars_to_sim_pars(self, trial_pars=None, return_full=True):
-        ''' Create genotype_pars and pars dict from the trial parameters'''
+        '''
+        Create genotype_pars and pars dicts from the trial parameters
+        Args:
+            trial_pars (dict): dictionary of parameters from a single trial. If not provided, best parameters will be used
+            return_full (bool): whether to return a unified par dict ready for use in a sim, or the sim pars and genotype pars separately
+        '''
 
+        # Initialize
         calib_pars = {}
         genotype_pars = sc.objdict()
 
+        # Deal with trial parameters
         if trial_pars is None:
             try:
                 trial_pars = self.best_pars
@@ -219,19 +226,22 @@ class Calibration(sc.prettyobj):
                 errormsg = 'No trial parameters provided.'
                 raise ValueError(errormsg)
 
+        # Handle genotype parameters
         for gname, gpars in self.genotype_pars.items():
-            this_genotype_pars = hppar.get_genotype_pars(gname)
+            this_genotype_pars = hppar.get_genotype_pars(gname) # Get default values
             for gpar, gval in gpars.items():
                 if isinstance(gval, dict):
                     for gparkey in gval.keys():
-                        this_genotype_pars[gpar][gparkey] = trial_pars[f'{gname}_{gpar}_{gparkey}']
+                        this_genotype_pars[gpar][gparkey] = trial_pars[f'{gname}_{gpar}_{gparkey}'] # Update with values from trial pars
                 else:
                     this_genotype_pars[gpar] = trial_pars[f'{gname}_{gpar}']
             genotype_pars[gname] = this_genotype_pars
 
+        # Handle regular sim parameters
         for pname in self.calib_pars.keys():
             calib_pars[pname] = trial_pars[pname]
 
+        # Return
         if return_full:
             all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars)
             return all_pars
@@ -327,16 +337,16 @@ class Calibration(sc.prettyobj):
 
         # Now compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
-        for rkey in sim_results:
-            sim_results[rkey].model_output = sim.results[rkey][:,sim_results[rkey].timepoints[0]]
-            sim_results[rkey].diffs = sim_results[rkey].data.value - sim_results[rkey].model_output
-            sim_results[rkey].gofs = hpm.compute_gof(sim_results[rkey].data.value, sim_results[rkey].model_output)
-            sim_results[rkey].losses = sim_results[rkey].gofs * sim_results[rkey].weights
-            sim_results[rkey].mismatch = sim_results[rkey].losses.sum()
-            sim.fit += sim_results[rkey].mismatch
-            sim_results[rkey] = sim_results[rkey].model_output
+        for rkey in self.sim_results:
+            model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
+            diffs = self.sim_results[rkey].data.value - model_output
+            gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output)
+            losses = gofs * self.sim_results[rkey].weights
+            mismatch = losses.sum()
+            sim.fit += mismatch
+            sim_results[rkey] = model_output
 
-        # Really kludgy way to store results
+        # Store results in temporary files (TODO: consider alternatives)
         if save:
             results = dict(sim=sim_results, analyzer=sim.get_analyzer().results)
             filename = self.tmp_filename % trial.number
