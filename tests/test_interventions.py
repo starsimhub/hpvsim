@@ -374,7 +374,7 @@ def test_screening_ltfu(do_plot=False, do_save=False, fig_path=None):
 
     pars = {
         'n_agents': n_agents,
-        'n_years': 20,
+        'n_years': 25,
         'burnin': 10,
         'start': 2000,
         'genotypes': [hpv16, hpv18],
