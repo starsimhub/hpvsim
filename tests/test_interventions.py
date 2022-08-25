@@ -198,17 +198,17 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     pars = {
         'n_agents': n_agents,
-        'n_years': 20,
+        'n_years': 50,
         'burnin': 10,
         'start': 2000,
         'genotypes': [hpv16, hpv18],
         'location': 'tanzania',
-        'dt': 1.,
+        'dt': 0.5,
     }
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
-    screen_prop = .7
-    compliance = .9
+    screen_prop = .15
+    txvx_prop = 0.7
     ablation_compliance=0.5
     excision_compliance=0.2
     cancer_compliance = 0.1
@@ -216,6 +216,13 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                                              cancer_compliance=cancer_compliance)
     hpv_screening = hpv.Screening(primary_screen_test='hpv', screen_start_age=30, screen_stop_age=50, screen_interval=5,
                                   screen_start_year='2010', screen_compliance=screen_prop, treatment_pathway=treatment)
+
+    def age_subtarget(sim):
+        ''' Select people who are eligible for therapeutic vaccination '''
+        inds = sc.findinds((sim.people.age >= 25) & (sim.people.age <=30) & (sim.people.is_female))
+        return {'vals': [txvx_prop for _ in inds], 'inds': inds}
+
+    txvx = hpv.TherapeuticVaccination(LTFU= 0.1, timepoints='2030', subtarget=age_subtarget)
 
     # screen_prop = [.015, .025, .05, .1, .2, .3, 0.4, .5, .6, .7]
     # hpv_screening_scaleup = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
@@ -251,18 +258,18 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         #     'pars': {
         #     }
         # },
-        'hpv_screening': {
-            'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
-            'pars': {
-                'interventions': [hpv_screening],
-            }
-        },
-        # 'hpv_screening_scaleup': {
-        #     'name': f'Screen scaleup from{screen_prop[0] * 100}% to {screen_prop[-1] * 100}% of 30-50y women with {hpv_screening_scaleup.label}',
+        # 'hpv_screening': {
+        #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
         #     'pars': {
-        #         'interventions': [hpv_screening_scaleup],
+        #         'interventions': [hpv_screening],
         #     }
         # },
+        'hpv_screening_txvx': {
+            'name': f'Screening with therapeutic vaccine in 2030',
+            'pars': {
+                'interventions': [hpv_screening, txvx],
+            }
+        },
         # 'hpv_hpv1618_screening': {
         #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
         #     'pars': {

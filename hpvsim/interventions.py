@@ -1540,11 +1540,14 @@ class TherapeuticVaccination(Intervention):
                 hpv11=[0.01, 0.1],
             ),
         )
+        return
 
     def initialize(self, sim):
+        super().initialize()
         self.timepoints, self.dates = sim.get_t(self.timepoints,
                                                 return_date_format='str')  # Ensure timepoints and dates are in the right format
         self.second_dose_timepoints = [None] * sim.npts  # People who get second dose (if relevant)
+        return
 
     def administer(self, people, inds):
 
@@ -1554,7 +1557,7 @@ class TherapeuticVaccination(Intervention):
 
         # Find those who are getting first dose
         people_not_vaccinated = hpu.false(people.tx_vaccinated)
-        first_dose_inds = inds[people_not_vaccinated[inds]]
+        first_dose_inds = np.intersect1d(people_not_vaccinated, inds)
         people.tx_vaccinated[first_dose_inds] = True
 
         people.txvx_doses[inds] += 1
@@ -1566,8 +1569,8 @@ class TherapeuticVaccination(Intervention):
         for inds_to_treat, dose in zip([first_dose_inds, second_dose_inds], [0,1]):
             for state in self.treat_states:
                 for g in range(ng):
-                    people_in_state = hpu.true(people[g,state])
-                    treat_state_inds = inds_to_treat[people_in_state[inds_to_treat]]
+                    people_in_state = hpu.true(people[state][g,inds_to_treat])
+                    treat_state_inds = inds_to_treat[people_in_state]
 
                     # Determine whether treatment is successful
                     eff_probs = np.full(len(treat_state_inds), self.efficacy[state][genotype_map[g]][dose],
@@ -1605,7 +1608,7 @@ class TherapeuticVaccination(Intervention):
                 if len(vacc_inds):
                     if self.interval is not None:
                         # Schedule the doses
-                        second_dose_timepoints = sim.t + int(self.interval[0]/sim['dt'])
+                        second_dose_timepoints = sim.t + int(self.interval/sim['dt'])
                         if second_dose_timepoints < sim.npts:
                             self.second_dose_timepoints[second_dose_timepoints] = vacc_inds
 
@@ -1613,7 +1616,7 @@ class TherapeuticVaccination(Intervention):
             vacc_inds_dose2 = self.second_dose_timepoints[sim.t]
             if vacc_inds_dose2 is not None:
                 if self.LTFU is not None:
-                    vacc_probs = np.full(len(vacc_inds_dose2), self.LTFU)
+                    vacc_probs = np.full(len(vacc_inds_dose2), (1-self.LTFU))
                     vacc_inds_dose2 = vacc_inds_dose2[hpu.true(hpu.binomial_arr(vacc_probs))]
                 vacc_inds = np.concatenate((vacc_inds, vacc_inds_dose2), axis=None)
 
