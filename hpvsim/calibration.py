@@ -74,8 +74,7 @@ class Calibration(sc.prettyobj):
 
     def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, par_samplers=None,
                  n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
-                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True,
-                 save_results=False):
+                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
 
         import multiprocessing as mp # Import here since it's also slow
 
@@ -94,7 +93,6 @@ class Calibration(sc.prettyobj):
         self.sim            = sim
         self.calib_pars     = calib_pars
         self.genotype_pars  = genotype_pars
-        self.save_results   = save_results
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
         self.die            = die
