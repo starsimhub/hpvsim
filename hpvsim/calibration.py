@@ -527,6 +527,7 @@ class Calibration(sc.prettyobj):
                 data[key].append(r[key])
         self.data = data
         self.df = pd.DataFrame.from_dict(data)
+        self.df = self.df.sort_values(by=['mismatch']) # Sort
 
         return
 
@@ -570,7 +571,7 @@ class Calibration(sc.prettyobj):
         if sc.isstring(plot_type) and plot_type.startswith('sns'):
             import seaborn as sns
             if plot_type.split('.')[1]=='boxplot':
-                extra_args=dict(alpha=.3)
+                extra_args=dict(boxprops=dict(alpha=.3))
                 dodge=True
             else: extra_args = dict()
             plot_func = getattr(sns, plot_type.split('.')[1])
@@ -614,7 +615,6 @@ class Calibration(sc.prettyobj):
 
         # determine how many results to plot
         if res_to_plot is not None:
-            self.df = self.df.sort_values(by=['mismatch'])
             index_to_plot = self.df.iloc[res_to_plot, 0].values
             analyzer_results = [analyzer_results[i] for i in index_to_plot]
             sim_results = [sim_results[i] for i in index_to_plot]
