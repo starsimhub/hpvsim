@@ -204,7 +204,7 @@ class Calibration(sc.prettyobj):
         return new_pars
 
 
-    def trial_pars_to_sim_pars(self, trial_pars=None, return_full=True):
+    def trial_pars_to_sim_pars(self, trial_pars=None, which_pars=None, return_full=True):
         '''
         Create genotype_pars and pars dicts from the trial parameters.
         Note: not used during self.calibrate.
@@ -233,7 +233,11 @@ class Calibration(sc.prettyobj):
         # Deal with trial parameters
         if trial_pars is None:
             try:
-                trial_pars = self.best_pars
+                if which_pars is None or which_pars==0:
+                    trial_pars = self.best_pars
+                else:
+                    ddict = self.df.to_dict(orient='records')[which_pars]
+                    trial_pars = {k:v for k,v in ddict.items() if k not in ['index','mismatch']}
             except:
                 errormsg = 'No trial parameters provided.'
                 raise ValueError(errormsg)
@@ -546,7 +550,7 @@ class Calibration(sc.prettyobj):
             return json
 
 
-    def plot(self, top_results=None, fig_args=None, axis_args=None, data_args=None, do_save=None,
+    def plot(self, res_to_plot=None, fig_args=None, axis_args=None, data_args=None, do_save=None,
              fig_path=None, do_show=True, plot_type='sns.boxplot', **kwargs):
         '''
         Plot the calibration results
@@ -565,9 +569,14 @@ class Calibration(sc.prettyobj):
         # Import Seaborn here since slow
         if sc.isstring(plot_type) and plot_type.startswith('sns'):
             import seaborn as sns
+            if plot_type.split('.')[1]=='boxplot':
+                extra_args=dict(alpha=.3)
+                dodge=True
+            else: extra_args = dict()
             plot_func = getattr(sns, plot_type.split('.')[1])
         else:
             plot_func = plot_type
+            extra_args = dict()
 
         # Handle inputs
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
@@ -602,6 +611,13 @@ class Calibration(sc.prettyobj):
         for resname,resdict in zip(self.age_results_keys, analyzer_results[0].values()):
             age_labels[resname] = [str(int(resdict['bins'][i])) + '-' + str(int(resdict['bins'][i + 1])) for i in range(len(resdict['bins']) - 1)]
             age_labels[resname].append(str(int(resdict['bins'][-1])) + '+')
+
+        # determine how many results to plot
+        if res_to_plot is not None:
+            self.df = self.df.sort_values(by=['mismatch'])
+            index_to_plot = self.df.iloc[res_to_plot, 0].values
+            analyzer_results = [analyzer_results[i] for i in index_to_plot]
+            sim_results = [sim_results[i] for i in index_to_plot]
 
         # Make the figure
         with hpo.with_style(**kwargs):
@@ -639,7 +655,7 @@ class Calibration(sc.prettyobj):
 
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values, 'genotypes':genotypes})
-                        ax = plot_func(ax=ax, x='bins', y='values', hue="genotypes", data=modeldf, dodge=True, boxprops=dict(alpha=.3))
+                        ax = plot_func(ax=ax, x='bins', y='values', hue="genotypes", data=modeldf, **extra_args)
 
                     else:
                         # Plot data
@@ -653,7 +669,7 @@ class Calibration(sc.prettyobj):
 
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values})
-                        ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, color=self.result_properties[resname].color, boxprops=dict(alpha=.3))
+                        ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, color=self.result_properties[resname].color, **extra_args)
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
@@ -677,7 +693,7 @@ class Calibration(sc.prettyobj):
                     values += list(run[resname])
                 # Plot model
                 modeldf = pd.DataFrame({'bins': bins, 'values': values})
-                ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, dodge=True, boxprops=dict(alpha=.3))
+                ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, **extra_args)
 
                 # Set title and labels
                 date = thisdatadf.year[0]
