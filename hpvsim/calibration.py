@@ -557,7 +557,7 @@ class Calibration(sc.prettyobj):
         Plot the calibration results
 
         Args:
-            top_results (int): number of results to plot. if None, plot them all
+            res_to_plot (int): number of results to plot. if None, plot them all
             fig_args (dict): passed to pl.figure()
             axis_args (dict): passed to pl.subplots_adjust()
             data_args (dict): 'width', 'color', and 'offset' arguments for the data
@@ -615,7 +615,7 @@ class Calibration(sc.prettyobj):
 
         # determine how many results to plot
         if res_to_plot is not None:
-            index_to_plot = self.df.iloc[res_to_plot, 0].values
+            index_to_plot = self.df.iloc[0:res_to_plot, 0].values
             analyzer_results = [analyzer_results[i] for i in index_to_plot]
             sim_results = [sim_results[i] for i in index_to_plot]
 

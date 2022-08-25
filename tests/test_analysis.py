@@ -141,12 +141,12 @@ def test_reduce_analyzers():
             result_keys=sc.objdict(
                 cancer_incidence=sc.objdict(
                     timepoints=['2020'],
-                    datafile=f'test_data/{location}_cancer_cases.csv',
+                    # datafile=f'test_data/{location}_cancer_cases.csv',
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 ),
                 cancer_mortality=sc.objdict(
                     timepoints=['2020'],
-                    datafile=f'test_data/{location}_cancer_deaths.csv',
+                    # datafile=f'test_data/{location}_cancer_deaths.csv',
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 )
             )
