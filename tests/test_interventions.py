@@ -470,7 +470,7 @@ if __name__ == '__main__':
     # scens1 = test_vaccinate_prob(do_plot=True)
     # scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
-    # scens4 = test_screening_ltfu(do_plot=True)
+    # scens4 = test_screening_ltfu(do_plot=True) # CURRENTLY BROKEN
 
     sc.toc(T)
     print('Done.')

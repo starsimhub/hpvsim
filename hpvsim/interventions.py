@@ -704,15 +704,25 @@ class vaccinate_prob(BaseVaccination):
 
 class vaccinate_routine(vaccinate_prob):
 
-    def __init__(self, *args, age_range, coverage, **kwargs):
+    def __init__(self, *args, age_range, coverage, sex=0, **kwargs):
         super().__init__(*args, **kwargs, subtarget=self.subtarget_function)
         self.age_range = age_range
         self.coverage = sc.promotetoarray(coverage)
         if len(self.coverage) == 1:
             self.coverage = self.coverage * np.ones_like(self.timepoints)
 
+        # Deal with sex
+        if sc.checktype(sex,'listlike'):
+            if sc.checktype(sex[0],'str'): # If provided as 'f'/'m', convert to 0/1
+                self.sex = np.array([0,1])
+        else:
+            self.sex = sc.promotetoarray(sex)
+
+
     def subtarget_function(self, sim):
-        inds = sc.findinds((sim.people.age >= self.age_range[0]) & (sim.people.age <self.age_range[1]))
+        conditions = (sim.people.age >= self.age_range[0]) & (sim.people.age <self.age_range[1])
+        if len(self.sex)==1: conditions = conditions & (sim.people.sex == self.sex[0])
+        inds = sc.findinds(conditions)
         coverage = self.coverage[self.timepoints==sim.t][0]
         return {'vals': coverage*np.ones_like(inds), 'inds': inds}
 
