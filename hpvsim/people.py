@@ -402,6 +402,8 @@ class People(hpb.BasePeople):
                     self.treated[treat_inds] = True
                     self.date_treated[treat_inds] = self.t
                     return len(is_detected_inds)
+                else:
+                    return 0
 
 
     def check_death(self):
