@@ -207,7 +207,7 @@ by_sex_names   = ['total infections by sex',    'deaths from other causes by sex
 by_sex_colors  = ['#000000',                    '#000000']
 
 # Intervention-related flows (total across genotypes)
-intv_flow_keys   = ['screens',  'screened',         'vaccinations', 'vaccinated', ]
+intv_flow_keys   = ['screens',  'screened',         'vaccinations', 'vaccinated']
 intv_flow_names  = ['screens',  'women screened',   'vaccinations', 'women vaccinated']
 intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,      pl.cm.Oranges,  pl.cm.Oranges]
 

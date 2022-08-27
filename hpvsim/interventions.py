@@ -1542,8 +1542,8 @@ class TherapeuticVaccination(Intervention):
                 hpv11=[0.01, 0.1],
             ),
             cin2=dict(
-                hpv16=[0.1, 0.5],
-                hpv18=[0.1, 0.5],
+                hpv16=[0.1, 0.6],
+                hpv18=[0.1, 0.6],
                 hpv31=[0.01, 0.1],
                 hpv33=[0.01, 0.1],
                 hpv35=[0.01, 0.1],
@@ -1556,8 +1556,8 @@ class TherapeuticVaccination(Intervention):
                 hpv11=[0.01, 0.1],
             ),
             cin3=dict(
-                hpv16=[0.1, 0.4],
-                hpv18=[0.1, 0.4],
+                hpv16=[0.1, 0.5],
+                hpv18=[0.1, 0.5],
                 hpv31=[0.01, 0.1],
                 hpv33=[0.01, 0.1],
                 hpv35=[0.01, 0.1],
@@ -1642,6 +1642,9 @@ class TherapeuticVaccination(Intervention):
                         if second_dose_timepoints < sim.npts:
                             self.second_dose_timepoints[second_dose_timepoints] = vacc_inds
 
+            idx = int(sim.t / sim.resfreq)
+            sim.results['new_txvx_vaccinated'] += len(vacc_inds)
+
             # Also, if appropriate, vaccinate people with their second doses
             vacc_inds_dose2 = self.second_dose_timepoints[sim.t]
             if vacc_inds_dose2 is not None:
@@ -1649,6 +1652,9 @@ class TherapeuticVaccination(Intervention):
                     vacc_probs = np.full(len(vacc_inds_dose2), (1-self.LTFU))
                     vacc_inds_dose2 = vacc_inds_dose2[hpu.true(hpu.binomial_arr(vacc_probs))]
                 vacc_inds = np.concatenate((vacc_inds, vacc_inds_dose2), axis=None)
+
+            sim.results['new_txvx_doses'][idx] += len(vacc_inds)
+
 
         return vacc_inds
 

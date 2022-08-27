@@ -430,6 +430,10 @@ class Sim(hpb.BaseSim):
         results['new_doses'] = init_res('New doses')
         results['cum_doses'] = init_res('Cumulative doses')
 
+        # Therapeutic vaccine results
+        results['new_txvx_doses'] = init_res('New therapeutic vaccine doses')
+        results['new_txvx_vaccinated'] = init_res('Newly therapeutic vaccinated')
+
         # Detectable HPV
         results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
         results['n_total_detectable_hpv'] = init_res('Number with detectable HPV')
