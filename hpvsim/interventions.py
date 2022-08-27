@@ -1501,7 +1501,8 @@ class TherapeuticVaccination(Intervention):
 
         '''
 
-    def __init__(self, timepoints, prob=None, LTFU=None,  doses=None, interval=None, efficacy=None, subtarget=None, **kwargs):
+    def __init__(self, timepoints, prob=None, LTFU=None,  doses=None, interval=None, efficacy=None, subtarget=None,
+                 proph=False, **kwargs):
         super().__init__(**kwargs)  # Initialize the Intervention object
         self.subtarget = subtarget
         if prob is None: # Populate default value of probability: 1 if no subtargeting, 0 if subtargeting
@@ -1511,6 +1512,7 @@ class TherapeuticVaccination(Intervention):
         self.timepoints = timepoints
         self.doses = doses or 2
         self.interval = interval or 0.5  # Interval between doses in years
+        self.prophylactic = proph # whether to deliver a single-dose prophylactic vaccine at first dose
         self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
         self.efficacy = efficacy or dict(  # default efficacy decreases as dysplasia increases
             none=dict(
@@ -1577,6 +1579,11 @@ class TherapeuticVaccination(Intervention):
         self.timepoints, self.dates = sim.get_t(self.timepoints,
                                                 return_date_format='str')  # Ensure timepoints and dates are in the right format
         self.second_dose_timepoints = [None] * sim.npts  # People who get second dose (if relevant)
+        if self.prophylactic:
+            # Initialize a prophylactic vaccine intervention to reference later
+            vx = vaccinate_prob(vaccine='bivalent_1dose', prob=0, timepoints=self.dates[0])
+            vx.initialize(sim)
+            self.prophylactic_vaccine = vx
         return
 
     def administer(self, people, inds):
@@ -1611,6 +1618,7 @@ class TherapeuticVaccination(Intervention):
                     people[f'date_{state}'][g, eff_treat_inds] = np.nan
                     hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g) # Get natural immune memory
 
+        return
 
     def select_people(self, sim):
 
@@ -1662,7 +1670,10 @@ class TherapeuticVaccination(Intervention):
         ''' Perform vaccination each timestep '''
         inds = self.select_people(sim)
         if len(inds):
-            inds = self.administer(sim.people, inds)
+            self.administer(sim.people, inds)
+            if self.prophylactic:
+                inds_to_vax = inds[hpu.false(sim.people.vaccinated[inds])]
+                self.prophylactic_vaccine.vaccinate(sim, inds_to_vax)
         return inds
 
 

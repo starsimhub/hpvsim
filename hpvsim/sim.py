@@ -525,7 +525,8 @@ class Sim(hpb.BaseSim):
                 intervention.initialize(self)
 
         # Set the number of immunity sources
-        self['n_imm_sources'] += len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
+        # self['n_imm_sources'] += len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
+        self['n_imm_sources'] = self['immunity'].shape[0]
         return
 
 

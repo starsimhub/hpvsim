@@ -148,16 +148,16 @@ def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
     bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints=years,
                                        subtarget=faster_age_subtarget)
 
-    n_runs = 3
+    n_runs = 1
     sim = hpv.Sim(pars=base_pars)
 
     # Define the scenarios
     scenarios = {
-        'no_vx': {
-            'name': 'No vaccination',
-            'pars': {
-            }
-        },
+        # 'no_vx': {
+        #     'name': 'No vaccination',
+        #     'pars': {
+        #     }
+        # },
         'vx': {
             'name': f'Vaccinate {vx_prop*100}% of 9-14y girls starting in 2020',
             'pars': {
@@ -292,7 +292,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     years = np.arange(2030, 2050)
     coverage = [0.7]*len(years)
-    txvx = hpv.routine_therapeutic(LTFU= 0.1, timepoints=years, age_range=(25,30), coverage=coverage)
+    txvx = hpv.routine_therapeutic(LTFU= 0.1, timepoints=years, age_range=(25,30), coverage=coverage, proph=True)
 
     # screen_prop = [.015, .025, .05, .1, .2, .3, 0.4, .5, .6, .7]
     # hpv_screening_scaleup = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
