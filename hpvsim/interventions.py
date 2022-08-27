@@ -1643,7 +1643,7 @@ class TherapeuticVaccination(Intervention):
                             self.second_dose_timepoints[second_dose_timepoints] = vacc_inds
 
             idx = int(sim.t / sim.resfreq)
-            sim.results['new_txvx_vaccinated'] += len(vacc_inds)
+            sim.results['new_txvx_vaccinated'][idx] += len(vacc_inds)
 
             # Also, if appropriate, vaccinate people with their second doses
             vacc_inds_dose2 = self.second_dose_timepoints[sim.t]
