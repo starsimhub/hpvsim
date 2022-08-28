@@ -101,6 +101,7 @@ def make_pars(**kwargs):
 
     # Screening and treatment parameters
     pars['screen_pars']     = dict()  # Screening method that is being used; populated during initialization
+    pars['treat_pars'] = dict()  # Treatment method that is being used; populated during initialization
     pars['cancer_symp_detection'] = 0.01 # Annual probability of having cancer detected via symptoms, rather than screening
     pars['cancer_symp_treatment'] = 0.01 # Probability of receiving treatment for those with symptom-detected cancer
 
@@ -1123,49 +1124,6 @@ def get_screen_pars(screen=None):
             ),
             inadequacy=0,
         ),
-    )
-
-    return _get_from_pars(pars, key=screen)
-
-def get_treatment_pars(screen=None):
-    '''
-    Define the parameters for each treatment method
-    '''
-
-    pars = dict(
-        persistence=dict(
-            hpv16=dict(dist='beta', par1=2, par2=7),
-            hpv18=dict(dist='beta', par1=2, par2=7),
-            hpv31=dict(dist='beta', par1=2, par2=7),
-            hpv33=dict(dist='beta', par1=2, par2=7),
-            hpv35=dict(dist='beta', par1=2, par2=7),
-            hpv45=dict(dist='beta', par1=2, par2=7),
-            hpv51=dict(dist='beta', par1=2, par2=7),
-            hpv52=dict(dist='beta', par1=2, par2=7),
-            hpv56=dict(dist='beta', par1=2, par2=7),
-            hpv58=dict(dist='beta', par1=2, par2=7),
-            hpv6=dict(dist='beta', par1=2, par2=7),
-            hpv11=dict(dist='beta', par1=2, par2=7),
-        ),
-        excisional=dict(
-            efficacy=dict(
-                none=0,
-                cin1=0.936,
-                cin2=0.936,
-                cin3=0.936,
-            ),
-        ),
-        ablative=dict(
-            efficacy=dict(
-                none=0,
-                cin1=0.81,
-                cin2=0.81,
-                cin3=0.81,
-            ),
-        ),
-        radiation=dict(
-            dur=dict(dist='lognormal', par1=6.0, par2=3.0)
-        )
     )
 
     return _get_from_pars(pars, key=screen)

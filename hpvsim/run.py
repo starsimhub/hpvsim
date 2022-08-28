@@ -1019,6 +1019,7 @@ class Scenarios(hpb.ParsObj):
             # If vaccination is provided, we need to re-initialize the people because the number of immunity sources is different
             if 'interventions' in allpars.keys():
                 vaxintvs = [x for x in allpars['interventions'] if isinstance(x, hpi.BaseVaccination)]
+                vaxintvs += [x for x in allpars['interventions'] if isinstance(x, hpi.TherapeuticVaccination) and x.prophylactic == True]
                 if len(vaxintvs)>0:
                     scen_sim.people = None # Set to None so they get re-initialized - WARNING, should be a better way to do this
             scen_sim.initialized = False # Ensure it gets re-initialized

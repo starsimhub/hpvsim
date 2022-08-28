@@ -396,9 +396,14 @@ class People(hpb.BasePeople):
                 self.date_detected_cancer[is_detected_inds] = self.t
                 treat_probs = np.full(len(is_detected_inds), self.pars['cancer_symp_treatment'])
                 treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-                new_dur_cancer = hpu.sample(**hppar.get_treatment_pars('radiation')['dur'], size=len(treat_inds))
-                self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
-                return len(is_detected_inds)
+                if 'cancer_treatment' in self.pars['treat_pars'].keys():
+                    new_dur_cancer = hpu.sample(**self.pars['treat_pars']['cancer_treatment']['dur'], size=len(treat_inds))
+                    self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
+                    self.treated[treat_inds] = True
+                    self.date_treated[treat_inds] = self.t
+                    return len(is_detected_inds)
+                else:
+                    return 0
 
 
     def check_death(self):

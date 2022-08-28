@@ -148,16 +148,16 @@ def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
     bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints=years,
                                        subtarget=faster_age_subtarget)
 
-    n_runs = 3
+    n_runs = 1
     sim = hpv.Sim(pars=base_pars)
 
     # Define the scenarios
     scenarios = {
-        'no_vx': {
-            'name': 'No vaccination',
-            'pars': {
-            }
-        },
+        # 'no_vx': {
+        #     'name': 'No vaccination',
+        #     'pars': {
+        #     }
+        # },
         'vx': {
             'name': f'Vaccinate {vx_prop*100}% of 9-14y girls starting in 2020',
             'pars': {
@@ -266,26 +266,38 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     pars = {
         'n_agents': n_agents,
-        'n_years': 20,
+        'n_years': 50,
         'burnin': 10,
         'start': 2000,
         'genotypes': [hpv16, hpv18],
         'location': 'tanzania',
-        'dt': 1.,
+        'dt': 0.5,
     }
 
     # Model an intervention to screen 50% of 30 year olds with hpv DNA testing and treat immediately
-    screen_prop = .7
-    compliance = .9
-    cancer_compliance = 0.2
-    hpv_screening = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=5, screen_start_year='2010',
-                                  screen_compliance=screen_prop, triage_compliance=compliance, cancer_compliance=cancer_compliance)
+    screen_prop = .15
+    txvx_prop = 0.7
+    ablation_compliance=0.5
+    excision_compliance=0.2
+    cancer_compliance = 0.1
+    treatment = hpv.StandardTreatmentPathway(ablation_compliance=ablation_compliance, excision_compliance=excision_compliance,
+                                             cancer_compliance=cancer_compliance)
+    hpv_screening = hpv.Screening(primary_screen_test='hpv', screen_start_age=30, screen_stop_age=50, screen_interval=5,
+                                  screen_start_year='2010', screen_compliance=screen_prop, treatment_pathway=treatment)
 
-    screen_prop = [.015, .025, .05, .1, .2, .3, 0.4, .5, .6, .7]
-    hpv_screening_scaleup = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
-                                  screen_stop_age=50, screen_interval=10, screen_start_year='2010', label='hpv primary, via triage',
-                                  screen_compliance=screen_prop, triage_compliance=compliance, cancer_compliance=cancer_compliance)
+    def age_subtarget(sim):
+        ''' Select people who are eligible for therapeutic vaccination '''
+        inds = sc.findinds((sim.people.age >= 25) & (sim.people.age <=30) & (sim.people.is_female))
+        return {'vals': [txvx_prop for _ in inds], 'inds': inds}
+
+    years = np.arange(2030, 2050)
+    coverage = [0.7]*len(years)
+    txvx = hpv.routine_therapeutic(LTFU= 0.1, timepoints=years, age_range=(25,30), coverage=coverage, proph=True)
+
+    # screen_prop = [.015, .025, .05, .1, .2, .3, 0.4, .5, .6, .7]
+    # hpv_screening_scaleup = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
+    #                               screen_stop_age=50, screen_interval=10, screen_start_year='2010', label='hpv primary, via triage',
+    #                               screen_compliance=screen_prop, triage_compliance=compliance, cancer_compliance=cancer_compliance)
 
     # hpv_hpv1618_screening = hpv.Screening(primary_screen_test='hpv', triage_screen_test='hpv1618', treatment='via_triage',
     #                                     screen_start_age=30,screen_stop_age=50, screen_interval=10, screen_start_year='2010',
@@ -322,10 +334,10 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         #         'interventions': [hpv_screening],
         #     }
         # },
-        'hpv_screening_scaleup': {
-            'name': f'Screen scaleup from{screen_prop[0] * 100}% to {screen_prop[-1] * 100}% of 30-50y women with {hpv_screening_scaleup.label}',
+        'hpv_screening_txvx': {
+            'name': f'Screening with therapeutic vaccine in 2030',
             'pars': {
-                'interventions': [hpv_screening_scaleup],
+                'interventions': [hpv_screening, txvx],
             }
         },
         # 'hpv_hpv1618_screening': {
@@ -453,10 +465,10 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_dynamic_pars()
-    scens0 = test_complex_vax(do_plot=True)
-    scens1 = test_vaccinate_prob(do_plot=True)
-    scens2 = test_vaccinate_num(do_plot=True)
+    # sim0 = test_dynamic_pars()
+    # scens0 = test_complex_vax(do_plot=True)
+    # scens1 = test_vaccinate_prob(do_plot=True)
+    # scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True) # CURRENTLY BROKEN
 
