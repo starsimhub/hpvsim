@@ -1502,7 +1502,7 @@ class TherapeuticVaccination(Intervention):
         '''
 
     def __init__(self, timepoints, prob=None, LTFU=None,  doses=None, interval=None, efficacy=None, subtarget=None,
-                 proph=False, **kwargs):
+                 proph=False, vaccine='bivalent_1dose', **kwargs):
         super().__init__(**kwargs)  # Initialize the Intervention object
         self.subtarget = subtarget
         if prob is None: # Populate default value of probability: 1 if no subtargeting, 0 if subtargeting
@@ -1513,6 +1513,7 @@ class TherapeuticVaccination(Intervention):
         self.doses = doses or 2
         self.interval = interval or 0.5  # Interval between doses in years
         self.prophylactic = proph # whether to deliver a single-dose prophylactic vaccine at first dose
+        self.vaccine = vaccine # which vaccine to deliver
         self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
         self.efficacy = efficacy or dict(  # default efficacy decreases as dysplasia increases
             none=dict(
@@ -1581,7 +1582,7 @@ class TherapeuticVaccination(Intervention):
         self.second_dose_timepoints = [None] * sim.npts  # People who get second dose (if relevant)
         if self.prophylactic:
             # Initialize a prophylactic vaccine intervention to reference later
-            vx = vaccinate_prob(vaccine='bivalent_1dose', prob=0, timepoints=self.dates[0])
+            vx = vaccinate_prob(vaccine=self.vaccine, prob=0, timepoints=self.dates[0])
             vx.initialize(sim)
             self.prophylactic_vaccine = vx
         return
