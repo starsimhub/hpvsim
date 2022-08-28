@@ -103,7 +103,8 @@ class Intervention:
         do_plot    (bool): whether or not to plot the intervention
         line_args  (dict): arguments passed to pl.axvline() when plotting
     '''
-    def __init__(self, label=None, show_label=False, do_plot=None, line_args=None):
+    def __init__(self, label=None, show_label=False, do_plot=None, line_args=None, **kwargs):
+        super().__init__(**kwargs)
         self._store_args() # Store the input arguments so the intervention can be recreated
         if label is None: label = self.__class__.__name__ # Use the class name if no label is supplied
         self.label = label # e.g. "Screen"
@@ -1492,7 +1493,7 @@ class StandardTreatmentPathway(Product):
 __all__ += ['TherapeuticVaccination', 'routine_therapeutic']
 
 
-class TherapeuticVaccination(Intervention):
+class TherapeuticVaccination(Intervention, Product):
     '''
         Base class to apply a therapeutic vaccine to a subset of the population. Can be implemented as
         a campaign-style or routine administration within S&T.
