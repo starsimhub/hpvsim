@@ -38,11 +38,11 @@ def test_dynamic_pars():
     }
 
     # Model an intervention to increase condom use
-    condom_int = hpv.dynamic_pars(
+    condom_int = hpv.DynamicPars(
         condoms=dict(timepoints=10, vals={'c': 0.9}))  # Increase condom use among casual partners to 90%
 
     # Model an intervention to increase the age of sexual debut
-    debut_int = hpv.dynamic_pars(
+    debut_int = hpv.DynamicPars(
         {'debut': {
             'timepoints': '2020',
             'vals': dict(f=dict(dist='normal', par1=20, par2=2.1), # Increase mean age of sexual debut
@@ -67,12 +67,12 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     # Routine vaccination
     routine_years = np.arange(2020, base_pars['end'], dtype=int)
     routine_values = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
-    routine_vx = hpv.vaccinate_routine(vaccine='bivalent', label='Routine', age_range=(9, 10), coverage=routine_values, timepoints=routine_years)
+    routine_vx = hpv.RoutineVaccination(vaccine='bivalent', label='Routine', age_range=(9, 10), coverage=routine_values, timepoints=routine_years)
 
     # Campaign vaccination
     campaign_years = np.arange(2020, 2022, dtype=int)
     campaign_values = 0.5
-    campaign_vx = hpv.vaccinate_routine(vaccine='bivalent', label='Campaign', age_range=(9, 24), coverage=campaign_values, timepoints=campaign_years)
+    campaign_vx = hpv.RoutineVaccination(vaccine='bivalent', label='Campaign', age_range=(9, 24), coverage=campaign_values, timepoints=campaign_years)
     interventions = [routine_vx, campaign_vx]
 
     n_runs = 1
@@ -143,9 +143,9 @@ def test_vaccinate_prob(do_plot=False, do_save=False, fig_path=None):
         return {'vals': [vx_prop for _ in inds], 'inds': inds}
 
     years = np.arange(2020, base_pars['end'], dtype=int)
-    bivalent_vx = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-14', timepoints=years,
+    bivalent_vx = hpv.Vaccination(vaccine='bivalent', label='bivalent, 9-14', timepoints=years,
                                        subtarget=age_subtarget)
-    bivalent_vx_faster = hpv.vaccinate_prob(vaccine='bivalent', label='bivalent, 9-24', timepoints=years,
+    bivalent_vx_faster = hpv.Vaccination(vaccine='bivalent', label='bivalent, 9-24', timepoints=years,
                                        subtarget=faster_age_subtarget)
 
     n_runs = 1
@@ -204,9 +204,9 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
     # Model an intervention to roll out prophylactic vaccination with a given number of doses over time
     age_target = {'inds': lambda sim: hpv.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give vaccine to people who have had 2 doses
     doses_per_year = 6e3
-    bivalent_1_dose = hpv.vaccinate_num(vaccine='bivalent_1dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029'], label='bivalent 1 dose, 9-14', subtarget=age_target)
-    bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029'], label='bivalent 2 dose, 9-14', subtarget=age_target)
-    # bivalent_3_dose = hpv.vaccinate_num(vaccine='bivalent_3dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024'], label='bivalent 3 dose, 9-14', subtarget=age_target)
+    bivalent_1_dose = hpv.NumberVaccination(vaccine='bivalent_1dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029'], label='bivalent 1 dose, 9-14', subtarget=age_target)
+    bivalent_2_dose = hpv.NumberVaccination(vaccine='bivalent_2dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029'], label='bivalent 2 dose, 9-14', subtarget=age_target)
+    # bivalent_3_dose = hpv.NumberVaccination(vaccine='bivalent_3dose', num_doses=doses_per_year, timepoints=['2020', '2021', '2022', '2023', '2024'], label='bivalent 3 dose, 9-14', subtarget=age_target)
 
     sim = hpv.Sim(pars=base_pars)
     n_runs = 3
@@ -259,8 +259,6 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
 def test_screening(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test screening intervention')
 
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 1
 
@@ -269,7 +267,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         'n_years': 50,
         'burnin': 10,
         'start': 2000,
-        'genotypes': [hpv16, hpv18],
+        'genotypes': [16, 18],
         'location': 'tanzania',
         'dt': 0.5,
     }
@@ -292,7 +290,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     years = np.arange(2030, 2050)
     coverage = [0.7]*len(years)
-    txvx = hpv.routine_therapeutic(LTFU= 0.1, timepoints=years, age_range=(25,30), coverage=coverage, proph=True)
+    txvx = hpv.RoutineTherapeutic(LTFU= 0.1, timepoints=years, age_range=(25,30), coverage=coverage, proph=True)
 
     # screen_prop = [.015, .025, .05, .1, .2, .3, 0.4, .5, .6, .7]
     # hpv_screening_scaleup = hpv.Screening(primary_screen_test='hpv', treatment='via_triage', screen_start_age=30,
@@ -465,10 +463,10 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
-    # scens0 = test_complex_vax(do_plot=True)
-    # scens1 = test_vaccinate_prob(do_plot=True)
-    # scens2 = test_vaccinate_num(do_plot=True)
+    sim0 = test_dynamic_pars()
+    scens0 = test_complex_vax(do_plot=True)
+    scens1 = test_vaccinate_prob(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True) # CURRENTLY BROKEN
 

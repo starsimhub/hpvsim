@@ -609,7 +609,7 @@ def check_doses(doses, interval, imm_boost):
     return doses, interval, imm_boost
 
 
-class Vaccionation(BaseVaccination):
+class Vaccination(BaseVaccination):
     '''
     Probability-based vaccination
 
@@ -1577,7 +1577,7 @@ class TherapeuticVaccination(Intervention, Product):
         self.second_dose_timepoints = [None] * sim.npts  # People who get second dose (if relevant)
         if self.prophylactic:
             # Initialize a prophylactic vaccine intervention to reference later
-            vx = vaccinate_prob(vaccine=self.vaccine, prob=0, timepoints=self.dates[0])
+            vx = Vaccination(vaccine=self.vaccine, prob=0, timepoints=self.dates[0])
             vx.initialize(sim)
             self.prophylactic_vaccine = vx
         return
