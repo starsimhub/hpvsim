@@ -974,6 +974,13 @@ class Sim(hpb.BaseSim):
         self.results['cum_total_vaccinated'][:] = np.cumsum(self.results['new_total_vaccinated'][:])
         self.results['cum_doses'][:] = np.cumsum(self.results['new_doses'][:])
 
+        # Age of causal infection
+        cancerous_inds = hpu.true(self.people.cancerous)
+        current_age = self.people.age[cancerous_inds]
+        cancerous_genotype = self.people.cancer_genotype[cancerous_inds]
+        offset = (self.t -self.people.date_initial_infection[cancerous_genotype, cancerous_inds])*self['dt']
+        causal_infection_age = current_age - offset
+
         return
 
 

@@ -14,7 +14,7 @@ do_save = 0
 hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
 
-n_agents = [2e3,50e3][0] # Swap between sizes
+n_agents = [2e3,50e3][1] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,
@@ -262,13 +262,13 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     hpv16 = hpv.genotype('HPV16')
     hpv18 = hpv.genotype('HPV18')
     verbose = .1
-    debug = 1
+    debug = 0
 
     pars = {
         'n_agents': n_agents,
-        'n_years': 50,
-        'burnin': 10,
-        'start': 2000,
+        'n_years': 70,
+        'burnin': 50,
+        'start': 1950,
         'genotypes': [hpv16, hpv18],
         'location': 'tanzania',
         'dt': 0.5,
@@ -371,7 +371,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         }
         scens.plot(to_plot=to_plot)
         scens.plot_age_results(analyzer_ref=0, plot_type=sns.boxplot)
-
+        scens.plot(to_plot=['age_causal_infection'])
     return scens
 
 

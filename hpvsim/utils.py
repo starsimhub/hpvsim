@@ -277,7 +277,11 @@ def set_prognoses(people, inds, g, dur_none):
     people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
 
     # Record new causal HPV infections and associated age
-    people.age_causal_infection[cancer_inds] = people.age[cancer_inds] - (people.date_initial_infection[g, cancer_inds]-people.t)*people.pars['dt']
+    if len(cancer_inds):
+        print('debugme')
+    current_age = people.age[cancer_inds]
+    offset = (people.date_initial_infection[g, cancer_inds]-people.t)*people.pars['dt']
+    people.age_causal_infection[cancer_inds] = current_age - offset
 
     return
 
