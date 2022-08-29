@@ -16,23 +16,21 @@ from collections import defaultdict
 
 #%% Helper functions
 
-def find_day(arr, t=None, interv=None, sim=None, which='first'):
+def find_timepoint(arr, t=None, interv=None, sim=None, which='first'):
     '''
-    Helper function to find if the current simulation time matches any day in the
+    Helper function to find if the current simulation time matches any timepoint in the
     intervention. Although usually never more than one index is returned, it is
     returned as a list for the sake of easy iteration.
 
     Args:
         arr (list/function): list of timepoints in the intervention, or a boolean array; or a function that returns these
         t (int): current simulation time (can be None if a boolean array is used)
-        which (str): what to return: 'first', 'last', or 'all' indices
         interv (intervention): the intervention object (usually self); only used if arr is callable
         sim (sim): the simulation object; only used if arr is callable
+        which (str): what to return: 'first', 'last', or 'all' indices
 
     Returns:
         inds (list): list of matching timepoints; length zero or one unless which is 'all'
-
-    New in version 2.1.2: arr can be a function with arguments interv and sim.
     '''
     if callable(arr):
         arr = arr(interv, sim)
@@ -88,6 +86,7 @@ def get_subtargets(subtarget, sim):
             raise ValueError(errormsg)
 
     return subtarget_inds, subtarget_vals
+
 
 #%% Generic intervention classes
 
@@ -283,9 +282,9 @@ class Intervention:
 
 
 #%% Behavior change interventions
-__all__ += ['dynamic_pars']
+__all__ += ['DynamicPars']
 
-class dynamic_pars(Intervention):
+class DynamicPars(Intervention):
     '''
     A generic intervention that modifies a set of parameters at specified points
     in time.
@@ -303,8 +302,8 @@ class dynamic_pars(Intervention):
 
     **Examples**::
 
-        interv = hp.dynamic_pars(condoms=dict(timepoints=10, vals={'c':0.9})) # Increase condom use amount casual partners to 90%
-        interv = hp.dynamic_pars({'beta':{'timepoints':[10, 15], 'vals':[0.005, 0.015]}, # At timepoint 10, reduce beta, then increase it again
+        interv = hp.DynamicPars(condoms=dict(timepoints=10, vals={'c':0.9})) # Increase condom use amount casual partners to 90%
+        interv = hp.DynamicPars({'beta':{'timepoints':[10, 15], 'vals':[0.005, 0.015]}, # At timepoint 10, reduce beta, then increase it again
                                   'debut':{'timepoints':10, 'vals':dict(f=dict(dist='normal', par1=20, par2=2.1), m=dict(dist='normal', par1=19.6, par2=1.8))}}) # Increase mean age of sexual debut
     '''
 
@@ -331,13 +330,6 @@ class dynamic_pars(Intervention):
                     pars[parkey][subkey] = sc.promotetoarray(pars[parkey][subkey])
                 else:
                     pars[parkey][subkey] = sc.promotetolist(pars[parkey][subkey])
-            # timepoints = pars[parkey]['timepoints']
-            # vals = pars[parkey]['vals']
-            # if sc.isiterable(timepoints):
-            #     len_timepoints = len(timepoints)
-            #     len_vals = len(vals)
-            #     if len_timepoints != len_vals:
-            #         raise ValueError(f'Length of timepoints ({len_timepoints}) does not match length of values ({len_vals}) for parameter {parkey}')
         self.pars = pars
 
         return
@@ -365,7 +357,7 @@ class dynamic_pars(Intervention):
         ''' Loop over the parameters, and then loop over the timepoints, applying them if any are found '''
         t = sim.t
         for parkey,parval in self.pars.items():
-            if t in parval['processed_timepoints']: # TODO: make this more robust
+            if t in parval['processed_timepoints']:
                 self.timepoints.append(t)
                 ind = sc.findinds(parval['processed_timepoints'], t)[0]
                 val = parval['vals'][ind]
@@ -377,7 +369,7 @@ class dynamic_pars(Intervention):
 
 
 #%% Vaccination
-__all__ += ['BaseVaccination', 'vaccinate_prob', 'vaccinate_routine', 'vaccinate_num']
+__all__ += ['BaseVaccination', 'Vaccination', 'RoutineVaccination', 'NumberVaccination']
 
 class BaseVaccination(Intervention):
     '''
@@ -385,7 +377,7 @@ class BaseVaccination(Intervention):
 
     This base class implements the mechanism of vaccinating people to modify their immunity.
     It does not implement allocation of the vaccines, which is implemented by derived classes
-    such as `hpv.vaccinate_num`.
+    such as `hpv.VaccinateProb`.
 
     Some quantities are tracked during execution for reporting after running the simulation.
     These are:
@@ -617,7 +609,7 @@ def check_doses(doses, interval, imm_boost):
     return doses, interval, imm_boost
 
 
-class vaccinate_prob(BaseVaccination):
+class Vaccionation(BaseVaccination):
     '''
     Probability-based vaccination
 
@@ -634,7 +626,7 @@ class vaccinate_prob(BaseVaccination):
 
     **Example**::
 
-        bivalent = hpv.vaccinate_prob(vaccine='bivalent', timepoints='2020', prob=0.7)
+        bivalent = hpv.Vaccination(vaccine='bivalent', timepoints='2020', prob=0.7)
         hpv.Sim(interventions=bivalent).run().plot()
     '''
     def __init__(self, vaccine, timepoints, label=None, prob=None, subtarget=None, **kwargs) -> object:
@@ -665,7 +657,7 @@ class vaccinate_prob(BaseVaccination):
         if sim.t >= np.min(self.timepoints):
 
             # Vaccinate people with their first dose
-            for _ in find_day(self.timepoints, sim.t, interv=self, sim=sim):
+            for _ in find_timepoint(self.timepoints, sim.t, interv=self, sim=sim):
 
                 vacc_probs = np.zeros(len(sim.people))
 
@@ -703,7 +695,7 @@ class vaccinate_prob(BaseVaccination):
         return vacc_inds
 
 
-class vaccinate_routine(vaccinate_prob):
+class RoutineVaccination(Vaccination):
 
     def __init__(self, *args, age_range, coverage, sex=0, **kwargs):
         super().__init__(*args, **kwargs, subtarget=self.subtarget_function)
@@ -728,7 +720,7 @@ class vaccinate_routine(vaccinate_prob):
         return {'vals': coverage*np.ones_like(inds), 'inds': inds}
 
 
-class vaccinate_num(BaseVaccination):
+class NumberVaccination(BaseVaccination):
     '''
     This vaccine intervention allocates vaccines in a pre-computed order of
     distribution, at a specified rate of doses per day.
@@ -750,7 +742,7 @@ class vaccinate_num(BaseVaccination):
 
     **Example**::
 
-        bivalent = hpv.vaccinate_num(vaccine='bivalent', num_doses=1e6, timepoints=2020)
+        bivalent = hpv.NumberVaccination(vaccine='bivalent', num_doses=1e6, timepoints=2020)
         hpv.Sim(interventions=bivalent).run().plot()
     '''
 
@@ -1107,7 +1099,7 @@ class Screening(Intervention):
 
         screen_inds = np.array([], dtype=int)  # Initialize in case no one gets screened
 
-        for i in find_day(self.timepoints, sim.t, interv=self, sim=sim):
+        for i in find_timepoint(self.timepoints, sim.t, interv=self, sim=sim):
             self.where_in_timepoints = i
             screen_probs = np.zeros(len(sim.people), dtype=hpd.default_float)
 
@@ -1490,7 +1482,9 @@ class StandardTreatmentPathway(Product):
         return
 
 
-__all__ += ['TherapeuticVaccination', 'routine_therapeutic']
+#%% Therapeutic vaccination
+
+__all__ += ['TherapeuticVaccination', 'RoutineTherapeutic']
 
 
 class TherapeuticVaccination(Intervention, Product):
@@ -1629,7 +1623,7 @@ class TherapeuticVaccination(Intervention, Product):
         if sim.t >= np.min(self.timepoints):
 
             # Vaccinate people with their first dose
-            for _ in find_day(self.timepoints, sim.t, interv=self, sim=sim):
+            for _ in find_timepoint(self.timepoints, sim.t, interv=self, sim=sim):
 
                 vacc_probs = np.zeros(len(sim.people))
 
@@ -1679,7 +1673,10 @@ class TherapeuticVaccination(Intervention, Product):
         return inds
 
 
-class routine_therapeutic(TherapeuticVaccination):
+class RoutineTherapeutic(TherapeuticVaccination):
+    '''
+    Routine therapeutic vaccination
+    '''
 
     def __init__(self, *args, age_range, coverage, **kwargs):
         super().__init__(*args, **kwargs, subtarget=self.subtarget_function)
