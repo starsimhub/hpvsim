@@ -1515,9 +1515,23 @@ class TherapeuticVaccination(Intervention, Product):
         self.interval = interval or 0.5  # Interval between doses in years
         self.prophylactic = proph # whether to deliver a single-dose prophylactic vaccine at first dose
         self.vaccine = vaccine # which vaccine to deliver
-        self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
+        self.treat_states = ['none', 'latent', 'cin1', 'cin2', 'cin3']
         self.efficacy = efficacy or dict(  # default efficacy decreases as dysplasia increases
             none=dict(
+                hpv16=[0.1, 0.9],
+                hpv18=[0.1, 0.9],
+                hpv31=[0.01, 0.1],
+                hpv33=[0.01, 0.1],
+                hpv35=[0.01, 0.1],
+                hpv45=[0.01, 0.1],
+                hpv51=[0.01, 0.1],
+                hpv52=[0.01, 0.1],
+                hpv56=[0.01, 0.1],
+                hpv58=[0.01, 0.1],
+                hpv6=[0.01, 0.1],
+                hpv11=[0.01, 0.1],
+            ),
+            latent=dict(
                 hpv16=[0.1, 0.9],
                 hpv18=[0.1, 0.9],
                 hpv31=[0.01, 0.1],
