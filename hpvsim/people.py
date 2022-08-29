@@ -573,6 +573,8 @@ class People(hpb.BasePeople):
         # Set all dates
         base_t = self.t + offset if offset is not None else self.t
         self.date_infectious[g,inds] = base_t
+        if layer != 'reactivation':
+            self.date_initial_infection[g,inds] = base_t
 
         # Count reinfections
         self.flows['reinfections'][g]           += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])

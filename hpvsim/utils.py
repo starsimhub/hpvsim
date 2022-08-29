@@ -175,7 +175,7 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
-def set_prognoses(people, inds, g, dur_none, new=False):
+def set_prognoses(people, inds, g, dur_none):
     ''' Set disease progression '''
 
     # Get parameters that will be used later
@@ -276,9 +276,8 @@ def set_prognoses(people, inds, g, dur_none, new=False):
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
     people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
 
-    if not new:
-        # Record new causal HPV infections and associated age
-        people.age_causal_infection[cancer_inds] = people.age[cancer_inds]
+    # Record new causal HPV infections and associated age
+    people.age_causal_infection[cancer_inds] = people.age[cancer_inds] - (people.date_initial_infection[g, cancer_inds]-people.t)*people.pars['dt']
 
     return
 

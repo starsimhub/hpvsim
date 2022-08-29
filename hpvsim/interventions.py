@@ -1262,7 +1262,7 @@ class PrecancerTreatment(Product):
                 persist_inds = inf_inds[to_persist]
                 people['none'][g, persist_inds] = True  # People whose HPV persists
                 dur_hpv = (people.t - people.date_infectious[g, persist_inds]) * people.pars['dt']
-                hpu.set_prognoses(people, persist_inds, g, dur_hpv, new=True)
+                hpu.set_prognoses(people, persist_inds, g, dur_hpv)
 
                 # Clear infection for women who clear
                 to_clear = inf_inds[~to_persist]  # Determine who will clear infection

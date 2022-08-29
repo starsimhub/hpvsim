@@ -776,9 +776,7 @@ class Sim(hpb.BaseSim):
             age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
             standard_pop = self.pars['standard_pop'][1, :-1]
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
-            self.results['age_causal_infection'][idx] = np.sum(self.people.age_causal_infection[
-                                                            ~np.isnan(self.people.age_causal_infection)]) / len(
-                self.people.age_causal_infection[~np.isnan(self.people.age_causal_infection)])
+            self.results['age_causal_infection'][idx] = np.median(self.people.age_causal_infection[~np.isnan(self.people.age_causal_infection)])
 
             # Compute detectable hpv prevalence
             hpv_test_pars = hppar.get_screen_pars('hpv')
