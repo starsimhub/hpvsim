@@ -276,6 +276,9 @@ def set_prognoses(people, inds, g, dur_none):
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
     people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
 
+    # Record new causal HPV infections and associated age
+    people.age_causal_infection[cancer_inds] = people.age[cancer_inds]
+
     return
 
 

@@ -453,6 +453,9 @@ class Sim(hpb.BaseSim):
         results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
 
+        # Dwelltime results
+        results['age_causal_infection'] = init_res('Age of causal HPV infections', scale=False)
+
         # Time vector
         results['year'] = self.res_yearvec
         results['t'] = self.res_tvec
@@ -744,6 +747,8 @@ class Sim(hpb.BaseSim):
         for key,count in people.by_age_flows.items():
             self.results[key][:,idx] += count
 
+
+
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 
@@ -771,6 +776,9 @@ class Sim(hpb.BaseSim):
             age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
             standard_pop = self.pars['standard_pop'][1, :-1]
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
+            self.results['age_causal_infection'][idx] = np.sum(self.people.age_causal_infection[
+                                                            ~np.isnan(self.people.age_causal_infection)]) / len(
+                self.people.age_causal_infection[~np.isnan(self.people.age_causal_infection)])
 
             # Compute detectable hpv prevalence
             hpv_test_pars = hppar.get_screen_pars('hpv')

@@ -88,6 +88,7 @@ class PeopleMeta(sc.prettyobj):
         State('cancerous', bool, False),
         State('detected_cancer', bool, False),
         State('cancer_genotype', default_int, -2147483648),
+        State('age_causal_infection', default_float, np.nan),
         State('latent', bool, False,'n_genotypes'),
         State('alive', bool, True), # Save this as a state so we can record population sizes
         State('dead_cancer', bool, False),
