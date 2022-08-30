@@ -196,27 +196,6 @@ def test_age_causal_analyzer():
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
 
-    az1 = hpv.age_results(
-        result_keys=sc.objdict(
-            hpv_prevalence=sc.objdict(
-                timepoints=['2019'],
-                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-            ),
-            infections=sc.objdict(
-                timepoints=['2019'],
-                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-            ),
-            # cancer_incidence=sc.objdict(
-            #     timepoints=['2019'],
-            #     edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
-            # ),
-            # cancer_mortality=sc.objdict(
-            #     timepoints=['2019'],
-            #     edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-            # )
-        )
-    )
-
     sim = hpv.Sim(pars=pars, analyzers=[az1, hpv.age_causal_infection()])
     sim.run()
     a = sim.get_analyzer(hpv.age_causal_infection)
@@ -247,10 +226,10 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    # people      = test_snapshot()
-    # sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
-    # sim2, a2    = test_reduce_analyzers()
+    people      = test_snapshot()
+    sim0, a0    = test_age_pyramids()
+    sim1, a1    = test_age_results()
+    sim2, a2    = test_reduce_analyzers()
     sim3, a3    = test_age_causal_analyzer()
 
     sc.toc(T)

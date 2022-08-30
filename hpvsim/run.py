@@ -1151,7 +1151,6 @@ class Scenarios(hpb.ParsObj):
     def plot_age_results(self, *args, **kwargs):
         '''
         Plot all age_results analyzers in a scenario together.
-
         Returns:
             fig: Figure handle
 

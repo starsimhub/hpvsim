@@ -259,8 +259,6 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
 def test_screening(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test screening intervention')
 
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 0
 
@@ -269,7 +267,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         'n_years': 70,
         'burnin': 50,
         'start': 1950,
-        'genotypes': [hpv16, hpv18],
+        'genotypes': [16, 18],
         'location': 'tanzania',
         'dt': 0.5,
     }
@@ -318,7 +316,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         )
     )
 
-    sim = hpv.Sim(pars=pars, analyzers=[az])
+    sim = hpv.Sim(pars=pars, analyzers=[az, hpv.age_causal_infection()])
     n_runs = 3
 
     # Define the scenarios
@@ -371,7 +369,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         }
         scens.plot(to_plot=to_plot)
         scens.plot_age_results(analyzer_ref=0, plot_type=sns.boxplot)
-        scens.plot(to_plot=['age_causal_infection'])
+
     return scens
 
 
@@ -465,10 +463,10 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
-    # scens0 = test_complex_vax(do_plot=True)
-    # scens1 = test_vaccinate_prob(do_plot=True)
-    # scens2 = test_vaccinate_num(do_plot=True)
+    sim0 = test_dynamic_pars()
+    scens0 = test_complex_vax(do_plot=True)
+    scens1 = test_vaccinate_prob(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True) # CURRENTLY BROKEN
 
