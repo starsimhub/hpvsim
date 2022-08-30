@@ -66,7 +66,7 @@ def test_age_results(do_plot=True):
 
     sc.heading('Testing by-age results')
 
-    pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='kenya')
+    pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='tanzania')
     pars['beta'] = .5
 
     pars['init_hpv_prev'] = {
@@ -77,6 +77,10 @@ def test_age_results(do_plot=True):
     az1 = hpv.age_results(
         result_keys=sc.objdict(
             hpv_prevalence=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            hpv_incidence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
@@ -180,6 +184,10 @@ def test_age_causal_analyzer():
         'start': 1950,
         'genotypes': [16, 18],
         'location': 'tanzania',
+        'network': 'default',
+        'hpv_control_prob': 0.9,
+        'debut': dict(f=dict(dist='normal', par1=14.0, par2=2.0),
+                      m=dict(dist='normal', par1=16.0, par2=2.5)),
         'dt': 0.5,
     }
     pars['init_hpv_prev'] = {
@@ -188,7 +196,28 @@ def test_age_causal_analyzer():
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
 
-    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection()])
+    az1 = hpv.age_results(
+        result_keys=sc.objdict(
+            hpv_prevalence=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            infections=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            # cancer_incidence=sc.objdict(
+            #     timepoints=['2019'],
+            #     edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
+            # ),
+            # cancer_mortality=sc.objdict(
+            #     timepoints=['2019'],
+            #     edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            # )
+        )
+    )
+
+    sim = hpv.Sim(pars=pars, analyzers=[az1, hpv.age_causal_infection()])
     sim.run()
     a = sim.get_analyzer(hpv.age_causal_infection)
 
@@ -204,6 +233,9 @@ def test_age_causal_analyzer():
     plt.xlabel('Year')
     plt.ylabel('Age bin')
     plt.show()
+
+    a2 = sim.get_analyzer(0)
+    a2.plot()
 
     return sim, a
 
