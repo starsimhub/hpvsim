@@ -87,7 +87,6 @@ class PeopleMeta(sc.prettyobj):
         State('cin', bool, False, 'n_genotypes'),
         State('cancerous', bool, False),
         State('detected_cancer', bool, False),
-        State('cancer_genotype', default_int, -2147483648),
         State('latent', bool, False,'n_genotypes'),
         State('alive', bool, True), # Save this as a state so we can record population sizes
         State('dead_cancer', bool, False),
@@ -99,6 +98,9 @@ class PeopleMeta(sc.prettyobj):
     ]
 
     # Set genotype states, which store info about which genotype a person is exposed to
+    genotype_states = [
+        State('cancer_genotype', default_int, -1)
+        ]
 
     # Immune states, by genotype/vaccine
     imm_states = [
