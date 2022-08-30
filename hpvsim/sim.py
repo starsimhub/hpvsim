@@ -593,8 +593,8 @@ class Sim(hpb.BaseSim):
         genotype_map = self.pars['genotype_map']
 
         for g in range(ng):
-            dur_none = genotype_pars[genotype_map[g]]['dur_none']
-            dur_hpv = hpu.sample(**dur_none, size=len(hpv_inds))
+            dur_no_dysp = genotype_pars[genotype_map[g]]['dur_no_dysp']
+            dur_hpv = hpu.sample(**dur_no_dysp, size=len(hpv_inds))
             t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
             _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
@@ -745,7 +745,6 @@ class Sim(hpb.BaseSim):
             self.results[key][:,idx] += count
 
 
-
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 
@@ -776,7 +775,7 @@ class Sim(hpb.BaseSim):
 
             # Compute detectable hpv prevalence
             hpv_test_pars = hppar.get_screen_pars('hpv')
-            for state in ['none', 'cin1', 'cin2', 'cin3']:
+            for state in ['no_dysp', 'cin1', 'cin2', 'cin3']:
                 hpv_pos_probs = np.zeros(len(people))
                 for g in range(ng):
                     tp_inds = hpu.true(people[state][g,:])
@@ -954,7 +953,7 @@ class Sim(hpb.BaseSim):
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution by cytology
-        res['none_types'][:,(res['n_total_none'][:]>0)] = res['n_none'][:,(res['n_total_none'][:]>0)]/res['n_total_none'][(res['n_total_none'][:]>0)]
+        res['no_dysp_types'][:,(res['n_total_no_dysp'][:]>0)] = res['n_no_dysp'][:,(res['n_total_no_dysp'][:]>0)]/res['n_total_no_dysp'][(res['n_total_no_dysp'][:]>0)]
         res['cin1_types'][:,(res['n_total_cin1'][:]>0)] = res['n_cin1'][:,(res['n_total_cin1'][:]>0)]/res['n_total_cin1'][(res['n_total_cin1'][:]>0)]
         res['cin2_types'][:,(res['n_total_cin2'][:]>0)] = res['n_cin2'][:,(res['n_total_cin2'][:]>0)]/res['n_total_cin2'][(res['n_total_cin2'][:]>0)]
         res['cin3_types'][:,(res['n_total_cin3'][:]>0)] = res['n_cin3'][:,(res['n_total_cin3'][:]>0)]/res['n_total_cin3'][(res['n_total_cin3'][:]>0)]

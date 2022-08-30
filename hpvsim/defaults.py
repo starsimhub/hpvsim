@@ -80,7 +80,7 @@ class PeopleMeta(sc.prettyobj):
     states = [
         State('susceptible', bool, True, 'n_genotypes'),
         State('infectious', bool, False, 'n_genotypes'),
-        State('none', bool, False, 'n_genotypes'), # HPV without dysplasia
+        State('no_dysp', bool, False, 'n_genotypes'), # HPV without dysplasia
         State('cin1', bool, False, 'n_genotypes'),
         State('cin2', bool, False, 'n_genotypes'),
         State('cin3', bool, False, 'n_genotypes'),
@@ -100,7 +100,7 @@ class PeopleMeta(sc.prettyobj):
     # Set genotype states, which store info about which genotype a person is exposed to
     genotype_states = [
         State('cancer_genotype', default_int, -1)
-        ]
+    ]
 
     # Immune states, by genotype/vaccine
     imm_states = [
@@ -135,16 +135,16 @@ class PeopleMeta(sc.prettyobj):
 
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
-        State('dur_none', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
+        State('dur_no_dysp', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
         State('dur_disease', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has >= HPV present
-        State('dur_none2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
+        State('dur_no_dysp2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
         State('dur_cin12cin2', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN1 to CIN2
         State('dur_cin22cin3', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN2 to CIN3
         State('dur_cin2cancer', default_float, np.nan, shape='n_genotypes'),# Length of time to go from CIN3 to cancer
         State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
     ]
 
-    all_states = person + states + imm_states + intv_states + dates + durs + rship_states
+    all_states = person + states + genotype_states + imm_states + intv_states + dates + durs + rship_states
 
     @classmethod
     def validate(cls):
@@ -162,7 +162,7 @@ class PeopleMeta(sc.prettyobj):
 
         """
         # Validate
-        state_types = ['person', 'states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
+        state_types = ['person', 'states', 'genotype_states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
         for state_type in state_types:
             states = getattr(cls, state_type)
             n_states        = len(states)
@@ -184,7 +184,7 @@ flow_colors = [pl.cm.GnBu,      pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
-stock_keys   = ['susceptible',  'infectious',   'none',                 'cin1',         'cin2',         'cin3',         'cin']
+stock_keys   = ['susceptible',  'infectious',   'no_dysp',                 'cin1',         'cin2',         'cin3',         'cin']
 stock_names  = ['susceptible',  'infectious',   'without dysplasia',    'with CIN1',    'with CIN2',    'with CIN3',    'with CIN']
 stock_colors = [pl.cm.Greens,   pl.cm.GnBu,     pl.cm.GnBu,             pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
 
@@ -215,7 +215,7 @@ intv_flow_names  = ['screens',  'women screened',   'vaccinations', 'women vacci
 intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,      pl.cm.Oranges,  pl.cm.Oranges]
 
 # Type distributions by cytology
-type_keys  = ['none_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
+type_keys  = ['no_dysp_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
 type_names = ['HPV type distribution, normal cytology', 'HPV type distribution, CIN1 lesions', 'HPV type distribution, CIN2 lesions', 'HPV type distribution, CIN3 lesions', 'HPV type distribution, cervical cancer']
 type_colors = [pl.cm.GnBu, pl.cm.Oranges, pl.cm.Oranges,  pl.cm.Oranges, pl.cm.Reds]
 
