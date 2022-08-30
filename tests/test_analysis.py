@@ -196,7 +196,7 @@ def test_age_causal_analyzer():
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
 
-    sim = hpv.Sim(pars=pars, analyzers=[az1, hpv.age_causal_infection()])
+    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection()])
     sim.run()
     a = sim.get_analyzer(hpv.age_causal_infection)
 
@@ -212,9 +212,6 @@ def test_age_causal_analyzer():
     plt.xlabel('Year')
     plt.ylabel('Age bin')
     plt.show()
-
-    a2 = sim.get_analyzer(0)
-    a2.plot()
 
     return sim, a
 
