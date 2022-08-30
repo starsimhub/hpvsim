@@ -173,15 +173,12 @@ def test_reduce_analyzers():
 def test_age_causal_analyzer():
     sc.heading('Test age causal infection analyzer')
 
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
-
     pars = {
         'n_agents': n_agents,
         'n_years': 70,
         'burnin': 50,
         'start': 1950,
-        'genotypes': [hpv16, hpv18],
+        'genotypes': [16, 18],
         'location': 'tanzania',
         'dt': 0.5,
     }
@@ -199,12 +196,14 @@ def test_age_causal_analyzer():
     plt.scatter(a.years, a.median)
     plt.xlabel('Year')
     plt.ylabel('Median age of causal infection')
+    plt.show()
 
     v = a.bin_ages(np.arange(0,105,5))
     plt.figure()
     plt.imshow(v)
     plt.xlabel('Year')
     plt.ylabel('Age bin')
+    plt.show()
 
     return sim, a
 

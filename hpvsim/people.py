@@ -406,19 +406,6 @@ class People(hpb.BasePeople):
                     return 0
 
 
-    def check_death(self):
-        '''
-        Check for new deaths
-        '''
-        filter_inds = self.true('alive')
-        inds = self.check_inds(self.dead_other, self.date_dead_other, filter_inds=filter_inds)
-        deaths_female = len(hpu.true(self.is_female[inds]))
-        deaths_male = len(hpu.true(self.is_male[inds]))
-        # Apply deaths
-        new_other_deaths = self.make_die(inds, cause='other')
-        return new_other_deaths, deaths_female, deaths_male
-
-
     def check_clearance(self, genotype):
         '''
         Check for HPV clearance.
@@ -574,7 +561,7 @@ class People(hpb.BasePeople):
         base_t = self.t + offset if offset is not None else self.t
         self.date_infectious[g,inds] = base_t
         if layer != 'reactivation':
-            self.date_initial_infection[g,inds] = base_t
+            self.date_exposed[g,inds] = base_t
 
         # Count reinfections
         self.flows['reinfections'][g]           += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
@@ -640,6 +627,7 @@ class People(hpb.BasePeople):
         ''' Make people die of all other causes (background mortality) '''
 
         if cause=='other':
+            self.date_dead_other[inds] = self.t
             self.dead_other[inds] = True
         elif cause=='cancer':
             self.dead_cancer[inds] = True
