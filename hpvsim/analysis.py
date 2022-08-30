@@ -985,10 +985,6 @@ class age_results(Analyzer):
 class age_causal_infection(Analyzer):
     '''
     Determine the age at which people with cervical cancer were causally infected
-    Args:
-          TBC
-    Returns:
-
     '''
 
     def __init__(self, **kwargs):
@@ -1016,7 +1012,7 @@ class age_causal_infection(Analyzer):
             current_age = sim.people.age[cancer_inds]
             cancer_genotypes = sim.people.cancer_genotype[cancer_inds]
             date_exposed = sim.people.date_exposed[cancer_genotypes,cancer_inds]
-            offset = (date_exposed - sim.people.t) * sim.people.pars['dt']
+            offset = (sim.people.t - date_exposed) * sim.people.pars['dt']
             self.age_causal.append(current_age - offset)
         else:
             self.age_causal.append([])

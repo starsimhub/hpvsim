@@ -974,7 +974,7 @@ class Sim(hpb.BaseSim):
         cancerous_inds = hpu.true(self.people.cancerous)
         current_age = self.people.age[cancerous_inds]
         cancerous_genotype = self.people.cancer_genotype[cancerous_inds]
-        offset = (self.t -self.people.date_initial_infection[cancerous_genotype, cancerous_inds])*self['dt']
+        offset = (self.t -self.people.date_exposed[cancerous_genotype, cancerous_inds])*self['dt']
         causal_infection_age = current_age - offset
 
         return
