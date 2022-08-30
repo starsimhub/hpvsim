@@ -1204,20 +1204,6 @@ class Product():
 
 class PrecancerTreatment(Product):
     def __init__(self):
-        self.persistence = dict(
-            hpv16=dict(dist='beta', par1=2, par2=7),
-            hpv18=dict(dist='beta', par1=2, par2=7),
-            hpv31=dict(dist='beta', par1=2, par2=7),
-            hpv33=dict(dist='beta', par1=2, par2=7),
-            hpv35=dict(dist='beta', par1=2, par2=7),
-            hpv45=dict(dist='beta', par1=2, par2=7),
-            hpv51=dict(dist='beta', par1=2, par2=7),
-            hpv52=dict(dist='beta', par1=2, par2=7),
-            hpv56=dict(dist='beta', par1=2, par2=7),
-            hpv58=dict(dist='beta', par1=2, par2=7),
-            hpv6=dict(dist='beta', par1=2, par2=7),
-            hpv11=dict(dist='beta', par1=2, par2=7),
-        )
         self.efficacy=dict(
             none=0,
             cin1=0.936,
@@ -1247,29 +1233,12 @@ class PrecancerTreatment(Product):
             people[state][:, eff_treat_inds] = False  # People who get treated have their CINs removed
             people[f'date_{state}'][:, eff_treat_inds] = np.nan
 
-        successfully_treated = np.array(successfully_treated)
-
-        if len(successfully_treated) > 0:
-
+            # Clear infection for women who clear
             for g in range(people.pars['n_genotypes']):
-                # Determine whether infection persists
-                inf_inds = hpu.true(people['infectious'][g, successfully_treated])
-                inf_inds = successfully_treated[inf_inds]
-                persistence_probs = hpu.sample(**self.persistence[people.pars['genotype_map'][g]], size=len(inf_inds))
-
-                # Determine who will have persistent infection, give them new prognoses
-                to_persist = hpu.binomial_arr(persistence_probs)
-                persist_inds = inf_inds[to_persist]
-                people['none'][g, persist_inds] = True  # People whose HPV persists
-                dur_hpv = (people.t - people.date_infectious[g, persist_inds]) * people.pars['dt']
-                hpu.set_prognoses(people, persist_inds, g, dur_hpv)
-
-                # Clear infection for women who clear
-                to_clear = inf_inds[~to_persist]  # Determine who will clear infection
-                people['infectious'][g, to_clear] = False  # People whose HPV clears
-                people['none'][g, to_clear] = False  # People whose HPV clears
-                people.dur_disease[g, to_clear] = (people.t - people.date_infectious[g, to_clear]) * people.pars['dt']
-                hpi.update_peak_immunity(people, to_clear, imm_pars=people.pars, imm_source=g)
+                people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
+                people['none'][g, eff_treat_inds] = False  # People whose HPV clears
+                people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
+                hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
         people.treated[inds] = True
         people.date_treated[inds] = people.t
