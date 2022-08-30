@@ -15,7 +15,7 @@ from . import parameters as hppar
 from .settings import options as hpo # For setting global options
 
 
-__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results']
+__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection']
 
 
 class Analyzer(sc.prettyobj):
@@ -979,3 +979,40 @@ class age_results(Analyzer):
 
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
+
+
+
+class age_causal_infection(Analyzer):
+    '''
+    Determine the age at which people with cervical cancer were causally infected
+    '''
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.age_causal = []
+        self.years = None
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.years = sim.yearvec
+
+    @property
+    def median(self):
+        return np.array([np.median(x) for x in self.age_causal])
+
+    def bin_ages(self, bins):
+        out = np.zeros(((len(bins)-1),len(self.years)))
+        for i, ages in enumerate(self.age_causal):
+            out[:,i] = np.histogram(ages, bins)[0]
+        return out
+
+    def apply(self, sim):
+        cancer_inds = hpu.true((sim.people.date_cancerous == sim.t) & sim.people.alive)
+        if len(cancer_inds):
+            current_age = sim.people.age[cancer_inds]
+            cancer_genotypes = sim.people.cancer_genotype[cancer_inds]
+            date_exposed = sim.people.date_exposed[cancer_genotypes,cancer_inds]
+            offset = (sim.people.t - date_exposed) * sim.people.pars['dt']
+            self.age_causal.append(current_age - offset)
+        else:
+            self.age_causal.append([])

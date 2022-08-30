@@ -14,7 +14,7 @@ do_save = 0
 hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
 
-n_agents = [2e3,50e3][0] # Swap between sizes
+n_agents = [2e3,50e3][1] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,
@@ -259,17 +259,15 @@ def test_vaccinate_num(do_plot=False, do_save=False, fig_path=None):
 def test_screening(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test screening intervention')
 
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
     verbose = .1
-    debug = 1
+    debug = 0
 
     pars = {
         'n_agents': n_agents,
-        'n_years': 50,
-        'burnin': 10,
-        'start': 2000,
-        'genotypes': [hpv16, hpv18],
+        'n_years': 70,
+        'burnin': 50,
+        'start': 1950,
+        'genotypes': [16, 18],
         'location': 'tanzania',
         'dt': 0.5,
     }
@@ -318,28 +316,28 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
         )
     )
 
-    sim = hpv.Sim(pars=pars, analyzers=[az])
+    sim = hpv.Sim(pars=pars, analyzers=[az, hpv.age_causal_infection()])
     n_runs = 3
 
     # Define the scenarios
     scenarios = {
-        # 'no_screening_rsa': {
-        #     'name': 'No screening',
-        #     'pars': {
-        #     }
-        # },
+        'no_screening_rsa': {
+            'name': 'No screening',
+            'pars': {
+            }
+        },
         # 'hpv_screening': {
         #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_screening.label}',
         #     'pars': {
         #         'interventions': [hpv_screening],
         #     }
         # },
-        'hpv_screening_txvx': {
-            'name': f'Screening with therapeutic vaccine in 2030',
-            'pars': {
-                'interventions': [hpv_screening, txvx],
-            }
-        },
+        # 'hpv_screening_txvx': {
+        #     'name': f'Screening with therapeutic vaccine in 2030',
+        #     'pars': {
+        #         'interventions': [hpv_screening, txvx],
+        #     }
+        # },
         # 'hpv_hpv1618_screening': {
         #     'name': f'Screen {screen_prop * 100}% of 30-50y women with {hpv_hpv1618_screening.label}',
         #     'pars': {
@@ -465,10 +463,10 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_dynamic_pars()
-    # scens0 = test_complex_vax(do_plot=True)
-    # scens1 = test_vaccinate_prob(do_plot=True)
-    # scens2 = test_vaccinate_num(do_plot=True)
+    sim0 = test_dynamic_pars()
+    scens0 = test_complex_vax(do_plot=True)
+    scens1 = test_vaccinate_prob(do_plot=True)
+    scens2 = test_vaccinate_num(do_plot=True)
     scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True) # CURRENTLY BROKEN
 

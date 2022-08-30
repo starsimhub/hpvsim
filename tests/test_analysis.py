@@ -6,6 +6,7 @@ Tests for analyzers
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
+import matplotlib.pyplot as plt
 
 do_plot = 1
 do_save = 0
@@ -65,7 +66,7 @@ def test_age_results(do_plot=True):
 
     sc.heading('Testing by-age results')
 
-    pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='kenya')
+    pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='tanzania')
     pars['beta'] = .5
 
     pars['init_hpv_prev'] = {
@@ -76,6 +77,10 @@ def test_age_results(do_plot=True):
     az1 = hpv.age_results(
         result_keys=sc.objdict(
             hpv_prevalence=sc.objdict(
+                timepoints=['2019'],
+                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            ),
+            hpv_incidence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
@@ -117,7 +122,6 @@ def test_age_results(do_plot=True):
         # fig1 = sim.get_analyzer(1).plot()
 
     return sim, a
-
 
 
 def test_reduce_analyzers():
@@ -170,6 +174,48 @@ def test_reduce_analyzers():
     return sim, reduced_analyzer
 
 
+def test_age_causal_analyzer():
+    sc.heading('Test age causal infection analyzer')
+
+    pars = {
+        'n_agents': n_agents,
+        'n_years': 70,
+        'burnin': 50,
+        'start': 1950,
+        'genotypes': [16, 18],
+        'location': 'tanzania',
+        'network': 'default',
+        'hpv_control_prob': 0.9,
+        'debut': dict(f=dict(dist='normal', par1=14.0, par2=2.0),
+                      m=dict(dist='normal', par1=16.0, par2=2.5)),
+        'dt': 0.5,
+    }
+    pars['init_hpv_prev'] = {
+        'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
+        'm'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
+        'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
+    }
+
+    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection()])
+    sim.run()
+    a = sim.get_analyzer(hpv.age_causal_infection)
+
+    plt.figure()
+    plt.scatter(a.years, a.median)
+    plt.xlabel('Year')
+    plt.ylabel('Median age of causal infection')
+    plt.show()
+
+    v = a.bin_ages(np.arange(0,105,5))
+    plt.figure()
+    plt.imshow(v)
+    plt.xlabel('Year')
+    plt.ylabel('Age bin')
+    plt.show()
+
+    return sim, a
+
+
 
 
 #%% Run as a script
@@ -181,6 +227,7 @@ if __name__ == '__main__':
     sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()
+    sim3, a3    = test_age_causal_analyzer()
 
     sc.toc(T)
     print('Done.')

@@ -276,6 +276,7 @@ def set_prognoses(people, inds, g, dur_none):
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
     people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
 
+
     return
 
 
