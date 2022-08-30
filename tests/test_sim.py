@@ -202,7 +202,7 @@ def test_result_consistency():
     # The test below was faulty, but leaving it here (commented out) is instructive.
     # Specifically, the total number of people infectious by genotype (sim.results['n_infectious'])
     # doesn't necessarily sum to the number of infectious people in total (sim.results['n_total_infectious'])
-    # because of the possibility of coinfections within a sinlg person.
+    # because of the possibility of coinfections within a single person.
     # So sim.results['n_total_infectious'] represents the total number of people who have 1+ infections
     # whereas sim.results['n_infectious'] represents the total number of people infected with each genotype.
     # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
