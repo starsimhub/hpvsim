@@ -1129,7 +1129,7 @@ class Screening(Intervention):
 
             # Set screening states and dates
             sim.people.intv_flows['screens'] += len(screen_inds)
-            sim.people.intv_flows['screened'] += len(hpu.true(eligible_ages & (sim.people.screens == 0)))
+            sim.people.intv_flows['screened'] += len(hpu.true(sim.people[screen_inds].screens == 0))
             sim.people.screened[screen_inds] = True
             sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
