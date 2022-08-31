@@ -410,10 +410,6 @@ class Sim(hpb.BaseSim):
         for var, name, color in zip(hpd.intv_flow_keys, hpd.intv_flow_names, hpd.intv_flow_colors):
             results[f'{var}'] = init_res(f'{name}', color=color)
 
-        # Create cancer results
-        for var, name, cmap in zip(hpd.cancer_flow_keys, hpd.cancer_flow_names, hpd.cancer_flow_colors):
-            results[f'{var}'] = init_res(f'{name}', color=cmap(0.95))
-
         # Create by-age results using standard populations
         results['cancers_by_age'] = init_res('Cancers by age', n_rows=len(self.pars['standard_pop'][0,:])-1)
         results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
@@ -440,12 +436,9 @@ class Sim(hpb.BaseSim):
         results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence', color=hpd.stock_colors[0](0.95))
 
-        # Cancer stocks
-        results['n_cancerous'] = init_res('Number with cancer', color=hpd.cancer_flow_colors[0](0.95))
-        results['n_cancerous_by_genotype'] = init_res('Number with cancer, by attributable genotype', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
-        results['cancer_incidence'] = init_res('Cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
-        results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color=hpd.cancer_flow_colors[0](0.95))
-        results['cancer_mortality'] = init_res('Cancer mortality', color=hpd.cancer_flow_colors[0](0.95))
+        # Additional cancer results
+        results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color='#fcba03')
+        results['cancer_mortality'] = init_res('Cancer mortality')
 
         # Other results
         results['n_alive'] = init_res('Number alive')
@@ -681,7 +674,7 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cin1] *= rel_trans_pars['cin1']
         rel_trans[people.cin2] *= rel_trans_pars['cin2']
         rel_trans[people.cin3] *= rel_trans_pars['cin3']
-        rel_trans[:, people.cancerous] *= rel_trans_pars['cancerous']
+        rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
         # Loop over layers
         ln = 0 # Layer number
@@ -729,13 +722,12 @@ class Sim(hpb.BaseSim):
         # Update counts for this time step: flows
         for key,count in people.total_flows.items():
             self.results[key][idx] += count
-        for key,count in people.cancer_flows.items():
-            self.results[key][idx] += count
         for key,count in people.demographic_flows.items():
             self.results[key][idx] += count
         for key,count in people.flows.items():
-            for genotype in range(ng):
-                self.results[key][genotype][idx] += count[genotype]
+            if key != 'cancer_deaths':
+                for genotype in range(ng):
+                    self.results[key][genotype][idx] += count[genotype]
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
@@ -748,11 +740,11 @@ class Sim(hpb.BaseSim):
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 
-            # Create cancer type distribution
-            ca_genotype_bins = np.bincount(people.cancer_genotype[people.cancer_genotype >= 0])
-            if len(ca_genotype_bins):
-                for g in range(len(ca_genotype_bins)):
-                    self.results['n_cancerous_by_genotype'][g,idx] = ca_genotype_bins[g]
+            # # Create cancer type distribution
+            # ca_genotype_bins = np.bincount(people.cancer_genotype[people.cancer_genotype >= 0])
+            # if len(ca_genotype_bins):
+            #     for g in range(len(ca_genotype_bins)):
+            #         self.results['n_cancerous_by_genotype'][g,idx] = ca_genotype_bins[g]
 
             # Create total stocks
             for key in hpd.stock_keys:
@@ -766,9 +758,9 @@ class Sim(hpb.BaseSim):
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
             # Update cancers and cancers by age
-            self.results['n_cancerous'][idx] = people.count('cancerous')
+            # self.results['n_cancerous'][idx] = people.count('cancerous')
             cases_by_age = self.results['cancers_by_age'][:, idx]
-            denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous], self.pars['standard_pop'][0,])[0]
+            denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous.any(axis=0)], self.pars['standard_pop'][0,])[0]
             age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
             standard_pop = self.pars['standard_pop'][1, :-1]
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
@@ -934,7 +926,7 @@ class Sim(hpb.BaseSim):
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
-        at_risk_females = alive_females - res['n_cancerous'][:]
+        at_risk_females = alive_females - res['n_cancerous'][:,:].sum(axis=0)
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
         self.results['total_cin1_incidence'][:]    = res['total_cin1s'][:] / demoninator
@@ -946,10 +938,14 @@ class Sim(hpb.BaseSim):
         self.results['cin3_incidence'][:]          = res['cin3s'][:] / demoninator
         self.results['cin_incidence'][:]           = res['cins'][:] / demoninator
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
-        self.results['detected_cancer_incidence'][:]      = res['detected_cancers'][:] / demoninator
+        # self.results['detected_cancer_incidence'][:]      = res['detected_cancers'][:] / demoninator
 
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor
+        import traceback;
+        traceback.print_exc();
+        import pdb;
+        pdb.set_trace()
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution by cytology

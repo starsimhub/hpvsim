@@ -103,7 +103,6 @@ class People(hpb.BasePeople):
         self.flows_by_sex       = {f'{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'         : 0 for key in hpd.dem_keys}
         self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
-        self.cancer_flows       = {f'{key}'         : 0 for key in hpd.cancer_flow_keys}
         self.by_age_flows       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
 
         return
@@ -156,20 +155,22 @@ class People(hpb.BasePeople):
             self.flows['cin2s'][g]              = self.check_cin2(g)
             self.flows['cin3s'][g]              = self.check_cin3(g)
             new_cancers, cancers_by_age         = self.check_cancer(g)
-            self.cancer_flows['cancers']        += new_cancers
+            self.flows['cancers']               += new_cancers
             self.by_age_flows['cancers_by_age'] += cancers_by_age
             self.flows['cins'][g]               = self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
             self.check_clearance(g)
 
         # Perform updates that are not genotype specific
-        self.cancer_flows['cancer_deaths'] = self.check_cancer_deaths()
-        self.cancer_flows['detected_cancers'] = self.check_cancer_detection()
+        self.flows['cancer_deaths'] = self.check_cancer_deaths()
+        # self.cancer_flows['detected_cancers'] = self.check_cancer_detection()
 
         # Create total flows
         self.total_flows['total_cin1s'] = self.flows['cin1s'].sum()
         self.total_flows['total_cin2s'] = self.flows['cin2s'].sum()
         self.total_flows['total_cin3s'] = self.flows['cin3s'].sum()
         self.total_flows['total_cins']  = self.flows['cins'].sum()
+        self.total_flows['total_cancers']  = self.flows['cancers'].sum()
+        # self.total_flows['total_cancer_deaths']  = self.flows['cancer_deaths'].sum()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
         self.sus_pool = self.susceptible.all(axis=0) # True for people with no infection at the start of the timestep
@@ -348,11 +349,10 @@ class People(hpb.BasePeople):
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
-        inds = self.check_inds(self.cancerous, self.date_cancerous, filter_inds=filter_inds)
-        self.cancerous[inds] = True
-        self.cancer_genotype[inds] = genotype
+        inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
+        self.cancerous[genotype, inds] = True
         self.cin3[genotype, inds] = False # No longer counted as CIN3
-        self.susceptible[:, inds] = False
+        self.susceptible[:, inds] = False # No longer susceptible to any new genotypes
         self.date_clearance[:, inds] = np.nan
 
         # Calculations for age-standardized cancer incidence
@@ -372,8 +372,9 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
         self.make_die(inds, cause='cancer')
 
-        # check which of these were detected by symptom or screening
-        self.cancer_flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
+        # # check which of these were detected by symptom or screening
+        # self.cancer_flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
+
         return len(inds)
 
 
@@ -640,9 +641,10 @@ class People(hpb.BasePeople):
         self.cin1[:, inds] = False
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False
-        self.cancerous[inds] = False
-        self.cancer_genotype[inds] = -1
+        self.cancerous[:, inds] = False
         self.alive[inds] = False
+
+        # Wipe future dates
 
         return len(inds)
 

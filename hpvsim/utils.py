@@ -266,16 +266,15 @@ def set_prognoses(people, inds, g, dur_none):
                                                   np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
 
     # Case 2.2.2.2: Severe dysplasia progresses to cancer
-    excl_inds = true(people.date_cancerous[cancer_inds] < people.t)  # Don't count cancers that were acquired before now
-    people.date_cancerous[cancer_inds[excl_inds]] = np.nan
-    people.date_cancerous[cancer_inds] = np.fmin(people.date_cancerous[cancer_inds],
+    excl_inds = true(people.date_cancerous[g,cancer_inds] < people.t)  # Don't count cancers that were acquired before now
+    people.date_cancerous[g,cancer_inds[excl_inds]] = np.nan
+    people.date_cancerous[g,cancer_inds] = np.fmin(people.date_cancerous[g,cancer_inds],
                                                     people.date_cin1[g, cancer_inds] +
                                                     np.ceil(time_to_cancer / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
 
     # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
-    people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
-
+    people.date_dead_cancer[cancer_inds] = people.date_cancerous[g,cancer_inds] + np.ceil(dur_cancer / dt)
 
     return
 
