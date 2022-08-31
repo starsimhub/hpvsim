@@ -7,7 +7,7 @@ import numpy as np
 import sciris as sc
 from .. import misc as hpm
 
-__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_death_rates', 'get_birth_rates']
+__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates', 'get_birth_rates']
 
 
 thisdir = sc.path(sc.thisdir())
@@ -113,7 +113,7 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
     Load age distribution for a given country or countries.
 
     Args:
-        location (str or list): name of the country to load the age distribution for
+        location (str): name of the country to load the age distribution for
         year (int): year to load the age distribution for
         total_pop_file (str): optional filepath to save total population size for every year
 
@@ -151,6 +151,32 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
         dd.to_csv(total_pop_file)
 
     return result
+
+
+def get_total_pop(location=None):
+    '''
+    Load total population for a given country or countries.
+
+    Args:
+        location (str or list): name of the country to load the total population for
+
+    Returns:
+        pop_data (dataframe): Dataframe of year and pop_size columns
+    '''
+
+    # Load the raw data
+    try:
+        df = load_file(files.age_dist)
+    except Exception as E:
+        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+        raise ValueError(errormsg) from E
+
+    # Extract the age distribution for the given location and year
+    full_df = map_entries(df, location)[location]
+    dd = full_df.groupby("Time").sum()["PopTotal"]
+    dd = dd * 1e3
+    df = sc.dataframe(dd).reset_index().rename(columns={'Time':'year', 'PopTotal':'pop_size'})
+    return df
 
 
 def get_death_rates(location=None, by_sex=True, overall=False):
