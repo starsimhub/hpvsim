@@ -5,24 +5,42 @@ Load data
 #%% Housekeeping
 import numpy as np
 import sciris as sc
+import unicodedata
+import re
 from .. import misc as hpm
 
 __all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates', 'get_birth_rates']
 
 
-thisdir = sc.path(sc.thisdir())
+filesdir = sc.path(sc.thisdir()) / 'files'
 files = sc.objdict()
+files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
 
 for k,v in files.items():
-    files[k] = thisdir / v
+    files[k] = filesdir / v
 
 
-def load_file(filename):
+def sanitizestr(string=None, alphanumeric=True, nospaces=True, asciify=True, lower=True, spacechar='_', symchar='_'):
+    ''' Remove all non-printable characters from a string -- to be moved to Sciris eventually '''
+    string = str(string)
+    if asciify:
+        string = unicodedata.normalize('NFKD', string).encode('ascii', 'ignore').decode()
+    if nospaces:
+        string = string.replace(' ', spacechar)
+    if lower:
+        string = string.lower()
+    if alphanumeric:
+        string = re.sub('[^0-9a-zA-Z ]', symchar, string)
+    return string
+
+
+def load_file(path, relative=False):
     ''' Load a data file from the local data folder '''
-    path = sc.path(sc.thisdir()) / filename
+    if relative:
+        path = sc.path(sc.thisdir()) / 'files' / path
     obj = sc.load(path)
     return obj
 
@@ -35,7 +53,7 @@ def get_country_aliases(wb=False):
        'Cape Verde':     'Cabo Verdeo',
        'Hong Kong':      'China, Hong Kong Special Administrative Region',
        'Macao':          'China, Macao Special Administrative Region',
-       "Cote d'Ivore":   'Côte d’Ivoire',
+       "Cote d'Ivoire":   'Côte d’Ivoire',
        "Ivory Coast":    'Côte d’Ivoire',
        'DRC':            'Democratic Republic of the Congo',
        'Iran':           'Iran (Islamic Republic of)',
@@ -58,7 +76,11 @@ def get_country_aliases(wb=False):
        'Vietnam':        'Viet Nam',
         }
 
-    if wb: country_mappings['DRC'] = 'Congo, Dem. Rep.' # Slightly different aliases for WB data
+    # Slightly different aliases for WB data
+    if wb:
+        for key,val in country_mappings:
+            if val == 'Democratic Republic of the Congo':
+                country_mappings[key] = 'Congo, Dem. Rep.'
 
     return country_mappings # Convert to lowercase
 

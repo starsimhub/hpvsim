@@ -1,5 +1,12 @@
 '''
-Download data needed for HPVsim. This file needs to be run before HPVsim will work.
+Download data needed for HPVsim.
+
+Typically, this is done automatically: on load, HPVsim checks if the data are already
+downloaded, and if not, downloads them using the quick_download() function. The
+"slow download" functions supply the files that are usually zipped and stored in
+a separate repository, hpvsim_data.
+
+To ensure the data is updated, update the data_version parameter below.
 '''
 
 import os
@@ -13,13 +20,16 @@ import sciris as sc
 from . import loaders
 
 # Set parameters
+data_version = '1.0' # Data version
 quick_url = 'https://github.com/amath-idm/hpvsim_data/blob/main/hpvsim_data.zip?raw=true'
 age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
 death_stem = 'WPP2022_Life_Table_Abridged_Medium_'
 base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/'
 years = ['1950-2021', '2022-2100']
 
+
 thisdir = sc.path(sc.thisdir())
+filesdir = thisdir / 'files'
 
 __all__ = ['get_data', 'quick_download', 'check_downloaded', 'remove_data']
 
@@ -55,7 +65,7 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
 
     df = pd.concat(dfs)
     dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
-    sc.save(thisdir/outfile, dd)
+    sc.save(filesdir/outfile, dd)
 
     T.toc(doprint=False)
     print(f'Done with {label}: took {T.timings[:].sum():0.1f} s.')
@@ -88,7 +98,7 @@ def get_birth_data(start=1960, end=2020):
     for country in birth_rates['Country'].unique():
         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,2:]
     d['years'] = np.arange(start, end)
-    sc.saveobj(thisdir/'birth_rates.obj', d)
+    sc.saveobj(filesdir/'birth_rates.obj', d)
     T.toc(label='Done with birth data')
     return d
 
@@ -133,17 +143,20 @@ def quick_download(verbose=True, init=False):
         sc.heading('Downloading preprocessed HPVsim data')
         if init:
             print('Note: this automatic download only happens once, when HPVsim is first run.\n\n')
-    filepath = thisdir/'tmp_hpvsim_data.zip'
+    filepath = sc.makefilepath(filesdir / 'tmp_hpvsim_data.zip')
     sc.download(url=quick_url, filename=filepath, convert=False, verbose=verbose)
-    sc.loadzip(filepath, outfolder=thisdir)
+    sc.loadzip(filepath, outfolder=filesdir)
     sc.rmpath(filepath)
     if verbose:
         print('\nData downloaded.')
     return
 
 
-def check_downloaded(verbose=False):
-    ''' Check if data is downloaded '''
+def check_downloaded(verbose=False, check_version=True):
+    '''
+    Check if data is downloaded. Note: to update data, update the date here and
+    in data/files/metadata.json.
+    '''
     exists = dict()
     for key,fn in loaders.files.items():
         exists[key] = os.path.exists(fn)
@@ -154,7 +167,16 @@ def check_downloaded(verbose=False):
         if result:
             print('All files exist')
         else:
-            print('At least one file missing')
+            print(f'At least one file missing: {exists}')
+    if result and check_version: # Don't bother checking version if files are missing
+        metadata = sc.loadjson(loaders.files.metadata)
+        match = metadata['version'] == data_version
+        if verbose:
+            if match:
+                print(f'Versions match ({data_version})')
+            else:
+                print(f'Versions do not match ({metadata["version"]} != {data_version})')
+        result = result and match
     return result
 
 
