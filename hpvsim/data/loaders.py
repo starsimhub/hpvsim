@@ -78,7 +78,7 @@ def get_country_aliases(wb=False):
 
     # Slightly different aliases for WB data
     if wb:
-        for key,val in country_mappings:
+        for key,val in country_mappings.items():
             if val == 'Democratic Republic of the Congo':
                 country_mappings[key] = 'Congo, Dem. Rep.'
 

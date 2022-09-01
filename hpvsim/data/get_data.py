@@ -152,32 +152,40 @@ def quick_download(verbose=True, init=False):
     return
 
 
-def check_downloaded(verbose=False, check_version=True):
+def check_downloaded(verbose=1, check_version=True):
     '''
     Check if data is downloaded. Note: to update data, update the date here and
     in data/files/metadata.json.
+
+    Args:
+        verbose (int): detail to print (0 = none, 1 = reason for failure, 2 = everything)
+        check_version (bool): whether to treat a version mismatch as a failure
     '''
+
+    # Do file checks
     exists = dict()
     for key,fn in loaders.files.items():
         exists[key] = os.path.exists(fn)
-        if verbose:
-            print(f'Checking {fn}: {exists[key]}')
-    result = all(list(exists.values()))
-    if verbose:
-        if result:
-            print('All files exist')
-        else:
-            print(f'At least one file missing: {exists}')
-    if result and check_version: # Don't bother checking version if files are missing
+        if verbose>1:
+            print(f'HPVsim data: checking {fn}: {exists[key]}')
+    ok = all(list(exists.values()))
+    if not ok and verbose:
+        print(f'HPVsim data: at least one file missing: {exists}')
+    elif ok and verbose>1:
+        print('HPVsim data: all files exist')
+
+    # Do version check (if files exist)
+    if ok and check_version:
         metadata = sc.loadjson(loaders.files.metadata)
         match = metadata['version'] == data_version
         if verbose:
-            if match:
-                print(f'Versions match ({data_version})')
-            else:
-                print(f'Versions do not match ({metadata["version"]} != {data_version})')
-        result = result and match
-    return result
+            if not match and verbose:
+                print(f'HPVsim data: versions do not match ({metadata["version"]} != {data_version})')
+            elif match and verbose>1:
+                print(f'HPVsim data: versions match ({data_version})')
+        ok = ok and match
+
+    return ok
 
 
 def remove_data(verbose=True, **kwargs):
