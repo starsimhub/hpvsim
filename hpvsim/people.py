@@ -553,8 +553,6 @@ class People(hpb.BasePeople):
         else:
             n_migrate = 0
 
-        print('debug:', year, n_migrate)
-
         return n_migrate
 
 
