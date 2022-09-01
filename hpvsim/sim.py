@@ -384,8 +384,12 @@ class Sim(hpb.BaseSim):
 
         # Create new flows
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
-            for flow,name,cmap in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors):
-                results[f'{lkey+flow}'] = init_res(f'{llab} {name}', color=cmap(cstride), n_rows=g)
+            for flow in hpd.flows:
+                if (flow.by_genotype and lkey=='') or lkey=='total_':
+                    results[f'{lkey + flow.name}'] = init_res(f'{llab} {flow.label}', color=flow.cmap(cstride), n_rows=g)
+
+            # for flow,name,cmap in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors):
+            #     results[f'{lkey+flow}'] = init_res(f'{llab} {name}', color=cmap(cstride), n_rows=g)
 
         # Create stocks
         for lkey,llabel,cstride,g in zip(['total_',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
@@ -942,19 +946,13 @@ class Sim(hpb.BaseSim):
 
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor
-        import traceback;
-        traceback.print_exc();
-        import pdb;
-        pdb.set_trace()
-        self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
+        self.results['cancer_mortality'][:]         = res['total_cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution by cytology
-        res['no_dysp_types'][:,(res['n_total_no_dysp'][:]>0)] = res['n_no_dysp'][:,(res['n_total_no_dysp'][:]>0)]/res['n_total_no_dysp'][(res['n_total_no_dysp'][:]>0)]
-        res['cin1_types'][:,(res['n_total_cin1'][:]>0)] = res['n_cin1'][:,(res['n_total_cin1'][:]>0)]/res['n_total_cin1'][(res['n_total_cin1'][:]>0)]
-        res['cin2_types'][:,(res['n_total_cin2'][:]>0)] = res['n_cin2'][:,(res['n_total_cin2'][:]>0)]/res['n_total_cin2'][(res['n_total_cin2'][:]>0)]
-        res['cin3_types'][:,(res['n_total_cin3'][:]>0)] = res['n_cin3'][:,(res['n_total_cin3'][:]>0)]/res['n_total_cin3'][(res['n_total_cin3'][:]>0)]
-        cinds = res['n_cancerous'][:]>0 # Indices where there is some cancer present
-        self.results['cancer_types'][:,cinds] = res['n_cancerous_by_genotype'][:,cinds]/res['n_cancerous'][cinds]
+        for which in hpd.type_keys:
+            subkey = which[:-6] # Switch from e.g. cin1_types to cin1, i.e. remove the _types part of the key
+            if subkey=='cancer': subkey='cancerous'
+            res[which][:, (res[f'n_total_{subkey}'][:]>0)] = res[f'n_{subkey}'][:,(res[f'n_total_{subkey}'][:]>0)]/res[f'n_total_{subkey}'][(res[f'n_total_{subkey}'][:]>0)]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])
@@ -964,13 +962,6 @@ class Sim(hpb.BaseSim):
         self.results['cum_vaccinated'][:] = np.cumsum(self.results['new_vaccinated'][:], axis=0)
         self.results['cum_total_vaccinated'][:] = np.cumsum(self.results['new_total_vaccinated'][:])
         self.results['cum_doses'][:] = np.cumsum(self.results['new_doses'][:])
-
-        # Age of causal infection
-        cancerous_inds = hpu.true(self.people.cancerous)
-        current_age = self.people.age[cancerous_inds]
-        cancerous_genotype = self.people.cancer_genotype[cancerous_inds]
-        offset = (self.t -self.people.date_exposed[cancerous_genotype, cancerous_inds])*self['dt']
-        causal_infection_age = current_age - offset
 
         return
 
