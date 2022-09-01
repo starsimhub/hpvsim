@@ -102,8 +102,6 @@ def make_pars(**kwargs):
     # Screening and treatment parameters
     pars['screen_pars']     = dict()  # Screening method that is being used; populated during initialization
     pars['treat_pars'] = dict()  # Treatment method that is being used; populated during initialization
-    pars['cancer_symp_detection'] = 0.01 # Annual probability of having cancer detected via symptoms, rather than screening
-    pars['cancer_symp_treatment'] = 0.01 # Probability of receiving treatment for those with symptom-detected cancer
 
     # Durations
     pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1

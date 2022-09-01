@@ -431,11 +431,12 @@ class Sim(hpb.BaseSim):
         results['new_txvx_doses'] = init_res('New therapeutic vaccine doses')
         results['new_txvx_vaccinated'] = init_res('Newly therapeutic vaccinated')
 
-        # Detectable HPV
+        # Detections
         results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
         results['n_total_detectable_hpv'] = init_res('Number with detectable HPV')
         results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence', color=hpd.stock_colors[0](0.95))
+        results['detected_cancers']
 
         # Additional cancer results
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color='#fcba03')

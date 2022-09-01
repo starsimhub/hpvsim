@@ -216,6 +216,24 @@ def test_age_causal_analyzer():
     return sim, a
 
 
+def test_detection():
+    sc.heading('Test detection analyzers')
+
+    pars = {
+        'n_agents': n_agents,
+        'n_years': 70,
+        'burnin': 50,
+        'start': 1950,
+        'genotypes': [16, 18],
+        'location': 'tanzania',
+        'dt': 0.5,
+    }
+
+    sim = hpv.Sim(pars=pars, analyzers=[hpv.cancer_detection()])
+    sim.run()
+    a = sim.get_analyzer(hpv.cancer_detection)
+
+    return sim, a
 
 
 #%% Run as a script
@@ -223,11 +241,12 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
-    sim2, a2    = test_reduce_analyzers()
-    sim3, a3    = test_age_causal_analyzer()
+    # people      = test_snapshot()
+    # sim0, a0    = test_age_pyramids()
+    # sim1, a1    = test_age_results()
+    # sim2, a2    = test_reduce_analyzers()
+    # sim3, a3    = test_age_causal_analyzer()
+    sim, a    = test_detection()
 
     sc.toc(T)
     print('Done.')

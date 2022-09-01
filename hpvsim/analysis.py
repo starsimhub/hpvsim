@@ -15,7 +15,8 @@ from . import parameters as hppar
 from .settings import options as hpo # For setting global options
 
 
-__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection']
+__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection',
+           'cancer_detection']
 
 
 class Analyzer(sc.prettyobj):
@@ -1020,3 +1021,59 @@ class age_causal_infection(Analyzer):
             self.age_causal.append(current_age - offset)
         else:
             self.age_causal.append([])
+
+
+
+class cancer_detection(Analyzer):
+    '''
+    Cancer detection via symptoms
+    Args:
+        symp_prob: Probability of having cancer detected via symptoms, rather than screening
+        treat_prob: Probability of receiving treatment for those with symptom-detected cancer
+    '''
+
+    def __init__(self, symp_prob=0.01, treat_prob=0.01, **kwargs):
+        super().__init__(**kwargs)
+        self.symp_prob = symp_prob
+        self.treat_prob = treat_prob
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.dt = sim['dt']
+
+        # Add entries to results
+
+
+    def apply(self, sim):
+        '''
+        Check for new cancer detection, treat subset of detected cancers
+        '''
+        cancer_genotypes, cancer_inds = sim.people.cancerous.nonzero()  # Get everyone with cancer
+
+        if len(cancer_inds) > 0:
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
+
+            detection_probs = np.full(len(cancer_inds), self.symp_prob / self.dt, dtype=hpd.default_float)  # Initialize probabilities of cancer detection
+            detection_probs[self.detected_cancer[cancer_inds]] = 0
+            is_detected = hpu.binomial_arr(detection_probs)
+            is_detected_inds = cancer_inds[is_detected]
+            if len(is_detected_inds) == 0:
+                return 0
+            else:
+                self.detected_cancer[is_detected_inds] = True
+                self.date_detected_cancer[is_detected_inds] = self.t
+                treat_probs = np.full(len(is_detected_inds), self.pars['cancer_symp_treatment'])
+                treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
+                if 'cancer_treatment' in self.pars['treat_pars'].keys():
+                    new_dur_cancer = hpu.sample(**self.pars['treat_pars']['cancer_treatment']['dur'],
+                                                size=len(treat_inds))
+                    self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
+                    self.treated[treat_inds] = True
+                    self.date_treated[treat_inds] = self.t
+                    return len(is_detected_inds)
+                else:
+                    return 0
+

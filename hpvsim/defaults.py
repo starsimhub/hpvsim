@@ -45,7 +45,7 @@ class State():
         self.dtype = dtype
         self.fill_value = fill_value
         self.shape = shape
-        self.label = label
+        self.label = label or name
         self.cmap = cmap
 
     def new(self, pars, n):
@@ -69,9 +69,13 @@ class PeopleMeta(sc.prettyobj):
     # Set the properties of a person
     person = [
         State('uid',            default_int),           # Int
-        State('age',            default_float, np.nan), # Float
-        State('sex',            default_float, np.nan), # Float
-        State('debut',          default_float, np.nan), # Float
+        State('age',            default_float,  np.nan), # Float
+        State('sex',            default_float,  np.nan), # Float
+        State('debut',          default_float,  np.nan), # Float
+        State('doses',          default_int,    0),  # Number of doses of the prophylactic vaccine given per person
+        State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
+        State('vaccine_source', default_int,    -1), # Index of the prophylactic vaccine that individual received
+        State('screens',        default_int,    0),  # Number of screens given per person
     ]
 
     # Set the states that a person can be in
@@ -112,15 +116,24 @@ class PeopleMeta(sc.prettyobj):
         State('latent',     bool, label='with latent infection', cmap=pl.cm.GnBu), # intersection of no_dysp and inactive.
     ]
 
+    # Additional intervention states
+    intv_states = [
+        State('detected_cancer', bool,          False, cmap=pl.cm.Reds, by_genotype=False), # Whether the person's cancer has been detected
+        State('screened',       bool,           False, cmap=pl.cm.Blues, by_genotype=False), # Whether the person has been screened (how does this change over time?)
+        State('treated',        bool,           False, cmap=pl.cm.autumn, by_genotype=False), # Whether the person has been treated
+        State('vaccinated',     bool,           False), # Whether the person has received the prophylactic vaccine
+        State('tx_vaccinated',  bool,           False), # Whether the person has received the therapeutic vaccine
+    ]
+
     # Collection of mutually exclusive + collectively exhaustive states
     mece_states = alive_states + viral_states + dysp_states
 
     # Collection of states that we store as stock results
-    stock_states = viral_states + dysp_states + derived_states
+    stock_states = viral_states + dysp_states + derived_states + intv_states
 
     # Set dates
     # Convert each MECE state and derived state into a date except for susceptible, alive, and no_dysp (which are True by default)
-    dates = [State(f'date_{state.name}', default_float, np.nan, shape=state.shape) for state in mece_states+derived_states if not state.fill_value]
+    dates = [State(f'date_{state.name}', default_float, np.nan, shape=state.shape) for state in mece_states+derived_states+intv_states if not state.fill_value]
 
     # Immune states, by genotype/vaccine
     imm_states = [
@@ -128,19 +141,6 @@ class PeopleMeta(sc.prettyobj):
         State('peak_imm',       default_float,  0,'n_imm_sources'),  # Float, peak level of immunity
         State('imm',            default_float,  0,'n_imm_sources'),  # Float, current immunity level
         State('t_imm_event',    default_int,    0,'n_imm_sources'),  # Int, time since immunity event
-    ]
-
-    # Additional intervention states
-    intv_states = [
-        State('detected_cancer', bool,          False), # Whether the person's cancer has been detected
-        State('screened',       bool,           False), # Whether the person has been screened (how does this change over time?)
-        State('treated',        bool,           False), # Whether the person has been treated
-        State('vaccinated',     bool,           False), # Whether the person has received the prophylactic vaccine
-        State('tx_vaccinated',  bool,           False), # Whether the person has received the therapeutic vaccine
-        State('doses',          default_int,    0),     # Number of doses of the prophylactic vaccine given per person
-        State('txvx_doses',     default_int,    0),     # Number of doses of the therapeutic vaccine given per person
-        State('vaccine_source', default_int,    -1),    # Index of the prophylactic vaccine that individual received
-        State('screens',        default_int,    0),     # Number of screens given per person
     ]
 
     # Relationship states

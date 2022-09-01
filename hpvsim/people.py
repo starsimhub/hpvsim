@@ -162,7 +162,7 @@ class People(hpb.BasePeople):
 
         # Perform updates that are not genotype specific
         self.flows['cancer_deaths'] = self.check_cancer_deaths()
-        # self.cancer_flows['detected_cancers'] = self.check_cancer_detection()
+        # self.flows['detected_cancers'] = self.check_cancer_detection()
 
         # Create total flows
         self.total_flows['total_cin1s'] = self.flows['cin1s'].sum()
@@ -376,35 +376,6 @@ class People(hpb.BasePeople):
         # self.cancer_flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
 
         return len(inds)
-
-
-    def check_cancer_detection(self):
-        '''
-        Check for new cancer detection, treat subset of detected cancers
-        '''
-        cancer_inds = self.true('cancerous') # Get everyone with cancer
-        if len(cancer_inds)==0:
-            return 0
-        else:
-            detection_probs = np.full(len(cancer_inds), self.pars['cancer_symp_detection']/self.dt, dtype=hpd.default_float) # Initialize probabilities of cancer detection
-            detection_probs[self.detected_cancer[cancer_inds]] = 0
-            is_detected = hpu.binomial_arr(detection_probs)
-            is_detected_inds = cancer_inds[is_detected]
-            if len(is_detected_inds)==0:
-                return 0
-            else:
-                self.detected_cancer[is_detected_inds] = True
-                self.date_detected_cancer[is_detected_inds] = self.t
-                treat_probs = np.full(len(is_detected_inds), self.pars['cancer_symp_treatment'])
-                treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-                if 'cancer_treatment' in self.pars['treat_pars'].keys():
-                    new_dur_cancer = hpu.sample(**self.pars['treat_pars']['cancer_treatment']['dur'], size=len(treat_inds))
-                    self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
-                    self.treated[treat_inds] = True
-                    self.date_treated[treat_inds] = self.t
-                    return len(is_detected_inds)
-                else:
-                    return 0
 
 
     def check_clearance(self, genotype):
