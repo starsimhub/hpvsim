@@ -489,7 +489,7 @@ class People(hpb.BasePeople):
         assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
         if new_births is None:
-            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
+            this_birth_rate = np.interp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
             new_births = sc.randround(this_birth_rate*self.n_alive) # Crude births per 1000
 
         if new_births>0:
@@ -515,7 +515,21 @@ class People(hpb.BasePeople):
 
         if self.pars['use_migration'] and self.pop_trend:
 
-            assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
+            # Pull things out
+            sim_start = self.pars['start']
+            data_years = self.pop_trend.year
+            data_min = data_years[0]
+            data_max = data_years[-1]
+
+            # No migration if outside the range of the data
+            if year < data_min:
+                return 0
+            elif year > data_max:
+                return 0
+            if sim_start < data_min: # Figure this out later, can't use n_agents then
+                errormsg = f'Starting the sim earlier than the data is not hard, but has not been done yet'
+                raise NotImplementedError(errormsg)
+
 
             if new_births is None:
                 this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
