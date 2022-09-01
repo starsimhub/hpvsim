@@ -147,8 +147,9 @@ class People(hpb.BasePeople):
             self.demographic_flows['births'] = new_births
 
             # Check migration
-            migration = self.check_migration(year=year)
-            self.demographic_flows['migration'] = migration
+            if self.pars['use_migration']:
+                migration = self.check_migration(year=year)
+                self.demographic_flows['migration'] = migration
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
