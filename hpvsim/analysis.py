@@ -756,7 +756,7 @@ class age_results(Analyzer):
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
-                if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result or 'mortality' in result:
+                if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result or 'mortality' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
                     if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
                         if result == 'detected_cancer_deaths':
@@ -776,7 +776,7 @@ class age_results(Analyzer):
                             if 'hpv' in result:  # Denominator is susceptible population
                                 denom = (np.histogram(age[sim.people.sus_pool], bins=result_dict.edges)[0] * scale)
                             else:  # Denominator is females at risk for cancer
-                                denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous)], bins=result_dict.edges)[
+                                denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous.any(axis=0))], bins=result_dict.edges)[
                                              0] * scale) / 1e5  # CIN and cancer are per 100,000 women
                             if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
                             self.results[result][date] = self.results[result][date] / denom
@@ -952,7 +952,7 @@ class age_results(Analyzer):
                         thisdatadf = self.result_keys[rkey].data[(self.result_keys[rkey].data.year == float(date))&(self.result_keys[rkey].data.name == rkey)]
                         unique_genotypes = thisdatadf.genotype.unique()
 
-                    if 'total' not in rkey and 'cancer' not in rkey:
+                    if 'total' not in rkey and 'mortality' not in rkey:
                         # Prepare plot settings
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
@@ -1007,10 +1007,14 @@ class age_causal_infection(Analyzer):
         return out
 
     def apply(self, sim):
-        cancer_inds = hpu.true((sim.people.date_cancerous == sim.t) & sim.people.alive)
+        cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
         if len(cancer_inds):
+            if sim.people.dead_other[cancer_inds].any():
+                import traceback;
+                traceback.print_exc();
+                import pdb;
+                pdb.set_trace()
             current_age = sim.people.age[cancer_inds]
-            cancer_genotypes = sim.people.cancer_genotype[cancer_inds]
             date_exposed = sim.people.date_exposed[cancer_genotypes,cancer_inds]
             offset = (sim.people.t - date_exposed) * sim.people.pars['dt']
             self.age_causal.append(current_age - offset)

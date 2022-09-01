@@ -382,19 +382,16 @@ class Sim(hpb.BaseSim):
         ng = self['n_genotypes']
         results = dict()
 
-        # Create new flows
+        # Create flows
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
             for flow in hpd.flows:
                 if (flow.by_genotype and lkey=='') or lkey=='total_':
                     results[f'{lkey + flow.name}'] = init_res(f'{llab} {flow.label}', color=flow.cmap(cstride), n_rows=g)
 
-            # for flow,name,cmap in zip(hpd.flow_keys, hpd.flow_names, hpd.flow_colors):
-            #     results[f'{lkey+flow}'] = init_res(f'{llab} {name}', color=cmap(cstride), n_rows=g)
-
         # Create stocks
         for lkey,llabel,cstride,g in zip(['total_',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
-            for stock, name, cmap in zip(hpd.stock_keys, hpd.stock_names, hpd.stock_colors):
-                results[f'n_{lkey+stock}'] = init_res(f'{llabel} {name}', color=cmap(cstride), n_rows=g)
+            for stock in self.people.meta.stock_states:
+                results[f'n_{lkey+stock.name}'] = init_res(f'{llabel} {stock.label}', color=stock.cmap(cstride), n_rows=g)
 
         # Create incidence and prevalence results
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
@@ -951,8 +948,8 @@ class Sim(hpb.BaseSim):
         # Compute HPV type distribution by cytology
         for which in hpd.type_keys:
             subkey = which[:-6] # Switch from e.g. cin1_types to cin1, i.e. remove the _types part of the key
-            if subkey=='cancer': subkey='cancerous'
-            res[which][:, (res[f'n_total_{subkey}'][:]>0)] = res[f'n_{subkey}'][:,(res[f'n_total_{subkey}'][:]>0)]/res[f'n_total_{subkey}'][(res[f'n_total_{subkey}'][:]>0)]
+            if subkey=='cancer': subkey='cancerous' # different naming convention for cancer
+            res[which][:, (res[f'n_total_{subkey}'][:]>0)] = res[f'n_{subkey}'][:,(res[f'n_total_{subkey}'][:]>0)]/res[f'n_total_{subkey}'][(res[f'n_total_{subkey}'][:]>0)] # ugly line to calculate type distributions
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])

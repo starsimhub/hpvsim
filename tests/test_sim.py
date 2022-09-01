@@ -75,7 +75,7 @@ def test_epi():
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'init_hpv_prev'] # Parameters
     vary_vals   = [[0.01, 0.99],    [1, 200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'cancer_incidence'] # Epi outcomes to check
+    vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -215,7 +215,7 @@ def test_result_consistency():
     # Check that males don't have CINs or cancers
     male_inds = sim.people.is_male.nonzero()[0]
     males_with_cin = hpv.defined(sim.people.date_cin1[:,male_inds])
-    males_with_cancer = hpv.defined(sim.people.date_cancerous[male_inds])
+    males_with_cancer = hpv.defined(sim.people.date_cancerous[:,male_inds])
     assert len(males_with_cin)==0
     assert len(males_with_cancer)==0
 

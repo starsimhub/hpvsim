@@ -84,7 +84,7 @@ def test_age_results(do_plot=True):
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            cancer_incidence=sc.objdict(
+            total_cancer_incidence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             ),
@@ -108,7 +108,7 @@ def test_age_results(do_plot=True):
             'cin_prevalence',
         ],
         'Cervical cancer incidence': [
-            'cancer_incidence',
+            'total_cancer_incidence',
         ],
         'Cervical cancer mortality': [
             'cancer_mortality',
@@ -143,7 +143,7 @@ def test_reduce_analyzers():
 
         az = hpv.age_results(
             result_keys=sc.objdict(
-                cancer_incidence=sc.objdict(
+                total_cancer_incidence=sc.objdict(
                     timepoints=['2020'],
                     # datafile=f'test_data/{location}_cancer_cases.csv',
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),

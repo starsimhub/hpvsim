@@ -222,8 +222,6 @@ flows = [
     Flow('reactivations',   cmap=pl.cm.GnBu),
 ]
 flow_keys   = [flow.name for flow in flows]
-flow_names  = [flow.label for flow in flows]
-flow_colors = [flow.cmap for flow in flows]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes

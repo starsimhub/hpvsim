@@ -645,6 +645,17 @@ class People(hpb.BasePeople):
         self.alive[inds] = False
 
         # Wipe future dates
+        future_dates = [date.name for date in self.meta.dates]
+        for future_date in future_dates:
+            ndims = len(self[future_date].shape)
+            if ndims == 1:
+                iinds = (self[future_date][inds] > self.t).nonzero()[-1]
+                if len(iinds):
+                    self[future_date][inds[iinds]] = np.nan
+            elif ndims == 2:
+                genotypes_to_clear, iinds = (self[future_date][:, inds] > self.t).nonzero()
+                if len(iinds):
+                    self[future_date][genotypes_to_clear, inds[iinds]] = np.nan
 
         return len(inds)
 
