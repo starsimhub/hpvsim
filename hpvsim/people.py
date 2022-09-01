@@ -489,7 +489,7 @@ class People(hpb.BasePeople):
         assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
         if new_births is None:
-            this_birth_rate = np.interp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
+            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1], smoothness=0)[0]/1e3
             new_births = sc.randround(this_birth_rate*self.n_alive) # Crude births per 1000
 
         if new_births>0:
@@ -513,11 +513,13 @@ class People(hpb.BasePeople):
         size correct.
         """
 
-        if self.pars['use_migration'] and self.pop_trend:
+        if self.pars['use_migration'] and self.pop_trend is not None:
 
             # Pull things out
             sim_start = self.pars['start']
-            data_years = self.pop_trend.year
+            sim_pop0 = self.pars['n_agents']
+            data_years = self.pop_trend.year.values
+            data_pop = self.pop_trend.pop_size.values
             data_min = data_years[0]
             data_max = data_years[-1]
 
@@ -527,30 +529,33 @@ class People(hpb.BasePeople):
             elif year > data_max:
                 return 0
             if sim_start < data_min: # Figure this out later, can't use n_agents then
-                errormsg = f'Starting the sim earlier than the data is not hard, but has not been done yet'
+                errormsg = 'Starting the sim earlier than the data is not hard, but has not been done yet'
                 raise NotImplementedError(errormsg)
 
+            # Do basic calculations
+            data_pop0 = np.interp(sim_start, data_years, data_pop)
+            scale = sim_pop0 / data_pop0 # Scale factor
+            alive_inds = hpu.true(self.alive)
+            n_alive = len(alive_inds) # Actual number of alive agents
+            expected = np.interp(year, data_years, data_pop)*scale
+            n_migrate = int(expected - n_alive)
 
-            if new_births is None:
-                this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
-                new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
+            # Apply emigration
+            if n_migrate < 0:
+                inds = hpu.choose(n_alive, -n_migrate)
+                migrate_inds = alive_inds[inds]
+                self.make_die(migrate_inds, cause='emigration') # Apply "deaths"
 
-            if new_births>0:
-                # Generate other characteristics of the new people
-                uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
-
-                # Grow the arrays
-                self._grow(new_births)
-                self['uid'][-new_births:] = uids
-                self['age'][-new_births:] = 0
-                self['sex'][-new_births:] = sexes
-                self['debut'][-new_births:] = debuts
-                self['partners'][:,-new_births:] = partners
+            # Apply immigration -- TODO, add age?
+            elif n_migrate > 0:
+                self.add_births(new_births=n_migrate)
 
         else:
-            migration = 0
+            n_migrate = 0
 
-        return migration
+        print('debug:', year, n_migrate)
+
+        return n_migrate
 
 
 
@@ -685,7 +690,7 @@ class People(hpb.BasePeople):
         elif cause == 'emigration':
             self.emigrated[inds] = True
         else:
-            errormsg = f'Cause of death must be one of "other" or "cancer", not {cause}.'
+            errormsg = f'Cause of death must be one of "other", "cancer", or "emigration", not {cause}.'
             raise ValueError(errormsg)
 
         self.susceptible[:, inds] = False
