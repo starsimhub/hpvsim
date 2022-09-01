@@ -15,13 +15,19 @@ do_save = 0
 def test_total_pop():
     sc.heading('Testing total population')
 
-    loc_map = dict(kenya='kenya')
+    locs = ['kenya']
     r = sc.objdict()
+    s = sc.objdict()
 
-    for key,locs in loc_map.items():
-        r[key] = hpv.data.get_total_pop(locs)
+    for loc in locs:
+        tp = hpv.data.get_total_pop(loc)
+        n_agents = round(tp.pop_size[0]/1e3)
+        start = tp.year[0]
+        end = 2030
+        r[loc] = tp
+        s[loc] = hpv.Sim(location=loc, n_agents=n_agents, start=start, end=end).run()
 
-    return r
+    return r,s
 
 
 
@@ -31,7 +37,7 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    r1 = test_total_pop()
+    r,s = test_total_pop()
 
     sc.toc(T)
     print('Done.')
