@@ -67,8 +67,8 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 print(f'Loading location-specific data for "{location}"')
             if use_age_data:
                 try:
-                    age_data = hpdata.get_age_distribution(location, year=sim['start'])
-                    pop_sizes = hpdata.get_total_pop(location)
+                    age_data  = hpdata.get_age_distribution(location, year=sim['start'])
+                    pop_trend = hpdata.get_total_pop(location)
                 except ValueError as E:
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
@@ -116,11 +116,11 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
         popdict['contacts'] = contacts
         popdict['current_partners'] = np.array(current_partners)
-        popdict['layer_keys'] = list(sim['partners'].keys())
+        # popdict['layer_keys'] = list(sim['partners'].keys())
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
-    people = hpppl.People(sim.pars, pop_sizes=pop_sizes, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
+    people = hpppl.People(sim.pars, pop_trend=pop_trend, **popdict) # List for storing the people
 
     sc.printv(f'Created {n_agents} agents, average age {people.age.mean():0.2f} years', 2, verbose)
 

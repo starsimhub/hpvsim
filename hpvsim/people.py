@@ -33,6 +33,7 @@ class People(hpb.BasePeople):
     Args:
         pars (dict): the sim parameters, e.g. sim.pars -- alternatively, if a number, interpreted as n_agents
         strict (bool): whether or not to only create keys that are already in self.meta.person; otherwise, let any key be set
+        pop_trend (dataframe): a dataframe of years and population sizes, if available
         kwargs (dict): the actual data, e.g. from a popdict, being specified
 
     **Examples**::
@@ -43,7 +44,7 @@ class People(hpb.BasePeople):
         ppl2 = hp.People(sim.pars)
     '''
 
-    def __init__(self, pars, strict=True, **kwargs):
+    def __init__(self, pars, strict=True, pop_trend=None, **kwargs):
 
         # Initialize the BasePeople, which also sets things up for filtering
         super().__init__(pars)
@@ -51,6 +52,7 @@ class People(hpb.BasePeople):
         # Handle pars and settings
 
         # Other initialization
+        self.pop_trend = pop_trend
         self.init_contacts() # Initialize the contacts
         self.infection_log = [] # Record of infections - keys for ['source','target','date','layer']
 
@@ -147,9 +149,8 @@ class People(hpb.BasePeople):
             self.demographic_flows['births'] = new_births
 
             # Check migration
-            if self.pars['use_migration']:
-                migration = self.check_migration(year=year)
-                self.demographic_flows['migration'] = migration
+            migration = self.check_migration(year=year)
+            self.demographic_flows['migration'] = migration
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
@@ -505,31 +506,36 @@ class People(hpb.BasePeople):
         return new_births
 
 
-    def migration(self, year=None):
+    def check_migration(self, year=None):
         """
         Check if people need to immigrate/emigrate in order to make the population
         size correct.
         """
 
-        assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
+        if self.pars['use_migration'] and self.pop_trend:
 
-        if new_births is None:
-            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
-            new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
+            assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
-        if new_births>0:
-            # Generate other characteristics of the new people
-            uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
+            if new_births is None:
+                this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
+                new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
 
-            # Grow the arrays
-            self._grow(new_births)
-            self['uid'][-new_births:] = uids
-            self['age'][-new_births:] = 0
-            self['sex'][-new_births:] = sexes
-            self['debut'][-new_births:] = debuts
-            self['partners'][:,-new_births:] = partners
+            if new_births>0:
+                # Generate other characteristics of the new people
+                uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
 
-        return new_births
+                # Grow the arrays
+                self._grow(new_births)
+                self['uid'][-new_births:] = uids
+                self['age'][-new_births:] = 0
+                self['sex'][-new_births:] = sexes
+                self['debut'][-new_births:] = debuts
+                self['partners'][:,-new_births:] = partners
+
+        else:
+            migration = 0
+
+        return migration
 
 
 
