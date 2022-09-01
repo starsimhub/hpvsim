@@ -32,14 +32,17 @@ else:
 #%% Define all properties of people
 
 class State():
-    def __init__(self, name, dtype, fill_value=None, shape=None, label=None, cmap=None):
+    def __init__(self, name, dtype, fill_value=None, shape=None, label=None, cmap=None,
+                 totalprefix=None):
         '''
-        :param name:
-        :param dtype:
-        :param fill_value:
-        :param shape: If not none, set to match a string in `pars` containing the dimensionality e.g., `n_genotypes`)
-        :param label:
-        :param cmap: colormap (used for plotting stocks)
+        Args:
+            name: name of the result as used in the model (e.g. cin1)
+            dtype: datatype
+            fill_value: default value for this state upon model initialization
+            shape: If not none, set to match a string in `pars` containing the dimensionality e.g., `n_genotypes`)
+            label: text used to construct labels for the result for displaying on plots and other outputs
+            cmap: colormap (used for plotting stocks)
+            totalprefix: the prefix used for differentiating by-genotype results from total results. Set to None if the result only appears as a total
         '''
         self.name = name
         self.dtype = dtype
@@ -47,6 +50,7 @@ class State():
         self.shape = shape
         self.label = label or name
         self.cmap = cmap
+        self.totalprefix = totalprefix or ('total_' if shape else '')
 
     def new(self, pars, n):
         array_shape = n if self.shape is None else (pars[self.shape], n)
@@ -82,9 +86,9 @@ class PeopleMeta(sc.prettyobj):
     # The following three groupings are all mutually exclusive and collectively exhaustive.
     alive_states = [
         # States related to whether or not the person is alive or dead
-        State('alive',          bool, True, label='Population'),    # Save this as a state so we can record population sizes
-        State('dead_cancer',    bool, False, label='Cumulative cancer deaths'),   # Dead from cancer
-        State('dead_other',     bool, False, label='Cumulative deaths from other causes'),   # Dead from all other causes
+        State('alive',          bool,   True,   label='Population'),    # Save this as a state so we can record population sizes
+        State('dead_cancer',    bool,   False,  label='Cumulative cancer deaths'),   # Dead from cancer
+        State('dead_other',     bool,   False,  label='Cumulative deaths from other causes'),   # Dead from all other causes
     ]
 
     viral_states = [
@@ -110,19 +114,19 @@ class PeopleMeta(sc.prettyobj):
     ]
 
     derived_states = [
-        State('infected',   bool, label='infected', cmap=pl.cm.Purples), # union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
-        State('cin',        bool, label='with dysplasia', cmap=pl.cm.Oranges), # union of cin1, cin2, cin3
-        State('precin',     bool, label='with active infection and no dysplasia', cmap=pl.cm.Purples), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
-        State('latent',     bool, label='with latent infection', cmap=pl.cm.GnBu), # intersection of no_dysp and inactive.
+        State('infected',   bool, False, 'n_genotypes', label='infected', cmap=pl.cm.Purples), # union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
+        State('cin',        bool, False, 'n_genotypes', label='with dysplasia', cmap=pl.cm.Oranges), # union of cin1, cin2, cin3
+        State('precin',     bool, False, 'n_genotypes', label='with active infection and no dysplasia', cmap=pl.cm.Purples), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
+        State('latent',     bool, False, 'n_genotypes', label='with latent infection', cmap=pl.cm.GnBu), # intersection of no_dysp and inactive.
     ]
 
     # Additional intervention states
     intv_states = [
-        State('detected_cancer', bool,          False, cmap=pl.cm.Reds, by_genotype=False), # Whether the person's cancer has been detected
-        State('screened',       bool,           False, cmap=pl.cm.Blues, by_genotype=False), # Whether the person has been screened (how does this change over time?)
-        State('treated',        bool,           False, cmap=pl.cm.autumn, by_genotype=False), # Whether the person has been treated
-        State('vaccinated',     bool,           False), # Whether the person has received the prophylactic vaccine
-        State('tx_vaccinated',  bool,           False), # Whether the person has received the therapeutic vaccine
+        State('detected_cancer',    bool,   False), # Whether the person's cancer has been detected
+        State('screened',           bool,   False), # Whether the person has been screened (how does this change over time?)
+        State('treated',            bool,   False), # Whether the person has been treated
+        State('vaccinated',         bool,   False), # Whether the person has received the prophylactic vaccine
+        State('tx_vaccinated',      bool,   False), # Whether the person has received the therapeutic vaccine
     ]
 
     # Collection of mutually exclusive + collectively exhaustive states
@@ -211,15 +215,17 @@ class Flow():
         self.by_genotype = by_genotype
 
 flows = [
-    Flow('infections',      cmap=pl.cm.GnBu),
-    Flow('cin1s',           cmap=pl.cm.Oranges, label='CIN1s'),
-    Flow('cin2s',           cmap=pl.cm.Oranges, label='CIN2s'),
-    Flow('cin3s',           cmap=pl.cm.Oranges, label='CIN3s'),
-    Flow('cins',            cmap=pl.cm.Oranges, label='CINs'),
-    Flow('cancers',         cmap=pl.cm.Reds),
-    Flow('cancer_deaths',   cmap=pl.cm.Purples, label='cancer deaths', by_genotype=False),
-    Flow('reinfections',    cmap=pl.cm.GnBu),
-    Flow('reactivations',   cmap=pl.cm.GnBu),
+    Flow('infections',              cmap=pl.cm.GnBu),
+    Flow('cin1s',                   cmap=pl.cm.Oranges, label='CIN1s'),
+    Flow('cin2s',                   cmap=pl.cm.Oranges, label='CIN2s'),
+    Flow('cin3s',                   cmap=pl.cm.Oranges, label='CIN3s'),
+    Flow('cins',                    cmap=pl.cm.Oranges, label='CINs'),
+    Flow('cancers',                 cmap=pl.cm.Reds),
+    Flow('detected_cancers',        cmap=pl.cm.Reds,    label='cancer detections', by_genotype=False),
+    Flow('cancer_deaths',           cmap=pl.cm.Purples, label='cancer deaths', by_genotype=False),
+    Flow('detected_cancer_deaths',  cmap=pl.cm.Purples, label='detected cancer deaths', by_genotype=False),
+    Flow('reinfections',            cmap=pl.cm.GnBu),
+    Flow('reactivations',           cmap=pl.cm.GnBu),
 ]
 flow_keys   = [flow.name for flow in flows]
 
@@ -228,6 +234,7 @@ flow_keys   = [flow.name for flow in flows]
 stock_keys   = [state.name for state in PeopleMeta.stock_states]
 stock_names  = [state.label for state in PeopleMeta.stock_states]
 stock_colors = [state.cmap for state in PeopleMeta.stock_states]
+total_stock_keys = [state.name for state in PeopleMeta.stock_states if state.shape=='n_genotypes']
 
 # Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -246,9 +253,9 @@ by_sex_names   = ['total infections by sex',    'deaths from other causes by sex
 by_sex_colors  = ['#000000',                    '#000000']
 
 # Intervention-related flows (total across genotypes)
-intv_flow_keys   = ['screens',  'screened',         'vaccinations', 'vaccinated']
-intv_flow_names  = ['screens',  'women screened',   'vaccinations', 'women vaccinated']
-intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges,      pl.cm.Oranges,  pl.cm.Oranges]
+intv_flow_keys   = ['screens',  'vaccinations']
+intv_flow_names  = ['screens',  'vaccinations']
+intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges]
 
 # Type distributions by cytology
 type_keys  = ['no_dysp_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']

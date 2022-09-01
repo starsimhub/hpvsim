@@ -162,7 +162,6 @@ class People(hpb.BasePeople):
 
         # Perform updates that are not genotype specific
         self.flows['cancer_deaths'] = self.check_cancer_deaths()
-        # self.flows['detected_cancers'] = self.check_cancer_detection()
 
         # Create total flows
         self.total_flows['total_cin1s'] = self.flows['cin1s'].sum()
@@ -372,8 +371,8 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
         self.make_die(inds, cause='cancer')
 
-        # # check which of these were detected by symptom or screening
-        # self.cancer_flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
+        # check which of these were detected by symptom or screening
+        self.flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
 
         return len(inds)
 

@@ -308,11 +308,11 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     az = hpv.age_results(
         result_keys=sc.objdict(
-            cancer_deaths=sc.objdict(
+            total_cancer_deaths=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            detected_cancers=sc.objdict(
+            total_detected_cancers=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             )

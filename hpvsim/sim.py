@@ -389,9 +389,12 @@ class Sim(hpb.BaseSim):
                     results[f'{lkey + flow.name}'] = init_res(f'{llab} {flow.label}', color=flow.cmap(cstride), n_rows=g)
 
         # Create stocks
-        for lkey,llabel,cstride,g in zip(['total_',''], ['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
+        for llabel,cstride,g in zip(['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
             for stock in self.people.meta.stock_states:
-                results[f'n_{lkey+stock.name}'] = init_res(f'{llabel} {stock.label}', color=stock.cmap(cstride), n_rows=g)
+                if (stock.shape=='n_genotypes' and llabel=='Number') or llabel=='Total number':
+                    lkey = stock.totalprefix if llabel == 'Total number' else ''
+                    color = stock.cmap(cstride) if stock.cmap is not None else None
+                    results[f'n_{lkey+stock.name}'] = init_res(f'{llabel} {stock.label}', color=color, n_rows=g)
 
         # Create incidence and prevalence results
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
@@ -436,7 +439,6 @@ class Sim(hpb.BaseSim):
         results['n_total_detectable_hpv'] = init_res('Number with detectable HPV')
         results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
         results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence', color=hpd.stock_colors[0](0.95))
-        results['detected_cancers']
 
         # Additional cancer results
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color='#fcba03')
@@ -719,7 +721,7 @@ class Sim(hpb.BaseSim):
         idx = int(t / self.resfreq)
 
         # Store whether people have any grade of CIN
-        people.cin[:] = people.cin1 + people.cin2 + people.cin3
+        # people.cin[:] = people.cin1 + people.cin2 + people.cin3
 
         # Update counts for this time step: flows
         for key,count in people.total_flows.items():
@@ -727,7 +729,8 @@ class Sim(hpb.BaseSim):
         for key,count in people.demographic_flows.items():
             self.results[key][idx] += count
         for key,count in people.flows.items():
-            if key != 'cancer_deaths':
+            flow_ind = [flow.name for flow in hpd.flows].index(key)
+            if hpd.flows[flow_ind].by_genotype:
                 for genotype in range(ng):
                     self.results[key][genotype][idx] += count[genotype]
         for key,count in people.flows_by_sex.items():
@@ -742,14 +745,8 @@ class Sim(hpb.BaseSim):
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
 
-            # # Create cancer type distribution
-            # ca_genotype_bins = np.bincount(people.cancer_genotype[people.cancer_genotype >= 0])
-            # if len(ca_genotype_bins):
-            #     for g in range(len(ca_genotype_bins)):
-            #         self.results['n_cancerous_by_genotype'][g,idx] = ca_genotype_bins[g]
-
             # Create total stocks
-            for key in hpd.stock_keys:
+            for key in hpd.total_stock_keys:
                 for g in range(ng):
                     self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['susceptible']:

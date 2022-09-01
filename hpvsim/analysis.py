@@ -1049,31 +1049,30 @@ class cancer_detection(Analyzer):
         Check for new cancer detection, treat subset of detected cancers
         '''
         cancer_genotypes, cancer_inds = sim.people.cancerous.nonzero()  # Get everyone with cancer
+        new_detections, new_treatments = 0, 0
 
         if len(cancer_inds) > 0:
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
 
             detection_probs = np.full(len(cancer_inds), self.symp_prob / self.dt, dtype=hpd.default_float)  # Initialize probabilities of cancer detection
-            detection_probs[self.detected_cancer[cancer_inds]] = 0
+            detection_probs[sim.people.detected_cancer[cancer_inds]] = 0
             is_detected = hpu.binomial_arr(detection_probs)
             is_detected_inds = cancer_inds[is_detected]
-            if len(is_detected_inds) == 0:
-                return 0
-            else:
-                self.detected_cancer[is_detected_inds] = True
-                self.date_detected_cancer[is_detected_inds] = self.t
-                treat_probs = np.full(len(is_detected_inds), self.pars['cancer_symp_treatment'])
+            new_detections = len(is_detected_inds)
+
+            if new_detections>0:
+                sim.people.detected_cancer[is_detected_inds] = True
+                sim.people.date_detected_cancer[is_detected_inds] = sim.t
+                treat_probs = np.full(len(is_detected_inds), self.treat_prob)
                 treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-                if 'cancer_treatment' in self.pars['treat_pars'].keys():
-                    new_dur_cancer = hpu.sample(**self.pars['treat_pars']['cancer_treatment']['dur'],
-                                                size=len(treat_inds))
-                    self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
-                    self.treated[treat_inds] = True
-                    self.date_treated[treat_inds] = self.t
-                    return len(is_detected_inds)
-                else:
-                    return 0
+                if 'cancer_treatment' in sim.pars['treat_pars'].keys():
+                    new_dur_cancer = hpu.sample(**sim.pars['treat_pars']['cancer_treatment']['dur'], size=len(treat_inds))
+                    sim.people.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self.dt)
+                    sim.people.treated[treat_inds] = True
+                    sim.people.date_treated[treat_inds] = sim.t
+                    new_treatments = len(treat_inds)
+
+        # Update flows
+        sim.people.flows['detected_cancers'] = new_detections
+
+        return new_detections, new_treatments
 
