@@ -124,7 +124,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t, year=None):
+    def update_states_pre(self, t, year=None, resfreq=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
@@ -136,7 +136,7 @@ class People(hpb.BasePeople):
         self.increment_age()
 
         # Perform updates that are not genotype-specific
-        if t % self.pars['dt_demog'] == 0:
+        if t % resfreq == 0:
 
             # Apply death rates from other causes
             other_deaths, deaths_female, deaths_male    = self.apply_death_rates(year=year)
