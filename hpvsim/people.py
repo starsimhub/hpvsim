@@ -10,7 +10,6 @@ from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
 from . import population as hppop
-from . import parameters as hppar
 from . import plotting as hpplt
 from . import immunity as hpimm
 
@@ -123,20 +122,19 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t, year=None, resfreq=None):
+    def update_states_pre(self, t, year=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
         self.t = t
         self.dt = self.pars['dt']
-        self.resfreq = resfreq if resfreq is not None else 1
         self.init_flows()
 
         # Let people age by one time step
         self.increment_age()
 
         # Perform updates that are not genotype-specific
-        if t%self.resfreq==0:
+        if t % self.pars['dt_demog'] == 0:
 
             # Apply death rates from other causes
             other_deaths, deaths_female, deaths_male    = self.apply_death_rates(year=year)
@@ -147,7 +145,10 @@ class People(hpb.BasePeople):
             # Add births
             new_births = self.add_births(year=year)
             self.demographic_flows['births'] = new_births
-            # self.addtoself(new_people) # New births are added to the population
+
+            # Check migration
+            migration = self.check_migration(year=year)
+            self.demographic_flows['migration'] = migration
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
@@ -486,6 +487,33 @@ class People(hpb.BasePeople):
 
         if new_births is None:
             this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
+            new_births = sc.randround(this_birth_rate*self.n_alive) # Crude births per 1000
+
+        if new_births>0:
+            # Generate other characteristics of the new people
+            uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
+
+            # Grow the arrays
+            self._grow(new_births)
+            self['uid'][-new_births:] = uids
+            self['age'][-new_births:] = 0
+            self['sex'][-new_births:] = sexes
+            self['debut'][-new_births:] = debuts
+            self['partners'][:,-new_births:] = partners
+
+        return new_births
+
+
+    def migration(self, year=None):
+        """
+        Check if people need to immigrate/emigrate in order to make the population
+        size correct.
+        """
+
+        assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
+
+        if new_births is None:
+            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
             new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
 
         if new_births>0:
@@ -501,6 +529,7 @@ class People(hpb.BasePeople):
             self['partners'][:,-new_births:] = partners
 
         return new_births
+
 
 
     #%% Methods to make events occur (death, infection, others TBC)
@@ -626,11 +655,13 @@ class People(hpb.BasePeople):
     def make_die(self, inds, cause=None):
         ''' Make people die of all other causes (background mortality) '''
 
-        if cause=='other':
+        if cause == 'other':
             self.date_dead_other[inds] = self.t
             self.dead_other[inds] = True
-        elif cause=='cancer':
+        elif cause == 'cancer':
             self.dead_cancer[inds] = True
+        elif cause == 'emigration':
+            self.emigrated[inds] = True
         else:
             errormsg = f'Cause of death must be one of "other" or "cancer", not {cause}.'
             raise ValueError(errormsg)
