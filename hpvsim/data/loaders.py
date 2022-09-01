@@ -19,6 +19,9 @@ files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
 
+# Cache data as a dict
+cache = dict()
+
 for k,v in files.items():
     files[k] = filesdir / v
 
@@ -37,11 +40,14 @@ def sanitizestr(string=None, alphanumeric=True, nospaces=True, asciify=True, low
     return string
 
 
-def load_file(path, relative=False):
-    ''' Load a data file from the local data folder '''
-    if relative:
-        path = sc.path(sc.thisdir()) / 'files' / path
-    obj = sc.load(path)
+def load_file(path):
+    ''' Load a data file from the local data folder -- but store in memory if already loaded '''
+    strpath = str(path)
+    if strpath not in cache:
+        obj = sc.load(path)
+        cache[strpath] = obj
+    else:
+        obj = cache[strpath]
     return obj
 
 
