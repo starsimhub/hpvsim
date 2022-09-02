@@ -720,9 +720,6 @@ class Sim(hpb.BaseSim):
         # Index for results
         idx = int(t / self.resfreq)
 
-        # Store whether people have any grade of CIN
-        # people.cin[:] = people.cin1 + people.cin2 + people.cin3
-
         # Update counts for this time step: flows
         for key,count in people.total_flows.items():
             self.results[key][idx] += count
@@ -733,6 +730,13 @@ class Sim(hpb.BaseSim):
             if hpd.flows[flow_ind].by_genotype:
                 for genotype in range(ng):
                     self.results[key][genotype][idx] += count[genotype]
+            else:
+                try: self.results[f'total_{key}'][idx] += count
+                except:
+                    import traceback;
+                    traceback.print_exc();
+                    import pdb;
+                    pdb.set_trace()
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
@@ -757,7 +761,6 @@ class Sim(hpb.BaseSim):
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
             # Update cancers and cancers by age
-            # self.results['n_cancerous'][idx] = people.count('cancerous')
             cases_by_age = self.results['cancers_by_age'][:, idx]
             denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous.any(axis=0)], self.pars['standard_pop'][0,])[0]
             age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
@@ -932,12 +935,12 @@ class Sim(hpb.BaseSim):
         self.results['total_cin2_incidence'][:]    = res['total_cin2s'][:] / demoninator
         self.results['total_cin3_incidence'][:]    = res['total_cin3s'][:] / demoninator
         self.results['total_cin_incidence'][:]     = res['total_cins'][:] / demoninator
+        self.results['total_cancer_incidence'][:]  = res['total_cancers'][:] / demoninator
         self.results['cin1_incidence'][:]          = res['cin1s'][:] / demoninator
         self.results['cin2_incidence'][:]          = res['cin2s'][:] / demoninator
         self.results['cin3_incidence'][:]          = res['cin3s'][:] / demoninator
         self.results['cin_incidence'][:]           = res['cins'][:] / demoninator
         self.results['cancer_incidence'][:]        = res['cancers'][:] / demoninator
-        # self.results['detected_cancer_incidence'][:]      = res['detected_cancers'][:] / demoninator
 
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor

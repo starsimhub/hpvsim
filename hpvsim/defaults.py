@@ -228,7 +228,8 @@ flows = [
     Flow('reinfections',            cmap=pl.cm.GnBu),
     Flow('reactivations',           cmap=pl.cm.GnBu),
 ]
-flow_keys   = [flow.name for flow in flows]
+flow_keys   = [flow.name for flow in flows if flow.by_genotype]
+total_flow_keys   = [flow.name for flow in flows if not flow.by_genotype]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes

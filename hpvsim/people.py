@@ -100,6 +100,8 @@ class People(hpb.BasePeople):
         ng = self.pars['n_genotypes']
         df = hpd.default_float
         self.flows              = {f'{key}'         : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
+        for tf in hpd.total_flow_keys:
+            self.flows[tf]      = 0
         self.total_flows        = {f'total_{key}'   : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'         : 0 for key in hpd.dem_keys}
@@ -373,7 +375,7 @@ class People(hpb.BasePeople):
         '''
         filter_inds = self.true('cancerous')
         inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
-        self.make_die(inds, cause='cancer')
+        self.remove_people(inds, cause='cancer')
 
         # check which of these were detected by symptom or screening
         self.flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
@@ -438,7 +440,7 @@ class People(hpb.BasePeople):
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
         deaths_female = len(hpu.true(self.is_female[death_inds]))
         deaths_male = len(hpu.true(self.is_male[death_inds]))
-        other_deaths = self.make_die(death_inds, cause='other') # Apply deaths
+        other_deaths = self.remove_people(death_inds, cause='other') # Apply deaths
 
         return other_deaths, deaths_female, deaths_male
 
@@ -515,7 +517,7 @@ class People(hpb.BasePeople):
             if n_migrate < 0:
                 inds = hpu.choose(n_alive, -n_migrate)
                 migrate_inds = alive_inds[inds]
-                self.make_die(migrate_inds, cause='emigration') # Apply "deaths"
+                self.remove_people(migrate_inds, cause='emigration') # Remove people
 
             # Apply immigration -- TODO, add age?
             elif n_migrate > 0:
@@ -647,8 +649,8 @@ class People(hpb.BasePeople):
         return len(inds) # For incrementing counters
 
 
-    def make_die(self, inds, cause=None):
-        ''' Make people die of all other causes (background mortality) '''
+    def remove_people(self, inds, cause=None):
+        ''' Remove people - used for death and migration '''
 
         if cause == 'other':
             self.date_dead_other[inds] = self.t
