@@ -1404,7 +1404,7 @@ class StandardTreatmentPathway(Product):
             ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
             ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
             people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
-            self.cancer_product.administer(people, to_treat_ca)
+            self.cancer_product.administer(people, ca_treat_inds)
         else:
             ca_treat_inds = np.array([], dtype=hpd.default_int)
 
