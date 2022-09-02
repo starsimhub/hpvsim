@@ -9,12 +9,12 @@ import seaborn as sns
 import hpvsim as hpv
 import pytest
 
-do_plot = 1
+do_plot = 0
 do_save = 0
 hpv16 = hpv.genotype('HPV16')
 hpv18 = hpv.genotype('HPV18')
 
-n_agents = [2e3,50e3][1] # Swap between sizes
+n_agents = [2e3,50e3][0] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,

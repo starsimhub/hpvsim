@@ -10,7 +10,6 @@ from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
 from . import population as hppop
-from . import parameters as hppar
 from . import plotting as hpplt
 from . import immunity as hpimm
 
@@ -34,6 +33,7 @@ class People(hpb.BasePeople):
     Args:
         pars (dict): the sim parameters, e.g. sim.pars -- alternatively, if a number, interpreted as n_agents
         strict (bool): whether or not to only create keys that are already in self.meta.person; otherwise, let any key be set
+        pop_trend (dataframe): a dataframe of years and population sizes, if available
         kwargs (dict): the actual data, e.g. from a popdict, being specified
 
     **Examples**::
@@ -44,7 +44,7 @@ class People(hpb.BasePeople):
         ppl2 = hp.People(sim.pars)
     '''
 
-    def __init__(self, pars, strict=True, **kwargs):
+    def __init__(self, pars, strict=True, pop_trend=None, **kwargs):
 
         # Initialize the BasePeople, which also sets things up for filtering
         super().__init__(pars)
@@ -52,6 +52,7 @@ class People(hpb.BasePeople):
         # Handle pars and settings
 
         # Other initialization
+        self.pop_trend = pop_trend
         self.init_contacts() # Initialize the contacts
         self.infection_log = [] # Record of infections - keys for ['source','target','date','layer']
 
@@ -123,20 +124,20 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t, year=None, resfreq=None):
+    def update_states_pre(self, t, year=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
         self.t = t
         self.dt = self.pars['dt']
-        self.resfreq = resfreq if resfreq is not None else 1
         self.init_flows()
 
         # Let people age by one time step
         self.increment_age()
 
         # Perform updates that are not genotype-specific
-        if t%self.resfreq==0:
+        update_freq = max(1, int(self.pars['dt_demog'] / self.pars['dt'])) # Ensure it's an integer not smaller than 1
+        if t % update_freq == 0:
 
             # Apply death rates from other causes
             other_deaths, deaths_female, deaths_male    = self.apply_death_rates(year=year)
@@ -147,7 +148,10 @@ class People(hpb.BasePeople):
             # Add births
             new_births = self.add_births(year=year)
             self.demographic_flows['births'] = new_births
-            # self.addtoself(new_people) # New births are added to the population
+
+            # Check migration
+            migration = self.check_migration(year=year)
+            self.demographic_flows['migration'] = migration
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
@@ -485,8 +489,8 @@ class People(hpb.BasePeople):
         assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
         if new_births is None:
-            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
-            new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
+            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1], smoothness=0)[0]/1e3
+            new_births = sc.randround(this_birth_rate*self.n_alive) # Crude births per 1000
 
         if new_births>0:
             # Generate other characteristics of the new people
@@ -501,6 +505,56 @@ class People(hpb.BasePeople):
             self['partners'][:,-new_births:] = partners
 
         return new_births
+
+
+    def check_migration(self, year=None):
+        """
+        Check if people need to immigrate/emigrate in order to make the population
+        size correct.
+        """
+
+        if self.pars['use_migration'] and self.pop_trend is not None:
+
+            # Pull things out
+            sim_start = self.pars['start']
+            sim_pop0 = self.pars['n_agents']
+            data_years = self.pop_trend.year.values
+            data_pop = self.pop_trend.pop_size.values
+            data_min = data_years[0]
+            data_max = data_years[-1]
+
+            # No migration if outside the range of the data
+            if year < data_min:
+                return 0
+            elif year > data_max:
+                return 0
+            if sim_start < data_min: # Figure this out later, can't use n_agents then
+                errormsg = 'Starting the sim earlier than the data is not hard, but has not been done yet'
+                raise NotImplementedError(errormsg)
+
+            # Do basic calculations
+            data_pop0 = np.interp(sim_start, data_years, data_pop)
+            scale = sim_pop0 / data_pop0 # Scale factor
+            alive_inds = hpu.true(self.alive)
+            n_alive = len(alive_inds) # Actual number of alive agents
+            expected = np.interp(year, data_years, data_pop)*scale
+            n_migrate = int(expected - n_alive)
+
+            # Apply emigration
+            if n_migrate < 0:
+                inds = hpu.choose(n_alive, -n_migrate)
+                migrate_inds = alive_inds[inds]
+                self.make_die(migrate_inds, cause='emigration') # Apply "deaths"
+
+            # Apply immigration -- TODO, add age?
+            elif n_migrate > 0:
+                self.add_births(new_births=n_migrate)
+
+        else:
+            n_migrate = 0
+
+        return n_migrate
+
 
 
     #%% Methods to make events occur (death, infection, others TBC)
@@ -626,13 +680,15 @@ class People(hpb.BasePeople):
     def make_die(self, inds, cause=None):
         ''' Make people die of all other causes (background mortality) '''
 
-        if cause=='other':
+        if cause == 'other':
             self.date_dead_other[inds] = self.t
             self.dead_other[inds] = True
-        elif cause=='cancer':
+        elif cause == 'cancer':
             self.dead_cancer[inds] = True
+        elif cause == 'emigration':
+            self.emigrated[inds] = True
         else:
-            errormsg = f'Cause of death must be one of "other" or "cancer", not {cause}.'
+            errormsg = f'Cause of death must be one of "other", "cancer", or "emigration", not {cause}.'
             raise ValueError(errormsg)
 
         self.susceptible[:, inds] = False
