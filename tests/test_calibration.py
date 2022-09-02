@@ -30,12 +30,12 @@ def test_calibration():
         hpv16=dict(
             dysp_rate=[0.5, 0.2, 1.0],
             prog_rate=[0.5, 0.2, 1.0],
-            dur_no_dysp = dict(par1=[1.0, 0.5, 2.5])
+            dur_precin = dict(par1=[1.0, 0.5, 2.5])
         ),
         hpv18=dict(
             dysp_rate=[0.5, 0.2, 1.0],
             prog_rate=[0.5, 0.2, 1.0],
-            dur_no_dysp=dict(par1=[1.0, 0.5, 2.5])
+            dur_precin=dict(par1=[1.0, 0.5, 2.5])
         )
     )
 
