@@ -117,7 +117,6 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
         popdict['contacts'] = contacts
         popdict['current_partners'] = np.array(current_partners)
-        # popdict['layer_keys'] = list(sim['partners'].keys())
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
