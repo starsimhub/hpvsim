@@ -580,7 +580,7 @@ class People(hpb.BasePeople):
         # Deal with genotype parameters
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
-        dur_no_dysp        = genotype_pars[genotype_map[g]]['dur_no_dysp']
+        dur_precin        = genotype_pars[genotype_map[g]]['dur_precin']
 
         # Set all dates
         base_t = self.t + offset if offset is not None else self.t
@@ -603,7 +603,6 @@ class People(hpb.BasePeople):
         # Update states, genotype info, and flows
         self.susceptible[g, inds]   = False # Adjust states - set susceptible to false
         self.infectious[g, inds]    = True  # Adjust states - set infectious to true
-        self.no_dysp[g, inds]       = True  # In the first instance, there is no dysplasia
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
@@ -624,8 +623,8 @@ class People(hpb.BasePeople):
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
-            this_dur = hpu.sample(**dur_no_dysp, size=len(inds))  # Duration of infection without dysplasia in years
-            this_dur_f = self.dur_no_dysp[g, inds[self.is_female[inds]]]
+            this_dur = hpu.sample(**dur_precin, size=len(inds))  # Duration of infection without dysplasia in years
+            this_dur_f = self.dur_precin[g, inds[self.is_female[inds]]]
         else:
             if len(dur) != len(inds):
                 errormsg = f'If supplying durations of infections, they must be the same length as inds: {len(dur)} vs. {len(inds)}.'
@@ -633,8 +632,8 @@ class People(hpb.BasePeople):
             this_dur    = dur
             this_dur_f  = dur[self.is_female[inds]]
 
-        self.dur_no_dysp[g, inds] = this_dur  # Set the duration of infection
-        self.dur_disease[g, inds] = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
+        self.dur_precin[g, inds]    = this_dur  # Set the duration of infection
+        self.dur_disease[g, inds]   = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
 
         # Compute disease progression for females and skip for makes; males are updated below
         if len(f_inds)>0:
@@ -643,7 +642,7 @@ class People(hpb.BasePeople):
             hpu.set_prognoses(self, fg_inds, g, this_dur_f)
 
         if len(m_inds)>0:
-            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_no_dysp[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_precin[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return len(inds) # For incrementing counters
 

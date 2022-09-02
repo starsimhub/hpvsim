@@ -590,8 +590,8 @@ class Sim(hpb.BaseSim):
         genotype_map = self.pars['genotype_map']
 
         for g in range(ng):
-            dur_no_dysp = genotype_pars[genotype_map[g]]['dur_no_dysp']
-            dur_hpv = hpu.sample(**dur_no_dysp, size=len(hpv_inds))
+            dur_precin = genotype_pars[genotype_map[g]]['dur_precin']
+            dur_hpv = hpu.sample(**dur_precin, size=len(hpv_inds))
             t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
             _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
@@ -766,7 +766,7 @@ class Sim(hpb.BaseSim):
 
             # Compute detectable hpv prevalence
             hpv_test_pars = hppar.get_screen_pars('hpv')
-            for state in ['no_dysp', 'cin1', 'cin2', 'cin3']:
+            for state in ['precin', 'cin1', 'cin2', 'cin3']:
                 hpv_pos_probs = np.zeros(len(people))
                 for g in range(ng):
                     tp_inds = hpu.true(people[state][g,:])
