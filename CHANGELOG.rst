@@ -9,6 +9,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.2.3 (2022-09-01)
+--------------------------
+- Adds a ``use_migration`` parameter that activates immigration/emigration to ensure population sizes line up with data.
+- Adds simple data versioning.
+- *GitHub info*: PR `279 <https://github.com/amath-idm/hpvsim/pull/279>`__
+
+
 Version 0.2.2 (2022-08-22)
 --------------------------
 - Separates out the ``Calibration`` class into a separate file and to no longer inherit from ``Analyzer``. Functionality is unchanged.

@@ -89,6 +89,7 @@ class PeopleMeta(sc.prettyobj):
         State('alive',          bool,   True,   label='Population'),    # Save this as a state so we can record population sizes
         State('dead_cancer',    bool,   False,  label='Cumulative cancer deaths'),   # Dead from cancer
         State('dead_other',     bool,   False,  label='Cumulative deaths from other causes'),   # Dead from all other causes
+        State('emigrated',      bool,   False,  label='Emirated'),  # Emigrated
     ]
 
     viral_states = [
@@ -243,9 +244,9 @@ inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN
 inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges, pl.cm.Reds]
 
 # Demographics
-dem_keys    = ['births',    'other_deaths']
-dem_names   = ['births',    'other deaths']
-dem_colors  = ['#fcba03',   '#000000']
+dem_keys    = ['births',    'other_deaths', 'migration']
+dem_names   = ['births',    'other deaths', 'migration']
+dem_colors  = ['#fcba03',   '#000000',      '#000000']
 
 # Results by sex
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']

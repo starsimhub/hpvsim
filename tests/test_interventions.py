@@ -9,7 +9,7 @@ import seaborn as sns
 import hpvsim as hpv
 import pytest
 
-do_plot = 1
+do_plot = 0
 do_save = 0
 
 n_agents = [2e3,50e3][0] # Swap between sizes

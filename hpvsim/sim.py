@@ -626,7 +626,7 @@ class Sim(hpb.BaseSim):
 
         # Update demographics and partnerships
         old_pop_size = len(self.people)
-        self.people.update_states_pre(t=t, year=self.yearvec[t], resfreq=self.resfreq) # NB this also ages people, applies deaths, and generates new births
+        self.people.update_states_pre(t=t, year=self.yearvec[t]) # NB this also ages people, applies deaths, and generates new births
 
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
