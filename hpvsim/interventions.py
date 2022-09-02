@@ -1144,30 +1144,18 @@ class Screening(Intervention):
         for state in states:
             screen_probs = np.zeros(len(screen_inds))
             if pars['by_genotype']:
-                if state != 'cancerous':
-                    for g in range(sim['n_genotypes']):
-                        tp_inds = hpu.true(sim.people[state][g, screen_inds])
-                        screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
-                        screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                        screen_pos += list(screen_pos_inds)
-                else:
-                    tp_inds = hpu.true(sim.people[state][screen_inds])
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
+                for g in range(sim['n_genotypes']):
+                    tp_inds = hpu.true(sim.people[state][g, screen_inds])
+                    screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
                     screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
                     screen_pos += list(screen_pos_inds)
                 screen_pos = list(set(screen_pos)) # If anyone has screened positive for >1 genotype, only include them once
 
             else:
-                if state != 'cancerous':
-                    tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
-                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                    screen_pos += list(screen_pos_inds)
-                else:
-                    tp_inds = hpu.true(sim.people[state][screen_inds])
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
-                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                    screen_pos += list(screen_pos_inds)
+                tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
+                screen_probs[tp_inds] = pars['test_positivity'][state]
+                screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                screen_pos += list(screen_pos_inds)
 
         screen_pos = np.array(screen_pos)
         if len(screen_pos)>0:
