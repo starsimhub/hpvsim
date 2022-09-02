@@ -39,6 +39,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     # Set inputs and defaults
     n_agents = int(sim['n_agents']) # Shorten
     total_pop = None # Optionally created but always returned
+    pop_trend = None # Populated later if location is specified
 
     if verbose is None:
         verbose = sim['verbose']
