@@ -441,12 +441,7 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
                             color = genotype_colors[genotype]
                             label = sim['genotypes'][genotype]
                             ax.fill_between(res_t, scendata.low[genotype,:], scendata.high[genotype,:], color=color, **args.fill)  # Create the uncertainty bound
-                            try: ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
-                            except:
-                                import traceback;
-                                traceback.print_exc();
-                                import pdb;
-                                pdb.set_trace()
+                            ax.plot(res_t[bi:], res_y[bi:], label=label, c=color, **args.plot)  # Plot the actual line
                     elif reskey in sexkeys:
                         n_sexes = 2
                         sex_colors = ['#4679A2', '#A24679']

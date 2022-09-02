@@ -414,7 +414,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
                     'cin_incidence',
-                    'cancer_incidence',
+                    'total_cancer_incidence',
                     ],
             })
 
@@ -424,7 +424,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'total_hpv_incidence',
                 ],
                 'Cancers per 100,000 women': [
-                    'cancer_incidence',
+                    'total_cancer_incidence',
                     ],
             })
 
