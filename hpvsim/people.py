@@ -680,7 +680,7 @@ class People(hpb.BasePeople):
                 if len(iinds):
                     self[future_date][inds[iinds]] = np.nan
             elif ndims == 2:
-                genotypes_to_clear, iinds = (self[future_date][:, inds] > self.t).nonzero()
+                genotypes_to_clear, iinds = (self[future_date][:, inds] >= self.t).nonzero()
                 if len(iinds):
                     self[future_date][genotypes_to_clear, inds[iinds]] = np.nan
 

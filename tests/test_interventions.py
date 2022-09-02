@@ -320,6 +320,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     )
 
     sim = hpv.Sim(pars=pars, analyzers=[az, hpv.age_causal_infection()])
+
     n_runs = 3
 
     # Define the scenarios
