@@ -759,7 +759,7 @@ class age_results(Analyzer):
                 # Figure out if it's a flow or incidence
                 if result.replace('total_', '') in hpd.flow_keys+hpd.total_flow_keys or 'incidence' in result or 'mortality' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
-                    if result[:5] == 'total':  # Results across all genotypes
+                    if result[:5] == 'total' or 'mortality' in result:  # Results across all genotypes
                         if result == 'detected_cancer_deaths':
                             inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
                         else:
