@@ -161,7 +161,7 @@ class People(hpb.BasePeople):
             self.flows['cin2s'][g]              = self.check_cin2(g)
             self.flows['cin3s'][g]              = self.check_cin3(g)
             new_cancers, cancers_by_age         = self.check_cancer(g)
-            self.flows['cancers']               += new_cancers
+            self.flows['cancers'][g]            += new_cancers
             self.by_age_flows['cancers_by_age'] += cancers_by_age
             self.flows['cins'][g]               = self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
             self.check_clearance(g)
