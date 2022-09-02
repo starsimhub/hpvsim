@@ -1374,19 +1374,19 @@ class BasePeople(FlexPretty):
 
     def true(self, key):
         ''' Return indices matching the condition '''
-        return self[key].nonzero()[0]
+        return self[key].nonzero()[-1]
 
     def true_by_genotype(self, key, genotype):
         ''' Return indices matching genotype-condition'''
-        return self[key][genotype,:].nonzero()[0]
+        return self[key][genotype,:].nonzero()[-1]
 
     def false_by_genotype(self, key, genotype):
         ''' Return indices not matching genotype-condition'''
-        return (~self[key][genotype,:]).nonzero()[0]
+        return (~self[key][genotype,:]).nonzero()[-1]
 
     def false(self, key):
         ''' Return indices not matching the condition '''
-        return (~self[key]).nonzero()[0]
+        return (~self[key]).nonzero()[-1]
 
     def defined(self, key):
         ''' Return indices of people who are not-nan '''

@@ -728,7 +728,7 @@ class age_results(Analyzer):
                     else:
                         if 'detectable' in result:
                             hpv_test_pars = hppar.get_screen_pars('hpv')
-                            for state in ['hpv', 'cin1', 'cin2', 'cin3']:
+                            for state in ['precin', 'cin1', 'cin2', 'cin3']:
                                 for g in range(ng):
                                     hpv_pos_probs = np.zeros(len(sim.people))
                                     tp_inds = hpu.true(sim.people[state][g, :])
@@ -757,9 +757,9 @@ class age_results(Analyzer):
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
-                if result.replace('total_', '') in hpd.flow_keys or 'incidence' in result or 'mortality' in result:
+                if result.replace('total_', '') in hpd.flow_keys+hpd.total_flow_keys or 'incidence' in result or 'mortality' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
-                    if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
+                    if result[:5] == 'total' or 'mortality' in result:  # Results across all genotypes
                         if result == 'detected_cancer_deaths':
                             inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
                         else:
@@ -1010,11 +1010,6 @@ class age_causal_infection(Analyzer):
     def apply(self, sim):
         cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
         if len(cancer_inds):
-            if sim.people.dead_other[cancer_inds].any():
-                import traceback;
-                traceback.print_exc();
-                import pdb;
-                pdb.set_trace()
             current_age = sim.people.age[cancer_inds]
             date_exposed = sim.people.date_exposed[cancer_genotypes,cancer_inds]
             offset = (sim.people.t - date_exposed) * sim.people.pars['dt']

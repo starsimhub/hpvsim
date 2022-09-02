@@ -165,9 +165,9 @@ class PeopleMeta(sc.prettyobj):
 
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
-        State('dur_no_dysp', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
+        State('dur_precin', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
         State('dur_disease', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has >= HPV present
-        State('dur_no_dysp2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
+        State('dur_precin2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
         State('dur_cin12cin2', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN1 to CIN2
         State('dur_cin22cin3', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN2 to CIN3
         State('dur_cin2cancer', default_float, np.nan, shape='n_genotypes'),# Length of time to go from CIN3 to cancer
@@ -228,7 +228,8 @@ flows = [
     Flow('reinfections',            cmap=pl.cm.GnBu),
     Flow('reactivations',           cmap=pl.cm.GnBu),
 ]
-flow_keys   = [flow.name for flow in flows]
+flow_keys   = [flow.name for flow in flows if flow.by_genotype]
+total_flow_keys   = [flow.name for flow in flows if not flow.by_genotype]
 
 # Stocks: the number in each of the following states
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -414,7 +415,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                 'CINs and cancers per 100,000 women': [
                     'total_cin_incidence',
                     'cin_incidence',
-                    'cancer_incidence',
+                    'total_cancer_incidence',
                     ],
             })
 
@@ -424,7 +425,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'total_hpv_incidence',
                 ],
                 'Cancers per 100,000 women': [
-                    'cancer_incidence',
+                    'total_cancer_incidence',
                     ],
             })
 

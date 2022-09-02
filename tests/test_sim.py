@@ -43,7 +43,7 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
-        'start': 1990,
+        'start': 1980,
         'burnin': 30,
         'end': 2030,
         'location': 'tanzania',
@@ -73,7 +73,7 @@ def test_epi():
 
     # Define the parameters to vary
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.01, 0.99],    [1, 200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
+    vary_vals   = [[0.01, 0.99],    [1, 200],           [0.01,1.0],         [15,25],             [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
     vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
 
@@ -286,13 +286,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
+    # sim4 = test_result_consistency()
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
 
     sc.toc(T)
     print('Done.')

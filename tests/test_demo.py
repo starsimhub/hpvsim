@@ -49,48 +49,6 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
     hpv52   = hpv.genotype('HPV52')
     hpv58   = hpv.genotype('HPV58')
 
-    # # Set up genotype pars
-    # HPV 16 #
-    # hpv16.p.prog_rate = .567
-    # hpv16.p.prog_time = 6.23
-    # hpv16.p.dur_dysp['par1'] = 7.59
-    # hpv16.p.dur_none['par1'] = 2.35
-    #
-    # # HPV 18 #
-    # hpv18.p.dysp_rate = 1.2
-    # hpv18.p.prog_rate = 0.956
-    # hpv18.p.prog_time = 5.189
-    # hpv18.p.dur_dysp['par1'] = 5.627
-    # hpv18.p.dur_none['par1'] = 2.76
-    # hpv18.p.rel_beta = 0.7228
-    #
-    # # HPV 31 #
-    # hpv31.p.prog_rate = 0.17948958373918267
-    # hpv31.p.prog_time = 14.12136294913353
-    # hpv31.p.dur_dysp['par1'] = 1.353471867503286
-    # hpv31.p.rel_beta = 0.9355728046226204
-    #
-    # # HPV 33 #
-    # hpv33.p.prog_rate = 0.23565745824841802
-    # hpv33.p.prog_time = 8.4648
-    # hpv33.p.dur_dysp['par1'] = 14.12136294913353
-    # hpv33.p.rel_beta = 0.26010781379830755
-    #
-    # # HPV 45 #
-    # hpv45.p.dysp_rate = 1.2
-    # hpv45.p.prog_rate = 0.9499
-    # hpv45.p.prog_time = 7.3
-    # hpv45.p.dur_dysp['par1'] = 3.575
-    # hpv45.p.dur_none['par1'] = 1.639
-    # hpv45.p.rel_beta = 0.77
-    #
-    # # HPV 52 #
-    # hpv52.p.prog_rate = 0.484
-    # hpv52.p.prog_time = 4.24
-    # hpv52.p.dur_dysp['par1'] = 2.35
-    # hpv52.p.rel_beta = 0.623
-
-
     az = hpv.age_results(
         result_keys=sc.objdict(
             hpv_prevalence=sc.objdict(
@@ -104,7 +62,7 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
             cancer_mortality=sc.objdict(
                 datafile=f'test_data/{location}_cancer_mortality.csv',
             ),
-            cancer_incidence=sc.objdict(
+            total_cancer_incidence=sc.objdict(
                 datafile=f'test_data/{location}_cancer_incidence.csv',
             )
         )
@@ -138,7 +96,7 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
                 'cancer_mortality',
             ],
             'Cervical cancer incidence': [
-                'cancer_incidence',
+                'total_cancer_incidence',
             ],
         }
         # sim.plot('demographics', do_save=True, do_show=False, fig_path=f'{figfolder}/{location}_dem.png')

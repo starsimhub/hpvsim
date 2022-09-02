@@ -967,7 +967,7 @@ class Screening(Intervention):
 
         # States that will return a positive screen results
         if screen_states is None:
-            screen_states = ['none', 'cin1', 'cin2', 'cin3', 'cancerous']
+            screen_states = ['precin', 'cin1', 'cin2', 'cin3', 'cancerous']
         self.screen_states = screen_states
 
         # Parse the screening parameters, which can be provided in different formats
@@ -1205,12 +1205,12 @@ class Product():
 class PrecancerTreatment(Product):
     def __init__(self):
         self.efficacy=dict(
-            none=0,
+            precin=0,
             cin1=0.936,
             cin2=0.936,
             cin3=0.936,
         )
-        self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
+        self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
 
     def administer(self, people, inds):
         # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
@@ -1236,7 +1236,6 @@ class PrecancerTreatment(Product):
             # Clear infection for women who clear
             for g in range(people.pars['n_genotypes']):
                 people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
-                people['none'][g, eff_treat_inds] = False  # People whose HPV clears
                 people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
                 hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
@@ -1250,7 +1249,7 @@ class ExcisionTreatment(PrecancerTreatment):
     def __init__(self):
         super().__init__()
         self.efficacy = dict(
-            none=0,
+            precin=0,
             cin1=0.936,
             cin2=0.936,
             cin3=0.936,
@@ -1261,7 +1260,7 @@ class AblativeTreatment(PrecancerTreatment):
     def __init__(self):
         super().__init__()
         self.efficacy = dict(
-            none=0,
+            precin=0,
             cin1=0.81,
             cin2=0.81,
             cin3=0.81,
@@ -1273,9 +1272,9 @@ class AblativeTreatment(PrecancerTreatment):
 #         self.timepoints = timepoints or '2030'
 #         self.doses = doses or 2
 #         self.interval = interval or 0.5 # Interval between doses in years
-#         self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
+#         self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
 #         self.efficacy = efficacy or dict( # default efficacy decreases as dysplasia increases
-#             none=dict(
+#             precin=dict(
 #                 hpv16=[0.1, 0.9],
 #                 hpv18=[0.1, 0.9],
 #                 hpv31=[0.01, 0.1],
@@ -1401,8 +1400,8 @@ class StandardTreatmentPathway(Product):
         self.cancer_product = cancer_product or RadiationTherapy()
         self.ablation_product = ablation_product or AblativeTreatment()
         self.excision_product = excision_product or ExcisionTreatment()
-        self.test_positivity = {'none': 0.98, 'cin1': 0.97, 'cin2': 0.89,'cin3': 0.79, 'cancerous': 0.4} # eligibility for ablation vs excision
-        self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
+        self.test_positivity = {'precin': 0.98, 'cin1': 0.97, 'cin2': 0.89,'cin3': 0.79, 'cancerous': 0.4} # eligibility for ablation vs excision
+        self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
 
     def administer(self, people, inds):
         ''' Determine what kind of treatment they should receive and administer it '''
@@ -1484,9 +1483,9 @@ class TherapeuticVaccination(Intervention, Product):
         self.interval = interval or 0.5  # Interval between doses in years
         self.prophylactic = proph # whether to deliver a single-dose prophylactic vaccine at first dose
         self.vaccine = vaccine # which vaccine to deliver
-        self.treat_states = ['none', 'latent', 'cin1', 'cin2', 'cin3']
+        self.treat_states = ['precin', 'latent', 'cin1', 'cin2', 'cin3']
         self.efficacy = efficacy or dict(  # default efficacy decreases as dysplasia increases
-            none=dict(
+            precin=dict(
                 hpv16=[0.1, 0.9],
                 hpv18=[0.1, 0.9],
                 hpv31=[0.01, 0.1],

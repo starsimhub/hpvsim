@@ -320,6 +320,7 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
     )
 
     sim = hpv.Sim(pars=pars, analyzers=[az, hpv.age_causal_infection()])
+
     n_runs = 3
 
     # Define the scenarios
@@ -364,10 +365,10 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
                 'total_cin_prevalence',
             ],
             'Cancers per 100,000 women': [
-                'cancer_incidence',
+                'total_cancer_incidence',
             ],
             'Screened': [
-                'screened',
+                'n_screened',
             ],
         }
         scens.plot(to_plot=to_plot)
@@ -467,9 +468,9 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim0 = test_dynamic_pars()
-    scens0 = test_complex_vax(do_plot=True)
-    scens1 = test_vaccinate_prob(do_plot=True)
-    scens2 = test_vaccinate_num(do_plot=True)
+    scens0 = test_complex_vax(do_plot=do_plot)
+    scens1 = test_vaccinate_prob(do_plot=do_plot)
+    scens2 = test_vaccinate_num(do_plot=do_plot)
     scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True) # CURRENTLY BROKEN
 
