@@ -43,7 +43,7 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
-        'start': 1990,
+        'start': 1980,
         'burnin': 30,
         'end': 2030,
         'location': 'tanzania',
@@ -51,12 +51,6 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
         'genotypes': [16,18]
     }
     pars = sc.mergedicts(pars, kwargs)
-
-    # age_target = {'inds': lambda sim: hpu.true((sim.people.age < 9)+(sim.people.age > 14)), 'vals': 0}  # Only give boosters to people who have had 2 doses
-    # doses_per_year = 2e3
-    # bivalent_2_dose = hpv.vaccinate_num(vaccine='bivalent_2dose', num_doses=doses_per_year,
-    #                                     timepoints=['2020', '2021', '2022', '2023', '2024'],
-    #                                     label='bivalent 2 dose, 9-14', subtarget=age_target)
 
     sim = hpv.Sim(pars=pars)
     sim.set_seed(seed)
@@ -73,14 +67,15 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_years=10, dt=0.5)
-    sim = hpv.Sim()
+    base_pars = dict(n_years=10, dt=0.5, network='random')
+    sim = hpv.Sim(pars=base_pars)
+    sim.initialize()
 
     # Define the parameters to vary
     vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.01, 0.99],    [1, 200],           [0.1,1.0],         [15,25],             [0.01,0.8]] # Values
+    vary_vals   = [[0.01, 0.99],    [1, 200],           [0.01,1.0],         [15,25],             [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'cancer_incidence'] # Epi outcomes to check
+    vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -220,7 +215,7 @@ def test_result_consistency():
     # Check that males don't have CINs or cancers
     male_inds = sim.people.is_male.nonzero()[0]
     males_with_cin = hpv.defined(sim.people.date_cin1[:,male_inds])
-    males_with_cancer = hpv.defined(sim.people.date_cancerous[male_inds])
+    males_with_cancer = hpv.defined(sim.people.date_cancerous[:,male_inds])
     assert len(males_with_cin)==0
     assert len(males_with_cancer)==0
 
@@ -291,13 +286,13 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim2 = test_epi()
+    # sim3 = test_flexible_inputs()
+    # sim4 = test_result_consistency()
+    # sim5 = test_location_loading()
+    # sim6 = test_resuming()
 
     sc.toc(T)
     print('Done.')

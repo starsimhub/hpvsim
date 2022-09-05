@@ -15,7 +15,8 @@ from . import parameters as hppar
 from .settings import options as hpo # For setting global options
 
 
-__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results']
+__all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection',
+           'cancer_detection']
 
 
 class Analyzer(sc.prettyobj):
@@ -727,7 +728,7 @@ class age_results(Analyzer):
                     else:
                         if 'detectable' in result:
                             hpv_test_pars = hppar.get_screen_pars('hpv')
-                            for state in ['hpv', 'cin1', 'cin2', 'cin3']:
+                            for state in ['precin', 'cin1', 'cin2', 'cin3']:
                                 for g in range(ng):
                                     hpv_pos_probs = np.zeros(len(sim.people))
                                     tp_inds = hpu.true(sim.people[state][g, :])
@@ -756,9 +757,9 @@ class age_results(Analyzer):
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
-                if result.replace('total_', '') in hpd.flow_keys or result in hpd.cancer_flow_keys or 'incidence' in result or 'mortality' in result:
+                if result.replace('total_', '') in hpd.flow_keys+hpd.total_flow_keys or 'incidence' in result or 'mortality' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
-                    if result[:5] == 'total' or 'cancer' in result:  # Results across all genotypes
+                    if result[:5] == 'total' or 'mortality' in result:  # Results across all genotypes
                         if result == 'detected_cancer_deaths':
                             inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
                         else:
@@ -776,7 +777,7 @@ class age_results(Analyzer):
                             if 'hpv' in result:  # Denominator is susceptible population
                                 denom = (np.histogram(age[sim.people.sus_pool], bins=result_dict.edges)[0] * scale)
                             else:  # Denominator is females at risk for cancer
-                                denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous)], bins=result_dict.edges)[
+                                denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous.any(axis=0))], bins=result_dict.edges)[
                                              0] * scale) / 1e5  # CIN and cancer are per 100,000 women
                             if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
                             self.results[result][date] = self.results[result][date] / denom
@@ -952,7 +953,7 @@ class age_results(Analyzer):
                         thisdatadf = self.result_keys[rkey].data[(self.result_keys[rkey].data.year == float(date))&(self.result_keys[rkey].data.name == rkey)]
                         unique_genotypes = thisdatadf.genotype.unique()
 
-                    if 'total' not in rkey and 'cancer' not in rkey:
+                    if 'total' not in rkey and 'mortality' not in rkey:
                         # Prepare plot settings
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
@@ -979,3 +980,94 @@ class age_results(Analyzer):
 
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
+
+
+
+class age_causal_infection(Analyzer):
+    '''
+    Determine the age at which people with cervical cancer were causally infected
+    '''
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.age_causal = []
+        self.years = None
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.years = sim.yearvec
+
+    @property
+    def median(self):
+        return np.array([np.median(x) for x in self.age_causal])
+
+    def bin_ages(self, bins):
+        out = np.zeros(((len(bins)-1),len(self.years)))
+        for i, ages in enumerate(self.age_causal):
+            out[:,i] = np.histogram(ages, bins)[0]
+        return out
+
+    def apply(self, sim):
+        cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
+        if len(cancer_inds):
+            current_age = sim.people.age[cancer_inds]
+            date_exposed = sim.people.date_exposed[cancer_genotypes,cancer_inds]
+            offset = (sim.people.t - date_exposed) * sim.people.pars['dt']
+            self.age_causal.append(current_age - offset)
+        else:
+            self.age_causal.append([])
+
+
+
+class cancer_detection(Analyzer):
+    '''
+    Cancer detection via symptoms
+    Args:
+        symp_prob: Probability of having cancer detected via symptoms, rather than screening
+        treat_prob: Probability of receiving treatment for those with symptom-detected cancer
+    '''
+
+    def __init__(self, symp_prob=0.01, treat_prob=0.01, **kwargs):
+        super().__init__(**kwargs)
+        self.symp_prob = symp_prob
+        self.treat_prob = treat_prob
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.dt = sim['dt']
+
+        # Add entries to results
+
+
+    def apply(self, sim):
+        '''
+        Check for new cancer detection, treat subset of detected cancers
+        '''
+        cancer_genotypes, cancer_inds = sim.people.cancerous.nonzero()  # Get everyone with cancer
+        new_detections, new_treatments = 0, 0
+
+        if len(cancer_inds) > 0:
+
+            detection_probs = np.full(len(cancer_inds), self.symp_prob / self.dt, dtype=hpd.default_float)  # Initialize probabilities of cancer detection
+            detection_probs[sim.people.detected_cancer[cancer_inds]] = 0
+            is_detected = hpu.binomial_arr(detection_probs)
+            is_detected_inds = cancer_inds[is_detected]
+            new_detections = len(is_detected_inds)
+
+            if new_detections>0:
+                sim.people.detected_cancer[is_detected_inds] = True
+                sim.people.date_detected_cancer[is_detected_inds] = sim.t
+                treat_probs = np.full(len(is_detected_inds), self.treat_prob)
+                treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
+                if 'cancer_treatment' in sim.pars['treat_pars'].keys():
+                    new_dur_cancer = hpu.sample(**sim.pars['treat_pars']['cancer_treatment']['dur'], size=len(treat_inds))
+                    sim.people.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self.dt)
+                    sim.people.treated[treat_inds] = True
+                    sim.people.date_treated[treat_inds] = sim.t
+                    new_treatments = len(treat_inds)
+
+        # Update flows
+        sim.people.flows['detected_cancers'] = new_detections
+
+        return new_detections, new_treatments
+

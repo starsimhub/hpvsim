@@ -10,7 +10,6 @@ from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
 from . import population as hppop
-from . import parameters as hppar
 from . import plotting as hpplt
 from . import immunity as hpimm
 
@@ -34,6 +33,7 @@ class People(hpb.BasePeople):
     Args:
         pars (dict): the sim parameters, e.g. sim.pars -- alternatively, if a number, interpreted as n_agents
         strict (bool): whether or not to only create keys that are already in self.meta.person; otherwise, let any key be set
+        pop_trend (dataframe): a dataframe of years and population sizes, if available
         kwargs (dict): the actual data, e.g. from a popdict, being specified
 
     **Examples**::
@@ -44,7 +44,7 @@ class People(hpb.BasePeople):
         ppl2 = hp.People(sim.pars)
     '''
 
-    def __init__(self, pars, strict=True, **kwargs):
+    def __init__(self, pars, strict=True, pop_trend=None, **kwargs):
 
         # Initialize the BasePeople, which also sets things up for filtering
         super().__init__(pars)
@@ -52,6 +52,7 @@ class People(hpb.BasePeople):
         # Handle pars and settings
 
         # Other initialization
+        self.pop_trend = pop_trend
         self.init_contacts() # Initialize the contacts
         self.infection_log = [] # Record of infections - keys for ['source','target','date','layer']
 
@@ -99,11 +100,12 @@ class People(hpb.BasePeople):
         ng = self.pars['n_genotypes']
         df = hpd.default_float
         self.flows              = {f'{key}'         : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
+        for tf in hpd.total_flow_keys:
+            self.flows[tf]      = 0
         self.total_flows        = {f'total_{key}'   : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'         : 0 for key in hpd.dem_keys}
         self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
-        self.cancer_flows       = {f'{key}'         : 0 for key in hpd.cancer_flow_keys}
         self.by_age_flows       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
 
         return
@@ -123,20 +125,20 @@ class People(hpb.BasePeople):
         return
 
 
-    def update_states_pre(self, t, year=None, resfreq=None):
+    def update_states_pre(self, t, year=None):
         ''' Perform all state updates at the current timestep '''
 
         # Initialize
         self.t = t
         self.dt = self.pars['dt']
-        self.resfreq = resfreq if resfreq is not None else 1
         self.init_flows()
 
         # Let people age by one time step
         self.increment_age()
 
         # Perform updates that are not genotype-specific
-        if t%self.resfreq==0:
+        update_freq = max(1, int(self.pars['dt_demog'] / self.pars['dt'])) # Ensure it's an integer not smaller than 1
+        if t % update_freq == 0:
 
             # Apply death rates from other causes
             other_deaths, deaths_female, deaths_male    = self.apply_death_rates(year=year)
@@ -147,7 +149,10 @@ class People(hpb.BasePeople):
             # Add births
             new_births = self.add_births(year=year)
             self.demographic_flows['births'] = new_births
-            # self.addtoself(new_people) # New births are added to the population
+
+            # Check migration
+            migration = self.check_migration(year=year)
+            self.demographic_flows['migration'] = migration
 
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
@@ -156,20 +161,21 @@ class People(hpb.BasePeople):
             self.flows['cin2s'][g]              = self.check_cin2(g)
             self.flows['cin3s'][g]              = self.check_cin3(g)
             new_cancers, cancers_by_age         = self.check_cancer(g)
-            self.cancer_flows['cancers']        += new_cancers
+            self.flows['cancers'][g]            += new_cancers
             self.by_age_flows['cancers_by_age'] += cancers_by_age
             self.flows['cins'][g]               = self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
             self.check_clearance(g)
 
         # Perform updates that are not genotype specific
-        self.cancer_flows['cancer_deaths'] = self.check_cancer_deaths()
-        self.cancer_flows['detected_cancers'] = self.check_cancer_detection()
+        self.flows['cancer_deaths'] = self.check_cancer_deaths()
 
         # Create total flows
         self.total_flows['total_cin1s'] = self.flows['cin1s'].sum()
         self.total_flows['total_cin2s'] = self.flows['cin2s'].sum()
         self.total_flows['total_cin3s'] = self.flows['cin3s'].sum()
         self.total_flows['total_cins']  = self.flows['cins'].sum()
+        self.total_flows['total_cancers']  = self.flows['cancers'].sum()
+        # self.total_flows['total_cancer_deaths']  = self.flows['cancer_deaths'].sum()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
         self.sus_pool = self.susceptible.all(axis=0) # True for people with no infection at the start of the timestep
@@ -326,7 +332,7 @@ class People(hpb.BasePeople):
         filter_inds = filters.nonzero()[0]
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
-        self.none[genotype, inds] = False
+        self.no_dysp[genotype, inds] = False
         return len(inds)
 
     def check_cin2(self, genotype):
@@ -348,11 +354,10 @@ class People(hpb.BasePeople):
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
-        inds = self.check_inds(self.cancerous, self.date_cancerous, filter_inds=filter_inds)
-        self.cancerous[inds] = True
-        self.cancer_genotype[inds] = genotype
+        inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
+        self.cancerous[genotype, inds] = True
         self.cin3[genotype, inds] = False # No longer counted as CIN3
-        self.susceptible[:, inds] = False
+        self.susceptible[:, inds] = False # No longer susceptible to any new genotypes
         self.date_clearance[:, inds] = np.nan
 
         # Calculations for age-standardized cancer incidence
@@ -370,53 +375,12 @@ class People(hpb.BasePeople):
         '''
         filter_inds = self.true('cancerous')
         inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
-        self.make_die(inds, cause='cancer')
+        self.remove_people(inds, cause='cancer')
 
         # check which of these were detected by symptom or screening
-        self.cancer_flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
+        self.flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
+
         return len(inds)
-
-
-    def check_cancer_detection(self):
-        '''
-        Check for new cancer detection, treat subset of detected cancers
-        '''
-        cancer_inds = self.true('cancerous') # Get everyone with cancer
-        if len(cancer_inds)==0:
-            return 0
-        else:
-            detection_probs = np.full(len(cancer_inds), self.pars['cancer_symp_detection']/self.dt, dtype=hpd.default_float) # Initialize probabilities of cancer detection
-            detection_probs[self.detected_cancer[cancer_inds]] = 0
-            is_detected = hpu.binomial_arr(detection_probs)
-            is_detected_inds = cancer_inds[is_detected]
-            if len(is_detected_inds)==0:
-                return 0
-            else:
-                self.detected_cancer[is_detected_inds] = True
-                self.date_detected_cancer[is_detected_inds] = self.t
-                treat_probs = np.full(len(is_detected_inds), self.pars['cancer_symp_treatment'])
-                treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-                if 'cancer_treatment' in self.pars['treat_pars'].keys():
-                    new_dur_cancer = hpu.sample(**self.pars['treat_pars']['cancer_treatment']['dur'], size=len(treat_inds))
-                    self.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self['dt'])
-                    self.treated[treat_inds] = True
-                    self.date_treated[treat_inds] = self.t
-                    return len(is_detected_inds)
-                else:
-                    return 0
-
-
-    def check_death(self):
-        '''
-        Check for new deaths
-        '''
-        filter_inds = self.true('alive')
-        inds = self.check_inds(self.dead_other, self.date_dead_other, filter_inds=filter_inds)
-        deaths_female = len(hpu.true(self.is_female[inds]))
-        deaths_male = len(hpu.true(self.is_male[inds]))
-        # Apply deaths
-        new_other_deaths = self.make_die(inds, cause='other')
-        return new_other_deaths, deaths_female, deaths_male
 
 
     def check_clearance(self, genotype):
@@ -435,7 +399,7 @@ class People(hpb.BasePeople):
         # Now reset disease states
         self.susceptible[genotype, cleared_inds] = True
         self.infectious[genotype, inds] = False
-        self.none[genotype, inds] = False
+        self.no_dysp[genotype, inds] = False
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
@@ -476,7 +440,7 @@ class People(hpb.BasePeople):
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
         deaths_female = len(hpu.true(self.is_female[death_inds]))
         deaths_male = len(hpu.true(self.is_male[death_inds]))
-        other_deaths = self.make_die(death_inds, cause='other') # Apply deaths
+        other_deaths = self.remove_people(death_inds, cause='other') # Apply deaths
 
         return other_deaths, deaths_female, deaths_male
 
@@ -498,8 +462,8 @@ class People(hpb.BasePeople):
         assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
         if new_births is None:
-            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1])[0]/1e3
-            new_births = round(this_birth_rate*self.n_alive) # Crude births per 1000
+            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1], smoothness=0)[0]/1e3
+            new_births = sc.randround(this_birth_rate*self.n_alive) # Crude births per 1000
 
         if new_births>0:
             # Generate other characteristics of the new people
@@ -514,6 +478,56 @@ class People(hpb.BasePeople):
             self['partners'][:,-new_births:] = partners
 
         return new_births
+
+
+    def check_migration(self, year=None):
+        """
+        Check if people need to immigrate/emigrate in order to make the population
+        size correct.
+        """
+
+        if self.pars['use_migration'] and self.pop_trend is not None:
+
+            # Pull things out
+            sim_start = self.pars['start']
+            sim_pop0 = self.pars['n_agents']
+            data_years = self.pop_trend.year.values
+            data_pop = self.pop_trend.pop_size.values
+            data_min = data_years[0]
+            data_max = data_years[-1]
+
+            # No migration if outside the range of the data
+            if year < data_min:
+                return 0
+            elif year > data_max:
+                return 0
+            if sim_start < data_min: # Figure this out later, can't use n_agents then
+                errormsg = 'Starting the sim earlier than the data is not hard, but has not been done yet'
+                raise NotImplementedError(errormsg)
+
+            # Do basic calculations
+            data_pop0 = np.interp(sim_start, data_years, data_pop)
+            scale = sim_pop0 / data_pop0 # Scale factor
+            alive_inds = hpu.true(self.alive)
+            n_alive = len(alive_inds) # Actual number of alive agents
+            expected = np.interp(year, data_years, data_pop)*scale
+            n_migrate = int(expected - n_alive)
+
+            # Apply emigration
+            if n_migrate < 0:
+                inds = hpu.choose(n_alive, -n_migrate)
+                migrate_inds = alive_inds[inds]
+                self.remove_people(migrate_inds, cause='emigration') # Remove people
+
+            # Apply immigration -- TODO, add age?
+            elif n_migrate > 0:
+                self.add_births(new_births=n_migrate)
+
+        else:
+            n_migrate = 0
+
+        return n_migrate
+
 
 
     #%% Methods to make events occur (death, infection, others TBC)
@@ -568,11 +582,13 @@ class People(hpb.BasePeople):
         # Deal with genotype parameters
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
-        dur_none        = genotype_pars[genotype_map[g]]['dur_none']
+        dur_precin        = genotype_pars[genotype_map[g]]['dur_precin']
 
         # Set all dates
         base_t = self.t + offset if offset is not None else self.t
         self.date_infectious[g,inds] = base_t
+        if layer != 'reactivation':
+            self.date_exposed[g,inds] = base_t
 
         # Count reinfections
         self.flows['reinfections'][g]           += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
@@ -589,7 +605,6 @@ class People(hpb.BasePeople):
         # Update states, genotype info, and flows
         self.susceptible[g, inds]   = False # Adjust states - set susceptible to false
         self.infectious[g, inds]    = True  # Adjust states - set infectious to true
-        self.none[g, inds]          = True  # In the first instance, there is no dysplasia
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
@@ -610,8 +625,8 @@ class People(hpb.BasePeople):
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
-            this_dur = hpu.sample(**dur_none, size=len(inds))  # Duration of infection without dysplasia in years
-            this_dur_f = self.dur_none[g, inds[self.is_female[inds]]]
+            this_dur = hpu.sample(**dur_precin, size=len(inds))  # Duration of infection without dysplasia in years
+            this_dur_f = self.dur_precin[g, inds[self.is_female[inds]]]
         else:
             if len(dur) != len(inds):
                 errormsg = f'If supplying durations of infections, they must be the same length as inds: {len(dur)} vs. {len(inds)}.'
@@ -619,8 +634,8 @@ class People(hpb.BasePeople):
             this_dur    = dur
             this_dur_f  = dur[self.is_female[inds]]
 
-        self.dur_none[g, inds] = this_dur  # Set the duration of infection
-        self.dur_disease[g, inds] = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
+        self.dur_precin[g, inds]    = this_dur  # Set the duration of infection
+        self.dur_disease[g, inds]   = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
 
         # Compute disease progression for females and skip for makes; males are updated below
         if len(f_inds)>0:
@@ -629,20 +644,23 @@ class People(hpb.BasePeople):
             hpu.set_prognoses(self, fg_inds, g, this_dur_f)
 
         if len(m_inds)>0:
-            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_none[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_precin[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return len(inds) # For incrementing counters
 
 
-    def make_die(self, inds, cause=None):
-        ''' Make people die of all other causes (background mortality) '''
+    def remove_people(self, inds, cause=None):
+        ''' Remove people - used for death and migration '''
 
-        if cause=='other':
+        if cause == 'other':
+            self.date_dead_other[inds] = self.t
             self.dead_other[inds] = True
-        elif cause=='cancer':
+        elif cause == 'cancer':
             self.dead_cancer[inds] = True
+        elif cause == 'emigration':
+            self.emigrated[inds] = True
         else:
-            errormsg = f'Cause of death must be one of "other" or "cancer", not {cause}.'
+            errormsg = f'Cause of death must be one of "other", "cancer", or "emigration", not {cause}.'
             raise ValueError(errormsg)
 
         self.susceptible[:, inds] = False
@@ -650,9 +668,21 @@ class People(hpb.BasePeople):
         self.cin1[:, inds] = False
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False
-        self.cancerous[inds] = False
-        self.cancer_genotype[inds] = -1
+        self.cancerous[:, inds] = False
         self.alive[inds] = False
+
+        # Wipe future dates
+        future_dates = [date.name for date in self.meta.dates]
+        for future_date in future_dates:
+            ndims = len(self[future_date].shape)
+            if ndims == 1:
+                iinds = (self[future_date][inds] > self.t).nonzero()[-1]
+                if len(iinds):
+                    self[future_date][inds[iinds]] = np.nan
+            elif ndims == 2:
+                genotypes_to_clear, iinds = (self[future_date][:, inds] >= self.t).nonzero()
+                if len(iinds):
+                    self[future_date][genotypes_to_clear, inds[iinds]] = np.nan
 
         return len(inds)
 

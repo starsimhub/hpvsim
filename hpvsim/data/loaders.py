@@ -5,25 +5,49 @@ Load data
 #%% Housekeeping
 import numpy as np
 import sciris as sc
+import unicodedata
+import re
 from .. import misc as hpm
 
-__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_death_rates', 'get_birth_rates']
+__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates', 'get_birth_rates']
 
 
-thisdir = sc.path(sc.thisdir())
+filesdir = sc.path(sc.thisdir()) / 'files'
 files = sc.objdict()
+files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
 
+# Cache data as a dict
+cache = dict()
+
 for k,v in files.items():
-    files[k] = thisdir / v
+    files[k] = filesdir / v
 
 
-def load_file(filename):
-    ''' Load a data file from the local data folder '''
-    path = sc.path(sc.thisdir()) / filename
-    obj = sc.load(path)
+def sanitizestr(string=None, alphanumeric=True, nospaces=True, asciify=True, lower=True, spacechar='_', symchar='_'):
+    ''' Remove all non-printable characters from a string -- to be moved to Sciris eventually '''
+    string = str(string)
+    if asciify:
+        string = unicodedata.normalize('NFKD', string).encode('ascii', 'ignore').decode()
+    if nospaces:
+        string = string.replace(' ', spacechar)
+    if lower:
+        string = string.lower()
+    if alphanumeric:
+        string = re.sub('[^0-9a-zA-Z ]', symchar, string)
+    return string
+
+
+def load_file(path):
+    ''' Load a data file from the local data folder -- but store in memory if already loaded '''
+    strpath = str(path)
+    if strpath not in cache:
+        obj = sc.load(path)
+        cache[strpath] = obj
+    else:
+        obj = cache[strpath]
     return obj
 
 
@@ -35,7 +59,7 @@ def get_country_aliases(wb=False):
        'Cape Verde':     'Cabo Verdeo',
        'Hong Kong':      'China, Hong Kong Special Administrative Region',
        'Macao':          'China, Macao Special Administrative Region',
-       "Cote d'Ivore":   'Côte d’Ivoire',
+       "Cote d'Ivoire":   'Côte d’Ivoire',
        "Ivory Coast":    'Côte d’Ivoire',
        'DRC':            'Democratic Republic of the Congo',
        'Iran':           'Iran (Islamic Republic of)',
@@ -58,7 +82,11 @@ def get_country_aliases(wb=False):
        'Vietnam':        'Viet Nam',
         }
 
-    if wb: country_mappings['DRC'] = 'Congo, Dem. Rep.' # Slightly different aliases for WB data
+    # Slightly different aliases for WB data
+    if wb:
+        for key,val in country_mappings.items():
+            if val == 'Democratic Republic of the Congo':
+                country_mappings[key] = 'Congo, Dem. Rep.'
 
     return country_mappings # Convert to lowercase
 
@@ -113,7 +141,7 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
     Load age distribution for a given country or countries.
 
     Args:
-        location (str or list): name of the country to load the age distribution for
+        location (str): name of the country to load the age distribution for
         year (int): year to load the age distribution for
         total_pop_file (str): optional filepath to save total population size for every year
 
@@ -151,6 +179,32 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
         dd.to_csv(total_pop_file)
 
     return result
+
+
+def get_total_pop(location=None):
+    '''
+    Load total population for a given country or countries.
+
+    Args:
+        location (str or list): name of the country to load the total population for
+
+    Returns:
+        pop_data (dataframe): Dataframe of year and pop_size columns
+    '''
+
+    # Load the raw data
+    try:
+        df = load_file(files.age_dist)
+    except Exception as E:
+        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+        raise ValueError(errormsg) from E
+
+    # Extract the age distribution for the given location and year
+    full_df = map_entries(df, location)[location]
+    dd = full_df.groupby("Time").sum()["PopTotal"]
+    dd = dd * 1e3
+    df = sc.dataframe(dd).reset_index().rename(columns={'Time':'year', 'PopTotal':'pop_size'})
+    return df
 
 
 def get_death_rates(location=None, by_sex=True, overall=False):
