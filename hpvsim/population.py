@@ -110,7 +110,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 durations = sim['dur_pship'][lkey]
                 acts = sim['acts'][lkey]
                 contacts[lkey], current_partners = make_contacts(
-                    lno=lno, t=0, p_count=partners[lno,:], current_partners=current_partners,
+                    lno=lno, t=0, partners=partners[lno,:], current_partners=current_partners,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
                     pref_weight=100, durations=durations, acts=acts, age_act_pars=sim['age_act_pars'][lkey], **kwargs
@@ -251,7 +251,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
     return scaled_acts
 
 
-def make_contacts(lno=None, t=None, p_count=None, current_partners=None,
+def make_contacts(lno=None, t=None, partners=None, current_partners=None,
                   sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
                   mixing=None, layer_probs=None, cross_layer=None,
                   pref_weight=None, durations=None, acts=None, age_act_pars=None):
@@ -260,7 +260,7 @@ def make_contacts(lno=None, t=None, p_count=None, current_partners=None,
     active male partners for sexually active females using age structure if given.
 
     Args:
-        p_count     (arr)   : the number of contacts to add for each person
+        partners    (arr)   : the number of preferred partners for each person
         n_new       (int)   : number of agents to create contacts between (N)
         mapping     (array) : optionally map the generated indices onto new indices
 
@@ -270,7 +270,7 @@ def make_contacts(lno=None, t=None, p_count=None, current_partners=None,
     '''
 
     f,m,current_partners = hpu.create_partnerships(
-        lno, p_count, current_partners, mixing, sexes, ages, is_active, is_female,
+        lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
         layer_probs, pref_weight, cross_layer)
 
     # Scale number of acts by age of couple
@@ -297,7 +297,13 @@ def make_contacts(lno=None, t=None, p_count=None, current_partners=None,
     output['dur'] = hpu.sample(**durations, size=n_partnerships)
     output['acts'] = scaled_acts
     output['start'] = np.array([t] * n_partnerships, dtype=hpd.default_float)
-    output['end'] = output['start'] + output['dur']
+    try:
+        output['end'] = output['start'] + output['dur']
+    except:
+        import traceback;
+        traceback.print_exc();
+        import pdb;
+        pdb.set_trace()
 
     return output, current_partners
 

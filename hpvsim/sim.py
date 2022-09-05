@@ -650,16 +650,19 @@ class Sim(hpb.BaseSim):
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
         contacts = people.contacts # Shorten
         lno=0
+        new_pships = dict()
         for lkey, layer in contacts.items():
-            pship_args = dict(lno=lno, t=self.yearvec-self['start'], partners=people.partners[lno], current_partners=people.current_partners,
+            pship_args = dict(lno=lno, t=self.yearvec[t]-self['start'], partners=people.partners[lno], current_partners=people.current_partners,
                               sexes=people.sex, ages=people.age, debuts=people.debut, is_female=people.is_female, is_active=people.is_active,
                               mixing=self['mixing'][lkey], layer_probs=self['layer_probs'][lkey], cross_layer=self['cross_layer'],
                               pref_weight=100, durations=self['dur_pship'][lkey], acts=self['acts'][lkey], age_act_pars=self['age_act_pars'][lkey]
                               )
-            new_pships, current_partners = hppop.make_contacts(**pship_args)
-            people.add_contacts(new_pships)
+            new_pships[lkey], current_partners = hppop.make_contacts(**pship_args)
             people.current_partners = current_partners
+            lno += 1
+        people.add_contacts(new_pships)
 
+        for lkey, layer in contacts.items():
             fs.append(layer['f'])
             ms.append(layer['m'])
 
