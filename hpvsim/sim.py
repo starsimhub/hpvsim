@@ -624,21 +624,17 @@ class Sim(hpb.BaseSim):
         imm_kin_pars = self['imm_kin']
         trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
 
-        # Update demographics and partnerships
+        # Update demographics and states, and dissolve old partnernships
         old_pop_size = len(self.people)
         self.people.update_states_pre(t=t, year=self.yearvec[t]) # NB this also ages people, applies deaths, and generates new births
-
         people = self.people # Shorten
-        n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
-        new_pop_size = len(people)
-        people.create_partnerships(t=t, n_new=n_dissolved, scale_factor=new_pop_size/old_pop_size) # Create new partnerships (maintaining the same overall partnerhip rate)
         n_people = len(people)
+        n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
 
         # Apply interventions
         for i,intervention in enumerate(self['interventions']):
             intervention(self) # If it's a function, call it directly
 
-        contacts = people.contacts # Shorten
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
         if self['use_waning']:
@@ -649,9 +645,19 @@ class Sim(hpb.BaseSim):
             people.imm[:] = people.peak_imm
         hpimm.check_immunity(people)
 
-        # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
+        # Loop over contact layers and create new partnerhips for each one, and precalculate
+        # aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
+        contacts = people.contacts # Shorten
+        lno=0
         for lkey, layer in contacts.items():
+            pship_args = dict(partners=people.partners[lno], current_partners=people.current_partners[lno],
+                              mixing=sim['mixing'][lkey], sexes=people.sex, ages=people.age,
+                              age_act_pars=self['age_act_pars'][lkey], layer_probs=self['layer_probs'][lkey],
+                              debuts=people.debuts, n=n_people, durations=self['dur_pships'][lkey],
+                              acts=self['acts'][lkey])
+            people.create_partnerships(t=t, lkey=lkey, n_new=n_dissolved, scale_factor=n_people/old_pop_size)  # Create new partnerships
+
             fs.append(layer['f'])
             ms.append(layer['m'])
 

@@ -287,6 +287,7 @@ class People(hpb.BasePeople):
                 f = new_pship_inds_f[keep_inds]
                 m = new_pship_inds_m[keep_inds]
                 scaled_acts = scaled_acts[keep_inds]
+
                 final_n_new = len(f)
 
                 # Add everything to a contacts dictionary

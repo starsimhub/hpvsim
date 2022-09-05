@@ -55,6 +55,7 @@ def make_pars(**kwargs):
     # Network parameters, generally initialized after the population has been constructed
     pars['debut']           = dict(f=dict(dist='normal', par1=18.6, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=19.6, par2=1.8))
+    pars['cross_layer']     = 0.05  # Proportion of females who have crosslayer relationships
     pars['partners']        = None  # The number of concurrent sexual partners for each partnership type
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
     pars['condoms']         = None  # The proportion of acts in which condoms are used for each partnership type
@@ -180,7 +181,6 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         age_act_pars = dict(m=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
                             c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
                             o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
-        # layer_probs = dict(m=0.7, c=0.4, o=0.05),   # Default proportion of the population in each layer
         dur_pship   = dict(m=dict(dist='normal_pos', par1=8,par2=3),
                            c=dict(dist='normal_pos', par1=1, par2=1),
                            o=dict(dist='normal_pos', par1=0.1, par2=0.05)),
