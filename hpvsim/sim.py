@@ -622,6 +622,12 @@ class Sim(hpb.BaseSim):
         beta = self['beta']
         gen_pars = self['genotype_pars']
         imm_kin_pars = self['imm_kin']
+        mixing = self['mixing']
+        layer_probs = self['layer_probs']
+        cross_layer = self['cross_layer']
+        acts = self['acts']
+        dur_pship = self['dur_pship']
+        age_act_pars = self['age_act_pars']
         trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
 
         # Update demographics and states, and dissolve old partnernships
@@ -645,23 +651,13 @@ class Sim(hpb.BaseSim):
             people.imm[:] = people.peak_imm
         hpimm.check_immunity(people)
 
-        # Loop over contact layers and create new partnerhips for each one, and precalculate
-        # aspects of transmission that don't depend on genotype (acts, condoms)
-        fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
+        # Create new partnerhips
         contacts = people.contacts # Shorten
-        lno=0
-        new_pships = dict()
-        for lkey, layer in contacts.items():
-            pship_args = dict(lno=lno, t=self.yearvec[t]-self['start'], partners=people.partners[lno], current_partners=people.current_partners,
-                              sexes=people.sex, ages=people.age, debuts=people.debut, is_female=people.is_female, is_active=people.is_active,
-                              mixing=self['mixing'][lkey], layer_probs=self['layer_probs'][lkey], cross_layer=self['cross_layer'],
-                              pref_weight=100, durations=self['dur_pship'][lkey], acts=self['acts'][lkey], age_act_pars=self['age_act_pars'][lkey]
-                              )
-            new_pships[lkey], current_partners = hppop.make_contacts(**pship_args)
-            people.current_partners = current_partners
-            lno += 1
-        people.add_contacts(new_pships)
+        tind = self.yearvec[t] - self['start']
+        people.create_parnterships(tind, mixing, layer_probs, cross_layer, pref_weight, dur_pship, acts, age_act_pars)
 
+        # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
+        fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
         for lkey, layer in contacts.items():
             fs.append(layer['f'])
             ms.append(layer['m'])

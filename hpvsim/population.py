@@ -109,7 +109,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             for lkey,n in sim['partners'].items():
                 durations = sim['dur_pship'][lkey]
                 acts = sim['acts'][lkey]
-                contacts[lkey], current_partners = make_contacts(
+                contacts[lkey], current_partners,_,_ = make_contacts(
                     lno=lno, t=0, partners=partners[lno,:], current_partners=current_partners,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
@@ -258,52 +258,43 @@ def make_contacts(lno=None, t=None, partners=None, current_partners=None,
     '''
     Make contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females using age structure if given.
-
-    Args:
-        partners    (arr)   : the number of preferred partners for each person
-        n_new       (int)   : number of agents to create contacts between (N)
-        mapping     (array) : optionally map the generated indices onto new indices
-
-    Returns:
-        Dictionary of two arrays defining UIDs of the edgelist (sources and targets)
-
     '''
 
-    f,m,current_partners = hpu.create_partnerships(
+    # Create edgelist
+    f,m,current_partners,new_pship_inds,new_pship_counts = hpu.create_edgelist(
         lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
         layer_probs, pref_weight, cross_layer)
 
-    # Scale number of acts by age of couple
-    acts = hpu.sample(**acts, size=len(f))
-    kwargs = dict(acts=acts,
-                  age_act_pars=age_act_pars,
-                  age_f=ages[f],
-                  age_m=ages[m],
-                  debut_f=debuts[f],
-                  debut_m=debuts[m]
-                  )
+    # Convert edgelist into Contacts dict, with info about each partnership's duration,
+    # coital frequency, etc
+    output = {}
 
-    scaled_acts = age_scale_acts(**kwargs)
-    keep_inds = scaled_acts>0 # Discard partnerships with zero acts (e.g. because they are "post-retirement")
-    m = m[keep_inds]
-    f = f[keep_inds]
-    scaled_acts = scaled_acts[keep_inds]
+    if len(f):
+        # Scale number of acts by age of couple
+        acts = hpu.sample(**acts, size=len(f))
+        kwargs = dict(acts=acts,
+                      age_act_pars=age_act_pars,
+                      age_f=ages[f],
+                      age_m=ages[m],
+                      debut_f=debuts[f],
+                      debut_m=debuts[m]
+                      )
 
-    # Tidy up and add durations and start dates
-    output = _tidy_edgelist(m, f)
-    n_partnerships = len(output['m'])
-    output['age_f'] = ages[f]
-    output['age_m'] = ages[m]
-    output['dur'] = hpu.sample(**durations, size=n_partnerships)
-    output['acts'] = scaled_acts
-    output['start'] = np.array([t] * n_partnerships, dtype=hpd.default_float)
-    try:
+        scaled_acts = age_scale_acts(**kwargs)
+        keep_inds = scaled_acts>0 # Discard partnerships with zero acts (e.g. because they are "post-retirement")
+        m = m[keep_inds]
+        f = f[keep_inds]
+        scaled_acts = scaled_acts[keep_inds]
+
+        # Tidy up and add durations and start dates
+        output = _tidy_edgelist(m, f)
+        n_partnerships = len(output['m'])
+        output['age_f'] = ages[f]
+        output['age_m'] = ages[m]
+        output['dur'] = hpu.sample(**durations, size=n_partnerships)
+        output['acts'] = scaled_acts
+        output['start'] = np.array([t] * n_partnerships, dtype=hpd.default_float)
         output['end'] = output['start'] + output['dur']
-    except:
-        import traceback;
-        traceback.print_exc();
-        import pdb;
-        pdb.set_trace()
 
-    return output, current_partners
+    return output, current_partners, new_pship_inds, new_pship_counts
 

@@ -175,7 +175,7 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
-def create_partnerships(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
+def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
                         layer_probs, pref_weight, cross_layer):
     '''
     Create partnerships for a single layer
@@ -198,7 +198,8 @@ def create_partnerships(lno, partners, current_partners, mixing, sex, age, is_ac
     # Useful variables
     n_agents        = len(sex)
     n_layers        = current_partners.shape[0]
-    f_active        = is_female & is_active
+    f_active        =  is_female & is_active
+    m_active        = ~is_female & is_active
     underpartnered  = current_partners[lno, :] < partners  # Indices of underpartnered people
 
     # Figure out how many new relationships to create by calculating the number of females
@@ -213,27 +214,28 @@ def create_partnerships(lno, partners, current_partners, mixing, sex, age, is_ac
     f_eligible              = is_female & is_active & underpartnered & (~other_partners | f_cross_layer)
     f_eligible_inds         = true(f_eligible)
 
-    # Bin the females by age and select a given proportion of them
-    bins = layer_probs[0, :]  # Extract age bins
-    age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
+    # Bin the females by age
+    bins        = layer_probs[0, :]  # Extract age bins
+    age_bins_f  = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
     bin_range_f = np.unique(age_bins_f)  # Range of bins
+
     for ab in bin_range_f:  # Loop over age bins
         these_f_contacts = binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
         f += these_f_contacts.tolist()
     f = np.array(f)
 
-    # Start constructing probabilities for males to be selected for new relationships
-    m_probs                         = np.zeros(n_agents)    # Begin by assigning everyone equal probability of forming a new relationship
-    m_probs[is_active & ~is_female] = 1                     # Only select sexually active males
-    m_probs[underpartnered]         *= pref_weight          # Increase weight for those who are underpartnerned
+    # Probabilities for males to be selected for new relationships
+    m_probs                 = np.zeros(n_agents)    # Begin by assigning everyone equal probability of forming a new relationship
+    m_probs[m_active]       = 1                     # Only select sexually active males
+    m_probs[underpartnered] *= pref_weight          # Increase weight for those who are underpartnerned
 
     # Draw male partners based on mixing matrices
     if len(f) > 0:
 
-        bins = mixing[:, 0]
-        m_active_inds = true(is_active & ~is_female)  # Males active to be selected
-        age_bins_f = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
-        age_bins_m = np.digitize(age[m_active_inds], bins=bins) - 1  # Age bins of active males
+        bins            = mixing[:, 0]
+        m_active_inds   = true(m_active)  # Indices of active males
+        age_bins_f      = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
+        age_bins_m      = np.digitize(age[m_active_inds], bins=bins) - 1  # Age bins of active males
         bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
 
         for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
@@ -244,11 +246,11 @@ def create_partnerships(lno, partners, current_partners, mixing, sex, age, is_ac
             m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
         m = np.array(m)
 
-    # Count how many contacts there actually are
-    unique, counts = np.unique(np.concatenate([f, m]), return_counts=True)
-    current_partners[lno, unique] += counts
+        # Count how many contacts there actually are
+        new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
+        current_partners[lno, new_pship_inds] += new_pship_counts
 
-    return f, m, current_partners
+    return f, m, current_partners, new_pship_inds, new_pship_counts
 
 
 def set_prognoses(people, inds, g, dur_none):
