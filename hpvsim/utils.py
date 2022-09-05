@@ -245,7 +245,7 @@ def create_partnerships(lno, partners, current_partners, mixing, sex, age, is_ac
         m = np.array(m)
 
     # Count how many contacts there actually are
-    unique, counts = unique(np.concatenate([f, m]))
+    unique, counts = np.unique(np.concatenate([f, m]), return_counts=True)
     current_partners[lno, unique] += counts
 
     return f, m, current_partners

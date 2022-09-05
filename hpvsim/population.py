@@ -269,8 +269,9 @@ def make_contacts(lno=None, t=None, p_count=None, current_partners=None,
 
     '''
 
-    f,m = hpu.create_partnerships(lno, p_count, current_partners, mixing, sexes, ages, is_active, is_female,
-                                  layer_probs, pref_weight, cross_layer)
+    f,m,current_partners = hpu.create_partnerships(
+        lno, p_count, current_partners, mixing, sexes, ages, is_active, is_female,
+        layer_probs, pref_weight, cross_layer)
 
     # Scale number of acts by age of couple
     acts = hpu.sample(**acts, size=len(f))

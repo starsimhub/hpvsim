@@ -651,12 +651,14 @@ class Sim(hpb.BaseSim):
         contacts = people.contacts # Shorten
         lno=0
         for lkey, layer in contacts.items():
-            pship_args = dict(partners=people.partners[lno], current_partners=people.current_partners[lno],
-                              mixing=self['mixing'][lkey], sexes=people.sex, ages=people.age,
-                              age_act_pars=self['age_act_pars'][lkey], layer_probs=self['layer_probs'][lkey],
-                              debuts=people.debuts, n=n_people, durations=self['dur_pships'][lkey],
-                              acts=self['acts'][lkey])
-            people.create_partnerships(t=t, lkey=lkey, n_new=n_dissolved, scale_factor=n_people/old_pop_size)  # Create new partnerships
+            pship_args = dict(lno=lno, t=self.yearvec-self['start'], partners=people.partners[lno], current_partners=people.current_partners,
+                              sexes=people.sex, ages=people.age, debuts=people.debut, is_female=people.is_female, is_active=people.is_active,
+                              mixing=self['mixing'][lkey], layer_probs=self['layer_probs'][lkey], cross_layer=self['cross_layer'],
+                              pref_weight=100, durations=self['dur_pship'][lkey], acts=self['acts'][lkey], age_act_pars=self['age_act_pars'][lkey]
+                              )
+            new_pships, current_partners = hppop.make_contacts(**pship_args)
+            people.add_contacts(new_pships)
+            people.current_partners = current_partners
 
             fs.append(layer['f'])
             ms.append(layer['m'])
