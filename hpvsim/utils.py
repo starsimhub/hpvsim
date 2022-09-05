@@ -244,7 +244,11 @@ def create_partnerships(lno, partners, current_partners, mixing, sex, age, is_ac
             m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
         m = np.array(m)
 
-    return f, m
+    # Count how many contacts there actually are
+    unique, counts = unique(np.concatenate([f, m]))
+    current_partners[lno, unique] += counts
+
+    return f, m, current_partners
 
 
 def set_prognoses(people, inds, g, dur_none):

@@ -97,6 +97,9 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['debut'] = debuts
         popdict['partners'] = partners
 
+        is_active = ages > debuts
+        is_female = sexes == 0
+
         # Create the contacts
         lkeys = sim['partners'].keys() # TODO: consider a more robust way to do this
         if microstructure in ['random', 'default']:
@@ -106,10 +109,12 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             for lkey,n in sim['partners'].items():
                 durations = sim['dur_pship'][lkey]
                 acts = sim['acts'][lkey]
-                contacts[lkey], current_partners = make_contacts(lno=lno, p_count=partners[lno,:], current_partners=current_partners,
-                                                   mixing=sim['mixing'][lkey], sexes=sexes, ages=ages, debuts=debuts,
-                                                   layer_probs=sim['layer_probs'][lkey], pref_weight=100, cross_layer=sim['cross_layer'],
-                                                   durations=durations, acts=acts, age_act_pars=sim['age_act_pars'][lkey], **kwargs)
+                contacts[lkey], current_partners = make_contacts(
+                    lno=lno, t=0, p_count=partners[lno,:], current_partners=current_partners,
+                    sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
+                    mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
+                    pref_weight=100, durations=durations, acts=acts, age_act_pars=sim['age_act_pars'][lkey], **kwargs
+                )
                 contacts[lkey]['acts'] += 1 # To avoid zeros
                 lno += 1
         else:
@@ -246,10 +251,10 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
     return scaled_acts
 
 
-def make_contacts(lno=None, p_count=None, current_partners=None, mixing=None,
-                  sexes=None, ages=None, debuts=None, layer_probs=None,
-                  pref_weight=None, cross_layer=None,
-                  durations=None, acts=None,age_act_pars=None):
+def make_contacts(lno=None, t=None, p_count=None, current_partners=None,
+                  sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
+                  mixing=None, layer_probs=None, cross_layer=None,
+                  pref_weight=None, durations=None, acts=None, age_act_pars=None):
     '''
     Make contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females using age structure if given.
@@ -264,14 +269,8 @@ def make_contacts(lno=None, p_count=None, current_partners=None, mixing=None,
 
     '''
 
-    is_active = ages>debuts
-    is_female = sexes==0
     f,m = hpu.create_partnerships(lno, p_count, current_partners, mixing, sexes, ages, is_active, is_female,
                                   layer_probs, pref_weight, cross_layer)
-
-    # Count how many contacts there actually are
-    unique, counts = hpu.unique(np.concatenate([f, m]))
-    current_partners[lno, unique] += counts
 
     # Scale number of acts by age of couple
     acts = hpu.sample(**acts, size=len(f))
@@ -296,7 +295,7 @@ def make_contacts(lno=None, p_count=None, current_partners=None, mixing=None,
     output['age_m'] = ages[m]
     output['dur'] = hpu.sample(**durations, size=n_partnerships)
     output['acts'] = scaled_acts
-    output['start'] = np.zeros(n_partnerships) # For now, assume commence at beginning of sim
+    output['start'] = np.array([t] * n_partnerships, dtype=hpd.default_float)
     output['end'] = output['start'] + output['dur']
 
     return output, current_partners

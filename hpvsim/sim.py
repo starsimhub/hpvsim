@@ -652,7 +652,7 @@ class Sim(hpb.BaseSim):
         lno=0
         for lkey, layer in contacts.items():
             pship_args = dict(partners=people.partners[lno], current_partners=people.current_partners[lno],
-                              mixing=sim['mixing'][lkey], sexes=people.sex, ages=people.age,
+                              mixing=self['mixing'][lkey], sexes=people.sex, ages=people.age,
                               age_act_pars=self['age_act_pars'][lkey], layer_probs=self['layer_probs'][lkey],
                               debuts=people.debuts, n=n_people, durations=self['dur_pships'][lkey],
                               acts=self['acts'][lkey])
