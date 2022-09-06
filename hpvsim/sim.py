@@ -630,17 +630,17 @@ class Sim(hpb.BaseSim):
         age_act_pars = self['age_act_pars']
         trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
 
-        # Update demographics and states, and dissolve old partnernships
-        old_pop_size = len(self.people)
-        self.people.update_states_pre(t=t, year=self.yearvec[t]) # NB this also ages people, applies deaths, and generates new births
+        # Update demographics, states, and partnerships
+        self.people.update_states_pre(t=t, year=self.yearvec[t]) # This also ages people, applies deaths, and generates new births
         people = self.people # Shorten
         n_people = len(people)
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
+        tind = self.yearvec[t] - self['start']
+        people.create_parnterships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
 
         # Apply interventions
         for i,intervention in enumerate(self['interventions']):
             intervention(self) # If it's a function, call it directly
-
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
         if self['use_waning']:
@@ -651,13 +651,9 @@ class Sim(hpb.BaseSim):
             people.imm[:] = people.peak_imm
         hpimm.check_immunity(people)
 
-        # Create new partnerhips
-        contacts = people.contacts # Shorten
-        tind = self.yearvec[t] - self['start']
-        people.create_parnterships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
-
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
+        contacts = people.contacts # Shorten
         for lkey, layer in contacts.items():
             fs.append(layer['f'])
             ms.append(layer['m'])
