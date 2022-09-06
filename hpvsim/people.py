@@ -203,19 +203,19 @@ class People(hpb.BasePeople):
         return n_dissolved # Return the number of dissolved partnerships by layer
 
 
-    def create_parnterships(tind, mixing, layer_probs, cross_layer, pref_weight, dur_pship, acts, age_act_pars):
+    def create_parnterships(self, tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars, pref_weight=100):
         '''
         Create partnerships. All the hard work of creating the contacts is done by hppop.make_contacts,
-        which in turn references hpu.create_edgelist for creating the edgelist. This method is just a light wrapper
-        that passes in the arguments in the right format.
+        which in turn relies on hpu.create_edgelist for creating the edgelist. This method is just a light wrapper
+        that passes in the arguments in the right format and the updates relationship info stored in the People class.
         '''
         # Initialize
         new_pships = dict()
 
         # Loop over layers
-        for lno, lkey in enumerate(self.layer_keys):
+        for lno, lkey in enumerate(self.layer_keys()):
             pship_args = dict(
-                lno=lno, t=tind, partners=self.partners[lno], current_partners=self.current_partners,
+                lno=lno, tind=tind, partners=self.partners[lno], current_partners=self.current_partners,
                 sexes=self.sex, ages=self.age, debuts=self.debut, is_female=self.is_female, is_active=self.is_active,
                 mixing=mixing[lkey], layer_probs=layer_probs[lkey], cross_layer=cross_layer,
                 pref_weight=pref_weight, durations=dur_pship[lkey], acts=acts[lkey], age_act_pars=age_act_pars[lkey]
@@ -224,10 +224,11 @@ class People(hpb.BasePeople):
 
             # Update relationship info
             self.current_partners[:] = current_partners
-            self.rship_start_dates[lno, new_pships[lkey]] = t
-            self.n_rships[lno, new_pship_inds] += new_pship_counts
-            lags = self.rship_start_dates[lno, new_pship_inds] - self.rship_end_dates[lno, new_pship_inds]
-            self.rship_lags[lkey] += np.histogram(lags, self.lag_bins)[0]
+            if len(new_pship_inds):
+                self.rship_start_dates[lno, new_pship_inds] = self.t
+                self.n_rships[lno, new_pship_inds] += new_pship_counts
+                lags = self.rship_start_dates[lno, new_pship_inds] - self.rship_end_dates[lno, new_pship_inds]
+                self.rship_lags[lkey] += np.histogram(lags, self.lag_bins)[0]
 
         self.add_contacts(new_pships)
 

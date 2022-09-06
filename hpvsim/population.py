@@ -105,18 +105,14 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         if microstructure in ['random', 'default']:
             contacts = dict()
             current_partners = np.zeros((len(lkeys),n_agents))
-            lno = 0
-            for lkey,n in sim['partners'].items():
-                durations = sim['dur_pship'][lkey]
-                acts = sim['acts'][lkey]
+            for lno,lkey in enumerate(lkeys):
                 contacts[lkey], current_partners,_,_ = make_contacts(
-                    lno=lno, t=0, partners=partners[lno,:], current_partners=current_partners,
+                    lno=lno, tind=0, partners=partners[lno,:], current_partners=current_partners,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
-                    pref_weight=100, durations=durations, acts=acts, age_act_pars=sim['age_act_pars'][lkey], **kwargs
+                    pref_weight=100, durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey], **kwargs
                 )
-                contacts[lkey]['acts'] += 1 # To avoid zeros
-                lno += 1
+
         else:
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
             raise NotImplementedError(errormsg)
@@ -251,7 +247,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
     return scaled_acts
 
 
-def make_contacts(lno=None, t=None, partners=None, current_partners=None,
+def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
                   sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
                   mixing=None, layer_probs=None, cross_layer=None,
                   pref_weight=None, durations=None, acts=None, age_act_pars=None):
@@ -287,13 +283,13 @@ def make_contacts(lno=None, t=None, partners=None, current_partners=None,
         scaled_acts = scaled_acts[keep_inds]
 
         # Tidy up and add durations and start dates
-        output = _tidy_edgelist(m, f)
+        output = _tidy_edgelist(f, m)
         n_partnerships = len(output['m'])
         output['age_f'] = ages[f]
         output['age_m'] = ages[m]
         output['dur'] = hpu.sample(**durations, size=n_partnerships)
         output['acts'] = scaled_acts
-        output['start'] = np.array([t] * n_partnerships, dtype=hpd.default_float)
+        output['start'] = np.array([tind] * n_partnerships, dtype=hpd.default_float)
         output['end'] = output['start'] + output['dur']
 
     return output, current_partners, new_pship_inds, new_pship_counts

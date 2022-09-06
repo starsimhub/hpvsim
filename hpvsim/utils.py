@@ -104,11 +104,15 @@ def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p
     return p1_source_inds, p1_genotypes
 
 
-@nb.njit(                (nb.int64[:],  nb.int64[:],    nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
+# @nb.njit(                (nb.int64[:],  nb.int64[:],    nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
 def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
     '''
     Construct discordant partnerships
     '''
+    import traceback;
+    traceback.print_exc();
+    import pdb;
+    pdb.set_trace()
     p1_source_pships    = pair_lookup(p1, p1_inf_inds, n) # Pull out the indices of partnerships in which p1 is infected
     p2_sus_pships       = pair_lookup(p2, p2_sus_inds, n) # ... pull out the indices of partnerships in which p2 is susceptible
     p1_source_pships    = p1_source_pships * p2_sus_pships # Remove partnerships where both partners have an infection with the same genotype
@@ -194,6 +198,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     # Initialize
     f           = [] # Initialize the female partners
     m           = [] # Initialize the male partners
+    new_pship_inds, new_pship_counts = [], [] # Initialize the indices and counts of new partnerships
 
     # Useful variables
     n_agents        = len(sex)

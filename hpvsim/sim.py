@@ -654,7 +654,7 @@ class Sim(hpb.BaseSim):
         # Create new partnerhips
         contacts = people.contacts # Shorten
         tind = self.yearvec[t] - self['start']
-        people.create_parnterships(tind, mixing, layer_probs, cross_layer, pref_weight, dur_pship, acts, age_act_pars)
+        people.create_parnterships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
@@ -688,22 +688,26 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
         # Loop over layers
-        ln = 0 # Layer number
-        for lkey, layer in contacts.items():
-            f = fs[ln]
-            m = ms[ln]
+        for lno,lkey in enumerate(contacts.keys()):
+            f = fs[lno]
+            m = ms[lno]
 
             # Compute transmissions
             for g in range(ng):
                 f_source_inds = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
                 m_source_inds = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
 
-                foi_frac = 1 - frac_acts[ln] * gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])  # Probability of not getting infected from any fractional acts
-                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])) ** whole_acts[ln]  # Probability of not getting infected from whole acts
+                foi_frac = 1 - frac_acts[lno] * gen_betas[g] * trans[:, None] * (1 - effective_condoms[lno])  # Probability of not getting infected from any fractional acts
+                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms[lno])) ** whole_acts[lno]  # Probability of not getting infected from whole acts
                 foi = (1 - (foi_whole * foi_frac)).astype(hpd.default_float)
 
                 discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g], foi[0,:]],
                                     [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g], foi[1,:]]]
+
+                import traceback;
+                traceback.print_exc();
+                import pdb;
+                pdb.set_trace()
 
                 # Compute transmissibility for each partnership
                 for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
