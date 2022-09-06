@@ -204,13 +204,13 @@ def validate_popdict(popdict, pars, verbose=True):
     return
 
 
-def _tidy_edgelist(m, f, mapping=None):
+def _tidy_edgelist(f, m, mapping=None):
     ''' Helper function to convert lists to arrays and optionally map arrays '''
     if mapping is not None:
         mapping = np.array(mapping, dtype=hpd.default_int)
         m = mapping[m]
         f = mapping[f]
-    output = dict(m=m, f=f)
+    output = dict(f=f, m=m)
     return output
 
 
