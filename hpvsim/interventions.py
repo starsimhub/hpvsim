@@ -1277,6 +1277,7 @@ class PrecancerTreatment(Product):
                 people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
                 hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
+        # Should this be successfully_treated instead of inds??
         people.treated[inds] = True
         people.date_treated[inds] = people.t
 
@@ -1717,3 +1718,7 @@ class RoutineTherapeutic(TherapeuticVaccination):
         inds = sc.findinds((sim.people.age >= self.age_range[0]) & (sim.people.age < self.age_range[1]) & (sim.people.is_female))
         coverage = self.coverage[self.timepoints == sim.t][0]
         return {'vals': coverage * np.ones_like(inds), 'inds': inds}
+
+
+
+

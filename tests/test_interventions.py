@@ -267,15 +267,9 @@ def test_screening(do_plot=False, do_save=False, fig_path=None):
 
     pars = {
         'n_agents': n_agents,
-<<<<<<< HEAD
-        'n_years': 50,
-        'burnin': 10,
-        'start': 2000,
-=======
         'n_years': 70,
         'burnin': 50,
         'start': 1950,
->>>>>>> main
         'genotypes': [16, 18],
         'location': 'tanzania',
         'dt': 0.5,
