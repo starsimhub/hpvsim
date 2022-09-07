@@ -87,11 +87,12 @@ class PeopleMeta(sc.prettyobj):
         State('cin', bool, False, 'n_genotypes'),
         State('cancerous', bool, False),
         State('detected_cancer', bool, False),
-        State('cancer_genotype', default_int, -2147483648),
+        State('cancer_genotype', default_int, -2147483648), # CK: What
         State('latent', bool, False,'n_genotypes'),
         State('alive', bool, True), # Save this as a state so we can record population sizes
         State('dead_cancer', bool, False),
         State('dead_other', bool, False),  # Dead from all other causes
+        State('emigrated', bool, False), # Emigrated
         State('vaccinated', bool, False),
         State('screened', bool, False),
         State('treated', bool, False),
@@ -127,6 +128,7 @@ class PeopleMeta(sc.prettyobj):
 
     dates += [
         State('date_clearance', default_float, np.nan, shape='n_genotypes'),
+        State('date_exposed', default_float, np.nan, shape='n_genotypes'),
         State('date_next_screen', default_float, np.nan),
     ]
 
@@ -197,9 +199,9 @@ inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN
 inci_colors = [pl.cm.GnBu,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges,  pl.cm.Oranges]
 
 # Demographics
-dem_keys    = ['births',    'other_deaths']
-dem_names   = ['births',    'other deaths']
-dem_colors  = ['#fcba03',   '#000000']
+dem_keys    = ['births',    'other_deaths', 'migration']
+dem_names   = ['births',    'other deaths', 'migration']
+dem_colors  = ['#fcba03',   '#000000',      '#000000']
 
 # Results by sex
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']

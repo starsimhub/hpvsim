@@ -629,7 +629,7 @@ class Sim(hpb.BaseSim):
 
         # Update demographics and partnerships
         old_pop_size = len(self.people)
-        self.people.update_states_pre(t=t, year=self.yearvec[t], resfreq=self.resfreq) # NB this also ages people, applies deaths, and generates new births
+        self.people.update_states_pre(t=t, year=self.yearvec[t]) # NB this also ages people, applies deaths, and generates new births
 
         people = self.people # Shorten
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
@@ -743,6 +743,8 @@ class Sim(hpb.BaseSim):
             self.results[key][idx] += count
         for key,count in people.by_age_flows.items():
             self.results[key][:,idx] += count
+
+
 
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == 0:
@@ -967,6 +969,13 @@ class Sim(hpb.BaseSim):
         self.results['cum_vaccinated'][:] = np.cumsum(self.results['new_vaccinated'][:], axis=0)
         self.results['cum_total_vaccinated'][:] = np.cumsum(self.results['new_total_vaccinated'][:])
         self.results['cum_doses'][:] = np.cumsum(self.results['new_doses'][:])
+
+        # Age of causal infection
+        cancerous_inds = hpu.true(self.people.cancerous)
+        current_age = self.people.age[cancerous_inds]
+        cancerous_genotype = self.people.cancer_genotype[cancerous_inds]
+        offset = (self.t -self.people.date_exposed[cancerous_genotype, cancerous_inds])*self['dt']
+        causal_infection_age = current_age - offset
 
         return
 

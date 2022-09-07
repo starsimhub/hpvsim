@@ -282,7 +282,7 @@ class Intervention:
 
 
 #%% Behavior change interventions
-__all__ += ['DynamicPars']
+__all__ += ['DynamicPars', 'EventSchedule', 'set_intervention_attributes']
 
 class DynamicPars(Intervention):
     '''
@@ -366,6 +366,69 @@ class DynamicPars(Intervention):
                 else:
                     sim[parkey] = val # Set the parameter if not a dict
         return
+
+
+class EventSchedule(Intervention):
+    """
+    Run functions on different days
+
+    This intervention is a a kind of generalization of `dynamic_pars` to allow more
+    flexibility in triggering multiple, arbitrary operations and to more easily assemble
+    multiple changes at different times. This intervention can be used to implement scale-up
+    or other changes to interventions without needing to implement time-dependency in the
+    intervention itself.
+
+    To use the intervention, simply index the intervention by `t` or by date, and then
+    Example:
+
+    >>> iv = EventSchedule()
+    >>> iv[1] = lambda sim: print(sim.t)
+    >>> iv['2020-04-02'] = lambda sim: print('foo')
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.schedule = defaultdict(list)
+
+    def __getitem__(self, day):
+        return self.schedule[day]
+
+    def __setitem__(self, day, fcn):
+        if day in self.schedule:
+            raise Exception("Use a list instead to assign multiple functions - or to really overwrite, delete the function for this day first i.e. `del schedule[day]` before performing `schedule[day]=...`")
+        self.schedule[day] = fcn
+
+    def __delitem__(self, key):
+        del self.schedule[key]
+
+    def initialize(self, sim):
+        super().initialize(sim)
+
+        # First convert all values into lists (i.e., wrap any standalone functions into lists)
+        for k, v in list(self.schedule.items()):
+            self.schedule[k] = [v] if not isinstance(self.schedule[k], list) else v
+
+        # Then convert any dates into time indices
+        for k, v in list(self.schedule.items()):
+            t = sim.get_t(k)[0]
+            if t != k:
+                self.schedule[t] += v
+                del self.schedule[k]
+
+    def apply(self, sim):
+        if sim.t in self.schedule:
+            for fcn in self.schedule[sim.t]:
+                fcn(sim)
+
+
+def set_intervention_attributes(sim, intervention_name, **kwargs):
+    # This is a helper method that can be used to set arbitrary intervention attributes
+    # It's a separately defined function so that it can be pickled properly
+    iv = sim.get_intervention(intervention_name)
+    for attr, value in kwargs.items():
+        assert hasattr(iv, attr), "set_intervention_attributes() should only be used to change existing attributes"  # avoid silent errors if the attr is misspelled
+        setattr(iv, attr, value)
 
 
 #%% Vaccination
@@ -1121,7 +1184,6 @@ class Screening(Intervention):
 
             # Set screening states and dates
             sim.people.intv_flows['screens'] += len(screen_inds)
-            sim.people.intv_flows['screened'] += len(hpu.true(eligible_ages & (sim.people.screens == 0)))
             sim.people.screened[screen_inds] = True
             sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
@@ -1196,20 +1258,6 @@ class Product():
 
 class PrecancerTreatment(Product):
     def __init__(self):
-        self.persistence = dict(
-            hpv16=dict(dist='beta', par1=2, par2=7),
-            hpv18=dict(dist='beta', par1=2, par2=7),
-            hpv31=dict(dist='beta', par1=2, par2=7),
-            hpv33=dict(dist='beta', par1=2, par2=7),
-            hpv35=dict(dist='beta', par1=2, par2=7),
-            hpv45=dict(dist='beta', par1=2, par2=7),
-            hpv51=dict(dist='beta', par1=2, par2=7),
-            hpv52=dict(dist='beta', par1=2, par2=7),
-            hpv56=dict(dist='beta', par1=2, par2=7),
-            hpv58=dict(dist='beta', par1=2, par2=7),
-            hpv6=dict(dist='beta', par1=2, par2=7),
-            hpv11=dict(dist='beta', par1=2, par2=7),
-        )
         self.efficacy=dict(
             none=0,
             cin1=0.936,
@@ -1239,29 +1287,12 @@ class PrecancerTreatment(Product):
             people[state][:, eff_treat_inds] = False  # People who get treated have their CINs removed
             people[f'date_{state}'][:, eff_treat_inds] = np.nan
 
-        successfully_treated = np.array(successfully_treated)
-
-        if len(successfully_treated) > 0:
-
+            # Clear infection for women who clear
             for g in range(people.pars['n_genotypes']):
-                # Determine whether infection persists
-                inf_inds = hpu.true(people['infectious'][g, successfully_treated])
-                inf_inds = successfully_treated[inf_inds]
-                persistence_probs = hpu.sample(**self.persistence[people.pars['genotype_map'][g]], size=len(inf_inds))
-
-                # Determine who will have persistent infection, give them new prognoses
-                to_persist = hpu.binomial_arr(persistence_probs)
-                persist_inds = inf_inds[to_persist]
-                people['none'][g, persist_inds] = True  # People whose HPV persists
-                dur_hpv = (people.t - people.date_infectious[g, persist_inds]) * people.pars['dt']
-                hpu.set_prognoses(people, persist_inds, g, dur_hpv)
-
-                # Clear infection for women who clear
-                to_clear = inf_inds[~to_persist]  # Determine who will clear infection
-                people['infectious'][g, to_clear] = False  # People whose HPV clears
-                people['none'][g, to_clear] = False  # People whose HPV clears
-                people.dur_disease[g, to_clear] = (people.t - people.date_infectious[g, to_clear]) * people.pars['dt']
-                hpi.update_peak_immunity(people, to_clear, imm_pars=people.pars, imm_source=g)
+                people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
+                people['none'][g, eff_treat_inds] = False  # People whose HPV clears
+                people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
+                hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
         people.treated[inds] = True
         people.date_treated[inds] = people.t
@@ -1509,9 +1540,23 @@ class TherapeuticVaccination(Intervention, Product):
         self.interval = interval or 0.5  # Interval between doses in years
         self.prophylactic = proph # whether to deliver a single-dose prophylactic vaccine at first dose
         self.vaccine = vaccine # which vaccine to deliver
-        self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
+        self.treat_states = ['none', 'latent', 'cin1', 'cin2', 'cin3']
         self.efficacy = efficacy or dict(  # default efficacy decreases as dysplasia increases
             none=dict(
+                hpv16=[0.1, 0.9],
+                hpv18=[0.1, 0.9],
+                hpv31=[0.01, 0.1],
+                hpv33=[0.01, 0.1],
+                hpv35=[0.01, 0.1],
+                hpv45=[0.01, 0.1],
+                hpv51=[0.01, 0.1],
+                hpv52=[0.01, 0.1],
+                hpv56=[0.01, 0.1],
+                hpv58=[0.01, 0.1],
+                hpv6=[0.01, 0.1],
+                hpv11=[0.01, 0.1],
+            ),
+            latent=dict(
                 hpv16=[0.1, 0.9],
                 hpv18=[0.1, 0.9],
                 hpv31=[0.01, 0.1],

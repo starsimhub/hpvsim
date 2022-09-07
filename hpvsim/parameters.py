@@ -31,7 +31,7 @@ def make_pars(**kwargs):
     # Population parameters
     pars['n_agents']        = 20e3      # Number of agents
     pars['pop_scale']       = None      # How much to scale the population
-    pars['network']         = 'random'  # What type of sexual network to use -- 'random', 'basic', other options TBC
+    pars['network']         = 'default'  # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
     pars['birth_rates']     = None      # Birth rates, loaded below
@@ -46,9 +46,11 @@ def make_pars(**kwargs):
     pars['n_years']         = 15            # Number of years to run, if end isn't specified. Note that this includes burn-in
     pars['burnin']          = 5             # Number of years of burnin. NB, this is doesn't affect the start and end dates of the simulation, but it is possible remove these years from plots
     pars['dt']              = 0.2           # Timestep (in years)
+    pars['dt_demog']        = 1.0           # Timestep for demographic updates (in years)
     pars['rand_seed']       = 1             # Random seed, if None, don't reset
     pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
     pars['use_waning']      = False         # Whether or not to use waning immunity. If set to False, immunity from infection and vaccination is assumed to stay at the same level permanently
+    pars['use_migration']   = True          # Whether to estimate migration rates to correct the total population size
 
     # Network parameters, generally initialized after the population has been constructed
     pars['debut']           = dict(f=dict(dist='normal', par1=18.6, par2=2.1), # Location-specific data should be used here if possible

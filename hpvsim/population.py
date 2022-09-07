@@ -39,6 +39,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     # Set inputs and defaults
     n_agents = int(sim['n_agents']) # Shorten
     total_pop = None # Optionally created but always returned
+    pop_trend = None # Populated later if location is specified
 
     if verbose is None:
         verbose = sim['verbose']
@@ -67,7 +68,8 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 print(f'Loading location-specific data for "{location}"')
             if use_age_data:
                 try:
-                    age_data = hpdata.get_age_distribution(location, year=sim['start'])
+                    age_data  = hpdata.get_age_distribution(location, year=sim['start'])
+                    pop_trend = hpdata.get_total_pop(location)
                 except ValueError as E:
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
@@ -115,11 +117,10 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
         popdict['contacts'] = contacts
         popdict['current_partners'] = np.array(current_partners)
-        popdict['layer_keys'] = list(sim['partners'].keys())
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
-    people = hpppl.People(sim.pars, uid=popdict['uid'], age=popdict['age'], sex=popdict['sex'], debut=popdict['debut'], partners=popdict['partners'], contacts=popdict['contacts'], current_partners=popdict['current_partners']) # List for storing the people
+    people = hpppl.People(sim.pars, pop_trend=pop_trend, **popdict) # List for storing the people
 
     sc.printv(f'Created {n_agents} agents, average age {people.age.mean():0.2f} years', 2, verbose)
 
@@ -129,7 +130,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 def partner_count(n_agents=None, partner_pars=None):
     '''
     Assign each person a preferred number of concurrent partners for each layer
-    
+
     Args:
         n_agents    (int)   : number of agents
         layer_keys  (list)  : list of layers
