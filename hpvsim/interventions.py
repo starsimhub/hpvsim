@@ -1257,10 +1257,6 @@ class PrecancerTreatment(Product):
     def administer(self, people, inds):
         # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
 
-        # nb. this will record treated=True reflecting delivery of the treatment, even if the treatment fails?
-        people.treated[inds] = True
-        people.date_treated[inds] = people.t
-
         successfully_treated = []
         for state in self.treat_states:
             people_in_state = people[state].any(axis=0)
