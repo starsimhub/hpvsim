@@ -175,6 +175,85 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
+def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
+                        layer_probs, pref_weight, cross_layer):
+    '''
+    Create partnerships for a single layer
+    Args:
+        partners (int arr): array containing each agent's desired number of partners in this layer
+        current_partners (int arr): array containing each agent's actual current number of partners in this layer
+        mixing (float arr): mixing matrix
+        sex (bool arr): sex
+        is_active (bool arr): whether or not people are sexually active
+        is_female (bool arr): whether each person is female
+        layer_probs (float arr): participation rates in this layer by age and sex
+        pref_weight (float):
+        cross_layer (float): proportion of females that have cross-layer relationships
+
+    '''
+    # Initialize
+    f           = [] # Initialize the female partners
+    m           = [] # Initialize the male partners
+    new_pship_inds, new_pship_counts = [], [] # Initialize the indices and counts of new partnerships
+
+    # Useful variables
+    n_agents        = len(sex)
+    n_layers        = current_partners.shape[0]
+    f_active        =  is_female & is_active
+    m_active        = ~is_female & is_active
+    underpartnered  = current_partners[lno, :] < partners  # Indices of underpartnered people
+
+    # Figure out how many new relationships to create by calculating the number of females
+    # who are underpartnered in this layer and either unpartnered in other layers or available
+    # for cross-layer participation
+    other_layers            = np.delete(np.arange(n_layers), lno)  # Indices of all other layers but this one
+    other_partners          = current_partners[other_layers, :].any(axis=0)  # Whether or not people already partnered in other layers
+    other_partners_f        = true(other_partners & f_active) # Indices of sexually active females with parthers in other layers
+    f_cross                 = binomial_filter(cross_layer, other_partners_f) # Indices of females who have cross-layer relationships
+    f_cross_layer           = np.full(n_agents, False, dtype=bool) # Construct a boolean array indicating whether people have cross-layer relationships
+    f_cross_layer[f_cross]  = True # Only true for the selected females
+    f_eligible              = is_female & is_active & underpartnered & (~other_partners | f_cross_layer)
+    f_eligible_inds         = true(f_eligible)
+
+    # Bin the females by age
+    bins        = layer_probs[0, :]  # Extract age bins
+    age_bins_f  = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
+    bin_range_f = np.unique(age_bins_f)  # Range of bins
+
+    for ab in bin_range_f:  # Loop over age bins
+        these_f_contacts = binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
+        f += these_f_contacts.tolist()
+    f = np.array(f)
+
+    # Probabilities for males to be selected for new relationships
+    m_probs                 = np.zeros(n_agents)    # Begin by assigning everyone equal probability of forming a new relationship
+    m_probs[m_active]       = 1                     # Only select sexually active males
+    m_probs[underpartnered] *= pref_weight          # Increase weight for those who are underpartnerned
+
+    # Draw male partners based on mixing matrices
+    if len(f) > 0:
+
+        bins            = mixing[:, 0]
+        m_active_inds   = true(m_active)  # Indices of active males
+        age_bins_f      = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
+        age_bins_m      = np.digitize(age[m_active_inds], bins=bins) - 1  # Age bins of active males
+        bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
+
+        for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
+            male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
+            this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
+            nonzero_weighting = true(this_weighting != 0)
+            selected_males = choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
+            m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
+        m = np.array(m)
+
+        # Count how many contacts there actually are
+        new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
+        current_partners[lno, new_pship_inds] += new_pship_counts
+
+    return f, m, current_partners, new_pship_inds, new_pship_counts
+
+
 def set_prognoses(people, inds, g, dur_none):
     ''' Set disease progression '''
 
@@ -198,18 +277,18 @@ def set_prognoses(people, inds, g, dur_none):
 
     # CASE 1: Infection clears without causing dysplasia
     people.date_clearance[g, no_cin1_inds] = people.date_infectious[g, no_cin1_inds] \
-                                             + np.ceil(people.dur_none[g, no_cin1_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+                                             + np.ceil(people.dur_precin[g, no_cin1_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
     # CASE 2: Infection progresses to mild dysplasia (CIN1)
     excl_inds = true(people.date_cin1[g, cin1_inds] < people.t)  # Don't count CIN1s that were acquired before now
     people.date_cin1[g, cin1_inds[excl_inds]] = np.nan
     people.date_cin1[g, cin1_inds] = np.fmin(people.date_cin1[g, cin1_inds],
                                              people.date_infectious[g, cin1_inds] +
-                                             np.ceil(people.dur_none[g, cin1_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
+                                             np.ceil(people.dur_precin[g, cin1_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
 
     # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
     dur_to_peak_dys = sample(**dur_dyps, size=len(cin1_inds))
-    people.dur_none[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
+    people.dur_precin[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
     mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
     peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
@@ -266,16 +345,15 @@ def set_prognoses(people, inds, g, dur_none):
                                                   np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
 
     # Case 2.2.2.2: Severe dysplasia progresses to cancer
-    excl_inds = true(people.date_cancerous[cancer_inds] < people.t)  # Don't count cancers that were acquired before now
-    people.date_cancerous[cancer_inds[excl_inds]] = np.nan
-    people.date_cancerous[cancer_inds] = np.fmin(people.date_cancerous[cancer_inds],
+    excl_inds = true(people.date_cancerous[g,cancer_inds] < people.t)  # Don't count cancers that were acquired before now
+    people.date_cancerous[g,cancer_inds[excl_inds]] = np.nan
+    people.date_cancerous[g,cancer_inds] = np.fmin(people.date_cancerous[g,cancer_inds],
                                                     people.date_cin1[g, cancer_inds] +
                                                     np.ceil(time_to_cancer / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
 
     # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
-    people.date_dead_cancer[cancer_inds] = people.date_cancerous[cancer_inds] + np.ceil(dur_cancer / dt)
-
+    people.date_dead_cancer[cancer_inds] = people.date_cancerous[g,cancer_inds] + np.ceil(dur_cancer / dt)
 
     return
 
