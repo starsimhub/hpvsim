@@ -1340,21 +1340,53 @@ class BasePeople(FlexPretty):
         ''' Number of people alive '''
         return len(self.alive_inds)
 
+    @property
+    def infected(self):
+        '''
+        Boolean array of everyone infected. Union of infectious and inactive.
+        Includes people with cancer, people with latent infections, and people with active infections
+        '''
+        return self.infectious | self.inactive
+
+    @property
+    def cin(self):
+        '''
+        Boolean array of everyone with dysplasia. Union of CIN1, CIN2, CIN3
+        '''
+        return self.cin1 | self.cin2 | self.cin3
+
+    @property
+    def precin(self):
+        '''
+        Boolean array of everyone infectious with no dysplasia. Includes people
+        with transient infections that will clear on their own plus those where
+        dysplasia isn't established yet
+        '''
+        return self.infectious & self.no_dysp
+
+    @property
+    def latent(self):
+        '''
+        Boolean array of everyone with latent infection. By definition, these
+        people have no dysplasia and inactive infection status.
+        '''
+        return self.inactive & self.no_dysp
+
     def true(self, key):
         ''' Return indices matching the condition '''
-        return self[key].nonzero()[0]
+        return self[key].nonzero()[-1]
 
     def true_by_genotype(self, key, genotype):
         ''' Return indices matching genotype-condition'''
-        return self[key][genotype,:].nonzero()[0]
+        return self[key][genotype,:].nonzero()[-1]
 
     def false_by_genotype(self, key, genotype):
         ''' Return indices not matching genotype-condition'''
-        return (~self[key][genotype,:]).nonzero()[0]
+        return (~self[key][genotype,:]).nonzero()[-1]
 
     def false(self, key):
         ''' Return indices not matching the condition '''
-        return (~self[key]).nonzero()[0]
+        return (~self[key]).nonzero()[-1]
 
     def defined(self, key):
         ''' Return indices of people who are not-nan '''
