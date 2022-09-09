@@ -68,9 +68,9 @@ class Sim(hpb.BaseSim):
         self.set_seed() # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
         self.init_immunity() # initialize information about immunity
+        self.init_results() # After initializing the genotypes and people, create the results structure
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
-        self.init_results() # After initializing the genotypes, create the results structure
         self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
@@ -390,7 +390,7 @@ class Sim(hpb.BaseSim):
 
         # Create stocks
         for llabel,cstride,g in zip(['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
-            for stock in self.people.meta.stock_states:
+            for stock in hpd.PeopleMeta.stock_states:
                 if (stock.shape=='n_genotypes' and llabel=='Number') or llabel=='Total number':
                     lkey = stock.totalprefix if llabel == 'Total number' else ''
                     color = stock.cmap(cstride) if stock.cmap is not None else None
@@ -455,7 +455,6 @@ class Sim(hpb.BaseSim):
         results['t'] = self.res_tvec
 
         # Final items
-        self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts) # Not included in the results, but used to scale them
         self.results = results
         self.results_ready = False
 
@@ -506,6 +505,8 @@ class Sim(hpb.BaseSim):
                 self['pop_scale'] = 1
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
+        # # Now set the rescale vec
+        # self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts)
 
         return self
 
@@ -529,7 +530,7 @@ class Sim(hpb.BaseSim):
 
     def finalize_interventions(self):
         for intervention in self['interventions']:
-            if isinstance(intervention, hpimm.Intervention):
+            if isinstance(intervention, hpi.Intervention):
                 intervention.finalize(self)
 
 
@@ -870,11 +871,11 @@ class Sim(hpb.BaseSim):
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
-                self.results[reskey].values *= self.rescale_vec
+                self.results[reskey].values *= self['pop_scale']
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
-        # self.finalize_interventions()
+        self.finalize_interventions()
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results

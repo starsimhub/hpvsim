@@ -1018,7 +1018,6 @@ class age_causal_infection(Analyzer):
             self.age_causal.append([])
 
 
-
 class cancer_detection(Analyzer):
     '''
     Cancer detection via symptoms
@@ -1070,4 +1069,5 @@ class cancer_detection(Analyzer):
         sim.people.flows['detected_cancers'] = new_detections
 
         return new_detections, new_treatments
+
 

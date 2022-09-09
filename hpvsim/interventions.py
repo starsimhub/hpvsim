@@ -11,6 +11,7 @@ from . import defaults as hpd
 from . import parameters as hppar
 from . import utils as hpu
 from . import immunity as hpi
+from . import base as hpb
 from collections import defaultdict
 
 
@@ -468,6 +469,7 @@ class BaseVaccination(Intervention):
         self.immunity = None # Record the immunity conferred by this vaccine to each of the genotypes in the sim
         self.immunity_inds = None # Record the indices of genotypes that are targeted by this vaccine
         self._parse_vaccine_pars(vaccine=vaccine) # Populate
+
         return
 
 
@@ -520,6 +522,9 @@ class BaseVaccination(Intervention):
 
     def initialize(self, sim):
         super().initialize()
+
+        # Store the number of doses administered by this intervention
+        self.doses = hpb.Result(name=f'Doses {self.label}', npts=sim.res_npts, scale=True)
 
         # Populate any missing keys -- must be here, after genotypes are initialized
         default_genotype_pars   = hppar.get_vaccine_genotype_pars(default=True)
@@ -625,6 +630,7 @@ class BaseVaccination(Intervention):
             sim.results['new_vaccinated'][self.immunity_inds, idx] += len(first_vacc_inds)
             sim.results['new_total_vaccinated'][idx] += len(first_vacc_inds)
             sim.results['new_doses'][idx] += len(vacc_inds)
+            self.doses[idx] += len(vacc_inds)
 
         return vacc_inds
 
@@ -635,6 +641,8 @@ class BaseVaccination(Intervention):
         if len(inds):
             inds = self.vaccinate(sim, inds)
         return inds
+
+
 
 
     def shrink(self, in_place=True):

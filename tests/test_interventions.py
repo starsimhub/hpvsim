@@ -73,11 +73,17 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     campaign_vx = hpv.RoutineVaccination(vaccine='bivalent', label='Campaign', age_range=(9, 24), coverage=campaign_values, timepoints=campaign_years)
     interventions = [routine_vx, campaign_vx]
 
+    # Screening
+
+
     n_runs = 1
 
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
     return sim
+
+    # Add plots of vaccination coverage (by age/over time?)
+
 
     # sim = hpv.Sim(pars=base_pars)
 
@@ -467,11 +473,11 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_dynamic_pars()
-    scens0 = test_complex_vax(do_plot=do_plot)
-    scens1 = test_vaccinate_prob(do_plot=do_plot)
-    scens2 = test_vaccinate_num(do_plot=do_plot)
-    scens3 = test_screening(do_plot=True)
+    # sim0 = test_dynamic_pars()
+    sim = test_complex_vax(do_plot=do_plot)
+    # scens1 = test_vaccinate_prob(do_plot=do_plot)
+    # scens2 = test_vaccinate_num(do_plot=do_plot)
+    # scens3 = test_screening(do_plot=True)
     # scens4 = test_screening_ltfu(do_plot=True) # CURRENTLY BROKEN
 
     sc.toc(T)
