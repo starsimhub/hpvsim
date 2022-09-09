@@ -449,6 +449,7 @@ class Sim(hpb.BaseSim):
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
         results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
+        results['hiv_incidence'] = init_res('HIV incidence rate')
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -916,6 +917,7 @@ class Sim(hpb.BaseSim):
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
         self.results['detectable_hpv_prevalence'][:] = res['n_detectable_hpv'][:] / res['n_alive'][:]
         self.results['total_detectable_hpv_prevalence'][:] = res['n_total_detectable_hpv'][:] / res['n_alive'][:]
+        self.results['hiv_incidence'][:] = res['total_hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]
