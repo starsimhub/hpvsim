@@ -831,3 +831,7 @@ def find_cutoff(duration_cutoffs, duration):
     Find which duration bin each ind belongs to.
     '''
     return np.nonzero(duration_cutoffs <= duration)[0][-1]  # Index of the duration bin to use
+
+
+def check_hiv(people, t):
+    return None

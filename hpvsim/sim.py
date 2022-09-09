@@ -649,6 +649,10 @@ class Sim(hpb.BaseSim):
             people.imm[:] = people.peak_imm
         hpimm.check_immunity(people)
 
+        # Check for HIV infections/ART changes
+        if self['model_hiv']:
+            new_hiv = hpu.check_hiv(people, t)
+
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
         for lkey, layer in contacts.items():
