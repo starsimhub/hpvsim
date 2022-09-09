@@ -427,12 +427,14 @@ class People(hpb.BasePeople):
         all_years = np.array(list(hiv_pars.keys()))
         base_year = all_years[0]
         age_bins = hiv_pars[base_year]['m'][:,0]
+        age_bins = age_bins[:-1]
+        age_bins = [int(i) for i in age_bins]
         age_inds = np.digitize(self.age, age_bins)-1
         hiv_probs = np.empty(len(self), dtype=hpd.default_float)
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
-        hiv_f = hiv_probs[nearest_year]['f'][:,1]
-        hiv_m = hiv_probs[nearest_year]['m'][:,1]
+        hiv_f = hiv_pars[nearest_year]['f'][:,1]
+        hiv_m = hiv_pars[nearest_year]['m'][:,1]
 
         hiv_probs[self.is_female] = hiv_f[age_inds[self.is_female]]
         hiv_probs[self.is_male] = hiv_m[age_inds[self.is_male]]
@@ -442,7 +444,7 @@ class People(hpb.BasePeople):
         # Get indices of people who acquire HIV
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
         self.hiv[hiv_inds] = True
-        return hiv_inds
+        return len(hiv_inds)
 
 
     def apply_death_rates(self, year=None):

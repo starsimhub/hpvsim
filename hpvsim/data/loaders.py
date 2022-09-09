@@ -4,6 +4,7 @@ Load data
 
 #%% Housekeeping
 import numpy as np
+import pandas as pd
 import sciris as sc
 import unicodedata
 import re
@@ -106,6 +107,8 @@ def map_entries(json, location, df=None, wb=False):
         countries = [key.lower() for key in json.keys()]
     elif sc.checktype(json, 'listlike'):
         countries = [l.lower() for l in json]
+    elif sc.checktype(json, pd.DataFrame):
+        countries = [l.lower() for l in np.unique(json.Country.values)]
 
     # Set parameters
     if location is None:
@@ -283,12 +286,12 @@ def get_hiv_incidence_rates(location=None):
         '''
     # Load the raw data
     try:
-        df = load_file(files.hiv)
+        df = pd.read_csv(files.hiv)
     except Exception as E:
         errormsg = 'Could not locate datafile with age-specific HIV incidence rates by country. Please run data/get_data.py first.'
         raise ValueError(errormsg) from E
 
-    raw_df = map_entries(df, location)[location]
+    raw_df = df[df['Country']==location]
 
     sex_keys = ['Male', 'Female']
     sex_key_map = {'Male': 'm', 'Female': 'f'}
@@ -304,7 +307,6 @@ def get_hiv_incidence_rates(location=None):
         for sk in sex_keys:
             sk_out = sex_key_map[sk]
             result[year][sk_out] = np.array(
-                raw_df[(raw_df['Time'] == year) & (raw_df['Sex'] == sk)][['AgeGrpStart', 'hiv']])
-            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
+                raw_df[(raw_df['Year'] == year) & (raw_df['Sex'] == sk_out)][['Age', 'Incidence']])
 
     return result
