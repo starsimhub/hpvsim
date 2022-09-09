@@ -18,6 +18,7 @@ files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
+files.hiv = 'hiv_incidence.csv'
 
 # Cache data as a dict
 cache = dict()
@@ -269,3 +270,41 @@ def get_birth_rates(location=None):
     birth_rates, inds = sc.sanitize(birth_rates, returninds=True)
     years = years[inds]
     return np.array([years, birth_rates])
+
+
+def get_hiv_incidence_rates(location=None):
+    '''
+        Load HIV incidence rates for a given country or countries.
+        Args:
+            location (str or list): name of the country or countries to load the HIV incidence data for
+
+        Returns:
+            hiv_incidence_rates (dict): HIV incidence rates by age and sex
+        '''
+    # Load the raw data
+    try:
+        df = load_file(files.hiv)
+    except Exception as E:
+        errormsg = 'Could not locate datafile with age-specific HIV incidence rates by country. Please run data/get_data.py first.'
+        raise ValueError(errormsg) from E
+
+    raw_df = map_entries(df, location)[location]
+
+    sex_keys = ['Male', 'Female']
+    sex_key_map = {'Male': 'm', 'Female': 'f'}
+
+    # max_age = 99
+    # age_groups = raw_df['AgeGrpStart'].unique()
+    years = raw_df['Year'].unique()
+    result = dict()
+
+    # Processing
+    for year in years:
+        result[year] = dict()
+        for sk in sex_keys:
+            sk_out = sex_key_map[sk]
+            result[year][sk_out] = np.array(
+                raw_df[(raw_df['Time'] == year) & (raw_df['Sex'] == sk)][['AgeGrpStart', 'hiv']])
+            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
+
+    return result

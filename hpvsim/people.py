@@ -136,6 +136,10 @@ class People(hpb.BasePeople):
         # Let people age by one time step
         self.increment_age()
 
+        # Check for HIV acquisitions
+        if self.pars['model_hiv']:
+            self.flows['hiv_infections'] = self.apply_hiv_rates(year=year)
+
         # Perform updates that are not genotype-specific
         update_freq = max(1, int(self.pars['dt_demog'] / self.pars['dt'])) # Ensure it's an integer not smaller than 1
         if t % update_freq == 0:
@@ -412,6 +416,33 @@ class People(hpb.BasePeople):
         hpimm.update_peak_immunity(self, cleared_inds, imm_pars=self.pars, imm_source=genotype)
 
         return
+
+
+    def apply_hiv_rates(self, year=None):
+        '''
+        Apply HIV infection rates to population
+        '''
+
+        hiv_pars = self.pars['hiv_infection_rates']
+        all_years = np.array(list(hiv_pars.keys()))
+        base_year = all_years[0]
+        age_bins = hiv_pars[base_year]['m'][:,0]
+        age_inds = np.digitize(self.age, age_bins)-1
+        hiv_probs = np.empty(len(self), dtype=hpd.default_float)
+        year_ind = sc.findnearest(all_years, year)
+        nearest_year = all_years[year_ind]
+        hiv_f = hiv_probs[nearest_year]['f'][:,1]
+        hiv_m = hiv_probs[nearest_year]['m'][:,1]
+
+        hiv_probs[self.is_female] = hiv_f[age_inds[self.is_female]]
+        hiv_probs[self.is_male] = hiv_m[age_inds[self.is_male]]
+        hiv_probs[~self.alive] = 0
+        hiv_probs[self.hiv] = 0 # not at risk if already infected
+
+        # Get indices of people who acquire HIV
+        hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
+        self.hiv[hiv_inds] = True
+        return hiv_inds
 
 
     def apply_death_rates(self, year=None):
