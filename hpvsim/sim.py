@@ -450,6 +450,7 @@ class Sim(hpb.BaseSim):
         results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
         results['hiv_incidence'] = init_res('HIV incidence rate')
+        results['hiv_prevalence'] = init_res('HIV prevalence rate')
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -763,6 +764,9 @@ class Sim(hpb.BaseSim):
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
+            # Count total hiv infections
+            self.results['n_hiv'][idx] = people.count('hiv')
+
             # Update cancers and cancers by age
             cases_by_age = self.results['cancers_by_age'][:, idx]
             denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous.any(axis=0)], self.pars['standard_pop'][0,])[0]
@@ -911,13 +915,14 @@ class Sim(hpb.BaseSim):
         res = self.results
 
         # Compute HPV incidence and prevalence
-        self.results['total_hpv_incidence'][:]  = res['total_infections'][:]/ res['n_total_susceptible'][:]
-        self.results['hpv_incidence'][:]        = res['infections'][:]/ res['n_susceptible'][:]
+        self.results['total_hpv_incidence'][:]  = res['total_infections'][:] / res['n_total_susceptible'][:]
+        self.results['hpv_incidence'][:]        = res['infections'][:] / res['n_susceptible'][:]
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
         self.results['detectable_hpv_prevalence'][:] = res['n_detectable_hpv'][:] / res['n_alive'][:]
         self.results['total_detectable_hpv_prevalence'][:] = res['n_total_detectable_hpv'][:] / res['n_alive'][:]
         self.results['hiv_incidence'][:] = res['total_hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
+        self.results['hiv_prevalence'][:] = res['n_hiv'][:] / res['n_alive'][:]
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]

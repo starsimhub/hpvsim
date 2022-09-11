@@ -433,8 +433,8 @@ class People(hpb.BasePeople):
         hiv_probs = np.empty(len(self), dtype=hpd.default_float)
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
-        hiv_f = hiv_pars[nearest_year]['f'][:,1]
-        hiv_m = hiv_pars[nearest_year]['m'][:,1]
+        hiv_f = hiv_pars[nearest_year]['f'][:,1]*self.pars['dt']
+        hiv_m = hiv_pars[nearest_year]['m'][:,1]*self.pars['dt']
 
         hiv_probs[self.is_female] = hiv_f[age_inds[self.is_female]]
         hiv_probs[self.is_male] = hiv_m[age_inds[self.is_male]]
