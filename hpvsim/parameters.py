@@ -123,6 +123,10 @@ def make_pars(**kwargs):
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
 
+    # HIV parameters
+    pars['hiv_infection_rates'] = None # loaded below if model_hiv == True
+    pars['art_initiation_rates'] = None # loaded below if model_hiv == True
+
     # Events and interventions
     pars['interventions']   = []   # The interventions present in this simulation; populated by the user
     pars['analyzers']       = []   # Custom analysis functions; populated by the user
