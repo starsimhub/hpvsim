@@ -985,121 +985,85 @@ class Screening(Intervention):
     interval between screens and follow-up protocol, loss-to-follow-up, test characteristics, and efficacies.
 
     Args:
-         primary_screen_test (dict/str)  : the screening test to use as a primary filtering method
-         triage_screen_test  (dict/str)  : the screening test to use as a triage (or None)
+         product             (Product)  : the screening test to use
+         age_range           (list)      : age range for screening
+         screen_prob         (list of floats)  :
+         screen_interval     (int)       : interval between screens. If not supplied, women are assumed to only have one screen in their lifetime
          treatment_pathway   (Product)   : optionally specify a treatment pathway to administer treatment
-         screen_start_age    (int)       : age to start screening
-         screen_interval     (int)       : interval between screens
-         screen_stop_age     (int)       : age to stop screening
-         screen_start_year   (str)       : the year to start screening intervention
-         screen_end_year     (str)       : the year to end screening intervention (if None, assume continues until end of simulation)
-         screen_compliance   (list of floats)     : probability of being screened (per screen) over time
-         triage_compliance   (list of floats)     : probability of coming back for triage over time
          label               (str)       : the name of screening strategy
          kwargs (dict)      : passed to Intervention()
 
     If ``primary_screen_test`` and/or ``triage_screen_test`` is supplied as a dictionary, it must have the following parameters:
-
         - ``test_positivity``   : dictionary of probability of testing positive given each stage (i.e., NONE, CIN1, CIN2)
 
+    Example:
+        screen = hpv.Screening('hpv', 0.02)
+        sim = hpv.Sim(interventions=screen)
     '''
 
-    def __init__(self, primary_screen_test, screen_start_age, screen_interval, screen_stop_age,
-                 screen_start_year, screen_end_year=None, screen_compliance=None, triage_compliance=None,
-                 triage_screen_test=None, screen_fu_neg_triage=None, treatment_pathway=None,
+    def __init__(self, product, screen_prob, timepoints=None,
+                 age_range=None, screen_interval=None, treatment_pathway=None,
                  label=None, screen_states=None, verbose=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
-        self.label = label  # Screening label (used as a dict key)
-        self.verbose = verbose
-        self.p = None  # Screening parameters
-        self.treatment = treatment_pathway
-        self.screen_start_year = screen_start_year
-        self.screen_end_year = screen_end_year
-        if screen_compliance is None: # Populate default value of probability: 1
-            screen_compliance = 1
-        self.screen_compliance = sc.promotetolist(screen_compliance)
-        if triage_compliance is None: # Populate default value of compliance: 1
-            triage_compliance = 1
-        self.triage_compliance = sc.promotetolist(triage_compliance)
-        if screen_fu_neg_triage is None: # Populate default value of follow up after -ve triage: 1 year
-            screen_fu_neg_triage = 1
-        self.screen_fu_neg_triage = sc.promotetolist(screen_fu_neg_triage)
-        self.screen_start_age = screen_start_age
-        self.screen_interval = screen_interval
-        self.screen_stop_age = screen_stop_age
+        self.product        = product # The product(s) being used to screen people
+        self.screen_prob    = screen_prob # Annual probability of being screened
+        self.timepoints     = timepoints # If not supplied, this is set to be the duration of the sim
+        self.age_range      = age_range or [30,50] # This is later filtered to exclude people not yet sexually active
+        self.interval       = screen_interval or 100 # by default, people only have one lifetime screen
+        self.treatment      = treatment_pathway
+        self.label          = label  # Screening label (used as a dict key)
+        self.verbose        = verbose
 
-        # States that will return a positive screen results
-        if screen_states is None:
-            screen_states = ['precin', 'cin1', 'cin2', 'cin3', 'cancerous']
-        self.screen_states = screen_states
-
-        # Parse the screening parameters, which can be provided in different formats
-        self._parse_screening_pars(screen=primary_screen_test)  # Populate
-        self._parse_screening_pars(screen=triage_screen_test, triage=True)  # Populate
+        # Parse the screening product(s), which can be provided in different formats
+        self._parse_products()
 
         return
 
 
-    def _parse_screening_pars(self, screen, triage=False):
-        ''' Unpack screening information, which may be given as a string or dict '''
+    def _parse_products(self):
+        ''' Unpack screening information, which may be given as a string or Product'''
+
+        import traceback;
+        traceback.print_exc();
+        import pdb;
+        pdb.set_trace()
 
         # Option 1: screening can be chosen from a list of pre-defined screening strategies
-        if isinstance(screen, str):
+        if isinstance(self.product, str):
 
-            choices, mapping = hppar.get_screen_choices()
-            screen_pars = hppar.get_screen_pars()
-
-            label = screen.lower()
-            for txt in ['.', ' ', '&', '-', 'screen']:
-                label = label.replace(txt, '')
-
-            if label in mapping:
-                label = mapping[label]
-                screen_pars = screen_pars[label]
-            else: # pragma: no cover
-                errormsg = f'The selected screening method "{screen}" is not implemented; choices are:\n{sc.pp(choices, doprint=False)}'
+            dfp = pd.read_csv('../hpvsim/screen_products.csv')
+            if self.product not in dfp.products.unique():
+                errormsg = f'The selected screening product "{self.product}" is not implemented; choices are:\n {dfp.products.unique()}'
                 raise NotImplementedError(errormsg)
 
-            if self.label is None:
-                self.label = label
+            screen_pars = dfp[dfp.products==self.product]
 
-        # Option 2: screening can be specified as a dict of pars
-        elif isinstance(screen, dict):
+            self.product = Product()
 
-            # Parse label
-            screen_pars = screen
-            label = screen_pars.pop('label', None) # Allow including the label in the parameters
-            if self.label is None: # pragma: no cover
-                if label is None:
-                    self.label = 'custom'
-                else:
-                    self.label = label
-
-        # Option 3: we are in triage and no triage is defined
-        elif screen is None:
-            screen_pars = None
-
-        else: # pragma: no cover
-            errormsg = f'Could not understand {type(screen)}, please specify as a string indexing a predefined vaccine or a dict.'
-            raise ValueError(errormsg)
-
-        if triage:
-            if screen is None:
-                self.p = sc.mergedicts(self.p, {'triage': None})
-            else:
-                self.p = sc.mergedicts(self.p, {'triage': sc.objdict(screen_pars)})
-        else:
-            # Set label and parameters
-            self.p = {'primary': sc.objdict(screen_pars)}
+        # # Option 2: screening can be specified as a dict of pars
+        # elif isinstance(self.product, dict):
+        #
+        #     # Parse label
+        #     screen_pars = screen
+        #     label = screen_pars.pop('label', None) # Allow including the label in the parameters
+        #     if self.label is None: # pragma: no cover
+        #         if label is None:
+        #             self.label = 'custom'
+        #         else:
+        #             self.label = label
 
         return
+
 
 
     def initialize(self, sim):
         super().initialize()
 
-        if self.screen_end_year is None:
-            self.screen_end_year = str(sim['end'])
+        import traceback;
+        traceback.print_exc();
+        import pdb;
+        pdb.set_trace()
+
 
         start_day, start_date = sim.get_t(self.screen_start_year, return_date_format='str')
         end_day, end_date = sim.get_t(self.screen_end_year, return_date_format='str')
@@ -1250,6 +1214,12 @@ class Product():
         Change something about the People based on them recieving this product
         """
         raise NotImplementedError
+
+class Test(Product):
+    def __init__(self, df):
+        self.efficacy=dict(precin=0.4,cin1=0.8,cin2=0.9,cin3=0.95)
+        self.by_genotype = by_genotype
+        self.states = list(self.efficacy.keys())
 
 
 class PrecancerTreatment(Product):

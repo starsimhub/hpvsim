@@ -74,6 +74,26 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     interventions = [routine_vx, campaign_vx]
 
     # Screening
+    ablation_compliance=0.5
+    excision_compliance=0.2
+    cancer_compliance = 0.1
+
+    screen_years    = np.arange(2020, base_pars['end'], dtype=int)
+    screen_coverage = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
+
+    treatment = hpv.StandardTreatmentPathway(
+        ablation_compliance=0.5,
+        excision_compliance=0.2,
+        cancer_compliance=0.1
+    )
+    hpv_screening = hpv.Screening(
+        product='hpv',
+        screen_prob=0.03, # What does 80% coverage of screening mean exactly??
+        age_range=[30,50],
+        screen_interval=5,
+        timepoints=screen_years,
+        treatment_pathway=treatment
+    )
 
 
     n_runs = 1

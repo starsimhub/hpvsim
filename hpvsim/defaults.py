@@ -128,6 +128,7 @@ class PeopleMeta(sc.prettyobj):
         State('treated',            bool,   False), # Whether the person has been treated
         State('vaccinated',         bool,   False), # Whether the person has received the prophylactic vaccine
         State('tx_vaccinated',      bool,   False), # Whether the person has received the therapeutic vaccine
+        State('screen_eligible',    bool,   False), # Whether the person is eligible for screening
     ]
 
     # Collection of mutually exclusive + collectively exhaustive states
