@@ -768,16 +768,16 @@ class Sim(hpb.BaseSim):
             standard_pop = self.pars['standard_pop'][1, :-1]
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
 
-            # Compute detectable hpv prevalence
-            hpv_test_pars = hppar.get_screen_pars('hpv')
-            for state in ['precin', 'cin1', 'cin2', 'cin3']:
-                hpv_pos_probs = np.zeros(len(people))
-                for g in range(ng):
-                    tp_inds = hpu.true(people[state][g,:])
-                    hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][self['genotype_map'][g]]
-                    hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
-                    self.results['n_detectable_hpv'][g, idx] = len(hpv_pos_inds)
-                    self.results['n_total_detectable_hpv'][idx] += len(hpv_pos_inds)
+            # # Compute detectable hpv prevalence
+            # hpv_test_pars = hppar.get_screen_pars('hpv')
+            # for state in ['precin', 'cin1', 'cin2', 'cin3']:
+            #     hpv_pos_probs = np.zeros(len(people))
+            #     for g in range(ng):
+            #         tp_inds = hpu.true(people[state][g,:])
+            #         hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][self['genotype_map'][g]]
+            #         hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
+            #         self.results['n_detectable_hpv'][g, idx] = len(hpv_pos_inds)
+            #         self.results['n_total_detectable_hpv'][idx] += len(hpv_pos_inds)
 
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])

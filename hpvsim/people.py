@@ -378,18 +378,13 @@ class People(hpb.BasePeople):
 
 
     def add_births(self, year=None, new_births=None):
-        """
+        '''
         Add more people to the population
 
         Specify either the year from which to retrieve the birth rate, or the absolute number
         of new people to add. Must specify one or the other. People are added in-place to the
         current `People` instance
-
-        :param year:
-        :param new_births:
-        :returns: Number of new agents added
-
-        """
+        '''
 
         assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
@@ -579,6 +574,37 @@ class People(hpb.BasePeople):
             self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_precin[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return len(inds) # For incrementing counters
+
+
+    def test(self, inds, test_sensitivity=1.0, loss_prob=0.0, test_delay=0):
+        '''
+        Method to test people. Typically not to be called by the user directly;
+        see the test_num() and test_prob() interventions.
+        Args:
+            inds: indices of who to test
+            test_sensitivity (float): probability of a true positive
+            loss_prob (float): probability of loss to follow-up
+            test_delay (int): number of days before test results are ready
+        '''
+
+        inds = np.unique(inds)
+        self.tested[inds] = True
+        self.date_tested[inds] = self.t # Only keep the last time they tested
+
+        is_infectious = cvu.itruei(self.infectious, inds)
+        pos_test      = cvu.n_binomial(test_sensitivity, len(is_infectious))
+        is_inf_pos    = is_infectious[pos_test]
+
+        not_diagnosed = is_inf_pos[np.isnan(self.date_diagnosed[is_inf_pos])]
+        not_lost      = cvu.n_binomial(1.0-loss_prob, len(not_diagnosed))
+        final_inds    = not_diagnosed[not_lost]
+
+        # Store the date the person will be diagnosed, as well as the date they took the test which will come back positive
+        self.date_diagnosed[final_inds] = self.t + test_delay
+        self.date_pos_test[final_inds] = self.t
+
+        return final_inds
+
 
 
     def remove_people(self, inds, cause=None):

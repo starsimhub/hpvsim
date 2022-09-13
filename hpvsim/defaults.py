@@ -128,7 +128,6 @@ class PeopleMeta(sc.prettyobj):
         State('treated',            bool,   False), # Whether the person has been treated
         State('vaccinated',         bool,   False), # Whether the person has received the prophylactic vaccine
         State('tx_vaccinated',      bool,   False), # Whether the person has received the therapeutic vaccine
-        State('screen_eligible',    bool,   False), # Whether the person is eligible for screening
     ]
 
     # Collection of mutually exclusive + collectively exhaustive states
@@ -161,7 +160,6 @@ class PeopleMeta(sc.prettyobj):
     dates += [
         State('date_clearance',     default_float, np.nan, shape='n_genotypes'),
         State('date_exposed',       default_float, np.nan, shape='n_genotypes'),
-        State('date_next_screen',   default_float, np.nan),
     ]
 
     # Duration of different states: these are floats per person -- used in people.py

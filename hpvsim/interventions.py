@@ -6,6 +6,7 @@ defined by the user by inheriting from these classes.
 import numpy as np
 import sciris as sc
 import pylab as pl
+import pandas as pd
 import inspect
 from . import defaults as hpd
 from . import parameters as hppar
@@ -643,8 +644,6 @@ class BaseVaccination(Intervention):
         return inds
 
 
-
-
     def shrink(self, in_place=True):
         ''' Shrink vaccination intervention '''
         obj = super().shrink(in_place=in_place)
@@ -973,44 +972,33 @@ class NumberVaccination(BaseVaccination):
 
 
 #%% Screening
-__all__ += ['Screening']
+__all__ += ['BaseScreening', 'RoutineScreening', 'CampaignScreening']
 
-class Screening(Intervention):
+class BaseScreening(Intervention):
     '''
-    Screen/triage a subset of the population.
-
-    This base class implements the mechanism of screening people to identify pre-cancerous lesions.
-    Screening involves a series of standard operations to modify the trajectories of `hpv.People`. Screening algorithms
-    can vary in complexity along the dimensions of primary screening modalities, triage modalities,
-    interval between screens and follow-up protocol, loss-to-follow-up, test characteristics, and efficacies.
-
+    Base screening class. Different logic applies depending on whether it's a routine
+    or campaign screening intervention, so these are separated into different Interventions.
+    This base class contains the common functionality for both.
     Args:
-         product             (Product)  : the screening test to use
-         age_range           (list)      : age range for screening
-         screen_prob         (list of floats)  :
-         screen_interval     (int)       : interval between screens. If not supplied, women are assumed to only have one screen in their lifetime
-         treatment_pathway   (Product)   : optionally specify a treatment pathway to administer treatment
-         label               (str)       : the name of screening strategy
-         kwargs (dict)      : passed to Intervention()
+         product            (str/Product)   : the screening test to use
+         screen_prob        (float/arr) : annual probability of eligible women getting screened
+         eligibility        (inds/fn/state): indices OR string corresponding to valid state or people OR callable
+         age_range          (list)      : age range for screening
+         screen_interval    (int)       : interval between screens. If not supplied, women are assumed to only have one screen in their lifetime
+         treatment_pathway  (Product)   : optionally specify a treatment pathway to administer treatment
+         label              (str)       : the name of screening strategy
+         kwargs             (dict)      : passed to Intervention()
+≈    '''
 
-    If ``primary_screen_test`` and/or ``triage_screen_test`` is supplied as a dictionary, it must have the following parameters:
-        - ``test_positivity``   : dictionary of probability of testing positive given each stage (i.e., NONE, CIN1, CIN2)
-
-    Example:
-        screen = hpv.Screening('hpv', 0.02)
-        sim = hpv.Sim(interventions=screen)
-    '''
-
-    def __init__(self, product, screen_prob, timepoints=None,
-                 age_range=None, screen_interval=None, treatment_pathway=None,
-                 label=None, screen_states=None, verbose=False, **kwargs):
+    def __init__(self, product, screen_prob, eligibility=None,
+                 age_range=None, interval=None, states=None,
+                 label=None, verbose=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
-        self.product        = product # The product(s) being used to screen people
-        self.screen_prob    = screen_prob # Annual probability of being screened
-        self.timepoints     = timepoints # If not supplied, this is set to be the duration of the sim
+        self.product        = product # The test product being used to screen people
+        self.screen_prob    = sc.promotetoarray(screen_prob) # Annual probability of being screened
+        self.eligibility    = eligibility
         self.age_range      = age_range or [30,50] # This is later filtered to exclude people not yet sexually active
-        self.interval       = screen_interval or 100 # by default, people only have one lifetime screen
-        self.treatment      = treatment_pathway
+        self.interval       = interval
         self.label          = label  # Screening label (used as a dict key)
         self.verbose        = verbose
 
@@ -1023,175 +1011,77 @@ class Screening(Intervention):
     def _parse_products(self):
         ''' Unpack screening information, which may be given as a string or Product'''
 
-        import traceback;
-        traceback.print_exc();
-        import pdb;
-        pdb.set_trace()
-
-        # Option 1: screening can be chosen from a list of pre-defined screening strategies
+        # Option 1: the tests can be chosen from a list of pre-defined screening products
         if isinstance(self.product, str):
-
-            dfp = pd.read_csv('../hpvsim/screen_products.csv')
-            if self.product not in dfp.products.unique():
-                errormsg = f'The selected screening product "{self.product}" is not implemented; choices are:\n {dfp.products.unique()}'
+            dfp = pd.read_csv('../hpvsim/screen_products1.csv')
+            if self.product not in dfp.name.unique():
+                errormsg = f'The selected screening product "{self.product}" is not implemented; choices are:\n {dfp.name.unique()}'
                 raise NotImplementedError(errormsg)
+            test_pars = dfp[dfp.name==self.product].set_index('name') #.to_dict(orient='records')
+            test_product = Test(test_pars)
+            self.product = test_product
 
-            screen_pars = dfp[dfp.products==self.product]
-
-            self.product = Product()
-
-        # # Option 2: screening can be specified as a dict of pars
-        # elif isinstance(self.product, dict):
-        #
-        #     # Parse label
-        #     screen_pars = screen
-        #     label = screen_pars.pop('label', None) # Allow including the label in the parameters
-        #     if self.label is None: # pragma: no cover
-        #         if label is None:
-        #             self.label = 'custom'
-        #         else:
-        #             self.label = label
+        self.results = {state: defaultdict(set) for state in self.product.results}
 
         return
-
 
 
     def initialize(self, sim):
         super().initialize()
-
-        import traceback;
-        traceback.print_exc();
-        import pdb;
-        pdb.set_trace()
-
-
-        start_day, start_date = sim.get_t(self.screen_start_year, return_date_format='str')
-        end_day, end_date = sim.get_t(self.screen_end_year, return_date_format='str')
-        self.timepoints = np.arange(start_day, end_day)
-
-        n_timepoints = len(self.timepoints)
-
-        for compliance in ['screen_compliance', 'triage_compliance', 'screen_fu_neg_triage']:
-            if len(getattr(self, compliance)) != n_timepoints:
-                print(f'{n_timepoints} timepoints provided but only {len(getattr(self, compliance))} values for {compliance}. Assuming constant over time.')
-                setattr(self, compliance, getattr(self, compliance)*n_timepoints)
-
-        sim['screen_pars'][self.label] = self.p  # Store the parameters
-        if self.treatment.cancer_product is not None:
-            sim['treat_pars']['cancer_treatment'] = {'dur':self.treatment.cancer_product.dur}
         return
 
 
     def apply(self, sim):
-        '''
-        This method performs the entire screen-and-treat algorithm, using the following steps:
+        ''' TBC '''
+        if sim.t in self.timepoints:
 
-            1. Select people to screen and screen them using a defined primary screening algorithm
-            2. Optionally triage anyone who screens positive to find those eligible for treatment
-            3. Select those who will be treated, accounting for compliance
-            4. Treat those who agree to treatment with defined treatment types
+            # Step 1: select people for screening and then record the number of screens
+            inds = self.select_people(sim)
+            if len(inds):
+                sim.people.intv_flows['screens'] += len(inds)
+                sim.people.screened[inds] = True
+                sim.people.screens[inds] += 1
+                sim.people.date_screened[inds] = sim.t
 
-        Args:
-            sim: hpv.Sim instance
+                # Step 2: screen people
+                self.product.administer(inds)
 
-        Returns:
-            TBC
-        '''
-
-        # parameters that will be used below
-        primary_screen_pars = self.p['primary']
-        triage_screen_pars = self.p['triage']
-
-        # 1. Select people to screen and screen them
-        to_screen_inds = self.select_people_screen(sim)
-        if len(to_screen_inds): # Screen people
-            screen_pos_inds = self.screen(to_screen_inds, primary_screen_pars, sim, self.screen_states) # Determine who is eligible for triage
-
-            # 2. Optionally triage anyone who has screened positive
-            if len(screen_pos_inds):
-                if triage_screen_pars is not None:
-                    triage_probs = np.full(len(screen_pos_inds), self.triage_compliance[self.where_in_timepoints], dtype=hpd.default_float)
-                    to_triage = hpu.binomial_arr(triage_probs)
-                    triage_inds = screen_pos_inds[to_triage]  # Indices of those who get treated
-                    treat_eligible_inds = self.screen(triage_inds, triage_screen_pars, sim, self.screen_states, triage=True) # Determine who is eligible for treatment
-
-                else:
-                    treat_eligible_inds = screen_pos_inds
-
-                if self.treatment is not None:
-                    self.treatment.administer(sim.people, treat_eligible_inds)
+                pos_inds = self.screen(sim, inds)
+                for rkey in self.results.keys():
+                    self.outcomes[state][int(sim.t)].update(pos_inds)
 
         return
 
 
-    def select_people_screen(self, sim):
-        """
+    def check_eligibility(self, sim):
+        ''' Return boolean array specifying who's eligible for screening at time t '''
+        active_females  = sim.people.is_female & sim.people.is_active
+        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
+        screen_due      = self.eligibility(sim, self.interval)
+        return active_females & in_age_range & screen_due
+
+
+    def select_people(self, sim):
+        '''
         Return an array of indices of people to screen
         Args:
             sim: A hpv.Sim instance
         Returns: Array of person indices
-        """
+        '''
 
-        screen_inds = np.array([], dtype=int)  # Initialize in case no one gets screened
+        inds = np.array([], dtype=int)  # Initialize in case no one gets screened
 
-        for i in find_timepoint(self.timepoints, sim.t, interv=self, sim=sim):
-            self.where_in_timepoints = i
-            screen_probs = np.zeros(len(sim.people), dtype=hpd.default_float)
+        # Get the proportion of people who screen on this timestep
+        ti = sc.findinds(self.timepoints, sim.t)[0]
+        screen_prob = self.screen_prob[ti]
 
-            # Find people eligible for screening based on age
-            eligible_ages = (sim.people.age >= self.screen_start_age) &\
-                            (sim.people.age <= self.screen_stop_age)
-
-            # Assign screening probabilities
-            screen_probs[eligible_ages & (sim.people.screens == 0)] = self.screen_compliance[self.where_in_timepoints] # First screen
-            screen_probs[eligible_ages & (sim.t == sim.people.date_next_screen)] = self.screen_compliance[self.where_in_timepoints] # Due for next screen
-
-            # Remove males and dead people
-            screen_probs[~sim.people.alive]     *= 0.0  # Do not screen dead people
-            screen_probs[ sim.people.is_male]   *= 0.0  # Do not screen men
-            screen_probs[~sim.people.is_active] *= 0.0  # Corner case, avoid screening anyone not yet sexually active
-
-            # Calculate who actually gets screened
-            screen_inds = hpu.true(hpu.binomial_arr(screen_probs))
-
-            # Set screening states and dates
-            sim.people.intv_flows['screens'] += len(screen_inds)
-            sim.people.screened[screen_inds] = True
-            sim.people.screens[screen_inds] += 1
-            sim.people.date_screened[screen_inds] = sim.t
-            sim.people.date_next_screen[screen_inds] = sim.t + self.screen_interval/sim['dt']
+        # Initialize an array of probabilities of everyone screening
+        screen_probs    = np.zeros(len(sim.people), dtype=hpd.default_float)
+        eligible        = self.check_eligibility(sim)
+        screen_probs[eligible] = screen_prob
+        screen_inds     = hpu.true(hpu.binomial_arr(screen_probs))
 
         return screen_inds
-
-
-    def screen(self, screen_inds, pars, sim, states, triage=False):
-        ''' Screen or triage people '''
-        screen_pos = []
-        for state in states:
-            screen_probs = np.zeros(len(screen_inds))
-            if pars['by_genotype']:
-                for g in range(sim['n_genotypes']):
-                    tp_inds = hpu.true(sim.people[state][g, screen_inds])
-                    screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
-                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                    screen_pos += list(screen_pos_inds)
-                screen_pos = list(set(screen_pos)) # If anyone has screened positive for >1 genotype, only include them once
-
-            else:
-                tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
-                screen_probs[tp_inds] = pars['test_positivity'][state]
-                screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                screen_pos += list(screen_pos_inds)
-
-        screen_pos = np.array(screen_pos)
-        if len(screen_pos)>0:
-            screen_pos = screen_inds[screen_pos]
-
-        if triage:
-            screen_neg = np.setdiff1d(screen_inds, screen_pos)
-            sim.people.date_next_screen[screen_neg] = sim.t + self.screen_fu_neg_triage[self.where_in_timepoints] / sim['dt'] # primary +ve/ triage -ve follow up sooner
-        return screen_pos
-
 
     def shrink(self, in_place=True):
         ''' Shrink vaccination intervention '''
@@ -1199,10 +1089,99 @@ class Screening(Intervention):
         return obj
 
 
+class RoutineScreening(BaseScreening):
+    '''
+    Routine screening.
+    Example:
+        screen1 = hpv.RoutineScreening('hpv', 0.02) # Screen 2% of the eligible population every year
+        screen2 = hpv.RoutineScreening('hpv', 0.02, start_year=2020) # Screen 2% every year starting in 2020
+        screen3 = hpv.RoutineScreening('hpv', np.linspace(0.005,0.025,5), years=np.arange(2020,2025)) # Scale up screening over 5 years starting in 2020
+    '''
+    def __init__(self, years=None, start_year=None, end_year=None, interval=None, **kwargs):
+        super().__init__(**kwargs) # Initialize the Intervention object
+        self.years      = years
+        self.start_year = start_year
+        self.end_year   = end_year
+        self.interval   = interval or 100 # by default, people only have one lifetime screen
+        return
+
+    def initialize(self, sim):
+        super().initialize(sim)
+
+        # Handle time/date inputs
+        if (self.years is not None) and (self.start_year is not None or self.end_year is not None):
+            errormsg = 'Provide either a list of years or a start year, not both.'
+            raise ValueError(errormsg)
+
+        if self.years is None:
+            if self.start_year is None: self.start_year = sim.res_yearvec[0]
+            if self.end_year is None:   self.end_year   = sim.res_yearvec[-1]
+        else:
+            self.start_year = self.years[0]
+            self.end_year   = self.years[-1]
+
+        if (self.start_year not in sim.yearvec) or (self.end_year not in sim.yearvec):
+            errormsg = 'Years for screening must be within simulation start and end dates.'
+            raise ValueError(errormsg)
+
+        self.start_point    = sc.findinds(sim.yearvec, self.start_year)[0]
+        self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0]
+        self.years          = np.arange(self.start_year, self.end_year)
+        self.timepoints     = np.arange(self.start_point, self.end_point)
+
+        if len(self.years) != len(self.screen_prob):
+            if len(self.screen_prob)==1:
+                self.screen_prob = np.array([self.screen_prob[0]]*len(self.timepoints))
+            else:
+                errormsg = f'Length of screening years incompatible with length of screening probabilities: {len(self.years)} vs {len(self.screen_prob)}'
+                raise ValueError(errormsg)
+        else:
+            self.screen_prob = sc.smoothinterp(self.timepoints, self.years, self.screen_prob, smoothness=0)
+
+        self.screen_prob *= sim['dt']
+
+        return
+
+class CampaignScreening(BaseScreening):
+    '''
+    Campaign screening.
+    Example:
+        campaign_screen = hpv.CampaignScreening('hpv', 0.2, years=2020) # Screen 20% of the eligible population in 2020 and 2025
+        sim = hpv.Sim(interventions=campaign_screen)
+    '''
+    def __init__(self, years, interpolate=True, **kwargs):
+        super().__init__(**kwargs) # Initialize the Intervention object
+        self.years = sc.promotetoarray(years)
+        self.interpolate = interpolate # Whether to space the intervention over the year (if true) or do them all at once (if false)
+        return
+
+    def initialize(self, sim):
+        super().initialize(sim)
+
+        if self.interpolate:
+            yearpoints = []
+            for yi, year in enumerate(self.years):
+                yearpoints += [year+(i*sim['dt']) for i in range(int(1 / sim['dt']))]
+            self.timepoints = np.array([sc.findinds(sim.yearvec,yp)[0] for yp in yearpoints])
+        else:
+            self.timepoints = np.array([sc.findinds(sim.yearvec,year)[0] for year in self.years])
+
+        if len(self.years) != len(self.screen_prob):
+            if len(self.screen_prob) == 1:
+                self.screen_prob = np.array([self.screen_prob[0]] * len(self.timepoints))
+            else:
+                errormsg = f'Length of screening years incompatible with length of screening probabilities: {len(self.years)} vs {len(self.screen_prob)}'
+                raise ValueError(errormsg)
+
+        if self.interpolate: self.screen_prob *= sim['dt']
+
+        return
+
+
 #%% Treatment
 __all__ += ['StandardTreatmentPathway', 'RadiationTherapy', 'PrecancerTreatment', 'ExcisionTreatment', 'AblativeTreatment']
 
-class Product():
+class Product(hpb.FlexPretty):
     """
     Generic product implementation
     """
@@ -1215,11 +1194,45 @@ class Product():
         """
         raise NotImplementedError
 
+
 class Test(Product):
     def __init__(self, df):
-        self.efficacy=dict(precin=0.4,cin1=0.8,cin2=0.9,cin3=0.95)
-        self.by_genotype = by_genotype
-        self.states = list(self.efficacy.keys())
+        import traceback;
+        traceback.print_exc();
+        import pdb;
+        pdb.set_trace()
+
+        self.df = sc.objdict({'hpv'+e['genotype']: {k:v for k,v in e.items() if k not in ['genotype','inadequacy']} for e in pardict})
+        self.by_genotype = True if len(self.test_positivity)>1 else False
+        self.results = pardict[0]['results'].split(',')
+
+
+    def administer(self, people, inds):
+        ''' Administer the testing product '''
+
+        for result in self.results:
+            for state in self.detectable_states:
+
+                true_inds = hpu.true(people[state][:, inds])
+                screen_probs[tp_inds] = test_pos_val
+
+        screen_pos = []
+        screen_probs = np.zeros(len(inds))
+        for g, gname, test_pos_dict in self.product.test_positivity.enumitems():
+            if gname == 'all': g = Ellipsis
+            if gname in sim['genotype_map'].values():
+                for state, test_pos_val in test_pos_dict.items():
+                    tp_inds = hpu.true(sim.people[state][g, screen_inds])
+                    screen_probs[tp_inds] = test_pos_val
+                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                    screen_pos += list(screen_pos_inds)
+
+        screen_pos = list(set(screen_pos))  # If anyone has screened positive for >1 genotype, only include them once
+        screen_pos = np.array(screen_pos)
+        if len(screen_pos) > 0:
+            screen_pos = screen_inds[screen_pos]
+
+        return screen_pos
 
 
 class PrecancerTreatment(Product):
