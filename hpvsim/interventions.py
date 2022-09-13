@@ -1197,10 +1197,10 @@ class Test(Product):
     def __init__(self, df):
         self.df = df
         self.result_states = df.result.unique()
-        self.dysp_states = df.dysp_state.unique()
+        self.states = df.state.unique()
 
 
-    def administer(self, people, inds, return_format='array'):
+    def administer(self, people, inds, return_format='dict'):
         '''
         Administer the testing product.
         Returns:
@@ -1208,34 +1208,34 @@ class Test(Product):
              if return_format=='dict': a dictionary keyed by result_states with values containing the indices of people classified into this state
         '''
         results = np.full_like(inds, fill_value=-1, dtype=hpd.default_int)
-        for state in self.dysp_states:
-            thisdf = self.df[(self.df.genotype == 'hpv16') & (self.df.dysp_state == state)]
+        for state in self.states:
+            ## TODO: loop over genotypes rather than hardcoding hpv16 like this
+            thisdf = self.df[(self.df.genotype == 'hpv16') & (self.df.state == state)]
             theseinds = hpu.true(people[state][0, inds])
             results[theseinds] = hpu.n_multinomial(thisdf.probability.to_list(), len(theseinds))
 
-        # START HERE:
-        # problem here - people should be in exactly one SII state and exactly one dysplasia state, but they're not %!%*#$
+        if return_format=='dict':
+            output = {self.result_states[i]:inds[results==i] for i in range(len(self.result_states))}
+
         import traceback;
         traceback.print_exc();
         import pdb;
         pdb.set_trace()
-
-
-        screen_pos = []
-        screen_probs = np.zeros(len(inds))
-        for g, gname, test_pos_dict in self.product.test_positivity.enumitems():
-            if gname == 'all': g = Ellipsis
-            if gname in sim['genotype_map'].values():
-                for state, test_pos_val in test_pos_dict.items():
-                    tp_inds = hpu.true(sim.people[state][g, screen_inds])
-                    screen_probs[tp_inds] = test_pos_val
-                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                    screen_pos += list(screen_pos_inds)
-
-        screen_pos = list(set(screen_pos))  # If anyone has screened positive for >1 genotype, only include them once
-        screen_pos = np.array(screen_pos)
-        if len(screen_pos) > 0:
-            screen_pos = screen_inds[screen_pos]
+        # screen_pos = []
+        # screen_probs = np.zeros(len(inds))
+        # for g, gname, test_pos_dict in self.product.test_positivity.enumitems():
+        #     if gname == 'all': g = Ellipsis
+        #     if gname in sim['genotype_map'].values():
+        #         for state, test_pos_val in test_pos_dict.items():
+        #             tp_inds = hpu.true(sim.people[state][g, screen_inds])
+        #             screen_probs[tp_inds] = test_pos_val
+        #             screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+        #             screen_pos += list(screen_pos_inds)
+        #
+        # screen_pos = list(set(screen_pos))  # If anyone has screened positive for >1 genotype, only include them once
+        # screen_pos = np.array(screen_pos)
+        # if len(screen_pos) > 0:
+        #     screen_pos = screen_inds[screen_pos]
 
         return screen_pos
 

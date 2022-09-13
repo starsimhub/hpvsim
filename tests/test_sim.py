@@ -147,10 +147,6 @@ def test_states():
                 d5 = ~(people.cin3[g,:] & people.cancerous[g,:]).all()
 
                 if not np.array([s1, s2, s3, s4, d1, d2, d3, d4, d5]).all():
-                    import traceback;
-                    traceback.print_exc();
-                    import pdb;
-                    pdb.set_trace()
                     self.okay = False
 
             return
