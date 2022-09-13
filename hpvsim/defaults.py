@@ -89,7 +89,7 @@ class PeopleMeta(sc.prettyobj):
         State('alive',          bool,   True,   label='Population'),    # Save this as a state so we can record population sizes
         State('dead_cancer',    bool,   False,  label='Cumulative cancer deaths'),   # Dead from cancer
         State('dead_other',     bool,   False,  label='Cumulative deaths from other causes'),   # Dead from all other causes
-        State('emigrated',      bool,   False,  label='Emirated'),  # Emigrated
+        State('emigrated',      bool,   False,  label='Emigrated'),  # Emigrated
     ]
 
     viral_states = [

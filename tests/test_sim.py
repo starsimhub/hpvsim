@@ -118,6 +118,51 @@ def test_epi():
     return
 
 
+def test_states():
+    sc.heading('Test states')
+
+    # Define baseline parameters and initialize sim
+    base_pars = dict(n_years=10, dt=0.5, network='random', beta=0.05)
+
+    class check_states(hpv.Analyzer):
+
+        def __init__(self):
+            self.okay = True
+            return
+
+        def apply(self, sim):
+            people = sim.people
+            ng = sim['n_genotypes']
+            removed = people.dead_cancer[:] | people.dead_other[:] | people.emigrated[:]
+            for g in range(ng):
+                s1  = (people.susceptible[g,:] | people.infectious[g,:] | people.inactive[g,:] | removed ).all()
+                s2  = ~(people.susceptible[g,:] & people.infectious[g,:]).any()
+                s3  = ~(people.susceptible[g,:] & people.inactive[g,:]).any()
+                s4  = ~(people.infectious[g,:] & people.inactive[g,:]).any()
+
+                d1 = (people.no_dysp[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous | removed).all()
+                d2 = ~(people.no_dysp[g,:] & people.cin1[g,:]).all()
+                d3 = ~(people.cin1[g,:] & people.cin2[g,:]).all()
+                d4 = ~(people.cin2[g,:] & people.cin3[g,:]).all()
+                d5 = ~(people.cin3[g,:] & people.cancerous[g,:]).all()
+
+                if not np.array([s1, s2, s3, s4, d1, d2, d3, d4, d5]).all():
+                    import traceback;
+                    traceback.print_exc();
+                    import pdb;
+                    pdb.set_trace()
+                    self.okay = False
+
+            return
+
+    sim = hpv.Sim(pars=base_pars, analyzers=check_states())
+    sim.run()
+    a = sim.get_analyzer()
+    assert a.okay
+
+    return sim
+
+
 def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
@@ -286,13 +331,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_flexible_inputs()
-    sim4 = test_result_consistency()
-    sim5 = test_location_loading()
-    sim6 = test_resuming()
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim2 = test_epi()
+    sim = test_states()
+    # sim4 = test_flexible_inputs()
+    # sim5 = test_result_consistency()
+    # sim6 = test_location_loading()
+    # sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')

@@ -1021,8 +1021,6 @@ class BaseScreening(Intervention):
             test_product = Test(test_pars)
             self.product = test_product
 
-        self.results = {state: defaultdict(set) for state in self.product.results}
-
         return
 
 
@@ -1044,7 +1042,7 @@ class BaseScreening(Intervention):
                 sim.people.date_screened[inds] = sim.t
 
                 # Step 2: screen people
-                self.product.administer(inds)
+                self.product.administer(sim.people, inds)
 
                 pos_inds = self.screen(sim, inds)
                 for rkey in self.results.keys():
@@ -1197,24 +1195,31 @@ class Product(hpb.FlexPretty):
 
 class Test(Product):
     def __init__(self, df):
+        self.df = df
+        self.result_states = df.result.unique()
+        self.dysp_states = df.dysp_state.unique()
+
+
+    def administer(self, people, inds, return_format='array'):
+        '''
+        Administer the testing product.
+        Returns:
+             if return_format=='array': an array of length len(inds) with integer entries that map each person to one of the result_states
+             if return_format=='dict': a dictionary keyed by result_states with values containing the indices of people classified into this state
+        '''
+        results = np.full_like(inds, fill_value=-1, dtype=hpd.default_int)
+        for state in self.dysp_states:
+            thisdf = self.df[(self.df.genotype == 'hpv16') & (self.df.dysp_state == state)]
+            theseinds = hpu.true(people[state][0, inds])
+            results[theseinds] = hpu.n_multinomial(thisdf.probability.to_list(), len(theseinds))
+
+        # START HERE:
+        # problem here - people should be in exactly one SII state and exactly one dysplasia state, but they're not %!%*#$
         import traceback;
         traceback.print_exc();
         import pdb;
         pdb.set_trace()
 
-        self.df = sc.objdict({'hpv'+e['genotype']: {k:v for k,v in e.items() if k not in ['genotype','inadequacy']} for e in pardict})
-        self.by_genotype = True if len(self.test_positivity)>1 else False
-        self.results = pardict[0]['results'].split(',')
-
-
-    def administer(self, people, inds):
-        ''' Administer the testing product '''
-
-        for result in self.results:
-            for state in self.detectable_states:
-
-                true_inds = hpu.true(people[state][:, inds])
-                screen_probs[tp_inds] = test_pos_val
 
         screen_pos = []
         screen_probs = np.zeros(len(inds))

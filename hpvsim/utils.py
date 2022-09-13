@@ -586,7 +586,7 @@ def n_multinomial(probs, n): # No speed gain from Numba
 
     **Example**::
 
-        outcomes = hp.multinomial(np.ones(6)/6.0, 50)+1 # Return 50 die-rolls
+        outcomes = hp.n_multinomial(np.ones(6)/6.0, 50)+1 # Return 50 die-rolls
     '''
     return np.searchsorted(np.cumsum(probs), np.random.random(n))
 

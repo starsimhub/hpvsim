@@ -325,23 +325,34 @@ class People(hpb.BasePeople):
         # Determine who clears and who controls
         latent_probs = np.full(len(inds), self.pars['hpv_control_prob'], dtype=hpd.default_float)
         latent_bools = hpu.binomial_arr(latent_probs)
+
         latent_inds = inds[latent_bools]
         cleared_inds = inds[~latent_bools]
 
         # Now reset disease states
-        self.susceptible[genotype, cleared_inds] = True
-        self.infectious[genotype, inds] = False
-        self.no_dysp[genotype, inds] = False
+        if len(cleared_inds):
+            self.susceptible[genotype, cleared_inds] = True
+            self.infectious[genotype, cleared_inds] = False
+            self.inactive[genotype, cleared_inds] = False # should already be false
+            hpimm.update_peak_immunity(self, cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
+
+        if len(latent_inds):
+            self.susceptible[genotype, latent_inds] = False # should already be false
+            self.infectious[genotype, latent_inds] = False
+            self.inactive[genotype, latent_inds] = True
+            self.date_clearance[genotype, latent_inds] = np.nan
+            #
+            # if self.t==2:
+            #     import traceback;
+            #     traceback.print_exc();
+            #     import pdb;
+            #     pdb.set_trace()
+
+        # Whether infection is controlled on not, people have no dysplasia
+        self.no_dysp[genotype, inds] = True
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
-
-        if len(latent_inds):
-            self.latent[genotype, latent_inds] = True
-            self.date_clearance[genotype, latent_inds] = np.nan
-
-        # Update immunity
-        hpimm.update_peak_immunity(self, cleared_inds, imm_pars=self.pars, imm_source=genotype)
 
         return
 
@@ -530,8 +541,9 @@ class People(hpb.BasePeople):
             self.latent[g, inds] = False # Adjust states -- no longer latent
 
         # Update states, genotype info, and flows
-        self.susceptible[g, inds]   = False # Adjust states - set susceptible to false
-        self.infectious[g, inds]    = True  # Adjust states - set infectious to true
+        self.susceptible[g, inds]   = False # no longer susceptible
+        self.infectious[g, inds]    = True  # now infectious
+        self.inactive[g, inds]      = False  # no longer inactive
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
@@ -566,7 +578,6 @@ class People(hpb.BasePeople):
 
         # Compute disease progression for females and skip for makes; males are updated below
         if len(f_inds)>0:
-
             fg_inds = inds[self.is_female[inds]] # Subset the indices so we're only looking at females with this genotype
             hpu.set_prognoses(self, fg_inds, g, this_dur_f)
 
@@ -624,6 +635,7 @@ class People(hpb.BasePeople):
         self.susceptible[:, inds] = False
         self.infectious[:, inds] = False
         self.cin1[:, inds] = False
+
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False
         self.cancerous[:, inds] = False
