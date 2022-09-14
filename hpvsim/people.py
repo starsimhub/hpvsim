@@ -444,6 +444,9 @@ class People(hpb.BasePeople):
         # Get indices of people who acquire HIV
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
         self.hiv[hiv_inds] = True
+
+        # Determine who gets on ART and who does not
+
         return len(hiv_inds)
 
 

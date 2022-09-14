@@ -1374,6 +1374,13 @@ class BasePeople(FlexPretty):
         '''
         return self.inactive & self.no_dysp
 
+    @property
+    def immunocompromised(self):
+        '''
+        Boolean array of everyone with HIV infection and not on ART.
+        '''
+        return self.hiv & ~self.art
+
     def true(self, key):
         ''' Return indices matching the condition '''
         return self[key].nonzero()[-1]
