@@ -19,7 +19,7 @@ files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
-files.hiv = 'hiv_incidence.csv'
+files.hiv = 'hiv_incidence'
 
 # Cache data as a dict
 cache = dict()
@@ -61,7 +61,7 @@ def get_country_aliases(wb=False):
        'Cape Verde':     'Cabo Verdeo',
        'Hong Kong':      'China, Hong Kong Special Administrative Region',
        'Macao':          'China, Macao Special Administrative Region',
-       "Cote d'Ivoire":   'Côte d’Ivoire',
+       "Cote d'Ivoire":  'Côte d’Ivoire',
        "Ivory Coast":    'Côte d’Ivoire',
        'DRC':            'Democratic Republic of the Congo',
        'Iran':           'Iran (Islamic Republic of)',
@@ -275,30 +275,28 @@ def get_birth_rates(location=None):
     return np.array([years, birth_rates])
 
 
-def get_hiv_incidence_rates(location=None):
+def get_hiv_incidence_rates(location):
     '''
-        Load HIV incidence rates for a given country or countries.
+        Load HIV incidence rates for a given country.
         Args:
-            location (str or list): name of the country or countries to load the HIV incidence data for
+            location (str): name of the country to load the HIV incidence data for
 
         Returns:
             hiv_incidence_rates (dict): HIV incidence rates by age and sex
         '''
-    # Load the raw data
-    try:
-        df = pd.read_csv(files.hiv)
-    except Exception as E:
-        errormsg = 'Could not locate datafile with age-specific HIV incidence rates by country. Please run data/get_data.py first.'
-        raise ValueError(errormsg) from E
+    # Load the data
 
-    raw_df = df[df['Country']==location]
+    location = sanitizestr(location)
+    try:
+        df = pd.read_csv(f'{files.hiv}_{location}.csv')
+    except Exception as E:
+        errormsg = f'Could not locate datafile with age-specific HIV incidence rates for {location}. Please provide this file first.'
+        raise ValueError(errormsg) from E
 
     sex_keys = ['Male', 'Female']
     sex_key_map = {'Male': 'm', 'Female': 'f'}
 
-    # max_age = 99
-    # age_groups = raw_df['AgeGrpStart'].unique()
-    years = raw_df['Year'].unique()
+    years = df['Year'].unique()
     result = dict()
 
     # Processing
@@ -307,6 +305,6 @@ def get_hiv_incidence_rates(location=None):
         for sk in sex_keys:
             sk_out = sex_key_map[sk]
             result[year][sk_out] = np.array(
-                raw_df[(raw_df['Year'] == year) & (raw_df['Sex'] == sk_out)][['Age', 'Incidence']])
+                df[(df['Year'] == year) & (df['Sex'] == sk_out)][['Age', 'Incidence']])
 
     return result

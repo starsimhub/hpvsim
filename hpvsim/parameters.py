@@ -1156,19 +1156,18 @@ def get_screen_pars(screen=None):
     return _get_from_pars(pars, key=screen)
 
 
-def get_hiv_rates(location=None, verbose=False, die=True):
+def get_hiv_rates(location, verbose=False, die=True):
     '''
     Get HIV incidence data by location if provided, or use default
 
     Args:
-        location (str):  location; if none specified, use default value for XXX
+        location (str):  location, must be provided if you want to run with HIV dynamics
         verbose (bool):  whether to print progress
 
     Returns:
         hiv_inc (dict): dictionary keyed by sex, storing arrays of HIV incidence over time by age
     '''
 
-    hiv_incidence_rates = hpd.default_hiv_incidence_rates
     if location is not None:
         if verbose:
             print(f'Loading location-specific HIV incidence data for "{location}"')
@@ -1177,5 +1176,8 @@ def get_hiv_rates(location=None, verbose=False, die=True):
         except ValueError as E:
             warnmsg = f'Could not load HIV incidence data for requested location "{location}" ({str(E)}), using default'
             hpm.warn(warnmsg, die=die)
+        return hiv_incidence_rates
+    else:
+        errormsg = 'A location and location-specific HIV incidence file must be specified if running with HIV dynamics'
+        raise NotImplementedError(errormsg)
 
-    return hiv_incidence_rates
