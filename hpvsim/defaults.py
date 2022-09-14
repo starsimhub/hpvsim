@@ -253,10 +253,10 @@ by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['total infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',                    '#000000']
 
-# Intervention-related flows (total across genotypes)
-intv_flow_keys   = ['screens',  'vaccinations']
-intv_flow_names  = ['screens',  'vaccinations']
-intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges]
+# # Intervention-related flows (total across genotypes)
+# intv_flow_keys   = ['screens',  'vaccinations']
+# intv_flow_names  = ['screens',  'vaccinations']
+# intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges]
 
 # Type distributions by cytology
 type_keys  = ['no_dysp_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']

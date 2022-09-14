@@ -105,7 +105,7 @@ class People(hpb.BasePeople):
         self.total_flows        = {f'total_{key}'   : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'         : 0 for key in hpd.dem_keys}
-        self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
+        # self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
         self.by_age_flows       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
 
         return

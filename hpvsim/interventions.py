@@ -972,7 +972,7 @@ class NumberVaccination(BaseVaccination):
 
 
 #%% Screening
-__all__ += ['BaseScreening', 'RoutineScreening', 'CampaignScreening']
+__all__ += ['BaseScreening', 'RoutineScreening', 'CampaignScreening', 'Triage']
 
 class BaseScreening(Intervention):
     '''
@@ -984,48 +984,39 @@ class BaseScreening(Intervention):
          screen_prob        (float/arr) : annual probability of eligible women getting screened
          eligibility        (inds/fn/state): indices OR string corresponding to valid state or people OR callable
          age_range          (list)      : age range for screening
-         screen_interval    (int)       : interval between screens. If not supplied, women are assumed to only have one screen in their lifetime
-         treatment_pathway  (Product)   : optionally specify a treatment pathway to administer treatment
+         next_steps         (dict)      : optionally trigger next steps
          label              (str)       : the name of screening strategy
          kwargs             (dict)      : passed to Intervention()
 ≈    '''
 
     def __init__(self, product, screen_prob, eligibility=None,
-                 age_range=None, interval=None, states=None,
+                 age_range=None, next_steps=None,
                  label=None, verbose=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.product        = product # The test product being used to screen people
         self.screen_prob    = sc.promotetoarray(screen_prob) # Annual probability of being screened
         self.eligibility    = eligibility
         self.age_range      = age_range or [30,50] # This is later filtered to exclude people not yet sexually active
-        self.interval       = interval
         self.label          = label  # Screening label (used as a dict key)
         self.verbose        = verbose
+        self.next_steps     = next_steps
 
-        # Parse the screening product(s), which can be provided in different formats
-        self._parse_products()
+        # # Parse the screening product(s), which can be provided in different formats
+        # self._parse_products()
 
         return
 
 
     def _parse_products(self):
         ''' Unpack screening information, which may be given as a string or Product'''
-
-        # Option 1: the tests can be chosen from a list of pre-defined screening products
-        if isinstance(self.product, str):
-            dfp = pd.read_csv('../hpvsim/screen_products1.csv')
-            if self.product not in dfp.name.unique():
-                errormsg = f'The selected screening product "{self.product}" is not implemented; choices are:\n {dfp.name.unique()}'
-                raise NotImplementedError(errormsg)
-            test_pars = dfp[dfp.name==self.product].set_index('name') #.to_dict(orient='records')
-            test_product = Test(test_pars)
-            self.product = test_product
-
         return
 
 
     def initialize(self, sim):
         super().initialize()
+        self.npts = sim.res_npts
+        self.screens = hpb.Result(name=f'Screens {self.label}', npts=sim.res_npts, scale=True)
+        self.outcomes = {k:[] for k in self.product.hierarchy}
         return
 
 
@@ -1036,17 +1027,23 @@ class BaseScreening(Intervention):
             # Step 1: select people for screening and then record the number of screens
             inds = self.select_people(sim)
             if len(inds):
-                sim.people.intv_flows['screens'] += len(inds)
+                idx = int(sim.t / sim.resfreq)
                 sim.people.screened[inds] = True
                 sim.people.screens[inds] += 1
                 sim.people.date_screened[inds] = sim.t
+                self.screens[idx] += len(inds)
 
                 # Step 2: screen people
-                self.product.administer(sim.people, inds)
+                self.outcomes = self.product.administer(sim, inds)
 
-                pos_inds = self.screen(sim, inds)
-                for rkey in self.results.keys():
-                    self.outcomes[state][int(sim.t)].update(pos_inds)
+                # Step 3: trigger any subsequent interventions
+                if self.next_steps is not None:
+                    for result,next_step in self.next_steps.items():
+                        next_step(sim, output[result])
+
+
+                # for rkey in self.results.keys():
+                #     self.outcomes[state][int(sim.t)].update(pos_inds)
 
         return
 
@@ -1055,7 +1052,7 @@ class BaseScreening(Intervention):
         ''' Return boolean array specifying who's eligible for screening at time t '''
         active_females  = sim.people.is_female & sim.people.is_active
         in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
-        screen_due      = self.eligibility(sim, self.interval)
+        screen_due      = self.eligibility(sim)
         return active_females & in_age_range & screen_due
 
 
@@ -1085,6 +1082,66 @@ class BaseScreening(Intervention):
         ''' Shrink vaccination intervention '''
         obj = super().shrink(in_place=in_place)
         return obj
+
+
+class Triage(Intervention):
+    '''
+    Triage
+    Args:
+         product            (str/Product)   : the screening test to use
+         triage_prob        (float/arr) : annual probability of eligible women getting screened
+         eligibility        (callable/arr): array of indices of people who are eligible for triage OR callable that returns such indices
+≈    '''
+
+    def __init__(self, product, triage_prob, eligibility=None,
+                 label=None, verbose=False, **kwargs):
+        super().__init__(**kwargs) # Initialize the Intervention object
+        self.product        = product # The test product being used to screen people
+        self.triage_prob    = sc.promotetoarray(triage_prob) # Proportion of those eligible for screening who agree to be screened
+        self.eligibility    = eligibility # function or indices that determine who is eligible for the intervention
+        self.label          = label  # label (used as a dict key)
+        self.verbose        = verbose
+        return
+
+
+    def initialize(self, sim):
+        super().initialize()
+        self.npts = sim.res_npts
+        self.tests = hpb.Result(name=f'Tests administered by {self.label}', npts=sim.res_npts, scale=True)
+        self.outcomes = {k:[] for k in self.product.hierarchy}
+        return
+
+
+    def trigger(self, sim, inds):
+        ''' TBC '''
+        idx = int(sim.t / sim.resfreq)
+        self.tests[idx] += len(inds)
+        inds_accept = self.select_people(inds)
+        self.outcomes = self.product.administer(sim, inds_accept)
+        return
+
+
+    def apply(self, sim):
+        inds = self.eligibility(sim)
+        idx = int(sim.t / sim.resfreq)
+        self.tests[idx] += len(inds)
+        inds_accept = self.select_people(inds)
+        self.outcomes = self.product.administer(sim, inds_accept)
+        return
+
+
+    def select_people(self, inds):
+        '''
+        Return an array of indices of people to who accept triage
+        Args:
+            inds: array of indices of people offered triage
+        Returns: Array of indices of people who accept triage
+        '''
+        accept_inds     = np.array([], dtype=int)  # Initialize in case no one gets screened
+        triage_prob     = self.triage_prob[0] # TODO: generalise this to accept an array?
+        triage_probs    = np.full_like(inds, fill_value=triage_prob, dtype=hpd.default_float)
+        accept_inds     = hpu.true(hpu.binomial_arr(triage_probs))
+        return accept_inds
 
 
 class RoutineScreening(BaseScreening):
@@ -1176,8 +1233,8 @@ class CampaignScreening(BaseScreening):
         return
 
 
-#%% Treatment
-__all__ += ['StandardTreatmentPathway', 'RadiationTherapy', 'PrecancerTreatment', 'ExcisionTreatment', 'AblativeTreatment']
+#%% Products
+__all__ += ['Test', 'StandardTreatmentPathway', 'RadiationTherapy', 'PrecancerTreatment', 'ExcisionTreatment', 'AblativeTreatment']
 
 class Product(hpb.FlexPretty):
     """
@@ -1194,50 +1251,52 @@ class Product(hpb.FlexPretty):
 
 
 class Test(Product):
-    def __init__(self, df):
+    def __init__(self, df, hierarchy):
         self.df = df
-        self.result_states = df.result.unique()
         self.states = df.state.unique()
+        self.genotypes = df.genotype.unique()
+        self.ng = len(self.genotypes)
+        self.hierarchy = hierarchy # or ['high', 'medium', 'low', 'not detected'], or other
+
+    @property
+    def default_value(self):
+        return len(self.hierarchy)-1
 
 
-    def administer(self, people, inds, return_format='dict'):
+    def administer(self, sim, inds, return_format='dict'):
         '''
         Administer the testing product.
         Returns:
              if return_format=='array': an array of length len(inds) with integer entries that map each person to one of the result_states
              if return_format=='dict': a dictionary keyed by result_states with values containing the indices of people classified into this state
         '''
-        results = np.full_like(inds, fill_value=-1, dtype=hpd.default_int)
+
+        # Pre-fill with the default value, which is set to be the last value in the hierarchy
+        results = np.full_like(inds, fill_value=self.default_value, dtype=hpd.default_int)
+        people = sim.people
+
         for state in self.states:
-            ## TODO: loop over genotypes rather than hardcoding hpv16 like this
-            thisdf = self.df[(self.df.genotype == 'hpv16') & (self.df.state == state)]
-            theseinds = hpu.true(people[state][0, inds])
-            results[theseinds] = hpu.n_multinomial(thisdf.probability.to_list(), len(theseinds))
+            for g,genotype in sim['genotype_map'].items():
+
+                # gind = g if self.ng>1 else Ellipsis
+                theseinds = hpu.true(people[state][g, inds])
+
+                # Filter the dataframe to extract test results for people in this state
+                df_filter = (self.df.state == state) # filter by state
+                if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype) # also filter by genotype, if this test is by genotype
+                thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
+                probs = [thisdf[thisdf.result==result].probability.values[0] for result in self.hierarchy] # Pull out the result probabilities in the order specified by the result hierarchy
+
+                # Sort people into one of the possible result states and then update their overall results (aggregating over genotypes)
+                this_gtype_results = hpu.n_multinomial(probs, len(theseinds))
+                results[theseinds] = np.minimum(this_gtype_results, results[theseinds])
 
         if return_format=='dict':
-            output = {self.result_states[i]:inds[results==i] for i in range(len(self.result_states))}
+            output = {self.hierarchy[i]:inds[results==i] for i in range(len(self.hierarchy))}
+        elif return_format=='array':
+            output = results
 
-        import traceback;
-        traceback.print_exc();
-        import pdb;
-        pdb.set_trace()
-        # screen_pos = []
-        # screen_probs = np.zeros(len(inds))
-        # for g, gname, test_pos_dict in self.product.test_positivity.enumitems():
-        #     if gname == 'all': g = Ellipsis
-        #     if gname in sim['genotype_map'].values():
-        #         for state, test_pos_val in test_pos_dict.items():
-        #             tp_inds = hpu.true(sim.people[state][g, screen_inds])
-        #             screen_probs[tp_inds] = test_pos_val
-        #             screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-        #             screen_pos += list(screen_pos_inds)
-        #
-        # screen_pos = list(set(screen_pos))  # If anyone has screened positive for >1 genotype, only include them once
-        # screen_pos = np.array(screen_pos)
-        # if len(screen_pos) > 0:
-        #     screen_pos = screen_inds[screen_pos]
-
-        return screen_pos
+        return output
 
 
 class PrecancerTreatment(Product):

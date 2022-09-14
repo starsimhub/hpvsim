@@ -720,7 +720,7 @@ def true(arr):
 
         inds = hp.true(np.array([1,0,0,1,1,0,1])) # Returns array([0, 3, 4, 6])
     '''
-    return arr.nonzero()[0]
+    return arr.nonzero()[-1]
 
 
 def false(arr):
@@ -734,7 +734,7 @@ def false(arr):
 
         inds = hp.false(np.array([1,0,0,1,1,0,1]))
     '''
-    return np.logical_not(arr).nonzero()[0]
+    return np.logical_not(arr).nonzero()[-1]
 
 
 def defined(arr):
@@ -748,7 +748,7 @@ def defined(arr):
 
         inds = hp.defined(np.array([1,np.nan,0,np.nan,1,0,1]))
     '''
-    return (~np.isnan(arr)).nonzero()[0]
+    return (~np.isnan(arr)).nonzero()[-1]
 
 
 def undefined(arr):
@@ -762,7 +762,7 @@ def undefined(arr):
 
         inds = hp.defined(np.array([1,np.nan,0,np.nan,1,0,1]))
     '''
-    return np.isnan(arr).nonzero()[0]
+    return np.isnan(arr).nonzero()[-1]
 
 
 def itrue(arr, inds):

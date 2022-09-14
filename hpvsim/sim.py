@@ -410,10 +410,10 @@ class Sim(hpb.BaseSim):
         for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
             results[f'{var}'] = init_res(f'{name}', color=color, n_rows=2)
 
-        # Create intv results
-        for var, name, color in zip(hpd.intv_flow_keys, hpd.intv_flow_names, hpd.intv_flow_colors):
-            results[f'{var}'] = init_res(f'{name}', color=color)
-
+        # # Create intv results
+        # for var, name, color in zip(hpd.intv_flow_keys, hpd.intv_flow_names, hpd.intv_flow_colors):
+        #     results[f'{var}'] = init_res(f'{name}', color=color)
+        #
         # Create by-age results using standard populations
         results['cancers_by_age'] = init_res('Cancers by age', n_rows=len(self.pars['standard_pop'][0,:])-1)
         results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
@@ -741,8 +741,8 @@ class Sim(hpb.BaseSim):
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
-        for key,count in people.intv_flows.items():
-            self.results[key][idx] += count
+        # for key,count in people.intv_flows.items():
+        #     self.results[key][idx] += count
         for key,count in people.by_age_flows.items():
             self.results[key][:,idx] += count
 

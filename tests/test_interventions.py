@@ -46,27 +46,47 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     campaign_vx = hpv.RoutineVaccination(vaccine='bivalent', label='Campaign', age_range=(9, 24), coverage=campaign_values, timepoints=campaign_years)
     interventions = [routine_vx, campaign_vx]
 
-    # Screening
-    ablation_compliance=0.5
-    excision_compliance=0.2
-    cancer_compliance = 0.1
-
-    screen_years    = np.arange(2020, base_pars['end'], dtype=int)
-    screen_coverage = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
+    # # Screening
+    # ablation_compliance=0.5
+    # excision_compliance=0.2
+    # cancer_compliance = 0.1
+    #
+    # screen_years    = np.arange(2020, base_pars['end'], dtype=int)
+    # screen_coverage = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
 
     #### PROPOSED NEW ALGO
 
-    screen_eligible = lambda sim, interval: np.isnan(sim.people.date_screened) | (sim.t > sim.people.date_screened + interval/sim['dt'])
+    # Define test products
+    import pandas as pd
+    dfp = pd.read_csv('../hpvsim/screen_products1.csv')
+    via_df = dfp[dfp.name == 'via'].set_index('name')
+    via_product = hpv.Test(via_df, hierarchy=['positive', 'inadequate', 'negative'])
+    via_triage = hpv.Test(via_df, hierarchy=['positive', 'inadequate', 'negative'])
+
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine = hpv.RoutineScreening(
-        product='hpv', # pass in string or product
-        screen_prob=0.03, # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
-        eligibility=screen_eligible, # pass in valid state of People OR indices OR callable that gets indices
-        age_range=[30,50],
-        interval=5,
+        product=via_product,  # pass in string or product
+        screen_prob=0.03,  # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
+        eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
+        age_range=[30, 50],
         start_year=2020,
+        label='screening',
     )
 
-    interventions += [routine]
+    triage_eligible = lambda sim: sim.get_intervention('screening').outcomes['positive']
+    triage = hpv.Triage(
+        product = via_triage,
+        triage_prob = .5,
+        eligibility = triage_eligible,
+        label='triage'
+    )
+
+    ablation_product = hpv.PrecancerTreatment()
+    ablation_eligible = lambda sim: sim.get_intervention('triage').get_states('positive')
+    # ablationqueue = AblationQueue(product=ablationproduct, treat_prob=0.1)
+
+
+    interventions += [routine, triage]
 
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
@@ -74,34 +94,47 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     return sim
 
 
-    # routine.states = {}
-    # routine.states['positive'] = {1: [], 2: [], 3:[334,536]}
+    # # Define separate intervention that stores indices of people who are waiting for e.g. ablation
+    # class TreatmentQueue(hpv.Intervention):
+    #     '''
+    #     TBC
+    #     '''
+    #     def __init__(self, product):
+    #         self.product = product
+    #         self.queue = sc.autolist()
+    #         return
     #
-    # triage_eligible = lambda routine, tind, delay: routine.states('positive')[tind-delay]
-    # triage = hpv.Triage(
-    #     product='via_triage',
-    #     eligibility=triage_eligible,
-    #     triage_prob=0.1,
-    #     start_year=2020,
-    #     states=['negative','needs_ablation', 'needs_excision'],
-    # )
+    #     def request_treatment(self, inds):
+    #         self.queue += inds # or similar
+    #         return
     #
-    # ablation_eligible  = lambda triage: triage.get_states('needs_ablation')
-    # ablation = hpv.PrecancerTreatment(
-    #     product='ablation',
-    #     eligibility=ablation_eligible,
-    #     treat_prob=0.1,
-    #     start_year=2020,
-    #     states=['succesful', 'unsuccessful'],
-    # )
+    #     def apply(self, sim):
+    #         '''
+    #         1. Choose who gets the treatment
+    #         2. Check if they're still eligible
+    #         3. Apply the treatment
+    #         '''
     #
-    # excision_eligible = lambda triage, ablation: triage.get_states('needs_excision') | ablation.get_states('unsuccessful')
+    #         # 1. apply treat_prob
+    #
+    #         # 2. check all the different ways they might have become ineligible
+    #
+    #         # 3.
+    #         successful_inds = self.product.administer(eligible_inds)
+    #
+    #         self.queue -= successful_inds # or similar
+    #
+    #         return
+    #
+    #
+    # triage_eligible = lambda sim: (sim.get_intervention('routine').states('positive')) & (not already_triaged)
+    #
+    # excision_eligible = lambda sim: sim.get_intervention('triage').get_states('needs_excision') | ablation.get_states('unsuccessful')
     # ablation = hpv.PrecancerTreatment(
     #     product='excision',
     #     eligibility=excision_eligible,
     #     treat_prob=0.1,
     #     start_year=2020,
-    #     states=['succesful', 'unsuccessful'],
     # )
     #
     # campaign = hpv.CampaignScreening(
@@ -112,6 +145,9 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     #     states=['positive', 'negative']
     # )
     #
+
+
+   #
     # txvx = hpv.TherapeuticVaccination(
     #     product = txvx,
     #     eligibility = campaign.get_inds('positive'), # Returns inds
