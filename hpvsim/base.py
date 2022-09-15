@@ -261,7 +261,12 @@ class BaseSim(ParsObj):
         ''' Ensure that metaparameters get used properly before being updated '''
 
         # Merge everything together
-        pars = sc.mergedicts(pars, kwargs)
+        try: pars = sc.mergedicts(pars, kwargs)
+        except:
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
         if pars:
 
             # Define aliases

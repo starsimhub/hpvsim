@@ -34,17 +34,17 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     verbose = .1
     debug = 0
 
-    # Model an intervention to roll out prophylactic vaccination
-    # Routine vaccination
-    routine_years = np.arange(2020, base_pars['end'], dtype=int)
-    routine_values = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
-    routine_vx = hpv.RoutineVaccination(vaccine='bivalent', label='Routine', age_range=(9, 10), coverage=routine_values, timepoints=routine_years)
-
-    # Campaign vaccination
-    campaign_years = np.arange(2020, 2022, dtype=int)
-    campaign_values = 0.5
-    campaign_vx = hpv.RoutineVaccination(vaccine='bivalent', label='Campaign', age_range=(9, 24), coverage=campaign_values, timepoints=campaign_years)
-    interventions = [routine_vx, campaign_vx]
+    # # Model an intervention to roll out prophylactic vaccination
+    # # Routine vaccination
+    # routine_years = np.arange(2020, base_pars['end'], dtype=int)
+    # routine_values = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
+    # routine_vx = hpv.RoutineVaccination(vaccine='bivalent', label='Routine', age_range=(9, 10), coverage=routine_values, timepoints=routine_years)
+    #
+    # # Campaign vaccination
+    # campaign_years = np.arange(2020, 2022, dtype=int)
+    # campaign_values = 0.5
+    # campaign_vx = hpv.RoutineVaccination(vaccine='bivalent', label='Campaign', age_range=(9, 24), coverage=campaign_values, timepoints=campaign_years)
+    # interventions = [routine_vx, campaign_vx]
 
     # # Screening
     # ablation_compliance=0.5
@@ -56,12 +56,18 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
 
     #### PROPOSED NEW ALGO
 
-    # Define test products
+    # Define products
     import pandas as pd
     dfp = pd.read_csv('../hpvsim/screen_products1.csv')
-    via_df = dfp[dfp.name == 'via'].set_index('name')
-    via_product = hpv.Test(via_df, hierarchy=['positive', 'inadequate', 'negative'])
-    via_triage = hpv.Test(via_df, hierarchy=['positive', 'inadequate', 'negative'])
+
+    via_product         = hpv.Test(dfp[dfp.name == 'via'], hierarchy=['positive', 'inadequate', 'negative'])
+    via_triage          = hpv.Test(dfp[dfp.name == 'via_triage'], hierarchy=['positive', 'inadequate', 'negative'])
+    treatment_triage    = hpv.Test(dfp[dfp.name == 'treatment_triage'], hierarchy=['radiation', 'excision', 'ablation', 'none'])
+
+    ablation_prod       = hpv.Treatment(efficacy = dict(precin=0, cin1=0.936, cin2=0.936, cin3=0.936))
+    excision_prod       = hpv.Treatment(efficacy = dict(precin=0, cin1=0.81, cin2=0.81, cin3=0.81))
+    # radiation_prod      = hpv.Treatment()
+
 
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine = hpv.RoutineScreening(
@@ -78,15 +84,35 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
         product = via_triage,
         triage_prob = .5,
         eligibility = triage_eligible,
-        label='triage'
+        label='triage',
     )
 
-    ablation_product = hpv.PrecancerTreatment()
-    ablation_eligible = lambda sim: sim.get_intervention('triage').get_states('positive')
-    # ablationqueue = AblationQueue(product=ablationproduct, treat_prob=0.1)
+    confirmed_positive = lambda sim: sim.get_intervention('triage').outcomes['positive']
+    assign_treatment = hpv.Triage(
+        triage_prob = 1.0,
+        product = treatment_triage,
+        eligibility = confirmed_positive,
+        label = 'treatment_triage'
+    )
 
+    ablation_eligible = lambda sim: sim.get_intervention('treatment_triage').outcomes['ablation']
+    ablation = hpv.NumTreat(
+        treat_prob = 0.5,
+        product = ablation_prod,
+        eligibility = ablation_eligible,
+        label = 'ablation'
+    )
 
-    interventions += [routine, triage]
+    excision_eligible = lambda sim: sim.get_intervention('treatment_triage').outcomes['excision'] #| sim.get_intervention('ablation').outcomes['unsuccessful']
+    excision = hpv.DelayTreat(
+        treat_prob = 0.5,
+        delay = 0.5,
+        product = excision_prod,
+        eligibility = excision_eligible,
+        label = 'excision'
+    )
+
+    interventions  = [routine, triage, assign_treatment, ablation, excision]
 
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
@@ -94,37 +120,6 @@ def test_complex_vax(do_plot=False, do_save=False, fig_path=None):
     return sim
 
 
-    # # Define separate intervention that stores indices of people who are waiting for e.g. ablation
-    # class TreatmentQueue(hpv.Intervention):
-    #     '''
-    #     TBC
-    #     '''
-    #     def __init__(self, product):
-    #         self.product = product
-    #         self.queue = sc.autolist()
-    #         return
-    #
-    #     def request_treatment(self, inds):
-    #         self.queue += inds # or similar
-    #         return
-    #
-    #     def apply(self, sim):
-    #         '''
-    #         1. Choose who gets the treatment
-    #         2. Check if they're still eligible
-    #         3. Apply the treatment
-    #         '''
-    #
-    #         # 1. apply treat_prob
-    #
-    #         # 2. check all the different ways they might have become ineligible
-    #
-    #         # 3.
-    #         successful_inds = self.product.administer(eligible_inds)
-    #
-    #         self.queue -= successful_inds # or similar
-    #
-    #         return
     #
     #
     # triage_eligible = lambda sim: (sim.get_intervention('routine').states('positive')) & (not already_triaged)

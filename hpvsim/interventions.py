@@ -971,8 +971,22 @@ class NumberVaccination(BaseVaccination):
         return vacc_inds
 
 
-#%% Screening
+#%% Screening and triage
 __all__ += ['BaseScreening', 'RoutineScreening', 'CampaignScreening', 'Triage']
+
+# Helper function
+def select_people(inds, prob=None):
+    '''
+    Return an array of indices of people to who accept a service being offered
+    Args:
+        inds: array of indices of people offered a service (e.g. screening, triage, treatment)
+        prob: acceptance probability
+    Returns: Array of indices of people who accept triage
+    '''
+    accept_probs    = np.full_like(inds, fill_value=prob, dtype=hpd.default_float)
+    accept_inds     = hpu.true(hpu.binomial_arr(accept_probs))
+    return accept_inds
+
 
 class BaseScreening(Intervention):
     '''
@@ -984,13 +998,14 @@ class BaseScreening(Intervention):
          screen_prob        (float/arr) : annual probability of eligible women getting screened
          eligibility        (inds/fn/state): indices OR string corresponding to valid state or people OR callable
          age_range          (list)      : age range for screening
-         next_steps         (dict)      : optionally trigger next steps
+         results_to_store   (list)      : which results to store in the intervention (to avoid storing all results)
+         store_by_time      (bool)      : whether to store the results keyed by time - default false, so the indices of people are stored in a single pool
          label              (str)       : the name of screening strategy
          kwargs             (dict)      : passed to Intervention()
 ≈    '''
 
     def __init__(self, product, screen_prob, eligibility=None,
-                 age_range=None, next_steps=None,
+                 age_range=None, store_states=None,
                  label=None, verbose=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.product        = product # The test product being used to screen people
@@ -999,7 +1014,7 @@ class BaseScreening(Intervention):
         self.age_range      = age_range or [30,50] # This is later filtered to exclude people not yet sexually active
         self.label          = label  # Screening label (used as a dict key)
         self.verbose        = verbose
-        self.next_steps     = next_steps
+        self.store_states   = store_states
 
         # # Parse the screening product(s), which can be provided in different formats
         # self._parse_products()
@@ -1015,7 +1030,7 @@ class BaseScreening(Intervention):
     def initialize(self, sim):
         super().initialize()
         self.npts = sim.res_npts
-        self.screens = hpb.Result(name=f'Screens {self.label}', npts=sim.res_npts, scale=True)
+        self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
         self.outcomes = {k:[] for k in self.product.hierarchy}
         return
 
@@ -1024,26 +1039,21 @@ class BaseScreening(Intervention):
         ''' TBC '''
         if sim.t in self.timepoints:
 
-            # Step 1: select people for screening and then record the number of screens
-            inds = self.select_people(sim)
-            if len(inds):
+            # Select people for screening and then record the number of screens
+            ti = sc.findinds(self.timepoints, sim.t)[0]
+            screen_prob     = self.screen_prob[ti] # Get the proportion of people who screen on this timestep
+            eligible_inds   = self.check_eligibility(sim) # Check eligibility
+            screen_inds     = select_people(eligible_inds, prob=screen_prob)
+
+            if len(screen_inds):
                 idx = int(sim.t / sim.resfreq)
-                sim.people.screened[inds] = True
-                sim.people.screens[inds] += 1
-                sim.people.date_screened[inds] = sim.t
-                self.screens[idx] += len(inds)
+                sim.people.screened[screen_inds] = True
+                sim.people.screens[screen_inds] += 1
+                sim.people.date_screened[screen_inds] = sim.t
+                self.n_products_used[idx] += len(screen_inds)
 
                 # Step 2: screen people
-                self.outcomes = self.product.administer(sim, inds)
-
-                # Step 3: trigger any subsequent interventions
-                if self.next_steps is not None:
-                    for result,next_step in self.next_steps.items():
-                        next_step(sim, output[result])
-
-
-                # for rkey in self.results.keys():
-                #     self.outcomes[state][int(sim.t)].update(pos_inds)
+                self.outcomes = self.product.administer(sim, screen_inds)
 
         return
 
@@ -1054,94 +1064,6 @@ class BaseScreening(Intervention):
         in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
         screen_due      = self.eligibility(sim)
         return active_females & in_age_range & screen_due
-
-
-    def select_people(self, sim):
-        '''
-        Return an array of indices of people to screen
-        Args:
-            sim: A hpv.Sim instance
-        Returns: Array of person indices
-        '''
-
-        inds = np.array([], dtype=int)  # Initialize in case no one gets screened
-
-        # Get the proportion of people who screen on this timestep
-        ti = sc.findinds(self.timepoints, sim.t)[0]
-        screen_prob = self.screen_prob[ti]
-
-        # Initialize an array of probabilities of everyone screening
-        screen_probs    = np.zeros(len(sim.people), dtype=hpd.default_float)
-        eligible        = self.check_eligibility(sim)
-        screen_probs[eligible] = screen_prob
-        screen_inds     = hpu.true(hpu.binomial_arr(screen_probs))
-
-        return screen_inds
-
-    def shrink(self, in_place=True):
-        ''' Shrink vaccination intervention '''
-        obj = super().shrink(in_place=in_place)
-        return obj
-
-
-class Triage(Intervention):
-    '''
-    Triage
-    Args:
-         product            (str/Product)   : the screening test to use
-         triage_prob        (float/arr) : annual probability of eligible women getting screened
-         eligibility        (callable/arr): array of indices of people who are eligible for triage OR callable that returns such indices
-≈    '''
-
-    def __init__(self, product, triage_prob, eligibility=None,
-                 label=None, verbose=False, **kwargs):
-        super().__init__(**kwargs) # Initialize the Intervention object
-        self.product        = product # The test product being used to screen people
-        self.triage_prob    = sc.promotetoarray(triage_prob) # Proportion of those eligible for screening who agree to be screened
-        self.eligibility    = eligibility # function or indices that determine who is eligible for the intervention
-        self.label          = label  # label (used as a dict key)
-        self.verbose        = verbose
-        return
-
-
-    def initialize(self, sim):
-        super().initialize()
-        self.npts = sim.res_npts
-        self.tests = hpb.Result(name=f'Tests administered by {self.label}', npts=sim.res_npts, scale=True)
-        self.outcomes = {k:[] for k in self.product.hierarchy}
-        return
-
-
-    def trigger(self, sim, inds):
-        ''' TBC '''
-        idx = int(sim.t / sim.resfreq)
-        self.tests[idx] += len(inds)
-        inds_accept = self.select_people(inds)
-        self.outcomes = self.product.administer(sim, inds_accept)
-        return
-
-
-    def apply(self, sim):
-        inds = self.eligibility(sim)
-        idx = int(sim.t / sim.resfreq)
-        self.tests[idx] += len(inds)
-        inds_accept = self.select_people(inds)
-        self.outcomes = self.product.administer(sim, inds_accept)
-        return
-
-
-    def select_people(self, inds):
-        '''
-        Return an array of indices of people to who accept triage
-        Args:
-            inds: array of indices of people offered triage
-        Returns: Array of indices of people who accept triage
-        '''
-        accept_inds     = np.array([], dtype=int)  # Initialize in case no one gets screened
-        triage_prob     = self.triage_prob[0] # TODO: generalise this to accept an array?
-        triage_probs    = np.full_like(inds, fill_value=triage_prob, dtype=hpd.default_float)
-        accept_inds     = hpu.true(hpu.binomial_arr(triage_probs))
-        return accept_inds
 
 
 class RoutineScreening(BaseScreening):
@@ -1233,24 +1155,146 @@ class CampaignScreening(BaseScreening):
         return
 
 
+class Triage(Intervention):
+    '''
+    Triage
+    Args:
+         product            (str/Product)   : the screening test to use
+         triage_prob        (float/arr) : annual probability of eligible women getting screened
+         eligibility        (callable/arr): array of indices of people who are eligible for triage OR callable that returns such indices
+≈    '''
+
+    def __init__(self, product, triage_prob, eligibility=None,
+                 label=None, verbose=False, **kwargs):
+        super().__init__(**kwargs) # Initialize the Intervention object
+        self.product        = product # The test product being used to screen people
+        self.triage_prob    = sc.promotetoarray(triage_prob) # Proportion of those eligible for triage who accept. Applied each timestep to everyone who becomes eligible on that timestep (as determined by eligibility)
+        self.eligibility    = eligibility # Function or indices that determine who is eligible for the intervention
+        self.label          = label  # label (used as a dict key)
+        self.verbose        = verbose
+        return
+
+
+    def initialize(self, sim):
+        super().initialize()
+        self.npts = sim.res_npts
+        self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
+        self.outcomes = {k:[] for k in self.product.hierarchy}
+        return
+
+
+    def apply(self, sim):
+        eligible_inds = self.eligibility(sim) # Determine who's eligible
+        idx = int(sim.t / sim.resfreq) # Get the result time index
+        accept_inds = select_people(eligible_inds, prob=self.triage_prob[0]) # Select people who accept
+        self.n_products_used[idx] += len(accept_inds) # Count the number of products used
+        self.outcomes = self.product.administer(sim, accept_inds) # Administer the product
+        return
+
+
+
+#%% Treatment interventions
+__all__ += ['BaseTreatment', 'NumTreat', 'DelayTreat']
+
+class BaseTreatment(Intervention):
+    def __init__(self, product, eligibility, treat_prob, **kwargs):
+        super().__init__(**kwargs)
+        self.eligibility = eligibility
+        self.product = product
+        self.treat_prob = sc.promotetoarray(treat_prob)
+
+    def initialize(self, sim):
+        super().initialize()
+        self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
+
+    def recheck_eligibility(self, inds, sim):
+        ''' Recheck people's eligibility for treatment - it may have expired if they've been waiting awhile '''
+        conditions = sim.people.alive[inds] # TODO: what else should go here? can't use sim.people.cin because precins may also get treatment
+        return conditions
+
+    def get_accept_inds(self, sim):
+        ''' Add new indices to the queue of people awaiting treatment '''
+        accept_inds     = np.array([], dtype=hpd.default_int)
+        eligible_inds   = self.eligibility(sim) # Apply eligiblity
+        if len(eligible_inds):
+            accept_inds     = select_people(eligible_inds, prob=self.treat_prob[0])  # Select people who accept
+        return accept_inds
+
+    def apply(self, sim):
+        treat_candidates = self.get_candidates(sim)
+        still_eligible = self.recheck_eligibility(treat_candidates, sim)
+        treat_inds = treat_candidates[still_eligible]
+        self.product.administer(sim.people, treat_inds)
+        idx = int(sim.t / sim.resfreq)
+        self.n_products_used[idx] += len(treat_inds)
+
+
+class NumTreat(BaseTreatment):
+    def __init__(self, max_capacity=None, **kwargs):
+        super().__init__(**kwargs)
+        self.queue = []
+        self.max_capacity = max_capacity
+        return
+
+    def add_to_queue(self, sim):
+        accept_inds = self.get_accept_inds(sim)
+        if len(accept_inds): self.queue += accept_inds.tolist()  # Add people who are willing to accept treatment to the queue
+
+    def get_candidates(self, sim):
+        treat_candidates = np.array([], dtype=hpd.default_int)
+        if len(self.queue):
+            if self.max_capacity is None or (self.max_capacity>len(self.queue)):
+                treat_candidates = self.queue[:]
+            else:
+                treat_candidates = self.queue[:self.max_capacity]
+        return treat_candidates
+
+    def apply(self, sim):
+        self.add_to_queue(sim)
+        super().apply(sim)
+        self.queue = [e for e in self.queue if e not in treat_inds] # Recreate the queue, removing people who were treated
+        return
+
+
+class DelayTreat(BaseTreatment):
+    ''' Treat people after a fixed delay '''
+    def __init__(self, delay=None, **kwargs):
+        super().__init__(**kwargs)
+        self.delay = delay or 0
+        self.scheduler = defaultdict(list)
+
+    def add_to_schedule(self, sim):
+        accept_inds = self.get_accept_inds(sim)
+        if len(accept_inds): self.scheduler[sim.t] = accept_inds  # Add people who are willing to accept treatment to the queue
+
+    def get_candidates(self, sim):
+        ''' Get the indices of people who are candidates for treatment '''
+        due_time = sim.t-self.delay/sim['dt']
+        treat_candidates = np.array([], dtype=hpd.default_int)
+        if len(self.scheduler[due_time]):
+            treat_candidates = self.scheduler[due_time]
+        return treat_candidates
+
+    def apply(self, sim):
+        self.add_to_schedule(sim)
+        super().apply(sim)
+
+
 #%% Products
-__all__ += ['Test', 'StandardTreatmentPathway', 'RadiationTherapy', 'PrecancerTreatment', 'ExcisionTreatment', 'AblativeTreatment']
+__all__ += ['Test', 'Treatment']
 
 class Product(hpb.FlexPretty):
-    """
-    Generic product implementation
-    """
-
-    # Could potentially track other product related things like costs there too?!
-
+    ''' Generic product implementation '''
     def administer(self, people, inds):
-        """
-        Change something about the People based on them recieving this product
-        """
+        ''' Adminster a Product - implemented by derived classes '''
         raise NotImplementedError
 
 
 class Test(Product):
+    '''
+    Testing products are used within screening and triage. Their fundamental proprty is that they classify people
+    into exactly one result state. They do not change anything about the People.
+    '''
     def __init__(self, df, hierarchy):
         self.df = df
         self.states = df.state.unique()
@@ -1262,10 +1306,9 @@ class Test(Product):
     def default_value(self):
         return len(self.hierarchy)-1
 
-
     def administer(self, sim, inds, return_format='dict'):
         '''
-        Administer the testing product.
+        Administer a testing product.
         Returns:
              if return_format=='array': an array of length len(inds) with integer entries that map each person to one of the result_states
              if return_format=='dict': a dictionary keyed by result_states with values containing the indices of people classified into this state
@@ -1299,15 +1342,14 @@ class Test(Product):
         return output
 
 
-class PrecancerTreatment(Product):
-    def __init__(self):
-        self.efficacy=dict(
-            precin=0,
-            cin1=0.936,
-            cin2=0.936,
-            cin3=0.936,
-        )
-        self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
+class Treatment(Product):
+    '''
+    Treatment products include anything used to treat cancer or precancer, as well as therapeutic vaccination.
+    They change fundamental properties about People, including their prognoses and infectiousness.
+    '''
+    def __init__(self, efficacy):
+        self.efficacy = efficacy
+        self.treat_states = list(self.efficacy.keys())
 
     def administer(self, people, inds):
         # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
@@ -1318,8 +1360,7 @@ class PrecancerTreatment(Product):
             treat_state_inds = inds[people_in_state[inds]]
 
             # Determine whether treatment is successful
-            eff_probs = np.full(len(treat_state_inds), self.efficacy[state],
-                                dtype=hpd.default_float)  # Assign probabilities of treatment success
+            eff_probs = np.full(len(treat_state_inds), self.efficacy[state], dtype=hpd.default_float)  # Assign probabilities of treatment success
             to_eff_treat = hpu.binomial_arr(eff_probs)  # Determine who will have effective treatment
             eff_treat_inds = treat_state_inds[to_eff_treat]
             successfully_treated += list(eff_treat_inds)
@@ -1332,143 +1373,7 @@ class PrecancerTreatment(Product):
                 people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
                 hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
-        # Should this be successfully_treated instead of inds??
-        people.treated[inds] = True
-        people.date_treated[inds] = people.t
-
         return successfully_treated
-
-
-class ExcisionTreatment(PrecancerTreatment):
-    def __init__(self):
-        super().__init__()
-        self.efficacy = dict(
-            precin=0,
-            cin1=0.936,
-            cin2=0.936,
-            cin3=0.936,
-        )
-
-
-class AblativeTreatment(PrecancerTreatment):
-    def __init__(self):
-        super().__init__()
-        self.efficacy = dict(
-            precin=0,
-            cin1=0.81,
-            cin2=0.81,
-            cin3=0.81,
-        )
-
-
-# class TherapeuticVaccine(Product):
-#     def __init__(self, timepoints=None, doses=None, interval=None, efficacy=None):
-#         self.timepoints = timepoints or '2030'
-#         self.doses = doses or 2
-#         self.interval = interval or 0.5 # Interval between doses in years
-#         self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
-#         self.efficacy = efficacy or dict( # default efficacy decreases as dysplasia increases
-#             precin=dict(
-#                 hpv16=[0.1, 0.9],
-#                 hpv18=[0.1, 0.9],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#             cin1=dict(
-#                 hpv16=[0.1, 0.7],
-#                 hpv18=[0.1, 0.7],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#             cin2=dict(
-#                 hpv16=[0.1, 0.5],
-#                 hpv18=[0.1, 0.5],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#             cin3=dict(
-#                 hpv16=[0.1, 0.4],
-#                 hpv18=[0.1, 0.4],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#         )
-#
-#     def initialize(self, sim):
-#         self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str')  # Ensure timepoints and dates are in the right format
-#
-#         self.second_dose_timepoints = [None] * sim.npts  # People who get second dose (if relevant)
-#
-#
-#     def administer(self, people, inds):
-#
-#         #Extract parameters that will be used below
-#
-#         ng = people.pars['n_genotypes']
-#         genotype_map = people.pars['genotype_map']
-#
-#         # Find those who are getting first dose
-#         people_not_vaccinated = hpu.false(people.tx_vaccinated)
-#         first_dose_inds = inds[people_not_vaccinated[inds]]
-#         people.tx_vaccinated[first_dose_inds] = True
-#
-#         # Schedule next dose
-#         second_dose_timepoints = people.t + int(self.interval / people.pars['dt'])
-#         if second_dose_timepoints < people.npts:
-#             self.second_dose_timepoints[second_dose_timepoints] = first_dose_inds
-#
-#         people.txvx_doses[inds] += 1
-#
-#         # Find those who are getting second dose today
-#         second_dose_inds = np.setdiff1d(inds, first_dose_inds)
-#
-#         # Deliver vaccine and update prognoses
-#         for inds_to_treat, dose in zip([first_dose_inds, second_dose_inds], [0,1]):
-#             for state in self.treat_states:
-#                 for g in range(ng):
-#                     people_in_state = hpu.true(people[g,state])
-#                     treat_state_inds = inds_to_treat[people_in_state[inds_to_treat]]
-#
-#                     # Determine whether treatment is successful
-#                     eff_probs = np.full(len(treat_state_inds), self.efficacy[state][genotype_map[g]][dose],
-#                                         dtype=hpd.default_float)  # Assign probabilities of treatment success
-#                     to_eff_treat = hpu.binomial_arr(eff_probs)  # Determine who will have effective treatment
-#                     eff_treat_inds = treat_state_inds[to_eff_treat]
-#                     people[state][g, eff_treat_inds] = False  # People who are successfully treated
-#                     people[f'date_{state}'][g, eff_treat_inds] = np.nan
-#                     hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g) # Get natural immune memory
 
 
 class RadiationTherapy(Product):
@@ -1483,73 +1388,6 @@ class RadiationTherapy(Product):
         people.date_treated[inds] = people.t
         return inds
 
-
-class StandardTreatmentPathway(Product):
-    # A standard treatment pathway - kind of a meta-product that represents the normal algorithm and dispatches treatments to specific products
-
-    def __init__(self, ablation_compliance, excision_compliance, cancer_compliance, cancer_product=None, ablation_product=None, excision_product=None):
-        self.ablation_compliance = ablation_compliance # probability of coming back for ablation
-        self.excision_compliance = excision_compliance # probability of coming back for excision
-        self.cancer_compliance = cancer_compliance # probability of coming back for cancer treatment
-        self.cancer_product = cancer_product or RadiationTherapy()
-        self.ablation_product = ablation_product or AblativeTreatment()
-        self.excision_product = excision_product or ExcisionTreatment()
-        self.test_positivity = {'precin': 0.98, 'cin1': 0.97, 'cin2': 0.89,'cin3': 0.79, 'cancerous': 0.4} # eligibility for ablation vs excision
-        self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
-
-    def administer(self, people, inds):
-        ''' Determine what kind of treatment they should receive and administer it '''
-
-        # TREAT CANCER
-        cancerous_inds = hpu.true(people.cancerous.any(axis=0)) # Find indices of people with cancer
-        diagnosed_inds = np.intersect1d(inds, cancerous_inds) # Indices of those who will be diagnosed with cancer
-        if len(diagnosed_inds)>0:
-            # Treat cancers
-            ca_treat_probs = np.full(len(diagnosed_inds), self.cancer_compliance, dtype=hpd.default_float)
-            to_treat_ca = hpu.binomial_arr(ca_treat_probs)  # Determine who actually gets treated, after accounting for compliance
-            ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
-            ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
-            people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
-            self.cancer_product.administer(people, ca_treat_inds)
-        else:
-            ca_treat_inds = np.array([], dtype=hpd.default_int)
-
-        # Everyone remaining is eligible for precancer treatment
-        preca_treat_eligible_inds = np.setdiff1d(inds, ca_treat_inds) # Indices of those eligible for precancer treatment
-
-        # Determine who is eligible for ablative vs excisional treatment
-        if len(preca_treat_eligible_inds)>0:
-            ablation_eligible_inds = []
-            for state in self.treat_states:
-                ablate_probs = np.zeros(len(preca_treat_eligible_inds))
-                ablate_inds = hpu.true(people[state][:, preca_treat_eligible_inds].any(axis=0))
-                ablate_probs[ablate_inds] = self.test_positivity[state]
-                ablate_inds = hpu.true(hpu.binomial_arr(ablate_probs))
-                ablation_eligible_inds += list(ablate_inds)
-
-            ablation_eligible_inds = np.array(ablation_eligible_inds)
-            if len(ablation_eligible_inds)>0:
-                ablation_eligible_inds = preca_treat_eligible_inds[ablation_eligible_inds]
-            excision_eligible_inds = np.setdiff1d(preca_treat_eligible_inds, ablation_eligible_inds)
-
-            # Apply LTFU for both
-            if len(ablation_eligible_inds)>0:
-                ablate_treat_probs = np.full(len(ablation_eligible_inds), self.ablation_compliance, dtype=hpd.default_float)
-                to_ablate = hpu.binomial_arr(ablate_treat_probs)
-                ablation_inds = ablation_eligible_inds[to_ablate]  # Indices of those who get treated
-                ablate_LTFU_inds = ablation_eligible_inds[~to_ablate]
-                self.ablation_product.administer(people, ablation_inds)
-                people.date_next_screen[ablate_LTFU_inds] = np.nan
-
-            if len(excision_eligible_inds)>0:
-                excision_treat_probs = np.full(len(excision_eligible_inds), self.excision_compliance, dtype=hpd.default_float)
-                to_excise = hpu.binomial_arr(excision_treat_probs)
-                excision_inds = excision_eligible_inds[to_excise]  # Indices of those who get treated
-                excision_LTFU_inds = excision_eligible_inds[~to_excise]
-                self.excision_product.administer(people, excision_inds)
-                people.date_next_screen[excision_LTFU_inds] = np.nan
-
-        return
 
 
 #%% Therapeutic vaccination
