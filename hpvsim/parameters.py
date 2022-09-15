@@ -126,6 +126,9 @@ def make_pars(**kwargs):
     # HIV parameters
     pars['hiv_infection_rates'] = None # loaded below if model_hiv == True
     pars['art_coverage'] = None # loaded below if model_hiv == True
+    pars['hiv_pars'] = {
+        'rel_sus': 2.2,
+    }
 
     # Events and interventions
     pars['interventions']   = []   # The interventions present in this simulation; populated by the user
