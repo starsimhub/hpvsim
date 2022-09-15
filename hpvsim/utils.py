@@ -279,6 +279,35 @@ def set_prognoses(people, inds, g, dur_none):
     return
 
 
+def set_HIV_prognoses(people, inds, year=None):
+    ''' Set HIV outcomes (for now only ART) '''
+
+    # Get parameters that will be used later
+    dt = people.pars['dt']
+    art_cov = people.pars['art_coverage']
+
+    all_years = np.array(list(art_cov.keys()))
+    base_year = all_years[0]
+    age_bins = art_cov[base_year]['m'][:, 0]
+    age_bins = age_bins[:-1]
+    age_bins = [int(i) for i in age_bins]
+    age_inds = np.digitize(people.age[inds], age_bins) - 1
+    art_probs = np.empty(len(inds), dtype=hpd.default_float)
+    year_ind = sc.findnearest(all_years, year)
+    nearest_year = all_years[year_ind]
+    hiv_f = art_cov[nearest_year]['f'][:, 1] * dt
+    hiv_m = art_cov[nearest_year]['m'][:, 1] * dt
+
+    art_probs[true(people.is_female[inds])] = hiv_f[age_inds[true(people.is_female[inds])]]
+    art_probs[true(people.is_male[inds])] = hiv_m[age_inds[true(people.is_male[inds])]]
+    art_probs[~people.alive[inds]] = 0
+
+    # Get indices of people who will be on ART on average
+    art_inds = true(binomial_arr(art_probs))
+    people.art[art_inds] = True
+    return
+
+
 #%% Sampling and seed methods
 
 __all__ += ['sample', 'get_pdf', 'set_seed']

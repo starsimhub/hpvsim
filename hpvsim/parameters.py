@@ -125,7 +125,7 @@ def make_pars(**kwargs):
 
     # HIV parameters
     pars['hiv_infection_rates'] = None # loaded below if model_hiv == True
-    pars['art_initiation_rates'] = None # loaded below if model_hiv == True
+    pars['art_coverage'] = None # loaded below if model_hiv == True
 
     # Events and interventions
     pars['interventions']   = []   # The interventions present in this simulation; populated by the user
@@ -1156,9 +1156,9 @@ def get_screen_pars(screen=None):
     return _get_from_pars(pars, key=screen)
 
 
-def get_hiv_rates(location, verbose=False, die=True):
+def get_hiv_rates(location, verbose=False):
     '''
-    Get HIV incidence data by location if provided, or use default
+    Get HIV incidence and art coverage data by location
 
     Args:
         location (str):  location, must be provided if you want to run with HIV dynamics
@@ -1166,18 +1166,19 @@ def get_hiv_rates(location, verbose=False, die=True):
 
     Returns:
         hiv_inc (dict): dictionary keyed by sex, storing arrays of HIV incidence over time by age
+        art_cov (dict): dictionary keyed by sex, storing arrays of ART coverage over time by age
     '''
 
     if location is not None:
         if verbose:
-            print(f'Loading location-specific HIV incidence data for "{location}"')
+            print(f'Loading location-specific HIV data for "{location}"')
         try:
-            hiv_incidence_rates = hpdata.get_hiv_incidence_rates(location=location)
+            hiv_incidence_rates, art_coverage = hpdata.get_hiv_data(location=location)
+            return hiv_incidence_rates, art_coverage
         except ValueError as E:
-            warnmsg = f'Could not load HIV incidence data for requested location "{location}" ({str(E)}), using default'
-            hpm.warn(warnmsg, die=die)
-        return hiv_incidence_rates
+            errormsg = f'Could not load HIV data for requested location "{location}" ({str(E)})'
+            raise NotImplementedError(errormsg)
     else:
-        errormsg = 'A location and location-specific HIV incidence file must be specified if running with HIV dynamics'
+        errormsg = 'A location and location-specific HIV incidence and ART coverage file must be specified if running with HIV dynamics'
         raise NotImplementedError(errormsg)
 

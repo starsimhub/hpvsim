@@ -446,6 +446,8 @@ class People(hpb.BasePeople):
         self.hiv[hiv_inds] = True
 
         # Determine who gets on ART and who does not
+        if len(hiv_inds):
+            hpu.set_HIV_prognoses(self, hiv_inds, year=year)
 
         return len(hiv_inds)
 

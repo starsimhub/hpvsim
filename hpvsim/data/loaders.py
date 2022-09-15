@@ -19,7 +19,8 @@ files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
-files.hiv = 'hiv_incidence'
+files.hiv_incidence = 'hiv_incidence'
+files.art_coverage = 'art_coverage'
 
 # Cache data as a dict
 cache = dict()
@@ -275,36 +276,53 @@ def get_birth_rates(location=None):
     return np.array([years, birth_rates])
 
 
-def get_hiv_incidence_rates(location):
+def get_hiv_data(location):
     '''
-        Load HIV incidence rates for a given country.
+        Load HIV incidence rates and ART coverage for a given country.
         Args:
-            location (str): name of the country to load the HIV incidence data for
+            location (str): name of the country to load the HIV data for
 
         Returns:
             hiv_incidence_rates (dict): HIV incidence rates by age and sex
+            art_coverage (dict): ART coverage by age and sex
         '''
     # Load the data
 
     location = sanitizestr(location)
     try:
-        df = pd.read_csv(f'{files.hiv}_{location}.csv')
+        df_inc = pd.read_csv(f'{files.hiv_incidence}_{location}.csv')
+        df_art = pd.read_csv(f'{files.art_coverage}_{location}.csv')
     except Exception as E:
-        errormsg = f'Could not locate datafile with age-specific HIV incidence rates for {location}. Please provide this file first.'
+        errormsg = f'Could not locate HIV datafiles for {location}. Please provide these files first.'
         raise ValueError(errormsg) from E
 
     sex_keys = ['Male', 'Female']
     sex_key_map = {'Male': 'm', 'Female': 'f'}
 
-    years = df['Year'].unique()
-    result = dict()
+    ## Start with incidence file
+
+    years = df_inc['Year'].unique()
+    result_incidence = dict()
 
     # Processing
     for year in years:
-        result[year] = dict()
+        result_incidence[year] = dict()
         for sk in sex_keys:
             sk_out = sex_key_map[sk]
-            result[year][sk_out] = np.array(
-                df[(df['Year'] == year) & (df['Sex'] == sk_out)][['Age', 'Incidence']])
+            result_incidence[year][sk_out] = np.array(
+                df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']])
 
-    return result
+    ## Now do ART file
+
+    years = df_art['Year'].unique()
+    result_art = dict()
+
+    # Processing
+    for year in years:
+        result_art[year] = dict()
+        for sk in sex_keys:
+            sk_out = sex_key_map[sk]
+            result_art[year][sk_out] = np.array(
+                df_art[(df_art['Year'] == year) & (df_art['Sex'] == sk_out)][['Age', 'ART Coverage']])
+
+    return result_incidence, result_art
