@@ -448,6 +448,14 @@ class People(hpb.BasePeople):
         # Determine who gets on ART and who does not
         if len(hiv_inds):
             hpu.set_HIV_prognoses(self, hiv_inds, year=year)
+            immunocompromised_inds = hiv_inds[self.immunocompromised[hiv_inds]]
+            if len(immunocompromised_inds):
+                for health_state in ['precin', 'cin']:
+                    for g in range(self.pars['n_genotypes']):
+                        inds = immunocompromised_inds[hpu.true(self[health_state][g, immunocompromised_inds])]
+                        # Update HPV/CC prognoses
+                        pass
+
 
         return len(hiv_inds)
 

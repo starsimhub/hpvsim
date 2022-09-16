@@ -128,6 +128,9 @@ def make_pars(**kwargs):
     pars['art_coverage'] = None # loaded below if model_hiv == True
     pars['hiv_pars'] = {
         'rel_sus': 2.2,
+        'dysp_rate': 2,
+        'prog_rate': 2,
+        'prog_time': 3,
     }
 
     # Events and interventions

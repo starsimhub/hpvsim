@@ -19,14 +19,19 @@ files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
-files.hiv_incidence = 'hiv_incidence'
-files.art_coverage = 'art_coverage'
+
+hiv_files = sc.objdict()
+hiv_files.incidence = 'hiv_incidence'
+hiv_files.art_coverage = 'art_coverage'
 
 # Cache data as a dict
 cache = dict()
 
 for k,v in files.items():
     files[k] = filesdir / v
+
+for k,v in hiv_files.items():
+    hiv_files[k] = filesdir / v
 
 
 def sanitizestr(string=None, alphanumeric=True, nospaces=True, asciify=True, lower=True, spacechar='_', symchar='_'):
@@ -290,8 +295,8 @@ def get_hiv_data(location):
 
     location = sanitizestr(location)
     try:
-        df_inc = pd.read_csv(f'{files.hiv_incidence}_{location}.csv')
-        df_art = pd.read_csv(f'{files.art_coverage}_{location}.csv')
+        df_inc = pd.read_csv(f'{hiv_files.incidence}_{location}.csv')
+        df_art = pd.read_csv(f'{hiv_files.art_coverage}_{location}.csv')
     except Exception as E:
         errormsg = f'Could not locate HIV datafiles for {location}. Please provide these files first.'
         raise ValueError(errormsg) from E
