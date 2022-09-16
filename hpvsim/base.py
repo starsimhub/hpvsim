@@ -261,25 +261,17 @@ class BaseSim(ParsObj):
         ''' Ensure that metaparameters get used properly before being updated '''
 
         # Merge everything together
-        try: pars = sc.mergedicts(pars, kwargs)
-        except:
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
+        pars = sc.mergedicts(pars, kwargs)
         if pars:
-
-            # Define aliases
-            mapping = dict(
-                n_agents = 'n_agents',
-            )
-            for key1,key2 in mapping.items():
-                if key1 in pars:
-                    pars[key2] = pars.pop(key1)
 
             # Handle other special parameters
             if pars.get('network'):
                 hppar.reset_layer_pars(pars, force=False)
+            if pars.get('interventions'):
+                import traceback;
+                traceback.print_exc();
+                import pdb;
+                pdb.set_trace()
             location = None
             if pars.get('location'):
                 location = pars['location']
