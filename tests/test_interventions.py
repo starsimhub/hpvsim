@@ -35,9 +35,10 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     debug = 0
 
     # Define products
+    # TODO: think of a better way to do this, e.g. on sim initialization
     import pandas as pd
-    dfdx = pd.read_csv('../hpvsim/screen_products1.csv')
-    dfvx = pd.read_csv('../hpvsim/vx_products.csv')
+    dfdx = pd.read_csv('../hpvsim/data/screen_products.csv')
+    dfvx = pd.read_csv('../hpvsim/data/vx_products.csv')
 
     # Create screening and triage products
     via_primary = hpv.dx(dfdx[dfdx.name == 'via'],              hierarchy=['positive', 'inadequate', 'negative'])
