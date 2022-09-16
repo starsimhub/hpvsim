@@ -267,11 +267,11 @@ class BaseSim(ParsObj):
             # Handle other special parameters
             if pars.get('network'):
                 hppar.reset_layer_pars(pars, force=False)
-            if pars.get('interventions'):
-                import traceback;
-                traceback.print_exc();
-                import pdb;
-                pdb.set_trace()
+            # if pars.get('interventions'):
+            #     import traceback;
+            #     traceback.print_exc();
+            #     import pdb;
+            #     pdb.set_trace()
             location = None
             if pars.get('location'):
                 location = pars['location']
