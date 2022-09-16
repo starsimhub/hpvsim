@@ -10,7 +10,8 @@ import unicodedata
 import re
 from .. import misc as hpm
 
-__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates', 'get_birth_rates']
+__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates',
+           'get_birth_rates', 'get_hiv_data']
 
 
 filesdir = sc.path(sc.thisdir()) / 'files'
@@ -330,11 +331,12 @@ def get_hiv_data(location):
 
         Returns:
             hiv_incidence_rates (dict): HIV incidence rates by age and sex
-            art_coverage (dict): ART coverage by age and sex
+            art_coverage (df): ART coverage by year
+            life_expectancy (dict): life expectancy by year, age, sex
         '''
     # Load the data
     try:
-        life_exp = get_life_expectancy(location=location, by_sex=False, overall=True)
+        life_exp = get_life_expectancy(location=location)
     except Exception as E:
         errormsg = f'Could not locate life expectancy for {location}. Please provide these files first.'
         raise ValueError(errormsg) from E
@@ -363,18 +365,4 @@ def get_hiv_data(location):
             result_incidence[year][sk_out] = np.array(
                 df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']])
 
-    ## Now do ART file
-
-    years = df_art['Year'].unique()
-    result_art = dict()
-
-    # Processing
-    for year in years:
-        result_art[year] = dict()
-        for sk in sex_keys:
-            sk_out = sex_key_map[sk]
-            result_art[year][sk_out] = np.array(
-                df_art[(df_art['Year'] == year) & (df_art['Sex'] == sk_out)][['Age', 'ART Coverage']])
-
-
-    return result_incidence, result_art, life_exp
+    return result_incidence, df_art, life_exp

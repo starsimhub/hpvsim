@@ -670,7 +670,9 @@ class Sim(hpb.BaseSim):
         sus = people.susceptible
         sus_imm = people.sus_imm
         HIV_rel_sus = np.ones(len(people), dtype=hpd.default_float)
-        HIV_rel_sus[people.immunocompromised] = self['hiv_pars']['rel_sus']
+        hiv_inds = hpu.true(people.hiv)
+        immunocompromised_inds = hiv_inds[hpu.true(hpu.binomial_arr(1-people.art_adherence[hiv_inds]))]
+        HIV_rel_sus[immunocompromised_inds] = self['hiv_pars']['rel_sus']
 
         # Get indices of infected/susceptible people by genotype
         f_inf_genotypes, f_inf_inds, f_sus_genotypes, f_sus_inds = hpu.get_sources_targets(inf, sus, ~people.sex.astype(bool))  # Males and females infected with this genotype

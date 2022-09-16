@@ -280,7 +280,7 @@ class BaseSim(ParsObj):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
             if pars['model_hiv']:
-                pars['hiv_infection_rates'], pars['art_coverage'], pars['life_expectancy'] = hppar.get_hiv_rates(location=location)
+                pars['hiv_infection_rates'], pars['art_adherence'] = hppar.get_hiv_rates(location=location)
 
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
@@ -1373,13 +1373,6 @@ class BasePeople(FlexPretty):
         people have no dysplasia and inactive infection status.
         '''
         return self.inactive & self.no_dysp
-
-    @property
-    def immunocompromised(self):
-        '''
-        Boolean array of everyone with HIV infection and not on ART.
-        '''
-        return self.hiv & ~self.art
 
     def true(self, key):
         ''' Return indices matching the condition '''

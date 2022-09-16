@@ -123,7 +123,7 @@ class PeopleMeta(sc.prettyobj):
 
     hiv_states = [
         State('hiv',        bool, False, label='infected with HIV', cmap=pl.cm.GnBu),
-        State('art',        bool, False, label='on ART', cmap=pl.cm.Oranges)
+        State('art_adherence',        default_float, 0, label='adherence on ART', cmap=pl.cm.Oranges)
     ]
 
     # Additional intervention states

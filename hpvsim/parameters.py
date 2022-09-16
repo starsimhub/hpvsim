@@ -125,7 +125,7 @@ def make_pars(**kwargs):
 
     # HIV parameters
     pars['hiv_infection_rates'] = None # loaded below if model_hiv == True
-    pars['art_coverage'] = None # loaded below if model_hiv == True
+    pars['art_adherence'] = None # loaded below if model_hiv == True
     pars['hiv_pars'] = {
         'rel_sus': 2.2,
         'dysp_rate': 2,
@@ -1181,7 +1181,30 @@ def get_hiv_rates(location, verbose=False):
             print(f'Loading location-specific HIV data for "{location}"')
         try:
             hiv_incidence_rates, art_coverage, life_expectancy = hpdata.get_hiv_data(location=location)
-            return hiv_incidence_rates, art_coverage
+            # Now compute ART adherence over time/age
+
+            art_adherence = dict()
+            years = art_coverage['Year'].values
+            for i, year in enumerate(years):
+                ages_inc_str = hiv_incidence_rates[year]['m'][:,0]
+                ages_inc_str = ages_inc_str[:-1]
+                ages_inc = [int(i) for i in ages_inc_str]
+                ages_ex = life_expectancy[year]['m'][:,0]
+                ages = np.intersect1d(ages_inc, ages_ex)
+                cov = np.zeros(len(ages), dtype=hpd.default_float)
+                for j, age in enumerate(ages):
+                    idx = np.where(life_expectancy[year]['f'][:,0]== age)[0]
+                    life_exp = life_expectancy[year]['f'][idx,1]
+                    last_year = int(year + life_exp)
+                    year_ind = sc.findnearest(years, last_year)
+                    if year_ind> i:
+                        cov[j] = np.mean(art_coverage[i:year_ind]['ART Coverage'].values)
+                    else:
+                        cov[j] = np.mean(art_coverage.iloc[year_ind]['ART Coverage'])
+
+                art_adherence[year] = np.array([ages,cov])
+
+            return hiv_incidence_rates, art_adherence
         except ValueError as E:
             errormsg = f'Could not load HIV data for requested location "{location}" ({str(E)})'
             raise NotImplementedError(errormsg)
