@@ -284,13 +284,20 @@ def set_prognoses(people, inds, g, dur_nodysp):
     return
 
 
-def set_CIN1_prognoses(people, hpv_inds, g, dur_nodysp):
+def set_CIN1_prognoses(people, hpv_inds, g, dur_nodysp=None, pars=None):
     # Get parameters that will be used later
     dt = people.pars['dt']
     genotype_pars = people.pars['genotype_pars']
     genotype_map = people.pars['genotype_map']
     dur_dyps = genotype_pars[genotype_map[g]]['dur_dysp']
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
+
+    if pars is not None:
+        dysp_rate *= pars['dysp_rate']
+
+    if dur_nodysp is None:
+        dur_precin = genotype_pars[genotype_map[g]]['dur_precin']
+        dur_nodysp = sample(**dur_precin, size=len(hpv_inds))
 
     # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
     cin1_probs = logf1(dur_nodysp, dysp_rate)  # Probability of developing dysplasia
@@ -317,16 +324,25 @@ def set_CIN1_prognoses(people, hpv_inds, g, dur_nodysp):
     return cin1_inds, dur_to_peak_dys
 
 
-def set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys):
+def set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys=None, pars=None):
     # Get parameters that will be used later
     dt = people.pars['dt']
     genotype_pars = people.pars['genotype_pars']
     genotype_map = people.pars['genotype_map']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
     prog_time = genotype_pars[genotype_map[g]]['prog_time']
+
+    if pars is not None:
+        prog_rate *= pars['prog_rate']
+        prog_time *= pars['prog_time']
+
     ccut = people.pars['clinical_cutoffs']
     sev_dist = people.pars['severity_dist']['dist']
     sev_par2 = people.pars['severity_dist']['par2']
+
+    if dur_to_peak_dys is None:
+        dur_dyps = genotype_pars[genotype_map[g]]['dur_dysp']
+        dur_to_peak_dys = sample(**dur_dyps, size=len(cin1_inds))
 
     mean_peaks = logf2(dur_to_peak_dys, prog_time,
                        prog_rate)  # Apply a function that maps durations + genotype-specific progression to severity
@@ -356,16 +372,25 @@ def set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys):
     dur_to_peak_dys = dur_to_peak_dys[is_cin2]
     return cin2_inds, dur_to_peak_dys
 
-def set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys):
+def set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys=None, pars=None):
     # Get parameters that will be used later
     dt = people.pars['dt']
     genotype_pars = people.pars['genotype_pars']
     genotype_map = people.pars['genotype_map']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
     prog_time = genotype_pars[genotype_map[g]]['prog_time']
+
+    if pars is not None:
+        prog_rate *= pars['prog_rate']
+        prog_time *= pars['prog_time']
+
     ccut = people.pars['clinical_cutoffs']
     sev_dist = people.pars['severity_dist']['dist']
     sev_par2 = people.pars['severity_dist']['par2']
+
+    if dur_to_peak_dys is None:
+        dur_dyps = genotype_pars[genotype_map[g]]['dur_dysp']
+        dur_to_peak_dys = sample(**dur_dyps, size=len(cin2_inds))
 
     mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate)  # Apply a function that maps durations + genotype-specific progression to severity
     peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2))  # Evaluate peak dysplasia, which is a proxy for the clinical classification
@@ -394,16 +419,25 @@ def set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys):
     return cin3_inds, dur_to_peak_dys
 
 
-def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys):
+def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, pars=None):
     # Get parameters that will be used later
     dt = people.pars['dt']
     genotype_pars = people.pars['genotype_pars']
     genotype_map = people.pars['genotype_map']
     prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
     prog_time = genotype_pars[genotype_map[g]]['prog_time']
+
+    if pars is not None:
+        prog_rate *= pars['prog_rate']
+        prog_time *= pars['prog_time']
+
     ccut = people.pars['clinical_cutoffs']
     sev_dist = people.pars['severity_dist']['dist']
     sev_par2 = people.pars['severity_dist']['par2']
+
+    if dur_to_peak_dys is None:
+        dur_dyps = genotype_pars[genotype_map[g]]['dur_dysp']
+        dur_to_peak_dys = sample(**dur_dyps, size=len(cin3_inds))
 
     mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate)  # Apply a function that maps durations + genotype-specific progression to severity
     peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks,
