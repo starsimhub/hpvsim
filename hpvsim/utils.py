@@ -179,9 +179,9 @@ def set_prognoses(people, inds, g, dur_nodysp):
     ''' Set disease progression '''
 
     cin1_inds, dur_to_peak_dys = set_CIN1_prognoses(people, inds, g, dur_nodysp)
-    cin2_inds, dur_to_peak_dys = set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys)
-    cin3_inds, dur_to_peak_dys = set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys)
-    set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys)
+    cin2_inds, dur_to_peak_dys, peaks = set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys)
+    cin3_inds, dur_to_peak_dys, peaks = set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys, peaks)
+    set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys, peaks)
 
     # # Get parameters that will be used later
     # dt = people.pars['dt']
@@ -370,9 +370,10 @@ def set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys=None, pars=None):
                                              np.ceil(
                                                  time_to_cin2 / dt))  # Date they get CIN2 - minimum of any previous date and the date from the current infection
     dur_to_peak_dys = dur_to_peak_dys[is_cin2]
-    return cin2_inds, dur_to_peak_dys
+    peaks = peaks[is_cin2]
+    return cin2_inds, dur_to_peak_dys, peaks
 
-def set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys=None, pars=None):
+def set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys=None, peaks=None, pars=None):
     # Get parameters that will be used later
     dt = people.pars['dt']
     genotype_pars = people.pars['genotype_pars']
@@ -392,8 +393,8 @@ def set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys=None, pars=None):
         dur_dyps = genotype_pars[genotype_map[g]]['dur_dysp']
         dur_to_peak_dys = sample(**dur_dyps, size=len(cin2_inds))
 
-    mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate)  # Apply a function that maps durations + genotype-specific progression to severity
-    peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2))  # Evaluate peak dysplasia, which is a proxy for the clinical classification
+        mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate)  # Apply a function that maps durations + genotype-specific progression to severity
+        peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2))  # Evaluate peak dysplasia, which is a proxy for the clinical classification
 
     # Determine whether CIN2 clears or progresses to CIN3
     is_cin3 = peaks > ccut['cin2']  # This isn't a typo: the ccut['cin2'] value is the upper bound for CIN2 classification, so anyone above this is CIN3
@@ -416,10 +417,11 @@ def set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys=None, pars=None):
                                              np.ceil(
                                                  time_to_cin3 / dt))  # Date they get CIN3 - minimum of any previous date and the date from the current infection
     dur_to_peak_dys = dur_to_peak_dys[is_cin3]
-    return cin3_inds, dur_to_peak_dys
+    peaks = peaks[is_cin3]
+    return cin3_inds, dur_to_peak_dys, peaks
 
 
-def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, pars=None):
+def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, peaks=None, pars=None):
     # Get parameters that will be used later
     dt = people.pars['dt']
     genotype_pars = people.pars['genotype_pars']
@@ -439,11 +441,9 @@ def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, pars=None):
         dur_dyps = genotype_pars[genotype_map[g]]['dur_dysp']
         dur_to_peak_dys = sample(**dur_dyps, size=len(cin3_inds))
 
-    mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate)  # Apply a function that maps durations + genotype-specific progression to severity
-    peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks,
+        mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate)  # Apply a function that maps durations + genotype-specific progression to severity
+        peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks,
                                  par2=sev_par2))  # Evaluate peak dysplasia, which is a proxy for the clinical classification
-
-    is_cin3 = peaks > ccut['cin2']  # This isn't a typo: the ccut['cin2'] value is the upper bound for CIN2 classification, so anyone above this is CIN3
 
     # Determine whether CIN3 clears or progresses to invasive cervical cancer
     is_cancer = peaks > ccut['cin3']  # Anyone above the upper threshold for CIN3 classification is cancerous (NB, this reflects a modeling choice and does not represent an exact biological mechanism)
@@ -454,7 +454,7 @@ def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, pars=None):
     time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
     people.date_clearance[g, cin3_inds] = np.fmax(people.date_clearance[g, cin3_inds],
                                                   people.date_cin1[g, cin3_inds] +
-                                                  np.ceil(dur_to_peak_dys[is_cin3] / dt) +
+                                                  np.ceil(dur_to_peak_dys / dt) +
                                                   np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
 
     # Case 2.2.2.2: Severe dysplasia progresses to cancer
@@ -468,7 +468,7 @@ def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, pars=None):
     # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
     people.date_dead_cancer[cancer_inds] = people.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
-
+    return
 
 def set_HIV_prognoses(people, inds, year=None):
     ''' Set HIV outcomes (for now only ART) '''
