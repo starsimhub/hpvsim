@@ -19,6 +19,7 @@ files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
+files.life_expectancy = 'ex.obj'
 
 hiv_files = sc.objdict()
 hiv_files.incidence = 'hiv_incidence'
@@ -257,6 +258,46 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     return result
 
 
+def get_life_expectancy(location=None, by_sex=True, overall=False):
+    '''
+    Load life expectancy by age for a given country or countries.
+    Args:
+        location (str or list): name of the country or countries to load the age distribution for
+        by_sex (bool): whether to rates by sex
+        overall (bool): whether to load total rate
+    Returns:
+        life_expectancy (dict): life expectancy by age and sex
+    '''
+    # Load the raw data
+    try:
+        df = load_file(files.life_expectancy)
+    except Exception as E:
+        errormsg = 'Could not locate datafile with age-specific life expectancy by country. Please run data/get_data.py first.'
+        raise ValueError(errormsg) from E
+
+    raw_df = map_entries(df, location)[location]
+
+    sex_keys = []
+    if by_sex: sex_keys += ['Male', 'Female']
+    if overall: sex_keys += ['Both sexes']
+    sex_key_map = {'Male': 'm', 'Female': 'f', 'Both sexes': 'tot'}
+
+    # max_age = 99
+    # age_groups = raw_df['AgeGrpStart'].unique()
+    years = raw_df['Time'].unique()
+    result = dict()
+
+    # Processing
+    for year in years:
+        result[year] = dict()
+        for sk in sex_keys:
+            sk_out = sex_key_map[sk]
+            result[year][sk_out] = np.array(raw_df[(raw_df['Time']==year) & (raw_df['Sex']== sk)][['AgeGrpStart','ex']])
+            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
+
+    return result
+
+
 def get_birth_rates(location=None):
     '''
     Load crude birth rates for a given country
@@ -292,6 +333,11 @@ def get_hiv_data(location):
             art_coverage (dict): ART coverage by age and sex
         '''
     # Load the data
+    try:
+        life_exp = get_life_expectancy(location=location, by_sex=False, overall=True)
+    except Exception as E:
+        errormsg = f'Could not locate life expectancy for {location}. Please provide these files first.'
+        raise ValueError(errormsg) from E
 
     location = sanitizestr(location)
     try:
@@ -330,4 +376,5 @@ def get_hiv_data(location):
             result_art[year][sk_out] = np.array(
                 df_art[(df_art['Year'] == year) & (df_art['Sex'] == sk_out)][['Age', 'ART Coverage']])
 
-    return result_incidence, result_art
+
+    return result_incidence, result_art, life_exp

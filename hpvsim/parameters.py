@@ -1173,13 +1173,14 @@ def get_hiv_rates(location, verbose=False):
     Returns:
         hiv_inc (dict): dictionary keyed by sex, storing arrays of HIV incidence over time by age
         art_cov (dict): dictionary keyed by sex, storing arrays of ART coverage over time by age
+        life_expectancy (dict): dictionary storing life expectancy over time by age
     '''
 
     if location is not None:
         if verbose:
             print(f'Loading location-specific HIV data for "{location}"')
         try:
-            hiv_incidence_rates, art_coverage = hpdata.get_hiv_data(location=location)
+            hiv_incidence_rates, art_coverage, life_expectancy = hpdata.get_hiv_data(location=location)
             return hiv_incidence_rates, art_coverage
         except ValueError as E:
             errormsg = f'Could not load HIV data for requested location "{location}" ({str(E)})'
