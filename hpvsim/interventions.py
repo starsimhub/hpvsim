@@ -825,42 +825,6 @@ class campaign_triage(BaseTriage, CampaignDelivery):
 
 
 
-# class BaseTriage(Intervention):
-#     '''
-#     Triage.
-#     Args:
-#          product        (str/Product)   : the screening test to use
-#          prob           (float/arr)     : annual probability of eligible women getting screened
-#          eligibility    (callable/arr)  : array of indices of people who are eligible for triage OR callable that returns such indices
-#     '''
-#
-#     def __init__(self, product, prob, eligibility=None, label=None, **kwargs):
-#         super().__init__(**kwargs) # Initialize the Intervention object
-#         self.product        = product # The test product being used to screen people
-#         self.prob           = sc.promotetoarray(prob) # Proportion of those eligible for triage who accept. Applied each timestep to everyone who becomes eligible on that timestep (as determined by eligibility)
-#         self.eligibility    = eligibility # Function or indices that determine who is eligible for the intervention
-#         self.label          = label  # label
-#         return
-#
-#
-#     def initialize(self, sim):
-#         super().initialize()
-#         self.npts = sim.res_npts
-#         self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
-#         self.outcomes = {k:[] for k in self.product.hierarchy}
-#         return
-#
-#
-#     def apply(self, sim):
-#         eligible_inds = self.eligibility(sim) # Determine who's eligible
-#         idx = int(sim.t / sim.resfreq) # Get the result time index
-#         accept_inds = select_people(eligible_inds, prob=self.triage_prob[0]) # Select people who accept
-#         self.n_products_used[idx] += len(accept_inds) # Count the number of products used
-#         self.outcomes = self.product.administer(sim, accept_inds) # Administer the product
-#         return
-
-
-
 #%% Treatment interventions
 __all__ += ['BaseTreatment', 'treat_num', 'treat_delay', 'deliver_txvx']
 
