@@ -119,11 +119,10 @@ def init_immunity(sim, create=False):
 
         imm_source = ng
         for vi,vx_intv in enumerate(vx_intvs):
-            # TODO, START FROM HERE, BUGGY <<<<<<<<<<<<<
             genotype_pars_df = vx_intv.product.genotype_pars[vx_intv.product.genotype_pars.genotype.isin(sim['genotype_map'].values())] # TODO fix this
             vacc_mapping = [genotype_pars_df[genotype_pars_df.genotype==gtype].rel_imm.values[0] for gtype in sim['genotype_map'].values()]
-            vacc_mapping += [1]
-            vacc_mapping = np.reshape(vacc_mapping, (len(immunity)+1, 1)).astype(hpd.default_float)
+            vacc_mapping += [1]*(vi+1) # Add on some ones to pad out the matrix
+            vacc_mapping = np.reshape(vacc_mapping, (len(immunity)+1, 1)).astype(hpd.default_float) # Reshape
             immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
             vx_intv.product.imm_source = imm_source
