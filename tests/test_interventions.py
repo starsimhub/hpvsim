@@ -37,21 +37,27 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     # Define products
     # TODO: think of a better way to do this, e.g. on sim initialization
     import pandas as pd
-    dfdx = pd.read_csv('../hpvsim/data/screen_products.csv')
-    dfvx = pd.read_csv('../hpvsim/data/vx_products.csv')
+    dfdx    = pd.read_csv('../hpvsim/data/screen_products.csv')
+    dfvx    = pd.read_csv('../hpvsim/data/vx_products.csv')
+    dftx    = pd.read_csv('../hpvsim/data/tx_products.csv')
 
     # Create screening and triage products
-    via_primary = hpv.dx(dfdx[dfdx.name == 'via'],              hierarchy=['positive', 'inadequate', 'negative'])
-    via_triage  = hpv.dx(dfdx[dfdx.name == 'via_triage'],       hierarchy=['positive', 'inadequate', 'negative'])
-    tx_assigner = hpv.dx(dfdx[dfdx.name == 'treatment_triage'], hierarchy=['radiation', 'excision', 'ablation', 'none'])
+    via_primary             = hpv.dx(dfdx[dfdx.name == 'via'],                      hierarchy=['positive', 'inadequate', 'negative'])
+    pos_screen_assessment   = hpv.dx(dfdx[dfdx.name == 'pos_screen_assessment'],    hierarchy=['triage', 'txvx', 'none'])
+    via_triage              = hpv.dx(dfdx[dfdx.name == 'via_triage'],               hierarchy=['positive', 'inadequate', 'negative'])
+    tx_assigner             = hpv.dx(dfdx[dfdx.name == 'treatment_triage'],         hierarchy=['radiation', 'excision', 'ablation', 'none'])
 
-    # Create vaccines - first and second dose
+    # Create prophylactic vaccines - first and second dose are separate products
     bivalent    = hpv.vx(genotype_pars = dfvx[dfvx.name == 'bivalent'], imm_init=dict(dist='beta', par1=30, par2=2))
     bivalent2   = hpv.vx(genotype_pars = dfvx[dfvx.name == 'bivalent'], imm_boost=1.2)
 
+    # Create therapeutic vaccine - first and second dose are separate products
+    txvx1   = hpv.tx(df = dftx[dftx.name == 'txvx1'])
+    txvx2   = hpv.tx(df = dftx[dftx.name == 'txvx2'])
+
     # Create treatment products
-    abl_prod    = hpv.tx(efficacy = dict(precin=0, cin1=0.936, cin2=0.936, cin3=0.936))
-    exc_prod    = hpv.tx(efficacy = dict(precin=0, cin1=0.81,  cin2=0.81,  cin3=0.81))
+    abl_prod    = hpv.tx(df = dftx[dftx.name == 'ablation'])
+    exc_prod    = hpv.tx(df = dftx[dftx.name == 'excision'])
 
     ### Create interventions
     # Screen, triage, assign treatment, treat
@@ -69,21 +75,53 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         product=via_primary,
         prob=0.3,
         age_range=[30, 70],
-        years=2025,
+        years=2030,
         label='campaign screening',
     )
 
-    triage_eligible = lambda sim: sim.get_intervention('screening').outcomes['positive']
-    triage = hpv.triage(
+    # SOC: use a secondary diagnostic to determine how to treat people who screen positive
+    to_triage = lambda sim: sim.get_intervention('screening').outcomes['positive']
+    soc_triage = hpv.routine_triage(
+        years = [2020,2029],
+        prob = 0.5, #acceptance rate
         product = via_triage,
-        triage_prob = .5,
-        eligibility = triage_eligible,
-        label='triage',
+        eligibility = to_triage,
+        label = 'via_triage_old'
     )
 
-    confirmed_positive = lambda sim: sim.get_intervention('triage').outcomes['positive']
-    assign_treatment = hpv.triage(
-        triage_prob = 1.0,
+    #### New protocol: for those who screen positive, decide whether to immediately offer TxVx or refer them for further testing
+    screened_pos = lambda sim: list(set(sim.get_intervention('screening').outcomes['positive'].tolist() + sim.get_intervention('campaign screening').outcomes['positive'].tolist()))
+    pos_screen_assesser = hpv.routine_triage(
+        start_year=2030,
+        prob = 1.0,
+        product = pos_screen_assessment,
+        eligibility = screened_pos,
+        label = 'positive screen assessment'
+    )
+
+    # Do further testing for those who were referred for further testing
+    to_triage_new = lambda sim: sim.get_intervention('positive screen assessment').outcomes['triage']
+    new_triage = hpv.routine_triage(
+        start_year = 2030,
+        prob = 0.3,
+        product = via_triage,
+        eligibility = to_triage_new,
+        label = 'via_triage_new'
+    )
+
+    # Get people who've been classified as txvx eligible based on the positive screen assessment, and deliver txvx to them
+    txvx_eligible = lambda sim: sim.get_intervention('positive screen assessment').outcomes['txvx']
+    deliver_txvx = hpv.deliver_txvx(
+        accept_prob = 0.8,
+        product = txvx1,
+        eligibility = txvx_eligible,
+        label = 'txvx'
+    )
+
+    # New and old protocol: for those who've been confirmed positive in their secondary diagnostic, determine what kind of treatment to offer them
+    confirmed_positive = lambda sim: list(set(sim.get_intervention('via_triage_old').outcomes['positive'].tolist() + sim.get_intervention('via_triage_new').outcomes['positive'].tolist()))
+    assign_treatment = hpv.routine_triage(
+        prob = 1.0,
         product = tx_assigner,
         eligibility = confirmed_positive,
         label = 'treatment_triage'
@@ -91,23 +129,26 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 
     ablation_eligible = lambda sim: sim.get_intervention('treatment_triage').outcomes['ablation']
     ablation = hpv.treat_num(
-        treat_prob = 0.5,
+        accept_prob = 0.5,
         max_capacity = 100,
         product = abl_prod,
         eligibility = ablation_eligible,
         label = 'ablation'
     )
 
-    excision_eligible = lambda sim: sim.get_intervention('treatment_triage').outcomes['excision'] | sim.get_intervention('ablation').outcomes['unsuccessful']
+    excision_eligible = lambda sim: sim.get_intervention('treatment_triage').outcomes['excision'] #| sim.get_intervention('ablation').outcomes['unsuccessful']
     excision = hpv.treat_delay(
-        treat_prob = 0.5,
+        accept_prob = 0.5,
         delay = 0.5,
         product = exc_prod,
         eligibility = excision_eligible,
         label = 'excision'
     )
 
-    st_interventions  = [campaign_screen, routine_screen, triage, assign_treatment, ablation, excision]
+    soc_screen = [routine_screen, campaign_screen, soc_triage]
+    new_screen = [pos_screen_assesser, new_triage,  deliver_txvx]
+    triage_treat = [assign_treatment, ablation, excision]
+    st_interventions = soc_screen + new_screen + triage_treat
     # TODO: cancer treatment not included yet<<<<<
 
     ## Vaccination interventions

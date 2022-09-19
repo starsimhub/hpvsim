@@ -96,7 +96,7 @@ def select_people(inds, prob=None):
     Args:
         inds: array of indices of people offered a service (e.g. screening, triage, treatment)
         prob: acceptance probability
-    Returns: Array of indices of people who accept triage
+    Returns: Array of indices of people who accept
     '''
     accept_probs    = np.full_like(inds, fill_value=prob, dtype=hpd.default_float)
     accept_inds     = hpu.true(hpu.binomial_arr(accept_probs))
@@ -299,7 +299,9 @@ class Intervention:
 __all__ = ['RoutineDelivery', 'CampaignDelivery']
 
 class RoutineDelivery(Intervention):
-    ''' Routine delivery '''
+    '''
+    Base class for any intervention that uses routine delivery; handles interpolation of input years.
+    '''
     def __init__(self, years=None, start_year=None, end_year=None):
         self.years      = years
         self.start_year = start_year
@@ -309,12 +311,12 @@ class RoutineDelivery(Intervention):
     def initialize(self, sim):
         super().initialize(sim)
 
-        # Handle time/date inputs
-
+        # Validate inputs
         if (self.years is not None) and (self.start_year is not None or self.end_year is not None):
             errormsg = 'Provide either a list of years or a start year, not both.'
             raise ValueError(errormsg)
 
+        # If start_year and end_year are not provided, figure them out from the provided years or the sim
         if self.years is None:
             if self.start_year is None: self.start_year = sim.res_yearvec[0]
             if self.end_year is None:   self.end_year   = sim.res_yearvec[-1]
@@ -322,15 +324,18 @@ class RoutineDelivery(Intervention):
             self.start_year = self.years[0]
             self.end_year   = self.years[-1]
 
+        # More validation
         if (self.start_year not in sim.yearvec) or (self.end_year not in sim.yearvec):
             errormsg = 'Years for screening must be within simulation start and end dates.'
             raise ValueError(errormsg)
 
+        # Determine the timepoints at which the intervention will be applied
         self.start_point    = sc.findinds(sim.yearvec, self.start_year)[0]
         self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0]
         self.years          = np.arange(self.start_year, self.end_year)
         self.timepoints     = np.arange(self.start_point, self.end_point)
 
+        # Get the probability input into a format compatible with timepoints
         if len(self.years) != len(self.prob):
             if len(self.prob)==1:
                 self.prob = np.array([self.prob[0]]*len(self.timepoints))
@@ -340,12 +345,16 @@ class RoutineDelivery(Intervention):
         else:
             self.prob = sc.smoothinterp(np.arange(len(self.timepoints)), np.arange(len(self.years)), self.prob, smoothness=0)
 
+        # Lastly, adjust the annual probability by the sim's timestep
         self.prob *= sim['dt']
 
         return
 
+
 class CampaignDelivery(Intervention):
-    ''' Campaign delivery. '''
+    '''
+    Base class for any intervention that uses campaign delivery; handles interpolation of input years.
+    '''
     def __init__(self, years, interpolate=True, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.years = sc.promotetoarray(years)
@@ -355,6 +364,7 @@ class CampaignDelivery(Intervention):
     def initialize(self, sim):
         super().initialize(sim)
 
+        # Decide whether to apply the intervention at every timepoint throughout the year, or just once.
         if self.interpolate:
             yearpoints = []
             for yi, year in enumerate(self.years):
@@ -363,6 +373,7 @@ class CampaignDelivery(Intervention):
         else:
             self.timepoints = np.array([sc.findinds(sim.yearvec,year)[0] for year in self.years])
 
+        # Get the probability input into a format compatible with timepoints
         if len(self.prob) == len(self.years) and self.interpolate:
             self.prob = sc.smoothinterp(np.arange(len(self.timepoints)), np.arange(len(self.years)), self.prob, smoothness=0)*sim['dt']
         elif len(self.prob) == 1:
@@ -529,6 +540,17 @@ __all__ += ['BaseVaccination', 'routine_vx', 'campaign_vx']
 
 
 class BaseVaccination(Intervention):
+    '''
+    Base vaccination class for determining who will receive a vaccine.
+    Args:
+         product        (str/Product)   : the vaccine to use
+         prob           (float/arr)     : annual probability of eligible population getting vaccinated
+         age_range      (list/tuple)    : age range to vaccinate
+         sex            (int/str/list)  : sex to vaccinate - accepts 0/1 or 'f'/'m' or a list of both
+         eligibility    (inds/callable) : indices OR callable that returns inds
+         label          (str)           : the name of vaccination strategy
+         kwargs         (dict)          : passed to Intervention()
+    '''
     def __init__(self, product=None, prob=None, age_range=None, sex=None, eligibility=None, label=None, **kwargs):
         super().__init__(**kwargs)
         self.product = product
@@ -539,8 +561,16 @@ class BaseVaccination(Intervention):
 
         # Deal with sex
         if sc.checktype(sex,'listlike'):
-            if sc.checktype(sex[0],'str'): # If provided as 'f'/'m', convert to 0/1
+            if sc.checktype(sex[0],'str'): # If provided as ['f','m'], convert to [0,1]
                 self.sex = np.array([0,1])
+        elif sc.checktype(sex, 'str'):  # If provided as 'f' or 'm', convert to 0 or 1
+            if sex=='f':
+                self.sex = np.array([0])
+            elif sex=='m':
+                self.sex = np.array([1])
+            else:
+                errormsg = f'Sex "{sex}" not understood.'
+                raise ValueError(errormsg)
         else:
             self.sex = sc.promotetoarray(sex)
 
@@ -553,19 +583,24 @@ class BaseVaccination(Intervention):
 
 
     def check_eligibility(self, sim):
-        conditions = np.full(len(sim.people), True, dtype=bool)
+        '''
+        Determine who is eligible for vaccination
+        '''
+        conditions = np.full(len(sim.people), True, dtype=bool) # Start by assuming everyone is eligible
         if len(self.sex)==1:
-            conditions = conditions & (sim.people.sex == self.sex[0])
+            conditions = conditions & (sim.people.sex == self.sex[0]) # Filter by sex
         if self.age_range is not None:
-            conditions = conditions & ((sim.people.age >= self.age_range[0]) & (sim.people.age <self.age_range[1]))
+            conditions = conditions & ((sim.people.age >= self.age_range[0]) & (sim.people.age <self.age_range[1])) # Filter by age
         if self.eligibility is not None:
-            other_eligible  = self.eligibility(sim)
+            other_eligible  = self.eligibility(sim) # Apply any other user-defined eligibility
             conditions      = conditions & other_eligible
         return conditions
 
 
     def apply(self, sim):
-        ''' Perform vaccination '''
+        '''
+        Perform vaccination by finding who's eligible for vaccination, finding who accepts, and applying the vaccine product.
+        '''
         if sim.t in self.timepoints:
 
             # Select people for screening and then record the number of screens
@@ -596,6 +631,14 @@ class BaseVaccination(Intervention):
 
 
 class routine_vx(BaseVaccination, RoutineDelivery):
+    '''
+    Routine vaccination - an instance of base vaccination combined with routine delivery.
+    See base classes for a description of input arguments.
+    Examples:
+        vx1 = hpv.routine_vx(product='bivalent', age_range=[9,10], prob=0.9, start_year=2025) # Vaccinate 90% of girls aged 9-10 every year
+        vx2 = hpv.routine_vx(product='bivalent', age_range=[9,10], prob=0.9, sex=[0,1], years=np.arange(2020,2025)) # Screen 90% of girls and boys aged 9-10 every year from 2020-2025
+        vx3 = hpv.routine_vx(product='quadrivalent', prob=np.linspace(0.2,0.8,5), years=np.arange(2020,2025)) # Scale up vaccination over 5 years starting in 2020
+    '''
 
     def __init__(self, product=None, prob=None, age_range=None, sex=0, eligibility=None,
                  start_year=None, end_year=None, years=None, **kwargs):
@@ -605,6 +648,10 @@ class routine_vx(BaseVaccination, RoutineDelivery):
 
 
 class campaign_vx(BaseVaccination, CampaignDelivery):
+    '''
+    Campaign vaccination - an instance of base vaccination combined with campaign delivery.
+    See base classes for a description of input arguments.
+    '''
 
     def __init__(self, product=None, prob=None, age_range=None, sex=0, eligibility=None,
                  years=None, interpolate=True, **kwargs):
@@ -615,45 +662,30 @@ class campaign_vx(BaseVaccination, CampaignDelivery):
 
 
 #%% Screening and triage
-__all__ += ['BaseScreening', 'routine_screening', 'campaign_screening', 'triage']
+__all__ += ['BaseTest', 'BaseScreening', 'routine_screening', 'campaign_screening', 'BaseTriage', 'routine_triage', 'campaign_triage']
 
 
-class BaseScreening(Intervention):
+class BaseTest(Intervention):
     '''
-    Base screening class. Different logic applies depending on whether it's a routine
+    Base class for screening and triage. Different logic applies depending on whether it's a routine
     or campaign screening intervention, so these are separated into different Interventions.
     This base class contains the common functionality for both.
     Args:
-         product            (str/Product)   : the screening test to use
-         screen_prob        (float/arr) : annual probability of eligible women getting screened
-         eligibility        (inds/fn/state): indices OR string corresponding to valid state or people OR callable
-         age_range          (list)      : age range for screening
-         results_to_store   (list)      : which results to store in the intervention (to avoid storing all results)
-         store_by_time      (bool)      : whether to store the results keyed by time - default false, so the indices of people are stored in a single pool
-         label              (str)       : the name of screening strategy
-         kwargs             (dict)      : passed to Intervention()
-≈    '''
+         product        (str/Product)   : the screening test to use
+         prob           (float/arr)     : annual probability of eligible women getting screened
+         age_range      (list/tuple)    : age range to screen
+         eligibility    (inds/callable) : indices OR callable that returns inds
+         label          (str)           : the name of screening strategy
+         kwargs         (dict)          : passed to Intervention()
+    '''
 
-    def __init__(self, product=None, prob=None, eligibility=None,
-                 age_range=None, store_states=None,
-                 label=None, verbose=False, **kwargs):
+    def __init__(self, product=None, prob=None, eligibility=None, label=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Intervention object
         self.product        = product # The test product being used to screen people
         self.prob           = sc.promotetoarray(prob) # Annual probability of being screened
         self.eligibility    = eligibility
-        self.age_range      = age_range or [30,50] # This is later filtered to exclude people not yet sexually active
         self.label          = label  # Screening label (used as a dict key)
-        self.verbose        = verbose
-        self.store_states   = store_states
-
-        # # Parse the screening product(s), which can be provided in different formats
-        # self._parse_products()
-
-        return
-
-
-    def _parse_products(self):
-        ''' Unpack screening information, which may be given as a string or Product'''
+        self.timepoints     = []
         return
 
 
@@ -661,35 +693,43 @@ class BaseScreening(Intervention):
         super().initialize(sim)
         self.npts = sim.res_npts
         self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
-        self.outcomes = {k:[] for k in self.product.hierarchy}
+        self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         return
 
 
-    def apply(self, sim):
-        ''' TBC '''
-        if sim.t in self.timepoints:
+    def deliver(self, sim):
+        '''
+        Deliver the tests by finding who's eligible, finding who accepts, and applying the product.
+        '''
+        ti = sc.findinds(self.timepoints, sim.t)[0]
+        prob            = self.prob[ti] # Get the proportion of people who screen on this timestep
+        eligible_inds   = self.check_eligibility(sim) # Check eligibility
+        accept_inds     = select_people(eligible_inds, prob=prob) # Find people who accept
+        if len(accept_inds):
+            idx = int(sim.t / sim.resfreq)
+            self.n_products_used[idx] += len(accept_inds)
+            self.outcomes = self.product.administer(sim, accept_inds)
 
-            # Select people for screening and then record the number of screens
-            ti = sc.findinds(self.timepoints, sim.t)[0]
-            prob            = self.prob[ti] # Get the proportion of people who screen on this timestep
-            eligible_inds   = self.check_eligibility(sim) # Check eligibility
-            screen_inds     = select_people(eligible_inds, prob=prob)
-
-            if len(screen_inds):
-                idx = int(sim.t / sim.resfreq)
-                sim.people.screened[screen_inds] = True
-                sim.people.screens[screen_inds] += 1
-                sim.people.date_screened[screen_inds] = sim.t
-                self.n_products_used[idx] += len(screen_inds)
-
-                # Step 2: screen people
-                self.outcomes = self.product.administer(sim, screen_inds)
-
-        return
+        return accept_inds
 
 
     def check_eligibility(self, sim):
-        ''' Return boolean array specifying who's eligible for screening at time t '''
+        raise NotImplementedError
+
+
+class BaseScreening(BaseTest):
+    '''
+    Base class for screening. See BaseTest for a description of input arguments.
+    '''
+    def __init__(self, age_range=None, **kwargs):
+        super().__init__(**kwargs) # Initialize the BaseTest object
+        self.age_range = age_range or [30,50] # This is later filtered to exclude people not yet sexually active
+
+
+    def check_eligibility(self, sim):
+        '''
+        Return boolean array specifying who's eligible at time t
+        '''
         active_females  = sim.people.is_female & sim.people.is_active
         in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
         conditions      = (active_females & in_age_range)
@@ -699,107 +739,192 @@ class BaseScreening(Intervention):
         return conditions
 
 
+    def apply(self, sim):
+        '''
+        Perform the test by finding who's eligible, finding who accepts, and applying the product.
+        '''
+        if sim.t in self.timepoints:
+            accept_inds = self.deliver(sim)
+            sim.people.screened[accept_inds] = True
+            sim.people.screens[accept_inds] += 1
+            sim.people.date_screened[accept_inds] = sim.t
+
+        return
+
+
+class BaseTriage(BaseTest):
+    '''
+    Base class for triage. See BaseTest for a description of input arguments.
+    '''
+    def __init__(self, age_range=None, **kwargs):
+        super().__init__(**kwargs) # Initialize the BaseTest object
+
+    def check_eligibility(self, sim):
+        return self.eligibility(sim)
+
+    def apply(self, sim):
+        if sim.t in self.timepoints: _ = self.deliver(sim)
+        return
+
+
 class routine_screening(BaseScreening, RoutineDelivery):
     '''
-    Routine screening.
-    Example:
-        screen1 = hpv.routine_screening('hpv', 0.02) # Screen 2% of the eligible population every year
-        screen2 = hpv.routine_screening('hpv', 0.02, start_year=2020) # Screen 2% every year starting in 2020
-        screen3 = hpv.routine_screening('hpv', np.linspace(0.005,0.025,5), years=np.arange(2020,2025)) # Scale up screening over 5 years starting in 2020
+    Routine screening - an instance of base screening combined with routine delivery.
+    See base classes for a description of input arguments.
+    Examples:
+        screen1 = hpv.routine_screening(product='hpv', prob=0.02) # Screen 2% of the eligible population every year
+        screen2 = hpv.routine_screening(product='hpv', prob=0.02, start_year=2020) # Screen 2% every year starting in 2020
+        screen3 = hpv.routine_screening(product='hpv', prob=np.linspace(0.005,0.025,5), years=np.arange(2020,2025)) # Scale up screening over 5 years starting in 2020
     '''
-    def __init__(self, product=None, prob=None, eligibility=None, age_range=None, label=None, verbose=False,
+    def __init__(self, product=None, prob=None, eligibility=None, age_range=None, label=None,
                          years=None, start_year=None, end_year=None, **kwargs):
-        super().__init__(product=product, prob=prob, eligibility=eligibility, age_range=age_range, label=label, verbose=verbose,
+        super().__init__(product=product, prob=prob, eligibility=eligibility, age_range=age_range, label=label,
                          years=years, start_year=start_year, end_year=end_year, **kwargs)
 
 
 class campaign_screening(BaseScreening, CampaignDelivery):
     '''
-    Campaign screening.
-    Example:
-        campaign_screen = hpv.CampaignScreening('hpv', 0.2, years=[2020, 2025]) # Screen 20% of the eligible population in 2020 and again in 2025
+    Campaign screening - an instance of base screening combined with campaign delivery.
+    See base classes for a description of input arguments.
+    Examples:
+        screen1 = hpv.campaign_screening(product='hpv', prob=0.2, years=2030) # Screen 20% of the eligible population in 2020
+        screen2 = hpv.campaign_screening(product='hpv', prob=0.02, years=[2025,2030]) # Screen 20% of the eligible population in 2025 and again in 2030
+    '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class routine_triage(BaseTriage, RoutineDelivery):
+    '''
+    Routine triage - an instance of base triage combined with routine delivery.
+    See base classes for a description of input arguments.
+    Examples:
+        # Example 1: Triage 40% of the eligible population in all years
+        triage1 = hpv.routine_triage(product='via_triage', prob=0.4)
+
+        # Example 2: Triage positive screens into confirmatory testing or theapeutic vaccintion
+        pos_screen_assessment  = hpv.dx(df, hierarchy=['confirm', 'txvx', 'none']) # Create a diagnostic that determines how positive screens should be handled
+        screened_pos = lambda sim: sim.get_intervention('screening').outcomes['positive']
+        triage2 = hpv.routine_triage(product=pos_screen_assessment, eligibility=screen_pos, prob=0.9, start_year=2030)
+    '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class campaign_triage(BaseTriage, CampaignDelivery):
+    '''
+    Campaign triage - an instance of base triage combined with campaign delivery.
+    See base classes for a description of input arguments.
+    Examples:
+        # Example 1: Triage positive screens into confirmatory testing or theapeutic vaccintion
+        pos_screen_assessment  = hpv.dx(df, hierarchy=['confirm', 'txvx', 'none']) # Create a diagnostic that determines how positive screens should be handled
+        screened_pos = lambda sim: sim.get_intervention('screening').outcomes['positive']
+        triage2 = hpv.routine_triage(product=pos_screen_assessment, eligibility=screen_pos, prob=0.9, years=[2030, 2035])
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
 
 
-class triage(Intervention):
-    '''
-    Triage.
-    TODO: is it possible to get rid of this and leave it as a type of screening??
-    Args:
-         product            (str/Product)   : the screening test to use
-         triage_prob        (float/arr) : annual probability of eligible women getting screened
-         eligibility        (callable/arr): array of indices of people who are eligible for triage OR callable that returns such indices
-≈    '''
-
-    def __init__(self, product, triage_prob, eligibility=None,
-                 label=None, verbose=False, **kwargs):
-        super().__init__(**kwargs) # Initialize the Intervention object
-        self.product        = product # The test product being used to screen people
-        self.triage_prob    = sc.promotetoarray(triage_prob) # Proportion of those eligible for triage who accept. Applied each timestep to everyone who becomes eligible on that timestep (as determined by eligibility)
-        self.eligibility    = eligibility # Function or indices that determine who is eligible for the intervention
-        self.label          = label  # label (used as a dict key)
-        self.verbose        = verbose
-        return
-
-
-    def initialize(self, sim):
-        super().initialize()
-        self.npts = sim.res_npts
-        self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
-        self.outcomes = {k:[] for k in self.product.hierarchy}
-        return
-
-
-    def apply(self, sim):
-        eligible_inds = self.eligibility(sim) # Determine who's eligible
-        idx = int(sim.t / sim.resfreq) # Get the result time index
-        accept_inds = select_people(eligible_inds, prob=self.triage_prob[0]) # Select people who accept
-        self.n_products_used[idx] += len(accept_inds) # Count the number of products used
-        self.outcomes = self.product.administer(sim, accept_inds) # Administer the product
-        return
+# class BaseTriage(Intervention):
+#     '''
+#     Triage.
+#     Args:
+#          product        (str/Product)   : the screening test to use
+#          prob           (float/arr)     : annual probability of eligible women getting screened
+#          eligibility    (callable/arr)  : array of indices of people who are eligible for triage OR callable that returns such indices
+#     '''
+#
+#     def __init__(self, product, prob, eligibility=None, label=None, **kwargs):
+#         super().__init__(**kwargs) # Initialize the Intervention object
+#         self.product        = product # The test product being used to screen people
+#         self.prob           = sc.promotetoarray(prob) # Proportion of those eligible for triage who accept. Applied each timestep to everyone who becomes eligible on that timestep (as determined by eligibility)
+#         self.eligibility    = eligibility # Function or indices that determine who is eligible for the intervention
+#         self.label          = label  # label
+#         return
+#
+#
+#     def initialize(self, sim):
+#         super().initialize()
+#         self.npts = sim.res_npts
+#         self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
+#         self.outcomes = {k:[] for k in self.product.hierarchy}
+#         return
+#
+#
+#     def apply(self, sim):
+#         eligible_inds = self.eligibility(sim) # Determine who's eligible
+#         idx = int(sim.t / sim.resfreq) # Get the result time index
+#         accept_inds = select_people(eligible_inds, prob=self.triage_prob[0]) # Select people who accept
+#         self.n_products_used[idx] += len(accept_inds) # Count the number of products used
+#         self.outcomes = self.product.administer(sim, accept_inds) # Administer the product
+#         return
 
 
 
 #%% Treatment interventions
-__all__ += ['BaseTreatment', 'treat_num', 'treat_delay']
+__all__ += ['BaseTreatment', 'treat_num', 'treat_delay', 'deliver_txvx']
 
 class BaseTreatment(Intervention):
-    def __init__(self, product, eligibility, treat_prob, **kwargs):
+    '''
+    Base treatment class.
+    Args:
+         product        (str/Product)   : the treatment product to use
+         accept_prob     (float/arr)    : acceptance rate of treatment - interpreted as the % of women eligble for treatment who accept
+         eligibility    (inds/callable) : indices OR callable that returns inds
+         label          (str)           : the name of treatment strategy
+         kwargs         (dict)          : passed to Intervention()
+    '''
+    def __init__(self, product, accept_prob, eligibility, **kwargs):
         super().__init__(**kwargs)
-        self.eligibility = eligibility
         self.product = product
-        self.treat_prob = sc.promotetoarray(treat_prob)
+        self.accept_prob = sc.promotetoarray(accept_prob)
+        self.eligibility = eligibility
 
     def initialize(self, sim):
         super().initialize()
         self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
 
     def recheck_eligibility(self, inds, sim):
-        ''' Recheck people's eligibility for treatment - it may have expired if they've been waiting awhile '''
+        '''
+        Recheck people's eligibility for treatment - it may have expired if they've been waiting awhile
+        '''
         conditions = sim.people.alive[inds] # TODO: what else should go here? can't use sim.people.cin because precins may also get treatment
         return conditions
 
     def get_accept_inds(self, sim):
-        ''' Add new indices to the queue of people awaiting treatment '''
+        '''
+        Get indices of people who will acccept treatment; these people are then added to a queue or scheduler for receiving treatment
+        '''
         accept_inds     = np.array([], dtype=hpd.default_int)
         eligible_inds   = self.eligibility(sim) # Apply eligiblity
         if len(eligible_inds):
-            accept_inds     = select_people(eligible_inds, prob=self.treat_prob[0])  # Select people who accept
+            accept_inds     = select_people(eligible_inds, prob=self.accept_prob[0])  # Select people who accept
         return accept_inds
 
+    def get_candidates(self, sim):
+        '''
+        Get candidates for treatment on this timestep. Implemented by derived classes.
+        '''
+        raise NotImplementedError
+
     def apply(self, sim):
-        treat_candidates = self.get_candidates(sim)
+        '''
+        Perform treatment by getting candidates, checking their eligibility, and then treating them.
+        '''
+        treat_candidates = self.get_candidates(sim) # NB, this needs to be implemented by derived classes
         still_eligible = self.recheck_eligibility(treat_candidates, sim)
         treat_inds = treat_candidates[still_eligible]
-        self.product.administer(sim.people, treat_inds)
+        self.product.administer(sim, treat_inds)
         idx = int(sim.t / sim.resfreq)
         self.n_products_used[idx] += len(treat_inds)
 
 
 class treat_num(BaseTreatment):
+    '''
+    Treat a fixed number of people each timestep.
+    Args:
+         max_capacity (int): maximum number who can be treated each timestep
+    '''
     def __init__(self, max_capacity=None, **kwargs):
         super().__init__(**kwargs)
         self.queue = []
@@ -807,10 +932,16 @@ class treat_num(BaseTreatment):
         return
 
     def add_to_queue(self, sim):
+        '''
+        Add people who are willing to accept treatment to the queue
+        '''
         accept_inds = self.get_accept_inds(sim)
-        if len(accept_inds): self.queue += accept_inds.tolist()  # Add people who are willing to accept treatment to the queue
+        if len(accept_inds): self.queue += accept_inds.tolist()
 
     def get_candidates(self, sim):
+        '''
+        Get the indices of people who are candidates for treatment
+        '''
         treat_candidates = np.array([], dtype=hpd.default_int)
         if len(self.queue):
             if self.max_capacity is None or (self.max_capacity>len(self.queue)):
@@ -820,25 +951,38 @@ class treat_num(BaseTreatment):
         return treat_candidates
 
     def apply(self, sim):
+        '''
+        Apply treatment. On each timestep, this method will add eligible people who are willing to accept treatment to a
+        queue, and then will treat as many people in the queue as there is capacity for.
+        '''
         self.add_to_queue(sim)
-        super().apply(sim)
+        super().apply(sim) # Apply method from BaseTreatment class
         self.queue = [e for e in self.queue if e not in treat_inds] # Recreate the queue, removing people who were treated
         return
 
 
 class treat_delay(BaseTreatment):
-    ''' Treat people after a fixed delay '''
+    '''
+    Treat people after a fixed delay
+    Args:
+         delay (int): years of delay between becoming eligible for treatment and receiving treatment.
+    '''
     def __init__(self, delay=None, **kwargs):
         super().__init__(**kwargs)
         self.delay = delay or 0
         self.scheduler = defaultdict(list)
 
     def add_to_schedule(self, sim):
+        '''
+        Add people who are willing to accept treatment to the treatment scehduler
+        '''
         accept_inds = self.get_accept_inds(sim)
-        if len(accept_inds): self.scheduler[sim.t] = accept_inds  # Add people who are willing to accept treatment to the queue
+        if len(accept_inds): self.scheduler[sim.t] = accept_inds
 
     def get_candidates(self, sim):
-        ''' Get the indices of people who are candidates for treatment '''
+        '''
+        Get the indices of people who are candidates for treatment
+        '''
         due_time = sim.t-self.delay/sim['dt']
         treat_candidates = np.array([], dtype=hpd.default_int)
         if len(self.scheduler[due_time]):
@@ -846,12 +990,32 @@ class treat_delay(BaseTreatment):
         return treat_candidates
 
     def apply(self, sim):
+        '''
+        Apply treatment. On each timestep, this method will add eligible people who are willing to accept treatment to a
+        scheduler, and then will treat anyone scheduled for treatment on this timestep.
+        '''
         self.add_to_schedule(sim)
         super().apply(sim)
 
 
+class deliver_txvx(BaseTreatment):
+    '''
+    Deliver therapeutic vaccine
+    '''
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def apply(self, sim):
+        '''
+        Apply treatment. On each timestep, this method will add eligible people who are willing to accept treatment to a
+        queue, and then will treat as many people in the queue as there is capacity for.
+        '''
+        pass
+
+
+
 #%% Products
-__all__ += ['dx', 'tx', 'vx', 'txvx']
+__all__ += ['dx', 'tx', 'vx'] #, 'txvx']
 
 class Product(hpb.FlexPretty):
     ''' Generic product implementation '''
@@ -891,7 +1055,6 @@ class dx(Product):
         for state in self.states:
             for g,genotype in sim['genotype_map'].items():
 
-                # gind = g if self.ng>1 else Ellipsis
                 theseinds = hpu.true(people[state][g, inds])
 
                 # Filter the dataframe to extract test results for people in this state
@@ -917,45 +1080,71 @@ class tx(Product):
     Treatment products include anything used to treat cancer or precancer, as well as therapeutic vaccination.
     They change fundamental properties about People, including their prognoses and infectiousness.
     '''
-    def __init__(self, efficacy):
-        self.efficacy = efficacy
-        self.treat_states = list(self.efficacy.keys())
+    def __init__(self, df, name=None, clears_all=False):
+        self.df = df
+        self.name = name
+        self.states = df.state.unique()
+        self.genotypes = df.genotype.unique()
+        self.ng = len(self.genotypes)
 
-    def administer(self, people, inds):
-        # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
+    def get_people_in_state(self, state, g, sim):
+        '''
+        Find people within a given state/genotype. Returns indices
+        '''
+        if self.ng==1:  theseinds = people[state][:, inds].any(axis=0)
+        else:           theseinds = hpu.true(people[state][g, inds])
 
-        successfully_treated = []
-        for state in self.treat_states:
-            people_in_state = people[state].any(axis=0)
-            treat_state_inds = inds[people_in_state[inds]]
 
-            # Determine whether treatment is successful
-            eff_probs = np.full(len(treat_state_inds), self.efficacy[state], dtype=hpd.default_float)  # Assign probabilities of treatment success
-            to_eff_treat = hpu.binomial_arr(eff_probs)  # Determine who will have effective treatment
-            eff_treat_inds = treat_state_inds[to_eff_treat]
-            successfully_treated += list(eff_treat_inds)
-            people[state][:, eff_treat_inds] = False  # People who get treated have their CINs removed
-            people[f'date_{state}'][:, eff_treat_inds] = np.nan
+    def administer(self, sim, inds, return_format='dict'):
+        '''
+        Loop over treatment states to determine those who are successfully treated and clear infection
+        '''
 
-            # Clear infection for women who clear
-            for g in range(people.pars['n_genotypes']):
+        tx_successful = [] # Initialize list of successfully treated individuals
+        people = sim.people
+
+        for state in self.states: # Loop over states
+            df_filter = (self.df.state == state)  # Filter by state
+            for g,gname in sim['genotype_map'].items(): # Loop over genotypes in the sim
+
+                theseinds = hpu.true(people[state][g, inds]) # Extract people for whom this state is true for this genotype
+                if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype)
+                thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
+
+                # Determine whether treatment is successful
+                efficacy = thisdf.efficacy.values[0]
+                eff_probs = np.full(len(inds), efficacy, dtype=hpd.default_float)  # Assign probabilities of treatment success
+                to_eff_treat = hpu.binomial_arr(eff_probs)  # Determine who will have effective treatment
+                eff_treat_inds = theseinds[to_eff_treat]
+                tx_successful += list(eff_treat_inds)
+
+                people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
+                people[f'date_{state}'][:, eff_treat_inds] = np.nan
+
+                # Clear infection for women who clear
                 people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
                 people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
                 hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
-        return successfully_treated
+        tx_successful = np.array(list(set(tx_successful)))
+        tx_unsuccessful = np.setdiff1d(inds, tx_successful)
+        if return_format=='dict':
+            output = {'successful':tx_successful, 'unsuccessful': tx_unsuccessful}
+        elif return_format=='array':
+            output = tx_successful
+
+        return output
 
 
 class vx(Product):
     ''' Vaccine product '''
-    def __init__(self, genotype_pars=None, imm_init=None, imm_boost=None, prophylactic=True):
+    def __init__(self, genotype_pars=None, imm_init=None, imm_boost=None):
         self.genotype_pars = genotype_pars
         self.imm_init = imm_init
         self.imm_boost = imm_boost
         if (imm_init is None and imm_boost is None) or (imm_init is not None and imm_boost is not None):
             errormsg = 'Must provide either an initial immune effect (for first doses) or an immune boosting effect (for subsequent doses), not both/neither.'
             raise ValueError(errormsg)
-        self.prophylactic = prophylactic # Whether this vaccine has a prophylactic effect
 
 
     def administer(self, people, inds):
@@ -971,22 +1160,6 @@ class vx(Product):
         return inds
 
 
-# class txvx(Product):
-#     ''' Therapeutic vaccine product '''
-#
-#     def __init__(self, pars, hierarchy):
-#         self.df = df
-#         self.hierarchy = hierarchy
-#         self.states = df.state.unique()
-#         self.genotypes = df.genotype.unique()
-#         self.ng = len(self.genotypes)
-#
-#     @property
-#     def default_value(self):
-#         return len(self.hierarchy)-1
-#
-#     def administer(self, people, inds):
-#         pass
 
 # class RadiationTherapy(Product):
 #     # Cancer treatment product
@@ -1118,7 +1291,7 @@ class vx(Product):
 #
 #     def administer(self, people, inds):
 #
-#         #Extract parameters that will be used below
+#         # Extract parameters that will be used below
 #         ng = people.pars['n_genotypes']
 #         genotype_map = people.pars['genotype_map']
 #
