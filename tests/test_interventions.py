@@ -181,7 +181,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 
     vx_interventions = [routine_vx, campaign_vx, second_dose]
 
-    interventions = st_interventions + vx_interventions
+    interventions =  st_interventions + vx_interventions
 
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()

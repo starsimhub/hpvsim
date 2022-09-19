@@ -100,7 +100,7 @@ def select_people(inds, prob=None):
     '''
     accept_probs    = np.full_like(inds, fill_value=prob, dtype=hpd.default_float)
     accept_inds     = hpu.true(hpu.binomial_arr(accept_probs))
-    return accept_inds
+    return inds[accept_inds]
 
 
 #%% Generic intervention classes
@@ -592,9 +592,9 @@ class BaseVaccination(Intervention):
         if self.age_range is not None:
             conditions = conditions & ((sim.people.age >= self.age_range[0]) & (sim.people.age <self.age_range[1])) # Filter by age
         if self.eligibility is not None:
-            other_eligible  = self.eligibility(sim) # Apply any other user-defined eligibility
+            other_eligible  = sc.promotetoarray(self.eligibility(sim)) # Apply any other user-defined eligibility
             conditions      = conditions & other_eligible
-        return conditions
+        return hpu.true(conditions)
 
 
     def apply(self, sim):
@@ -607,18 +607,18 @@ class BaseVaccination(Intervention):
             ti = sc.findinds(self.timepoints, sim.t)[0]
             prob            = self.prob[ti] # Get the proportion of people who screen on this timestep
             eligible_inds   = self.check_eligibility(sim) # Check eligibility
-            inds            = select_people(eligible_inds, prob=prob)
+            accept_inds     = select_people(eligible_inds, prob=prob)
 
-            if len(inds):
-                inds = self.product.administer(sim.people, inds) # Actually change people's immunity
+            if len(accept_inds):
+                inds = self.product.administer(sim.people, accept_inds) # Actually change people's immunity
                 # Update people's state and dates, as well as results and doses
-                sim.people.vaccinated[inds] = True
-                sim.people.date_vaccinated[inds] = sim.t
-                sim.people.doses[inds] += 1
+                sim.people.vaccinated[accept_inds] = True
+                sim.people.date_vaccinated[accept_inds] = sim.t
+                sim.people.doses[accept_inds] += 1
                 idx = int(sim.t / sim.resfreq)
-                sim.results['new_vaccinated'][:,idx] += len(inds)
-                sim.results['new_doses'][idx] += len(inds)
-                self.n_products_used[idx] += len(inds)
+                sim.results['new_vaccinated'][:,idx] += len(accept_inds)
+                sim.results['new_doses'][idx] += len(accept_inds)
+                self.n_products_used[idx] += len(accept_inds)
 
         return
 
@@ -702,7 +702,7 @@ class BaseTest(Intervention):
         Deliver the tests by finding who's eligible, finding who accepts, and applying the product.
         '''
         ti = sc.findinds(self.timepoints, sim.t)[0]
-        prob            = self.prob[ti] # Get the proportion of people who screen on this timestep
+        prob            = self.prob[ti] # Get the proportion of people who will be tested this timestep
         eligible_inds   = self.check_eligibility(sim) # Check eligibility
         accept_inds     = select_people(eligible_inds, prob=prob) # Find people who accept
         if len(accept_inds):
@@ -734,9 +734,9 @@ class BaseScreening(BaseTest):
         in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
         conditions      = (active_females & in_age_range)
         if self.eligibility is not None:
-            other_eligible  = self.eligibility(sim)
+            other_eligible  = sc.promotetoarray(self.eligibility(sim))
             conditions      = conditions & other_eligible
-        return conditions
+        return hpu.true(conditions)
 
 
     def apply(self, sim):
@@ -760,7 +760,7 @@ class BaseTriage(BaseTest):
         super().__init__(**kwargs) # Initialize the BaseTest object
 
     def check_eligibility(self, sim):
-        return self.eligibility(sim)
+        return sc.promotetoarray(self.eligibility(sim))
 
     def apply(self, sim):
         if sim.t in self.timepoints: _ = self.deliver(sim)
@@ -838,11 +838,12 @@ class BaseTreatment(Intervention):
          label          (str)           : the name of treatment strategy
          kwargs         (dict)          : passed to Intervention()
     '''
-    def __init__(self, product, accept_prob, eligibility, **kwargs):
+    def __init__(self, product, accept_prob, eligibility, label=None, **kwargs):
         super().__init__(**kwargs)
         self.product = product
         self.accept_prob = sc.promotetoarray(accept_prob)
         self.eligibility = eligibility
+        self.label = label
 
     def initialize(self, sim):
         super().initialize()
@@ -860,7 +861,7 @@ class BaseTreatment(Intervention):
         Get indices of people who will acccept treatment; these people are then added to a queue or scheduler for receiving treatment
         '''
         accept_inds     = np.array([], dtype=hpd.default_int)
-        eligible_inds   = self.eligibility(sim) # Apply eligiblity
+        eligible_inds   = sc.promotetoarray(self.eligibility(sim)) # Apply eligiblity
         if len(eligible_inds):
             accept_inds     = select_people(eligible_inds, prob=self.accept_prob[0])  # Select people who accept
         return accept_inds
@@ -881,6 +882,7 @@ class BaseTreatment(Intervention):
         self.product.administer(sim, treat_inds)
         idx = int(sim.t / sim.resfreq)
         self.n_products_used[idx] += len(treat_inds)
+        return treat_inds
 
 
 class treat_num(BaseTreatment):
@@ -912,7 +914,7 @@ class treat_num(BaseTreatment):
                 treat_candidates = self.queue[:]
             else:
                 treat_candidates = self.queue[:self.max_capacity]
-        return treat_candidates
+        return sc.promotetoarray(treat_candidates)
 
     def apply(self, sim):
         '''
@@ -920,7 +922,7 @@ class treat_num(BaseTreatment):
         queue, and then will treat as many people in the queue as there is capacity for.
         '''
         self.add_to_queue(sim)
-        super().apply(sim) # Apply method from BaseTreatment class
+        treat_inds = super().apply(sim) # Apply method from BaseTreatment class
         self.queue = [e for e in self.queue if e not in treat_inds] # Recreate the queue, removing people who were treated
         return
 
@@ -962,7 +964,7 @@ class treat_delay(BaseTreatment):
         super().apply(sim)
 
 
-class deliver_txvx(BaseTreatment):
+class deliver_txvx(treat_num):
     '''
     Deliver therapeutic vaccine
     '''
@@ -970,16 +972,11 @@ class deliver_txvx(BaseTreatment):
         super().__init__(**kwargs)
 
     def apply(self, sim):
-        '''
-        Apply treatment. On each timestep, this method will add eligible people who are willing to accept treatment to a
-        queue, and then will treat as many people in the queue as there is capacity for.
-        '''
-        pass
-
+        super().apply(sim)
 
 
 #%% Products
-__all__ += ['dx', 'tx', 'vx'] #, 'txvx']
+__all__ += ['dx', 'tx', 'vx']
 
 class Product(hpb.FlexPretty):
     ''' Generic product implementation '''
@@ -1046,7 +1043,7 @@ class tx(Product):
     '''
     def __init__(self, df, name=None, clears_all=False):
         self.df = df
-        self.name = name
+        self.name = df.name.unique()[0] # TODO fix
         self.states = df.state.unique()
         self.genotypes = df.genotype.unique()
         self.ng = len(self.genotypes)
@@ -1068,27 +1065,30 @@ class tx(Product):
         people = sim.people
 
         for state in self.states: # Loop over states
-            df_filter = (self.df.state == state)  # Filter by state
-            for g,gname in sim['genotype_map'].items(): # Loop over genotypes in the sim
+            for g,genotype in sim['genotype_map'].items(): # Loop over genotypes in the sim
 
                 theseinds = hpu.true(people[state][g, inds]) # Extract people for whom this state is true for this genotype
-                if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype)
-                thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
 
-                # Determine whether treatment is successful
-                efficacy = thisdf.efficacy.values[0]
-                eff_probs = np.full(len(inds), efficacy, dtype=hpd.default_float)  # Assign probabilities of treatment success
-                to_eff_treat = hpu.binomial_arr(eff_probs)  # Determine who will have effective treatment
-                eff_treat_inds = theseinds[to_eff_treat]
-                tx_successful += list(eff_treat_inds)
+                if len(theseinds):
 
-                people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
-                people[f'date_{state}'][:, eff_treat_inds] = np.nan
+                    df_filter = (self.df.state == state)  # Filter by state
+                    if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype)
+                    thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
 
-                # Clear infection for women who clear
-                people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
-                people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
-                hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
+                    # Determine whether treatment is successful
+                    efficacy = thisdf.efficacy.values[0]
+                    eff_probs = np.full(len(theseinds), efficacy, dtype=hpd.default_float)  # Assign probabilities of treatment success
+                    to_eff_treat = hpu.binomial_arr(eff_probs)  # Determine who will have effective treatment
+                    eff_treat_inds = theseinds[to_eff_treat]
+                    if len(eff_treat_inds):
+                        tx_successful += list(eff_treat_inds)
+                        people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
+                        people[f'date_{state}'][:, eff_treat_inds] = np.nan
+
+                        # Clear infection for women who clear
+                        people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
+                        people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
+                        hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
         tx_successful = np.array(list(set(tx_successful)))
         tx_unsuccessful = np.setdiff1d(inds, tx_successful)
@@ -1106,6 +1106,7 @@ class vx(Product):
         self.genotype_pars = genotype_pars
         self.imm_init = imm_init
         self.imm_boost = imm_boost
+        self.imm_source = None # Set during immunity initialization. Warning, fragile!!!
         if (imm_init is None and imm_boost is None) or (imm_init is not None and imm_boost is not None):
             errormsg = 'Must provide either an initial immune effect (for first doses) or an immune boosting effect (for subsequent doses), not both/neither.'
             raise ValueError(errormsg)
@@ -1114,13 +1115,11 @@ class vx(Product):
     def administer(self, people, inds):
         ''' Apply the vaccine to the requested people indices. '''
         inds = inds[people.alive[inds]]  # Skip anyone that is dead
-        imm_source = 0 # WARNING TEMPPPPPP <<<<<<<<<<!!!!!!!!!!!
-        print('warning, using placeholder imm_source')
         if self.imm_init is not None:
-            people.peak_imm[imm_source, inds] = hpu.sample(**self.imm_init, size=len(inds))
+            people.peak_imm[self.imm_source, inds] = hpu.sample(**self.imm_init, size=len(inds))
         elif self.imm_boost is not None:
-            people.peak_imm[imm_source, inds] *= self.imm_boost
-        people.t_imm_event[imm_source, inds] = people.t
+            people.peak_imm[self.imm_source, inds] *= self.imm_boost
+        people.t_imm_event[self.imm_source, inds] = people.t
         return inds
 
 
@@ -1138,229 +1137,3 @@ class vx(Product):
 #         return inds
 #
 
-
-# #%% Therapeutic vaccination
-#
-# __all__ += ['TherapeuticVaccination', 'RoutineTherapeutic']
-#
-#
-# class TherapeuticVaccination(Intervention, Product):
-#     '''
-#         Base class to apply a therapeutic vaccine to a subset of the population. Can be implemented as
-#         a campaign-style or routine administration within S&T.
-#
-#         This class implements the mechanism of delivering a therapeutic vaccine.
-#
-#         '''
-#
-#     def __init__(self, timepoints, prob=None, LTFU=None,  doses=None, interval=None, efficacy=None, subtarget=None,
-#                  proph=False, vaccine='bivalent_1dose', **kwargs):
-#         super().__init__(**kwargs)  # Initialize the Intervention object
-#         self.subtarget = subtarget
-#         if prob is None: # Populate default value of probability: 1 if no subtargeting, 0 if subtargeting
-#             prob = 1.0 if subtarget is None else 0.0
-#         self.prob      = prob
-#         self.LTFU = LTFU
-#         self.timepoints = timepoints
-#         self.doses = doses or 2
-#         self.interval = interval or 0.5  # Interval between doses in years
-#         self.prophylactic = proph # whether to deliver a single-dose prophylactic vaccine at first dose
-#         self.vaccine = vaccine # which vaccine to deliver
-#         self.treat_states = ['precin', 'latent', 'cin1', 'cin2', 'cin3']
-#         self.efficacy = efficacy or dict(  # default efficacy decreases as dysplasia increases
-#             precin=dict(
-#                 hpv16=[0.1, 0.9],
-#                 hpv18=[0.1, 0.9],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#             latent=dict(
-#                 hpv16=[0.1, 0.9],
-#                 hpv18=[0.1, 0.9],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#             cin1=dict(
-#                 hpv16=[0.1, 0.7],
-#                 hpv18=[0.1, 0.7],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#             cin2=dict(
-#                 hpv16=[0.1, 0.6],
-#                 hpv18=[0.1, 0.6],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#             cin3=dict(
-#                 hpv16=[0.1, 0.5],
-#                 hpv18=[0.1, 0.5],
-#                 hpv31=[0.01, 0.1],
-#                 hpv33=[0.01, 0.1],
-#                 hpv35=[0.01, 0.1],
-#                 hpv45=[0.01, 0.1],
-#                 hpv51=[0.01, 0.1],
-#                 hpv52=[0.01, 0.1],
-#                 hpv56=[0.01, 0.1],
-#                 hpv58=[0.01, 0.1],
-#                 hpv6=[0.01, 0.1],
-#                 hpv11=[0.01, 0.1],
-#             ),
-#         )
-#         return
-#
-#     def initialize(self, sim):
-#         super().initialize()
-#         self.timepoints, self.dates = sim.get_t(self.timepoints,
-#                                                 return_date_format='str')  # Ensure timepoints and dates are in the right format
-#         self.second_dose_timepoints = [None] * sim.npts  # People who get second dose (if relevant)
-#         if self.prophylactic:
-#             # Initialize a prophylactic vaccine intervention to reference later
-#             vx = Vaccination(vaccine=self.vaccine, prob=0, timepoints=self.dates[0])
-#             vx.initialize(sim)
-#             self.prophylactic_vaccine = vx
-#         return
-#
-#     def administer(self, people, inds):
-#
-#         # Extract parameters that will be used below
-#         ng = people.pars['n_genotypes']
-#         genotype_map = people.pars['genotype_map']
-#
-#         # Find those who are getting first dose
-#         people_not_vaccinated = hpu.false(people.tx_vaccinated)
-#         first_dose_inds = np.intersect1d(people_not_vaccinated, inds)
-#         people.tx_vaccinated[first_dose_inds] = True
-#
-#         people.txvx_doses[inds] += 1
-#
-#         # Find those who are getting second dose today
-#         second_dose_inds = np.setdiff1d(inds, first_dose_inds)
-#
-#         # Deliver vaccine and update prognoses TODO: immune response in those without infection/lesion
-#         for inds_to_treat, dose in zip([first_dose_inds, second_dose_inds], [0,1]):
-#             for state in self.treat_states:
-#                 for g in range(ng):
-#                     people_in_state = hpu.true(people[state][g,inds_to_treat])
-#                     treat_state_inds = inds_to_treat[people_in_state]
-#
-#                     # Determine whether treatment is successful
-#                     eff_probs = np.full(len(treat_state_inds), self.efficacy[state][genotype_map[g]][dose],
-#                                         dtype=hpd.default_float)  # Assign probabilities of treatment success
-#                     to_eff_treat = hpu.binomial_arr(eff_probs)  # Determine who will have effective treatment
-#                     eff_treat_inds = treat_state_inds[to_eff_treat]
-#                     people[state][g, eff_treat_inds] = False  # People who are successfully treated
-#                     people[f'date_{state}'][g, eff_treat_inds] = np.nan
-#                     hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g) # Get natural immune memory
-#
-#         return
-#
-#     def select_people(self, sim):
-#
-#         vacc_inds = np.array([], dtype=int)  # Initialize in case no one gets their first dose
-#
-#         if sim.t >= np.min(self.timepoints):
-#
-#             # Vaccinate people with their first dose
-#             for _ in find_timepoint(self.timepoints, sim.t, interv=self, sim=sim):
-#
-#                 vacc_probs = np.zeros(len(sim.people))
-#
-#                 # Find eligible people
-#                 vacc_probs[hpu.true(~sim.people.alive)] *= 0.0  # Do not vaccinate dead people
-#                 eligible_inds = sc.findinds(~sim.people.tx_vaccinated)
-#                 vacc_probs[eligible_inds] = self.prob  # Assign equal vaccination probability to everyone
-#
-#                 # Apply any subtargeting
-#                 if self.subtarget is not None:
-#                     subtarget_inds, subtarget_vals = get_subtargets(self.subtarget, sim)
-#                     vacc_probs[subtarget_inds] = subtarget_vals  # People being explicitly subtargeted
-#
-#                 vacc_inds = hpu.true(hpu.binomial_arr(vacc_probs))  # Calculate who actually gets vaccinated
-#
-#                 if len(vacc_inds):
-#                     if self.interval is not None:
-#                         # Schedule the doses
-#                         second_dose_timepoints = sim.t + int(self.interval/sim['dt'])
-#                         if second_dose_timepoints < sim.npts:
-#                             self.second_dose_timepoints[second_dose_timepoints] = vacc_inds
-#
-#             idx = int(sim.t / sim.resfreq)
-#             sim.results['new_txvx_vaccinated'][idx] += len(vacc_inds)
-#
-#             # Also, if appropriate, vaccinate people with their second doses
-#             vacc_inds_dose2 = self.second_dose_timepoints[sim.t]
-#             if vacc_inds_dose2 is not None:
-#                 if self.LTFU is not None:
-#                     vacc_probs = np.full(len(vacc_inds_dose2), (1-self.LTFU))
-#                     vacc_inds_dose2 = vacc_inds_dose2[hpu.true(hpu.binomial_arr(vacc_probs))]
-#                 vacc_inds = np.concatenate((vacc_inds, vacc_inds_dose2), axis=None)
-#
-#             sim.results['new_txvx_doses'][idx] += len(vacc_inds)
-#
-#
-#         return vacc_inds
-#
-#     def apply(self, sim):
-#         ''' Perform vaccination each timestep '''
-#         inds = self.select_people(sim)
-#         if len(inds):
-#             self.administer(sim.people, inds)
-#             if self.prophylactic:
-#                 inds_to_vax = inds[hpu.false(sim.people.vaccinated[inds])]
-#                 self.prophylactic_vaccine.vaccinate(sim, inds_to_vax)
-#         return inds
-#
-#
-# class RoutineTherapeutic(TherapeuticVaccination):
-#     '''
-#     Routine therapeutic vaccination
-#     '''
-#
-#     def __init__(self, *args, age_range, coverage, **kwargs):
-#         super().__init__(*args, **kwargs, subtarget=self.subtarget_function)
-#         self.age_range = age_range
-#         self.coverage = sc.promotetoarray(coverage)
-#         if len(self.coverage) == 1:
-#             self.coverage = self.coverage * np.ones_like(self.timepoints)
-#
-#     def subtarget_function(self, sim):
-#         inds = sc.findinds((sim.people.age >= self.age_range[0]) & (sim.people.age < self.age_range[1]) & (sim.people.is_female))
-#         coverage = self.coverage[self.timepoints == sim.t][0]
-#         return {'vals': coverage * np.ones_like(inds), 'inds': inds}
-#
-#
-#
-#

@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from . import utils as hpu
 from . import defaults as hpd
 from . import parameters as hppar
+from . import interventions as hpimm
 
 
 
@@ -80,10 +81,17 @@ class genotype(sc.prettyobj):
 # %% Immunity methods
 
 def init_immunity(sim, create=False):
-    ''' Initialize immunity matrices with all genotypes are in the sim'''
+    ''' Initialize immunity matrices with all genotypes and vaccines in the sim'''
 
     # Pull out all of the circulating genotypes for cross-immunity
     ng = sim['n_genotypes']
+
+    # Pull out all the vaccination interventions
+    vx_intvs = [x for x in sim['interventions'] if isinstance(x, hpimm.BaseVaccination)]
+    nv = len(vx_intvs)
+
+    # Dimension for immunity matrix
+    ndim = ng + nv
 
     # If immunity values have been provided, process them
     if sim['immunity'] is None or create:
@@ -96,8 +104,7 @@ def init_immunity(sim, create=False):
             sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
 
         sim['immunity_map'] = dict()
-        # Firstly, initialize immunity matrix with defaults. These are then overwitten with genotype-specific values below
-        # Susceptibility matrix is of size sim['n_genotypes']*sim['n_genotypes']
+        # Firstly, initialize immunity matrix with defaults. These are then overwitten with specific values below
         immunity = np.ones((ng, ng), dtype=hpd.default_float)  # Fill with defaults
 
         # Next, overwrite these defaults with any known immunity values about specific genotypes
@@ -110,11 +117,23 @@ def init_immunity(sim, create=False):
                 if label_i in default_cross_immunity and label_j in default_cross_immunity:
                     immunity[j][i] = default_cross_immunity[label_j][label_i]
 
+        imm_source = ng
+        for vi,vx_intv in enumerate(vx_intvs):
+            # TODO, START FROM HERE, BUGGY <<<<<<<<<<<<<
+            genotype_pars_df = vx_intv.product.genotype_pars[vx_intv.product.genotype_pars.genotype.isin(sim['genotype_map'].values())] # TODO fix this
+            vacc_mapping = [genotype_pars_df[genotype_pars_df.genotype==gtype].rel_imm.values[0] for gtype in sim['genotype_map'].values()]
+            vacc_mapping += [1]
+            vacc_mapping = np.reshape(vacc_mapping, (len(immunity)+1, 1)).astype(hpd.default_float)
+            immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
+            immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
+            vx_intv.product.imm_source = imm_source
+            imm_source += 1
+
         sim['immunity'] = immunity
 
-    # Ensure a user-provided immunity matrix is the right type
-
     sim['immunity'] = sim['immunity'].astype('float32')
+    sim['n_imm_sources'] = ndim
+
     return
 
 

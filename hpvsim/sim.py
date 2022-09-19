@@ -67,9 +67,9 @@ class Sim(hpb.BaseSim):
         self.validate_pars() # Ensure parameters have valid values
         self.set_seed() # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
-        self.init_immunity() # initialize information about immunity
         self.init_results() # After initializing the genotypes and people, create the results structure
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
+        self.init_immunity() # initialize information about immunity
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
@@ -524,7 +524,7 @@ class Sim(hpb.BaseSim):
 
         # Set the number of immunity sources
         # self['n_imm_sources'] += len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
-        self['n_imm_sources'] = self['immunity'].shape[0]
+        # self['n_imm_sources'] = self['immunity'].shape[0]
         return
 
 
