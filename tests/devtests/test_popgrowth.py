@@ -54,8 +54,8 @@ Model: {y0:0.1f} = {pop0:0.2f}m; {y1:0.1f} = {pop1:0.2f}m
 Data:  {dy0:0.1f} = {data0:0.2f}m; {dy1:0.1f} = {data1:0.2f}m
 Ratio: {ratio:0.3f}''')
         pl.legend()
-        pl.show()
         sc.figlayout()
+        pl.show()
         return
 
 
