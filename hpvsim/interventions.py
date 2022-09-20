@@ -283,7 +283,7 @@ class Intervention:
 
 
 #%% Behavior change interventions
-__all__ += ['dynamic_pars']
+__all__ += ['dynamic_pars', 'EventSchedule', 'set_intervention_attributes']
 
 class dynamic_pars(Intervention):
     '''
@@ -374,6 +374,69 @@ class dynamic_pars(Intervention):
                 else:
                     sim[parkey] = val # Set the parameter if not a dict
         return
+
+
+class EventSchedule(Intervention):
+    """
+    Run functions on different days
+
+    This intervention is a a kind of generalization of `dynamic_pars` to allow more
+    flexibility in triggering multiple, arbitrary operations and to more easily assemble
+    multiple changes at different times. This intervention can be used to implement scale-up
+    or other changes to interventions without needing to implement time-dependency in the
+    intervention itself.
+
+    To use the intervention, simply index the intervention by `t` or by date, and then
+    Example:
+
+    >>> iv = EventSchedule()
+    >>> iv[1] = lambda sim: print(sim.t)
+    >>> iv['2020-04-02'] = lambda sim: print('foo')
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.schedule = defaultdict(list)
+
+    def __getitem__(self, day):
+        return self.schedule[day]
+
+    def __setitem__(self, day, fcn):
+        if day in self.schedule:
+            raise Exception("Use a list instead to assign multiple functions - or to really overwrite, delete the function for this day first i.e. `del schedule[day]` before performing `schedule[day]=...`")
+        self.schedule[day] = fcn
+
+    def __delitem__(self, key):
+        del self.schedule[key]
+
+    def initialize(self, sim):
+        super().initialize(sim)
+
+        # First convert all values into lists (i.e., wrap any standalone functions into lists)
+        for k, v in list(self.schedule.items()):
+            self.schedule[k] = [v] if not isinstance(self.schedule[k], list) else v
+
+        # Then convert any dates into time indices
+        for k, v in list(self.schedule.items()):
+            t = sim.get_t(k)[0]
+            if t != k:
+                self.schedule[t] += v
+                del self.schedule[k]
+
+    def apply(self, sim):
+        if sim.t in self.schedule:
+            for fcn in self.schedule[sim.t]:
+                fcn(sim)
+
+
+def set_intervention_attributes(sim, intervention_name, **kwargs):
+    # This is a helper method that can be used to set arbitrary intervention attributes
+    # It's a separately defined function so that it can be pickled properly
+    iv = sim.get_intervention(intervention_name)
+    for attr, value in kwargs.items():
+        assert hasattr(iv, attr), "set_intervention_attributes() should only be used to change existing attributes"  # avoid silent errors if the attr is misspelled
+        setattr(iv, attr, value)
 
 
 #%% Vaccination
@@ -967,7 +1030,7 @@ class Screening(Intervention):
 
         # States that will return a positive screen results
         if screen_states is None:
-            screen_states = ['none', 'cin1', 'cin2', 'cin3', 'cancerous']
+            screen_states = ['precin', 'cin1', 'cin2', 'cin3', 'cancerous']
         self.screen_states = screen_states
 
         # Parse the screening parameters, which can be provided in different formats
@@ -1129,7 +1192,6 @@ class Screening(Intervention):
 
             # Set screening states and dates
             sim.people.intv_flows['screens'] += len(screen_inds)
-            sim.people.intv_flows['screened'] += len(hpu.true(sim.people[screen_inds].screens == 0))
             sim.people.screened[screen_inds] = True
             sim.people.screens[screen_inds] += 1
             sim.people.date_screened[screen_inds] = sim.t
@@ -1144,30 +1206,18 @@ class Screening(Intervention):
         for state in states:
             screen_probs = np.zeros(len(screen_inds))
             if pars['by_genotype']:
-                if state != 'cancerous':
-                    for g in range(sim['n_genotypes']):
-                        tp_inds = hpu.true(sim.people[state][g, screen_inds])
-                        screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
-                        screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                        screen_pos += list(screen_pos_inds)
-                else:
-                    tp_inds = hpu.true(sim.people[state][screen_inds])
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
+                for g in range(sim['n_genotypes']):
+                    tp_inds = hpu.true(sim.people[state][g, screen_inds])
+                    screen_probs[tp_inds] = pars['test_positivity'][state][sim['genotype_map'][g]]
                     screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
                     screen_pos += list(screen_pos_inds)
                 screen_pos = list(set(screen_pos)) # If anyone has screened positive for >1 genotype, only include them once
 
             else:
-                if state != 'cancerous':
-                    tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
-                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                    screen_pos += list(screen_pos_inds)
-                else:
-                    tp_inds = hpu.true(sim.people[state][screen_inds])
-                    screen_probs[tp_inds] = pars['test_positivity'][state]
-                    screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
-                    screen_pos += list(screen_pos_inds)
+                tp_inds = hpu.true(sim.people[state][:, screen_inds].any(axis=0))
+                screen_probs[tp_inds] = pars['test_positivity'][state]
+                screen_pos_inds = hpu.true(hpu.binomial_arr(screen_probs))
+                screen_pos += list(screen_pos_inds)
 
         screen_pos = np.array(screen_pos)
         if len(screen_pos)>0:
@@ -1205,12 +1255,12 @@ class Product():
 class PrecancerTreatment(Product):
     def __init__(self):
         self.efficacy=dict(
-            none=0,
+            precin=0,
             cin1=0.936,
             cin2=0.936,
             cin3=0.936,
         )
-        self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
+        self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
 
     def administer(self, people, inds):
         # Loop over treatment states to determine those who (a) are successfully treated and (b) clear infection
@@ -1236,7 +1286,6 @@ class PrecancerTreatment(Product):
             # Clear infection for women who clear
             for g in range(people.pars['n_genotypes']):
                 people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
-                people['none'][g, eff_treat_inds] = False  # People whose HPV clears
                 people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
                 hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
@@ -1250,7 +1299,7 @@ class ExcisionTreatment(PrecancerTreatment):
     def __init__(self):
         super().__init__()
         self.efficacy = dict(
-            none=0,
+            precin=0,
             cin1=0.936,
             cin2=0.936,
             cin3=0.936,
@@ -1261,7 +1310,7 @@ class AblativeTreatment(PrecancerTreatment):
     def __init__(self):
         super().__init__()
         self.efficacy = dict(
-            none=0,
+            precin=0,
             cin1=0.81,
             cin2=0.81,
             cin3=0.81,
@@ -1273,9 +1322,9 @@ class AblativeTreatment(PrecancerTreatment):
 #         self.timepoints = timepoints or '2030'
 #         self.doses = doses or 2
 #         self.interval = interval or 0.5 # Interval between doses in years
-#         self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
+#         self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
 #         self.efficacy = efficacy or dict( # default efficacy decreases as dysplasia increases
-#             none=dict(
+#             precin=dict(
 #                 hpv16=[0.1, 0.9],
 #                 hpv18=[0.1, 0.9],
 #                 hpv31=[0.01, 0.1],
@@ -1401,8 +1450,8 @@ class StandardTreatmentPathway(Product):
         self.cancer_product = cancer_product or RadiationTherapy()
         self.ablation_product = ablation_product or AblativeTreatment()
         self.excision_product = excision_product or ExcisionTreatment()
-        self.test_positivity = {'none': 0.98, 'cin1': 0.97, 'cin2': 0.89,'cin3': 0.79, 'cancerous': 0.4} # eligibility for ablation vs excision
-        self.treat_states = ['none', 'cin1', 'cin2', 'cin3']
+        self.test_positivity = {'precin': 0.98, 'cin1': 0.97, 'cin2': 0.89,'cin3': 0.79, 'cancerous': 0.4} # eligibility for ablation vs excision
+        self.treat_states = ['precin', 'cin1', 'cin2', 'cin3']
 
     def administer(self, people, inds):
         ''' Determine what kind of treatment they should receive and administer it '''
@@ -1417,7 +1466,7 @@ class StandardTreatmentPathway(Product):
             ca_treat_inds = diagnosed_inds[to_treat_ca]  # Indices of those who get treated
             ca_LTFU_inds = diagnosed_inds[~to_treat_ca] # Indices of those lost to follow up
             people.date_next_screen[ca_LTFU_inds] = np.nan # Remove any future screening
-            self.cancer_product.administer(people, to_treat_ca)
+            self.cancer_product.administer(people, ca_treat_inds)
         else:
             ca_treat_inds = np.array([], dtype=hpd.default_int)
 
@@ -1484,9 +1533,9 @@ class TherapeuticVaccination(Intervention, Product):
         self.interval = interval or 0.5  # Interval between doses in years
         self.prophylactic = proph # whether to deliver a single-dose prophylactic vaccine at first dose
         self.vaccine = vaccine # which vaccine to deliver
-        self.treat_states = ['none', 'latent', 'cin1', 'cin2', 'cin3']
+        self.treat_states = ['precin', 'latent', 'cin1', 'cin2', 'cin3']
         self.efficacy = efficacy or dict(  # default efficacy decreases as dysplasia increases
-            none=dict(
+            precin=dict(
                 hpv16=[0.1, 0.9],
                 hpv18=[0.1, 0.9],
                 hpv31=[0.01, 0.1],

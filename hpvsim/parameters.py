@@ -104,8 +104,6 @@ def make_pars(**kwargs):
     # Screening and treatment parameters
     pars['screen_pars']     = dict()  # Screening method that is being used; populated during initialization
     pars['treat_pars'] = dict()  # Treatment method that is being used; populated during initialization
-    pars['cancer_symp_detection'] = 0.01 # Annual probability of having cancer detected via symptoms, rather than screening
-    pars['cancer_symp_treatment'] = 0.01 # Probability of receiving treatment for those with symptom-detected cancer
 
     # Durations
     pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1
@@ -115,7 +113,7 @@ def make_pars(**kwargs):
 
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
-    pars['rel_trans']['none']   = 1 # Baseline value
+    pars['rel_trans']['precin']   = 1 # Baseline value
     pars['rel_trans']['cin1']   = 1 # Baseline assumption, can be adjusted during calibration
     pars['rel_trans']['cin2']   = 1 # Baseline assumption, can be adjusted during calibration
     pars['rel_trans']['cin3']   = 1 # Baseline assumption, can be adjusted during calibration
@@ -361,14 +359,10 @@ def get_genotype_pars(default=False, genotype=None):
     Define the default parameters for the different genotypes
     '''
 
-    dur_dict = sc.objdict()
-    for stage in ['none', 'dys']:
-        dur_dict[stage] = dict()
-
     pars = sc.objdict()
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_none     = dict(dist='lognormal', par1=2.618, par2=0.5)
+    pars.hpv16.dur_precin  = dict(dist='lognormal', par1=2.618, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
@@ -382,7 +376,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_none     = dict(dist='lognormal', par1=2.16, par2=0.5)
+    pars.hpv18.dur_precin  = dict(dist='lognormal', par1=2.16, par2=0.5)
                                     # Made the distribution wider to accommodate varying means
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
@@ -396,7 +390,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv31 = sc.objdict()
-    pars.hpv31.dur_none     = dict(dist='lognormal', par1=2.5197, par2=1.0)
+    pars.hpv31.dur_precin  = dict(dist='lognormal', par1=2.5197, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -408,7 +402,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv31.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv33 = sc.objdict()
-    pars.hpv33.dur_none     = dict(dist='lognormal', par1=2.3226, par2=1.0)
+    pars.hpv33.dur_precin  = dict(dist='lognormal', par1=2.3226, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -420,7 +414,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv33.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv35 = sc.objdict()
-    pars.hpv35.dur_none     = dict(dist='lognormal', par1=2.5, par2=1.0)
+    pars.hpv35.dur_precin  = dict(dist='lognormal', par1=2.5, par2=1.0)
     pars.hpv35.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv35.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv35.prog_rate    = 0.25 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
@@ -429,7 +423,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv35.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv45 = sc.objdict()
-    pars.hpv45.dur_none     = dict(dist='lognormal', par1=2.84, par2=1.0)
+    pars.hpv45.dur_precin  = dict(dist='lognormal', par1=2.84, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -441,7 +435,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv45.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv51 = sc.objdict()
-    pars.hpv51.dur_none     = dict(dist='lognormal', par1=2.0, par2=1.0)
+    pars.hpv51.dur_precin  = dict(dist='lognormal', par1=2.0, par2=1.0)
     pars.hpv51.dur_dysp     = dict(dist='lognormal', par1=1.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv51.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv51.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
@@ -450,7 +444,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv51.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv52 = sc.objdict()
-    pars.hpv52.dur_none     = dict(dist='lognormal', par1=2.3491, par2=1.0)
+    pars.hpv52.dur_precin  = dict(dist='lognormal', par1=2.3491, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -462,7 +456,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv52.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv56 = sc.objdict()
-    pars.hpv56.dur_none     = dict(dist='lognormal', par1=2.0, par2=1.0)
+    pars.hpv56.dur_precin  = dict(dist='lognormal', par1=2.0, par2=1.0)
     pars.hpv56.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv56.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv56.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
@@ -471,7 +465,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv56.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv58 = sc.objdict()
-    pars.hpv58.dur_none     = dict(dist='lognormal', par1=2.3491, par2=1.0)
+    pars.hpv58.dur_precin  = dict(dist='lognormal', par1=2.3491, par2=1.0)
                                     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
@@ -483,7 +477,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv58.imm_boost    = 1.0 # TODO: look for data
 
     pars.hpv6 = sc.objdict()
-    pars.hpv6.dur_none      = dict(dist='lognormal', par1=1.8245, par2=1.0)
+    pars.hpv6.dur_precin   = dict(dist='lognormal', par1=1.8245, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv6.dur_dysp      = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dysp_rate     = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
@@ -493,7 +487,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.imm_boost     = 1.0 # TODO: look for data
 
     pars.hpv11 = sc.objdict()
-    pars.hpv11.dur_none     = dict(dist='lognormal', par1=1.8718, par2=1.0)
+    pars.hpv11.dur_precin  = dict(dist='lognormal', par1=1.8718, par2=1.0)
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv11.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv11.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
@@ -979,7 +973,7 @@ def get_screen_pars(screen=None):
         hpv = dict(
             by_genotype=True,
             test_positivity=dict(
-                none=dict(
+                precin=dict(
                     hpv16=0.55,
                     hpv18=0.55,
                     hpv31=0.55,
@@ -1035,7 +1029,20 @@ def get_screen_pars(screen=None):
                     hpv6=0,
                     hpv11=0,
                 ),
-                cancerous=0.984,
+                cancerous=dict(
+                    hpv16=0.984,
+                    hpv18=0.984,
+                    hpv31=0.984,
+                    hpv33=0.984,
+                    hpv35=0.984,
+                    hpv45=0.984,
+                    hpv51=0.984,
+                    hpv52=0.984,
+                    hpv56=0.984,
+                    hpv58=0.984,
+                    hpv6=0,
+                    hpv11=0,
+                ),
             ),
             inadequacy=0,
         ),
@@ -1043,7 +1050,7 @@ def get_screen_pars(screen=None):
         hpv1618 = dict(
             by_genotype=True,
             test_positivity=dict(
-                none=dict(
+                precin=dict(
                     hpv16=1,
                     hpv18=1,
                     hpv31=0,
@@ -1099,7 +1106,20 @@ def get_screen_pars(screen=None):
                     hpv6=0,
                     hpv11=0,
                 ),
-                cancerous=0.984,
+                cancerous=dict(
+                    hpv16=1,
+                    hpv18=1,
+                    hpv31=0,
+                    hpv33=0,
+                    hpv35=0,
+                    hpv45=0,
+                    hpv51=0,
+                    hpv52=0,
+                    hpv56=0,
+                    hpv58=0,
+                    hpv6=0,
+                    hpv11=0,
+                ),
             ),
             inadequacy=0,
         ),
@@ -1107,7 +1127,7 @@ def get_screen_pars(screen=None):
         via=dict(
             by_genotype=False,
             test_positivity=dict(
-                none=0.25,
+                precin=0.25,
                 cin1=0.3,
                 cin2=0.45,
                 cin3=0.41,
@@ -1118,7 +1138,7 @@ def get_screen_pars(screen=None):
         via_triage=dict(
             by_genotype=False,
             test_positivity=dict(
-                none=0.98,
+                precin=0.98,
                 cin1=0.97,
                 cin2=0.89,
                 cin3=0.79,

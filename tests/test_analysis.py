@@ -84,7 +84,7 @@ def test_age_results(do_plot=True):
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            cancer_incidence=sc.objdict(
+            total_cancer_incidence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             ),
@@ -108,7 +108,7 @@ def test_age_results(do_plot=True):
             'cin_prevalence',
         ],
         'Cervical cancer incidence': [
-            'cancer_incidence',
+            'total_cancer_incidence',
         ],
         'Cervical cancer mortality': [
             'cancer_mortality',
@@ -143,7 +143,7 @@ def test_reduce_analyzers():
 
         az = hpv.age_results(
             result_keys=sc.objdict(
-                cancer_incidence=sc.objdict(
+                total_cancer_incidence=sc.objdict(
                     timepoints=['2020'],
                     # datafile=f'test_data/{location}_cancer_cases.csv',
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
@@ -216,6 +216,24 @@ def test_age_causal_analyzer():
     return sim, a
 
 
+def test_detection():
+    sc.heading('Test detection analyzers')
+
+    pars = {
+        'n_agents': n_agents,
+        'n_years': 70,
+        'burnin': 50,
+        'start': 1950,
+        'genotypes': [16, 18],
+        'location': 'tanzania',
+        'dt': 0.5,
+    }
+
+    sim = hpv.Sim(pars=pars, analyzers=[hpv.cancer_detection()])
+    sim.run()
+    a = sim.get_analyzer(hpv.cancer_detection)
+
+    return sim, a
 
 
 #%% Run as a script
@@ -228,6 +246,7 @@ if __name__ == '__main__':
     sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()
     sim3, a3    = test_age_causal_analyzer()
+    sim4, a4    = test_detection()
 
     sc.toc(T)
     print('Done.')
