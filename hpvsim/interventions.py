@@ -346,7 +346,7 @@ class RoutineDelivery(Intervention):
             self.prob = sc.smoothinterp(np.arange(len(self.timepoints)), np.arange(len(self.years)), self.prob, smoothness=0)
 
         # Lastly, adjust the annual probability by the sim's timestep
-        self.prob *= sim['dt']
+        self.prob = self.prob*sim['dt']
 
         return
 
@@ -553,11 +553,11 @@ class BaseVaccination(Intervention):
     '''
     def __init__(self, product=None, prob=None, age_range=None, sex=None, eligibility=None, label=None, **kwargs):
         super().__init__(**kwargs)
-        self.product = product
         self.prob = sc.promotetoarray(prob)
         self.age_range = age_range
         self.label = label
         self.eligibility = eligibility
+        self._parse_product(product)
 
         # Deal with sex
         if sc.checktype(sex,'listlike'):
@@ -574,6 +574,22 @@ class BaseVaccination(Intervention):
         else:
             self.sex = sc.promotetoarray(sex)
 
+    def _parse_product(self, product):
+        '''
+        Parse the product input
+        '''
+        if isinstance(product, Product): # No need to do anything
+            self.product=product
+        elif isinstance(product, str): # Try to find it in the list of defaults
+            try:
+                self.product = default_vx(prod_name=product)
+            except:
+                errormsg = f'Could not find product {product} in the standard list.'
+                raise ValueError(errormsg)
+        else:
+            errormsg = f'Cannot understand format of product {product} - please provide it as either a Product or string matching a default product.'
+            raise ValueError(errormsg)
+        return
 
     def initialize(self, sim):
         super().initialize(sim)
@@ -601,12 +617,18 @@ class BaseVaccination(Intervention):
         '''
         Perform vaccination by finding who's eligible for vaccination, finding who accepts, and applying the vaccine product.
         '''
-        if sim.t in self.timepoints:
+        # Determine whether to apply the intervention. Apply it if no timepoints have been given or
+        # if the timepoint matches one of the requested timepoints.
+        if len(self.timepoints)>0 and (sim.t not in self.timepoints): do_apply = False
+        else: do_apply = True
 
+        if do_apply:
             # Select people for screening and then record the number of screens
-            ti = sc.findinds(self.timepoints, sim.t)[0]
-            prob            = self.prob[ti] # Get the proportion of people who screen on this timestep
             eligible_inds   = self.check_eligibility(sim) # Check eligibility
+            if len(self.timepoints)==0: # No timepoints provided
+                prob = self.prob
+            else: # Get the proportion of people who screen on this timestep
+                prob = self.prob[sc.findinds(self.timepoints, sim.t)[0]]
             accept_inds     = select_people(eligible_inds, prob=prob)
 
             if len(accept_inds):
@@ -667,27 +689,39 @@ __all__ += ['BaseTest', 'BaseScreening', 'routine_screening', 'campaign_screenin
 
 class BaseTest(Intervention):
     '''
-    Base class for screening and triage. Different logic applies depending on whether it's a routine
-    or campaign screening intervention, so these are separated into different Interventions.
-    This base class contains the common functionality for both.
+    Base class for screening and triage.
     Args:
-         product        (str/Product)   : the screening test to use
-         prob           (float/arr)     : annual probability of eligible women getting screened
-         age_range      (list/tuple)    : age range to screen
+         product        (str/Product)   : the diagnostic to use
+         prob           (float/arr)     : annual probability of eligible women receiving the diagnostic
          eligibility    (inds/callable) : indices OR callable that returns inds
          label          (str)           : the name of screening strategy
          kwargs         (dict)          : passed to Intervention()
     '''
 
     def __init__(self, product=None, prob=None, eligibility=None, label=None, **kwargs):
-        super().__init__(**kwargs) # Initialize the Intervention object
-        self.product        = product # The test product being used to screen people
-        self.prob           = sc.promotetoarray(prob) # Annual probability of being screened
+        super().__init__(**kwargs)
+        self.prob           = sc.promotetoarray(prob)
         self.eligibility    = eligibility
-        self.label          = label  # Screening label (used as a dict key)
+        self.label          = label
         self.timepoints     = []
-        return
+        self._parse_product(product)
 
+    def _parse_product(self, product):
+        '''
+        Parse the product input
+        '''
+        if isinstance(product, Product): # No need to do anything
+            self.product=product
+        elif isinstance(product, str): # Try to find it in the list of defaults
+            try:
+                self.product = default_dx(prod_name=product)
+            except:
+                errormsg = f'Could not find product {product} in the standard list.'
+                raise ValueError(errormsg)
+        else:
+            errormsg = f'Cannot understand format of product {product} - please provide it as either a Product or string matching a default product.'
+            raise ValueError(errormsg)
+        return
 
     def initialize(self, sim):
         super().initialize(sim)
@@ -696,10 +730,9 @@ class BaseTest(Intervention):
         self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         return
 
-
     def deliver(self, sim):
         '''
-        Deliver the tests by finding who's eligible, finding who accepts, and applying the product.
+        Deliver the diagnostics by finding who's eligible, finding who accepts, and applying the product.
         '''
         ti = sc.findinds(self.timepoints, sim.t)[0]
         prob            = self.prob[ti] # Get the proportion of people who will be tested this timestep
@@ -708,10 +741,8 @@ class BaseTest(Intervention):
         if len(accept_inds):
             idx = int(sim.t / sim.resfreq)
             self.n_products_used[idx] += len(accept_inds)
-            self.outcomes = self.product.administer(sim, accept_inds)
-
+            self.outcomes = self.product.administer(sim, accept_inds) # Actually administer the diagnostic, filtering people into outcome categories
         return accept_inds
-
 
     def check_eligibility(self, sim):
         raise NotImplementedError
@@ -719,16 +750,20 @@ class BaseTest(Intervention):
 
 class BaseScreening(BaseTest):
     '''
-    Base class for screening. See BaseTest for a description of input arguments.
+    Base class for screening.
+    Args:
+        age_range (list/tuple/arr)  : age range for screening, e.g. [30,50]
+        kwargs    (dict)            : passed to BaseTest
     '''
     def __init__(self, age_range=None, **kwargs):
         super().__init__(**kwargs) # Initialize the BaseTest object
         self.age_range = age_range or [30,50] # This is later filtered to exclude people not yet sexually active
 
-
     def check_eligibility(self, sim):
         '''
-        Return boolean array specifying who's eligible at time t
+        Return an array of indices of agents eligible for screening at time t, i.e. sexually active
+        females in age range, plus any additional user-defined eligibility, which often includes
+        the screening interval.
         '''
         active_females  = sim.people.is_female & sim.people.is_active
         in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
@@ -738,26 +773,26 @@ class BaseScreening(BaseTest):
             conditions      = conditions & other_eligible
         return hpu.true(conditions)
 
-
     def apply(self, sim):
         '''
-        Perform the test by finding who's eligible, finding who accepts, and applying the product.
+        Perform screening by finding who's eligible, finding who accepts, and applying the product.
         '''
         if sim.t in self.timepoints:
             accept_inds = self.deliver(sim)
             sim.people.screened[accept_inds] = True
             sim.people.screens[accept_inds] += 1
             sim.people.date_screened[accept_inds] = sim.t
-
         return
 
 
 class BaseTriage(BaseTest):
     '''
-    Base class for triage. See BaseTest for a description of input arguments.
+    Base class for triage.
+    Args:
+        kwargs (dict): passed to BaseTest
     '''
-    def __init__(self, age_range=None, **kwargs):
-        super().__init__(**kwargs) # Initialize the BaseTest object
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def check_eligibility(self, sim):
         return sc.promotetoarray(self.eligibility(sim))
@@ -803,22 +838,21 @@ class routine_triage(BaseTriage, RoutineDelivery):
         triage1 = hpv.routine_triage(product='via_triage', prob=0.4)
 
         # Example 2: Triage positive screens into confirmatory testing or theapeutic vaccintion
-        pos_screen_assessment  = hpv.dx(df, hierarchy=['confirm', 'txvx', 'none']) # Create a diagnostic that determines how positive screens should be handled
         screened_pos = lambda sim: sim.get_intervention('screening').outcomes['positive']
-        triage2 = hpv.routine_triage(product=pos_screen_assessment, eligibility=screen_pos, prob=0.9, start_year=2030)
+        triage2 = hpv.routine_triage(product='pos_screen_assessment', eligibility=screen_pos, prob=0.9, start_year=2030)
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
 
 class campaign_triage(BaseTriage, CampaignDelivery):
     '''
     Campaign triage - an instance of base triage combined with campaign delivery.
     See base classes for a description of input arguments.
     Examples:
-        # Example 1: Triage positive screens into confirmatory testing or theapeutic vaccintion
-        pos_screen_assessment  = hpv.dx(df, hierarchy=['confirm', 'txvx', 'none']) # Create a diagnostic that determines how positive screens should be handled
+        # Example 1: In 2030, triage all positive screens into confirmatory testing or therapeutic vaccintion
         screened_pos = lambda sim: sim.get_intervention('screening').outcomes['positive']
-        triage2 = hpv.routine_triage(product=pos_screen_assessment, eligibility=screen_pos, prob=0.9, years=[2030, 2035])
+        triage1 = hpv.campaign_triage(product='pos_screen_assessment', eligibility=screen_pos, prob=0.9, years=2030)
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -840,14 +874,32 @@ class BaseTreatment(Intervention):
     '''
     def __init__(self, product, accept_prob, eligibility, label=None, **kwargs):
         super().__init__(**kwargs)
-        self.product = product
         self.accept_prob = sc.promotetoarray(accept_prob)
         self.eligibility = eligibility
         self.label = label
+        self._parse_product(product)
+
+    def _parse_product(self, product):
+        '''
+        Parse the product input
+        '''
+        if isinstance(product, Product): # No need to do anything
+            self.product=product
+        elif isinstance(product, str): # Try to find it in the list of defaults
+            try:
+                self.product = default_tx(prod_name=product)
+            except:
+                errormsg = f'Could not find product {product} in the standard list.'
+                raise ValueError(errormsg)
+        else:
+            errormsg = f'Cannot understand format of product {product} - please provide it as either a Product or string matching a default product.'
+            raise ValueError(errormsg)
+        return
 
     def initialize(self, sim):
         super().initialize()
         self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
+        self.outcomes = {k: np.array([], dtype=hpd.default_int) for k in ['unsuccessful', 'successful']} # Store outcomes on each timestep
 
     def recheck_eligibility(self, inds, sim):
         '''
@@ -879,7 +931,7 @@ class BaseTreatment(Intervention):
         treat_candidates = self.get_candidates(sim) # NB, this needs to be implemented by derived classes
         still_eligible = self.recheck_eligibility(treat_candidates, sim)
         treat_inds = treat_candidates[still_eligible]
-        self.product.administer(sim, treat_inds)
+        self.outcomes = self.product.administer(sim, treat_inds)
         idx = int(sim.t / sim.resfreq)
         self.n_products_used[idx] += len(treat_inds)
         return treat_inds
@@ -1122,6 +1174,56 @@ class vx(Product):
         people.t_imm_event[self.imm_source, inds] = people.t
         return inds
 
+
+#%% Create default products
+
+# dfvx    = pd.read_csv('../hpvsim/data/vx_products.csv')
+# dftx    = pd.read_csv('../hpvsim/data/tx_products.csv')
+
+def default_dx(prod_name=None):
+    '''
+    Create default diagnostic products
+    '''
+    dfdx = pd.read_csv('../hpvsim/data/products_dx.csv') # Read in dataframe with parameters
+    dxprods = dict(
+        # Default primary screening diagnostics
+        via             = dx(dfdx[dfdx.name == 'via'],              hierarchy=['positive', 'inadequate', 'negative']),
+        hpv             = dx(dfdx[dfdx.name == 'hpv'],              hierarchy=['positive', 'inadequate', 'negative']),
+        hpv1618         = dx(dfdx[dfdx.name == 'hpv1618'],          hierarchy=['positive', 'inadequate', 'negative']),
+        # Diagnostics used for confimatory testing
+        via_triage      = dx(dfdx[dfdx.name == 'via_triage'],       hierarchy=['positive', 'inadequate', 'negative']),
+        # Diagnostics used to determine of subsequent care pathways
+        txvx_assigner   = dx(dfdx[dfdx.name == 'txvx_assigner'],    hierarchy=['triage', 'txvx', 'none']),
+        tx_assigner     = dx(dfdx[dfdx.name == 'tx_assigner'],      hierarchy=['radiation', 'excision', 'ablation', 'none']),
+    )
+    if prod_name is not None:   return dxprods[prod_name]
+    else:                       return dxprods
+
+
+def default_tx(prod_name=None):
+    '''
+    Create default treatment products
+    '''
+    dftx = pd.read_csv('../hpvsim/data/products_tx.csv') # Read in dataframe with parameters
+    txprods = dict()
+    for name in dftx.name.unique():
+        txprods[name] = tx(dftx[dftx.name==name])
+    if prod_name is not None:   return txprods[prod_name]
+    else:                       return txprods
+
+
+def default_vx(prod_name=None):
+    '''
+    Create default vaccine products
+    '''
+    dfvx = pd.read_csv('../hpvsim/data/products_vx.csv') # Read in dataframe with parameters
+    vxprods = dict()
+    for name in dfvx.name.unique():
+        vxprods[name]       = vx(genotype_pars=dfvx[dfvx.name==name], imm_init=dict(dist='beta', par1=30, par2=2))
+        vxprods[name+'2']   = vx(genotype_pars=dfvx[dfvx.name==name], imm_boost=1.2) # 2nd dose
+        vxprods[name+'3']   = vx(genotype_pars=dfvx[dfvx.name==name], imm_boost=1.1) # 3rd dose
+    if prod_name is not None:   return vxprods[prod_name]
+    else:                       return vxprods
 
 
 # class RadiationTherapy(Product):

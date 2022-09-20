@@ -34,36 +34,11 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     verbose = .1
     debug = 0
 
-    # Define products
-    # TODO: think of a better way to do this, e.g. on sim initialization
-    import pandas as pd
-    dfdx    = pd.read_csv('../hpvsim/data/screen_products.csv')
-    dfvx    = pd.read_csv('../hpvsim/data/vx_products.csv')
-    dftx    = pd.read_csv('../hpvsim/data/tx_products.csv')
-
-    # Create screening and triage products
-    via_primary             = hpv.dx(dfdx[dfdx.name == 'via'],                      hierarchy=['positive', 'inadequate', 'negative'])
-    pos_screen_assessment   = hpv.dx(dfdx[dfdx.name == 'pos_screen_assessment'],    hierarchy=['triage', 'txvx', 'none'])
-    via_triage              = hpv.dx(dfdx[dfdx.name == 'via_triage'],               hierarchy=['positive', 'inadequate', 'negative'])
-    tx_assigner             = hpv.dx(dfdx[dfdx.name == 'treatment_triage'],         hierarchy=['radiation', 'excision', 'ablation', 'none'])
-
-    # Create prophylactic vaccines - first and second dose are separate products
-    bivalent    = hpv.vx(genotype_pars = dfvx[dfvx.name == 'bivalent'], imm_init=dict(dist='beta', par1=30, par2=2))
-    bivalent2   = hpv.vx(genotype_pars = dfvx[dfvx.name == 'bivalent'], imm_boost=1.2)
-
-    # Create therapeutic vaccine - first and second dose are separate products
-    txvx1   = hpv.tx(df = dftx[dftx.name == 'txvx1'])
-    txvx2   = hpv.tx(df = dftx[dftx.name == 'txvx2'])
-
-    # Create treatment products
-    abl_prod    = hpv.tx(df = dftx[dftx.name == 'ablation'])
-    exc_prod    = hpv.tx(df = dftx[dftx.name == 'excision'])
-
     ### Create interventions
     # Screen, triage, assign treatment, treat
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine_screen = hpv.routine_screening(
-        product=via_primary,  # pass in string or product
+        product='via',  # pass in string or product
         prob=0.03,  # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
         eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
         age_range=[30, 50],
@@ -72,7 +47,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     )
 
     campaign_screen = hpv.campaign_screening(
-        product=via_primary,
+        product='via',
         prob=0.3,
         age_range=[30, 70],
         years=2030,
@@ -83,8 +58,8 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     to_triage = lambda sim: sim.get_intervention('screening').outcomes['positive']
     soc_triage = hpv.routine_triage(
         years = [2020,2029],
-        prob = 0.5, #acceptance rate
-        product = via_triage,
+        prob = 0.5, # acceptance rate
+        product = 'via_triage',
         eligibility = to_triage,
         label = 'via_triage_old'
     )
@@ -94,26 +69,26 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     pos_screen_assesser = hpv.routine_triage(
         start_year=2030,
         prob = 1.0,
-        product = pos_screen_assessment,
+        product = 'txvx_assigner',
         eligibility = screened_pos,
-        label = 'positive screen assessment'
+        label = 'txvx_assigner'
     )
 
     # Do further testing for those who were referred for further testing
-    to_triage_new = lambda sim: sim.get_intervention('positive screen assessment').outcomes['triage']
+    to_triage_new = lambda sim: sim.get_intervention('txvx_assigner').outcomes['triage']
     new_triage = hpv.routine_triage(
         start_year = 2030,
         prob = 0.3,
-        product = via_triage,
+        product = 'via_triage',
         eligibility = to_triage_new,
         label = 'via_triage_new'
     )
 
     # Get people who've been classified as txvx eligible based on the positive screen assessment, and deliver txvx to them
-    txvx_eligible = lambda sim: sim.get_intervention('positive screen assessment').outcomes['txvx']
+    txvx_eligible = lambda sim: sim.get_intervention('txvx_assigner').outcomes['txvx']
     deliver_txvx = hpv.deliver_txvx(
         accept_prob = 0.8,
-        product = txvx1,
+        product = 'txvx1',
         eligibility = txvx_eligible,
         label = 'txvx'
     )
@@ -122,25 +97,25 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     confirmed_positive = lambda sim: list(set(sim.get_intervention('via_triage_old').outcomes['positive'].tolist() + sim.get_intervention('via_triage_new').outcomes['positive'].tolist()))
     assign_treatment = hpv.routine_triage(
         prob = 1.0,
-        product = tx_assigner,
+        product = 'tx_assigner',
         eligibility = confirmed_positive,
-        label = 'treatment_triage'
+        label = 'tx_assigner'
     )
 
-    ablation_eligible = lambda sim: sim.get_intervention('treatment_triage').outcomes['ablation']
+    ablation_eligible = lambda sim: sim.get_intervention('tx_assigner').outcomes['ablation']
     ablation = hpv.treat_num(
         accept_prob = 0.5,
         max_capacity = 100,
-        product = abl_prod,
+        product = 'ablation',
         eligibility = ablation_eligible,
         label = 'ablation'
     )
 
-    excision_eligible = lambda sim: sim.get_intervention('treatment_triage').outcomes['excision'] #| sim.get_intervention('ablation').outcomes['unsuccessful']
+    excision_eligible = lambda sim: list(set(sim.get_intervention('tx_assigner').outcomes['excision'] + sim.get_intervention('ablation').outcomes['unsuccessful']))
     excision = hpv.treat_delay(
         accept_prob = 0.5,
         delay = 0.5,
-        product = exc_prod,
+        product = 'excision',
         eligibility = excision_eligible,
         label = 'excision'
     )
@@ -158,7 +133,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     routine_vx = hpv.routine_vx(
         prob = routine_values,
         years = routine_years,
-        product = bivalent,
+        product = 'bivalent',
         age_range=(9,10),
         label = 'routine vx'
     )
@@ -166,7 +141,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     campaign_vx = hpv.campaign_vx(
         prob = 0.9,
         years = 2023,
-        product = bivalent,
+        product = 'bivalent',
         age_range=(9,14),
         label = 'campaign vx'
     )
@@ -174,7 +149,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     second_dose_eligible = lambda sim: (sim.people.doses == 1) | (sim.t > (sim.people.date_vaccinated + 0.5 / sim['dt']))
     second_dose = hpv.routine_vx(
         prob = 0.1,
-        product = bivalent2,
+        product = 'bivalent2',
         eligibility = second_dose_eligible,
         label = '2nd dose'
     )
