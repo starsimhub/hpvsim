@@ -118,12 +118,12 @@ class Intervention:
         line_args  (dict): arguments passed to pl.axvline() when plotting
     '''
     def __init__(self, label=None, show_label=False, do_plot=None, line_args=None, **kwargs):
-        super().__init__(**kwargs)
+        # super().__init__(**kwargs)
         self._store_args() # Store the input arguments so the intervention can be recreated
         if label is None: label = self.__class__.__name__ # Use the class name if no label is supplied
         self.label = label # e.g. "Screen"
         self.show_label = show_label # Do not show the label by default
-        self.do_plot = do_plot if do_plot is not None else True # Plot the intervention, including if None
+        self.do_plot = do_plot if do_plot is not None else False # Plot the intervention, including if None
         self.line_args = sc.mergedicts(dict(linestyle='--', c='#aaa', lw=1.0), line_args) # Do not set alpha by default due to the issue of overlapping interventions
         self.timepoints = [] # The start and end timepoints of the intervention
         self.initialized = False # Whether or not it has been initialized

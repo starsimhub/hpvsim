@@ -43,7 +43,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
         age_range=[30, 50],
         start_year=2020,
-        label='screening',
+        label='routine screening',
     )
 
     campaign_screen = hpv.campaign_screening(
@@ -55,37 +55,37 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     )
 
     # SOC: use a secondary diagnostic to determine how to treat people who screen positive
-    to_triage = lambda sim: sim.get_intervention('screening').outcomes['positive']
+    to_triage = lambda sim: sim.get_intervention('routine screening').outcomes['positive']
     soc_triage = hpv.routine_triage(
         years = [2020,2029],
         prob = 0.5, # acceptance rate
         product = 'via_triage',
         eligibility = to_triage,
-        label = 'via_triage_old'
+        label = 'VIA triage (pre-txvx)'
     )
 
     #### New protocol: for those who screen positive, decide whether to immediately offer TxVx or refer them for further testing
-    screened_pos = lambda sim: list(set(sim.get_intervention('screening').outcomes['positive'].tolist() + sim.get_intervention('campaign screening').outcomes['positive'].tolist()))
+    screened_pos = lambda sim: list(set(sim.get_intervention('routine screening').outcomes['positive'].tolist() + sim.get_intervention('campaign screening').outcomes['positive'].tolist()))
     pos_screen_assesser = hpv.routine_triage(
         start_year=2030,
         prob = 1.0,
         product = 'txvx_assigner',
         eligibility = screened_pos,
-        label = 'txvx_assigner'
+        label = 'txvx assigner'
     )
 
     # Do further testing for those who were referred for further testing
-    to_triage_new = lambda sim: sim.get_intervention('txvx_assigner').outcomes['triage']
+    to_triage_new = lambda sim: sim.get_intervention('txvx assigner').outcomes['triage']
     new_triage = hpv.routine_triage(
         start_year = 2030,
         prob = 0.3,
         product = 'via_triage',
         eligibility = to_triage_new,
-        label = 'via_triage_new'
+        label = 'VIA triage (post-txvx)'
     )
 
     # Get people who've been classified as txvx eligible based on the positive screen assessment, and deliver txvx to them
-    txvx_eligible = lambda sim: sim.get_intervention('txvx_assigner').outcomes['txvx']
+    txvx_eligible = lambda sim: sim.get_intervention('txvx assigner').outcomes['txvx']
     deliver_txvx = hpv.deliver_txvx(
         accept_prob = 0.8,
         product = 'txvx1',
@@ -94,15 +94,15 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     )
 
     # New and old protocol: for those who've been confirmed positive in their secondary diagnostic, determine what kind of treatment to offer them
-    confirmed_positive = lambda sim: list(set(sim.get_intervention('via_triage_old').outcomes['positive'].tolist() + sim.get_intervention('via_triage_new').outcomes['positive'].tolist()))
+    confirmed_positive = lambda sim: list(set(sim.get_intervention('VIA triage (pre-txvx)').outcomes['positive'].tolist() + sim.get_intervention('VIA triage (post-txvx)').outcomes['positive'].tolist()))
     assign_treatment = hpv.routine_triage(
         prob = 1.0,
         product = 'tx_assigner',
         eligibility = confirmed_positive,
-        label = 'tx_assigner'
+        label = 'tx assigner'
     )
 
-    ablation_eligible = lambda sim: sim.get_intervention('tx_assigner').outcomes['ablation']
+    ablation_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['ablation']
     ablation = hpv.treat_num(
         accept_prob = 0.5,
         max_capacity = 100,
@@ -111,7 +111,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         label = 'ablation'
     )
 
-    excision_eligible = lambda sim: list(set(sim.get_intervention('tx_assigner').outcomes['excision'] + sim.get_intervention('ablation').outcomes['unsuccessful']))
+    excision_eligible = lambda sim: list(set(sim.get_intervention('tx assigner').outcomes['excision'] + sim.get_intervention('ablation').outcomes['unsuccessful']))
     excision = hpv.treat_delay(
         accept_prob = 0.5,
         delay = 0.5,
@@ -120,7 +120,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         label = 'excision'
     )
 
-    radiation_eligible = lambda sim: sim.get_intervention('tx_assigner').outcomes['radiation']
+    radiation_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['radiation']
     radiation = hpv.treat_delay(
         accept_prob = 0.01,
         delay = 1.0,
@@ -159,15 +159,23 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         prob = 0.1,
         product = 'bivalent2',
         eligibility = second_dose_eligible,
-        label = '2nd dose'
+        label = '2nd dose routine'
     )
 
     vx_interventions = [routine_vx, campaign_vx, second_dose]
 
     interventions =  st_interventions + vx_interventions
+    for intv in interventions: intv.do_plot=False
 
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
+    to_plot = {
+        'Screens': ['resources_routine screening', 'resources_campaign screening'],
+        'Vaccines': ['resources_routine vx', 'resources_campaign vx'],
+        'Therapeutic vaccine': ['resources_txvx'],
+        'Treatments': ['resources_ablation', 'resources_excision', 'resources_radiation'],
+    }
+    sim.plot(to_plot=to_plot)
 
     return sim
 

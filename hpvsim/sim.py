@@ -527,7 +527,8 @@ class Sim(hpb.BaseSim):
     def finalize_interventions(self):
         for intervention in self['interventions']:
             if isinstance(intervention, hpi.Intervention):
-                intervention.finalize(self)
+                if hasattr(intervention,'n_products_used'):
+                    self.results[f'resources_{intervention.label}'] = intervention.n_products_used
 
 
     def init_analyzers(self):
@@ -862,14 +863,14 @@ class Sim(hpb.BaseSim):
             # otherwise the scale factor will be applied multiple times
             raise AlreadyRunError('Simulation has already been finalized')
 
+        # Finalize analyzers and interventions
+        self.finalize_analyzers()
+        self.finalize_interventions()
+
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
                 self.results[reskey].values *= self['pop_scale']
-
-        # Finalize analyzers and interventions
-        self.finalize_analyzers()
-        self.finalize_interventions()
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results
