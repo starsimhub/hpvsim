@@ -32,24 +32,13 @@ genotype_pars['hpv18'].prog_time = 8
 genotype_pars['hpv16'].prog_rate = 0.7
 genotype_pars['hpv18'].prog_rate = 0.8
 genotype_pars['hpv31'].prog_time = 15
-# genotype_pars['hpv6'].prog_time = 15
 genotype_pars['hpv31'].prog_rate = .3
-# genotype_pars['hpv6'].prog_rate = 0.1
 genotype_pars['hpv16'].dur_dysp['par1'] = 3.16
-genotype_pars['hpv16'].dur_none['par1'] = 1.23
+genotype_pars['hpv16'].dur_precin['par1'] = 1.23
 
-# Prognoses from Harvard model
-prognoses = dict(
-        duration_cutoffs  = np.array([0,       1,          2,          3,          4,          5,          10]),       # Duration cutoffs (lower limits)
-        seroconvert_probs = np.array([0.25,    0.5,        0.95,       1.0,        1.0,        1.0,        1.0]),      # Probability of seroconverting given duration of infection
-        cin1_probs        = np.array([0.015,   0.3655,     0.86800,    1.0,        1.0,        1.0,        1.0]),      # Conditional probability of developing CIN1 given HPV infection
-        cin2_probs        = np.array([0.020,   0.0287,     0.0305,     0.06427,    0.1659,     0.3011,     0.4483]),   # Conditional probability of developing CIN2 given CIN1, derived from Harvard model calibration
-        cin3_probs        = np.array([0.007,   0.0097,     0.0102,     0.0219,     0.0586,     0.112,      0.1779]),   # Conditional probability of developing CIN3 given CIN2, derived from Harvard model calibration
-        cancer_probs      = np.array([0.002,   0.003,      0.0564,     0.1569,     0.2908,     0.3111,     0.5586]),   # Conditional probability of developing cancer given CIN3, derived from Harvard model calibration
-        )
 
 # Shorten duration names
-dur_none = [genotype_pars[genotype_map[g]]['dur_none'] for g in range(ng)]
+dur_precin = [genotype_pars[genotype_map[g]]['dur_precin'] for g in range(ng)]
 dur_dysp = [genotype_pars[genotype_map[g]]['dur_dysp'] for g in range(ng)]
 dysp_rate = [genotype_pars[genotype_map[g]]['dysp_rate'] for g in range(ng)]
 prog_time = [genotype_pars[genotype_map[g]]['prog_time'] for g in range(ng)]
@@ -102,7 +91,7 @@ x = np.linspace(0.01, 7, 700)
 shares = []
 gtypes = []
 for g in range(ng):
-    sigma, scale = lognorm_params(dur_none[g]['par1'], dur_none[g]['par2'])
+    sigma, scale = lognorm_params(dur_precin[g]['par1'], dur_precin[g]['par2'])
     rv = lognorm(sigma, 0, scale)
     aa = np.diff(rv.cdf(x))
     bb = logf1(x, dysp_rate[g])[1:]
@@ -176,7 +165,7 @@ def make_fig1():
 
     ###### Distributions
     for g in range(ng):
-        sigma, scale = lognorm_params(dur_none[g]['par1'], dur_none[g]['par2'])
+        sigma, scale = lognorm_params(dur_precin[g]['par1'], dur_precin[g]['par2'])
         rv = lognorm(sigma, 0, scale)
         ax[0,0].plot(x, rv.pdf(x), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,0].legend()
@@ -187,15 +176,11 @@ def make_fig1():
 
 
     ###### Relationship between durations and probability of detectable dysplasia
-    xx = prognoses['duration_cutoffs']
-    yy = prognoses['cin1_probs']
     for g in range(ng):
         ax[0,1].plot(x, logf1(x, dysp_rate[g]), color=colors[g], lw=2)
-    ax[0,1].plot(xx[:-1], yy[:-1], 'ko', label="Values from\nHarvard model")
     ax[0,1].set_xlabel("Pre-dysplasia/control duration")
     ax[0,1].set_ylabel("")
     ax[0,1].grid()
-    ax[0,1].legend(fontsize=15, frameon=False)
     ax[0,1].set_title("Probability of developing\ndysplasia by duration")
 
 
