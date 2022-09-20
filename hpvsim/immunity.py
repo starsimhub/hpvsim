@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from . import utils as hpu
 from . import defaults as hpd
 from . import parameters as hppar
-from . import interventions as hpimm
+from . import interventions as hpi
 
 
 
@@ -87,7 +87,7 @@ def init_immunity(sim, create=False):
     ng = sim['n_genotypes']
 
     # Pull out all the vaccination interventions
-    vx_intvs = [x for x in sim['interventions'] if isinstance(x, hpimm.BaseVaccination)]
+    vx_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseVaccination)]
     nv = len(vx_intvs)
 
     # Dimension for immunity matrix

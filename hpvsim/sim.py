@@ -410,10 +410,6 @@ class Sim(hpb.BaseSim):
         for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
             results[f'{var}'] = init_res(f'{name}', color=color, n_rows=2)
 
-        # # Create intv results
-        # for var, name, color in zip(hpd.intv_flow_keys, hpd.intv_flow_names, hpd.intv_flow_colors):
-        #     results[f'{var}'] = init_res(f'{name}', color=color)
-        #
         # Create by-age results using standard populations
         results['cancers_by_age'] = init_res('Cancers by age', n_rows=len(self.pars['standard_pop'][0,:])-1)
         results['asr_cancer'] = init_res('ASR of cancer incidence', scale=False)
