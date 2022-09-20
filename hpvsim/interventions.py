@@ -1028,7 +1028,7 @@ class deliver_txvx(treat_num):
 
 
 #%% Products
-__all__ += ['dx', 'tx', 'vx']
+__all__ += ['dx', 'tx', 'vx', 'radiation']
 
 class Product(hpb.FlexPretty):
     ''' Generic product implementation '''
@@ -1095,7 +1095,7 @@ class tx(Product):
     '''
     def __init__(self, df, name=None, clears_all=False):
         self.df = df
-        self.name = df.name.unique()[0] # TODO fix
+        self.name = df.name.unique()[0]
         self.states = df.state.unique()
         self.genotypes = df.genotype.unique()
         self.ng = len(self.genotypes)
@@ -1175,10 +1175,19 @@ class vx(Product):
         return inds
 
 
-#%% Create default products
+class radiation(Product):
+    # Cancer treatment product
+    def __init__(self, dur=None):
+        self.dur = dur or dict(dist='normal', par1=18.0, par2=2.) # whatever the default duration should be
 
-# dfvx    = pd.read_csv('../hpvsim/data/vx_products.csv')
-# dftx    = pd.read_csv('../hpvsim/data/tx_products.csv')
+    def administer(self, sim, inds):
+        people = sim.people
+        new_dur_cancer = hpu.sample(**self.dur, size=len(inds))
+        people.date_dead_cancer[inds] += np.ceil(new_dur_cancer / people.pars['dt'])
+        return inds
+
+
+#%% Create default products
 
 def default_dx(prod_name=None):
     '''
@@ -1225,17 +1234,4 @@ def default_vx(prod_name=None):
     if prod_name is not None:   return vxprods[prod_name]
     else:                       return vxprods
 
-
-# class RadiationTherapy(Product):
-#     # Cancer treatment product
-#     def __init__(self, dur=None):
-#         self.dur = dur or dict(dist='normal', par1=18.0, par2=2.) # whatever the default duration should be
-#
-#     def administer(self, people, inds):
-#         new_dur_cancer = hpu.sample(**self.dur, size=len(inds))
-#         people.date_dead_cancer[inds] += np.ceil(new_dur_cancer / people.pars['dt'])
-#         people.treated[inds] = True
-#         people.date_treated[inds] = people.t
-#         return inds
-#
 

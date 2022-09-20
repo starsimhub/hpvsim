@@ -120,11 +120,19 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         label = 'excision'
     )
 
+    radiation_eligible = lambda sim: sim.get_intervention('tx_assigner').outcomes['radiation']
+    radiation = hpv.treat_delay(
+        accept_prob = 0.01,
+        delay = 1.0,
+        product = hpv.radiation(),
+        eligibility = radiation_eligible,
+        label = 'radiation'
+    )
+
     soc_screen = [routine_screen, campaign_screen, soc_triage]
     new_screen = [pos_screen_assesser, new_triage,  deliver_txvx]
-    triage_treat = [assign_treatment, ablation, excision]
+    triage_treat = [assign_treatment, ablation, excision, radiation]
     st_interventions = soc_screen + new_screen + triage_treat
-    # TODO: cancer treatment not included yet<<<<<
 
     ## Vaccination interventions
     routine_years = np.arange(2020, base_pars['end']+1, dtype=int)
