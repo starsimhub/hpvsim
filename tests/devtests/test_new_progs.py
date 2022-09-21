@@ -36,7 +36,7 @@ genotype_pars['hpv31'].prog_time = 15
 genotype_pars['hpv31'].prog_rate = .3
 # genotype_pars['hpv6'].prog_rate = 0.1
 genotype_pars['hpv16'].dur_dysp['par1'] = 3.16
-genotype_pars['hpv16'].dur_none['par1'] = 1.23
+genotype_pars['hpv16'].dur_precin['par1'] = 1.23
 
 # Prognoses from Harvard model
 prognoses = dict(
@@ -49,7 +49,7 @@ prognoses = dict(
         )
 
 # Shorten duration names
-dur_none = [genotype_pars[genotype_map[g]]['dur_none'] for g in range(ng)]
+dur_precin = [genotype_pars[genotype_map[g]]['dur_precin'] for g in range(ng)]
 dur_dysp = [genotype_pars[genotype_map[g]]['dur_dysp'] for g in range(ng)]
 dysp_rate = [genotype_pars[genotype_map[g]]['dysp_rate'] for g in range(ng)]
 prog_time = [genotype_pars[genotype_map[g]]['prog_time'] for g in range(ng)]
@@ -89,7 +89,7 @@ def logf2(x, x_infl, k):
 
 
 # Figure settings
-font_size = 26
+font_size = 30
 sc.fonts(add=sc.thisdir(aspath=True) / 'Libertinus Sans')
 sc.options(font='Libertinus Sans')
 plt.rcParams['font.size'] = font_size
@@ -102,7 +102,7 @@ x = np.linspace(0.01, 7, 700)
 shares = []
 gtypes = []
 for g in range(ng):
-    sigma, scale = lognorm_params(dur_none[g]['par1'], dur_none[g]['par2'])
+    sigma, scale = lognorm_params(dur_precin[g]['par1'], dur_precin[g]['par2'])
     rv = lognorm(sigma, 0, scale)
     aa = np.diff(rv.cdf(x))
     bb = logf1(x, dysp_rate[g])[1:]
@@ -176,7 +176,7 @@ def make_fig1():
 
     ###### Distributions
     for g in range(ng):
-        sigma, scale = lognorm_params(dur_none[g]['par1'], dur_none[g]['par2'])
+        sigma, scale = lognorm_params(dur_precin[g]['par1'], dur_precin[g]['par2'])
         rv = lognorm(sigma, 0, scale)
         ax[0,0].plot(x, rv.pdf(x), color=colors[g], lw=2, label=genotype_map[g].upper())
     ax[0,0].legend()
@@ -195,7 +195,7 @@ def make_fig1():
     ax[0,1].set_xlabel("Pre-dysplasia/control duration")
     ax[0,1].set_ylabel("")
     ax[0,1].grid()
-    ax[0,1].legend(fontsize=15, frameon=False)
+    ax[0,1].legend(fontsize=30, frameon=False)
     ax[0,1].set_title("Probability of developing\ndysplasia by duration")
 
 
@@ -239,9 +239,9 @@ def make_fig1():
     ax[1,0].axhspan(0.33, 0.67, color=cmap[1],alpha=.4)
     ax[1,0].axhspan(0.67, cancer_thresh, color=cmap[2],alpha=.4)
     ax[1,0].axhspan(cancer_thresh, 1, color=cmap[3],alpha=.4)
-    ax[1,0].text(-0.3, 0.12, 'CIN1', fontsize=15, rotation=90)
-    ax[1,0].text(-0.3, 0.45, 'CIN2', fontsize=15, rotation=90)
-    ax[1,0].text(-0.3, 0.75, 'CIN3', fontsize=15, rotation=90)
+    ax[1,0].text(-0.3, 0.08, 'CIN1', fontsize=30, rotation=90)
+    ax[1,0].text(-0.3, 0.4, 'CIN2', fontsize=30, rotation=90)
+    ax[1,0].text(-0.3, 0.73, 'CIN3', fontsize=30, rotation=90)
 
     ###### Share of women who develop each CIN grade
     loc_array = np.array([-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10])
@@ -279,7 +279,7 @@ def make_fig1():
     ax[1,2].set_xticklabels(gtypes+['Average'])
     ax[1,2].set_ylabel("")
     ax[1,2].set_title("Eventual outcomes for women\n")
-    ax[1,2].legend(bbox_to_anchor =(0.5, 1.15),loc='upper center',fontsize=15,ncol=5,frameon=False)
+    ax[1,2].legend(bbox_to_anchor =(1.2, 1.),loc='upper center',fontsize=30,ncol=1,frameon=False)
 
     fig.tight_layout()
     plt.savefig("progressions-1.png", dpi=100)
