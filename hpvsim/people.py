@@ -341,12 +341,6 @@ class People(hpb.BasePeople):
             self.infectious[genotype, latent_inds] = False
             self.inactive[genotype, latent_inds] = True
             self.date_clearance[genotype, latent_inds] = np.nan
-            #
-            # if self.t==2:
-            #     import traceback;
-            #     traceback.print_exc();
-            #     import pdb;
-            #     pdb.set_trace()
 
         # Whether infection is controlled on not, people have no dysplasia
         self.no_dysp[genotype, inds] = True

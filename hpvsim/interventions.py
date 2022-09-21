@@ -632,7 +632,7 @@ class BaseVaccination(Intervention):
             accept_inds     = select_people(eligible_inds, prob=prob)
 
             if len(accept_inds):
-                inds = self.product.administer(sim.people, accept_inds) # Actually change people's immunity
+                self.product.administer(sim.people, accept_inds) # Actually change people's immunity
                 # Update people's state and dates, as well as results and doses
                 sim.people.vaccinated[accept_inds] = True
                 sim.people.date_vaccinated[accept_inds] = sim.t
@@ -905,12 +905,12 @@ class BaseTreatment(Intervention):
         '''
         Recheck people's eligibility for treatment - it may have expired if they've been waiting awhile
         '''
-        conditions = sim.people.alive[inds] # TODO: what else should go here? can't use sim.people.cin because precins may also get treatment
+        conditions = sim.people.alive[inds] & (~sim.people.cancerous[inds])
         return conditions
 
     def get_accept_inds(self, sim):
         '''
-        Get indices of people who will acccept treatment; these people are then added to a queue or scheduler for receiving treatment
+        Get indices of people who will acccept treatment; these people are then added to a queue or scheduled for receiving treatment
         '''
         accept_inds     = np.array([], dtype=hpd.default_int)
         eligible_inds   = sc.promotetoarray(self.eligibility(sim)) # Apply eligiblity
@@ -1172,7 +1172,7 @@ class vx(Product):
         elif self.imm_boost is not None:
             people.peak_imm[self.imm_source, inds] *= self.imm_boost
         people.t_imm_event[self.imm_source, inds] = people.t
-        return inds
+
 
 
 class radiation(Product):
