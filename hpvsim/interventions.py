@@ -905,7 +905,7 @@ class BaseTreatment(Intervention):
         '''
         Recheck people's eligibility for treatment - it may have expired if they've been waiting awhile
         '''
-        conditions = sim.people.alive[inds] & (~sim.people.cancerous[inds])
+        conditions = sim.people.alive[inds] & (~sim.people.cancerous[:,inds].any(axis=0))
         return conditions
 
     def get_accept_inds(self, sim):
