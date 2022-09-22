@@ -67,10 +67,10 @@ class Sim(hpb.BaseSim):
         self.validate_pars() # Ensure parameters have valid values
         self.set_seed() # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
-        self.init_immunity() # initialize information about immunity
+        self.init_results() # After initializing the genotypes and people, create the results structure
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
+        self.init_immunity() # initialize information about immunity
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
-        self.init_results() # After initializing the genotypes, create the results structure
         self.init_analyzers()  # ...and the analyzers...
         self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
@@ -390,7 +390,7 @@ class Sim(hpb.BaseSim):
 
         # Create stocks
         for llabel,cstride,g in zip(['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
-            for stock in self.people.meta.stock_states:
+            for stock in hpd.PeopleMeta.stock_states:
                 if (stock.shape=='n_genotypes' and llabel=='Number') or llabel=='Total number':
                     lkey = stock.totalprefix if llabel == 'Total number' else ''
                     color = stock.cmap(cstride) if stock.cmap is not None else None
@@ -409,10 +409,6 @@ class Sim(hpb.BaseSim):
         # Create results by sex
         for var, name, color in zip(hpd.by_sex_keys, hpd.by_sex_colors, hpd.by_sex_colors):
             results[f'{var}'] = init_res(f'{name}', color=color, n_rows=2)
-
-        # Create intv results
-        for var, name, color in zip(hpd.intv_flow_keys, hpd.intv_flow_names, hpd.intv_flow_colors):
-            results[f'{var}'] = init_res(f'{name}', color=color)
 
         # Create by-age results using standard populations
         results['cancers_by_age'] = init_res('Cancers by age', n_rows=len(self.pars['standard_pop'][0,:])-1)
@@ -455,7 +451,6 @@ class Sim(hpb.BaseSim):
         results['t'] = self.res_tvec
 
         # Final items
-        self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts) # Not included in the results, but used to scale them
         self.results = results
         self.results_ready = False
 
@@ -506,6 +501,8 @@ class Sim(hpb.BaseSim):
                 self['pop_scale'] = 1
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
+        # # Now set the rescale vec
+        # self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts)
 
         return self
 
@@ -523,14 +520,15 @@ class Sim(hpb.BaseSim):
 
         # Set the number of immunity sources
         # self['n_imm_sources'] += len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
-        self['n_imm_sources'] = self['immunity'].shape[0]
+        # self['n_imm_sources'] = self['immunity'].shape[0]
         return
 
 
     def finalize_interventions(self):
         for intervention in self['interventions']:
-            if isinstance(intervention, hpimm.Intervention):
-                intervention.finalize(self)
+            if isinstance(intervention, hpi.Intervention):
+                if hasattr(intervention,'n_products_used'):
+                    self.results[f'resources_{intervention.label}'] = intervention.n_products_used
 
 
     def init_analyzers(self):
@@ -622,23 +620,25 @@ class Sim(hpb.BaseSim):
         beta = self['beta']
         gen_pars = self['genotype_pars']
         imm_kin_pars = self['imm_kin']
+        mixing = self['mixing']
+        layer_probs = self['layer_probs']
+        cross_layer = self['cross_layer']
+        acts = self['acts']
+        dur_pship = self['dur_pship']
+        age_act_pars = self['age_act_pars']
         trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
 
-        # Update demographics and partnerships
-        old_pop_size = len(self.people)
-        self.people.update_states_pre(t=t, year=self.yearvec[t]) # NB this also ages people, applies deaths, and generates new births
-
+        # Update demographics, states, and partnerships
+        self.people.update_states_pre(t=t, year=self.yearvec[t]) # This also ages people, applies deaths, and generates new births
         people = self.people # Shorten
-        n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
-        new_pop_size = len(people)
-        people.create_partnerships(t=t, n_new=n_dissolved, scale_factor=new_pop_size/old_pop_size) # Create new partnerships (maintaining the same overall partnerhip rate)
         n_people = len(people)
+        n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
+        tind = self.yearvec[t] - self['start']
+        people.create_parnterships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
 
         # Apply interventions
         for i,intervention in enumerate(self['interventions']):
             intervention(self) # If it's a function, call it directly
-
-        contacts = people.contacts # Shorten
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
         if self['use_waning']:
@@ -651,6 +651,7 @@ class Sim(hpb.BaseSim):
 
         # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
         fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
+        contacts = people.contacts # Shorten
         for lkey, layer in contacts.items():
             fs.append(layer['f'])
             ms.append(layer['m'])
@@ -681,18 +682,17 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
         # Loop over layers
-        ln = 0 # Layer number
-        for lkey, layer in contacts.items():
-            f = fs[ln]
-            m = ms[ln]
+        for lno,lkey in enumerate(contacts.keys()):
+            f = fs[lno]
+            m = ms[lno]
 
             # Compute transmissions
             for g in range(ng):
                 f_source_inds = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
                 m_source_inds = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
 
-                foi_frac = 1 - frac_acts[ln] * gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])  # Probability of not getting infected from any fractional acts
-                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms[ln])) ** whole_acts[ln]  # Probability of not getting infected from whole acts
+                foi_frac = 1 - frac_acts[lno] * gen_betas[g] * trans[:, None] * (1 - effective_condoms[lno])  # Probability of not getting infected from any fractional acts
+                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms[lno])) ** whole_acts[lno]  # Probability of not getting infected from whole acts
                 foi = (1 - (foi_whole * foi_frac)).astype(hpd.default_float)
 
                 discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g], foi[0,:]],
@@ -704,8 +704,6 @@ class Sim(hpb.BaseSim):
                     target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
-
-            ln += 1
 
         # Determine if there are any reactivated infections on this timestep
         for g in range(ng):
@@ -740,8 +738,6 @@ class Sim(hpb.BaseSim):
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
-        for key,count in people.intv_flows.items():
-            self.results[key][idx] += count
         for key,count in people.by_age_flows.items():
             self.results[key][:,idx] += count
 
@@ -766,17 +762,6 @@ class Sim(hpb.BaseSim):
             age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
             standard_pop = self.pars['standard_pop'][1, :-1]
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
-
-            # Compute detectable hpv prevalence
-            hpv_test_pars = hppar.get_screen_pars('hpv')
-            for state in ['precin', 'cin1', 'cin2', 'cin3']:
-                hpv_pos_probs = np.zeros(len(people))
-                for g in range(ng):
-                    tp_inds = hpu.true(people[state][g,:])
-                    hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][self['genotype_map'][g]]
-                    hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
-                    self.results['n_detectable_hpv'][g, idx] = len(hpv_pos_inds)
-                    self.results['n_total_detectable_hpv'][idx] += len(hpv_pos_inds)
 
             # Save number alive
             self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
@@ -867,14 +852,14 @@ class Sim(hpb.BaseSim):
             # otherwise the scale factor will be applied multiple times
             raise AlreadyRunError('Simulation has already been finalized')
 
+        # Finalize analyzers and interventions
+        self.finalize_analyzers()
+        self.finalize_interventions()
+
         # Scale the results
         for reskey in self.result_keys():
             if self.results[reskey].scale:
-                self.results[reskey].values *= self.rescale_vec
-
-        # Finalize analyzers and interventions
-        self.finalize_analyzers()
-        # self.finalize_interventions()
+                self.results[reskey].values *= self['pop_scale']
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results

@@ -264,14 +264,6 @@ class BaseSim(ParsObj):
         pars = sc.mergedicts(pars, kwargs)
         if pars:
 
-            # Define aliases
-            mapping = dict(
-                n_agents = 'n_agents',
-            )
-            for key1,key2 in mapping.items():
-                if key1 in pars:
-                    pars[key2] = pars.pop(key1)
-
             # Handle other special parameters
             if pars.get('network'):
                 hppar.reset_layer_pars(pars, force=False)

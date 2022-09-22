@@ -315,7 +315,7 @@ class age_pyramid(Analyzer):
 
             date = self.dates[ind]
             self.age_pyramids[date] = sc.objdict() # Initialize the dictionary
-            scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
+            scale = sim['pop_scale']
             age = sim.people.age # Get the age distribution
             self.age_pyramids[date]['bins'] = self.bins # Copy here for convenience
             for sb,sex in enumerate(['m','f']): # Loop over each sex; sb stands for sex boolean, translating the labels to 0/1
@@ -693,7 +693,7 @@ class age_results(Analyzer):
                 ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
                 date = result_dict.dates[ind]  # Create the date which will be used to key the results
                 age = sim.people.age  # Get the age distribution
-                scale = sim.rescale_vec[sim.t // sim.resfreq]  # Determine current scale factor
+                scale = sim['pop_scale']  # Determine current scale factor
 
                 if 'compute_fit' in result_dict.keys() and 'total' not in result:
                     thisdatadf = result_dict.data[(result_dict.data.year == float(date)) & (result_dict.data.name == result)]
@@ -753,7 +753,7 @@ class age_results(Analyzer):
             # the timepoints that belong to the requested year.
             if sim.t in result_dict.calcpoints:
                 date = self.date # Stored just above for use here
-                scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
+                scale = sim['pop_scale'] # Determine current scale factor
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
@@ -1018,7 +1018,6 @@ class age_causal_infection(Analyzer):
             self.age_causal.append([])
 
 
-
 class cancer_detection(Analyzer):
     '''
     Cancer detection via symptoms
@@ -1070,4 +1069,5 @@ class cancer_detection(Analyzer):
         sim.people.flows['detected_cancers'] = new_detections
 
         return new_detections, new_treatments
+
 
