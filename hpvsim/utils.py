@@ -175,9 +175,6 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
-<<<<<<< HEAD
-def set_prognoses(people, inds, g, dur_nodysp):
-=======
 def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
                         layer_probs, pref_weight, cross_layer):
     '''
@@ -257,8 +254,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     return f, m, current_partners, new_pship_inds, new_pship_counts
 
 
-def set_prognoses(people, inds, g, dur_none):
->>>>>>> main
+def set_prognoses(people, inds, g, dur_nodysp):
     ''' Set disease progression '''
 
     cin1_inds, dur_to_peak_dys = set_CIN1_prognoses(people, inds, g, dur_nodysp)
