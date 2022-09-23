@@ -7,14 +7,6 @@ import numpy as np
 import hpvsim as hpv
 import functools
 
-class simple_vaccinate_prob(hpv.vaccinate_prob):
-    # Simplified vaccination routine that delivers vaccine to everyone every day with probability prob
-    def select_people(self, sim):
-        vacc_probs = np.zeros(len(sim.people))
-        vacc_probs[sim.people.alive & ~sim.people.vaccinated] = self.prob  # Assign equal vaccination probability to everyone
-        print(self.prob)
-        return hpv.true(hpv.binomial_arr(vacc_probs))  # Calculate who actually gets vaccinated
-
 
 def test_schedule_scaleup():
     sc.heading('Test dynamics pars intervention')
@@ -24,7 +16,7 @@ def test_schedule_scaleup():
         'n_years': 50,
     }
 
-    vx = simple_vaccinate_prob(vaccine='bivalent', label='vaccine_intervention', timepoints=0, prob=0)
+    vx = hpv.BaseVaccination(product='bivalent', prob=0, label='vaccine_intervention')
 
     schedule = hpv.EventSchedule()
     schedule[10] = functools.partial(hpv.set_intervention_attributes, intervention_name='vaccine_intervention', prob=0.05)

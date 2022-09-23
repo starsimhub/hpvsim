@@ -89,7 +89,7 @@ class PeopleMeta(sc.prettyobj):
         State('alive',          bool,   True,   label='Population'),    # Save this as a state so we can record population sizes
         State('dead_cancer',    bool,   False,  label='Cumulative cancer deaths'),   # Dead from cancer
         State('dead_other',     bool,   False,  label='Cumulative deaths from other causes'),   # Dead from all other causes
-        State('emigrated',      bool,   False,  label='Emirated'),  # Emigrated
+        State('emigrated',      bool,   False,  label='Emigrated'),  # Emigrated
     ]
 
     viral_states = [
@@ -165,7 +165,6 @@ class PeopleMeta(sc.prettyobj):
     dates += [
         State('date_clearance',     default_float, np.nan, shape='n_genotypes'),
         State('date_exposed',       default_float, np.nan, shape='n_genotypes'),
-        State('date_next_screen',   default_float, np.nan),
     ]
 
     # Duration of different states: these are floats per person -- used in people.py
@@ -259,11 +258,6 @@ dem_colors  = ['#fcba03',   '#000000',      '#000000']
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['total infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',                    '#000000']
-
-# Intervention-related flows (total across genotypes)
-intv_flow_keys   = ['screens',  'vaccinations']
-intv_flow_names  = ['screens',  'vaccinations']
-intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges]
 
 # Type distributions by cytology
 type_keys  = ['no_dysp_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
