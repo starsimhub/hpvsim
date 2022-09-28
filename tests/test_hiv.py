@@ -14,21 +14,11 @@ do_save = 0
 
 n_agents = [2e3,50e3][1] # Swap between sizes
 
-base_pars = {
-    'n_agents': n_agents,
-    'start': 1990,
-    'burnin': 30,
-    'end': 2050,
-    'genotypes': [16, 18],
-    'location': 'south africa',
-    'dt': .5,
-}
-
 
 #%% Define the tests
 
-def test_hiv():
-    sc.heading('Test hiv')
+def test_hiv(model_hiv=True):
+    sc.heading('Testing hiv')
 
     pars = {
         'n_agents': n_agents,
@@ -38,7 +28,7 @@ def test_hiv():
         'genotypes': [16, 18],
         'location': 'south africa',
         'dt': .5,
-        'model_hiv': True
+        'model_hiv': model_hiv
     }
 
     sim = hpv.Sim(pars=pars)
@@ -51,6 +41,9 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv()
+    sim0 = test_hiv(model_hiv=True)
+    sc.toc(T)
+    T = sc.tic()
+    sim1 = test_hiv(model_hiv=False)
     sc.toc(T)
     print('Done.')
