@@ -36,14 +36,63 @@ def test_hiv(model_hiv=True):
     sim.plot(to_plot=['hiv_prevalence'])
     return sim
 
+def test_impact_on_cancer():
+    sc.heading('Testing hiv')
+
+    pars = {
+        'n_agents': n_agents,
+        'start': 1970,
+        'burnin': 30,
+        'end': 2050,
+        'genotypes': [16, 18],
+        'location': 'south africa',
+        'dt': .5,
+    }
+
+    base_sim = hpv.Sim(pars=pars)
+
+    scenarios = {
+        'no_hiv': {
+            'name': 'No HIV',
+            'pars': {
+                'model_hiv': False
+            }
+        },
+        'hiv': {
+            'name': 'HIV',
+            'pars': {
+                'model_hiv': True
+            }
+        }
+    }
+
+    metapars = {'n_runs': 3}
+    scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
+    scens.run()
+    to_plot = {
+        'HIV prevalence': [
+            'hiv_prevalence',
+        ],
+        'HPV prevalence': [
+            'total_hpv_prevalence',
+        ],
+        'Age standardized cancer incidence (per 100,000 women)': [
+            'asr_cancer',
+        ],
+        'Cancer deaths per 100,000 women': [
+            'cancer_mortality',
+        ],
+    }
+    scens.plot(to_plot=to_plot)
+    return scens
+
 #%% Run as a script
 if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv(model_hiv=True)
-    sc.toc(T)
-    T = sc.tic()
-    sim1 = test_hiv(model_hiv=False)
+    # sim0 = test_hiv(model_hiv=True)
+    # sim1 = test_hiv(model_hiv=False)
+    sim2 = test_impact_on_cancer()
     sc.toc(T)
     print('Done.')
