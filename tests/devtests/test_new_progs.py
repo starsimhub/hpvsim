@@ -13,13 +13,7 @@ from scipy.stats import lognorm
 
 
 # Create sim to get baseline prognoses parameters
-hpv16 = hpv.genotype('HPV16')
-hpv18 = hpv.genotype('HPV18')
-# hpv6 = hpv.genotype('HPV6')
-hpv31 = hpv.genotype('HPV31')
-sim = hpv.Sim(genotypes=[hpv16,hpv18,
-                         # hpv6,
-                         hpv31])
+sim = hpv.Sim(genotypes='all')
 sim.initialize()
 
 # Get parameters
@@ -27,16 +21,6 @@ ng = sim['n_genotypes']
 genotype_pars = sim['genotype_pars']
 genotype_map = sim['genotype_map']
 cancer_thresh = 0.99
-genotype_pars['hpv16'].prog_time = 8
-genotype_pars['hpv18'].prog_time = 8
-genotype_pars['hpv16'].prog_rate = 0.7
-genotype_pars['hpv18'].prog_rate = 0.8
-genotype_pars['hpv31'].prog_time = 15
-# genotype_pars['hpv6'].prog_time = 15
-genotype_pars['hpv31'].prog_rate = .3
-# genotype_pars['hpv6'].prog_rate = 0.1
-genotype_pars['hpv16'].dur_dysp['par1'] = 3.16
-genotype_pars['hpv16'].dur_precin['par1'] = 1.23
 
 # Prognoses from Harvard model
 prognoses = dict(
@@ -57,17 +41,17 @@ prog_rate = [genotype_pars[genotype_map[g]]['prog_rate'] for g in range(ng)]
 
 
 #%% Helper functions
-def lognorm_params(mode, stddev):
+def lognorm_params(par1, par2):
     """
     Given the mode and std. dev. of the log-normal distribution, this function
     returns the shape and scale parameters for scipy's parameterization of the
     distribution.
     """
-    p = np.poly1d([1, -1, 0, 0, -(stddev/mode)**2])
-    r = p.roots
-    sol = r[(r.imag == 0) & (r.real > 0)].real
-    shape = np.sqrt(np.log(sol))
-    scale = mode * sol
+    mean = np.log(par1 ** 2 / np.sqrt(par2 ** 2 + par1 ** 2))  # Computes the mean of the underlying normal distribution
+    sigma = np.sqrt(np.log(par2 ** 2 / par1 ** 2 + 1))  # Computes sigma for the underlying normal distribution
+
+    scale = np.exp(mean)
+    shape = sigma
     return shape, scale
 
 
@@ -94,7 +78,7 @@ sc.fonts(add=sc.thisdir(aspath=True) / 'Libertinus Sans')
 sc.options(font='Libertinus Sans')
 plt.rcParams['font.size'] = font_size
 colors = sc.gridcolors(ng)
-x = np.linspace(0.01, 7, 700)
+x = np.linspace(0.01, 2, 200)
 
 #%% Preliminary calculations (all to be moved within an analyzer? or sim method?)
 
@@ -133,10 +117,10 @@ for g in range(ng):
         indcancer = indcin3
 
     noneshares.append(1 - shares[g])
-    cin1shares.append(((rv.cdf(longx[indcin1])-rv.cdf(longx[0]))*shares[g])[0])
-    cin2shares.append(((rv.cdf(longx[indcin2])-rv.cdf(longx[indcin1]))*shares[g])[0])
-    cin3shares.append(((rv.cdf(longx[indcin3])-rv.cdf(longx[indcin2]))*shares[g])[0])
-    cancershares.append(((rv.cdf(longx[indcancer])-rv.cdf(longx[indcin3]))*shares[g])[0])
+    cin1shares.append(((rv.cdf(longx[indcin1])-rv.cdf(longx[0]))*shares[g]))
+    cin2shares.append(((rv.cdf(longx[indcin2])-rv.cdf(longx[indcin1]))*shares[g]))
+    cin3shares.append(((rv.cdf(longx[indcin3])-rv.cdf(longx[indcin2]))*shares[g]))
+    cancershares.append(((rv.cdf(longx[indcancer])-rv.cdf(longx[indcin3]))*shares[g]))
 
 ######## Outcomes by duration of infection and genotype
 n_samples = 10e3
