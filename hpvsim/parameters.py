@@ -350,6 +350,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars = sc.objdict()
     mean16 = 13.9/12 # Defined here since used repeatedly below. This is the duration of HPV16 infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pcvar = 0.4
+    dysp_rate = 1.5
     pcdist = 'lognormal'
 
     pars.hpv16 = sc.objdict()
@@ -454,7 +455,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11 = sc.objdict()
     pars.hpv11.dur_precin   = dict(dist=pcdist, par1=8.1/12, par2=pcvar)  # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv11.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv11.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv11.dysp_rate    = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv11.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv11.prog_time    = 30  # Point of inflection in logistic function
     pars.hpv11.rel_beta     = 0.5 # Relative transmissibility, generally calibrated to match available type distributions

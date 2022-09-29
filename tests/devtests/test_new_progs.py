@@ -149,6 +149,46 @@ sharesdf = pd.DataFrame(data)
 
 
 ################################################################################
+# BEGIN FIGURE WITH PRECIN DISTRIBUTIONS
+################################################################################
+def make_precinfig():
+    fig, ax = plt.subplots(2, 3, figsize=(24, 12))
+
+    HR = ['hpv16', 'hpv18']
+    OHR = ['hpv31', 'hpv33', 'hpv35', 'hpv45', 'hpv51', 'hpv52', 'hpv56', 'hpv58']
+    LR = ['hpv6', 'hpv11']
+    alltypes = [HR, OHR, LR]
+    pn = 0
+
+    # Output table
+    table  = ' Type : % no dysp\n'
+
+    for ai, gtypes in enumerate(alltypes):
+        for gtype in gtypes:
+            sigma, scale = lognorm_params(genotype_pars[gtype]['dur_precin']['par1'], genotype_pars[gtype]['dur_precin']['par2'])
+            rv = lognorm(sigma, 0, scale)
+            ax[0,ai].plot(x, rv.pdf(x), color=colors[pn], lw=2, label=gtype.upper())
+            ax[1,ai].plot(x, logf1(x, genotype_pars[gtype]['dysp_rate']), color=colors[pn], lw=2, label=gtype.upper())
+            table += f"{gtype.upper().rjust(5)}: {100-sum(np.diff(rv.cdf(x))*logf1(x, genotype_pars[gtype]['dysp_rate'])[1:])*100:.0f}\n"
+            pn += 1
+
+        ax[0,ai].legend(fontsize=18)
+        ax[1,ai].set_xlabel("Duration of infection prior to\ncontrol/clearance/dysplasia (months)")
+        for row in [0,1]:
+            ax[row,ai].set_ylabel("")
+            ax[row,ai].grid(axis='x')
+            ax[row,ai].set_xticks([0,0.5,1.0,1.5,2.0])
+            ax[row,ai].set_xticklabels([0,6,12,18,24])
+        ax[0,ai].get_yaxis().set_ticks([])
+        # ax[0,ai].set_title("Distribution of infection durations\nprior to dysplasia or control")
+
+    fig.tight_layout()
+    plt.savefig("precin_dists.png", dpi=100)
+    print(table)
+
+
+
+################################################################################
 # BEGIN FIGURE 1
 ################################################################################
 def make_fig1():
@@ -232,7 +272,7 @@ def make_fig1():
     w = 0.04
     for y in years:
         la = loc_array[y - 1] * w + np.sign(loc_array[y - 1])*(-1)*w/2
-        bottom = np.zeros(3)
+        bottom = np.zeros(ng)
         for gn, grade in enumerate(['CIN1', 'CIN2', 'CIN3', 'Cancer']):
             ydata = sharesdf[sharesdf['Year']==y][grade]
             ax[1,1].bar(np.arange(1,ng+1)+la, ydata, width=w, color=cmap[gn], bottom=bottom, edgecolor='k', label=grade);
@@ -285,7 +325,8 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    make_fig1()
+    make_precinfig()
+    # make_fig1()
     # make_fig2()
 
     sc.toc(T)
