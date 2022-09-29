@@ -58,10 +58,22 @@ def test_impact_on_cancer():
                 'model_hiv': False
             }
         },
-        'hiv': {
-            'name': 'HIV',
+        'hiv_baseline': {
+            'name': 'HIV, baseline',
             'pars': {
                 'model_hiv': True
+            }
+        },
+        'hiv_elevated_risk': {
+            'name': 'HIV, elevated risk',
+            'pars': {
+                'model_hiv': True,
+                'hiv_pars': {
+                    'rel_sus': 3,
+                    'dysp_rate': 5,
+                    'prog_rate': 5,
+                    'prog_time': 5,
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ import random # Used only for resetting the seed
 import sciris as sc # For additional utilities
 from .settings import options as hpo # To set options
 from . import defaults as hpd # To set default types
+from sklearn import preprocessing
 
 
 # What functions are externally visible -- note, this gets populated in each section below
@@ -254,13 +255,13 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     return f, m, current_partners, new_pship_inds, new_pship_counts
 
 
-def set_prognoses(people, inds, g, dur_nodysp):
+def set_prognoses(people, inds, g, dur_nodysp, pars=None):
     ''' Set disease progression '''
 
-    cin1_inds, dur_to_peak_dys = set_CIN1_prognoses(people, inds, g, dur_nodysp)
-    cin2_inds, dur_to_peak_dys, peaks = set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys)
-    cin3_inds, dur_to_peak_dys, peaks = set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys, peaks)
-    set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys, peaks)
+    cin1_inds, dur_to_peak_dys = set_CIN1_prognoses(people, inds, g, dur_nodysp, pars=pars)
+    cin2_inds, dur_to_peak_dys, peaks = set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys, pars=pars)
+    cin3_inds, dur_to_peak_dys, peaks = set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys, peaks, pars=pars)
+    set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys, peaks, pars=pars)
 
     return
 
@@ -274,8 +275,9 @@ def set_CIN1_prognoses(people, hpv_inds, g, dur_nodysp=None, pars=None):
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
 
     if pars is not None:
-        art_adherence = people.art_adherence[hpv_inds]
-        dysp_rate *= pars['dysp_rate']*(1-art_adherence)
+        art_adherence = 1 - people.art_adherence[hpv_inds]
+        adherence_scaled = normalize(art_adherence, 1/pars['dysp_rate'], 1)
+        dysp_rate *= pars['dysp_rate']*adherence_scaled
 
     if dur_nodysp is None:
         dur_precin = genotype_pars[genotype_map[g]]['dur_precin']
@@ -1032,3 +1034,13 @@ def find_cutoff(duration_cutoffs, duration):
 
 def check_hiv(people, t):
     return None
+
+# explicit function to normalize array
+def normalize(arr, t_min, t_max):
+    norm_arr = []
+    diff = t_max - t_min
+    diff_arr = max(arr) - min(arr)
+    for i in arr:
+        temp = (((i - min(arr))*diff)/diff_arr) + t_min
+        norm_arr.append(temp)
+    return norm_arr

@@ -608,20 +608,25 @@ class People(hpb.BasePeople):
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
             this_dur = hpu.sample(**dur_precin, size=len(inds))  # Duration of infection without dysplasia in years
-            this_dur_f = self.dur_precin[g, inds[self.is_female[inds]]]
         else:
             if len(dur) != len(inds):
                 errormsg = f'If supplying durations of infections, they must be the same length as inds: {len(dur)} vs. {len(inds)}.'
                 raise ValueError(errormsg)
             this_dur    = dur
-            this_dur_f  = dur[self.is_female[inds]]
 
         self.dur_precin[g, inds]    = this_dur  # Set the duration of infection
         self.dur_disease[g, inds]   = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
+        this_dur_f = self.dur_precin[g, inds[self.is_female[inds]]]
 
         # Compute disease progression for females and skip for makes; males are updated below
         if len(f_inds)>0:
             fg_inds = inds[self.is_female[inds]] # Subset the indices so we're only looking at females with this genotype
+            if self.pars['model_hiv']:
+                hiv_inds = fg_inds[hpu.true(self.hiv[fg_inds])] # Figure out if any of these women have HIV
+                if len(hiv_inds):
+                    hpu.set_prognoses(self, hiv_inds, g, this_dur_f[hpu.true(self.hiv[fg_inds])], pars=self.pars['hiv_pars'])
+                    fg_inds = np.setdiff1d(fg_inds, hiv_inds)
+                    this_dur_f = this_dur_f[hpu.false(self.hiv[fg_inds])]
             hpu.set_prognoses(self, fg_inds, g, this_dur_f)
 
         if len(m_inds)>0:
