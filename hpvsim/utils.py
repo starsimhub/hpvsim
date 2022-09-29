@@ -473,7 +473,6 @@ def set_HIV_prognoses(people, inds, year=None):
     ''' Set HIV outcomes (for now only ART) '''
 
     # Get parameters that will be used later
-    dt = people.pars['dt']
     art_cov = people.pars['art_adherence']
 
     all_years = np.array(list(art_cov.keys()))
@@ -482,7 +481,7 @@ def set_HIV_prognoses(people, inds, year=None):
     age_inds = np.digitize(people.age[inds], age_bins) - 1
     year_ind = sc.findnearest(all_years, year)
     nearest_year = all_years[year_ind]
-    art_covs = art_cov[nearest_year][1,:] * dt
+    art_covs = art_cov[nearest_year][1,:]
 
     art_adherence = art_covs[age_inds]
 
