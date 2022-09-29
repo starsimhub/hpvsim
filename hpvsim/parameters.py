@@ -131,7 +131,7 @@ def make_pars(**kwargs):
         'rel_sus': 2.2,
         'dysp_rate': 2,
         'prog_rate': 2,
-        'prog_time': 3,
+        'prog_time': 0.3,
     }
 
     # Events and interventions

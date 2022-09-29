@@ -275,9 +275,10 @@ def set_CIN1_prognoses(people, hpv_inds, g, dur_nodysp=None, pars=None):
     dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
 
     if pars is not None:
-        art_adherence = 1 - people.art_adherence[hpv_inds]
-        adherence_scaled = normalize(art_adherence, 1/pars['dysp_rate'], 1)
-        dysp_rate *= pars['dysp_rate']*adherence_scaled
+        immune_compromise = 1 - people.art_adherence[hpv_inds]
+        mod = immune_compromise * pars['dysp_rate']
+        mod[mod < 1] = 1
+        dysp_rate *= mod
 
     if dur_nodysp is None:
         dur_precin = genotype_pars[genotype_map[g]]['dur_precin']
@@ -317,9 +318,13 @@ def set_CIN2_prognoses(people, cin1_inds, g, dur_to_peak_dys=None, pars=None):
     prog_time = genotype_pars[genotype_map[g]]['prog_time']
 
     if pars is not None:
-        art_adherence = people.art_adherence[cin1_inds]
-        prog_rate *= pars['prog_rate']*(1-art_adherence)
-        prog_time *= pars['prog_time']*(1-art_adherence)
+        immune_compromise = 1 - people.art_adherence[cin1_inds]
+        mod = immune_compromise * pars['prog_rate']
+        mod[mod < 1] = 1
+        prog_rate *= mod
+        mod = immune_compromise * pars['prog_time']
+        mod[mod > 1] = 1
+        prog_time *= mod
 
     ccut = people.pars['clinical_cutoffs']
     sev_dist = people.pars['severity_dist']['dist']
@@ -367,9 +372,13 @@ def set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys=None, peaks=None, p
     prog_time = genotype_pars[genotype_map[g]]['prog_time']
 
     if pars is not None:
-        art_adherence = people.art_adherence[cin2_inds]
-        prog_rate *= pars['prog_rate']*(1-art_adherence)
-        prog_time *= pars['prog_time']*(1-art_adherence)
+        immune_compromise = 1 - people.art_adherence[cin2_inds]
+        mod = immune_compromise * pars['prog_rate']
+        mod[mod < 1] = 1
+        prog_rate *= mod
+        mod = immune_compromise * pars['prog_time']
+        mod[mod > 1] = 1
+        prog_time *= mod
 
     ccut = people.pars['clinical_cutoffs']
     sev_dist = people.pars['severity_dist']['dist']
@@ -416,9 +425,13 @@ def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, peaks=None,
     prog_time = genotype_pars[genotype_map[g]]['prog_time']
 
     if pars is not None:
-        art_adherence = people.art_adherence[cin3_inds]
-        prog_rate *= pars['prog_rate']*(1-art_adherence)
-        prog_time *= pars['prog_time']*(1-art_adherence)
+        immune_compromise = 1 - people.art_adherence[cin3_inds]
+        mod = immune_compromise * pars['prog_rate']
+        mod[mod < 1] = 1
+        prog_rate *= mod
+        mod = immune_compromise * pars['prog_time']
+        mod[mod > 1] = 1
+        prog_time *= mod
 
     ccut = people.pars['clinical_cutoffs']
     sev_dist = people.pars['severity_dist']['dist']
@@ -1030,17 +1043,3 @@ def find_cutoff(duration_cutoffs, duration):
     Find which duration bin each ind belongs to.
     '''
     return np.nonzero(duration_cutoffs <= duration)[0][-1]  # Index of the duration bin to use
-
-
-def check_hiv(people, t):
-    return None
-
-# explicit function to normalize array
-def normalize(arr, t_min, t_max):
-    norm_arr = []
-    diff = t_max - t_min
-    diff_arr = max(arr) - min(arr)
-    for i in arr:
-        temp = (((i - min(arr))*diff)/diff_arr) + t_min
-        norm_arr.append(temp)
-    return norm_arr

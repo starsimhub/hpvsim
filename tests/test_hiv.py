@@ -72,7 +72,7 @@ def test_impact_on_cancer():
                     'rel_sus': 3,
                     'dysp_rate': 5,
                     'prog_rate': 5,
-                    'prog_time': 5,
+                    'prog_time': 1/5,
                 }
             }
         }
