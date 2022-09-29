@@ -10,7 +10,6 @@ import random # Used only for resetting the seed
 import sciris as sc # For additional utilities
 from .settings import options as hpo # To set options
 from . import defaults as hpd # To set default types
-from sklearn import preprocessing
 
 
 # What functions are externally visible -- note, this gets populated in each section below
