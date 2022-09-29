@@ -382,7 +382,7 @@ class People(hpb.BasePeople):
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
         self.hiv[hiv_inds] = True
 
-        # Determine who gets on ART and who does not
+        # Set ART adherence for those who acquire HIV
         if len(hiv_inds):
             hpu.set_HIV_prognoses(self, hiv_inds, year=year)
             for health_state, update_prog in zip(['precin', 'cin1', 'cin2', 'cin3'],
@@ -390,7 +390,6 @@ class People(hpb.BasePeople):
                                                   hpu.set_CIN3_prognoses, hpu.set_cancer_prognoses]):
                 for g in range(self.pars['n_genotypes']):
                     inds = hiv_inds[hpu.true(self[health_state][g, hiv_inds])]
-                    # Update HPV/CC prognoses for those who are immunocompromised today?
                     if len(inds):
                         update_prog(self, inds, g, pars=self.pars['hiv_pars'])
                     pass
