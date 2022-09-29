@@ -132,6 +132,7 @@ def make_pars(**kwargs):
         'dysp_rate': 2,
         'prog_rate': 2,
         'prog_time': 0.3,
+        'reactivation_prob': 3,
     }
 
     # Events and interventions

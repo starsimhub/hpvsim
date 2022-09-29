@@ -64,18 +64,18 @@ def test_impact_on_cancer():
                 'model_hiv': True
             }
         },
-        'hiv_elevated_risk': {
-            'name': 'HIV, elevated risk',
-            'pars': {
-                'model_hiv': True,
-                'hiv_pars': {
-                    'rel_sus': 3,
-                    'dysp_rate': 5,
-                    'prog_rate': 5,
-                    'prog_time': 1/5,
-                }
-            }
-        }
+        # 'hiv_elevated_risk': {
+        #     'name': 'HIV, elevated risk',
+        #     'pars': {
+        #         'model_hiv': True,
+        #         'hiv_pars': {
+        #             'rel_sus': 3,
+        #             'dysp_rate': 5,
+        #             'prog_rate': 5,
+        #             'prog_time': 1/5,
+        #         }
+        #     }
+        # }
     }
 
     metapars = {'n_runs': 3}
@@ -103,7 +103,7 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv(model_hiv=True)
+    # sim0 = test_hiv(model_hiv=True)
     # sim1 = test_hiv(model_hiv=False)
     sim2 = test_impact_on_cancer()
     sc.toc(T)
