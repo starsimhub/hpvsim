@@ -385,11 +385,12 @@ class People(hpb.BasePeople):
         # Set ART adherence for those who acquire HIV
         if len(hiv_inds):
             hpu.set_HIV_prognoses(self, hiv_inds, year=year)
+            f_hiv_inds = self.is_female[hiv_inds].nonzero()[-1]
             for health_state, update_prog in zip(['precin', 'cin1', 'cin2', 'cin3'],
                                                  [hpu.set_CIN1_prognoses, hpu.set_CIN2_prognoses,
                                                   hpu.set_CIN3_prognoses, hpu.set_cancer_prognoses]):
                 for g in range(self.pars['n_genotypes']):
-                    inds = hiv_inds[hpu.true(self[health_state][g, hiv_inds])]
+                    inds = hiv_inds[hpu.true(self[health_state][g, f_hiv_inds])]
                     if len(inds):
                         update_prog(self, inds, g, pars=self.pars['hiv_pars'])
                     pass
