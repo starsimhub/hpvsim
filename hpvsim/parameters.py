@@ -945,21 +945,25 @@ def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=Fa
     art_adherence = dict()
     years = df_art['Year'].values
     for i, year in enumerate(years):
-        ages_inc_str = hiv_incidence_rates[year]['m'][:, 0]
-        ages_inc_str = ages_inc_str[:-1]
-        ages_inc = [int(i) for i in ages_inc_str]
-        ages_ex = life_exp[year]['m'][:, 0]
-        ages = np.intersect1d(ages_inc, ages_ex)
+
+        # Use the incidence file to determine which age groups we want to calculate ART coverage for
+        ages_inc_str = hiv_incidence_rates[year]['m'][:, 0] # Read in the age groups we have HIV incidence data for
+        ages_inc_str = ages_inc_str[:-1] # Drop the last value
+        ages_inc = [int(i) for i in ages_inc_str] # Convert to integers
+        ages_ex = life_exp[year]['m'][:, 0] # Age groups available in life expectancy file
+        ages = np.intersect1d(ages_inc, ages_ex) # Age groups we want to calculate ART coverage for
+
+        # Initialize age-specific ART coverage dict and start filling it in
         cov = np.zeros(len(ages), dtype=hpd.default_float)
         for j, age in enumerate(ages):
-            idx = np.where(life_exp[year]['f'][:, 0] == age)[0]
-            this_life_exp = life_exp[year]['f'][idx, 1]
-            last_year = int(year + this_life_exp)
-            year_ind = sc.findnearest(years, last_year)
-            if year_ind > i:
+            idx = np.where(life_exp[year]['f'][:, 0] == age)[0] # Finding life expectancy for this age group/year
+            this_life_exp = life_exp[year]['f'][idx, 1] # Pull out value
+            last_year = int(year + this_life_exp) # Figure out the year in which this age cohort is expected to die
+            year_ind = sc.findnearest(years, last_year) # Get as close to the above year as possible within the data
+            if year_ind > i: # Either take the mean of ART coverage from now up until the year of death
                 cov[j] = np.mean(df_art[i:year_ind]['ART Coverage'].values)
-            else:
-                cov[j] = np.mean(df_art.iloc[year_ind]['ART Coverage'])
+            else: # Or, just use ART overage in this year
+                cov[j] = df_art.iloc[year_ind]['ART Coverage']
 
         art_adherence[year] = np.array([ages, cov])
 

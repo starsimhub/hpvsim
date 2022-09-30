@@ -22,18 +22,11 @@ files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
 files.life_expectancy = 'ex.obj'
 
-hiv_files = sc.objdict()
-hiv_files.incidence = 'hiv_incidence'
-hiv_files.art_coverage = 'art_coverage'
-
 # Cache data as a dict
 cache = dict()
 
 for k,v in files.items():
     files[k] = filesdir / v
-
-for k,v in hiv_files.items():
-    hiv_files[k] = filesdir / v
 
 
 def sanitizestr(string=None, alphanumeric=True, nospaces=True, asciify=True, lower=True, spacechar='_', symchar='_'):
