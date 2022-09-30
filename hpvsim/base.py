@@ -271,8 +271,6 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
-            if pars.get('model_hiv'):
-                pars['hiv_infection_rates'], pars['art_adherence'] = hppar.get_hiv_rates(location=location)
 
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)

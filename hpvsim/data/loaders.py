@@ -11,7 +11,7 @@ import re
 from .. import misc as hpm
 
 __all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates',
-           'get_birth_rates', 'get_hiv_data']
+           'get_birth_rates', 'get_life_expectancy']
 
 
 filesdir = sc.path(sc.thisdir()) / 'files'
@@ -322,47 +322,3 @@ def get_birth_rates(location=None):
     years = years[inds]
     return np.array([years, birth_rates])
 
-
-def get_hiv_data(location):
-    '''
-        Load HIV incidence rates and ART coverage for a given country.
-        Args:
-            location (str): name of the country to load the HIV data for
-
-        Returns:
-            hiv_incidence_rates (dict): HIV incidence rates by age and sex
-            art_coverage (df): ART coverage by year
-            life_expectancy (dict): life expectancy by year, age, sex
-        '''
-    # Load the data
-    try:
-        life_exp = get_life_expectancy(location=location)
-    except Exception as E:
-        errormsg = f'Could not locate life expectancy for {location}. Please provide these files first.'
-        raise ValueError(errormsg) from E
-
-    location = sanitizestr(location)
-    try:
-        df_inc = pd.read_csv(f'{hiv_files.incidence}_{location}.csv')
-        df_art = pd.read_csv(f'{hiv_files.art_coverage}_{location}.csv')
-    except Exception as E:
-        errormsg = f'Could not locate HIV datafiles for {location}. Please provide these files first.'
-        raise ValueError(errormsg) from E
-
-    sex_keys = ['Male', 'Female']
-    sex_key_map = {'Male': 'm', 'Female': 'f'}
-
-    ## Start with incidence file
-
-    years = df_inc['Year'].unique()
-    result_incidence = dict()
-
-    # Processing
-    for year in years:
-        result_incidence[year] = dict()
-        for sk in sex_keys:
-            sk_out = sex_key_map[sk]
-            result_incidence[year][sk_out] = np.array(
-                df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']])
-
-    return result_incidence, df_art, life_exp

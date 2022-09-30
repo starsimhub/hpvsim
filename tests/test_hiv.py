@@ -12,7 +12,7 @@ from hpvsim.data import get_data as data
 do_plot = 0
 do_save = 0
 
-n_agents = [2e3,50e3][1] # Swap between sizes
+n_agents = [2e3,50e3][0] # Swap between sizes
 
 
 #%% Define the tests
@@ -31,7 +31,11 @@ def test_hiv(model_hiv=True):
         'model_hiv': model_hiv
     }
 
-    sim = hpv.Sim(pars=pars)
+    sim = hpv.Sim(
+        pars=pars,
+        hiv_datafile='test_data/hiv_incidence_south_africa.csv',
+        art_datafile='test_data/art_coverage_south_africa.csv'
+    )
     sim.run()
     sim.plot(to_plot=['hiv_prevalence'])
     return sim
@@ -49,7 +53,11 @@ def test_impact_on_cancer():
         'dt': .5,
     }
 
-    base_sim = hpv.Sim(pars=pars)
+    base_sim = hpv.Sim(
+        pars=pars,
+        hiv_datafile='test_data/hiv_incidence_south_africa.csv',
+        art_datafile='test_data/art_coverage_south_africa.csv'
+    )
 
     scenarios = {
         'no_hiv': {
@@ -104,8 +112,7 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    # sim0 = test_hiv(model_hiv=True)
-    # sim1 = test_hiv(model_hiv=False)
-    sim2 = test_impact_on_cancer()
+    sim0 = test_hiv(model_hiv=True)
+    sim1 = test_impact_on_cancer()
     sc.toc(T)
     print('Done.')

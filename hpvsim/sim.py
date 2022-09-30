@@ -22,7 +22,7 @@ from .settings import options as hpo
 class Sim(hpb.BaseSim):
 
     def __init__(self, pars=None, datafile=None, label=None,
-                 popfile=None, people=None, version=None, **kwargs):
+                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None, **kwargs):
 
         # Set attributes
         self.label         = label    # The label/name of the simulation
@@ -45,9 +45,14 @@ class Sim(hpb.BaseSim):
         default_pars = hppar.make_pars(version=version) # Start with default pars
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
-        # Update pars and load data
-        self.update_pars(pars, **kwargs)   # Update the parameters, if provided
+        # Load data, including datafile that are used to create additional optional parameters
         self.load_data(datafile) # Load the data, if provided
+        location = pars['location'] if pars.get('location') else None
+        data_pars = self.load_pars_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
+        pars = sc.mergedicts(pars, data_pars)
+
+        # Update parameters
+        self.update_pars(pars, **kwargs)   # Update the parameters, if provided
 
         return
 
@@ -58,6 +63,11 @@ class Sim(hpb.BaseSim):
             self.data = hpm.load_data(datafile=datafile, check_date=True, **kwargs)
         return
 
+    def load_pars_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
+        ''' Load any data files that are used to create additional parameters, if provided '''
+        data_pars = dict()
+        data_pars['hiv_infection_rates'], data_pars['art_adherence'] = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        return data_pars
 
     def initialize(self, reset=False, init_states=True, **kwargs):
         '''
