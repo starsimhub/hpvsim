@@ -907,6 +907,13 @@ def get_life_expectancy(location, verbose=False):
 def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
     '''
     Load HIV incidence and art coverage data, if provided
+    ART adherance calculations use life expectancy data to infer lifetime average coverage
+    rates for people in different age buckets. To give an example, suppose that ART coverage
+    over 2010-2020 is given by:
+        art_coverage = [0.23,0.3,0.38,0.43,0.48,0.52,0.57,0.61,0.65,0.68,0.72]
+    The average ART adherence in 2010 will be higher for younger cohorts than older ones.
+    Someone expected to die within a year would be given an average lifetime ART adherence
+    value of 0.23, whereas someone expected to survive >10 years would be given a value of 0.506.
 
     Args:
         location (str): must be provided if you want to run with HIV dynamics
