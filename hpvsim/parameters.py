@@ -945,8 +945,12 @@ def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=Fa
         hiv_incidence_rates[year] = dict()
         for sk in sex_keys:
             sk_out = sex_key_map[sk]
-            hiv_incidence_rates[year][sk_out] = np.array(
-                df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']])
+            hiv_incidence_rates[year][sk_out] = np.concatenate(
+                [
+                np.array(df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']], dtype=hpd.default_float),
+                np.array([[150,0]]) # Add another entry so that all older age groups are covered
+                ]
+            )
 
     # Now compute ART adherence over time/age
     art_adherence = dict()
@@ -954,9 +958,7 @@ def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=Fa
     for i, year in enumerate(years):
 
         # Use the incidence file to determine which age groups we want to calculate ART coverage for
-        ages_inc_str = hiv_incidence_rates[year]['m'][:, 0] # Read in the age groups we have HIV incidence data for
-        ages_inc_str = ages_inc_str[:-1] # Drop the last value
-        ages_inc = [int(i) for i in ages_inc_str] # Convert to integers
+        ages_inc = hiv_incidence_rates[year]['m'][:, 0] # Read in the age groups we have HIV incidence data for
         ages_ex = life_exp[year]['m'][:, 0] # Age groups available in life expectancy file
         ages = np.intersect1d(ages_inc, ages_ex) # Age groups we want to calculate ART coverage for
 

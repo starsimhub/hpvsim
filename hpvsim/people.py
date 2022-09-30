@@ -359,22 +359,18 @@ class People(hpb.BasePeople):
         '''
         Apply HIV infection rates to population
         '''
-
         hiv_pars = self.pars['hiv_infection_rates']
         all_years = np.array(list(hiv_pars.keys()))
-        base_year = all_years[0]
-        age_bins = hiv_pars[base_year]['m'][:,0]
-        age_bins = age_bins[:-1]
-        age_bins = [int(i) for i in age_bins]
-        age_inds = np.digitize(self.age, age_bins)-1
-        hiv_probs = np.empty(len(self), dtype=hpd.default_float)
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
-        hiv_f = hiv_pars[nearest_year]['f'][:,1]*self.pars['dt']
-        hiv_m = hiv_pars[nearest_year]['m'][:,1]*self.pars['dt']
 
-        hiv_probs[self.is_female] = hiv_f[age_inds[self.is_female]]
-        hiv_probs[self.is_male] = hiv_m[age_inds[self.is_male]]
+        hiv_probs = np.empty(len(self), dtype=hpd.default_float)
+        for sk in ['f','m']:
+            age_bins = hiv_pars[nearest_year][sk][:,0]
+            age_inds = np.digitize(self.age, age_bins)
+            hiv = hiv_pars[nearest_year][sk][:,1]*self.pars['dt']
+            if      sk=='f': hiv_probs[self.is_female]  = hiv[age_inds[self.is_female]]
+            elif    sk=='m': hiv_probs[self.is_male]    = hiv[age_inds[self.is_male]]
         hiv_probs[~self.alive] = 0
         hiv_probs[self.hiv] = 0 # not at risk if already infected
 
@@ -384,6 +380,7 @@ class People(hpb.BasePeople):
 
         # Set ART adherence for those who acquire HIV
         if len(hiv_inds):
+            
             hpu.set_HIV_prognoses(self, hiv_inds, year=year)
             f_hiv_inds = self.is_female[hiv_inds].nonzero()[-1]
             for health_state, update_prog in zip(['precin', 'cin1', 'cin2', 'cin3'],
@@ -391,11 +388,7 @@ class People(hpb.BasePeople):
                                                   hpu.set_CIN3_prognoses, hpu.set_cancer_prognoses]):
                 for g in range(self.pars['n_genotypes']):
                     inds = hiv_inds[hpu.true(self[health_state][g, f_hiv_inds])]
-                    if len(inds):
-                        update_prog(self, inds, g, pars=self.pars['hiv_pars'])
-                    pass
-
-
+                    if len(inds): update_prog(self, inds, g, pars=self.pars['hiv_pars'])
 
         return len(hiv_inds)
 
