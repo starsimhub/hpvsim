@@ -472,20 +472,22 @@ def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, peaks=None,
 def set_HIV_prognoses(people, inds, year=None):
     ''' Set HIV outcomes (for now only ART) '''
 
-    # Get parameters that will be used later
-    art_cov = people.pars['art_adherence']
+    art_cov = people.pars['art_adherence'] # Shorten
 
+    # Extract index of current year
     all_years = np.array(list(art_cov.keys()))
-    base_year = all_years[0]
-    age_bins = art_cov[base_year][0,:]
-    age_inds = np.digitize(people.age[inds], age_bins) - 1
     year_ind = sc.findnearest(all_years, year)
     nearest_year = all_years[year_ind]
+
+    # Figure out which age bin people belong to
+    age_bins = art_cov[nearest_year][0, :]
+    age_inds = np.digitize(people.age[inds], age_bins)
+
+    # Apply ART coverage by age to people
     art_covs = art_cov[nearest_year][1,:]
-
     art_adherence = art_covs[age_inds]
-
     people.art_adherence[inds] = art_adherence
+    
     return
 
 
