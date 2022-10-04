@@ -760,13 +760,7 @@ class Sim(hpb.BaseSim):
                     self.results[key][genotype][idx] += count[genotype]
             else:
                 try:self.results[f'total_{key}'][idx] += count
-                except:
-                    try: self.results[key][idx] += count
-                    except:
-                        import traceback;
-                        traceback.print_exc();
-                        import pdb;
-                        pdb.set_trace()
+                except: self.results[key][idx] += count
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
