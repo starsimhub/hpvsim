@@ -902,7 +902,8 @@ def get_life_expectancy(location, verbose=False):
         except ValueError as E:
             errormsg = f'Could not load HIV data for requested location "{location}" ({str(E)})'
             raise NotImplementedError(errormsg)
-
+    else:
+        raise NotImplementedError('Cannot load HIV data without a specified location')
 
 def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
     '''

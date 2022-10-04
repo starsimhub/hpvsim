@@ -48,7 +48,8 @@ class Sim(hpb.BaseSim):
         # Load data, including datafile that are used to create additional optional parameters
         self.load_data(datafile) # Load the data, if provided
         location = pars.get('location') if pars else None
-        if self.pars['model_hiv']:
+        model_hiv = pars.get('model_hiv') if pars else None
+        if model_hiv or self.pars['model_hiv']:
             data_pars = self.load_pars_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
             pars = sc.mergedicts(pars, data_pars) # Merge parameters supplied as in pars dict with any additional parameters created from datafile inputs
 
