@@ -28,6 +28,8 @@ class Sim(hpb.BaseSim):
         self.label         = label    # The label/name of the simulation
         self.created       = None     # The datetime the sim was created
         self.datafile      = datafile # The name of the data file
+        self.art_datafile  = art_datafile # The name of the ART data file
+        self.hiv_datafile  = hiv_datafile # The name of the HIV data file
         self.popfile       = popfile  # The population file
         self.data          = None     # The data
         self.popdict       = people   # The population dictionary
