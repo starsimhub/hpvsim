@@ -369,8 +369,8 @@ def get_genotype_pars(default=False, genotype=None):
                                     # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
                                     # https://academic.oup.com/jid/article/197/10/1436/2191990
                                     # https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=4.5, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv16.dysp_rate    = 1.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=4.5, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv16.prog_rate    = 0.79 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_time    = 4.4  # Point of inflection in logistic function
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this

@@ -378,17 +378,17 @@ class People(hpb.BasePeople):
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
         self.hiv[hiv_inds] = True
 
-        # Set ART adherence for those who acquire HIV
+        # Update prognoses for those with HIV
         if len(hiv_inds):
             
-            hpu.set_HIV_prognoses(self, hiv_inds, year=year)
-            f_hiv_inds = self.is_female[hiv_inds].nonzero()[-1]
+            hpu.set_HIV_prognoses(self, hiv_inds, year=year) # Set ART adherence for those with HIV
+            f_hiv_inds = self.is_female[hiv_inds].nonzero()[-1] # Women with HIV
             for health_state, update_prog in zip(['precin', 'cin1', 'cin2', 'cin3'],
-                                                 [hpu.set_CIN1_prognoses, hpu.set_CIN2_prognoses,
+                                                 [hpu.init_dysp, hpu.progress_dysp,
                                                   hpu.set_CIN3_prognoses, hpu.set_cancer_prognoses]):
                 for g in range(self.pars['n_genotypes']):
-                    inds = hiv_inds[hpu.true(self[health_state][g, f_hiv_inds])]
-                    if len(inds): update_prog(self, inds, g, pars=self.pars['hiv_pars'])
+                    inds = hiv_inds[hpu.true(self[health_state][g, f_hiv_inds])] # Indices of those with HIV for whom the current health state is true
+                    if len(inds): update_prog(self, inds, g, hiv_pars=self.pars['hiv_pars'])
 
         return len(hiv_inds)
 
@@ -617,7 +617,7 @@ class People(hpb.BasePeople):
             if self.pars['model_hiv']:
                 hiv_inds = fg_inds[hpu.true(self.hiv[fg_inds])] # Figure out if any of these women have HIV
                 if len(hiv_inds):
-                    hpu.set_prognoses(self, hiv_inds, g, this_dur_f[hpu.true(self.hiv[fg_inds])], pars=self.pars['hiv_pars'])
+                    hpu.set_prognoses(self, hiv_inds, g, this_dur_f[hpu.true(self.hiv[fg_inds])], hiv_pars=self.pars['hiv_pars'])
                     fg_inds = np.setdiff1d(fg_inds, hiv_inds)
                     this_dur_f = this_dur_f[hpu.false(self.hiv[fg_inds])]
             hpu.set_prognoses(self, fg_inds, g, this_dur_f)

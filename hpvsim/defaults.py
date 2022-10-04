@@ -178,7 +178,13 @@ class PeopleMeta(sc.prettyobj):
         State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
     ]
 
-    all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states
+    # Severity
+    sev = [
+        State('peak_dysp', default_float, np.nan, shape='n_genotypes') # Peak dysplasia, as represented by a value 0-1 that maps onto clinical thresholds for CIN grades
+    ]
+
+
+    all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev
 
     @classmethod
     def validate(cls):
@@ -196,7 +202,7 @@ class PeopleMeta(sc.prettyobj):
 
         """
         # Validate
-        state_types = ['person', 'mece_states', 'imm_states', 'hiv_states', 'intv_states', 'dates', 'durs', 'all_states']
+        state_types = ['person', 'mece_states', 'imm_states', 'hiv_states', 'intv_states', 'dates', 'durs', 'sev', 'all_states']
         for state_type in state_types:
             states = getattr(cls, state_type)
             n_states        = len(states)
