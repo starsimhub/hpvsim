@@ -121,6 +121,11 @@ class PeopleMeta(sc.prettyobj):
         State('latent',     bool, False, 'n_genotypes', label='with latent infection', cmap=pl.cm.GnBu), # intersection of no_dysp and inactive.
     ]
 
+    hiv_states = [
+        State('hiv',        bool, False, label='infected with HIV', cmap=pl.cm.GnBu),
+        State('art_adherence',        default_float, 0, label='adherence on ART', cmap=pl.cm.Oranges)
+    ]
+
     # Additional intervention states
     intv_states = [
         State('detected_cancer',    bool,   False), # Whether the person's cancer has been detected
@@ -134,7 +139,7 @@ class PeopleMeta(sc.prettyobj):
     mece_states = alive_states + viral_states + dysp_states
 
     # Collection of states that we store as stock results
-    stock_states = viral_states + dysp_states + derived_states + intv_states
+    stock_states = viral_states + dysp_states + derived_states + intv_states + hiv_states
 
     # Set dates
     # Convert each MECE state and derived state into a date except for susceptible, alive, and no_dysp (which are True by default)
@@ -173,7 +178,13 @@ class PeopleMeta(sc.prettyobj):
         State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
     ]
 
-    all_states = person + mece_states + imm_states + intv_states + dates + durs + rship_states
+    # Severity
+    sev = [
+        State('peak_dysp', default_float, np.nan, shape='n_genotypes') # Peak dysplasia, as represented by a value 0-1 that maps onto clinical thresholds for CIN grades
+    ]
+
+
+    all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev
 
     @classmethod
     def validate(cls):
@@ -191,7 +202,7 @@ class PeopleMeta(sc.prettyobj):
 
         """
         # Validate
-        state_types = ['person', 'mece_states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
+        state_types = ['person', 'mece_states', 'imm_states', 'hiv_states', 'intv_states', 'dates', 'durs', 'sev', 'all_states']
         for state_type in state_types:
             states = getattr(cls, state_type)
             n_states        = len(states)
@@ -226,6 +237,7 @@ flows = [
     Flow('detected_cancer_deaths',  cmap=pl.cm.Purples, label='detected cancer deaths', by_genotype=False),
     Flow('reinfections',            cmap=pl.cm.GnBu),
     Flow('reactivations',           cmap=pl.cm.GnBu),
+    Flow('hiv_infections',          cmap=pl.cm.Oranges, label='HIV infections', by_genotype=False)
 ]
 flow_keys   = [flow.name for flow in flows if flow.by_genotype]
 total_flow_keys   = [flow.name for flow in flows if not flow.by_genotype]

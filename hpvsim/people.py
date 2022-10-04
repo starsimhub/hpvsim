@@ -136,6 +136,10 @@ class People(hpb.BasePeople):
         # Let people age by one time step
         self.increment_age()
 
+        # Check for HIV acquisitions
+        if self.pars['model_hiv']:
+            self.flows['hiv_infections'] = self.apply_hiv_rates(year=year)
+
         # Perform updates that are not genotype-specific
         update_freq = max(1, int(self.pars['dt_demog'] / self.pars['dt'])) # Ensure it's an integer not smaller than 1
         if t % update_freq == 0:
@@ -351,6 +355,44 @@ class People(hpb.BasePeople):
         return
 
 
+    def apply_hiv_rates(self, year=None):
+        '''
+        Apply HIV infection rates to population
+        '''
+        hiv_pars = self.pars['hiv_infection_rates']
+        all_years = np.array(list(hiv_pars.keys()))
+        year_ind = sc.findnearest(all_years, year)
+        nearest_year = all_years[year_ind]
+
+        hiv_probs = np.empty(len(self), dtype=hpd.default_float)
+        for sk in ['f','m']:
+            age_bins = hiv_pars[nearest_year][sk][:,0]
+            age_inds = np.digitize(self.age, age_bins)
+            hiv = hiv_pars[nearest_year][sk][:,1]*self.pars['dt']
+            if      sk=='f': hiv_probs[self.is_female]  = hiv[age_inds[self.is_female]]
+            elif    sk=='m': hiv_probs[self.is_male]    = hiv[age_inds[self.is_male]]
+        hiv_probs[~self.alive] = 0
+        hiv_probs[self.hiv] = 0 # not at risk if already infected
+
+        # Get indices of people who acquire HIV
+        hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
+        self.hiv[hiv_inds] = True
+
+        # Update prognoses for those with HIV
+        if len(hiv_inds):
+            
+            hpu.set_HIV_prognoses(self, hiv_inds, year=year) # Set ART adherence for those with HIV
+            f_hiv_inds = self.is_female[hiv_inds].nonzero()[-1] # Women with HIV
+            for health_state, update_prog in zip(['precin', 'cin1', 'cin2', 'cin3'],
+                                                 [hpu.init_dysp, hpu.progress_dysp,
+                                                  hpu.set_CIN3_prognoses, hpu.set_cancer_prognoses]):
+                for g in range(self.pars['n_genotypes']):
+                    inds = hiv_inds[hpu.true(self[health_state][g, f_hiv_inds])] # Indices of those with HIV for whom the current health state is true
+                    if len(inds): update_prog(self, inds, g, hiv_pars=self.pars['hiv_pars'])
+
+        return len(hiv_inds)
+
+
     def apply_death_rates(self, year=None):
         '''
         Apply death rates to remove people from the population
@@ -559,20 +601,25 @@ class People(hpb.BasePeople):
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
             this_dur = hpu.sample(**dur_precin, size=len(inds))  # Duration of infection without dysplasia in years
-            this_dur_f = self.dur_precin[g, inds[self.is_female[inds]]]
         else:
             if len(dur) != len(inds):
                 errormsg = f'If supplying durations of infections, they must be the same length as inds: {len(dur)} vs. {len(inds)}.'
                 raise ValueError(errormsg)
             this_dur    = dur
-            this_dur_f  = dur[self.is_female[inds]]
 
         self.dur_precin[g, inds]    = this_dur  # Set the duration of infection
         self.dur_disease[g, inds]   = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
+        this_dur_f = self.dur_precin[g, inds[self.is_female[inds]]]
 
         # Compute disease progression for females and skip for makes; males are updated below
         if len(f_inds)>0:
             fg_inds = inds[self.is_female[inds]] # Subset the indices so we're only looking at females with this genotype
+            if self.pars['model_hiv']:
+                hiv_inds = fg_inds[hpu.true(self.hiv[fg_inds])] # Figure out if any of these women have HIV
+                if len(hiv_inds):
+                    hpu.set_prognoses(self, hiv_inds, g, this_dur_f[hpu.true(self.hiv[fg_inds])], hiv_pars=self.pars['hiv_pars'])
+                    fg_inds = np.setdiff1d(fg_inds, hiv_inds)
+                    this_dur_f = this_dur_f[hpu.false(self.hiv[fg_inds])]
             hpu.set_prognoses(self, fg_inds, g, this_dur_f)
 
         if len(m_inds)>0:

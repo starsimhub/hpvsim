@@ -22,7 +22,7 @@ from .settings import options as hpo
 class Sim(hpb.BaseSim):
 
     def __init__(self, pars=None, datafile=None, label=None,
-                 popfile=None, people=None, version=None, **kwargs):
+                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None, **kwargs):
 
         # Set attributes
         self.label         = label    # The label/name of the simulation
@@ -45,9 +45,14 @@ class Sim(hpb.BaseSim):
         default_pars = hppar.make_pars(version=version) # Start with default pars
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
-        # Update pars and load data
-        self.update_pars(pars, **kwargs)   # Update the parameters, if provided
+        # Load data, including datafile that are used to create additional optional parameters
         self.load_data(datafile) # Load the data, if provided
+        location = pars['location'] if pars.get('location') else None
+        data_pars = self.load_pars_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
+        pars = sc.mergedicts(pars, data_pars) # Merge parameters supplied as in pars dict with any additional parameters created from datafile inputs
+
+        # Update parameters
+        self.update_pars(pars, **kwargs)   # Update the parameters
 
         return
 
@@ -58,6 +63,11 @@ class Sim(hpb.BaseSim):
             self.data = hpm.load_data(datafile=datafile, check_date=True, **kwargs)
         return
 
+    def load_pars_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
+        ''' Load any data files that are used to create additional parameters, if provided '''
+        data_pars = dict()
+        data_pars['hiv_infection_rates'], data_pars['art_adherence'] = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        return data_pars
 
     def initialize(self, reset=False, init_states=True, **kwargs):
         '''
@@ -447,6 +457,8 @@ class Sim(hpb.BaseSim):
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
         results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
+        results['hiv_incidence'] = init_res('HIV incidence rate')
+        results['hiv_prevalence'] = init_res('HIV prevalence rate')
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -670,6 +682,12 @@ class Sim(hpb.BaseSim):
         inf = people.infectious
         sus = people.susceptible
         sus_imm = people.sus_imm
+        HIV_rel_sus = np.ones(len(people), dtype=hpd.default_float)
+        hiv_inds = hpu.true(people.hiv)
+        immune_compromise = 1 - people.art_adherence[hiv_inds]
+        mod = immune_compromise * self['hiv_pars']['rel_sus']
+        mod[mod < 1] = 1
+        HIV_rel_sus[hiv_inds] *= mod
 
         # Get indices of infected/susceptible people by genotype
         f_inf_genotypes, f_inf_inds, f_sus_genotypes, f_sus_inds = hpu.get_sources_targets(inf, sus, ~people.sex.astype(bool))  # Males and females infected with this genotype
@@ -702,7 +720,7 @@ class Sim(hpb.BaseSim):
 
                 # Compute transmissibility for each partnership
                 for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
-                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
+                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * HIV_rel_sus[targets] * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
                     target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
@@ -710,9 +728,18 @@ class Sim(hpb.BaseSim):
         # Determine if there are any reactivated infections on this timestep
         for g in range(ng):
             latent_inds = hpu.true(people.latent[g,:])
-            if len(latent_inds):
+            if len(latent_inds): # TODO: add in increased risk of reactivation for immunocompromised
                 age_inds = np.digitize(people.age[latent_inds], self['hpv_reactivation']['age_cutoffs'])-1 # convert ages to indices
                 reactivation_probs = self['hpv_reactivation']['hpv_reactivation_probs'][age_inds]
+
+                if self['model_hiv']:
+                    # determine if any of these inds have HIV and adjust their probs
+                    hiv_latent_inds = latent_inds[hpu.true(people.hiv[latent_inds])]
+                    if len(hiv_latent_inds):
+                        immune_compromise = 1 - people.art_adherence[hiv_latent_inds]
+                        mod = immune_compromise * self['hiv_pars']['reactivation_prob']
+                        mod[mod < 1] = 1
+                        reactivation_probs[hpu.true(people.hiv[latent_inds])] *= mod
                 is_reactivated = hpu.binomial_arr(reactivation_probs)
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
@@ -731,12 +758,14 @@ class Sim(hpb.BaseSim):
                 for genotype in range(ng):
                     self.results[key][genotype][idx] += count[genotype]
             else:
-                try: self.results[f'total_{key}'][idx] += count
+                try:self.results[f'total_{key}'][idx] += count
                 except:
-                    import traceback;
-                    traceback.print_exc();
-                    import pdb;
-                    pdb.set_trace()
+                    try: self.results[key][idx] += count
+                    except:
+                        import traceback;
+                        traceback.print_exc();
+                        import pdb;
+                        pdb.set_trace()
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
@@ -757,6 +786,9 @@ class Sim(hpb.BaseSim):
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
+
+            # Count total hiv infections
+            self.results['n_hiv'][idx] = people.count('hiv')
 
             # Update cancers and cancers by age
             cases_by_age = self.results['cancers_by_age'][:, idx]
@@ -895,12 +927,14 @@ class Sim(hpb.BaseSim):
         res = self.results
 
         # Compute HPV incidence and prevalence
-        self.results['total_hpv_incidence'][:]  = res['total_infections'][:]/ res['n_total_susceptible'][:]
-        self.results['hpv_incidence'][:]        = res['infections'][:]/ res['n_susceptible'][:]
+        self.results['total_hpv_incidence'][:]  = res['total_infections'][:] / res['n_total_susceptible'][:]
+        self.results['hpv_incidence'][:]        = res['infections'][:] / res['n_susceptible'][:]
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
         self.results['detectable_hpv_prevalence'][:] = res['n_detectable_hpv'][:] / res['n_alive'][:]
         self.results['total_detectable_hpv_prevalence'][:] = res['n_total_detectable_hpv'][:] / res['n_alive'][:]
+        self.results['hiv_incidence'][:] = res['total_hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
+        self.results['hiv_prevalence'][:] = res['n_hiv'][:] / res['n_alive'][:]
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]

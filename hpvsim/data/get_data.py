@@ -89,6 +89,14 @@ def get_death_data(force=None, tidy=None):
     return get_UN_data(**kw)
 
 
+def get_ex_data(force=None, tidy=None):
+    ''' Import age-specific life expectancy and population distributions from UNPD '''
+    columns = ["Location", "Time", "Sex", "AgeGrpStart", "ex"]
+    outfile = 'ex.obj'
+    kw = dict(label='ex', file_stem=death_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    return get_UN_data(**kw)
+
+
 def get_birth_data(start=1960, end=2020):
     ''' Import crude birth rates from WB '''
     sc.heading('Downloading World Bank birth rate data...')
@@ -111,6 +119,8 @@ def parallel_downloader(which):
         get_birth_data()
     if which in ['death', 'deaths']:
         get_death_data()
+    if which in ['life_expectancy', 'ex']:
+        get_ex_data()
     return
 
 
@@ -128,7 +138,7 @@ def get_data():
         which = 'all'
 
     if which == 'all':
-        which = ['age', 'birth', 'death']
+        which = ['age', 'birth', 'death', 'life_expectancy']
 
     # Actually download
     sc.parallelize(parallel_downloader, which)

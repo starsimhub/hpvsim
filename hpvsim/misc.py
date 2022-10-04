@@ -13,6 +13,7 @@ import collections as co
 from pathlib import Path
 from distutils.version import LooseVersion # TODO: deprecated, remove
 from . import version as hpv
+from . import data as hpdata
 from .settings import options as hpo
 
 #%% Convenience imports from Sciris

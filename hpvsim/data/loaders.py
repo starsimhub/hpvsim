@@ -4,12 +4,14 @@ Load data
 
 #%% Housekeeping
 import numpy as np
+import pandas as pd
 import sciris as sc
 import unicodedata
 import re
 from .. import misc as hpm
 
-__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates', 'get_birth_rates']
+__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates',
+           'get_birth_rates', 'get_life_expectancy']
 
 
 filesdir = sc.path(sc.thisdir()) / 'files'
@@ -18,6 +20,7 @@ files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
+files.life_expectancy = 'ex.obj'
 
 # Cache data as a dict
 cache = dict()
@@ -59,7 +62,7 @@ def get_country_aliases(wb=False):
        'Cape Verde':     'Cabo Verdeo',
        'Hong Kong':      'China, Hong Kong Special Administrative Region',
        'Macao':          'China, Macao Special Administrative Region',
-       "Cote d'Ivoire":   'Côte d’Ivoire',
+       "Cote d'Ivoire":  'Côte d’Ivoire',
        "Ivory Coast":    'Côte d’Ivoire',
        'DRC':            'Democratic Republic of the Congo',
        'Iran':           'Iran (Islamic Republic of)',
@@ -105,6 +108,8 @@ def map_entries(json, location, df=None, wb=False):
         countries = [key.lower() for key in json.keys()]
     elif sc.checktype(json, 'listlike'):
         countries = [l.lower() for l in json]
+    elif sc.checktype(json, pd.DataFrame):
+        countries = [l.lower() for l in np.unique(json.Country.values)]
 
     # Set parameters
     if location is None:
@@ -247,6 +252,46 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     return result
 
 
+def get_life_expectancy(location=None, by_sex=True, overall=False):
+    '''
+    Load life expectancy by age for a given country or countries.
+    Args:
+        location (str or list): name of the country or countries to load the age distribution for
+        by_sex (bool): whether to rates by sex
+        overall (bool): whether to load total rate
+    Returns:
+        life_expectancy (dict): life expectancy by age and sex
+    '''
+    # Load the raw data
+    try:
+        df = load_file(files.life_expectancy)
+    except Exception as E:
+        errormsg = 'Could not locate datafile with age-specific life expectancy by country. Please run data/get_data.py first.'
+        raise ValueError(errormsg) from E
+
+    raw_df = map_entries(df, location)[location]
+
+    sex_keys = []
+    if by_sex: sex_keys += ['Male', 'Female']
+    if overall: sex_keys += ['Both sexes']
+    sex_key_map = {'Male': 'm', 'Female': 'f', 'Both sexes': 'tot'}
+
+    # max_age = 99
+    # age_groups = raw_df['AgeGrpStart'].unique()
+    years = raw_df['Time'].unique()
+    result = dict()
+
+    # Processing
+    for year in years:
+        result[year] = dict()
+        for sk in sex_keys:
+            sk_out = sex_key_map[sk]
+            result[year][sk_out] = np.array(raw_df[(raw_df['Time']==year) & (raw_df['Sex']== sk)][['AgeGrpStart','ex']])
+            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
+
+    return result
+
+
 def get_birth_rates(location=None):
     '''
     Load crude birth rates for a given country
@@ -269,3 +314,4 @@ def get_birth_rates(location=None):
     birth_rates, inds = sc.sanitize(birth_rates, returninds=True)
     years = years[inds]
     return np.array([years, birth_rates])
+
