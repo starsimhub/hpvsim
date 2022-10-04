@@ -12,7 +12,7 @@ do_plot = 1
 do_save = 0
 debug   = 1
 verbose = 0
-n_agents = 500
+n_agents = 1000
 hpv.options.set(interactive=False) # Assume not running interactively
 
 
@@ -235,13 +235,13 @@ if __name__ == '__main__':
     hpv.options.set(interactive=do_plot)
     T = sc.tic()
 
-    #sim1   = test_singlerun()
-    #sims2  = test_multirun(do_plot=do_plot)
-    #msim1  = test_multisim_reduce(do_plot=do_plot)
-    #msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
-    #m1,m2  = test_multisim_advanced()
+    sim1   = test_singlerun()
+    sims2  = test_multirun(do_plot=do_plot)
+    msim1  = test_multisim_reduce(do_plot=do_plot)
+    msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
+    m1,m2  = test_multisim_advanced()
     scens1 = test_simple_scenarios(do_plot=do_plot)
-    #scens2 = test_complex_scenarios(do_plot=do_plot)
+    scens2 = test_complex_scenarios(do_plot=do_plot)
 
     sc.toc(T)
     print('Done.')
