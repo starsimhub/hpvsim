@@ -898,10 +898,10 @@ def get_life_expectancy(location, verbose=False):
             print(f'Loading location-specific life expectancy data for "{location}" - needed for HIV runs')
         try:
             life_expectancy = hpdata.get_life_expectancy(location=location)
+            return life_expectancy
         except ValueError as E:
             errormsg = f'Could not load HIV data for requested location "{location}" ({str(E)})'
             raise NotImplementedError(errormsg)
-    return life_expectancy
 
 
 def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
