@@ -2,6 +2,7 @@
 Set the parameters for hpvsim.
 '''
 
+import os
 import numpy as np
 import sciris as sc
 import pandas as pd
@@ -905,7 +906,7 @@ def get_life_expectancy(location, verbose=False):
     else:
         raise NotImplementedError('Cannot load HIV data without a specified location')
 
-def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
+def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False, die=False):
     '''
     Load HIV incidence and art coverage data, if provided
     ART adherance calculations use life expectancy data to infer lifetime average coverage
@@ -927,55 +928,60 @@ def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=Fa
         art_cov (dict): dictionary keyed by sex, storing arrays of ART coverage over time by age
         life_expectancy (dict): dictionary storing life expectancy over time by age
     '''
+    
+    if (not os.path.exists(hiv_datafile) or not os.path.exists(art_datafile)) and (not die):
+        hiv_incidence_rates, art_adherence = None, None
+        
+    else:
 
-    # Load data
-    life_exp    = get_life_expectancy(location=location, verbose=verbose) # Load the life expectancy data (needed for ART adherance calcs)
-    df_inc      = pd.read_csv(hiv_datafile) # HIV incidence
-    df_art      = pd.read_csv(art_datafile) # ART coverage
-
-    # Process HIV and ART data
-    sex_keys = ['Male', 'Female']
-    sex_key_map = {'Male': 'm', 'Female': 'f'}
-
-    ## Start with incidence file
-    years = df_inc['Year'].unique()
-    hiv_incidence_rates = dict()
-
-    # Processing
-    for year in years:
-        hiv_incidence_rates[year] = dict()
-        for sk in sex_keys:
-            sk_out = sex_key_map[sk]
-            hiv_incidence_rates[year][sk_out] = np.concatenate(
-                [
-                np.array(df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']], dtype=hpd.default_float),
-                np.array([[150,0]]) # Add another entry so that all older age groups are covered
-                ]
-            )
-
-    # Now compute ART adherence over time/age
-    art_adherence = dict()
-    years = df_art['Year'].values
-    for i, year in enumerate(years):
-
-        # Use the incidence file to determine which age groups we want to calculate ART coverage for
-        ages_inc = hiv_incidence_rates[year]['m'][:, 0] # Read in the age groups we have HIV incidence data for
-        ages_ex = life_exp[year]['m'][:, 0] # Age groups available in life expectancy file
-        ages = np.intersect1d(ages_inc, ages_ex) # Age groups we want to calculate ART coverage for
-
-        # Initialize age-specific ART coverage dict and start filling it in
-        cov = np.zeros(len(ages), dtype=hpd.default_float)
-        for j, age in enumerate(ages):
-            idx = np.where(life_exp[year]['f'][:, 0] == age)[0] # Finding life expectancy for this age group/year
-            this_life_exp = life_exp[year]['f'][idx, 1] # Pull out value
-            last_year = int(year + this_life_exp) # Figure out the year in which this age cohort is expected to die
-            year_ind = sc.findnearest(years, last_year) # Get as close to the above year as possible within the data
-            if year_ind > i: # Either take the mean of ART coverage from now up until the year of death
-                cov[j] = np.mean(df_art[i:year_ind]['ART Coverage'].values)
-            else: # Or, just use ART overage in this year
-                cov[j] = df_art.iloc[year_ind]['ART Coverage']
-
-        art_adherence[year] = np.array([ages, cov])
+        # Load data
+        life_exp    = get_life_expectancy(location=location, verbose=verbose) # Load the life expectancy data (needed for ART adherance calcs)
+        df_inc      = pd.read_csv(hiv_datafile) # HIV incidence
+        df_art      = pd.read_csv(art_datafile) # ART coverage
+    
+        # Process HIV and ART data
+        sex_keys = ['Male', 'Female']
+        sex_key_map = {'Male': 'm', 'Female': 'f'}
+    
+        ## Start with incidence file
+        years = df_inc['Year'].unique()
+        hiv_incidence_rates = dict()
+    
+        # Processing
+        for year in years:
+            hiv_incidence_rates[year] = dict()
+            for sk in sex_keys:
+                sk_out = sex_key_map[sk]
+                hiv_incidence_rates[year][sk_out] = np.concatenate(
+                    [
+                    np.array(df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']], dtype=hpd.default_float),
+                    np.array([[150,0]]) # Add another entry so that all older age groups are covered
+                    ]
+                )
+    
+        # Now compute ART adherence over time/age
+        art_adherence = dict()
+        years = df_art['Year'].values
+        for i, year in enumerate(years):
+    
+            # Use the incidence file to determine which age groups we want to calculate ART coverage for
+            ages_inc = hiv_incidence_rates[year]['m'][:, 0] # Read in the age groups we have HIV incidence data for
+            ages_ex = life_exp[year]['m'][:, 0] # Age groups available in life expectancy file
+            ages = np.intersect1d(ages_inc, ages_ex) # Age groups we want to calculate ART coverage for
+    
+            # Initialize age-specific ART coverage dict and start filling it in
+            cov = np.zeros(len(ages), dtype=hpd.default_float)
+            for j, age in enumerate(ages):
+                idx = np.where(life_exp[year]['f'][:, 0] == age)[0] # Finding life expectancy for this age group/year
+                this_life_exp = life_exp[year]['f'][idx, 1] # Pull out value
+                last_year = int(year + this_life_exp) # Figure out the year in which this age cohort is expected to die
+                year_ind = sc.findnearest(years, last_year) # Get as close to the above year as possible within the data
+                if year_ind > i: # Either take the mean of ART coverage from now up until the year of death
+                    cov[j] = np.mean(df_art[i:year_ind]['ART Coverage'].values)
+                else: # Or, just use ART overage in this year
+                    cov[j] = df_art.iloc[year_ind]['ART Coverage']
+    
+            art_adherence[year] = np.array([ages, cov])
 
     return hiv_incidence_rates, art_adherence
 
