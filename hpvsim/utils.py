@@ -469,10 +469,11 @@ def set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys=None, peaks=None,
     people.date_dead_cancer[cancer_inds] = people.date_cancerous[g, cancer_inds] + np.ceil(dur_cancer / dt)
     return
 
+
 def set_HIV_prognoses(people, inds, year=None):
     ''' Set HIV outcomes (for now only ART) '''
 
-    art_cov = people.pars['art_adherence'] # Shorten
+    art_cov = people.hiv_pars.art_adherence # Shorten
 
     # Extract index of current year
     all_years = np.array(list(art_cov.keys()))

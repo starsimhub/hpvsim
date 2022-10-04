@@ -48,12 +48,9 @@ class Sim(hpb.BaseSim):
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
         # Load data, including datafile that are used to create additional optional parameters
-        self.load_data(datafile) # Load the data, if provided
         location = pars.get('location') if pars else None
-        model_hiv = pars.get('model_hiv') if pars else None
-        if model_hiv or self.pars['model_hiv']:
-            data_pars = self.load_pars_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
-            pars = sc.mergedicts(pars, data_pars) # Merge parameters supplied as in pars dict with any additional parameters created from datafile inputs
+        self.load_data(datafile) # Load the data, if provided
+        self.load_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
 
         # Update parameters
         self.update_pars(pars, **kwargs)   # Update the parameters
@@ -67,11 +64,13 @@ class Sim(hpb.BaseSim):
             self.data = hpm.load_data(datafile=datafile, check_date=True, **kwargs)
         return
 
-    def load_pars_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
+
+    def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
         ''' Load any data files that are used to create additional parameters, if provided '''
-        data_pars = dict()
-        data_pars['hiv_infection_rates'], data_pars['art_adherence'] = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
-        return data_pars
+        self.hiv_pars = sc.objdict()
+        self.hiv_pars.infection_rates, self.hiv_pars.art_adherence = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        return
+
 
     def initialize(self, reset=False, init_states=True, **kwargs):
         '''
@@ -504,7 +503,7 @@ class Sim(hpb.BaseSim):
         # Actually make the people
         microstructure = self['network']
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
-        self.people.initialize(sim_pars=self.pars) # Fully initialize the people
+        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])

@@ -1014,12 +1014,6 @@ class Scenarios(hpb.ParsObj):
             scen_sim.label = scenname
             scen_sim.scen = scen
 
-            location = allpars['location']
-            model_hiv = allpars.get('model_hiv')
-            if model_hiv or allpars['model_hiv']:
-                data_pars = scen_sim.load_pars_data(location=location, hiv_datafile=scen_sim.hiv_datafile,
-                                                    art_datafile=scen_sim.art_datafile)  # Load any data that's used to create additional parameters (thus far, HIV and ART)
-                allpars = sc.mergedicts(allpars, data_pars)  # Merge parameters supplied as in pars dict with any additional parameters created from datafile inputs
             # Update the parameters, if provided, and re-initialize aspects of the simulation
             scen_sim.update_pars(allpars)
 
