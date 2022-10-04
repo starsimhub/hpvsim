@@ -57,7 +57,7 @@ def test_multirun(do_plot=do_plot): # If being run via pytest, turn off
     assert np.allclose(s1.summary[:], s2.summary[:], rtol=0, atol=0, equal_nan=True)
 
     # Run in serial for debugging
-    hpv.multi_run(sim=hpv.Sim(n_years=n_years, n_agents=n_agents), n_runs=2, parallel=False)
+    hpv.multi_run(sim=hpv.Sim(n_years=n_years, n_agents=n_agents), n_runs=2, parallel=not(debug))
 
     if do_plot:
         for sim in sims + sims2:
@@ -155,7 +155,7 @@ def test_simple_scenarios(do_plot=do_plot):
     xlsx_path = 'scen_test.xlsx'
 
     scens = hpv.Scenarios(basepars=basepars)
-    scens.run(verbose=verbose)
+    scens.run(verbose=verbose, parallel=not(debug))
     if do_plot:
         scens.plot()
     scens.to_json(json_path)
@@ -235,13 +235,13 @@ if __name__ == '__main__':
     hpv.options.set(interactive=do_plot)
     T = sc.tic()
 
-    sim1   = test_singlerun()
-    sims2  = test_multirun(do_plot=do_plot)
-    msim1  = test_multisim_reduce(do_plot=do_plot)
-    msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
-    m1,m2  = test_multisim_advanced()
+    #sim1   = test_singlerun()
+    #sims2  = test_multirun(do_plot=do_plot)
+    #msim1  = test_multisim_reduce(do_plot=do_plot)
+    #msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
+    #m1,m2  = test_multisim_advanced()
     scens1 = test_simple_scenarios(do_plot=do_plot)
-    scens2 = test_complex_scenarios(do_plot=do_plot)
+    #scens2 = test_complex_scenarios(do_plot=do_plot)
 
     sc.toc(T)
     print('Done.')
