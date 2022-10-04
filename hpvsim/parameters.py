@@ -2,7 +2,6 @@
 Set the parameters for hpvsim.
 '''
 
-import os
 import numpy as np
 import sciris as sc
 import pandas as pd
@@ -127,8 +126,6 @@ def make_pars(**kwargs):
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
 
     # HIV parameters
-    pars['hiv_infection_rates'] = None # loaded below if model_hiv == True
-    pars['art_adherence'] = None # loaded below if model_hiv == True
     pars['hiv_pars'] = {
         'rel_sus': 2.2,
         'dysp_rate': 2,
@@ -906,7 +903,8 @@ def get_life_expectancy(location, verbose=False):
     else:
         raise NotImplementedError('Cannot load HIV data without a specified location')
 
-def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False, die=False):
+
+def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
     '''
     Load HIV incidence and art coverage data, if provided
     ART adherance calculations use life expectancy data to infer lifetime average coverage
@@ -929,7 +927,7 @@ def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=Fa
         life_expectancy (dict): dictionary storing life expectancy over time by age
     '''
     
-    if (not os.path.exists(hiv_datafile) or not os.path.exists(art_datafile)) and (not die):
+    if hiv_datafile is None and art_datafile is None:
         hiv_incidence_rates, art_adherence = None, None
         
     else:

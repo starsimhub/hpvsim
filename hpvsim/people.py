@@ -359,7 +359,7 @@ class People(hpb.BasePeople):
         '''
         Apply HIV infection rates to population
         '''
-        hiv_pars = self.pars['hiv_infection_rates']
+        hiv_pars = self.hiv_pars.infection_rates
         all_years = np.array(list(hiv_pars.keys()))
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
