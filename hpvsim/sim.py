@@ -48,10 +48,9 @@ class Sim(hpb.BaseSim):
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
         # Load data, including datafile that are used to create additional optional parameters
-        self.load_data(datafile) # Load the data, if provided
         location = pars.get('location') if pars else None
-        hiv_pars = self.load_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
-        pars = sc.mergedicts(pars, hiv_pars) # Merge parameters supplied as in pars dict with any additional parameters created from datafile inputs
+        self.load_data(datafile) # Load the data, if provided
+        self.load_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
 
         # Update parameters
         self.update_pars(pars, **kwargs)   # Update the parameters
@@ -68,9 +67,8 @@ class Sim(hpb.BaseSim):
 
     def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
         ''' Load any data files that are used to create additional parameters, if provided '''
-        hiv_pars = dict()
-        hiv_pars['hiv_infection_rates'], hiv_pars['art_adherence'] = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
-        return hiv_pars
+        self.hiv_infection_rates, self.art_adherence = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        return
 
 
     def initialize(self, reset=False, init_states=True, **kwargs):
