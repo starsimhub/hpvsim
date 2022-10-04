@@ -415,11 +415,10 @@ def set_peak_dysp(people, dysp_inds, g, current_dysp=None, hiv_pars=None):
     return
 
 
-
 def set_HIV_prognoses(people, inds, year=None):
     ''' Set HIV outcomes (for now only ART) '''
 
-    art_cov = people.pars['art_adherence'] # Shorten
+    art_cov = people.hiv_pars.art_adherence # Shorten
 
     # Extract index of current year
     all_years = np.array(list(art_cov.keys()))

@@ -113,14 +113,14 @@ class People(hpb.BasePeople):
 
     def increment_age(self):
         ''' Let people age by one timestep '''
-        self.age[:] += self.dt
+        self.age[self.alive] += self.dt
         return
 
 
-    def initialize(self, sim_pars=None):
+    def initialize(self, sim_pars=None, hiv_pars=None):
         ''' Perform initializations '''
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
-        self.set_pars(sim_pars) # Replace the saved parameters with this simulation's
+        self.set_pars(pars=sim_pars, hiv_pars=hiv_pars) # Replace the saved parameters with this simulation's
         self.initialized = True
         return
 
@@ -359,19 +359,21 @@ class People(hpb.BasePeople):
         '''
         Apply HIV infection rates to population
         '''
-        hiv_pars = self.pars['hiv_infection_rates']
+        hiv_pars = self.hiv_pars.infection_rates
         all_years = np.array(list(hiv_pars.keys()))
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
+        hiv_year = hiv_pars[nearest_year]
 
-        hiv_probs = np.empty(len(self), dtype=hpd.default_float)
+        hiv_probs = np.zeros(len(self), dtype=hpd.default_float)
         for sk in ['f','m']:
-            age_bins = hiv_pars[nearest_year][sk][:,0]
-            age_inds = np.digitize(self.age, age_bins)
-            hiv = hiv_pars[nearest_year][sk][:,1]*self.pars['dt']
-            if      sk=='f': hiv_probs[self.is_female]  = hiv[age_inds[self.is_female]]
-            elif    sk=='m': hiv_probs[self.is_male]    = hiv[age_inds[self.is_male]]
-        hiv_probs[~self.alive] = 0
+            hiv_year_sex = hiv_year[sk]
+            age_bins = hiv_year_sex[:,0]
+            hiv_rates = hiv_year_sex[:,1]*self.pars['dt']
+            mf_inds = self.is_female if sk == 'f' else self.is_male
+            mf_inds *= self.alive # Only include people alive
+            age_inds = np.digitize(self.age[mf_inds], age_bins)
+            hiv_probs[mf_inds]  = hiv_rates[age_inds]
         hiv_probs[self.hiv] = 0 # not at risk if already infected
 
         # Get indices of people who acquire HIV

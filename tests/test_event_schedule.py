@@ -3,7 +3,6 @@ Tests for event scheduler
 '''
 
 import sciris as sc
-import numpy as np
 import hpvsim as hpv
 import functools
 
@@ -12,7 +11,7 @@ def test_schedule_scaleup():
     sc.heading('Test dynamics pars intervention')
 
     pars = {
-        'n_agents': 1e5,
+        'n_agents': 10e3,
         'n_years': 50,
     }
 

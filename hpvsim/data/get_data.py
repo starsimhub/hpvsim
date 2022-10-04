@@ -20,8 +20,9 @@ import sciris as sc
 from . import loaders
 
 # Set parameters
-data_version = '1.0' # Data version
-quick_url = 'https://github.com/amath-idm/hpvsim_data/blob/main/hpvsim_data.zip?raw=true'
+data_version = '1.1' # Data version
+data_file = f'hpvsim_data_v{data_version}.zip'
+quick_url = f'https://github.com/amath-idm/hpvsim_data/blob/main/{data_file}?raw=true'
 age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
 death_stem = 'WPP2022_Life_Table_Abridged_Medium_'
 base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/'
@@ -153,7 +154,7 @@ def quick_download(verbose=True, init=False):
         sc.heading('Downloading preprocessed HPVsim data')
         if init:
             print('Note: this automatic download only happens once, when HPVsim is first run.\n\n')
-    filepath = sc.makefilepath(filesdir / 'tmp_hpvsim_data.zip')
+    filepath = sc.makefilepath(filesdir / f'tmp_{data_file}.zip')
     sc.download(url=quick_url, filename=filepath, convert=False, verbose=verbose)
     sc.loadzip(filepath, outfolder=filesdir)
     sc.rmpath(filepath)
