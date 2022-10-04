@@ -113,7 +113,7 @@ class People(hpb.BasePeople):
 
     def increment_age(self):
         ''' Let people age by one timestep '''
-        self.age[:] += self.dt
+        self.age[self.alive] += self.dt
         return
 
 
@@ -363,14 +363,16 @@ class People(hpb.BasePeople):
         all_years = np.array(list(hiv_pars.keys()))
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
+        hiv_year = hiv_pars[nearest_year]
 
         hiv_probs = np.empty(len(self), dtype=hpd.default_float)
         for sk in ['f','m']:
+            hiv_year_sex = hiv_year[sk]
+            age_bins = hiv_year_sex[:,0]
+            hiv_rates = hiv_year_sex[:,1]*self.pars['dt']
             mf_inds = self.is_female if sk == 'f' else self.is_male
-            age_bins = hiv_pars[nearest_year][sk][:,0]
-            age_inds = np.digitize(self.age, age_bins)
-            hiv = hiv_pars[nearest_year][sk][:,1]*self.pars['dt']
-            hiv_probs[mf_inds]  = hiv[age_inds[mf_inds]]
+            age_inds = np.digitize(self.age[mf_inds], age_bins)
+            hiv_probs[mf_inds]  = hiv_rates[age_inds]
         hiv_probs[~self.alive] = 0
         hiv_probs[self.hiv] = 0 # not at risk if already infected
 
