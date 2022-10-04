@@ -132,7 +132,6 @@ def make_pars(**kwargs):
         'rel_sus': 2.2,
         'dysp_rate': 2,
         'prog_rate': 2,
-        'prog_time': 0.3,
         'reactivation_prob': 3,
     }
 
@@ -449,7 +448,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.dur_dysp      = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dysp_rate     = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv6.prog_rate     = dict(dist='normal', par1=0.05, par2=0.005) # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.prog_time     = 30  # Point of inflection in logistic function
     pars.hpv6.rel_beta      = 0.8 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv6.imm_boost     = 1.0 # TODO: look for data
 
