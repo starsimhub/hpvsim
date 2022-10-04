@@ -366,11 +366,11 @@ class People(hpb.BasePeople):
 
         hiv_probs = np.empty(len(self), dtype=hpd.default_float)
         for sk in ['f','m']:
+            mf_inds = self.is_female if sk == 'f' else self.is_male
             age_bins = hiv_pars[nearest_year][sk][:,0]
             age_inds = np.digitize(self.age, age_bins)
             hiv = hiv_pars[nearest_year][sk][:,1]*self.pars['dt']
-            if      sk=='f': hiv_probs[self.is_female]  = hiv[age_inds[self.is_female]]
-            elif    sk=='m': hiv_probs[self.is_male]    = hiv[age_inds[self.is_male]]
+            hiv_probs[mf_inds]  = hiv[age_inds[mf_inds]]
         hiv_probs[~self.alive] = 0
         hiv_probs[self.hiv] = 0 # not at risk if already infected
 
