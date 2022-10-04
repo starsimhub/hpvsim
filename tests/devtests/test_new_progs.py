@@ -147,17 +147,19 @@ for g in range(ng):
 data = {'Year':all_years, 'Genotype':all_genotypes, 'CIN1':cin1_shares, 'CIN2':cin2_shares, 'CIN3':cin3_shares, 'Cancer': cancer_shares}
 sharesdf = pd.DataFrame(data)
 
+HR = ['hpv16', 'hpv18']
+OHR = ['hpv31', 'hpv33', 'hpv35', 'hpv45', 'hpv51', 'hpv52', 'hpv56', 'hpv58']
+LR = ['hpv6', 'hpv11']
+alltypes = [HR, OHR, LR]
+
 
 ################################################################################
 # BEGIN FIGURE WITH PRECIN DISTRIBUTIONS
 ################################################################################
 def make_precinfig():
+
     fig, ax = plt.subplots(2, 3, figsize=(24, 12))
 
-    HR = ['hpv16', 'hpv18']
-    OHR = ['hpv31', 'hpv33', 'hpv35', 'hpv45', 'hpv51', 'hpv52', 'hpv56', 'hpv58']
-    LR = ['hpv6', 'hpv11']
-    alltypes = [HR, OHR, LR]
     pn = 0
 
     # Output table
@@ -186,6 +188,50 @@ def make_precinfig():
     plt.savefig("precin_dists.png", dpi=100)
     print(table)
 
+
+################################################################################
+# BEGIN FIGURE WITH CIN EVOLUTION
+################################################################################
+def make_cinfig():
+
+    ###### Relationship between duration of dysplasia and clinical severity
+    fig, ax = plt.subplots(2, 3, figsize=(24, 12))
+    pn = 0
+    thisx = np.linspace(0.01, 20, 100)
+
+    cmap = plt.cm.Oranges([0.25,0.5,0.75,1])
+    n_samples = 1
+    for ai, gtypes in enumerate(alltypes):
+        for gtype in gtypes:
+            ax[0,ai].plot(thisx, logf2(thisx, genotype_pars[gtype]['prog_time'], genotype_pars[gtype]['prog_rate']), color=colors[pn], lw=2, label=gtype.upper())
+            ax[1,ai].plot(thisx, logf1(thisx, genotype_pars[gtype]['prog_rate']), color=colors[pn], lw=2, label=gtype.upper())
+            # # Plot variation
+            # for year in range(1, 21):
+            #     mean_peaks = logf2(year, genotype_pars[gtype]['prog_time'], genotype_pars[gtype]['prog_rate'])
+            #     peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
+            #     ax[ai].plot([year] * n_samples, peaks, color=colors[pn], lw=0, marker='o', alpha=0.5)
+            pn+=1
+
+        for row in [0,1]:
+            ax[row,ai].legend(fontsize=18)
+            ax[row,ai].set_xlabel("Duration of dysplasia")
+            ax[row,ai].set_ylabel("")
+            ax[row,ai].grid(axis='x')
+            ax[row,ai].set_title("Mean peak clinical severity")
+            ax[row,ai].get_yaxis().set_ticks([])
+            ax[row,ai].axhline(y=0.33, ls=':', c='k')
+            ax[row,ai].axhline(y=0.67, ls=':', c='k')
+            ax[row,ai].axhline(y=cancer_thresh, ls=':', c='k')
+            ax[row,ai].axhspan(0, 0.33, color=cmap[0],alpha=.4)
+            ax[row,ai].axhspan(0.33, 0.67, color=cmap[1],alpha=.4)
+            ax[row,ai].axhspan(0.67, cancer_thresh, color=cmap[2],alpha=.4)
+            ax[row,ai].axhspan(cancer_thresh, 1, color=cmap[3],alpha=.4)
+            ax[row,ai].text(-0.3, 0.08, 'CIN1', fontsize=30, rotation=90)
+            ax[row,ai].text(-0.3, 0.4, 'CIN2', fontsize=30, rotation=90)
+            ax[row,ai].text(-0.3, 0.73, 'CIN3', fontsize=30, rotation=90)
+
+    fig.tight_layout()
+    plt.savefig("cin_prog.png", dpi=100)
 
 
 ################################################################################
@@ -325,7 +371,8 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    make_precinfig()
+    # make_precinfig()
+    make_cinfig()
     # make_fig1()
     # make_fig2()
 
