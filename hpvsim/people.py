@@ -365,15 +365,15 @@ class People(hpb.BasePeople):
         nearest_year = all_years[year_ind]
         hiv_year = hiv_pars[nearest_year]
 
-        hiv_probs = np.empty(len(self), dtype=hpd.default_float)
+        hiv_probs = np.zeros(len(self), dtype=hpd.default_float)
         for sk in ['f','m']:
             hiv_year_sex = hiv_year[sk]
             age_bins = hiv_year_sex[:,0]
             hiv_rates = hiv_year_sex[:,1]*self.pars['dt']
             mf_inds = self.is_female if sk == 'f' else self.is_male
+            mf_inds *= self.alive # Only include people alive
             age_inds = np.digitize(self.age[mf_inds], age_bins)
             hiv_probs[mf_inds]  = hiv_rates[age_inds]
-        hiv_probs[~self.alive] = 0
         hiv_probs[self.hiv] = 0 # not at risk if already infected
 
         # Get indices of people who acquire HIV
