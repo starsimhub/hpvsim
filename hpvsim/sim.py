@@ -67,7 +67,8 @@ class Sim(hpb.BaseSim):
 
     def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
         ''' Load any data files that are used to create additional parameters, if provided '''
-        self.hiv_infection_rates, self.art_adherence = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        self.hiv_pars = sc.objdict()
+        self.hiv_pars.infection_rates, self.hiv_pars.art_adherence = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return
 
 
@@ -502,7 +503,7 @@ class Sim(hpb.BaseSim):
         # Actually make the people
         microstructure = self['network']
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
-        self.people.initialize(sim_pars=self.pars) # Fully initialize the people
+        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])

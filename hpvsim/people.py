@@ -117,10 +117,10 @@ class People(hpb.BasePeople):
         return
 
 
-    def initialize(self, sim_pars=None):
+    def initialize(self, sim_pars=None, hiv_pars=None):
         ''' Perform initializations '''
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
-        self.set_pars(sim_pars) # Replace the saved parameters with this simulation's
+        self.set_pars(pars=sim_pars, hiv_pars=hiv_pars) # Replace the saved parameters with this simulation's
         self.initialized = True
         return
 
