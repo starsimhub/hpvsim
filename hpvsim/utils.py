@@ -277,9 +277,6 @@ def set_prognoses(people, inds, g, dur_nodysp, hiv_pars=None):
 
     dysp_inds = init_dysp(people, inds, g, dur_nodysp, hiv_pars=hiv_pars) # Indices of those who develop dysplasia
     progress_dysp(people, dysp_inds, g, hiv_pars=hiv_pars) # Set dysplasia progression over time
-    grades = set_clinical_grades(people, dysp_inds, g, hiv_pars=hiv_pars) # Set peak dysplasia levels
-    # cin3_inds, dur_to_peak_dys, peaks = set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys, peaks, hiv_pars=hiv_pars)
-    # set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys, peaks, hiv_pars=hiv_pars)
 
     return
 
@@ -355,6 +352,7 @@ def progress_dysp(people, dysp_inds, g, hiv_pars=None):
     prog_rate_pars = genotype_pars[genotype_map[g]]['prog_rate']
 
     # Evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
+    # Q: should this vary by HIV status??
     dur_dysp = sample(**dur_dysp_pars, size=len(dysp_inds))
     people.dur_disease[g, dysp_inds] += dur_dysp
 
@@ -374,14 +372,15 @@ def progress_dysp(people, dysp_inds, g, hiv_pars=None):
 
     # Map severity to clinical grades
     ccut = people.pars['clinical_cutoffs']
-    is_cin1   = peak_dysp<ccut['cin1'] # Boolean arrays of people who attain each clinical grade
+    is_cin1   = peak_dysp>0 # Boolean arrays of people who attain each clinical grade
     is_cin2   = peak_dysp>ccut['cin1']
     is_cin3   = peak_dysp>ccut['cin2']
     is_cancer = peak_dysp>ccut['cin3']
+    cin1_inds = dysp_inds[is_cin1] # Indices of those progress at least to CIN2
     cin2_inds = dysp_inds[is_cin2] # Indices of those progress at least to CIN2
     cin3_inds = dysp_inds[is_cin3] # Indices of those progress at least to CIN3
     cancer_inds = dysp_inds[is_cancer] # Indices of those progress to cancer
-    max_cin1_inds = dysp_inds[is_cin1] # Indices of those who don't progress beyond CIN1
+    max_cin1_inds = dysp_inds[is_cin1 & ~is_cin2] # Indices of those who don't progress beyond CIN1
     max_cin2_inds = dysp_inds[is_cin2 & ~is_cin3] # Indices of those who don't progress beyond CIN2
     max_cin3_inds = dysp_inds[is_cin3 & ~is_cancer] # Indices of those who don't progress beyond CIN3
 
@@ -389,27 +388,22 @@ def progress_dysp(people, dysp_inds, g, hiv_pars=None):
     # TODO:
     #   1. For people where dysplasia has already started, find some way to make it progress faster
 
-    import traceback;
-    traceback.print_exc();
-    import pdb;
-    pdb.set_trace()
-
     # Determine whether CIN1 clears or progresses to CIN2
-    people.date_cin2[g, cin2_inds] = invlogf1(ccut['cin1'], prog_rates[cin2_inds])
-    time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(cin1_inds))
-    people.date_clearance[g, cin1_inds] = np.fmax(people.date_clearance[g, cin1_inds],
-                                                  people.date_cin1[g, cin1_inds] +
+    people.date_cin2[g, cin2_inds] = invlogf1(ccut['cin1'], prog_rates[is_cin2])
+    time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(max_cin1_inds))
+    people.date_clearance[g, max_cin1_inds] = np.fmax(people.date_clearance[g, max_cin1_inds],
+                                                  people.date_cin1[g, max_cin1_inds] +
                                                   np.ceil(time_to_clear_cin1 / dt))
 
     # Determine whether CIN2 clears or progresses to CIN3
-    people.date_cin3[g, cin3_inds] = invlogf1(ccut['cin2'], prog_rates[cin3_inds])
+    people.date_cin3[g, cin3_inds] = invlogf1(ccut['cin2'], prog_rates[is_cin3])
     time_to_clear_cin2 = sample(**people.pars['dur_cin2_clear'], size=len(max_cin2_inds))
     people.date_clearance[g, max_cin2_inds] = np.fmax(people.date_clearance[g, max_cin2_inds],
                                                   people.date_cin2[g, max_cin2_inds] +
                                                   np.ceil(time_to_clear_cin2 / dt))
 
     # Determine whether CIN3 clears or progresses to cancer
-    people.date_cancerous[g, cancer_inds] = invlogf1(ccut['cin3'], prog_rates[cancer_inds])
+    people.date_cancerous[g, cancer_inds] = invlogf1(ccut['cin3'], prog_rates[is_cancer])
     time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(max_cin3_inds))
     people.date_clearance[g, max_cin3_inds] = np.fmax(people.date_clearance[g, max_cin3_inds],
                                                   people.date_cin3[g, max_cin3_inds] +

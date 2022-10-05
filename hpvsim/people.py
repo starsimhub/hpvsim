@@ -351,6 +351,7 @@ class People(hpb.BasePeople):
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
+        self.peak_dysp[genotype, inds] = np.nan
 
         return
 
@@ -385,6 +386,12 @@ class People(hpb.BasePeople):
             
             hpu.set_HIV_prognoses(self, hiv_inds, year=year) # Set ART adherence for those with HIV
             f_hiv_inds = self.is_female[hiv_inds].nonzero()[-1] # Women with HIV
+
+            # For women who don't have dysplasia, decide whether they will develop it or clear infection
+            for g in range(self.pars['n_genotypes']):
+                inds = hiv_inds[hpu.true(self.precin[g, f_hiv_inds])]  # Indices of those with HIV for whom the current health state is true
+                if len(inds): hpu.init_dysp(self, inds, g, hiv_pars=self.pars['hiv_pars'])
+
             for health_state, update_prog in zip(['precin', 'cin'], [hpu.init_dysp, hpu.progress_dysp]):
                 for g in range(self.pars['n_genotypes']):
                     inds = hiv_inds[hpu.true(self[health_state][g, f_hiv_inds])] # Indices of those with HIV for whom the current health state is true
