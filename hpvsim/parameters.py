@@ -423,7 +423,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv35.prog_time    = 7.5  # Point of inflection in logistic function
     pars.hpv35.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv35.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv33.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
+    pars.hpv35.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv45 = sc.objdict()
     pars.hpv45.dur_precin  = dict(dist='lognormal', par1=2.84, par2=1.0)
