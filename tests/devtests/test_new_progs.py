@@ -33,7 +33,7 @@ prog_rate = [genotype_pars[genotype_map[g]]['prog_rate'] for g in range(ng)]
 #%% Helper functions
 def lognorm_params(par1, par2):
     """
-    Given the mode and std. dev. of the log-normal distribution, this function
+    Given the mean and std. dev. of the log-normal distribution, this function
     returns the shape and scale parameters for scipy's parameterization of the
     distribution.
     """
@@ -90,7 +90,7 @@ longx = np.linspace(0.01, 20, 1000)
 for g in range(ng):
     sigma, scale = lognorm_params(dur_dysp[g]['par1'], dur_dysp[g]['par2'])
     rv = lognorm(sigma, 0, scale)
-    dd = logf2(longx, prog_time[g], prog_rate[g])
+    dd = logf1(longx, prog_rate[g]['par1'])
 
     indcin1 = sc.findinds(dd<.33)[-1]
     if (dd>.33).any():
@@ -126,8 +126,8 @@ for g in range(ng):
     r = lognorm(sigma, 0, scale)
 
     for year in years:
-        mean_peaks = logf2(year, prog_time[g], prog_rate[g])
-        peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
+        mean_peaks = logf1(year, prog_rate[g]['par1'])
+        peaks = logf1(year, hpu.sample(**prog_rate[g], size=n_samples))
         cin1_shares.append(sum(peaks<0.33)/n_samples)
         cin2_shares.append(sum((peaks>0.33)&(peaks<0.67))/n_samples)
         cin3_shares.append(sum((peaks>0.67)&(peaks<cancer_thresh))/n_samples)
@@ -185,7 +185,7 @@ def make_precinfig():
 def make_cinfig():
 
     ###### Relationship between duration of dysplasia and clinical severity
-    fig, ax = plt.subplots(2, 3, figsize=(24, 12))
+    fig, ax = plt.subplots(1, 3, figsize=(24, 12))
     pn = 0
     thisx = np.linspace(0.01, 20, 100)
 
@@ -193,32 +193,29 @@ def make_cinfig():
     n_samples = 1
     for ai, gtypes in enumerate(alltypes):
         for gtype in gtypes:
-            ax[0,ai].plot(thisx, logf2(thisx, genotype_pars[gtype]['prog_time'], genotype_pars[gtype]['prog_rate']), color=colors[pn], lw=2, label=gtype.upper())
-            ax[1,ai].plot(thisx, logf1(thisx, genotype_pars[gtype]['prog_rate']), color=colors[pn], lw=2, label=gtype.upper())
-            # # Plot variation
-            # for year in range(1, 21):
-            #     mean_peaks = logf2(year, genotype_pars[gtype]['prog_time'], genotype_pars[gtype]['prog_rate'])
-            #     peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
-            #     ax[ai].plot([year] * n_samples, peaks, color=colors[pn], lw=0, marker='o', alpha=0.5)
+            ax[ai].plot(thisx, logf1(thisx, genotype_pars[gtype]['prog_rate']['par1']), color=colors[pn], lw=2, label=gtype.upper())
+            # Plot variation
+            for year in range(1, 21):
+                peaks = logf1(year, hpu.sample(**genotype_pars[gtype]['prog_rate'], size=n_samples))
+                ax[ai].plot([year] * n_samples, peaks, color=colors[pn], lw=0, marker='o', alpha=0.5)
             pn+=1
 
-        for row in [0,1]:
-            ax[row,ai].legend(fontsize=18)
-            ax[row,ai].set_xlabel("Duration of dysplasia")
-            ax[row,ai].set_ylabel("")
-            ax[row,ai].grid(axis='x')
-            ax[row,ai].set_title("Mean peak clinical severity")
-            ax[row,ai].get_yaxis().set_ticks([])
-            ax[row,ai].axhline(y=0.33, ls=':', c='k')
-            ax[row,ai].axhline(y=0.67, ls=':', c='k')
-            ax[row,ai].axhline(y=cancer_thresh, ls=':', c='k')
-            ax[row,ai].axhspan(0, 0.33, color=cmap[0],alpha=.4)
-            ax[row,ai].axhspan(0.33, 0.67, color=cmap[1],alpha=.4)
-            ax[row,ai].axhspan(0.67, cancer_thresh, color=cmap[2],alpha=.4)
-            ax[row,ai].axhspan(cancer_thresh, 1, color=cmap[3],alpha=.4)
-            ax[row,ai].text(-0.3, 0.08, 'CIN1', fontsize=30, rotation=90)
-            ax[row,ai].text(-0.3, 0.4, 'CIN2', fontsize=30, rotation=90)
-            ax[row,ai].text(-0.3, 0.73, 'CIN3', fontsize=30, rotation=90)
+        ax[ai].legend(fontsize=18)
+        ax[ai].set_xlabel("Duration of dysplasia")
+        ax[ai].set_ylabel("")
+        ax[ai].grid(axis='x')
+        ax[ai].set_title("Mean peak clinical severity")
+        ax[ai].get_yaxis().set_ticks([])
+        ax[ai].axhline(y=0.33, ls=':', c='k')
+        ax[ai].axhline(y=0.67, ls=':', c='k')
+        ax[ai].axhline(y=cancer_thresh, ls=':', c='k')
+        ax[ai].axhspan(0, 0.33, color=cmap[0],alpha=.4)
+        ax[ai].axhspan(0.33, 0.67, color=cmap[1],alpha=.4)
+        ax[ai].axhspan(0.67, cancer_thresh, color=cmap[2],alpha=.4)
+        ax[ai].axhspan(cancer_thresh, 1, color=cmap[3],alpha=.4)
+        ax[ai].text(-0.3, 0.08, 'CIN1', fontsize=30, rotation=90)
+        ax[ai].text(-0.3, 0.4, 'CIN2', fontsize=30, rotation=90)
+        ax[ai].text(-0.3, 0.73, 'CIN3', fontsize=30, rotation=90)
 
     fig.tight_layout()
     plt.savefig("cin_prog.png", dpi=100)
@@ -277,11 +274,10 @@ def make_fig1():
     cmap = plt.cm.Oranges([0.25,0.5,0.75,1])
     n_samples = 10
     for g in range(ng):
-        ax[1,0].plot(thisx, logf2(thisx, prog_time[g], prog_rate[g]), color=colors[g], lw=2, label=genotype_map[g].upper())
+        ax[1,0].plot(thisx, logf1(thisx, prog_rate[g]['par1']), color=colors[g], lw=2, label=genotype_map[g].upper())
         # Plot variation
         for year in range(1, 21):
-            mean_peaks = logf2(year, prog_time[g], prog_rate[g])
-            peaks = np.minimum(1, hpu.sample(dist='lognormal', par1=mean_peaks, par2=0.1, size=n_samples))
+            peaks = logf1(year, hpu.sample(**prog_rate[g], size=n_samples))
             ax[1, 0].plot([year] * n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
     ax[1,0].set_xlabel("Duration of dysplasia")
@@ -342,26 +338,15 @@ def make_fig1():
     plt.savefig("progressions-1.png", dpi=100)
 
 
-################################################################################
-# BEGIN FIGURE 2
-################################################################################
-def make_fig2():
-    fig, ax = plt.subplots(1, 3, figsize=(24, 8))
-
-
-    fig.tight_layout()
-    plt.savefig("progressions-2.png", dpi=100)
-
 
 #%% Run as a script
 if __name__ == '__main__':
 
     T = sc.tic()
 
-    # make_precinfig()
+    make_precinfig()
     make_cinfig()
-    # make_fig1()
-    # make_fig2()
+    make_fig1()
 
     sc.toc(T)
     print('Done.')
