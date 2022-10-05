@@ -4,6 +4,7 @@ Set the parameters for hpvsim.
 
 import numpy as np
 import sciris as sc
+import pandas as pd
 from .settings import options as hpo # For setting global options
 from . import misc as hpm
 from . import defaults as hpd
@@ -51,6 +52,7 @@ def make_pars(**kwargs):
     pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
     pars['use_waning']      = False         # Whether or not to use waning immunity. If set to False, immunity from infection and vaccination is assumed to stay at the same level permanently
     pars['use_migration']   = True          # Whether to estimate migration rates to correct the total population size
+    pars['model_hiv']       = False         # Whether or not to model HIV natural history
 
     # Network parameters, generally initialized after the population has been constructed
     pars['debut']           = dict(f=dict(dist='normal', par1=18.6, par2=2.1), # Location-specific data should be used here if possible
@@ -121,6 +123,15 @@ def make_pars(**kwargs):
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
+
+    # HIV parameters
+    pars['hiv_pars'] = {
+        'rel_sus': 2.2,
+        'dysp_rate': 2,
+        'prog_rate': 2,
+        'prog_time': 0.3,
+        'reactivation_prob': 3,
+    }
 
     # Events and interventions
     pars['interventions']   = []   # The interventions present in this simulation; populated by the user
@@ -884,4 +895,102 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
     )
 
     return _get_from_pars(pars, default, key=vaccine)
+
+
+def get_life_expectancy(location, verbose=False):
+    '''
+    Get life expectancy data by location
+    life_expectancy (dict): dictionary storing life expectancy over time by age
+    '''
+    if location is not None:
+        if verbose:
+            print(f'Loading location-specific life expectancy data for "{location}" - needed for HIV runs')
+        try:
+            life_expectancy = hpdata.get_life_expectancy(location=location)
+            return life_expectancy
+        except ValueError as E:
+            errormsg = f'Could not load HIV data for requested location "{location}" ({str(E)})'
+            raise NotImplementedError(errormsg)
+    else:
+        raise NotImplementedError('Cannot load HIV data without a specified location')
+
+
+def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
+    '''
+    Load HIV incidence and art coverage data, if provided
+    ART adherance calculations use life expectancy data to infer lifetime average coverage
+    rates for people in different age buckets. To give an example, suppose that ART coverage
+    over 2010-2020 is given by:
+        art_coverage = [0.23,0.3,0.38,0.43,0.48,0.52,0.57,0.61,0.65,0.68,0.72]
+    The average ART adherence in 2010 will be higher for younger cohorts than older ones.
+    Someone expected to die within a year would be given an average lifetime ART adherence
+    value of 0.23, whereas someone expected to survive >10 years would be given a value of 0.506.
+
+    Args:
+        location (str): must be provided if you want to run with HIV dynamics
+        hiv_datafile (str):  must be provided if you want to run with HIV dynamics
+        art_datafile (str):  must be provided if you want to run with HIV dynamics
+        verbose (bool):  whether to print progress
+
+    Returns:
+        hiv_inc (dict): dictionary keyed by sex, storing arrays of HIV incidence over time by age
+        art_cov (dict): dictionary keyed by sex, storing arrays of ART coverage over time by age
+        life_expectancy (dict): dictionary storing life expectancy over time by age
+    '''
+    
+    if hiv_datafile is None and art_datafile is None:
+        hiv_incidence_rates, art_adherence = None, None
+        
+    else:
+
+        # Load data
+        life_exp    = get_life_expectancy(location=location, verbose=verbose) # Load the life expectancy data (needed for ART adherance calcs)
+        df_inc      = pd.read_csv(hiv_datafile) # HIV incidence
+        df_art      = pd.read_csv(art_datafile) # ART coverage
+    
+        # Process HIV and ART data
+        sex_keys = ['Male', 'Female']
+        sex_key_map = {'Male': 'm', 'Female': 'f'}
+    
+        ## Start with incidence file
+        years = df_inc['Year'].unique()
+        hiv_incidence_rates = dict()
+    
+        # Processing
+        for year in years:
+            hiv_incidence_rates[year] = dict()
+            for sk in sex_keys:
+                sk_out = sex_key_map[sk]
+                hiv_incidence_rates[year][sk_out] = np.concatenate(
+                    [
+                    np.array(df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']], dtype=hpd.default_float),
+                    np.array([[150,0]]) # Add another entry so that all older age groups are covered
+                    ]
+                )
+    
+        # Now compute ART adherence over time/age
+        art_adherence = dict()
+        years = df_art['Year'].values
+        for i, year in enumerate(years):
+    
+            # Use the incidence file to determine which age groups we want to calculate ART coverage for
+            ages_inc = hiv_incidence_rates[year]['m'][:, 0] # Read in the age groups we have HIV incidence data for
+            ages_ex = life_exp[year]['m'][:, 0] # Age groups available in life expectancy file
+            ages = np.intersect1d(ages_inc, ages_ex) # Age groups we want to calculate ART coverage for
+    
+            # Initialize age-specific ART coverage dict and start filling it in
+            cov = np.zeros(len(ages), dtype=hpd.default_float)
+            for j, age in enumerate(ages):
+                idx = np.where(life_exp[year]['f'][:, 0] == age)[0] # Finding life expectancy for this age group/year
+                this_life_exp = life_exp[year]['f'][idx, 1] # Pull out value
+                last_year = int(year + this_life_exp) # Figure out the year in which this age cohort is expected to die
+                year_ind = sc.findnearest(years, last_year) # Get as close to the above year as possible within the data
+                if year_ind > i: # Either take the mean of ART coverage from now up until the year of death
+                    cov[j] = np.mean(df_art[i:year_ind]['ART Coverage'].values)
+                else: # Or, just use ART overage in this year
+                    cov[j] = df_art.iloc[year_ind]['ART Coverage']
+    
+            art_adherence[year] = np.array([ages, cov])
+
+    return hiv_incidence_rates, art_adherence
 
