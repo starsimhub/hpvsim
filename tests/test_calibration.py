@@ -29,12 +29,10 @@ def test_calibration():
     genotype_pars = dict(
         hpv16=dict(
             dysp_rate=[0.5, 0.2, 1.0],
-            prog_rate=[0.5, 0.2, 1.0],
             dur_precin = dict(par1=[1.0, 0.5, 2.5])
         ),
         hpv18=dict(
             dysp_rate=[0.5, 0.2, 1.0],
-            prog_rate=[0.5, 0.2, 1.0],
             dur_precin=dict(par1=[1.0, 0.5, 2.5])
         )
     )
