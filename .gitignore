@@ -1,6 +1,7 @@
 # Other files
 .idea
 .vscode
+.DS_Store
 
 # HPVsim-generated files
 *.obj

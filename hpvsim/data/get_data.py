@@ -20,8 +20,9 @@ import sciris as sc
 from . import loaders
 
 # Set parameters
-data_version = '1.0' # Data version
-quick_url = 'https://github.com/amath-idm/hpvsim_data/blob/main/hpvsim_data.zip?raw=true'
+data_version = '1.1' # Data version
+data_file = f'hpvsim_data_v{data_version}.zip'
+quick_url = f'https://github.com/amath-idm/hpvsim_data/blob/main/{data_file}?raw=true'
 age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
 death_stem = 'WPP2022_Life_Table_Abridged_Medium_'
 base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/'
@@ -89,6 +90,14 @@ def get_death_data(force=None, tidy=None):
     return get_UN_data(**kw)
 
 
+def get_ex_data(force=None, tidy=None):
+    ''' Import age-specific life expectancy and population distributions from UNPD '''
+    columns = ["Location", "Time", "Sex", "AgeGrpStart", "ex"]
+    outfile = 'ex.obj'
+    kw = dict(label='ex', file_stem=death_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    return get_UN_data(**kw)
+
+
 def get_birth_data(start=1960, end=2020):
     ''' Import crude birth rates from WB '''
     sc.heading('Downloading World Bank birth rate data...')
@@ -111,6 +120,8 @@ def parallel_downloader(which):
         get_birth_data()
     if which in ['death', 'deaths']:
         get_death_data()
+    if which in ['life_expectancy', 'ex']:
+        get_ex_data()
     return
 
 
@@ -128,7 +139,7 @@ def get_data():
         which = 'all'
 
     if which == 'all':
-        which = ['age', 'birth', 'death']
+        which = ['age', 'birth', 'death', 'life_expectancy']
 
     # Actually download
     sc.parallelize(parallel_downloader, which)
@@ -143,7 +154,7 @@ def quick_download(verbose=True, init=False):
         sc.heading('Downloading preprocessed HPVsim data')
         if init:
             print('Note: this automatic download only happens once, when HPVsim is first run.\n\n')
-    filepath = sc.makefilepath(filesdir / 'tmp_hpvsim_data.zip')
+    filepath = sc.makefilepath(filesdir / f'tmp_{data_file}.zip')
     sc.download(url=quick_url, filename=filepath, convert=False, verbose=verbose)
     sc.loadzip(filepath, outfolder=filesdir)
     sc.rmpath(filepath)
