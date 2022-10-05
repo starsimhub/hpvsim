@@ -116,11 +116,11 @@ def make_pars(**kwargs):
 
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
-    pars['rel_trans']['precin']   = 1 # Baseline value
-    pars['rel_trans']['cin1']   = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans']['cin2']   = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans']['cin3']   = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans']['cancerous']   = 0.5 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['precin']     = 1 # Baseline value
+    pars['rel_trans']['cin1']       = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cin2']       = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cin3']       = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cancerous']  = 0.5 # Baseline assumption, can be adjusted during calibration
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov

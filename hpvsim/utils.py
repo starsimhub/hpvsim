@@ -276,7 +276,7 @@ def set_prognoses(people, inds, g, dur_nodysp, hiv_pars=None):
     ''' Set disease progression '''
 
     dysp_inds = init_dysp(people, inds, g, dur_nodysp, hiv_pars=hiv_pars) # Indices of those who develop dysplasia
-    peaks = set_peak_dysp(people, dysp_inds, g, hiv_pars=hiv_pars) # Set peak dysplasia levels
+    progress_dysp(people, dysp_inds, g, hiv_pars=hiv_pars) # Set dysplasia progression over time
     grades = set_clinical_grades(people, dysp_inds, g, hiv_pars=hiv_pars) # Set peak dysplasia levels
     # cin3_inds, dur_to_peak_dys, peaks = set_CIN3_prognoses(people, cin2_inds, g, dur_to_peak_dys, peaks, hiv_pars=hiv_pars)
     # set_cancer_prognoses(people, cin3_inds, g, dur_to_peak_dys, peaks, hiv_pars=hiv_pars)
@@ -335,15 +335,14 @@ def init_dysp(people, hpv_inds, g, dur_nodysp=None, hiv_pars=None):
     return dysp_inds
 
 
-def set_peak_dysp(people, dysp_inds, g, current_dysp=None, hiv_pars=None):
+def progress_dysp(people, dysp_inds, g, hiv_pars=None):
     '''
     Progress dysplasia.
     Args:
-        people:
-        dysp_inds:
-        g:
-        current_dysp: current level of dysplasia
-        hiv_pars:
+        people      (hpv.People): the people
+        dysp_inds   (int arr)   : array of indices of people with dysplasia
+        g           (int)       : the genotype
+        hiv_pars    (dict)      : optional dict of HIV-specific parameters that modify progression probabilities
     Returns:
          TBC
     '''
@@ -375,16 +374,25 @@ def set_peak_dysp(people, dysp_inds, g, current_dysp=None, hiv_pars=None):
 
     # Map severity to clinical grades
     ccut = people.pars['clinical_cutoffs']
-    is_cin1   = peaks<ccut['cin1'] # Boolean arrays of people who attain each clinical grade
-    is_cin2   = peaks>ccut['cin1']
-    is_cin3   = peaks>ccut['cin2']
-    is_cancer = peaks>ccut['cin3']
+    is_cin1   = peak_dysp<ccut['cin1'] # Boolean arrays of people who attain each clinical grade
+    is_cin2   = peak_dysp>ccut['cin1']
+    is_cin3   = peak_dysp>ccut['cin2']
+    is_cancer = peak_dysp>ccut['cin3']
     cin2_inds = dysp_inds[is_cin2] # Indices of those progress at least to CIN2
     cin3_inds = dysp_inds[is_cin3] # Indices of those progress at least to CIN3
     cancer_inds = dysp_inds[is_cancer] # Indices of those progress to cancer
     max_cin1_inds = dysp_inds[is_cin1] # Indices of those who don't progress beyond CIN1
     max_cin2_inds = dysp_inds[is_cin2 & ~is_cin3] # Indices of those who don't progress beyond CIN2
     max_cin3_inds = dysp_inds[is_cin3 & ~is_cancer] # Indices of those who don't progress beyond CIN3
+
+    # START HERE
+    # TODO:
+    #   1. For people where dysplasia has already started, find some way to make it progress faster
+
+    import traceback;
+    traceback.print_exc();
+    import pdb;
+    pdb.set_trace()
 
     # Determine whether CIN1 clears or progresses to CIN2
     people.date_cin2[g, cin2_inds] = invlogf1(ccut['cin1'], prog_rates[cin2_inds])
@@ -399,7 +407,6 @@ def set_peak_dysp(people, dysp_inds, g, current_dysp=None, hiv_pars=None):
     people.date_clearance[g, max_cin2_inds] = np.fmax(people.date_clearance[g, max_cin2_inds],
                                                   people.date_cin2[g, max_cin2_inds] +
                                                   np.ceil(time_to_clear_cin2 / dt))
-
 
     # Determine whether CIN3 clears or progresses to cancer
     people.date_cancerous[g, cancer_inds] = invlogf1(ccut['cin3'], prog_rates[cancer_inds])
