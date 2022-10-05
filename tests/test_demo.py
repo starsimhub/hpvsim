@@ -37,7 +37,6 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
 
-    pars['sero'] = 2.5
     pars['hpv_control_prob'] = 0.4
     pars['beta'] = 0.217
 

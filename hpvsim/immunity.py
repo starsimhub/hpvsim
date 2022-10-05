@@ -156,9 +156,10 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
     '''
 
     if infection:
-        # Determine whether individual seroconverts based upon duration of infection
-        dur_inf = people.dur_disease[imm_source, inds]
-        seroconvert_probs = hpu.logf1(dur_inf, imm_pars['sero'])
+        # Determine whether individual seroconverts based upon genotype
+        genotype_label = imm_pars['genotype_map'][imm_source]
+        genotype_pars = imm_pars['genotype_pars'][genotype_label]
+        seroconvert_probs = np.full(len(inds), fill_value=genotype_pars.sero_prob)
         is_seroconvert = hpu.binomial_arr(seroconvert_probs)
 
         # Extract parameters and indices
@@ -184,7 +185,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
         if imm_pars['doses']>1:
             imm_pars['imm_boost'] = sc.promotetolist(imm_pars['imm_boost'])
         if len(dose1_inds)>0: # Initialize immunity for newly vaccinated people
-            people.peak_imm[imm_source, dose1_inds] = hpu.sample(**imm_pars['imm_init'],size=len(dose1_inds))
+            people.peak_imm[imm_source, dose1_inds] = hpu.sample(**imm_pars['imm_init'], size=len(dose1_inds))
         if len(dose2_inds) > 0: # Boost immunity for people receiving 2nd dose...
             people.peak_imm[imm_source, dose2_inds] *= imm_pars['imm_boost'][0]
         if len(dose3_inds) > 0:
