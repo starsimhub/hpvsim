@@ -169,18 +169,17 @@ class PeopleMeta(sc.prettyobj):
 
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
+        State('dur_infection', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present
         State('dur_precin', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
-        State('dur_disease', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has >= HPV present
-        State('dur_precin2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
-        State('dur_cin12cin2', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN1 to CIN2
-        State('dur_cin22cin3', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN2 to CIN3
-        State('dur_cin2cancer', default_float, np.nan, shape='n_genotypes'),# Length of time to go from CIN3 to cancer
+        State('dur_dysp', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has dysplasia
         State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
     ]
 
-    # Severity
+    # Markers of disease severity
     sev = [
-        State('peak_dysp', default_float, np.nan, shape='n_genotypes') # Peak dysplasia, as represented by a value 0-1 that maps onto clinical thresholds for CIN grades
+        State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
+        State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of dysplasia to severity
+        State('peak_dysp', default_float, np.nan, shape='n_genotypes'), # Peak dysplasia, as represented by a value 0-1 that maps onto clinical thresholds for CIN grades
     ]
 
 

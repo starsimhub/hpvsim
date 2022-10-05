@@ -346,12 +346,13 @@ class People(hpb.BasePeople):
             self.inactive[genotype, latent_inds] = True
             self.date_clearance[genotype, latent_inds] = np.nan
 
-        # Whether infection is controlled on not, people have no dysplasia
+        # Whether infection is controlled on not, people have no dysplasia, so we clear all this info
         self.no_dysp[genotype, inds] = True
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
         self.peak_dysp[genotype, inds] = np.nan
+        self.dysp_rate[genotype, inds] = np.nan
 
         return
 
@@ -365,12 +366,13 @@ class People(hpb.BasePeople):
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
         hiv_year = hiv_pars[nearest_year]
+        dt = self.pars['dt']
 
         hiv_probs = np.zeros(len(self), dtype=hpd.default_float)
         for sk in ['f','m']:
             hiv_year_sex = hiv_year[sk]
             age_bins = hiv_year_sex[:,0]
-            hiv_rates = hiv_year_sex[:,1]*self.pars['dt']
+            hiv_rates = hiv_year_sex[:,1]*dt
             mf_inds = self.is_female if sk == 'f' else self.is_male
             mf_inds *= self.alive # Only include people alive
             age_inds = np.digitize(self.age[mf_inds], age_bins)
@@ -385,17 +387,17 @@ class People(hpb.BasePeople):
         if len(hiv_inds):
             
             hpu.set_HIV_prognoses(self, hiv_inds, year=year) # Set ART adherence for those with HIV
-            f_hiv_inds = self.is_female[hiv_inds].nonzero()[-1] # Women with HIV
 
-            # For women who don't have dysplasia, decide whether they will develop it or clear infection
             for g in range(self.pars['n_genotypes']):
-                inds = hiv_inds[hpu.true(self.precin[g, f_hiv_inds])]  # Indices of those with HIV for whom the current health state is true
-                if len(inds): hpu.init_dysp(self, inds, g, hiv_pars=self.pars['hiv_pars'])
+                nocin_inds = hpu.itruei((self.is_female &  np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
+                if len(nocin_inds): # Reevaluate whether these women will develop dysplasia
+                    hpu.update_precin_hiv(self, nocin_inds, g, self.pars['hiv_pars']['dysp_rate'])
+                    hpu.set_dysp_status(self, nocin_inds, g, dt)
 
-            for health_state, update_prog in zip(['precin', 'cin'], [hpu.init_dysp, hpu.progress_dysp]):
-                for g in range(self.pars['n_genotypes']):
-                    inds = hiv_inds[hpu.true(self[health_state][g, f_hiv_inds])] # Indices of those with HIV for whom the current health state is true
-                    if len(inds): update_prog(self, inds, g, hiv_pars=self.pars['hiv_pars'])
+                cin_inds = hpu.itruei((self.is_female & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
+                if len(cin_inds): # Reevaluate disease severity and progression speed for these women
+                    hpu.update_cin_hiv(self, cin_inds, g, self.pars['hiv_pars']['prog_rate'])
+                    hpu.set_cin_grades(self, cin_inds, g, dt)
 
         return len(hiv_inds)
 
@@ -563,21 +565,22 @@ class People(hpb.BasePeople):
         # Deal with genotype parameters
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
-        dur_precin        = genotype_pars[genotype_map[g]]['dur_precin']
+        dur_precin      = genotype_pars[genotype_map[g]]['dur_precin']
+        dysp_rate       = genotype_pars[genotype_map[g]]['dysp_rate']
 
-        # Set all dates
+        # Set date of infection and exposure
         base_t = self.t + offset if offset is not None else self.t
         self.date_infectious[g,inds] = base_t
         if layer != 'reactivation':
             self.date_exposed[g,inds] = base_t
 
-        # Count reinfections
+        # Count reinfections and remove any previous clearance dates
         self.flows['reinfections'][g]           += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         self.total_flows['total_reinfections']  += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         for key in ['date_clearance']:
             self[key][g, inds] = np.nan
 
-        # Count reactivations
+        # Count reactivations and adjust latency status
         if layer == 'reactivation':
             self.flows['reactivations'][g] += len(inds)
             self.total_flows['total_reactivations'] += len(inds)
@@ -602,8 +605,8 @@ class People(hpb.BasePeople):
 
         # Now use genotype-specific prognosis probabilities to determine what happens.
         # Only women can progress beyond infection.
-        f_inds = self.is_female[inds].nonzero()[-1]
-        m_inds = self.is_male[inds].nonzero()[-1]
+        f_inds = hpu.itruei(self.is_female,inds)
+        m_inds = hpu.itruei(self.is_male,inds)
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
@@ -614,23 +617,17 @@ class People(hpb.BasePeople):
                 raise ValueError(errormsg)
             this_dur    = dur
 
-        self.dur_precin[g, inds]    = this_dur  # Set the duration of infection
-        self.dur_disease[g, inds]   = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
-        this_dur_f = self.dur_precin[g, inds[self.is_female[inds]]]
+        # Set durations
+        self.dur_infection[g, inds] = this_dur  # Set the duration of infection
+        self.dur_precin[g, inds]    = this_dur  # Set the duration of infection without dysplasia
 
-        # Compute disease progression for females and skip for makes; males are updated below
+        # Compute disease progression for females
         if len(f_inds)>0:
-            fg_inds = inds[self.is_female[inds]] # Subset the indices so we're only looking at females with this genotype
-            if self.pars['model_hiv']:
-                hiv_inds = fg_inds[hpu.true(self.hiv[fg_inds])] # Figure out if any of these women have HIV
-                if len(hiv_inds):
-                    hpu.set_prognoses(self, hiv_inds, g, this_dur_f[hpu.true(self.hiv[fg_inds])], hiv_pars=self.pars['hiv_pars'])
-                    fg_inds = np.setdiff1d(fg_inds, hiv_inds)
-                    this_dur_f = this_dur_f[hpu.false(self.hiv[fg_inds])]
-            hpu.set_prognoses(self, fg_inds, g, this_dur_f)
+            hpu.set_prognoses(self, f_inds, g, dt, hiv_pars=self.pars['hiv_pars']) # Set prognoses
 
+        # Compute infection clearance for males
         if len(m_inds)>0:
-            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_precin[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+            self.date_clearance[g, m_inds] = self.date_infectious[g, m_inds] + np.ceil(self.dur_infection[g, m_inds]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return len(inds) # For incrementing counters
 
