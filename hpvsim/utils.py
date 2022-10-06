@@ -342,7 +342,7 @@ def set_severity(people, inds, g, gpars, hiv_pars=None):
     people.dur_infection[g, inds] += dur_dysp
 
     # Evaluate progression rates
-    people.prog_rate[g, inds] = sample(**gpars['prog_rate'], size=len(inds))
+    people.prog_rate[g, inds] = sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=len(inds))
     has_hiv = people.hiv[inds]
     if has_hiv.any(): # Figure out if any of these women have HIV
         update_cin_hiv(people, inds[has_hiv], g, hiv_pars['prog_rate']) # Update their progression rates if so
