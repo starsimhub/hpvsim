@@ -28,6 +28,7 @@ dur_precin = [genotype_pars[genotype_map[g]]['dur_precin'] for g in range(ng)]
 dur_dysp = [genotype_pars[genotype_map[g]]['dur_dysp'] for g in range(ng)]
 dysp_rate = [genotype_pars[genotype_map[g]]['dysp_rate'] for g in range(ng)]
 prog_rate = [genotype_pars[genotype_map[g]]['prog_rate'] for g in range(ng)]
+prog_rate_sd = [genotype_pars[genotype_map[g]]['prog_rate_sd'] for g in range(ng)]
 
 
 #%% Helper functions
@@ -90,7 +91,7 @@ longx = np.linspace(0.01, 20, 1000)
 for g in range(ng):
     sigma, scale = lognorm_params(dur_dysp[g]['par1'], dur_dysp[g]['par2'])
     rv = lognorm(sigma, 0, scale)
-    dd = logf1(longx, prog_rate[g]['par1'])
+    dd = logf1(longx, prog_rate[g])
 
     indcin1 = sc.findinds(dd<.33)[-1]
     if (dd>.33).any():
@@ -126,8 +127,8 @@ for g in range(ng):
     r = lognorm(sigma, 0, scale)
 
     for year in years:
-        mean_peaks = logf1(year, prog_rate[g]['par1'])
-        peaks = logf1(year, hpu.sample(**prog_rate[g], size=n_samples))
+        mean_peaks = logf1(year, prog_rate[g])
+        peaks = logf1(year, hpu.sample(dist='normal', par1=prog_rate[g], par2=prog_rate_sd[g], size=n_samples))
         cin1_shares.append(sum(peaks<0.33)/n_samples)
         cin2_shares.append(sum((peaks>0.33)&(peaks<0.67))/n_samples)
         cin3_shares.append(sum((peaks>0.67)&(peaks<cancer_thresh))/n_samples)
@@ -193,10 +194,10 @@ def make_cinfig():
     n_samples = 1
     for ai, gtypes in enumerate(alltypes):
         for gtype in gtypes:
-            ax[ai].plot(thisx, logf1(thisx, genotype_pars[gtype]['prog_rate']['par1']), color=colors[pn], lw=2, label=gtype.upper())
+            ax[ai].plot(thisx, logf1(thisx, genotype_pars[gtype]['prog_rate']), color=colors[pn], lw=2, label=gtype.upper())
             # Plot variation
             for year in range(1, 21):
-                peaks = logf1(year, hpu.sample(**genotype_pars[gtype]['prog_rate'], size=n_samples))
+                peaks = logf1(year, hpu.sample(dist='normal', par1=genotype_pars[gtype]['prog_rate'], par2=genotype_pars[gtype]['prog_rate_sd'], size=n_samples))
                 ax[ai].plot([year] * n_samples, peaks, color=colors[pn], lw=0, marker='o', alpha=0.5)
             pn+=1
 
@@ -274,10 +275,10 @@ def make_fig1():
     cmap = plt.cm.Oranges([0.25,0.5,0.75,1])
     n_samples = 10
     for g in range(ng):
-        ax[1,0].plot(thisx, logf1(thisx, prog_rate[g]['par1']), color=colors[g], lw=2, label=genotype_map[g].upper())
+        ax[1,0].plot(thisx, logf1(thisx, prog_rate[g]), color=colors[g], lw=2, label=genotype_map[g].upper())
         # Plot variation
         for year in range(1, 21):
-            peaks = logf1(year, hpu.sample(**prog_rate[g], size=n_samples))
+            peaks = logf1(year, hpu.sample(dist='normal', par1=prog_rate[g], par2=prog_rate_sd[g], size=n_samples))
             ax[1, 0].plot([year] * n_samples, peaks, color=colors[g], lw=0, marker='o', alpha=0.5)
 
     ax[1,0].set_xlabel("Duration of dysplasia")
