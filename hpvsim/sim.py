@@ -308,6 +308,8 @@ class Sim(hpb.BaseSim):
             self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
 
         genotype_options = hppar.get_genotype_pars().keys()
+        if self['genotypes'] == 'all':
+            self['genotypes'] = genotype_options
 
         for i, g in enumerate(self['genotypes']):
 
