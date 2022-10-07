@@ -353,6 +353,7 @@ class People(hpb.BasePeople):
         self.cin3[genotype, inds] = False
         self.peak_dysp[genotype, inds] = np.nan
         self.dysp_rate[genotype, inds] = np.nan
+        self.prog_rate[genotype, inds] = np.nan
 
         return
 
