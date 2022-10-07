@@ -11,9 +11,7 @@ from . import utils as hpu
 from . import misc as hpm
 from . import defaults as hpd
 from . import parameters as hppar
-
-obj_get = object.__getattribute__ # Alias the default getattribute method
-obj_set = object.__setattr__
+from .version import __version__
 
 
 # Specify all externally visible classes this file defines
@@ -896,10 +894,35 @@ class BasePeople(FlexPretty):
     whereas this class exists to handle the less interesting implementation details.
     '''
 
-    def __init__(self):
+    def __init__(self, pars):
         ''' Initialize essential attributes used for filtering '''
-        obj_set(self, '_keys', []) # Since getattribute is overwritten
-        obj_set(self, '_inds', None)
+        
+        # Set meta attribute here, because BasePeople methods expect it to exist
+        self.meta = hpd.PeopleMeta  # Store list of keys and dtypes
+        self.meta.validate()
+
+        # Define lock attribute here, since BasePeople.lock()/unlock() requires it
+        self._lock = False # Prevent further modification of keys
+
+        # Load other attributes
+        self.set_pars(pars)
+        self.version = __version__ # Store version info
+        self.contacts = None
+        self.t = 0 # Keep current simulation time
+
+        # Private variables relaying to dynamic allocation
+        self._data = sc.odict()
+        self._n = self.pars['n_agents']  # Number of agents (initial)
+        self._s = self._n # Underlying array sizes
+
+        # Initialize underlying storage and map arrays
+        for state in self.meta.all_states:
+            self._data[state.name] = state.new(pars, self._n)
+        self._map_arrays()
+
+        # Assign UIDs
+        self['uid'][:] = np.arange(self.pars['n_agents'])
+        
         return
 
 
@@ -1078,36 +1101,14 @@ class BasePeople(FlexPretty):
         return self.__setattr__(key, value)
 
 
-    def __getattribute__(self, attr):
-        ''' For array quantities, handle filtering '''
-        output  = obj_get(self, attr)
-        if attr[0] == '_': # Short-circuit for built-in methods to save time
-            return output
-        else:
-            try: # Unclear wy this fails, but sometimes it does during initialization/pickling
-                keys = obj_get(self, '_keys')
-            except:
-                keys = []
-            if attr not in keys:
-                return output
-            else:
-                if self._is_filtered(attr):
-                    output = output[self.inds]
-        return output
-
-
     def __setattr__(self, attr, value):
         ''' Ditto '''
         if hasattr(self, '_data') and attr in self._data:
             # Prevent accidentally overwriting a view with an actual array - if this happens, the updated values will
             # be lost the next time the arrays are resized
             raise Exception('Cannot assign directly to a dynamic array view - must index into the view instead e.g. `people.uid[:]=`')
-
-        if self._is_filtered(attr):
-            array = obj_get(self, attr)
-            array[self.inds] = value
         else:   # If not initialized, rely on the default behavior
-            obj_set(self, attr, value)
+            super().__setattr__(attr, value)
         return
 
 
@@ -1183,16 +1184,6 @@ class BasePeople(FlexPretty):
         return string
 
 
-    # CK: BROKEN DON'T USE
-    # def keys(self):
-    #     ''' Returns keys for all properties of the people object '''
-    #     try: # Unclear wy this fails, but sometimes it does during initialization/pickling
-    #         keys = obj_get(self, '_keys')[:]
-    #     except:
-    #         keys = []
-    #     return keys
-
-
     def set(self, key, value, die=True):
         self[key][:] = value[:] # nb. this will raise an exception the shapes don't match, and will automatically cast the value to the existing type
 
@@ -1206,79 +1197,6 @@ class BasePeople(FlexPretty):
             for k,ky in enumerate(key):
                 arr[:,k] = self[ky]
             return arr
-
-
-    def filter(self, criteria=None, inds=None):
-        '''
-        Store indices to allow for easy filtering of the People object.
-        Adapted from FPsim
-        Args:
-            criteria (array): a boolean array for the filtering critria
-            inds (array): alternatively, explicitly filter by these indices
-        Returns:
-            A filtered People object, which works just like a normal People object
-            except only operates on a subset of indices.
-        Examples:
-        active_people = people.filter(people.age > people.debut) # People object containing sexually active people
-        '''
-    
-        # Create a new People object with the same properties as the original
-        filtered = object.__new__(self.__class__) # Create a new People instance
-        BasePeople.__init__(filtered) # Perform essential initialization
-        filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
-    
-        # Perform the filtering
-        if criteria is None: # No filtering: reset
-            filtered._inds = None
-            if inds is not None: # Unless indices are supplied directly, in which case use them
-                filtered._inds = inds
-        else: # Main use case: perform filtering
-            if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
-                new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
-            elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
-                new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
-            else:
-                errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
-                raise ValueError(errormsg)
-            if filtered.inds is None: # Not yet filtered: use the indices directly
-                filtered._inds = new_inds
-            else: # Already filtered: map them back onto the original People indices
-                filtered._inds = filtered.inds[new_inds]
-    
-        return filtered
-    
-    
-    def unfilter(self):
-        '''
-        An easy way of unfiltering the People object, returning the original.
-        '''
-        unfiltered = self.filter(criteria=None)
-        return unfiltered
-    
-    
-    def _is_filtered(self, attr):
-        ''' Determine if a given attribute is filtered (e.g. people.age is, people.inds isn't) '''
-        is_filtered = (self._inds is not None and attr in self._keys)
-        return is_filtered
-    
-    @property
-    def inds(self):
-        ''' Alias to self._inds to prevent accidental overwrite & increase speed '''
-        return self._inds
-    
-    @property
-    def len_inds(self):
-        ''' Alias to len(self) '''
-        if self._inds is not None:
-            return len(self._inds)
-        else:
-            return len(self)
-
-
-    @property
-    def len_people(self):
-        ''' Full length of People array, ignoring filtering '''
-        return len(self.unfilter())
 
 
     @property

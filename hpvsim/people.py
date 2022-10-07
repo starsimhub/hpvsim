@@ -12,7 +12,6 @@ from . import base as hpb
 from . import population as hppop
 from . import plotting as hpplt
 from . import immunity as hpimm
-from .version import __version__
 
 
 __all__ = ['People']
@@ -48,34 +47,8 @@ class People(hpb.BasePeople):
     def __init__(self, pars, strict=True, pop_trend=None, **kwargs):
 
         # Initialize the BasePeople, which also sets things up for filtering
-        super().__init__()
+        super().__init__(pars)
         
-        # Set meta attribute here, because BasePeople methods expect it to exist
-        self.meta = hpd.PeopleMeta  # Store list of keys and dtypes
-        self.meta.validate()
-
-        # Define lock attribute here, since BasePeople.lock()/unlock() requires it
-        self._lock = False # Prevent further modification of keys
-
-        # Load other attributes
-        self.set_pars(pars)
-        self.version = __version__ # Store version info
-        self.contacts = None
-        self.t = 0 # Keep current simulation time
-
-        # Private variables relaying to dynamic allocation
-        self._data = sc.odict()
-        self._n = self.pars['n_agents']  # Number of agents (initial)
-        self._s = self._n # Underlying array sizes
-
-        # Initialize underlying storage and map arrays
-        for state in self.meta.all_states:
-            self._data[state.name] = state.new(pars, self._n)
-        self._map_arrays()
-
-        # Assign UIDs
-        self['uid'][:] = np.arange(self.pars['n_agents'])
-
         # Handle pars and settings
 
         # Other initialization
@@ -118,9 +91,6 @@ class People(hpb.BasePeople):
                 self[key][:] = value
             else:
                 self[key] = value
-        
-        # Store keys to avoid repeated calls
-        self._keys = self.keys()
         
         return
 
@@ -281,6 +251,7 @@ class People(hpb.BasePeople):
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
 
+
     def check_inds_true(self, current, date, filter_inds=None):
         ''' Return indices for which the current state is true and which meet the date criterion '''
         if filter_inds is None:
@@ -290,6 +261,7 @@ class People(hpb.BasePeople):
         has_date = hpu.idefinedi(date, current_inds)
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
+
 
     def check_cin1(self, genotype):
         ''' Check for new progressions to CIN1 '''
@@ -301,6 +273,7 @@ class People(hpb.BasePeople):
         self.no_dysp[genotype, inds] = False
         return len(inds)
 
+
     def check_cin2(self, genotype):
         ''' Check for new progressions to CIN2 '''
         filter_inds = self.true_by_genotype('cin1', genotype)
@@ -309,6 +282,7 @@ class People(hpb.BasePeople):
         self.cin1[genotype, inds] = False # No longer counted as CIN1
         return len(inds)
 
+
     def check_cin3(self, genotype):
         ''' Check for new progressions to CIN3 '''
         filter_inds = self.true_by_genotype('cin2', genotype)
@@ -316,6 +290,7 @@ class People(hpb.BasePeople):
         self.cin3[genotype, inds] = True
         self.cin2[genotype, inds] = False # No longer counted as CIN2
         return len(inds)
+
 
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
