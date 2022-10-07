@@ -202,18 +202,11 @@ def test_age_causal_analyzer():
 
     plt.figure()
 
-    # getting data of the histogram
     for gi, glist in a.age_causal.items():
         count, bins_count = np.histogram(glist, bins=10)
-        # finding the PDF of the histogram using count values
         pdf = count / sum(count)
-
-        # using numpy np.cumsum to calculate the CDF
-        # We can also find using the PDF values by looping and adding
         cdf = np.cumsum(pdf)
-
         gtype = sim['genotype_map'][gi]
-        # plotting PDF and CDF
         plt.plot(bins_count[1:], cdf, label=gtype)
 
     plt.title('Distribution of age of causal HPV infection')
