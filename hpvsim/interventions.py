@@ -860,7 +860,7 @@ class campaign_triage(BaseTriage, CampaignDelivery):
 
 
 #%% Treatment interventions
-__all__ += ['BaseTreatment', 'treat_num', 'treat_delay', 'deliver_txvx']
+__all__ += ['BaseTreatment', 'treat_num', 'treat_delay', 'BaseTxVx', 'routine_txvx', 'campaign_txvx', 'linked_txvx',]
 
 class BaseTreatment(Intervention):
     '''
@@ -872,12 +872,14 @@ class BaseTreatment(Intervention):
          label          (str)           : the name of treatment strategy
          kwargs         (dict)          : passed to Intervention()
     '''
-    def __init__(self, product, accept_prob, eligibility, label=None, **kwargs):
+    def __init__(self, product, prob, eligibility, age_range=None, label=None, **kwargs):
         super().__init__(**kwargs)
-        self.accept_prob = sc.promotetoarray(accept_prob)
+        self.prob = sc.promotetoarray(prob)
         self.eligibility = eligibility
         self.label = label
         self._parse_product(product)
+        self.age_range = age_range or [30,50]
+
 
     def _parse_product(self, product):
         '''
@@ -897,25 +899,31 @@ class BaseTreatment(Intervention):
         return
 
     def initialize(self, sim):
-        super().initialize()
+        super().initialize(sim)
         self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
         self.outcomes = {k: np.array([], dtype=hpd.default_int) for k in ['unsuccessful', 'successful']} # Store outcomes on each timestep
 
-    def recheck_eligibility(self, inds, sim):
+    def check_eligibility(self, inds, sim):
         '''
-        Recheck people's eligibility for treatment - it may have expired if they've been waiting awhile
+        Check people's eligibility for treatment
         '''
+        females         = sim.people.is_female
+        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
+        conditions      = (females & in_age_range)
+        if self.eligibility is not None:
+            other_eligible  = sc.promotetoarray(self.eligibility(sim))
+            conditions      = conditions & other_eligible
         conditions = sim.people.alive[inds] & (~sim.people.cancerous[:,inds].any(axis=0))
-        return conditions
+        return hpu.true(conditions)
 
     def get_accept_inds(self, sim):
         '''
         Get indices of people who will acccept treatment; these people are then added to a queue or scheduled for receiving treatment
         '''
         accept_inds     = np.array([], dtype=hpd.default_int)
-        eligible_inds   = sc.promotetoarray(self.eligibility(sim)) # Apply eligiblity
+        eligible_inds   = self.check_eligibility(accept_inds, sim) # Apply eligiblity
         if len(eligible_inds):
-            accept_inds     = select_people(eligible_inds, prob=self.accept_prob[0])  # Select people who accept
+            accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
         return accept_inds
 
     def get_candidates(self, sim):
@@ -929,7 +937,7 @@ class BaseTreatment(Intervention):
         Perform treatment by getting candidates, checking their eligibility, and then treating them.
         '''
         treat_candidates = self.get_candidates(sim) # NB, this needs to be implemented by derived classes
-        still_eligible = self.recheck_eligibility(treat_candidates, sim)
+        still_eligible = self.check_eligibility(treat_candidates, sim)
         treat_inds = treat_candidates[still_eligible]
         self.outcomes = self.product.administer(sim, treat_inds)
         idx = int(sim.t / sim.resfreq)
@@ -976,7 +984,7 @@ class treat_num(BaseTreatment):
         self.add_to_queue(sim)
         treat_inds = super().apply(sim) # Apply method from BaseTreatment class
         self.queue = [e for e in self.queue if e not in treat_inds] # Recreate the queue, removing people who were treated
-        return
+        return treat_inds
 
 
 class treat_delay(BaseTreatment):
@@ -1016,9 +1024,68 @@ class treat_delay(BaseTreatment):
         super().apply(sim)
 
 
-class deliver_txvx(treat_num):
+class BaseTxVx(treat_num):
     '''
-    Deliver therapeutic vaccine
+    Base class for therapeutic vaccination
+    '''
+    def __init__(self, age_range=None, **kwargs):
+        super().__init__(**kwargs)
+        self.age_range = age_range or [30,99]
+        self.timepoints     = []
+
+    def apply(self, sim):
+        inds = super().apply(sim) # Use treat_num to determine the indices of people to vaccinate
+        if len(inds):
+            # Update people's state and dates, as well as results and doses
+            sim.people.tx_vaccinated[inds] = True
+            sim.people.date_tx_vaccinated[accept_inds] = sim.t
+            sim.people.txvx_doses[inds] += 1
+            idx = int(sim.t / sim.resfreq)
+            sim.results['new_txvx_vaccinated'][:,idx] += len(inds)
+            sim.results['new_txvx_doses'][idx] += len(inds)
+        return
+
+
+class routine_txvx(BaseTxVx, RoutineDelivery):
+    '''
+    Routine delivery of therapeutic vaccine - an instance of treat_num combined
+     with routine delivery. See base classes for a description of input arguments.
+    Examples:
+        txvx1 = hpv.routine_txvx(product='txvx1', prob=0.9, age_range=[25,26], start_year=2030) # Vaccinate 90% of 25yo women every year starting 2025
+        txvx2 = hpv.routine_txvx(product='txvx1', prob=np.linspace(0.2,0.8,5), age_range=[25,26], years=np.arange(2030,2035)) # Scale up vaccination over 5 years starting in 2020
+    '''
+
+    def __init__(self, product=None, prob=None, age_range=None, eligibility=None,
+                 start_year=None, end_year=None, years=None, **kwargs):
+
+        super().__init__(product=product, prob=prob, age_range=age_range, eligibility=eligibility,
+                 start_year=start_year, end_year=end_year, years=years, **kwargs)
+
+    # def apply(self, sim):
+    #     super().apply(sim)
+
+
+class campaign_txvx(BaseTxVx, CampaignDelivery):
+    '''
+    Campaign delivery of therapeutic vaccine - an instance of treat_num combined
+     with campaign delivery. See base classes for a description of input arguments.
+    '''
+
+    def __init__(self, product=None, prob=None, age_range=None, eligibility=None,
+                 years=None, interpolate=True, **kwargs):
+
+        super().__init__(product=product, prob=prob, age_range=age_range, eligibility=eligibility,
+                 years=years, interpolate=interpolate, **kwargs)
+
+    # def apply(self, sim):
+    #     super().apply(sim)
+
+
+class linked_txvx(BaseTxVx):
+    '''
+    Deliver therapeutic vaccine. This intervention should be used if TxVx delivery
+    is linked to another program that determines eligibility, e.g. a screening program.
+    Handling of dates is assumed to be handled by the linked intervention.
     '''
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

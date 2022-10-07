@@ -181,7 +181,44 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 
 
 
+def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Testing TxVx rollout without screening')
 
+    verbose = .1
+    debug = 0
+
+    ### Create interventions
+    # Campaign txvx
+    txvx_dose1 = hpv.campaign_txvx(
+        prob = 0.5,
+        start_year = 2030,
+        age_range = [30,50],
+        product = 'txvx1',
+        label = 'txvx'
+    )
+
+    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
+    txvx_dose2 = hpv.campaign_txvx(
+        prob = 0.4,
+        start_year=2030,
+        age_range=[30, 70],
+        product = 'txvx2',
+        eligibility = second_dose_eligible,
+        label = '2nd dose routine'
+    )
+
+    interventions = [txvx_dose1, txvx_dose2]
+    for intv in interventions: intv.do_plot=False
+
+    sim = hpv.Sim(pars=base_pars, interventions=interventions)
+    sim.run()
+    to_plot = {
+        'Therapeutic vaccine': ['resources_txvx'],
+        'Number vaccinated': ['new_tx_vaccinated', 'cum_tx_vaccinated'],
+    }
+    sim.plot(to_plot=to_plot)
+
+    return sim
 
 
 #%% Run as a script
@@ -190,8 +227,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_new_interventions(do_plot=do_plot)
-
+    # sim0 = test_new_interventions(do_plot=do_plot)
+    sim = test_txvx_noscreen()
 
     sc.toc(T)
     print('Done.')

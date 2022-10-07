@@ -443,7 +443,9 @@ class Sim(hpb.BaseSim):
 
         # Therapeutic vaccine results
         results['new_txvx_doses'] = init_res('New therapeutic vaccine doses')
-        results['new_txvx_vaccinated'] = init_res('Newly therapeutic vaccinated')
+        results['new_tx_vaccinated'] = init_res('Newly received therapeutic vaccine')
+        results['cum_txvx_doses'] = init_res('Cumulative therapeutic vaccine doses')
+        results['cum_tx_vaccinated'] = init_res('Total received therapeutic vaccine')
 
         # Detections
         results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
@@ -978,6 +980,10 @@ class Sim(hpb.BaseSim):
         self.results['cum_vaccinated'][:] = np.cumsum(self.results['new_vaccinated'][:], axis=0)
         self.results['cum_total_vaccinated'][:] = np.cumsum(self.results['new_total_vaccinated'][:])
         self.results['cum_doses'][:] = np.cumsum(self.results['new_doses'][:])
+
+        # Therapeutic vaccination results
+        self.results['cum_tx_vaccinated'][:] = np.cumsum(self.results['new_tx_vaccinated'][:], axis=0)
+        self.results['cum_txvx_doses'][:] = np.cumsum(self.results['new_txvx_doses'][:])
 
         return
 
