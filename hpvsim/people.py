@@ -281,6 +281,7 @@ class People(hpb.BasePeople):
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
 
+
     def check_inds_true(self, current, date, filter_inds=None):
         ''' Return indices for which the current state is true and which meet the date criterion '''
         if filter_inds is None:
@@ -290,6 +291,7 @@ class People(hpb.BasePeople):
         has_date = hpu.idefinedi(date, current_inds)
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
+
 
     def check_cin1(self, genotype):
         ''' Check for new progressions to CIN1 '''
@@ -301,6 +303,7 @@ class People(hpb.BasePeople):
         self.no_dysp[genotype, inds] = False
         return len(inds)
 
+
     def check_cin2(self, genotype):
         ''' Check for new progressions to CIN2 '''
         filter_inds = self.true_by_genotype('cin1', genotype)
@@ -309,6 +312,7 @@ class People(hpb.BasePeople):
         self.cin1[genotype, inds] = False # No longer counted as CIN1
         return len(inds)
 
+
     def check_cin3(self, genotype):
         ''' Check for new progressions to CIN3 '''
         filter_inds = self.true_by_genotype('cin2', genotype)
@@ -316,6 +320,7 @@ class People(hpb.BasePeople):
         self.cin3[genotype, inds] = True
         self.cin2[genotype, inds] = False # No longer counted as CIN2
         return len(inds)
+
 
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
