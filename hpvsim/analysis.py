@@ -1021,8 +1021,6 @@ class age_causal_infection(Analyzer):
                 date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
                 offset = (sim.people.t - date_exposed) * sim['dt']
                 for i, age in enumerate(current_age):
-                    if (age - offset[i]) < 0:
-                        print('uh oh')
                     self.age_causal[cancer_genotypes[i]].append(age - offset[i])
 
 

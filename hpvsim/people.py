@@ -650,6 +650,7 @@ class People(hpb.BasePeople):
         self.susceptible[:, inds] = False
         self.infectious[:, inds] = False
         self.cin1[:, inds] = False
+        self.inactive[:, inds] = False
 
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False
