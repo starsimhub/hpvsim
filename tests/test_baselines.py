@@ -5,13 +5,14 @@ the baseline results.
 
 import numpy as np
 import sciris as sc
-import os
-import sys
 import hpvsim as hpv
 
 do_plot = 1
 do_save = 0
+baseline_filename  = sc.thisdir(__file__, 'baseline.json')
 benchmark_filename = sc.thisdir(__file__, 'benchmark.json')
+parameters_filename = sc.thisdir(hpv.__file__, 'regression', f'pars_v{hpv.__version__}.json')
+hpv.options.set(interactive=False) # Assume not running interactively
 
 
 def make_sim(use_defaults=False, do_plot=False, **kwargs):
@@ -41,6 +42,45 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     return sim
 
 
+def save_baseline():
+    '''
+    Refresh the baseline results. This function is not called during standard testing,
+    but instead is called by the update_baseline script.
+    '''
+
+    print('Updating baseline values...')
+
+    # Export default parameters
+    s1 = make_sim(use_defaults=True)
+    s1.export_pars(filename=parameters_filename) # If not different from previous version, can safely delete
+
+    # Export results
+    s2 = make_sim(use_defaults=False)
+    s2.run()
+    s2.to_json(filename=baseline_filename, keys='summary')
+
+    print('Done.')
+
+    return
+
+
+def test_baseline():
+    ''' Compare the current default sim against the saved baseline '''
+
+    # Load existing baseline
+    baseline = sc.loadjson(baseline_filename)
+    old = baseline['summary']
+
+    # Calculate new baseline
+    new = make_sim()
+    new.run()
+
+    # Compute the comparison
+    hpv.diff_sims(old, new, die=True)
+
+    return new
+
+
 def test_benchmark(do_save=do_save, repeats=1, verbose=True):
     ''' Compare benchmark performance '''
 
@@ -65,7 +105,7 @@ def test_benchmark(do_save=do_save, repeats=1, verbose=True):
             t_bl = sc.toc(t0, output=True)
             t_bls.append(t_bl)
         t_bl = min(t_bls)
-        reference = 0.112 # Benchmarked on an Intel i9-8950HK CPU @ 2.90GHz
+        reference = 0.07 # Benchmarked on an Intel i7-12700H CPU @ 2.90GHz
         ratio = reference/t_bl
         return ratio
 
@@ -137,9 +177,11 @@ def test_benchmark(do_save=do_save, repeats=1, verbose=True):
 if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
+    hpv.options.set(interactive=do_plot)
     T = sc.tic()
 
     json = test_benchmark(do_save=do_save, repeats=5) # Run this first so benchmarking is available even if results are different
+    new  = test_baseline()
     make_sim(do_plot=do_plot)
 
     print('\n'*2)
