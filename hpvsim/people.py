@@ -390,12 +390,12 @@ class People(hpb.BasePeople):
             hpu.set_HIV_prognoses(self, hiv_inds, year=year) # Set ART adherence for those with HIV
 
             for g in range(self.pars['n_genotypes']):
-                nocin_inds = hpu.itruei((self.is_female &  np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
+                nocin_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
                 if len(nocin_inds): # Reevaluate whether these women will develop dysplasia
                     hpu.update_precin_hiv(self, nocin_inds, g, self.pars['hiv_pars']['dysp_rate'])
                     hpu.set_dysp_status(self, nocin_inds, g, dt)
 
-                cin_inds = hpu.itruei((self.is_female & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
+                cin_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
                 if len(cin_inds): # Reevaluate disease severity and progression speed for these women
                     hpu.update_cin_hiv(self, cin_inds, g, self.pars['hiv_pars']['prog_rate'])
                     hpu.set_cin_grades(self, cin_inds, g, dt)
@@ -575,10 +575,10 @@ class People(hpb.BasePeople):
         if layer != 'reactivation':
             self.date_exposed[g,inds] = base_t
 
-        # Count reinfections and remove any previous clearance dates
+        # Count reinfections and remove any previous dates
         self.flows['reinfections'][g]           += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         self.total_flows['total_reinfections']  += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
-        for key in ['date_clearance']:
+        for key in ['date_clearance', 'date_cin1', 'date_cin2', 'date_cin3']:
             self[key][g, inds] = np.nan
 
         # Count reactivations and adjust latency status
