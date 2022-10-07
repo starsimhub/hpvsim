@@ -11,7 +11,9 @@ from . import utils as hpu
 from . import misc as hpm
 from . import defaults as hpd
 from . import parameters as hppar
-from .version import __version__
+
+obj_get = object.__getattribute__ # Alias the default getattribute method
+obj_set = object.__setattr__
 
 
 # Specify all externally visible classes this file defines
@@ -894,47 +896,29 @@ class BasePeople(FlexPretty):
     whereas this class exists to handle the less interesting implementation details.
     '''
 
-    def __init__(self, pars):
+    def __init__(self):
         ''' Initialize essential attributes used for filtering '''
-        # obj_set(self, '_keys', []) # Since getattribute is overwritten
-        # obj_set(self, '_inds', None)
-
-        # Set meta attribute here, because BasePeople methods expect it to exist
-        self.meta = hpd.PeopleMeta  # Store list of keys and dtypes
-        self.meta.validate()
-
-        # Define lock attribute here, since BasePeople.lock()/unlock() requires it
-        self._lock = False # Prevent further modification of keys
-
-        # Load other attributes
-        self.set_pars(pars)
-        self.version = __version__ # Store version info
-        self.contacts = None
-        self.t = 0 # Keep current simulation time
-
-        # Private variables relaying to dynamic allocation
-        self._data = sc.odict()
-        self._n = self.pars['n_agents']  # Number of agents (initial)
-        self._s = self._n # Underlying array sizes
-
-        # Initialize underlying storage and map arrays
-        for state in self.meta.all_states:
-            self._data[state.name] = state.new(pars, self._n)
-        self._map_arrays()
-
-        # Assign UIDs
-        self['uid'][:] = np.arange(self.pars['n_agents'])
-
+        obj_set(self, '_keys', []) # Since getattribute is overwritten
+        obj_set(self, '_inds', None)
         return
 
 
     def __len__(self):
-        ''' Length of people (undef fied?) '''
+        ''' Length of people '''
         try:
             return len(self.uid)
         except Exception as E:
             print(f'Warning: could not get length of People (could not get self.uid: {E})')
             return 0
+
+
+    def keys(self):
+        ''' Returns keys for all properties of the people object '''
+        try: # Unclear wy this fails, but sometimes it does during initialization/pickling
+            keys = obj_get(self, '_keys')[:]
+        except:
+            keys = []
+        return keys
 
 
     def set_pars(self, pars=None, hiv_pars=None):
@@ -1069,6 +1053,7 @@ class BasePeople(FlexPretty):
         self._n += n
         self._map_arrays()
 
+
     def _map_arrays(self):
         """
         Set main simulation attributes to be views of the underlying data
@@ -1082,6 +1067,7 @@ class BasePeople(FlexPretty):
                 super().__setattr__(k, self._data[k][:, :self._n])
             else:
                 super().__setattr__(k, self._data[k][:self._n])
+
 
     def __getitem__(self, key):
         ''' Allow people['attr'] instead of getattr(people, 'attr')
@@ -1101,12 +1087,38 @@ class BasePeople(FlexPretty):
         return self.__setattr__(key, value)
 
 
-    def __setattr__(self, key, value):
-        if hasattr(self, '_data') and key in self._data:
+    def __getattribute__(self, attr):
+        ''' For array quantities, handle filtering '''
+        output  = obj_get(self, attr)
+        if attr[0] == '_': # Short-circuit for built-in methods to save time
+            return output
+        else:
+            try: # Unclear wy this fails, but sometimes it does during initialization/pickling
+                keys = obj_get(self, '_keys')
+            except:
+                keys = []
+            if attr not in keys:
+                return output
+            else:
+                if self._is_filtered(attr):
+                    output = output[self.inds]
+        return output
+
+
+    def __setattr__(self, attr, value):
+        ''' Ditto '''
+        if hasattr(self, '_data') and attr in self._data:
             # Prevent accidentally overwriting a view with an actual array - if this happens, the updated values will
             # be lost the next time the arrays are resized
             raise Exception('Cannot assign directly to a dynamic array view - must index into the view instead e.g. `people.uid[:]=`')
-        super().__setattr__(key, value)
+
+        if self._is_filtered(attr):
+            array = obj_get(self, attr)
+            array[self.inds] = value
+        else:   # If not initialized, rely on the default behavior
+            obj_set(self, attr, value)
+        return
+
 
 
     def __iter__(self):
@@ -1138,6 +1150,12 @@ class BasePeople(FlexPretty):
         newpeople.set('uid', np.arange(len(newpeople)))
 
         return newpeople
+
+
+    def _is_filtered(self, attr):
+        ''' Determine if a given attribute is filtered (e.g. people.age is, people.inds isn't) '''
+        is_filtered = (self._inds is not None and attr in self._keys)
+        return is_filtered
 
 
     def addtoself(self, people2):
@@ -1205,7 +1223,6 @@ class BasePeople(FlexPretty):
             return arr
 
 
-    #%% Filtering methods
     def filter(self, criteria=None, inds=None):
         '''
         Store indices to allow for easy filtering of the People object.
