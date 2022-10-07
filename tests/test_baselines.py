@@ -105,7 +105,7 @@ def test_benchmark(do_save=do_save, repeats=1, verbose=True):
             t_bl = sc.toc(t0, output=True)
             t_bls.append(t_bl)
         t_bl = min(t_bls)
-        reference = 0.112 # Benchmarked on an Intel i9-8950HK CPU @ 2.90GHz
+        reference = 0.07 # Benchmarked on an Intel i7-12700H CPU @ 2.90GHz
         ratio = reference/t_bl
         return ratio
 
