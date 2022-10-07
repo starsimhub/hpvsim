@@ -1003,16 +1003,6 @@ class age_causal_infection(Analyzer):
         for g in range(len(gtypes)):
             self.age_causal[g] = []
 
-    # @property
-    # def median(self):
-    #     return np.array([np.median(x) for x in self.age_causal])
-    #
-    # def bin_ages(self, bins):
-    #     out = np.zeros(((len(bins)-1),len(self.years)))
-    #     for i, ages in enumerate(self.age_causal):
-    #         out[:,i] = np.histogram(ages, bins)[0]
-    #     return out
-
     def apply(self, sim):
         if sim.yearvec[sim.t] >= self.start_year:
             cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
