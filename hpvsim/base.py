@@ -912,13 +912,13 @@ class BasePeople(FlexPretty):
             return 0
 
 
-    def keys(self):
-        ''' Returns keys for all properties of the people object '''
-        try: # Unclear wy this fails, but sometimes it does during initialization/pickling
-            keys = obj_get(self, '_keys')[:]
-        except:
-            keys = []
-        return keys
+    # def keys(self):
+    #     ''' Returns keys for all properties of the people object '''
+    #     try: # Unclear wy this fails, but sometimes it does during initialization/pickling
+    #         keys = obj_get(self, '_keys')[:]
+    #     except:
+    #         keys = []
+    #     return keys
 
 
     def set_pars(self, pars=None, hiv_pars=None):
@@ -1150,13 +1150,7 @@ class BasePeople(FlexPretty):
         newpeople.set('uid', np.arange(len(newpeople)))
 
         return newpeople
-
-
-    def _is_filtered(self, attr):
-        ''' Determine if a given attribute is filtered (e.g. people.age is, people.inds isn't) '''
-        is_filtered = (self._inds is not None and attr in self._keys)
-        return is_filtered
-
+    
 
     def addtoself(self, people2):
         ''' Combine two people arrays, avoiding dcp '''
@@ -1271,6 +1265,11 @@ class BasePeople(FlexPretty):
         return unfiltered
     
     
+    def _is_filtered(self, attr):
+        ''' Determine if a given attribute is filtered (e.g. people.age is, people.inds isn't) '''
+        is_filtered = (self._inds is not None and attr in self._keys)
+        return is_filtered
+    
     @property
     def inds(self):
         ''' Alias to self._inds to prevent accidental overwrite & increase speed '''
@@ -1283,6 +1282,13 @@ class BasePeople(FlexPretty):
             return len(self._inds)
         else:
             return len(self)
+
+
+    @property
+    def len_people(self):
+        ''' Full length of People array, ignoring filtering '''
+        return len(self.unfilter())
+
 
     @property
     def is_female(self):

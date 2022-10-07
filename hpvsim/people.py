@@ -119,6 +119,9 @@ class People(hpb.BasePeople):
             else:
                 self[key] = value
         
+        # Store keys to avoid repeated calls
+        self._keys = self.keys()
+        
         return
 
 

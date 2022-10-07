@@ -9,6 +9,14 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.3.0 (2022-10-07)
+--------------------------
+- HIV was added.
+- Adds people filtering.
+- Fixes bug with ``print(sim)`` not working.
+- *GitHub info*: PR `308 <https://github.com/amath-idm/hpvsim/pull/308>`__
+
+
 Version 0.2.3 (2022-09-01)
 --------------------------
 - Adds a ``use_migration`` parameter that activates immigration/emigration to ensure population sizes line up with data.
