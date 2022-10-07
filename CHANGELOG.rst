@@ -9,12 +9,20 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
-Version 0.3.0 (2022-10-07)
+Version 0.2.5 (2022-10-07)
 --------------------------
-- HIV was added.
 - Adds people filtering.
 - Fixes bug with ``print(sim)`` not working.
-- *GitHub info*: PR `308 <https://github.com/amath-idm/hpvsim/pull/308>`__
+- Adds baseline tests.
+- *GitHub info*: PR `310 <https://github.com/amath-idm/hpvsim/pull/310>`__
+
+
+Version 0.2.4 (2022-10-07)
+--------------------------
+- Changes to dysplasia progression parameterization
+- Adds a new implementation of HPV natural history for HIV positive women 
+- Note: HIV was added since the previous version
+- *GitHub info*: PR `304 <https://github.com/amath-idm/hpvsim/pull/304>`__
 
 
 Version 0.2.3 (2022-09-01)
