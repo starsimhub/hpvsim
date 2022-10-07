@@ -920,6 +920,12 @@ class BaseTreatment(Intervention):
         '''
         Get indices of people who will acccept treatment; these people are then added to a queue or scheduled for receiving treatment
         '''
+        if sim.t==80:
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
+
         accept_inds     = np.array([], dtype=hpd.default_int)
         eligible_inds   = self.check_eligibility(accept_inds, sim) # Apply eligiblity
         if len(eligible_inds):
@@ -1077,8 +1083,8 @@ class campaign_txvx(BaseTxVx, CampaignDelivery):
         super().__init__(product=product, prob=prob, age_range=age_range, eligibility=eligibility,
                  years=years, interpolate=interpolate, **kwargs)
 
-    # def apply(self, sim):
-    #     super().apply(sim)
+    def apply(self, sim):
+        super().apply(sim)
 
 
 class linked_txvx(BaseTxVx):
