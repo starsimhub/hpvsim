@@ -303,6 +303,7 @@ def update_precin_hiv(people, inds, g, hiv_dysp_rate):
     '''
     immune_compromise = 1 - people.art_adherence[inds] # Get the degree of immunocompromise
     modified_dysp_rate = immune_compromise * hiv_dysp_rate # Calculate the modification to make to the dysplasia rate
+    modified_dysp_rate[modified_dysp_rate < 1] = 1
     people.dysp_rate[g, inds] = people.dysp_rate[g, inds] * modified_dysp_rate # Store dysplasia rates
     return
 
@@ -356,6 +357,7 @@ def update_cin_hiv(people, inds, g, hiv_prog_rate):
     '''
     immune_compromise = 1 - people.art_adherence[inds] # Get the degree of immunocompromise
     modified_prog_rate = immune_compromise * hiv_prog_rate # Calculate the modification to make to the progression rate
+    modified_prog_rate[modified_prog_rate < 1] = 1
     people.prog_rate[g, inds] = people.prog_rate[g, inds] * modified_prog_rate # Store progression rates
     return
 
