@@ -1095,9 +1095,9 @@ def diff_sims(sim1, sim2, skip_key_diffs=False, skip=None, output=False, die=Fal
 
     **Example**::
 
-        s1 = cv.Sim(rand_seed=1).run()
-        s2 = cv.Sim(rand_seed=2).run()
-        cv.diff_sims(s1, s2)
+        s1 = hpv.Sim(rand_seed=1).run()
+        s2 = hpv.Sim(rand_seed=2).run()
+        hpv.diff_sims(s1, s2)
     '''
 
     if isinstance(sim1, Sim):
