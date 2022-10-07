@@ -929,7 +929,7 @@ class BasePeople(FlexPretty):
 
 
     def __len__(self):
-        ''' Length of people (unfiltered?) '''
+        ''' Length of people (undef fied?) '''
         try:
             return len(self.uid)
         except Exception as E:
@@ -1206,66 +1206,66 @@ class BasePeople(FlexPretty):
 
 
     #%% Filtering methods
-    # def filter(self, criteria=None, inds=None):
-    #     '''
-    #     Store indices to allow for easy filtering of the People object.
-    #     Adapted from FPsim
-    #     Args:
-    #         criteria (array): a boolean array for the filtering critria
-    #         inds (array): alternatively, explicitly filter by these indices
-    #     Returns:
-    #         A filtered People object, which works just like a normal People object
-    #         except only operates on a subset of indices.
-    #     Examples:
-    #     active_people = people.filter(people.age > people.debut) # People object containing sexually active people
-    #     '''
-    #
-    #     # Create a new People object with the same properties as the original
-    #     filtered = object.__new__(self.__class__) # Create a new People instance
-    #     BasePeople.__init__(filtered) # Perform essential initialization
-    #     filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
-    #
-    #     # Perform the filtering
-    #     if criteria is None: # No filtering: reset
-    #         filtered._inds = None
-    #         if inds is not None: # Unless indices are supplied directly, in which case use them
-    #             filtered._inds = inds
-    #     else: # Main use case: perform filtering
-    #         if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
-    #             new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
-    #         elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
-    #             new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
-    #         else:
-    #             errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
-    #             raise ValueError(errormsg)
-    #         if filtered.inds is None: # Not yet filtered: use the indices directly
-    #             filtered._inds = new_inds
-    #         else: # Already filtered: map them back onto the original People indices
-    #             filtered._inds = filtered.inds[new_inds]
-    #
-    #     return filtered
-    #
-    #
-    # def unfilter(self):
-    #     '''
-    #     An easy way of unfiltering the People object, returning the original.
-    #     '''
-    #     unfiltered = self.filter(criteria=None)
-    #     return unfiltered
-    #
-    #
-    # @property
-    # def inds(self):
-    #     ''' Alias to self._inds to prevent accidental overwrite & increase speed '''
-    #     return self._inds
-    #
-    # @property
-    # def len_inds(self):
-    #     ''' Alias to len(self) '''
-    #     if self._inds is not None:
-    #         return len(self._inds)
-    #     else:
-    #         return len(self)
+    def filter(self, criteria=None, inds=None):
+        '''
+        Store indices to allow for easy filtering of the People object.
+        Adapted from FPsim
+        Args:
+            criteria (array): a boolean array for the filtering critria
+            inds (array): alternatively, explicitly filter by these indices
+        Returns:
+            A filtered People object, which works just like a normal People object
+            except only operates on a subset of indices.
+        Examples:
+        active_people = people.filter(people.age > people.debut) # People object containing sexually active people
+        '''
+    
+        # Create a new People object with the same properties as the original
+        filtered = object.__new__(self.__class__) # Create a new People instance
+        BasePeople.__init__(filtered) # Perform essential initialization
+        filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
+    
+        # Perform the filtering
+        if criteria is None: # No filtering: reset
+            filtered._inds = None
+            if inds is not None: # Unless indices are supplied directly, in which case use them
+                filtered._inds = inds
+        else: # Main use case: perform filtering
+            if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
+                new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
+            elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
+                new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
+            else:
+                errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
+                raise ValueError(errormsg)
+            if filtered.inds is None: # Not yet filtered: use the indices directly
+                filtered._inds = new_inds
+            else: # Already filtered: map them back onto the original People indices
+                filtered._inds = filtered.inds[new_inds]
+    
+        return filtered
+    
+    
+    def unfilter(self):
+        '''
+        An easy way of unfiltering the People object, returning the original.
+        '''
+        unfiltered = self.filter(criteria=None)
+        return unfiltered
+    
+    
+    @property
+    def inds(self):
+        ''' Alias to self._inds to prevent accidental overwrite & increase speed '''
+        return self._inds
+    
+    @property
+    def len_inds(self):
+        ''' Alias to len(self) '''
+        if self._inds is not None:
+            return len(self._inds)
+        else:
+            return len(self)
 
     @property
     def is_female(self):
