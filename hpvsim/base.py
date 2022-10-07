@@ -912,15 +912,6 @@ class BasePeople(FlexPretty):
             return 0
 
 
-    # def keys(self):
-    #     ''' Returns keys for all properties of the people object '''
-    #     try: # Unclear wy this fails, but sometimes it does during initialization/pickling
-    #         keys = obj_get(self, '_keys')[:]
-    #     except:
-    #         keys = []
-    #     return keys
-
-
     def set_pars(self, pars=None, hiv_pars=None):
         '''
         Re-link the parameters stored in the people object to the sim containing it,
