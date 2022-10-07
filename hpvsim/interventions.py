@@ -1139,7 +1139,7 @@ class tx(Product):
 
                         # Clear infection for women who clear
                         people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
-                        people.dur_disease[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
+                        people.dur_infection[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
                         hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
         tx_successful = np.array(list(set(tx_successful)))
