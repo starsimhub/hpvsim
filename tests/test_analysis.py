@@ -196,21 +196,29 @@ def test_age_causal_analyzer():
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
 
-    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection()])
+    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection(start_year=2000)])
     sim.run()
     a = sim.get_analyzer(hpv.age_causal_infection)
 
     plt.figure()
-    plt.scatter(a.years, a.median)
-    plt.xlabel('Year')
-    plt.ylabel('Median age of causal infection')
-    plt.show()
 
-    v = a.bin_ages(np.arange(0,105,5))
-    plt.figure()
-    plt.imshow(v)
-    plt.xlabel('Year')
-    plt.ylabel('Age bin')
+    # getting data of the histogram
+    for gi, glist in a.age_causal.items():
+        count, bins_count = np.histogram(glist, bins=10)
+        # finding the PDF of the histogram using count values
+        pdf = count / sum(count)
+
+        # using numpy np.cumsum to calculate the CDF
+        # We can also find using the PDF values by looping and adding
+        cdf = np.cumsum(pdf)
+
+        gtype = sim['genotype_map'][gi]
+        # plotting PDF and CDF
+        plt.plot(bins_count[1:], cdf, label=gtype)
+
+    plt.title('Distribution of age of causal HPV infection')
+    plt.legend()
+    plt.xlabel('Age')
     plt.show()
 
     return sim, a
@@ -241,12 +249,12 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
-    sim2, a2    = test_reduce_analyzers()
+    # people      = test_snapshot()
+    # sim0, a0    = test_age_pyramids()
+    # sim1, a1    = test_age_results()
+    # sim2, a2    = test_reduce_analyzers()
     sim3, a3    = test_age_causal_analyzer()
-    sim4, a4    = test_detection()
+    # sim4, a4    = test_detection()
 
     sc.toc(T)
     print('Done.')

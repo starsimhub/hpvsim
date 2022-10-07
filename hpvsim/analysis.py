@@ -988,34 +988,42 @@ class age_causal_infection(Analyzer):
     Determine the age at which people with cervical cancer were causally infected
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
-        self.age_causal = []
+        self.start_year = start_year
         self.years = None
 
     def initialize(self, sim):
         super().initialize(sim)
         self.years = sim.yearvec
+        if self.start_year is None:
+            self.start_year = sim['start']
+        self.age_causal = dict()
+        gtypes = sim['genotype_map'].keys()
+        for g in range(len(gtypes)):
+            self.age_causal[g] = []
 
-    @property
-    def median(self):
-        return np.array([np.median(x) for x in self.age_causal])
-
-    def bin_ages(self, bins):
-        out = np.zeros(((len(bins)-1),len(self.years)))
-        for i, ages in enumerate(self.age_causal):
-            out[:,i] = np.histogram(ages, bins)[0]
-        return out
+    # @property
+    # def median(self):
+    #     return np.array([np.median(x) for x in self.age_causal])
+    #
+    # def bin_ages(self, bins):
+    #     out = np.zeros(((len(bins)-1),len(self.years)))
+    #     for i, ages in enumerate(self.age_causal):
+    #         out[:,i] = np.histogram(ages, bins)[0]
+    #     return out
 
     def apply(self, sim):
-        cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
-        if len(cancer_inds):
-            current_age = sim.people.age[cancer_inds]
-            date_exposed = sim.people.date_exposed[cancer_genotypes,cancer_inds]
-            offset = (sim.people.t - date_exposed) * sim.people.pars['dt']
-            self.age_causal.append(current_age - offset)
-        else:
-            self.age_causal.append([])
+        if sim.yearvec[sim.t] >= self.start_year:
+            cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
+            if len(cancer_inds):
+                current_age = sim.people.age[cancer_inds]
+                date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
+                offset = (sim.people.t - date_exposed) * sim['dt']
+                for i, age in enumerate(current_age):
+                    if (age - offset[i]) < 0:
+                        print('uh oh')
+                    self.age_causal[cancer_genotypes[i]].append(age - offset[i])
 
 
 class cancer_detection(Analyzer):
