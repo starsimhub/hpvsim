@@ -12,6 +12,7 @@ from . import base as hpb
 from . import population as hppop
 from . import plotting as hpplt
 from . import immunity as hpimm
+from .version import __version__
 
 
 __all__ = ['People']
@@ -47,7 +48,33 @@ class People(hpb.BasePeople):
     def __init__(self, pars, strict=True, pop_trend=None, **kwargs):
 
         # Initialize the BasePeople, which also sets things up for filtering
-        super().__init__(pars)
+        super().__init__()
+        
+        # Set meta attribute here, because BasePeople methods expect it to exist
+        self.meta = hpd.PeopleMeta  # Store list of keys and dtypes
+        self.meta.validate()
+
+        # Define lock attribute here, since BasePeople.lock()/unlock() requires it
+        self._lock = False # Prevent further modification of keys
+
+        # Load other attributes
+        self.set_pars(pars)
+        self.version = __version__ # Store version info
+        self.contacts = None
+        self.t = 0 # Keep current simulation time
+
+        # Private variables relaying to dynamic allocation
+        self._data = sc.odict()
+        self._n = self.pars['n_agents']  # Number of agents (initial)
+        self._s = self._n # Underlying array sizes
+
+        # Initialize underlying storage and map arrays
+        for state in self.meta.all_states:
+            self._data[state.name] = state.new(pars, self._n)
+        self._map_arrays()
+
+        # Assign UIDs
+        self['uid'][:] = np.arange(self.pars['n_agents'])
 
         # Handle pars and settings
 
@@ -91,7 +118,10 @@ class People(hpb.BasePeople):
                 self[key][:] = value
             else:
                 self[key] = value
-
+        
+        # Store keys to avoid repeated calls
+        self._keys = self.keys()
+        
         return
 
 
