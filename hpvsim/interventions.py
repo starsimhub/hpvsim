@@ -302,14 +302,15 @@ class RoutineDelivery(Intervention):
     '''
     Base class for any intervention that uses routine delivery; handles interpolation of input years.
     '''
-    def __init__(self, years=None, start_year=None, end_year=None):
+    def __init__(self, years=None, start_year=None, end_year=None, prob=None):
         self.years      = years
         self.start_year = start_year
         self.end_year   = end_year
+        self.prob       = sc.promotetoarray(prob)
         return
 
     def initialize(self, sim):
-        super().initialize(sim)
+        # super().initialize(sim)
 
         # Validate inputs
         if (self.years is not None) and (self.start_year is not None or self.end_year is not None):
@@ -362,7 +363,7 @@ class CampaignDelivery(Intervention):
         return
 
     def initialize(self, sim):
-        super().initialize(sim)
+        # super().initialize(sim)
 
         # Decide whether to apply the intervention at every timepoint throughout the year, or just once.
         if self.interpolate:
@@ -872,13 +873,13 @@ class BaseTreatment(Intervention):
          label          (str)           : the name of treatment strategy
          kwargs         (dict)          : passed to Intervention()
     '''
-    def __init__(self, product, prob, eligibility, age_range=None, label=None, **kwargs):
+    def __init__(self, product=None, prob=None, eligibility=None, age_range=None, label=None, **kwargs):
         super().__init__(**kwargs)
         self.prob = sc.promotetoarray(prob)
         self.eligibility = eligibility
         self.label = label
         self._parse_product(product)
-        self.age_range = age_range or [30,50]
+        self.age_range = age_range or [0,99] # By default, no restrictions on treatment age
 
 
     def _parse_product(self, product):
@@ -899,35 +900,30 @@ class BaseTreatment(Intervention):
         return
 
     def initialize(self, sim):
-        super().initialize(sim)
+        Intervention.initialize(self)
         self.n_products_used = hpb.Result(name=f'Products administered by {self.label}', npts=sim.res_npts, scale=True)
         self.outcomes = {k: np.array([], dtype=hpd.default_int) for k in ['unsuccessful', 'successful']} # Store outcomes on each timestep
 
-    def check_eligibility(self, inds, sim):
+    def check_eligibility(self, sim):
         '''
         Check people's eligibility for treatment
         '''
         females         = sim.people.is_female
         in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
-        conditions      = (females & in_age_range)
+        alive           = sim.people.alive
+        nocancer        = ~sim.people.cancerous.any(axis=0)
+        conditions      = (females & in_age_range & alive & nocancer)
         if self.eligibility is not None:
             other_eligible  = sc.promotetoarray(self.eligibility(sim))
             conditions      = conditions & other_eligible
-        conditions = sim.people.alive[inds] & (~sim.people.cancerous[:,inds].any(axis=0))
         return hpu.true(conditions)
 
     def get_accept_inds(self, sim):
         '''
         Get indices of people who will acccept treatment; these people are then added to a queue or scheduled for receiving treatment
         '''
-        if sim.t==80:
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
-
         accept_inds     = np.array([], dtype=hpd.default_int)
-        eligible_inds   = self.check_eligibility(accept_inds, sim) # Apply eligiblity
+        eligible_inds   = self.check_eligibility(sim) # Apply eligiblity
         if len(eligible_inds):
             accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
         return accept_inds
@@ -1030,25 +1026,30 @@ class treat_delay(BaseTreatment):
         super().apply(sim)
 
 
-class BaseTxVx(treat_num):
+class BaseTxVx(BaseTreatment):
     '''
     Base class for therapeutic vaccination
     '''
     def __init__(self, age_range=None, **kwargs):
         super().__init__(**kwargs)
         self.age_range = age_range or [30,99]
-        self.timepoints     = []
 
-    def apply(self, sim):
-        inds = super().apply(sim) # Use treat_num to determine the indices of people to vaccinate
-        if len(inds):
-            # Update people's state and dates, as well as results and doses
-            sim.people.tx_vaccinated[inds] = True
-            sim.people.date_tx_vaccinated[accept_inds] = sim.t
-            sim.people.txvx_doses[inds] += 1
-            idx = int(sim.t / sim.resfreq)
-            sim.results['new_txvx_vaccinated'][:,idx] += len(inds)
-            sim.results['new_txvx_doses'][idx] += len(inds)
+    def deliver(self, sim):
+        ''' Deliver the intervention '''
+        eligible_inds = self.check_eligibility(sim)
+        if len(eligible_inds):
+            accept_inds = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
+            if len(accept_inds):
+                self.outcomes = self.product.administer(sim, accept_inds)
+                idx = int(sim.t / sim.resfreq)
+                self.n_products_used[idx] += len(accept_inds)
+                sim.people.tx_vaccinated[accept_inds] = True
+                sim.people.date_tx_vaccinated[accept_inds] = sim.t
+                sim.people.txvx_doses[accept_inds] += 1
+                idx = int(sim.t / sim.resfreq)
+                sim.results['new_tx_vaccinated'][idx] += len(accept_inds)
+                sim.results['new_txvx_doses'][idx] += len(accept_inds)
+
         return
 
 
@@ -1067,8 +1068,12 @@ class routine_txvx(BaseTxVx, RoutineDelivery):
         super().__init__(product=product, prob=prob, age_range=age_range, eligibility=eligibility,
                  start_year=start_year, end_year=end_year, years=years, **kwargs)
 
-    # def apply(self, sim):
-    #     super().apply(sim)
+    def initialize(self, sim):
+        RoutineDelivery.initialize(sim) # Initialize this first, as it ensures that prob is interpolated properly
+        BaseTxVx.initialize(sim) # Initialize this next - this actually calls BaseTreatment.initialize() and ensures products will be counted
+
+    def apply(self, sim):
+        if sim.t in self.timepoints: self.deliver(sim)
 
 
 class campaign_txvx(BaseTxVx, CampaignDelivery):
@@ -1083,8 +1088,12 @@ class campaign_txvx(BaseTxVx, CampaignDelivery):
         super().__init__(product=product, prob=prob, age_range=age_range, eligibility=eligibility,
                  years=years, interpolate=interpolate, **kwargs)
 
+    def initialize(self, sim):
+        CampaignDelivery.initialize(self, sim) # Initialize this first, as it ensures that prob is interpolated properly
+        BaseTxVx.initialize(self, sim) # Initialize this next - this actually calls BaseTreatment.initialize() and ensures products will be counted
+
     def apply(self, sim):
-        super().apply(sim)
+        if sim.t in self.timepoints: self.deliver(sim)
 
 
 class linked_txvx(BaseTxVx):

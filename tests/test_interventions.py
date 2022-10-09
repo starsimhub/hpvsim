@@ -189,25 +189,43 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
 
     ### Create interventions
     # Campaign txvx
-    txvx_dose1 = hpv.campaign_txvx(
-        prob = 0.5,
-        start_year = 2030,
+    campaign_txvx_dose1 = hpv.campaign_txvx(
+        prob = 0.9,
+        years = 2030,
         age_range = [30,50],
         product = 'txvx1',
-        label = 'txvx'
+        label = 'campaign txvx'
     )
 
     second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
-    txvx_dose2 = hpv.campaign_txvx(
-        prob = 0.4,
-        start_year=2030,
+    campaign_txvx_dose2 = hpv.campaign_txvx(
+        prob = 0.7,
+        years=2030,
         age_range=[30, 70],
         product = 'txvx2',
         eligibility = second_dose_eligible,
-        label = '2nd dose routine'
+        label = 'campaign txvx 2nd dose'
     )
 
-    interventions = [txvx_dose1, txvx_dose2]
+    routine_txvx_dose1 = hpv.routine_txvx(
+        prob = 0.9,
+        start_year = 2031,
+        age_range = [30,31],
+        product = 'txvx1',
+        label = 'routine txvx'
+    )
+
+    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
+    routine_txvx_dose2 = hpv.routine_txvx(
+        prob = 0.8,
+        start_year = 2031,
+        age_range = [30,31],
+        product = 'txvx1',
+        label = 'routine txvx 2nd dose'
+    )
+
+
+    interventions = [campaign_txvx_dose1, campaign_txvx_dose2, routine_txvx_dose1, routine_txvx_dose2]
     for intv in interventions: intv.do_plot=False
 
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
