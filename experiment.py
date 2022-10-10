@@ -16,7 +16,7 @@ npts = 300
 dt = 0.25
 
 scale = 100 # people per agent for non-cancer and non-death states
-scale_can = 1 # people per agent for cancer and death states
+scale_can = 2 # people per agent for cancer and death states
 
 can_prob = 0.05 # probability of getting cancer if infected
 time_to_rec = dict(dist='lognormal', par1=2.5, par2=4.0) # average infection duration, given recovery
@@ -30,7 +30,6 @@ class People(sc.objdict):
 
         self.ti = 0
         arr = lambda val=None: np.full(n, val)
-
 
         self.age = np.random.uniform(20, 40, size=n)
         self.sus = arr(True)
@@ -68,11 +67,11 @@ class People(sc.objdict):
 
         new_rec = self.check_recovery()
         self.res['new_rec_agents'][self.ti] = len(new_rec)
-        self.res['new_rec_people'][self.ti] = len(new_rec) * scale
+        self.res['new_rec_people'][self.ti] = self.scale[new_rec].sum()
 
         new_inf = self.check_transmission()
         self.res['new_inf_agents'][self.ti] = len(new_inf)
-        self.res['new_inf_people'][self.ti] = len(new_inf) * scale
+        self.res['new_inf_people'][self.ti] = self.scale[new_inf].sum()
 
         self.infect(new_inf)
 
@@ -184,7 +183,7 @@ class MultiScalePeople(People):
 
     def check_cancer(self):
         t = self.t
-        cancers_today = Counter([x[1] for x in self.cancer_queue if x[0] >= t])
+        cancers_today = Counter([x[1] for x in self.cancer_queue if x[0] <= t])
         new_can = []
         for ind, n in cancers_today.items():
             inds = self.extend(ind, n)
@@ -195,7 +194,7 @@ class MultiScalePeople(People):
             self.can[inds] = True
             self.scale[inds] = scale_can
             self.date_remove[inds] = np.nan
-        self.cancer_queue = [x for x in self.cancer_queue if x[0] < t]
+        self.cancer_queue = [x for x in self.cancer_queue if x[0] > t]
         return new_can
 
     def treat(self, inds):
@@ -244,47 +243,3 @@ sim = Sim(MultiScalePeople(n_infected=100))
 sim.run()
 sim.plot(fig, 'r')
 
-
-sim = Sim(People(n_infected=100))
-sim.run()
-fig = sim.plot()
-
-
-#######################
-
-
-#
-# dur_to_peak_dys = sample(**dur_dyps, size=len(cin1_inds))
-# prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
-# prog_time = genotype_pars[genotype_map[g]]['prog_time']
-# mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate)  # Apply a function that maps durations + genotype-specific progression to
-#
-# pars['severity_dist'] = dict(dist='lognormal', par1=None, par2=0.1) # Distribution of individual disease severity. Par1 is set to None because the mean is determined as a function of genotype and disease duration
-#
-# sev_dist = people.pars['severity_dist']['dist']
-# sev_par2 = people.pars['severity_dist']['par2']
-# peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks,par2=sev_par2))  # Evaluate peak dysplasia, which is a proxy for the clinical classification
-#
-# n = 100
-#
-# dur_dysp     = dict(dist='lognormal', par1=4.5, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
-# dur_to_peak_dys = hpu.sample(**dur_dysp, size=n)
-#
-# prog_rate    = 0.79 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-# prog_time    = 4.4  # Point of inflection in logistic function
-# mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate)  # Apply a function that maps durations + genotype-specific progression to
-#
-# We want the INVERSE of this. Distribution of dur_dysp given that the peak is greater than cin3?
-#
-# def logf2(x, c, k):
-#     '''
-#     Logistic function, constrained to pass through 0,0 and with upper asymptote
-#     at 1. Accepts 2 parameters: growth rate and point of inflexion.
-#     '''
-#     l_asymp = -1/(1+np.exp(k*c))
-#     return l_asymp + 1/( 1 + np.exp(-k*(x-c)))
-#
-#
-# def cutoff(t,c,k):
-#     z = -1/(1+np.exp(k*c))
-#     return (np.log(1/(t-z)-1)-k*c)/(-k)
