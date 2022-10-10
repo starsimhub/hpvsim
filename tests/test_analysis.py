@@ -196,21 +196,22 @@ def test_age_causal_analyzer():
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
 
-    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection()])
+    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection(start_year=2000)])
     sim.run()
     a = sim.get_analyzer(hpv.age_causal_infection)
 
     plt.figure()
-    plt.scatter(a.years, a.median)
-    plt.xlabel('Year')
-    plt.ylabel('Median age of causal infection')
-    plt.show()
 
-    v = a.bin_ages(np.arange(0,105,5))
-    plt.figure()
-    plt.imshow(v)
-    plt.xlabel('Year')
-    plt.ylabel('Age bin')
+    for gi, glist in a.age_causal.items():
+        count, bins_count = np.histogram(glist, bins=10)
+        pdf = count / sum(count)
+        cdf = np.cumsum(pdf)
+        gtype = sim['genotype_map'][gi]
+        plt.plot(bins_count[1:], cdf, label=gtype)
+
+    plt.title('Distribution of age of causal HPV infection')
+    plt.legend()
+    plt.xlabel('Age')
     plt.show()
 
     return sim, a

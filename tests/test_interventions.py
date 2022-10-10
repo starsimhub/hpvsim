@@ -111,7 +111,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         label = 'ablation'
     )
 
-    excision_eligible = lambda sim: list(set(sim.get_intervention('tx assigner').outcomes['excision'] + sim.get_intervention('ablation').outcomes['unsuccessful']))
+    excision_eligible = lambda sim: list(set(sim.get_intervention('tx assigner').outcomes['excision'].tolist() + sim.get_intervention('ablation').outcomes['unsuccessful'].tolist()))
     excision = hpv.treat_delay(
         prob = 0.5,
         delay = 0.5,

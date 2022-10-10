@@ -11,7 +11,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 Version 0.2.5 (2022-10-07)
 --------------------------
-- Adds people filtering.
+- Adds people filtering (NB: not used, and later removed).
 - Fixes bug with ``print(sim)`` not working.
 - Adds baseline tests.
 - *GitHub info*: PR `310 <https://github.com/amath-idm/hpvsim/pull/310>`__
