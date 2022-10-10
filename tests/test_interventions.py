@@ -247,7 +247,7 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim0 = test_new_interventions(do_plot=do_plot)
-    # sim = test_txvx_noscreen()
+    sim1 = test_txvx_noscreen()
 
 
     sc.toc(T)
