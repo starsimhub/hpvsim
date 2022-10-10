@@ -132,7 +132,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     soc_screen = [routine_screen, campaign_screen, soc_triage]
     new_screen = [pos_screen_assesser, new_triage,  deliver_txvx]
     triage_treat = [assign_treatment, ablation, excision, radiation]
-    st_interventions = soc_screen + new_screen + triage_treat
+    st_interventions = soc_screen + triage_treat + new_screen
 
     ## Vaccination interventions
     routine_years = np.arange(2020, base_pars['end']+1, dtype=int)
