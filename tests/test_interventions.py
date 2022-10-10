@@ -86,8 +86,8 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 
     # Get people who've been classified as txvx eligible based on the positive screen assessment, and deliver txvx to them
     txvx_eligible = lambda sim: sim.get_intervention('txvx assigner').outcomes['txvx']
-    deliver_txvx = hpv.deliver_txvx(
-        accept_prob = 0.8,
+    deliver_txvx = hpv.linked_txvx(
+        prob = 0.8,
         product = 'txvx1',
         eligibility = txvx_eligible,
         label = 'txvx'
@@ -104,7 +104,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 
     ablation_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['ablation']
     ablation = hpv.treat_num(
-        accept_prob = 0.5,
+        prob = 0.5,
         max_capacity = 100,
         product = 'ablation',
         eligibility = ablation_eligible,
@@ -113,7 +113,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 
     excision_eligible = lambda sim: list(set(sim.get_intervention('tx assigner').outcomes['excision'].tolist() + sim.get_intervention('ablation').outcomes['unsuccessful'].tolist()))
     excision = hpv.treat_delay(
-        accept_prob = 0.5,
+        prob = 0.5,
         delay = 0.5,
         product = 'excision',
         eligibility = excision_eligible,
@@ -122,7 +122,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 
     radiation_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['radiation']
     radiation = hpv.treat_delay(
-        accept_prob = 0.01,
+        prob = 0.01,
         delay = 1.0,
         product = hpv.radiation(),
         eligibility = radiation_eligible,
@@ -132,7 +132,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     soc_screen = [routine_screen, campaign_screen, soc_triage]
     new_screen = [pos_screen_assesser, new_triage,  deliver_txvx]
     triage_treat = [assign_treatment, ablation, excision, radiation]
-    st_interventions = soc_screen + new_screen + triage_treat
+    st_interventions = soc_screen + triage_treat + new_screen
 
     ## Vaccination interventions
     routine_years = np.arange(2020, base_pars['end']+1, dtype=int)
@@ -181,7 +181,64 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 
 
 
+def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Testing TxVx rollout without screening')
 
+    verbose = .1
+    debug = 0
+
+    ### Create interventions
+    # Campaign txvx
+    campaign_txvx_dose1 = hpv.campaign_txvx(
+        prob = 0.9,
+        years = 2030,
+        age_range = [30,50],
+        product = 'txvx1',
+        label = 'campaign txvx'
+    )
+
+    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
+    campaign_txvx_dose2 = hpv.campaign_txvx(
+        prob = 0.7,
+        years=2030,
+        age_range=[30, 70],
+        product = 'txvx2',
+        eligibility = second_dose_eligible,
+        label = 'campaign txvx 2nd dose'
+    )
+
+    routine_txvx_dose1 = hpv.routine_txvx(
+        prob = 0.9,
+        start_year = 2031,
+        age_range = [30,31],
+        product = 'txvx2',
+        label = 'routine txvx'
+    )
+
+    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
+    routine_txvx_dose2 = hpv.routine_txvx(
+        prob = 0.8,
+        start_year = 2031,
+        age_range = [30,31],
+        product = 'txvx1',
+        eligibility=second_dose_eligible,
+        label = 'routine txvx 2nd dose'
+    )
+
+
+    interventions = [campaign_txvx_dose1, campaign_txvx_dose2, routine_txvx_dose1, routine_txvx_dose2]
+    for intv in interventions: intv.do_plot=False
+
+    sim = hpv.Sim(pars=base_pars, interventions=interventions)
+    sim.run()
+    to_plot = {
+        'Therapeutic vaccine': ['resources_campaign txvx', 'resources_campaign txvx 2nd dose',
+                                'resources_routine txvx', 'resources_routine txvx 2nd dose'],
+        'Number vaccinated': ['new_tx_vaccinated', 'cum_tx_vaccinated'],
+    }
+    sim.plot(to_plot=to_plot)
+
+    return sim
 
 
 #%% Run as a script
@@ -190,7 +247,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_new_interventions(do_plot=do_plot)
+    sim0 = test_new_interventions(do_plot=do_plot)
+    sim1 = test_txvx_noscreen()
 
 
     sc.toc(T)
