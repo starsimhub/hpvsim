@@ -221,6 +221,7 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
         start_year = 2031,
         age_range = [30,31],
         product = 'txvx1',
+        eligibility=second_dose_eligible,
         label = 'routine txvx 2nd dose'
     )
 
