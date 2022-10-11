@@ -1,15 +1,10 @@
-'''
-Todo:
-- Add transmission
-- Same scale factor with all states, large number of agents, ground truth
-'''
-
 import numpy as np
 import sciris as sc
 import matplotlib.pyplot as plt
 # import hpvsim as hpv
 import hpvsim.utils as hpu
 from collections import Counter
+import pandas as pd
 
 n = 1000
 npts = 300
@@ -220,26 +215,48 @@ class Sim(sc.prettyobj):
         for i in range(npts):
             self.people.step()
 
-    def plot(self, fig=None, color='b'):
-        if fig is None:
-            fig = plt.figure(figsize=(14, 10))
-        else:
-            plt.figure(fig)
 
-        for i, key in enumerate(sim.df.columns):
-            if key != 't':
-                plt.subplot(5, 5, i + 1)
-                plt.plot(sim.df.t, sim.df[key], color=color)
-                plt.title(key)
-        plt.tight_layout()
-        return fig
+def plot(df, fig=None, color='b', alpha=1):
+    if fig is None:
+        fig = plt.figure(figsize=(14, 10))
+    else:
+        plt.figure(fig)
 
+    for i, key in enumerate(df.columns):
+        if key != 't':
+            plt.subplot(5, 5, i + 1)
+            plt.plot(df.t, df[key], color=color, alpha=alpha)
+            plt.title(key)
+    plt.tight_layout()
+    return fig
 
-sim = Sim(People(n_infected=100))
-sim.run()
-fig = sim.plot()
+def run_single_scale(*args, **kwargs):
+    sim = Sim(People(n_infected=100))
+    sim.run()
+    return sim.df
 
-sim = Sim(MultiScalePeople(n_infected=100))
-sim.run()
-sim.plot(fig, 'r')
+def run_multi_scale(*args, **kwargs):
+    sim = Sim(MultiScalePeople(n_infected=100))
+    sim.run()
+    return sim.df
 
+if __name__ == '__main__':
+
+    df = run_single_scale()
+    fig = plot(df)
+
+    df = run_multi_scale()
+    plot(df, fig, 'r')
+
+    dfs = sc.parallelize(run_single_scale, 20)
+    fig = None
+    for df in dfs:
+        fig = plot(df, fig=fig, alpha=0.3)
+
+    dfs = sc.parallelize(run_multi_scale, 20)
+    fig = None
+    for df in dfs:
+        fig = plot(df, fig=fig, color='r', alpha=0.3)
+
+    df = pd.concat(dfs).groupby(level=0).median()
+    plot(df, fig=fig, color='r', alpha=0.3)
