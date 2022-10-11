@@ -359,6 +359,7 @@ def set_cin_grades(people, inds, g, dt):
 
     # Map severity to clinical grades
     ccut = people.pars['clinical_cutoffs']
+    peak_dysp = people.peak_dysp[g,inds]
     is_cin1   = peak_dysp>0 # Boolean arrays of people who attain each clinical grade
     is_cin2   = peak_dysp>ccut['cin1']
     is_cin3   = peak_dysp>ccut['cin2']
