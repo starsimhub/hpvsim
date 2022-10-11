@@ -248,15 +248,19 @@ if __name__ == '__main__':
     df = run_multi_scale()
     plot(df, fig, 'r')
 
-    dfs = sc.parallelize(run_single_scale, 20)
+    dfs = sc.parallelize(run_single_scale, 40)
     fig = None
     for df in dfs:
         fig = plot(df, fig=fig, alpha=0.3)
+    df_single_median = pd.concat(dfs).groupby(level=0).median()
+    plot(df_single_median, fig=fig, color='k')
 
-    dfs = sc.parallelize(run_multi_scale, 20)
+    dfs = sc.parallelize(run_multi_scale, 40)
     fig = None
     for df in dfs:
         fig = plot(df, fig=fig, color='r', alpha=0.3)
+    df_multi_median = pd.concat(dfs).groupby(level=0).median()
+    plot(df_multi_median, fig=fig, color='k')
 
-    df = pd.concat(dfs).groupby(level=0).median()
-    plot(df, fig=fig, color='r', alpha=0.3)
+    fig = plot(df_single_median)
+    plot(df_multi_median, fig, 'r')
