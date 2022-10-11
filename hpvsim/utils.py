@@ -278,33 +278,25 @@ def set_prognoses(people, inds, g, dt, hiv_pars=None):
     '''
 
     gpars = people.pars['genotype_pars'][people.pars['genotype_map'][g]]
-    set_dysp_rates(people, inds, g, gpars, hiv_pars=hiv_pars) # Set variables that determine the probability that dysplasia begins
+    set_dysp_rates(people, inds, g, gpars, hiv_dysp_rate=hiv_pars['dysp_rate']) # Set variables that determine the probability that dysplasia begins
     dysp_inds = set_dysp_status(people, inds, g, dt) # Set people's dysplasia status
-    set_severity(people, dysp_inds, g, gpars, hiv_pars=hiv_pars) # Set dysplasia severity and duration
+    set_severity(people, dysp_inds, g, gpars, hiv_prog_rate=hiv_pars['prog_rate']) # Set dysplasia severity and duration
     set_cin_grades(people, dysp_inds, g, dt) # Set CIN grades and dates over time
 
     return
 
 
-def set_dysp_rates(people, inds, g, gpars, hiv_pars):
+def set_dysp_rates(people, inds, g, gpars, hiv_dysp_rate=None):
     '''
     Set dysplasia rates
     '''
     people.dysp_rate[g, inds] = gpars['dysp_rate']
     has_hiv = people.hiv[inds]
     if has_hiv.any(): # Figure out if any of these women have HIV
-        update_precin_hiv(people, inds[has_hiv], g, hiv_pars['dysp_rate'])
-    return
-
-
-def update_precin_hiv(people, inds, g, hiv_dysp_rate):
-    '''
-    Update precin pathway for WLHIV
-    '''
-    immune_compromise = 1 - people.art_adherence[inds] # Get the degree of immunocompromise
-    modified_dysp_rate = immune_compromise * hiv_dysp_rate # Calculate the modification to make to the dysplasia rate
-    modified_dysp_rate[modified_dysp_rate < 1] = 1
-    people.dysp_rate[g, inds] = people.dysp_rate[g, inds] * modified_dysp_rate # Store dysplasia rates
+        immune_compromise = 1 - people.art_adherence[inds] # Get the degree of immunocompromise
+        modified_dysp_rate = immune_compromise * hiv_dysp_rate # Calculate the modification to make to the dysplasia rate
+        modified_dysp_rate[modified_dysp_rate < 1] = 1
+        people.dysp_rate[g, inds] = people.dysp_rate[g, inds] * modified_dysp_rate # Store dysplasia rates
     return
 
 
@@ -334,7 +326,7 @@ def set_dysp_status(people, inds, g, dt):
     return dysp_inds
 
 
-def set_severity(people, inds, g, gpars, hiv_pars=None):
+def set_severity(people, inds, g, gpars, hiv_prog_rate=None):
     ''' Set dysplasia severity and duration for women who develop dysplasia '''
 
     # Evaluate duration of dysplasia prior to clearance/control/progression to cancer
@@ -346,19 +338,17 @@ def set_severity(people, inds, g, gpars, hiv_pars=None):
     people.prog_rate[g, inds] = sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=len(inds))
     has_hiv = people.hiv[inds]
     if has_hiv.any(): # Figure out if any of these women have HIV
-        update_cin_hiv(people, inds[has_hiv], g, hiv_pars['prog_rate']) # Update their progression rates if so
+        immune_compromise = 1 - people.art_adherence[inds] # Get the degree of immunocompromise
+        modified_prog_rate = immune_compromise * hiv_prog_rate # Calculate the modification to make to the progression rate
+        modified_prog_rate[modified_prog_rate < 1] = 1
+        people.prog_rate[g, inds] = people.prog_rate[g, inds] * modified_prog_rate # Store progression rates
 
-    return
+    # Set attributes
+    dur_dysp    = people.dur_dysp[g, inds]      # Array of durations of dysplasia prior to clearance/control/cancer
+    prog_rate   = people.prog_rate[g, inds]     # Array of progression rates
+    peak_dysp   = logf1(dur_dysp, prog_rate)    # Maps durations + progression to severity
+    people.peak_dysp[g, inds] = peak_dysp       # Store peak dysplasia
 
-
-def update_cin_hiv(people, inds, g, hiv_prog_rate):
-    '''
-    Update CIN pathway for WLHIV
-    '''
-    immune_compromise = 1 - people.art_adherence[inds] # Get the degree of immunocompromise
-    modified_prog_rate = immune_compromise * hiv_prog_rate # Calculate the modification to make to the progression rate
-    modified_prog_rate[modified_prog_rate < 1] = 1
-    people.prog_rate[g, inds] = people.prog_rate[g, inds] * modified_prog_rate # Store progression rates
     return
 
 
@@ -366,11 +356,6 @@ def set_cin_grades(people, inds, g, dt):
     '''
     Set CIN clinical grades and dates of progression
     '''
-
-    dur_dysp    = people.dur_dysp[g, inds]      # Array of durations of dysplasia prior to clearance/control/cancer
-    prog_rate   = people.prog_rate[g, inds]     # Array of progression rates
-    peak_dysp   = logf1(dur_dysp, prog_rate)    # Maps durations + progression to severity
-    people.peak_dysp[g, inds] = peak_dysp       # Store peak dysplasia
 
     # Map severity to clinical grades
     ccut = people.pars['clinical_cutoffs']

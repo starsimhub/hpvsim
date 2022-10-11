@@ -186,37 +186,44 @@ def make_precinfig():
 def make_cinfig():
 
     ###### Relationship between duration of dysplasia and clinical severity
-    fig, ax = plt.subplots(1, 3, figsize=(24, 12))
+    fig, ax = plt.subplots(2, 3, figsize=(24, 15))
     pn = 0
     thisx = np.linspace(0.01, 20, 100)
 
     cmap = plt.cm.Oranges([0.25,0.5,0.75,1])
-    n_samples = 1
+    n_samples = 10
     for ai, gtypes in enumerate(alltypes):
         for gtype in gtypes:
-            ax[ai].plot(thisx, logf1(thisx, genotype_pars[gtype]['prog_rate']), color=colors[pn], lw=2, label=gtype.upper())
+            sigma, scale = lognorm_params(genotype_pars[gtype]['dur_dysp']['par1'], genotype_pars[gtype]['dur_dysp']['par2'])
+            rv = lognorm(sigma, 0, scale)
+            ax[0,ai].plot(thisx, rv.pdf(thisx), color=colors[pn], lw=2, label=gtype.upper())
+            ax[1,ai].plot(thisx, logf1(thisx, genotype_pars[gtype]['prog_rate']), color=colors[pn], lw=2, label=gtype.upper())
             # Plot variation
             for year in range(1, 21):
                 peaks = logf1(year, hpu.sample(dist='normal', par1=genotype_pars[gtype]['prog_rate'], par2=genotype_pars[gtype]['prog_rate_sd'], size=n_samples))
-                ax[ai].plot([year] * n_samples, peaks, color=colors[pn], lw=0, marker='o', alpha=0.5)
+                ax[1,ai].plot([year] * n_samples, peaks, color=colors[pn], lw=0, marker='o', alpha=0.5)
             pn+=1
 
-        ax[ai].legend(fontsize=18)
-        ax[ai].set_xlabel("Duration of dysplasia")
-        ax[ai].set_ylabel("")
-        ax[ai].grid(axis='x')
-        ax[ai].set_title("Mean peak clinical severity")
-        ax[ai].get_yaxis().set_ticks([])
-        ax[ai].axhline(y=0.33, ls=':', c='k')
-        ax[ai].axhline(y=0.67, ls=':', c='k')
-        ax[ai].axhline(y=cancer_thresh, ls=':', c='k')
-        ax[ai].axhspan(0, 0.33, color=cmap[0],alpha=.4)
-        ax[ai].axhspan(0.33, 0.67, color=cmap[1],alpha=.4)
-        ax[ai].axhspan(0.67, cancer_thresh, color=cmap[2],alpha=.4)
-        ax[ai].axhspan(cancer_thresh, 1, color=cmap[3],alpha=.4)
-        ax[ai].text(-0.3, 0.08, 'CIN1', fontsize=30, rotation=90)
-        ax[ai].text(-0.3, 0.4, 'CIN2', fontsize=30, rotation=90)
-        ax[ai].text(-0.3, 0.73, 'CIN3', fontsize=30, rotation=90)
+        ax[0,ai].legend(fontsize=18)
+        ax[1,ai].set_xlabel("Duration of dysplasia")
+        for row in [0,1]:
+            ax[row,ai].grid(axis='x')
+            # ax[row,ai].set_xticks([0,0.5,1.0,1.5,2.0])
+            # ax[row,ai].set_xticklabels([0,6,12,18,24])
+            ax[row,ai].get_yaxis().set_ticks([])
+        ax[0, ai].set_ylabel("")
+
+        ax[1,ai].set_ylabel("Clinical severity")
+        ax[1,ai].axhline(y=0.33, ls=':', c='k')
+        ax[1,ai].axhline(y=0.67, ls=':', c='k')
+        ax[1,ai].axhline(y=cancer_thresh, ls=':', c='k')
+        ax[1,ai].axhspan(0, 0.33, color=cmap[0],alpha=.4)
+        ax[1,ai].axhspan(0.33, 0.67, color=cmap[1],alpha=.4)
+        ax[1,ai].axhspan(0.67, cancer_thresh, color=cmap[2],alpha=.4)
+        ax[1,ai].axhspan(cancer_thresh, 1, color=cmap[3],alpha=.4)
+        ax[1,ai].text(-0.3, 0.08, 'CIN1', fontsize=30, rotation=90)
+        ax[1,ai].text(-0.3, 0.4, 'CIN2', fontsize=30, rotation=90)
+        ax[1,ai].text(-0.3, 0.73, 'CIN3', fontsize=30, rotation=90)
 
     fig.tight_layout()
     plt.savefig("cin_prog.png", dpi=100)
@@ -345,9 +352,9 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    make_precinfig()
+    # make_precinfig()
     make_cinfig()
-    make_fig1()
+    # make_fig1()
 
     sc.toc(T)
     print('Done.')
