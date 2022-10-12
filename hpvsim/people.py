@@ -801,7 +801,7 @@ class People(hpb.BasePeople):
 
         # Compute disease progression for females
         if len(f_inds)>0:
-            hpu.set_prognoses(self, f_inds, g, dt, hiv_pars=self.pars['hiv_pars']) # Set prognoses
+            self.set_prognoses(f_inds, g, dt, hiv_pars=self.pars['hiv_pars']) # Set prognoses
 
         # Compute infection clearance for males
         if len(m_inds)>0:

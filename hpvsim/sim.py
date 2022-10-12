@@ -731,9 +731,8 @@ class Sim(hpb.BaseSim):
                 # Compute transmissibility for each partnership
                 for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
                     betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * hiv_rel_sus[targets] * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
-                    target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
-                    transmissions   = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
-                    target_inds     = targets[transmissions] # Extract indices of those who got infected
+                    transmissions = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
+                    target_inds   = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
 
