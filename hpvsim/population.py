@@ -338,7 +338,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
     '''
 
     # Create edgelist
-    f,m,current_partners,new_pship_inds,new_pship_counts = hpu.create_edgelist(
+    f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(
         lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
         layer_probs, pref_weight, cross_layer)
 
