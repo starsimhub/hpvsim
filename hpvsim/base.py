@@ -966,13 +966,12 @@ class BasePeople(FlexPretty):
         return
 
 
-    def validate(self, sim_pars=None, die=True, verbose=False):
+    def validate(self, sim_pars=None, verbose=False):
         '''
         Perform validation on the People object.
 
         Args:
             sim_pars (dict): dictionary of parameters from the sim to ensure they match the current People object
-            die (bool): whether to raise an exception if validation fails
             verbose (bool): detail to print
         '''
 
@@ -1005,36 +1004,12 @@ class BasePeople(FlexPretty):
             if self[key].ndim == 1:
                 actual_len = len(self[key])
             if actual_len != expected_len: # pragma: no cover
-                if die:
-                    errormsg = f'Length of key "{key}" did not match population size ({actual_len} vs. {expected_len})'
-                    raise IndexError(errormsg)
-                else:
-                    if verbose:
-                        print(f'Resizing "{key}" from {actual_len} to {expected_len}')
-                    self._resize_arrays(keys=key)
+                errormsg = f'Length of key "{key}" did not match population size ({actual_len} vs. {expected_len})'
+                raise IndexError(errormsg)
 
         # Check that the layers are valid
         for layer in self.contacts.values():
             layer.validate()
-
-        return
-
-
-    def _resize_arrays(self, new_size=None, keys=None):
-        ''' Resize arrays if any mismatches are found '''
-
-        # Handle None or tuple input (representing and n_agents)
-        if new_size is None:
-            new_size = len(self)
-        n_agents = new_size if not isinstance(new_size, tuple) else new_size[1]
-        self.pars['n_agents'] = n_agents
-
-        # Reset sizes
-        if keys is None:
-            keys = self.keys()
-        keys = sc.promotetolist(keys)
-        for key in keys:
-            self[key].resize(new_size, refcheck=False) # Don't worry about cross-references to the arrays
 
         return
 
@@ -1415,13 +1390,8 @@ class BasePeople(FlexPretty):
         ''' Return all people as a list '''
         return list(self)
 
-    def from_list(self, people, resize=True):
+    def from_list(self, people):
         ''' Convert a list of people back into a People object '''
-
-        # Handle population size
-        n_agents = len(people)
-        if resize:
-            self._resize_arrays(new_size=n_agents)
 
         # Iterate over people -- slow!
         for p,person in enumerate(people):
