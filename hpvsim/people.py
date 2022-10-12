@@ -337,7 +337,7 @@ class People(hpb.BasePeople):
         return
     
     
-    def set_HIV_prognoses(self, inds, year=None):
+    def set_hiv_prognoses(self, inds, year=None):
         ''' Set HIV outcomes (for now only ART) '''
     
         art_cov = self.hiv_pars.art_adherence # Shorten
@@ -564,7 +564,7 @@ class People(hpb.BasePeople):
         # Update prognoses for those with HIV
         if len(hiv_inds):
             
-            hpu.set_HIV_prognoses(self, hiv_inds, year=year) # Set ART adherence for those with HIV
+            self.set_hiv_prognoses(hiv_inds, year=year) # Set ART adherence for those with HIV
 
             for g in range(self.pars['n_genotypes']):
                 nocin_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
