@@ -5,7 +5,6 @@ Numerical utilities for running hpvsim.
 #%% Housekeeping
 
 import numpy as np # For numerics
-import random # Used only for resetting the seed
 import sciris as sc # For additional utilities
 from . import defaults as hpd # To set default types
 
@@ -270,30 +269,16 @@ def get_pdf(dist=None, par1=None, par2=None):
 
 def set_seed(seed=None):
     '''
-    Reset the random seed -- complicated because of Numba, which requires special
-    syntax to reset the seed. This function also resets Python's built-in random
+    Reset the random seed. This function also resets Python's built-in random
     number generated.
 
     Args:
         seed (int): the random seed
     '''
-
-    def set_seed_numba(seed):
-        return np.random.seed(seed)
-
-    def set_seed_regular(seed):
-        return np.random.seed(seed)
-
     # Dies if a float is given
     if seed is not None:
         seed = int(seed)
-
-    set_seed_regular(seed) # If None, reinitializes it
-    if seed is None: # Numba can't accept a None seed, so use our just-reinitialized Numpy stream to generate one
-        seed = np.random.randint(1e9)
-    set_seed_numba(seed)
-    random.seed(seed) # Finally, reset Python's built-in random number generator, just in case (used by SynthPops)
-
+    np.random.seed(seed) # If None, reinitializes it
     return
 
 
