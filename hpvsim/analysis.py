@@ -315,7 +315,7 @@ class age_pyramid(Analyzer):
 
             date = self.dates[ind]
             self.age_pyramids[date] = sc.objdict() # Initialize the dictionary
-            scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
+            scale = sim['pop_scale']
             age = sim.people.age # Get the age distribution
             self.age_pyramids[date]['bins'] = self.bins # Copy here for convenience
             for sb,sex in enumerate(['m','f']): # Loop over each sex; sb stands for sex boolean, translating the labels to 0/1
@@ -693,7 +693,7 @@ class age_results(Analyzer):
                 ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
                 date = result_dict.dates[ind]  # Create the date which will be used to key the results
                 age = sim.people.age  # Get the age distribution
-                scale = sim.rescale_vec[sim.t // sim.resfreq]  # Determine current scale factor
+                scale = sim['pop_scale']  # Determine current scale factor
 
                 if 'compute_fit' in result_dict.keys() and 'total' not in result:
                     thisdatadf = result_dict.data[(result_dict.data.year == float(date)) & (result_dict.data.name == result)]
@@ -753,7 +753,7 @@ class age_results(Analyzer):
             # the timepoints that belong to the requested year.
             if sim.t in result_dict.calcpoints:
                 date = self.date # Stored just above for use here
-                scale = sim.rescale_vec[sim.t//sim.resfreq] # Determine current scale factor
+                scale = sim['pop_scale'] # Determine current scale factor
                 age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
@@ -988,35 +988,30 @@ class age_causal_infection(Analyzer):
     Determine the age at which people with cervical cancer were causally infected
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
-        self.age_causal = []
+        self.start_year = start_year
         self.years = None
 
     def initialize(self, sim):
         super().initialize(sim)
         self.years = sim.yearvec
-
-    @property
-    def median(self):
-        return np.array([np.median(x) for x in self.age_causal])
-
-    def bin_ages(self, bins):
-        out = np.zeros(((len(bins)-1),len(self.years)))
-        for i, ages in enumerate(self.age_causal):
-            out[:,i] = np.histogram(ages, bins)[0]
-        return out
+        if self.start_year is None:
+            self.start_year = sim['start']
+        self.age_causal = dict()
+        gtypes = sim['genotype_map'].keys()
+        for g in range(len(gtypes)):
+            self.age_causal[g] = []
 
     def apply(self, sim):
-        cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
-        if len(cancer_inds):
-            current_age = sim.people.age[cancer_inds]
-            date_exposed = sim.people.date_exposed[cancer_genotypes,cancer_inds]
-            offset = (sim.people.t - date_exposed) * sim.people.pars['dt']
-            self.age_causal.append(current_age - offset)
-        else:
-            self.age_causal.append([])
-
+        if sim.yearvec[sim.t] >= self.start_year:
+            cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
+            if len(cancer_inds):
+                current_age = sim.people.age[cancer_inds]
+                date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
+                offset = (sim.people.t - date_exposed) * sim['dt']
+                for i, age in enumerate(current_age):
+                    self.age_causal[cancer_genotypes[i]].append(age - offset[i])
 
 
 class cancer_detection(Analyzer):
@@ -1070,4 +1065,5 @@ class cancer_detection(Analyzer):
         sim.people.flows['detected_cancers'] = new_detections
 
         return new_detections, new_treatments
+
 

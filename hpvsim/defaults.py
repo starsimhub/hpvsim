@@ -89,7 +89,7 @@ class PeopleMeta(sc.prettyobj):
         State('alive',          bool,   True,   label='Population'),    # Save this as a state so we can record population sizes
         State('dead_cancer',    bool,   False,  label='Cumulative cancer deaths'),   # Dead from cancer
         State('dead_other',     bool,   False,  label='Cumulative deaths from other causes'),   # Dead from all other causes
-        State('emigrated',      bool,   False,  label='Emirated'),  # Emigrated
+        State('emigrated',      bool,   False,  label='Emigrated'),  # Emigrated
     ]
 
     viral_states = [
@@ -121,6 +121,11 @@ class PeopleMeta(sc.prettyobj):
         State('latent',     bool, False, 'n_genotypes', label='with latent infection', cmap=pl.cm.GnBu), # intersection of no_dysp and inactive.
     ]
 
+    hiv_states = [
+        State('hiv',        bool, False, label='infected with HIV', cmap=pl.cm.GnBu),
+        State('art_adherence',        default_float, 0, label='adherence on ART', cmap=pl.cm.Oranges)
+    ]
+
     # Additional intervention states
     intv_states = [
         State('detected_cancer',    bool,   False), # Whether the person's cancer has been detected
@@ -134,7 +139,7 @@ class PeopleMeta(sc.prettyobj):
     mece_states = alive_states + viral_states + dysp_states
 
     # Collection of states that we store as stock results
-    stock_states = viral_states + dysp_states + derived_states + intv_states
+    stock_states = viral_states + dysp_states + derived_states + intv_states + hiv_states
 
     # Set dates
     # Convert each MECE state and derived state into a date except for susceptible, alive, and no_dysp (which are True by default)
@@ -160,21 +165,25 @@ class PeopleMeta(sc.prettyobj):
     dates += [
         State('date_clearance',     default_float, np.nan, shape='n_genotypes'),
         State('date_exposed',       default_float, np.nan, shape='n_genotypes'),
-        State('date_next_screen',   default_float, np.nan),
     ]
 
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
+        State('dur_infection', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present
         State('dur_precin', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
-        State('dur_disease', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has >= HPV present
-        State('dur_precin2cin1', default_float, np.nan, shape='n_genotypes'), # Length of time to go from no dysplasia to CIN1
-        State('dur_cin12cin2', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN1 to CIN2
-        State('dur_cin22cin3', default_float, np.nan, shape='n_genotypes'), # Length of time to go from CIN2 to CIN3
-        State('dur_cin2cancer', default_float, np.nan, shape='n_genotypes'),# Length of time to go from CIN3 to cancer
+        State('dur_dysp', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has dysplasia
         State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
     ]
 
-    all_states = person + mece_states + imm_states + intv_states + dates + durs + rship_states
+    # Markers of disease severity
+    sev = [
+        State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
+        State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of dysplasia to severity
+        State('peak_dysp', default_float, np.nan, shape='n_genotypes'), # Peak dysplasia, as represented by a value 0-1 that maps onto clinical thresholds for CIN grades
+    ]
+
+
+    all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev
 
     @classmethod
     def validate(cls):
@@ -192,7 +201,7 @@ class PeopleMeta(sc.prettyobj):
 
         """
         # Validate
-        state_types = ['person', 'mece_states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
+        state_types = ['person', 'mece_states', 'imm_states', 'hiv_states', 'intv_states', 'dates', 'durs', 'sev', 'all_states']
         for state_type in state_types:
             states = getattr(cls, state_type)
             n_states        = len(states)
@@ -227,6 +236,7 @@ flows = [
     Flow('detected_cancer_deaths',  cmap=pl.cm.Purples, label='detected cancer deaths', by_genotype=False),
     Flow('reinfections',            cmap=pl.cm.GnBu),
     Flow('reactivations',           cmap=pl.cm.GnBu),
+    Flow('hiv_infections',          cmap=pl.cm.Oranges, label='HIV infections', by_genotype=False)
 ]
 flow_keys   = [flow.name for flow in flows if flow.by_genotype]
 total_flow_keys   = [flow.name for flow in flows if not flow.by_genotype]
@@ -253,11 +263,6 @@ dem_colors  = ['#fcba03',   '#000000',      '#000000']
 by_sex_keys    = ['total_infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['total infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',                    '#000000']
-
-# Intervention-related flows (total across genotypes)
-intv_flow_keys   = ['screens',  'vaccinations']
-intv_flow_names  = ['screens',  'vaccinations']
-intv_flow_colors = [pl.cm.GnBu, pl.cm.Oranges]
 
 # Type distributions by cytology
 type_keys  = ['no_dysp_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']

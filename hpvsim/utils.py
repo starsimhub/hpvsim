@@ -166,6 +166,14 @@ def logf1(x, k):
     return (2 / (1 + np.exp(-k * x))) - 1
 
 
+def invlogf1(y, k):
+    '''
+    The inverse of the concave part of a logistic function, with point of inflexion at 0,0
+    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
+    '''
+    return (-1/k)*np.log(2/(y + 1) - 1)
+
+
 def logf2(x, x_infl, k):
     '''
     Logistic function, constrained to pass through 0,0 and with upper asymptote
@@ -175,106 +183,262 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
-def set_prognoses(people, inds, g, dur_none):
-    ''' Set disease progression '''
+def invlogf2(y, x_infl, k):
+    '''
+    Inverse logistic function, constrained to pass through 0,0 and with upper asymptote
+    at 1. Accepts 2 parameters: growth rate and point of inflexion.
+    '''
+    l_asymp = -1/(1+np.exp(k*x_infl))
+    return (-1/k)*np.log((1/(y - l_asymp)) - 1) + x_infl
 
-    # Get parameters that will be used later
-    dt = people.pars['dt']
-    genotype_pars = people.pars['genotype_pars']
-    genotype_map = people.pars['genotype_map']
-    dur_dyps  = genotype_pars[genotype_map[g]]['dur_dysp']
-    dysp_rate = genotype_pars[genotype_map[g]]['dysp_rate']
-    prog_rate = genotype_pars[genotype_map[g]]['prog_rate']
-    prog_time = genotype_pars[genotype_map[g]]['prog_time']
+
+def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
+                        layer_probs, pref_weight, cross_layer):
+    '''
+    Create partnerships for a single layer
+    Args:
+        partners            (int arr): array containing each agent's desired number of partners in this layer
+        current_partners    (int arr): array containing each agent's actual current number of partners in this layer
+        mixing              (float arr): mixing matrix
+        sex                 (bool arr): sex
+        age                 (float arr): age
+        is_active           (bool arr): whether or not people are sexually active
+        is_female           (bool arr): whether each person is female
+        layer_probs         (float arr): participation rates in this layer by age and sex
+        pref_weight         (float): weight that determines the extent to which people without their preferred number of partners are preferenced for selection
+        cross_layer         (float): proportion of females that have cross-layer relationships
+    '''
+
+    # Initialize
+    f           = [] # Initialize the female partners
+    m           = [] # Initialize the male partners
+    new_pship_inds, new_pship_counts = [], [] # Initialize the indices and counts of new partnerships
+
+    # Useful variables
+    n_agents        = len(sex)
+    n_layers        = current_partners.shape[0]
+    f_active        =  is_female & is_active
+    m_active        = ~is_female & is_active
+    underpartnered  = current_partners[lno, :] < partners  # Indices of underpartnered people
+
+    # Figure out how many new relationships to create by calculating the number of females
+    # who are underpartnered in this layer and either unpartnered in other layers or available
+    # for cross-layer participation
+    other_layers            = np.delete(np.arange(n_layers), lno)  # Indices of all other layers but this one
+    other_partners          = current_partners[other_layers, :].any(axis=0)  # Whether or not people already partnered in other layers
+    other_partners_f        = true(other_partners & f_active) # Indices of sexually active females with parthers in other layers
+    f_cross                 = binomial_filter(cross_layer, other_partners_f) # Indices of females who have cross-layer relationships
+    f_cross_layer           = np.full(n_agents, False, dtype=bool) # Construct a boolean array indicating whether people have cross-layer relationships
+    f_cross_layer[f_cross]  = True # Only true for the selected females
+    f_eligible              = is_female & is_active & underpartnered & (~other_partners | f_cross_layer)
+    f_eligible_inds         = true(f_eligible)
+
+    # Bin the females by age
+    bins        = layer_probs[0, :]  # Extract age bins
+    age_bins_f  = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
+    bin_range_f = np.unique(age_bins_f)  # Range of bins
+
+    for ab in bin_range_f:  # Loop over age bins
+        these_f_contacts = binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
+        f += these_f_contacts.tolist()
+    f = np.array(f)
+
+    # Probabilities for males to be selected for new relationships
+    m_probs                 = np.zeros(n_agents)    # Begin by assigning everyone equal probability of forming a new relationship
+    m_probs[m_active]       = 1                     # Only select sexually active males
+    m_probs[underpartnered] *= pref_weight          # Increase weight for those who are underpartnerned
+
+    # Draw male partners based on mixing matrices
+    if len(f) > 0:
+
+        bins            = mixing[:, 0]
+        m_active_inds   = true(m_active)  # Indices of active males
+        age_bins_f      = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
+        age_bins_m      = np.digitize(age[m_active_inds], bins=bins) - 1  # Age bins of active males
+        bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
+
+        for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
+            male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
+            this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
+            nonzero_weighting = true(this_weighting != 0)
+            selected_males = choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
+            m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
+        m = np.array(m)
+
+        # Count how many contacts there actually are
+        new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
+        current_partners[lno, new_pship_inds] += new_pship_counts
+
+    return f, m, current_partners, new_pship_inds, new_pship_counts
+
+
+def set_prognoses(people, inds, g, dt, hiv_pars=None):
+    '''
+    Set prognoses for people following infection.
+    '''
+
+    gpars = people.pars['genotype_pars'][people.pars['genotype_map'][g]]
+    set_dysp_rates(people, inds, g, gpars, hiv_pars=hiv_pars) # Set variables that determine the probability that dysplasia begins
+    dysp_inds = set_dysp_status(people, inds, g, dt) # Set people's dysplasia status
+    set_severity(people, dysp_inds, g, gpars, hiv_pars=hiv_pars) # Set dysplasia severity and duration
+    set_cin_grades(people, dysp_inds, g, dt) # Set CIN grades and dates over time
+
+    return
+
+
+def set_dysp_rates(people, inds, g, gpars, hiv_pars):
+    '''
+    Set dysplasia rates
+    '''
+    people.dysp_rate[g, inds] = gpars['dysp_rate']
+    has_hiv = people.hiv[inds]
+    if has_hiv.any(): # Figure out if any of these women have HIV
+        update_precin_hiv(people, inds[has_hiv], g, hiv_pars['dysp_rate'])
+    return
+
+
+def update_precin_hiv(people, inds, g, hiv_dysp_rate):
+    '''
+    Update precin pathway for WLHIV
+    '''
+    immune_compromise = 1 - people.art_adherence[inds] # Get the degree of immunocompromise
+    modified_dysp_rate = immune_compromise * hiv_dysp_rate # Calculate the modification to make to the dysplasia rate
+    modified_dysp_rate[modified_dysp_rate < 1] = 1
+    people.dysp_rate[g, inds] = people.dysp_rate[g, inds] * modified_dysp_rate # Store dysplasia rates
+    return
+
+
+def set_dysp_status(people, inds, g, dt):
+    '''
+    Use durations and dysplasia rates to determine whether HPV clears or progresses to dysplasia
+    '''
+    dur_precin  = people.dur_precin[g, inds]    # Array of durations of infection prior to dysplasia/clearance/control
+    dysp_rate   = people.dysp_rate[g, inds]     # Array of dysplasia rates
+    dysp_probs  = logf1(dur_precin, dysp_rate)  # Probability of developing dysplasia
+    has_dysp    = binomial_arr(dysp_probs)      # Boolean array of those who have dysplasia
+    nodysp_inds = inds[~has_dysp]               # Indices of those without dysplasia
+    dysp_inds   = inds[has_dysp]                # Indices of those with dysplasia
+
+    # Infection clears without causing dysplasia
+    people.date_clearance[g, nodysp_inds] = people.date_infectious[g, nodysp_inds] \
+                                             + np.ceil(people.dur_infection[g, nodysp_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+
+
+    # Infection progresses to dysplasia, which is initially classified as CIN1 - set dates for this
+    excl_inds = true(people.date_cin1[g, dysp_inds] < people.t)  # Don't count CIN1s that were acquired before now
+    people.date_cin1[g, dysp_inds[excl_inds]] = np.nan
+    people.date_cin1[g, dysp_inds] = np.fmin(people.date_cin1[g, dysp_inds],
+                                             people.date_infectious[g, dysp_inds] +
+                                             sc.randround(people.dur_precin[g, dysp_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
+
+    return dysp_inds
+
+
+def set_severity(people, inds, g, gpars, hiv_pars=None):
+    ''' Set dysplasia severity and duration for women who develop dysplasia '''
+
+    # Evaluate duration of dysplasia prior to clearance/control/progression to cancer
+    dur_dysp = sample(**gpars['dur_dysp'], size=len(inds))
+    people.dur_dysp[g, inds] = dur_dysp
+    people.dur_infection[g, inds] += dur_dysp
+
+    # Evaluate progression rates
+    people.prog_rate[g, inds] = sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=len(inds))
+    has_hiv = people.hiv[inds]
+    if has_hiv.any(): # Figure out if any of these women have HIV
+        update_cin_hiv(people, inds[has_hiv], g, hiv_pars['prog_rate']) # Update their progression rates if so
+
+    return
+
+
+def update_cin_hiv(people, inds, g, hiv_prog_rate):
+    '''
+    Update CIN pathway for WLHIV
+    '''
+    immune_compromise = 1 - people.art_adherence[inds] # Get the degree of immunocompromise
+    modified_prog_rate = immune_compromise * hiv_prog_rate # Calculate the modification to make to the progression rate
+    modified_prog_rate[modified_prog_rate < 1] = 1
+    people.prog_rate[g, inds] = people.prog_rate[g, inds] * modified_prog_rate # Store progression rates
+    return
+
+
+def set_cin_grades(people, inds, g, dt):
+    '''
+    Set CIN clinical grades and dates of progression
+    '''
+
+    dur_dysp    = people.dur_dysp[g, inds]      # Array of durations of dysplasia prior to clearance/control/cancer
+    prog_rate   = people.prog_rate[g, inds]     # Array of progression rates
+    peak_dysp   = logf1(dur_dysp, prog_rate)    # Maps durations + progression to severity
+    people.peak_dysp[g, inds] = peak_dysp       # Store peak dysplasia
+
+    # Map severity to clinical grades
     ccut = people.pars['clinical_cutoffs']
-    sev_dist = people.pars['severity_dist']['dist']
-    sev_par2 = people.pars['severity_dist']['par2']
-
-    # Use prognosis probabilities to determine whether HPV clears or progresses to CIN1
-    cin1_probs = logf1(dur_none, dysp_rate) # Probability of developing dysplasia
-    is_cin1 = binomial_arr(cin1_probs) # Boolean array of dysplasias
-    cin1_inds = inds[is_cin1] # Indices of those with dysplasia
-    no_cin1_inds = inds[~is_cin1] # Indices of those without dysplasia
-
-    # CASE 1: Infection clears without causing dysplasia
-    people.date_clearance[g, no_cin1_inds] = people.date_infectious[g, no_cin1_inds] \
-                                             + np.ceil(people.dur_precin[g, no_cin1_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
-
-    # CASE 2: Infection progresses to mild dysplasia (CIN1)
-    excl_inds = true(people.date_cin1[g, cin1_inds] < people.t)  # Don't count CIN1s that were acquired before now
-    people.date_cin1[g, cin1_inds[excl_inds]] = np.nan
-    people.date_cin1[g, cin1_inds] = np.fmin(people.date_cin1[g, cin1_inds],
-                                             people.date_infectious[g, cin1_inds] +
-                                             np.ceil(people.dur_precin[g, cin1_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
-
-    # For people with dysplasia, evaluate duration of dysplasia prior to either (a) control or (b) progression to cancer
-    dur_to_peak_dys = sample(**dur_dyps, size=len(cin1_inds))
-    people.dur_precin[g, cin1_inds] += dur_to_peak_dys  # Duration of HPV is the sum of the period without dysplasia and the period with dysplasia
-    mean_peaks = logf2(dur_to_peak_dys, prog_time, prog_rate) # Apply a function that maps durations + genotype-specific progression to severity
-    peaks = np.minimum(1, sample(dist=sev_dist, par1=mean_peaks, par2=sev_par2)) # Evaluate peak dysplasia, which is a proxy for the clinical classification
+    is_cin1   = peak_dysp>0 # Boolean arrays of people who attain each clinical grade
+    is_cin2   = peak_dysp>ccut['cin1']
+    is_cin3   = peak_dysp>ccut['cin2']
+    is_cancer = peak_dysp>ccut['cin3']
+    cin1_inds = inds[is_cin1] # Indices of those progress at least to CIN2
+    cin2_inds = inds[is_cin2] # Indices of those progress at least to CIN2
+    cin3_inds = inds[is_cin3] # Indices of those progress at least to CIN3
+    cancer_inds = inds[is_cancer] # Indices of those progress to cancer
+    max_cin1_inds = inds[is_cin1 & ~is_cin2] # Indices of those who don't progress beyond CIN1
+    max_cin2_inds = inds[is_cin2 & ~is_cin3] # Indices of those who don't progress beyond CIN2
+    max_cin3_inds = inds[is_cin3 & ~is_cancer] # Indices of those who don't progress beyond CIN3
 
     # Determine whether CIN1 clears or progresses to CIN2
-    is_cin2 = peaks>ccut['cin1']
-    time_to_cin2 = ccut['cin1']/(peaks[is_cin2]/dur_to_peak_dys[is_cin2])
-    cin2_inds = cin1_inds[is_cin2]
-    no_cin2_inds = cin1_inds[~is_cin2]
-
-    # CASE 2.1: Mild dysplasia regresses and infection clears
-    time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(no_cin2_inds))
-    people.date_clearance[g, no_cin2_inds] = np.fmax(people.date_clearance[g, no_cin2_inds],
-                                                     people.date_cin1[g, no_cin2_inds] +
-                                                     np.ceil(dur_to_peak_dys[~is_cin2] / dt) +
-                                                     np.ceil(time_to_clear_cin1 / dt))
-
-    # CASE 2.2: Mild dysplasia progresses to moderate (CIN1 to CIN2)
-    excl_inds = true(people.date_cin2[g, cin2_inds] < people.t)  # Don't count CIN2s that were acquired before now
-    people.date_cin2[g, cin2_inds[excl_inds]] = np.nan
-    people.date_cin2[g, cin2_inds] = np.fmin(people.date_cin2[g, cin2_inds],
-                                             people.date_cin1[g, cin2_inds] +
-                                             np.ceil(time_to_cin2 / dt))  # Date they get CIN2 - minimum of any previous date and the date from the current infection
+    people.date_cin2[g, cin2_inds] = np.fmax(people.t, # Don't let people progress to CIN2 prior to the current timestep
+                                             people.date_cin1[g, cin2_inds] + sc.randround(invlogf1(ccut['cin1'], prog_rate[is_cin2])/dt))
+    time_to_clear_cin1 = sample(**people.pars['dur_cin1_clear'], size=len(max_cin1_inds))
+    people.date_clearance[g, max_cin1_inds] = np.fmax(people.date_clearance[g, max_cin1_inds],
+                                                  people.date_cin1[g, max_cin1_inds] +
+                                                  sc.randround(time_to_clear_cin1 / dt))
+    people.dur_dysp[g, max_cin1_inds] += time_to_clear_cin1
 
     # Determine whether CIN2 clears or progresses to CIN3
-    is_cin3 = peaks>ccut['cin2'] # This isn't a typo: the ccut['cin2'] value is the upper bound for CIN2 classification, so anyone above this is CIN3
-    time_to_cin3 = ccut['cin2']/(peaks[is_cin3]/dur_to_peak_dys[is_cin3])
-    cin3_inds = cin1_inds[is_cin3]
-    no_cin3_inds = cin1_inds[~is_cin3]
+    people.date_cin3[g, cin3_inds] = np.fmax(people.t, # Don't let people progress to CIN3 prior to the current timestep
+                                             people.date_cin1[g, cin3_inds] + sc.randround(invlogf1(ccut['cin2'], prog_rate[is_cin3])/dt))
+    time_to_clear_cin2 = sample(**people.pars['dur_cin2_clear'], size=len(max_cin2_inds))
+    people.date_clearance[g, max_cin2_inds] = np.fmax(people.date_clearance[g, max_cin2_inds],
+                                                  people.date_cin2[g, max_cin2_inds] +
+                                                  sc.randround(time_to_clear_cin2 / dt))
+    people.dur_dysp[g, max_cin2_inds] += time_to_clear_cin2
 
-    # CASE 2.2.1: Moderate dysplasia regresses and the virus clears
-    time_to_clear_cin2 = sample(**people.pars['dur_cin2_clear'], size=len(no_cin3_inds))
-    people.date_clearance[g, no_cin3_inds] = np.fmax(people.date_clearance[g, no_cin3_inds],
-                                                     people.date_cin1[g, no_cin3_inds] +
-                                                     np.ceil(dur_to_peak_dys[~is_cin3] / dt) +
-                                                     np.ceil(time_to_clear_cin2 / dt))  # Date they clear CIN2
-
-    # CASE 2.2.2: Moderate dysplasia progresses to severe (CIN2 to CIN3)
-    excl_inds = true(people.date_cin3[g, cin3_inds] < people.t)  # Don't count CIN2s that were acquired before now
-    people.date_cin3[g, cin3_inds[excl_inds]] = np.nan
-    people.date_cin3[g, cin3_inds] = np.fmin(people.date_cin3[g, cin3_inds],
-                                             people.date_cin1[g, cin3_inds] +
-                                             np.ceil(time_to_cin3 / dt))  # Date they get CIN3 - minimum of any previous date and the date from the current infection
-
-    # Determine whether CIN3 clears or progresses to invasive cervical cancer
-    is_cancer = peaks>ccut['cin3'] # Anyone above the upper threshold for CIN3 classification is cancerous (NB, this reflects a modeling choice and does not represent an exact biological mechanism)
-    time_to_cancer = ccut['cin3']/(peaks[is_cancer]/dur_to_peak_dys[is_cancer])
-    cancer_inds = cin1_inds[is_cancer]
-
-    # Cases 2.2.2.1 and 2.2.2.2: HPV DNA is no longer present, either because it's integrated (& progression to cancer will follow) or because the infection clears naturally
-    time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(cin3_inds))
-    people.date_clearance[g, cin3_inds] = np.fmax(people.date_clearance[g, cin3_inds],
-                                                  people.date_cin1[g, cin3_inds] +
-                                                  np.ceil(dur_to_peak_dys[is_cin3] / dt) +
-                                                  np.ceil(time_to_clear_cin3 / dt))  # HPV is cleared
-
-    # Case 2.2.2.2: Severe dysplasia progresses to cancer
-    excl_inds = true(people.date_cancerous[g,cancer_inds] < people.t)  # Don't count cancers that were acquired before now
-    people.date_cancerous[g,cancer_inds[excl_inds]] = np.nan
-    people.date_cancerous[g,cancer_inds] = np.fmin(people.date_cancerous[g,cancer_inds],
-                                                    people.date_cin1[g, cancer_inds] +
-                                                    np.ceil(time_to_cancer / dt))  # Date they get cancer - minimum of any previous date and the date from the current infection
+    # Determine whether CIN3 clears or progresses to cancer
+    people.date_cancerous[g, cancer_inds] = np.fmax(people.t,
+                                                    people.date_cin1[g, cancer_inds] + sc.randround(invlogf1(ccut['cin3'], prog_rate[is_cancer])/dt))
+    time_to_clear_cin3 = sample(**people.pars['dur_cin3_clear'], size=len(max_cin3_inds))
+    people.date_clearance[g, max_cin3_inds] = np.fmax(people.date_clearance[g, max_cin3_inds],
+                                                  people.date_cin3[g, max_cin3_inds] +
+                                                  sc.randround(time_to_clear_cin3 / dt))
+    people.dur_dysp[g, max_cin3_inds] += time_to_clear_cin3
 
     # Record eventual deaths from cancer (assuming no survival without treatment)
     dur_cancer = sample(**people.pars['dur_cancer'], size=len(cancer_inds))
-    people.date_dead_cancer[cancer_inds] = people.date_cancerous[g,cancer_inds] + np.ceil(dur_cancer / dt)
+    people.date_dead_cancer[cancer_inds] = people.date_cancerous[g, cancer_inds] + sc.randround(dur_cancer / dt)
+    people.dur_cancer[g, cancer_inds] = dur_cancer
+
+    return
+
+
+def set_HIV_prognoses(people, inds, year=None):
+    ''' Set HIV outcomes (for now only ART) '''
+
+    art_cov = people.hiv_pars.art_adherence # Shorten
+
+    # Extract index of current year
+    all_years = np.array(list(art_cov.keys()))
+    year_ind = sc.findnearest(all_years, year)
+    nearest_year = all_years[year_ind]
+
+    # Figure out which age bin people belong to
+    age_bins = art_cov[nearest_year][0, :]
+    age_inds = np.digitize(people.age[inds], age_bins)
+
+    # Apply ART coverage by age to people
+    art_covs = art_cov[nearest_year][1,:]
+    art_adherence = art_covs[age_inds]
+    people.art_adherence[inds] = art_adherence
 
     return
 
@@ -507,7 +671,7 @@ def n_multinomial(probs, n): # No speed gain from Numba
 
     **Example**::
 
-        outcomes = hp.multinomial(np.ones(6)/6.0, 50)+1 # Return 50 die-rolls
+        outcomes = hp.n_multinomial(np.ones(6)/6.0, 50)+1 # Return 50 die-rolls
     '''
     return np.searchsorted(np.cumsum(probs), np.random.random(n))
 
@@ -641,7 +805,7 @@ def true(arr):
 
         inds = hp.true(np.array([1,0,0,1,1,0,1])) # Returns array([0, 3, 4, 6])
     '''
-    return arr.nonzero()[0]
+    return arr.nonzero()[-1]
 
 
 def false(arr):
@@ -655,7 +819,7 @@ def false(arr):
 
         inds = hp.false(np.array([1,0,0,1,1,0,1]))
     '''
-    return np.logical_not(arr).nonzero()[0]
+    return np.logical_not(arr).nonzero()[-1]
 
 
 def defined(arr):
@@ -669,7 +833,7 @@ def defined(arr):
 
         inds = hp.defined(np.array([1,np.nan,0,np.nan,1,0,1]))
     '''
-    return (~np.isnan(arr)).nonzero()[0]
+    return (~np.isnan(arr)).nonzero()[-1]
 
 
 def undefined(arr):
@@ -683,7 +847,7 @@ def undefined(arr):
 
         inds = hp.defined(np.array([1,np.nan,0,np.nan,1,0,1]))
     '''
-    return np.isnan(arr).nonzero()[0]
+    return np.isnan(arr).nonzero()[-1]
 
 
 def itrue(arr, inds):

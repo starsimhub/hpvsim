@@ -12,7 +12,7 @@ do_plot = 1
 do_save = 0
 debug   = 1
 verbose = 0
-n_agents = 500
+n_agents = 1000
 hpv.options.set(interactive=False) # Assume not running interactively
 
 
@@ -57,7 +57,7 @@ def test_multirun(do_plot=do_plot): # If being run via pytest, turn off
     assert np.allclose(s1.summary[:], s2.summary[:], rtol=0, atol=0, equal_nan=True)
 
     # Run in serial for debugging
-    hpv.multi_run(sim=hpv.Sim(n_years=n_years, n_agents=n_agents), n_runs=2, parallel=False)
+    hpv.multi_run(sim=hpv.Sim(n_years=n_years, n_agents=n_agents), n_runs=2, parallel=not(debug))
 
     if do_plot:
         for sim in sims + sims2:
@@ -155,7 +155,7 @@ def test_simple_scenarios(do_plot=do_plot):
     xlsx_path = 'scen_test.xlsx'
 
     scens = hpv.Scenarios(basepars=basepars)
-    scens.run(verbose=verbose)
+    scens.run(verbose=verbose, parallel=not(debug))
     if do_plot:
         scens.plot()
     scens.to_json(json_path)

@@ -1016,6 +1016,7 @@ class Scenarios(hpb.ParsObj):
 
             # Update the parameters, if provided, and re-initialize aspects of the simulation
             scen_sim.update_pars(allpars)
+
             # If vaccination is provided, we need to re-initialize the people because the number of immunity sources is different
             if 'interventions' in allpars.keys():
                 vaxintvs = [x for x in allpars['interventions'] if isinstance(x, hpi.BaseVaccination)]

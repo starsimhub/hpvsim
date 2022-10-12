@@ -48,7 +48,7 @@ class People(hpb.BasePeople):
 
         # Initialize the BasePeople, which also sets things up for filtering
         super().__init__(pars)
-
+        
         # Handle pars and settings
 
         # Other initialization
@@ -91,7 +91,7 @@ class People(hpb.BasePeople):
                 self[key][:] = value
             else:
                 self[key] = value
-
+        
         return
 
 
@@ -105,7 +105,7 @@ class People(hpb.BasePeople):
         self.total_flows        = {f'total_{key}'   : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'         : 0 for key in hpd.dem_keys}
-        self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
+        # self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
         self.by_age_flows       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
 
         return
@@ -113,14 +113,14 @@ class People(hpb.BasePeople):
 
     def increment_age(self):
         ''' Let people age by one timestep '''
-        self.age[:] += self.dt
+        self.age[self.alive] += self.dt
         return
 
 
-    def initialize(self, sim_pars=None):
+    def initialize(self, sim_pars=None, hiv_pars=None):
         ''' Perform initializations '''
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
-        self.set_pars(sim_pars) # Replace the saved parameters with this simulation's
+        self.set_pars(pars=sim_pars, hiv_pars=hiv_pars) # Replace the saved parameters with this simulation's
         self.initialized = True
         return
 
@@ -135,6 +135,10 @@ class People(hpb.BasePeople):
 
         # Let people age by one time step
         self.increment_age()
+
+        # Check for HIV acquisitions
+        if self.pars['model_hiv']:
+            self.flows['hiv_infections'] = self.apply_hiv_rates(year=year)
 
         # Perform updates that are not genotype-specific
         update_freq = max(1, int(self.pars['dt_demog'] / self.pars['dt'])) # Ensure it's an integer not smaller than 1
@@ -203,105 +207,37 @@ class People(hpb.BasePeople):
         return n_dissolved # Return the number of dissolved partnerships by layer
 
 
-    def create_partnerships(self, t=None, n_new=None, pref_weight=100, scale_factor=None):
-        ''' Create new partnerships '''
-
+    def create_parnterships(self, tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars, pref_weight=100):
+        '''
+        Create partnerships. All the hard work of creating the contacts is done by hppop.make_contacts,
+        which in turn relies on hpu.create_edgelist for creating the edgelist. This method is just a light wrapper
+        that passes in the arguments in the right format and the updates relationship info stored in the People class.
+        '''
+        # Initialize
         new_pships = dict()
-        mixing = self.pars['mixing']
-        layer_probs = self.pars['layer_probs']
 
-        for lno,lkey in enumerate(self.layer_keys()):
+        # Loop over layers
+        for lno, lkey in enumerate(self.layer_keys()):
+            pship_args = dict(
+                lno=lno, tind=tind, partners=self.partners[lno], current_partners=self.current_partners,
+                sexes=self.sex, ages=self.age, debuts=self.debut, is_female=self.is_female, is_active=self.is_active,
+                mixing=mixing[lkey], layer_probs=layer_probs[lkey], cross_layer=cross_layer,
+                pref_weight=pref_weight, durations=dur_pship[lkey], acts=acts[lkey], age_act_pars=age_act_pars[lkey]
+            )
+            new_pships[lkey], current_partners, new_pship_inds, new_pship_counts = hppop.make_contacts(**pship_args)
 
-            # Intialize storage
-            new_pships[lkey] = dict()
-            new_pship_probs = np.zeros(len(self)) # Begin by assigning everyone equal probability of forming a new relationship. This will be used for males, and for females if no layer_probs are provided
-            new_pship_probs[self.is_active] = 1  # Blank out people not yet active
-            underpartnered = self.is_active & (self.current_partners[lno, :] < self.partners[lno,:])
-            new_pship_probs[underpartnered] = pref_weight  # Increase weight for those who are underpartnerned
-
-            if layer_probs is not None: # If layer probabilities have been provided, we use them to select females by age
-                bins = layer_probs[lkey][0, :] # Extract age bins
-                other_layers = np.delete(np.arange(len(self.layer_keys())),lno) # Indices of all other layers but this one
-                already_partnered = self.current_partners[other_layers,:].any(axis=0)  # Whether or not people already partnered in other layers
-                f_eligible = self.is_female & ~already_partnered & underpartnered # Females who are underpartnered in this layer and aren't already partnered in other layers are eligible to be selected
-                f_eligible_inds = hpu.true(f_eligible)
-                age_bins_f = np.digitize(self.age[f_eligible_inds], bins=bins) - 1  # Age bins of eligible females
-                bin_range_f = np.unique(age_bins_f)  # Range of bins
-                new_pship_inds_f = []  # Initialize new female contact list
-                for ab in bin_range_f:  # Loop over age bins
-                    these_f_contacts = hpu.binomial_filter(layer_probs[lkey][1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
-                    new_pship_inds_f += these_f_contacts.tolist()
-                new_pship_inds_f = np.array(new_pship_inds_f)
-
-            else: # No layer probabilities have been provided, so we just select a specified number of new relationships for females
-                this_n_new = int(n_new[lkey] * scale_factor)
-                # Draw female partners
-                new_pship_inds_f = hpu.choose_w(probs=new_pship_probs*self.is_female, n=this_n_new, unique=True)
-                sorted_f_inds = self.age[new_pship_inds_f].argsort()
-                new_pship_inds_f = new_pship_inds_f[sorted_f_inds]
-
-            if len(new_pship_inds_f)>0:
-
-                # Draw male partners based on mixing matrices if provided
-                if mixing is not None:
-                    bins = mixing[lkey][:, 0]
-                    m_active_inds = hpu.true(self.is_active & self.is_male) # Males eligible to be selected
-                    age_bins_f = np.digitize(self.age[new_pship_inds_f], bins=bins) - 1 # Age bins of females that are entering new relationships
-                    age_bins_m = np.digitize(self.age[m_active_inds], bins=bins) - 1 # Age bins of eligible males
-                    bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
-                    weighting = new_pship_probs*self.is_male # Weight males according to how underpartnered they are so they're ready to be selected
-                    new_pship_inds_m = []  # Initialize the male contact list
-                    for ab,nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
-                        male_dist = mixing[lkey][:, ab+1]  # Get the distribution of ages of the male partners of females of this age
-                        this_weighting = weighting[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
-                        nonzero_weighting = hpu.true(this_weighting != 0)
-                        selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
-                        new_pship_inds_m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
-                    new_pship_inds_m = np.array(new_pship_inds_m)
-
-                # Otherwise, do rough age assortativity
-                else:
-                    new_pship_inds_m  = hpu.choose_w(probs=new_pship_probs*self.is_male, n=this_n_new, unique=True)
-                    sorted_m_inds = self.age[new_pship_inds_m].argsort()
-                    new_pship_inds_m = new_pship_inds_m[sorted_m_inds]
-
-                # Increment the number of current partners
-                new_pship_inds, counts = hpu.unique(np.concatenate([new_pship_inds_f, new_pship_inds_m]))
-                self.current_partners[lno, new_pship_inds] += counts
-                self.rship_start_dates[lno,new_pship_inds] = self.t
-                self.n_rships[lno,new_pship_inds] += counts
-                lags = self.rship_start_dates[lno,new_pship_inds] - self.rship_end_dates[lno,new_pship_inds]
+            # Update relationship info
+            self.current_partners[:] = current_partners
+            if len(new_pship_inds):
+                self.rship_start_dates[lno, new_pship_inds] = self.t
+                self.n_rships[lno, new_pship_inds] += new_pship_counts
+                lags = self.rship_start_dates[lno, new_pship_inds] - self.rship_end_dates[lno, new_pship_inds]
                 self.rship_lags[lkey] += np.histogram(lags, self.lag_bins)[0]
-
-                # Handle acts: these must be scaled according to age
-                acts = hpu.sample(**self['pars']['acts'][lkey], size=len(new_pship_inds_f))
-                kwargs = dict(acts=acts,
-                              age_act_pars=self['pars']['age_act_pars'][lkey],
-                              age_f=self.age[new_pship_inds_f],
-                              age_m=self.age[new_pship_inds_m],
-                              debut_f=self.debut[new_pship_inds_f],
-                              debut_m=self.debut[new_pship_inds_m]
-                              )
-                scaled_acts = hppop.age_scale_acts(**kwargs)
-                keep_inds = scaled_acts > 0  # Discard partnerships with zero acts (e.g. because they are "post-retirement")
-                f = new_pship_inds_f[keep_inds]
-                m = new_pship_inds_m[keep_inds]
-                scaled_acts = scaled_acts[keep_inds]
-                final_n_new = len(f)
-
-                # Add everything to a contacts dictionary
-                new_pships[lkey]['f']       = f
-                new_pships[lkey]['m']       = m
-                new_pships[lkey]['dur']     = hpu.sample(**self['pars']['dur_pship'][lkey], size=final_n_new)
-                new_pships[lkey]['start']   = np.array([t*self['pars']['dt']]*final_n_new, dtype=hpd.default_float)
-                new_pships[lkey]['end']     = new_pships[lkey]['start'] + new_pships[lkey]['dur']
-                new_pships[lkey]['acts']    = scaled_acts
-                new_pships[lkey]['age_f']   = self.age[f]
-                new_pships[lkey]['age_m']   = self.age[m]
 
         self.add_contacts(new_pships)
 
         return
+
 
 
     #%% Methods for updating state
@@ -315,6 +251,7 @@ class People(hpb.BasePeople):
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
 
+
     def check_inds_true(self, current, date, filter_inds=None):
         ''' Return indices for which the current state is true and which meet the date criterion '''
         if filter_inds is None:
@@ -324,6 +261,7 @@ class People(hpb.BasePeople):
         has_date = hpu.idefinedi(date, current_inds)
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
+
 
     def check_cin1(self, genotype):
         ''' Check for new progressions to CIN1 '''
@@ -335,6 +273,7 @@ class People(hpb.BasePeople):
         self.no_dysp[genotype, inds] = False
         return len(inds)
 
+
     def check_cin2(self, genotype):
         ''' Check for new progressions to CIN2 '''
         filter_inds = self.true_by_genotype('cin1', genotype)
@@ -343,6 +282,7 @@ class People(hpb.BasePeople):
         self.cin1[genotype, inds] = False # No longer counted as CIN1
         return len(inds)
 
+
     def check_cin3(self, genotype):
         ''' Check for new progressions to CIN3 '''
         filter_inds = self.true_by_genotype('cin2', genotype)
@@ -350,6 +290,7 @@ class People(hpb.BasePeople):
         self.cin3[genotype, inds] = True
         self.cin2[genotype, inds] = False # No longer counted as CIN2
         return len(inds)
+
 
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
@@ -393,25 +334,78 @@ class People(hpb.BasePeople):
         # Determine who clears and who controls
         latent_probs = np.full(len(inds), self.pars['hpv_control_prob'], dtype=hpd.default_float)
         latent_bools = hpu.binomial_arr(latent_probs)
+
         latent_inds = inds[latent_bools]
         cleared_inds = inds[~latent_bools]
 
         # Now reset disease states
-        self.susceptible[genotype, cleared_inds] = True
-        self.infectious[genotype, inds] = False
-        self.no_dysp[genotype, inds] = False
+        if len(cleared_inds):
+            self.susceptible[genotype, cleared_inds] = True
+            self.infectious[genotype, cleared_inds] = False
+            self.inactive[genotype, cleared_inds] = False # should already be false
+            hpimm.update_peak_immunity(self, cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
+
+        if len(latent_inds):
+            self.susceptible[genotype, latent_inds] = False # should already be false
+            self.infectious[genotype, latent_inds] = False
+            self.inactive[genotype, latent_inds] = True
+            self.date_clearance[genotype, latent_inds] = np.nan
+
+        # Whether infection is controlled on not, people have no dysplasia, so we clear all this info
+        self.no_dysp[genotype, inds] = True
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
-
-        if len(latent_inds):
-            self.latent[genotype, latent_inds] = True
-            self.date_clearance[genotype, latent_inds] = np.nan
-
-        # Update immunity
-        hpimm.update_peak_immunity(self, cleared_inds, imm_pars=self.pars, imm_source=genotype)
+        self.peak_dysp[genotype, inds] = np.nan
+        self.dysp_rate[genotype, inds] = np.nan
+        self.prog_rate[genotype, inds] = np.nan
 
         return
+
+
+    def apply_hiv_rates(self, year=None):
+        '''
+        Apply HIV infection rates to population
+        '''
+        hiv_pars = self.hiv_pars.infection_rates
+        all_years = np.array(list(hiv_pars.keys()))
+        year_ind = sc.findnearest(all_years, year)
+        nearest_year = all_years[year_ind]
+        hiv_year = hiv_pars[nearest_year]
+        dt = self.pars['dt']
+
+        hiv_probs = np.zeros(len(self), dtype=hpd.default_float)
+        for sk in ['f','m']:
+            hiv_year_sex = hiv_year[sk]
+            age_bins = hiv_year_sex[:,0]
+            hiv_rates = hiv_year_sex[:,1]*dt
+            mf_inds = self.is_female if sk == 'f' else self.is_male
+            mf_inds *= self.alive # Only include people alive
+            age_inds = np.digitize(self.age[mf_inds], age_bins)
+            hiv_probs[mf_inds]  = hiv_rates[age_inds]
+        hiv_probs[self.hiv] = 0 # not at risk if already infected
+
+        # Get indices of people who acquire HIV
+        hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
+        self.hiv[hiv_inds] = True
+
+        # Update prognoses for those with HIV
+        if len(hiv_inds):
+            
+            hpu.set_HIV_prognoses(self, hiv_inds, year=year) # Set ART adherence for those with HIV
+
+            for g in range(self.pars['n_genotypes']):
+                nocin_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
+                if len(nocin_inds): # Reevaluate whether these women will develop dysplasia
+                    hpu.update_precin_hiv(self, nocin_inds, g, self.pars['hiv_pars']['dysp_rate'])
+                    hpu.set_dysp_status(self, nocin_inds, g, dt)
+
+                cin_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
+                if len(cin_inds): # Reevaluate disease severity and progression speed for these women
+                    hpu.update_cin_hiv(self, cin_inds, g, self.pars['hiv_pars']['prog_rate'])
+                    hpu.set_cin_grades(self, cin_inds, g, dt)
+
+        return len(hiv_inds)
 
 
     def apply_death_rates(self, year=None):
@@ -446,18 +440,13 @@ class People(hpb.BasePeople):
 
 
     def add_births(self, year=None, new_births=None):
-        """
+        '''
         Add more people to the population
 
         Specify either the year from which to retrieve the birth rate, or the absolute number
         of new people to add. Must specify one or the other. People are added in-place to the
         current `People` instance
-
-        :param year:
-        :param new_births:
-        :returns: Number of new agents added
-
-        """
+        '''
 
         assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
@@ -582,29 +571,31 @@ class People(hpb.BasePeople):
         # Deal with genotype parameters
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
-        dur_precin        = genotype_pars[genotype_map[g]]['dur_precin']
+        dur_precin      = genotype_pars[genotype_map[g]]['dur_precin']
+        dysp_rate       = genotype_pars[genotype_map[g]]['dysp_rate']
 
-        # Set all dates
+        # Set date of infection and exposure
         base_t = self.t + offset if offset is not None else self.t
         self.date_infectious[g,inds] = base_t
         if layer != 'reactivation':
             self.date_exposed[g,inds] = base_t
 
-        # Count reinfections
+        # Count reinfections and remove any previous dates
         self.flows['reinfections'][g]           += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         self.total_flows['total_reinfections']  += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
-        for key in ['date_clearance']:
+        for key in ['date_clearance', 'date_cin1', 'date_cin2', 'date_cin3']:
             self[key][g, inds] = np.nan
 
-        # Count reactivations
+        # Count reactivations and adjust latency status
         if layer == 'reactivation':
             self.flows['reactivations'][g] += len(inds)
             self.total_flows['total_reactivations'] += len(inds)
             self.latent[g, inds] = False # Adjust states -- no longer latent
 
         # Update states, genotype info, and flows
-        self.susceptible[g, inds]   = False # Adjust states - set susceptible to false
-        self.infectious[g, inds]    = True  # Adjust states - set infectious to true
+        self.susceptible[g, inds]   = False # no longer susceptible
+        self.infectious[g, inds]    = True  # now infectious
+        self.inactive[g, inds]      = False  # no longer inactive
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
@@ -620,31 +611,29 @@ class People(hpb.BasePeople):
 
         # Now use genotype-specific prognosis probabilities to determine what happens.
         # Only women can progress beyond infection.
-        f_inds = self.is_female[inds].nonzero()[-1]
-        m_inds = self.is_male[inds].nonzero()[-1]
+        f_inds = hpu.itruei(self.is_female,inds)
+        m_inds = hpu.itruei(self.is_male,inds)
 
         # Determine the duration of the HPV infection without any dysplasia
         if dur is None:
             this_dur = hpu.sample(**dur_precin, size=len(inds))  # Duration of infection without dysplasia in years
-            this_dur_f = self.dur_precin[g, inds[self.is_female[inds]]]
         else:
             if len(dur) != len(inds):
                 errormsg = f'If supplying durations of infections, they must be the same length as inds: {len(dur)} vs. {len(inds)}.'
                 raise ValueError(errormsg)
             this_dur    = dur
-            this_dur_f  = dur[self.is_female[inds]]
 
-        self.dur_precin[g, inds]    = this_dur  # Set the duration of infection
-        self.dur_disease[g, inds]   = this_dur  # Set the initial duration of disease as the length of the period without dysplasia - this is then extended for those who progress
+        # Set durations
+        self.dur_infection[g, inds] = this_dur  # Set the duration of infection
+        self.dur_precin[g, inds]    = this_dur  # Set the duration of infection without dysplasia
 
-        # Compute disease progression for females and skip for makes; males are updated below
+        # Compute disease progression for females
         if len(f_inds)>0:
+            hpu.set_prognoses(self, f_inds, g, dt, hiv_pars=self.pars['hiv_pars']) # Set prognoses
 
-            fg_inds = inds[self.is_female[inds]] # Subset the indices so we're only looking at females with this genotype
-            hpu.set_prognoses(self, fg_inds, g, this_dur_f)
-
+        # Compute infection clearance for males
         if len(m_inds)>0:
-            self.date_clearance[g, inds[m_inds]] = self.date_infectious[g, inds[m_inds]] + np.ceil(self.dur_precin[g, inds[m_inds]]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+            self.date_clearance[g, m_inds] = self.date_infectious[g, m_inds] + np.ceil(self.dur_infection[g, m_inds]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return len(inds) # For incrementing counters
 
@@ -665,6 +654,7 @@ class People(hpb.BasePeople):
 
         self.susceptible[:, inds] = False
         self.infectious[:, inds] = False
+        self.inactive[:, inds] = False
         self.cin1[:, inds] = False
         self.cin2[:, inds] = False
         self.cin3[:, inds] = False

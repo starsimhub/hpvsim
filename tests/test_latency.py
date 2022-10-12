@@ -10,16 +10,12 @@ import hpvsim as hpv
 
 do_plot = 1
 do_save = 0
-hpv16 = hpv.genotype('HPV16')
-hpv18 = hpv.genotype('HPV18')
 
 
 #%% Define the tests
 def test_latency(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test latency')
 
-    hpv16 = hpv.genotype('HPV16')
-    hpv18 = hpv.genotype('HPV18')
     verbose = .1
     debug = 0
     n_agents = 1e3
@@ -29,7 +25,7 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
         'n_years': 60,
         'burnin': 30,
         'start': 1970,
-        'genotypes': [hpv16, hpv18],
+        'genotypes': [16, 18],
         'location': 'tanzania',
         'dt': 1.0,
     }
@@ -85,8 +81,8 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
                 'cancer_incidence',
             ],
         }
-        scens.plot(to_plot=to_plot)
-        scens.plot_age_results(plot_type=sns.boxplot)
+        # scens.plot(to_plot=to_plot)
+        # scens.plot_age_results(plot_type=sns.boxplot)
 
     return scens
 

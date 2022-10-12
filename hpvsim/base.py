@@ -231,7 +231,7 @@ class BaseSim(ParsObj):
         try:
             if self.results_ready:
                 infections = self.summary['total_infections']
-                cancers = self.summary['cancers']
+                cancers = self.summary['total_cancers']
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
@@ -263,14 +263,6 @@ class BaseSim(ParsObj):
         # Merge everything together
         pars = sc.mergedicts(pars, kwargs)
         if pars:
-
-            # Define aliases
-            mapping = dict(
-                n_agents = 'n_agents',
-            )
-            for key1,key2 in mapping.items():
-                if key1 in pars:
-                    pars[key2] = pars.pop(key1)
 
             # Handle other special parameters
             if pars.get('network'):
@@ -904,9 +896,7 @@ class BasePeople(FlexPretty):
 
     def __init__(self, pars):
         ''' Initialize essential attributes used for filtering '''
-        # obj_set(self, '_keys', []) # Since getattribute is overwritten
-        # obj_set(self, '_inds', None)
-
+        
         # Set meta attribute here, because BasePeople methods expect it to exist
         self.meta = hpd.PeopleMeta  # Store list of keys and dtypes
         self.meta.validate()
@@ -932,12 +922,12 @@ class BasePeople(FlexPretty):
 
         # Assign UIDs
         self['uid'][:] = np.arange(self.pars['n_agents'])
-
+        
         return
 
 
     def __len__(self):
-        ''' Length of people (unfiltered?) '''
+        ''' Length of people '''
         try:
             return len(self.uid)
         except Exception as E:
@@ -945,7 +935,7 @@ class BasePeople(FlexPretty):
             return 0
 
 
-    def set_pars(self, pars=None):
+    def set_pars(self, pars=None, hiv_pars=None):
         '''
         Re-link the parameters stored in the people object to the sim containing it,
         and perform some basic validation.
@@ -972,6 +962,7 @@ class BasePeople(FlexPretty):
         pars['n_agents'] = int(pars['n_agents'])
         pars.setdefault('location', None)
         self.pars = pars # Actually store the pars
+        self.hiv_pars = hiv_pars # And now set HIV
         return
 
 
@@ -1076,6 +1067,7 @@ class BasePeople(FlexPretty):
         self._n += n
         self._map_arrays()
 
+
     def _map_arrays(self):
         """
         Set main simulation attributes to be views of the underlying data
@@ -1089,6 +1081,7 @@ class BasePeople(FlexPretty):
                 super().__setattr__(k, self._data[k][:, :self._n])
             else:
                 super().__setattr__(k, self._data[k][:self._n])
+
 
     def __getitem__(self, key):
         ''' Allow people['attr'] instead of getattr(people, 'attr')
@@ -1108,12 +1101,16 @@ class BasePeople(FlexPretty):
         return self.__setattr__(key, value)
 
 
-    def __setattr__(self, key, value):
-        if hasattr(self, '_data') and key in self._data:
+    def __setattr__(self, attr, value):
+        ''' Ditto '''
+        if hasattr(self, '_data') and attr in self._data:
             # Prevent accidentally overwriting a view with an actual array - if this happens, the updated values will
             # be lost the next time the arrays are resized
             raise Exception('Cannot assign directly to a dynamic array view - must index into the view instead e.g. `people.uid[:]=`')
-        super().__setattr__(key, value)
+        else:   # If not initialized, rely on the default behavior
+            super().__setattr__(attr, value)
+        return
+
 
 
     def __iter__(self):
@@ -1145,7 +1142,7 @@ class BasePeople(FlexPretty):
         newpeople.set('uid', np.arange(len(newpeople)))
 
         return newpeople
-
+    
 
     def addtoself(self, people2):
         ''' Combine two people arrays, avoiding dcp '''
@@ -1187,16 +1184,6 @@ class BasePeople(FlexPretty):
         return string
 
 
-    # CK: BROKEN DON'T USE
-    # def keys(self):
-    #     ''' Returns keys for all properties of the people object '''
-    #     try: # Unclear wy this fails, but sometimes it does during initialization/pickling
-    #         keys = obj_get(self, '_keys')[:]
-    #     except:
-    #         keys = []
-    #     return keys
-
-
     def set(self, key, value, die=True):
         self[key][:] = value[:] # nb. this will raise an exception the shapes don't match, and will automatically cast the value to the existing type
 
@@ -1211,68 +1198,6 @@ class BasePeople(FlexPretty):
                 arr[:,k] = self[ky]
             return arr
 
-
-    #%% Filtering methods
-    # def filter(self, criteria=None, inds=None):
-    #     '''
-    #     Store indices to allow for easy filtering of the People object.
-    #     Adapted from FPsim
-    #     Args:
-    #         criteria (array): a boolean array for the filtering critria
-    #         inds (array): alternatively, explicitly filter by these indices
-    #     Returns:
-    #         A filtered People object, which works just like a normal People object
-    #         except only operates on a subset of indices.
-    #     Examples:
-    #     active_people = people.filter(people.age > people.debut) # People object containing sexually active people
-    #     '''
-    #
-    #     # Create a new People object with the same properties as the original
-    #     filtered = object.__new__(self.__class__) # Create a new People instance
-    #     BasePeople.__init__(filtered) # Perform essential initialization
-    #     filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
-    #
-    #     # Perform the filtering
-    #     if criteria is None: # No filtering: reset
-    #         filtered._inds = None
-    #         if inds is not None: # Unless indices are supplied directly, in which case use them
-    #             filtered._inds = inds
-    #     else: # Main use case: perform filtering
-    #         if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
-    #             new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
-    #         elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
-    #             new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
-    #         else:
-    #             errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
-    #             raise ValueError(errormsg)
-    #         if filtered.inds is None: # Not yet filtered: use the indices directly
-    #             filtered._inds = new_inds
-    #         else: # Already filtered: map them back onto the original People indices
-    #             filtered._inds = filtered.inds[new_inds]
-    #
-    #     return filtered
-    #
-    #
-    # def unfilter(self):
-    #     '''
-    #     An easy way of unfiltering the People object, returning the original.
-    #     '''
-    #     unfiltered = self.filter(criteria=None)
-    #     return unfiltered
-    #
-    #
-    # @property
-    # def inds(self):
-    #     ''' Alias to self._inds to prevent accidental overwrite & increase speed '''
-    #     return self._inds
-    #
-    # @property
-    # def len_inds(self):
-    #     ''' Alias to len(self) '''
-    #     if self._inds is not None:
-    #         return len(self._inds)
-    #     else:
-    #         return len(self)
 
     @property
     def is_female(self):

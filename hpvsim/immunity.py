@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from . import utils as hpu
 from . import defaults as hpd
 from . import parameters as hppar
+from . import interventions as hpi
 
 
 
@@ -80,10 +81,17 @@ class genotype(sc.prettyobj):
 # %% Immunity methods
 
 def init_immunity(sim, create=False):
-    ''' Initialize immunity matrices with all genotypes are in the sim'''
+    ''' Initialize immunity matrices with all genotypes and vaccines in the sim'''
 
     # Pull out all of the circulating genotypes for cross-immunity
     ng = sim['n_genotypes']
+
+    # Pull out all the vaccination interventions
+    vx_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseVaccination)]
+    nv = len(vx_intvs)
+
+    # Dimension for immunity matrix
+    ndim = ng + nv
 
     # If immunity values have been provided, process them
     if sim['immunity'] is None or create:
@@ -96,8 +104,7 @@ def init_immunity(sim, create=False):
             sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
 
         sim['immunity_map'] = dict()
-        # Firstly, initialize immunity matrix with defaults. These are then overwitten with genotype-specific values below
-        # Susceptibility matrix is of size sim['n_genotypes']*sim['n_genotypes']
+        # Firstly, initialize immunity matrix with defaults. These are then overwitten with specific values below
         immunity = np.ones((ng, ng), dtype=hpd.default_float)  # Fill with defaults
 
         # Next, overwrite these defaults with any known immunity values about specific genotypes
@@ -110,11 +117,22 @@ def init_immunity(sim, create=False):
                 if label_i in default_cross_immunity and label_j in default_cross_immunity:
                     immunity[j][i] = default_cross_immunity[label_j][label_i]
 
+        imm_source = ng
+        for vi,vx_intv in enumerate(vx_intvs):
+            genotype_pars_df = vx_intv.product.genotype_pars[vx_intv.product.genotype_pars.genotype.isin(sim['genotype_map'].values())] # TODO fix this
+            vacc_mapping = [genotype_pars_df[genotype_pars_df.genotype==gtype].rel_imm.values[0] for gtype in sim['genotype_map'].values()]
+            vacc_mapping += [1]*(vi+1) # Add on some ones to pad out the matrix
+            vacc_mapping = np.reshape(vacc_mapping, (len(immunity)+1, 1)).astype(hpd.default_float) # Reshape
+            immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
+            immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
+            vx_intv.product.imm_source = imm_source
+            imm_source += 1
+
         sim['immunity'] = immunity
 
-    # Ensure a user-provided immunity matrix is the right type
-
     sim['immunity'] = sim['immunity'].astype('float32')
+    sim['n_imm_sources'] = ndim
+
     return
 
 
@@ -138,9 +156,10 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
     '''
 
     if infection:
-        # Determine whether individual seroconverts based upon duration of infection
-        dur_inf = people.dur_disease[imm_source, inds]
-        seroconvert_probs = hpu.logf1(dur_inf, imm_pars['sero'])
+        # Determine whether individual seroconverts based upon genotype
+        genotype_label = imm_pars['genotype_map'][imm_source]
+        genotype_pars = imm_pars['genotype_pars'][genotype_label]
+        seroconvert_probs = np.full(len(inds), fill_value=genotype_pars.sero_prob)
         is_seroconvert = hpu.binomial_arr(seroconvert_probs)
 
         # Extract parameters and indices
@@ -166,7 +185,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
         if imm_pars['doses']>1:
             imm_pars['imm_boost'] = sc.promotetolist(imm_pars['imm_boost'])
         if len(dose1_inds)>0: # Initialize immunity for newly vaccinated people
-            people.peak_imm[imm_source, dose1_inds] = hpu.sample(**imm_pars['imm_init'],size=len(dose1_inds))
+            people.peak_imm[imm_source, dose1_inds] = hpu.sample(**imm_pars['imm_init'], size=len(dose1_inds))
         if len(dose2_inds) > 0: # Boost immunity for people receiving 2nd dose...
             people.peak_imm[imm_source, dose2_inds] *= imm_pars['imm_boost'][0]
         if len(dose3_inds) > 0:

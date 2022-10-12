@@ -67,15 +67,15 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_years=10, dt=0.5, network='random')
+    base_pars = dict(n_agents=50e3, n_years=10, dt=0.5, network='random', beta=0.05)
     sim = hpv.Sim(pars=base_pars)
     sim.initialize()
 
     # Define the parameters to vary
-    vary_pars   = ['beta',          'acts',             'condoms',          'debut',            'init_hpv_prev'] # Parameters
-    vary_vals   = [[0.01, 0.99],    [1, 200],           [0.01,1.0],         [15,25],             [0.01,0.8]] # Values
-    vary_rels   = ['pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['total_hpv_incidence', 'total_hpv_incidence',    'total_hpv_incidence',    'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
+    vary_pars   = ['model_hiv',     'beta',          'acts',             'condoms',          'debut',            'init_hpv_prev', ] # Parameters
+    vary_vals   = [[False, True],   [0.0001, 0.99],    [1, 200],           [0.01,1.0],         [15,25],             [0.01,0.8]] # Values
+    vary_rels   = ['pos',           'pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
+    vary_what   = ['total_hpv_prevalence', 'total_hpv_incidence',    'total_hpv_incidence',      'total_hpv_incidence', 'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -94,12 +94,20 @@ def test_epi():
             lo = vval[0]
             hi = vval[1]
 
-        pars0 = sc.mergedicts(base_pars, {vpar:lo}) # Use lower parameter bound
-        pars1 = sc.mergedicts(base_pars, {vpar:hi}) # Use upper parameter bound
+        if vpar == 'model_hiv':
+            base_pars['location'] = 'south africa'
+            hiv_datafile = 'test_data/hiv_incidence_south_africa.csv'
+            art_datafile = 'test_data/art_coverage_south_africa.csv'
+        else:
+            hiv_datafile = None
+            art_datafile = None
+
+        pars0 = sc.mergedicts(base_pars, {vpar: lo})  # Use lower parameter bound
+        pars1 = sc.mergedicts(base_pars, {vpar: hi})  # Use upper parameter bound
 
         # Run the simulations and pull out the results
-        s0 = hpv.Sim(pars0, label=f'{vpar} {vval[0]}').run()
-        s1 = hpv.Sim(pars1, label=f'{vpar} {vval[1]}').run()
+        s0 = hpv.Sim(pars0, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{vpar} {vval[0]}').run()
+        s1 = hpv.Sim(pars1, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{vpar} {vval[1]}').run()
         res0 = s0.summary
         res1 = s1.summary
 
@@ -116,6 +124,47 @@ def test_epi():
             print(f'✓ ({v0} => {v1})')
 
     return
+
+
+def test_states():
+    sc.heading('Test states')
+
+    # Define baseline parameters and initialize sim
+    base_pars = dict(n_years=10, dt=0.5, network='random', beta=0.05)
+
+    class check_states(hpv.Analyzer):
+
+        def __init__(self):
+            self.okay = True
+            return
+
+        def apply(self, sim):
+            people = sim.people
+            ng = sim['n_genotypes']
+            removed = people.dead_cancer[:] | people.dead_other[:] | people.emigrated[:]
+            for g in range(ng):
+                s1  = (people.susceptible[g,:] | people.infectious[g,:] | people.inactive[g,:] | removed ).all()
+                s2  = ~(people.susceptible[g,:] & people.infectious[g,:]).any()
+                s3  = ~(people.susceptible[g,:] & people.inactive[g,:]).any()
+                s4  = ~(people.infectious[g,:] & people.inactive[g,:]).any()
+
+                d1 = (people.no_dysp[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous | removed).all()
+                d2 = ~(people.no_dysp[g,:] & people.cin1[g,:]).all()
+                d3 = ~(people.cin1[g,:] & people.cin2[g,:]).all()
+                d4 = ~(people.cin2[g,:] & people.cin3[g,:]).all()
+                d5 = ~(people.cin3[g,:] & people.cancerous[g,:]).all()
+
+                if not np.array([s1, s2, s3, s4, d1, d2, d3, d4, d5]).all():
+                    self.okay = False
+
+            return
+
+    sim = hpv.Sim(pars=base_pars, analyzers=check_states())
+    sim.run()
+    a = sim.get_analyzer()
+    assert a.okay
+
+    return sim
 
 
 def test_flexible_inputs():
@@ -197,7 +246,7 @@ def test_result_consistency():
     # The test below was faulty, but leaving it here (commented out) is instructive.
     # Specifically, the total number of people infectious by genotype (sim.results['n_infectious'])
     # doesn't necessarily sum to the number of infectious people in total (sim.results['n_total_infectious'])
-    # because of the possibility of coinfections within a sinlg person.
+    # because of the possibility of coinfections within a single person.
     # So sim.results['n_total_infectious'] represents the total number of people who have 1+ infections
     # whereas sim.results['n_infectious'] represents the total number of people infected with each genotype.
     # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
@@ -286,13 +335,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
+    sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
-    # sim3 = test_flexible_inputs()
-    # sim4 = test_result_consistency()
-    # sim5 = test_location_loading()
-    # sim6 = test_resuming()
+    sim2 = test_epi()
+    sim3 = test_states()
+    sim4 = test_flexible_inputs()
+    sim5 = test_result_consistency()
+    sim6 = test_location_loading()
+    sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')

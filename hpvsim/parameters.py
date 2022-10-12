@@ -4,6 +4,7 @@ Set the parameters for hpvsim.
 
 import numpy as np
 import sciris as sc
+import pandas as pd
 from .settings import options as hpo # For setting global options
 from . import misc as hpm
 from . import defaults as hpd
@@ -51,10 +52,12 @@ def make_pars(**kwargs):
     pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
     pars['use_waning']      = False         # Whether or not to use waning immunity. If set to False, immunity from infection and vaccination is assumed to stay at the same level permanently
     pars['use_migration']   = True          # Whether to estimate migration rates to correct the total population size
+    pars['model_hiv']       = False         # Whether or not to model HIV natural history
 
     # Network parameters, generally initialized after the population has been constructed
     pars['debut']           = dict(f=dict(dist='normal', par1=18.6, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=19.6, par2=1.8))
+    pars['cross_layer']     = 0.05  # Proportion of females who have crosslayer relationships
     pars['partners']        = None  # The number of concurrent sexual partners for each partnership type
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
     pars['condoms']         = None  # The proportion of acts in which condoms are used for each partnership type
@@ -70,14 +73,13 @@ def make_pars(**kwargs):
     pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Parameters for disease progression
-    pars['sero']  = 2.5 # parameter used as the growth rate within a logistic function that maps durations to seroconversion probabilities
     pars['severity_dist'] = dict(dist='lognormal', par1=None, par2=0.1) # Distribution of individual disease severity. Par1 is set to None because the mean is determined as a function of genotype and disease duration
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
     pars['cancer_treat_prob'] = 0.1 # probability of receiving cancer treatment given symptom detection
     pars['hpv_control_prob']    = 0.44 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation'] = dict(
         age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
-        hpv_reactivation_probs  = np.array([0.0001,    0.05,        0.04]),      # made this up, need to parameterize somehow
+        hpv_reactivation_probs  = np.array([0.0001,    0.005,        0.01]),      # made this up, need to parameterize somehow
     )
 
     # Parameters used to calculate immunity
@@ -106,21 +108,29 @@ def make_pars(**kwargs):
     pars['treat_pars'] = dict()  # Treatment method that is being used; populated during initialization
 
     # Durations
-    pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1
-    pars['dur_cin2_clear']  = dict(dist='lognormal', par1=1.0, par2=0.5)  # Time to clearance from CIN2
-    pars['dur_cin3_clear']  = dict(dist='lognormal', par1=1.5, par2=0.5)  # Time to clearance from CIN3
-    pars['dur_cancer']      = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death
+    pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1 (years)
+    pars['dur_cin2_clear']  = dict(dist='lognormal', par1=1.0, par2=0.5)  # Time to clearance from CIN2 (years)
+    pars['dur_cin3_clear']  = dict(dist='lognormal', par1=1.5, par2=0.5)  # Time to clearance from CIN3 (years)
+    pars['dur_cancer']      = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
 
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans'] = {}
-    pars['rel_trans']['precin']   = 1 # Baseline value
-    pars['rel_trans']['cin1']   = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans']['cin2']   = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans']['cin3']   = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans']['cancerous']   = 0.5 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['precin']     = 1 # Baseline value
+    pars['rel_trans']['cin1']       = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cin2']       = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cin3']       = 1 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans']['cancerous']  = 0.5 # Baseline assumption, can be adjusted during calibration
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
+
+    # HIV parameters
+    pars['hiv_pars'] = {
+        'rel_sus': 2.2,
+        'dysp_rate': 2,
+        'prog_rate': 2,
+        'reactivation_prob': 3,
+    }
 
     # Events and interventions
     pars['interventions']   = []   # The interventions present in this simulation; populated by the user
@@ -180,7 +190,6 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         age_act_pars = dict(m=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
                             c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
                             o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
-        # layer_probs = dict(m=0.7, c=0.4, o=0.05),   # Default proportion of the population in each layer
         dur_pship   = dict(m=dict(dist='normal_pos', par1=8,par2=3),
                            c=dict(dist='normal_pos', par1=1, par2=1),
                            o=dict(dist='normal_pos', par1=0.1, par2=0.05)),
@@ -305,19 +314,7 @@ def get_vaccine_choices():
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
 
-def get_screen_choices():
-    '''
-    Define valid pre-defined screening names
-    '''
-    # List of choices currently available: new ones can be added to the list along with their aliases
-    choices = {
-        'hpv':  ['hpv', 'hpvdna'],
-        'hpv1618': ['hpv1618', 'hpvgenotyping'],
-        'via': ['via', 'visualinspection'],
-        'via_triage': ['via_triage'],
-    }
-    mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
-    return choices, mapping
+
 
 def get_treatment_choices():
     '''
@@ -360,141 +357,127 @@ def get_genotype_pars(default=False, genotype=None):
     '''
 
     pars = sc.objdict()
+    mean16 = 13.9/12 # Defined here since used repeatedly below. This is the duration of HPV16 infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_precin  = dict(dist='lognormal', par1=2.618, par2=0.5)
-                                    # Made the distribution wider to accommodate varying means
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
-                                    # https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv16.dur_precin   = dict(dist='lognormal', par1=mean16, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=4.5, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv16.dysp_rate    = 1.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate    = 0.79 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_time    = 4.4  # Point of inflection in logistic function
+    pars.hpv16.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv16.sero_prob    = 0.65 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_precin  = dict(dist='lognormal', par1=2.16, par2=0.5)
-                                    # Made the distribution wider to accommodate varying means
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
-                                    # https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv18.dur_precin   = dict(dist='lognormal', par1=14.9/12, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3.16, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv18.dysp_rate    = 1.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate    = 1.02 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_time    = 7.82  # Point of inflection in logistic function
+    pars.hpv18.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 0.72  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv18.sero_prob    = 0.6 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv31 = sc.objdict()
-    pars.hpv31.dur_precin  = dict(dist='lognormal', par1=2.5197, par2=1.0)
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
+    pars.hpv31.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
     pars.hpv31.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv31.dysp_rate    = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_rate    = 0.179 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_time    = 14.12  # Point of inflection in logistic function
+    pars.hpv31.dysp_rate    = 0.1 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv31.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv31.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv31.rel_beta     = 0.94 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv31.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv31.sero_prob    = 0.53 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv33 = sc.objdict()
-    pars.hpv33.dur_precin  = dict(dist='lognormal', par1=2.3226, par2=1.0)
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
+    pars.hpv33.dur_precin   = dict(dist='lognormal', par1=12.5/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
     pars.hpv33.dur_dysp     = dict(dist='lognormal', par1=14.12, par2=3.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv33.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_rate    = 0.24 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_time    = 8.46  # Point of inflection in logistic function
+    pars.hpv33.dysp_rate    = 0.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv33.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv33.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv33.rel_beta     = 0.26 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv33.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv33.sero_prob    = 0.6  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv35 = sc.objdict()
-    pars.hpv35.dur_precin  = dict(dist='lognormal', par1=2.5, par2=1.0)
+    pars.hpv35.dur_precin   = dict(dist='lognormal', par1=6.0/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
     pars.hpv35.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv35.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv35.prog_rate    = 0.25 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv35.prog_time    = 7.5  # Point of inflection in logistic function
+    pars.hpv35.dysp_rate    = 0.3 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv35.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv35.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv35.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv35.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv35.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv45 = sc.objdict()
-    pars.hpv45.dur_precin  = dict(dist='lognormal', par1=2.84, par2=1.0)
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
+    pars.hpv45.dur_precin   = dict(dist='lognormal', par1=8.0/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
     pars.hpv45.dur_dysp     = dict(dist='lognormal', par1=3.776, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv45.dysp_rate    = 1.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv45.prog_rate    = 0.925 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv45.prog_time    = 3.46  # Point of inflection in logistic function
+    pars.hpv45.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv45.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv45.rel_beta     = 0.77 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv45.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv45.sero_prob    = 0.25  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv51 = sc.objdict()
-    pars.hpv51.dur_precin  = dict(dist='lognormal', par1=2.0, par2=1.0)
+    pars.hpv51.dur_precin   = dict(dist='lognormal', par1=7.4/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
     pars.hpv51.dur_dysp     = dict(dist='lognormal', par1=1.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv51.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv51.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv51.prog_time    = 8.  # Point of inflection in logistic function
+    pars.hpv51.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv51.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv51.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv51.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv52 = sc.objdict()
-    pars.hpv52.dur_precin  = dict(dist='lognormal', par1=2.3491, par2=1.0)
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
+    pars.hpv52.dur_precin   = dict(dist='lognormal', par1=11.7/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
     pars.hpv52.dur_dysp     = dict(dist='lognormal', par1=1.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv52.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv52.prog_rate    = 0.526 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv52.prog_time    = 8.96  # Point of inflection in logistic function
+    pars.hpv52.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv52.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv52.rel_beta     = 0.623 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv52.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv52.sero_prob    = 0.5  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv56 = sc.objdict()
-    pars.hpv56.dur_precin  = dict(dist='lognormal', par1=2.0, par2=1.0)
+    pars.hpv56.dur_precin   = dict(dist='lognormal', par1=11.2/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
     pars.hpv56.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv56.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv56.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv56.prog_time    = 10  # Point of inflection in logistic function
+    pars.hpv56.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv56.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv56.rel_beta     = 0.6 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv56.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv56.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv58 = sc.objdict()
-    pars.hpv58.dur_precin  = dict(dist='lognormal', par1=2.3491, par2=1.0)
-                                    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/
-                                    # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.416.938&rep=rep1&type=pdf
-                                    # https://academic.oup.com/jid/article/197/10/1436/2191990
+    pars.hpv58.dur_precin   = dict(dist='lognormal', par1=9.7/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
     pars.hpv58.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv58.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv58.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv58.prog_time    = 10  # Point of inflection in logistic function
+    pars.hpv58.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv58.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv58.rel_beta     = 0.6 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv58.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv58.sero_prob    = 0.65  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv6 = sc.objdict()
-    pars.hpv6.dur_precin   = dict(dist='lognormal', par1=1.8245, par2=1.0)
-                                    # https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv6.dur_precin    = dict(dist='lognormal', par1=8.4/12, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv6.dur_dysp      = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv6.dysp_rate     = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.prog_rate     = 0.01 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.prog_time     = 30  # Point of inflection in logistic function
+    pars.hpv6.prog_rate     = 0.05 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv6.prog_rate_sd  = 0.005 # Standard deviation of the progression rate
     pars.hpv6.rel_beta      = 0.8 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv6.imm_boost     = 1.0 # TODO: look for data
+    pars.hpv6.sero_prob     = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv11 = sc.objdict()
-    pars.hpv11.dur_precin  = dict(dist='lognormal', par1=1.8718, par2=1.0)
-                                    # https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv11.dur_precin   = dict(dist='lognormal', par1=8.1/12, par2=0.4)  # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv11.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv11.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv11.prog_rate    = 0.8 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv11.prog_time    = 30  # Point of inflection in logistic function
+    pars.hpv11.dysp_rate    = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv11.prog_rate    = 0.05 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv11.prog_rate_sd = 0.005 # Standard deviation of the progression rate
     pars.hpv11.rel_beta     = 0.5 # Relative transmissibility, generally calibrated to match available type distributions
     pars.hpv11.imm_boost    = 1.0 # TODO: look for data
+    pars.hpv11.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
@@ -833,82 +816,6 @@ def get_mixing(network=None):
     return mixing, layer_probs
 
 
-def get_vaccine_genotype_pars(default=False, vaccine=None):
-    '''
-    Define the cross-immunity of each vaccine against each genotype
-    '''
-    pars = dict(
-
-        default = dict(
-            hpv16=1,
-            hpv18=1,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv35=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv51=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv56=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
-        ),
-
-        bivalent = dict(
-            hpv16=1,
-            hpv18=1,  # Assumption
-            hpv31=0.5,  # Assumption
-            hpv33=0.5,  # Assumption
-            hpv35=0.5,  # Assumption
-            hpv45=0.5,  # Assumption
-            hpv51=0.3,  # Assumption
-            hpv52=0.3,  # Assumption
-            hpv56=0.3,  # Assumption
-            hpv58=0.3,  # Assumption
-            hpv6=0,  # Assumption
-            hpv11=0,  # Assumption
-        ),
-
-        quadrivalent=dict(
-            hpv16=1,
-            hpv18=1,  # Assumption
-            hpv31=0,  # Assumption
-            hpv33=0,  # Assumption
-            hpv35=0,  # Assumption
-            hpv45=0,  # Assumption
-            hpv51=0,  # Assumption
-            hpv52=0,  # Assumption
-            hpv56=0,  # Assumption
-            hpv58=0,  # Assumption
-            hpv6=1,  # Assumption
-            hpv11=1,  # Assumption
-        ),
-
-        nonavalent=dict(
-            hpv16=1,
-            hpv18=1,  # Assumption
-            hpv31=1,  # Assumption
-            hpv33=1,  # Assumption
-            hpv35=0,  # Assumption
-            hpv45=1,  # Assumption
-            hpv51=0,  # Assumption
-            hpv52=1,  # Assumption
-            hpv56=0,  # Assumption
-            hpv58=1,  # Assumption
-            hpv6=1,  # Assumption
-            hpv11=1,  # Assumption
-        ),
-    )
-
-    pars['bivalent_2dose'] = pars['bivalent']
-    pars['bivalent_3dose'] = pars['bivalent']
-    pars['quadrivalent_2dose'] = pars['quadrivalent']
-    pars['quadrivalent_3dose'] = pars['quadrivalent']
-    pars['nonavalent_2dose'] = pars['nonavalent']
-    pars['nonavalent_3dose'] = pars['nonavalent']
-
-    return _get_from_pars(pars, default=default, key=vaccine)
-
 
 def get_vaccine_dose_pars(default=False, vaccine=None):
     '''
@@ -963,189 +870,100 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
     return _get_from_pars(pars, default, key=vaccine)
 
 
-def get_screen_pars(screen=None):
+def get_life_expectancy(location, verbose=False):
     '''
-    Define the parameters for each screen method
-    should extract test positivity, inadequacy
+    Get life expectancy data by location
+    life_expectancy (dict): dictionary storing life expectancy over time by age
     '''
+    if location is not None:
+        if verbose:
+            print(f'Loading location-specific life expectancy data for "{location}" - needed for HIV runs')
+        try:
+            life_expectancy = hpdata.get_life_expectancy(location=location)
+            return life_expectancy
+        except ValueError as E:
+            errormsg = f'Could not load HIV data for requested location "{location}" ({str(E)})'
+            raise NotImplementedError(errormsg)
+    else:
+        raise NotImplementedError('Cannot load HIV data without a specified location')
 
-    pars = dict(
-        hpv = dict(
-            by_genotype=True,
-            test_positivity=dict(
-                precin=dict(
-                    hpv16=0.55,
-                    hpv18=0.55,
-                    hpv31=0.55,
-                    hpv33=0.55,
-                    hpv35=0.55,
-                    hpv45=0.55,
-                    hpv51=0.55,
-                    hpv52=0.55,
-                    hpv56=0.55,
-                    hpv58=0.55,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-                cin1=dict(
-                    hpv16=0.8415,
-                    hpv18=0.8415,
-                    hpv31=0.8415,
-                    hpv33=0.8415,
-                    hpv35=0.8415,
-                    hpv45=0.8415,
-                    hpv51=0.8415,
-                    hpv52=0.8415,
-                    hpv56=0.8415,
-                    hpv58=0.8415,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-                cin2=dict(
-                    hpv16=0.93,
-                    hpv18=0.93,
-                    hpv31=0.93,
-                    hpv33=0.93,
-                    hpv35=0.93,
-                    hpv45=0.93,
-                    hpv51=0.93,
-                    hpv52=0.93,
-                    hpv56=0.93,
-                    hpv58=0.93,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-                cin3=dict(
-                    hpv16=0.984,
-                    hpv18=0.984,
-                    hpv31=0.984,
-                    hpv33=0.984,
-                    hpv35=0.984,
-                    hpv45=0.984,
-                    hpv51=0.984,
-                    hpv52=0.984,
-                    hpv56=0.984,
-                    hpv58=0.984,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-                cancerous=dict(
-                    hpv16=0.984,
-                    hpv18=0.984,
-                    hpv31=0.984,
-                    hpv33=0.984,
-                    hpv35=0.984,
-                    hpv45=0.984,
-                    hpv51=0.984,
-                    hpv52=0.984,
-                    hpv56=0.984,
-                    hpv58=0.984,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-            ),
-            inadequacy=0,
-        ),
 
-        hpv1618 = dict(
-            by_genotype=True,
-            test_positivity=dict(
-                precin=dict(
-                    hpv16=1,
-                    hpv18=1,
-                    hpv31=0,
-                    hpv33=0,
-                    hpv35=0,
-                    hpv45=0,
-                    hpv51=0,
-                    hpv52=0,
-                    hpv56=0,
-                    hpv58=0,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-                cin1=dict(
-                    hpv16=1,
-                    hpv18=1,
-                    hpv31=0,
-                    hpv33=0,
-                    hpv35=0,
-                    hpv45=0,
-                    hpv51=0,
-                    hpv52=0,
-                    hpv56=0,
-                    hpv58=0,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-                cin2=dict(
-                    hpv16=1,
-                    hpv18=1,
-                    hpv31=0,
-                    hpv33=0,
-                    hpv35=0,
-                    hpv45=0,
-                    hpv51=0,
-                    hpv52=0,
-                    hpv56=0,
-                    hpv58=0,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-                cin3=dict(
-                    hpv16=1,
-                    hpv18=1,
-                    hpv31=0,
-                    hpv33=0,
-                    hpv35=0,
-                    hpv45=0,
-                    hpv51=0,
-                    hpv52=0,
-                    hpv56=0,
-                    hpv58=0,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-                cancerous=dict(
-                    hpv16=1,
-                    hpv18=1,
-                    hpv31=0,
-                    hpv33=0,
-                    hpv35=0,
-                    hpv45=0,
-                    hpv51=0,
-                    hpv52=0,
-                    hpv56=0,
-                    hpv58=0,
-                    hpv6=0,
-                    hpv11=0,
-                ),
-            ),
-            inadequacy=0,
-        ),
+def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
+    '''
+    Load HIV incidence and art coverage data, if provided
+    ART adherance calculations use life expectancy data to infer lifetime average coverage
+    rates for people in different age buckets. To give an example, suppose that ART coverage
+    over 2010-2020 is given by:
+        art_coverage = [0.23,0.3,0.38,0.43,0.48,0.52,0.57,0.61,0.65,0.68,0.72]
+    The average ART adherence in 2010 will be higher for younger cohorts than older ones.
+    Someone expected to die within a year would be given an average lifetime ART adherence
+    value of 0.23, whereas someone expected to survive >10 years would be given a value of 0.506.
 
-        via=dict(
-            by_genotype=False,
-            test_positivity=dict(
-                precin=0.25,
-                cin1=0.3,
-                cin2=0.45,
-                cin3=0.41,
-                cancerous=0.6,
-            ),
-            inadequacy=0,
-        ),
-        via_triage=dict(
-            by_genotype=False,
-            test_positivity=dict(
-                precin=0.98,
-                cin1=0.97,
-                cin2=0.89,
-                cin3=0.79,
-                cancerous=0.4,
-            ),
-            inadequacy=0,
-        ),
-    )
+    Args:
+        location (str): must be provided if you want to run with HIV dynamics
+        hiv_datafile (str):  must be provided if you want to run with HIV dynamics
+        art_datafile (str):  must be provided if you want to run with HIV dynamics
+        verbose (bool):  whether to print progress
 
-    return _get_from_pars(pars, key=screen)
+    Returns:
+        hiv_inc (dict): dictionary keyed by sex, storing arrays of HIV incidence over time by age
+        art_cov (dict): dictionary keyed by sex, storing arrays of ART coverage over time by age
+        life_expectancy (dict): dictionary storing life expectancy over time by age
+    '''
+    
+    if hiv_datafile is None and art_datafile is None:
+        hiv_incidence_rates, art_adherence = None, None
+        
+    else:
+
+        # Load data
+        life_exp    = get_life_expectancy(location=location, verbose=verbose) # Load the life expectancy data (needed for ART adherance calcs)
+        df_inc      = pd.read_csv(hiv_datafile) # HIV incidence
+        df_art      = pd.read_csv(art_datafile) # ART coverage
+    
+        # Process HIV and ART data
+        sex_keys = ['Male', 'Female']
+        sex_key_map = {'Male': 'm', 'Female': 'f'}
+    
+        ## Start with incidence file
+        years = df_inc['Year'].unique()
+        hiv_incidence_rates = dict()
+    
+        # Processing
+        for year in years:
+            hiv_incidence_rates[year] = dict()
+            for sk in sex_keys:
+                sk_out = sex_key_map[sk]
+                hiv_incidence_rates[year][sk_out] = np.concatenate(
+                    [
+                    np.array(df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']], dtype=hpd.default_float),
+                    np.array([[150,0]]) # Add another entry so that all older age groups are covered
+                    ]
+                )
+    
+        # Now compute ART adherence over time/age
+        art_adherence = dict()
+        years = df_art['Year'].values
+        for i, year in enumerate(years):
+    
+            # Use the incidence file to determine which age groups we want to calculate ART coverage for
+            ages_inc = hiv_incidence_rates[year]['m'][:, 0] # Read in the age groups we have HIV incidence data for
+            ages_ex = life_exp[year]['m'][:, 0] # Age groups available in life expectancy file
+            ages = np.intersect1d(ages_inc, ages_ex) # Age groups we want to calculate ART coverage for
+    
+            # Initialize age-specific ART coverage dict and start filling it in
+            cov = np.zeros(len(ages), dtype=hpd.default_float)
+            for j, age in enumerate(ages):
+                idx = np.where(life_exp[year]['f'][:, 0] == age)[0] # Finding life expectancy for this age group/year
+                this_life_exp = life_exp[year]['f'][idx, 1] # Pull out value
+                last_year = int(year + this_life_exp) # Figure out the year in which this age cohort is expected to die
+                year_ind = sc.findnearest(years, last_year) # Get as close to the above year as possible within the data
+                if year_ind > i: # Either take the mean of ART coverage from now up until the year of death
+                    cov[j] = np.mean(df_art[i:year_ind]['ART Coverage'].values)
+                else: # Or, just use ART overage in this year
+                    cov[j] = df_art.iloc[year_ind]['ART Coverage']
+    
+            art_adherence[year] = np.array([ages, cov])
+
+    return hiv_incidence_rates, art_adherence
+
