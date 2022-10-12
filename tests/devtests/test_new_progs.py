@@ -205,7 +205,7 @@ def make_cinfig():
             pn+=1
 
         ax[0,ai].legend(fontsize=18)
-        ax[1,ai].set_xlabel("Duration of dysplasia")
+        ax[1,ai].set_xlabel("Duration of dysplasia prior to\nregression/cancer (years)")
         for row in [0,1]:
             ax[row,ai].grid(axis='x')
             # ax[row,ai].set_xticks([0,0.5,1.0,1.5,2.0])
