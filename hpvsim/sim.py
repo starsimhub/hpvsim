@@ -662,9 +662,13 @@ class Sim(hpb.BaseSim):
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
         if self['use_waning']:
-            has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
-            if len(has_imm):
-                hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
+            inds = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
+            if len(inds):
+                ss = people.t_imm_event[:, inds].shape
+                t_since_boost = (t - people.t_imm_event[:,inds]).ravel()
+                current_imm = imm_kin_pars[t_since_boost].reshape(ss) # Get people's current level of immunity
+                people.imm[:,inds] = current_imm*people.peak_imm[:,inds] # Set immunity relative to peak
+                    # return imm
         else:
             people.imm[:] = people.peak_imm
         hpimm.check_immunity(people)
@@ -728,6 +732,8 @@ class Sim(hpb.BaseSim):
                 for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
                     betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * hiv_rel_sus[targets] * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
                     target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
+                    transmissions   = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
+                    target_inds     = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
 

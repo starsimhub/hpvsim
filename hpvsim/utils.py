@@ -71,7 +71,6 @@ def get_discordant_pairs(p1_inf_inds, p1_inf_gens, p2_sus_inds, p1,p2,n):
     '''
     Construct discordant partnerships
     '''
-
     p1_source_pships, p1_genotypes = pair_lookup_vals(p1, p1_inf_inds, p1_inf_gens, n) # Pull out the indices of partnerships in which p1 is infected, as well as the genotypes they're infected with
     p2_sus_pships = pair_lookup(p2, p2_sus_inds, n) # ... pull out the indices of partnerships in which p2 is susceptible
     p1_genotypes = p1_genotypes[(~np.isnan(p1_genotypes)*p2_sus_pships).nonzero()[0]].astype(hpd.default_int) # Now get the actual genotypes
@@ -89,27 +88,6 @@ def get_discordant_pairs2(p1_inf_inds, p2_sus_inds, p1, p2, n):
     p1_source_pships    = p1_source_pships * p2_sus_pships # Remove partnerships where both partners have an infection with the same genotype
     p1_source_inds      = p1_source_pships.nonzero()[0] # Indices of partnerships where the p1 has an infection and p2 is susceptible
     return p1_source_inds
-
-
-def compute_infections(betas, targets):
-    '''
-    Compute who infects whom
-    '''
-    # Determine transmissions
-    transmissions   = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
-    target_inds     = targets[transmissions] # Extract indices of those who got infected
-    return target_inds
-
-
-def update_immunity(imm, t, t_imm_event, inds, imm_kin, peak_imm):
-    '''
-    Step immunity levels forward in time
-    '''
-    ss              = t_imm_event[:, inds].shape
-    t_since_boost   = (t - t_imm_event[:,inds]).ravel()
-    current_imm     = imm_kin[t_since_boost].reshape(ss) # Get people's current level of immunity
-    imm[:,inds]     = current_imm*peak_imm[:,inds] # Set immunity relative to peak
-    return imm
 
 
 def find_contacts(p1, p2, inds): # pragma: no cover
