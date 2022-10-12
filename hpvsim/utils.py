@@ -33,7 +33,7 @@ cache = hpo.numba_cache # Turning this off can help switching parallelization op
 
 #%% The core functions
 
-@nb.njit(              (nbbool[:,:],    nbbool[:,:],    nbbool[:]), cache=cache, parallel=safe_parallel)
+@nb.njit(cache=cache, parallel=safe_parallel)
 def get_sources_targets(inf,           sus,            sex):
     ''' Get indices of sources, i.e. people with current infections '''
     sus_genotypes, sus_inds = (sus * sex).nonzero()
@@ -41,7 +41,7 @@ def get_sources_targets(inf,           sus,            sex):
     return inf_genotypes, inf_inds, sus_genotypes, sus_inds
 
 
-@nb.njit(           (nbint[:],       nb.int64[:], nb.int64[:],  nbint), cache=cache, parallel=safe_parallel)
+@nb.njit(cache=cache, parallel=safe_parallel)
 def pair_lookup_vals(contacts_array, people_inds, genotypes,    n):
     ft = hpd.default_float # nbfloat
     lookup = np.empty(n, ft) # Create a lookup array consisting of length len(people)
@@ -52,7 +52,7 @@ def pair_lookup_vals(contacts_array, people_inds, genotypes,    n):
     return mask, res_val
 
 
-@nb.njit(      (nbint[:],       nb.int64[:], nbint), cache=cache,parallel=safe_parallel)
+@nb.njit(cache=cache,parallel=safe_parallel)
 def pair_lookup(contacts_array, people_inds, n):
     lookup = np.full(n, False)
     lookup[people_inds[::-1]] = True
@@ -72,7 +72,7 @@ def unique(arr):
     return unique, counts
 
 
-@nb.njit((nbint[:], nb.int64[:]), cache=cache, parallel=safe_parallel)
+@nb.njit(cache=cache, parallel=safe_parallel)
 def isin( arr,      search_inds):
     ''' Find search_inds in arr. Like np.isin() but faster '''
     n = len(arr)
@@ -84,13 +84,13 @@ def isin( arr,      search_inds):
     return result
 
 
-@nb.njit(   (nbint[:],  nb.int64[:]), cache=cache, parallel=safe_parallel)
+@nb.njit(cache=cache, parallel=safe_parallel)
 def findinds(arr,       vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
     return isin(arr,vals).nonzero()[0]
 
 
-@nb.njit(               (nb.int64[:],   nb.int64[:],    nb.int64[:], nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
+@nb.njit(cache=cache, parallel=safe_parallel)
 def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p2,       n):
     '''
     Construct discordant partnerships
@@ -104,7 +104,7 @@ def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p
     return p1_source_inds, p1_genotypes
 
 
-@nb.njit(                (nb.int64[:],  nb.int64[:],    nbint[:], nbint[:], nbint), cache=cache, parallel=safe_parallel)
+@nb.njit(cache=cache, parallel=safe_parallel)
 def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
     '''
     Construct discordant partnerships
@@ -116,7 +116,7 @@ def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
     return p1_source_inds
 
 
-@nb.njit(             (nb.float32[:],  nbint[:]), cache=cache, parallel=safe_parallel)
+@nb.njit(cache=cache, parallel=safe_parallel)
 def compute_infections(betas,       targets):
     '''
     Compute who infects whom
@@ -127,7 +127,7 @@ def compute_infections(betas,       targets):
     return target_inds
 
 
-@nb.njit(          (nbfloat[:,:],   nbint,  nbint[:,:],  nbint[:],  nbfloat[:], nbfloat[:,:]), cache=cache)
+@nb.njit(cache=cache)
 def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    peak_imm):
     '''
     Step immunity levels forward in time
@@ -139,7 +139,7 @@ def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    
     return imm
 
 
-@nb.njit((nbint[:], nbint[:], nb.int64[:]), cache=cache)
+@nb.njit(cache=cache)
 def find_contacts(p1, p2, inds): # pragma: no cover
     """
     Numba for Layer.find_contacts()
@@ -579,7 +579,7 @@ def set_seed(seed=None):
         seed (int): the random seed
     '''
 
-    @nb.njit((nbint,), cache=cache)
+    @nb.njit(cache=cache)
     def set_seed_numba(seed):
         return np.random.seed(seed)
 
@@ -676,7 +676,7 @@ def n_multinomial(probs, n): # No speed gain from Numba
     return np.searchsorted(np.cumsum(probs), np.random.random(n))
 
 
-@nb.njit((nbfloat,), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
+@nb.njit(cache=cache, parallel=rand_parallel) # Numba hugely increases performance
 def poisson(rate):
     '''
     A Poisson trial.
@@ -691,7 +691,7 @@ def poisson(rate):
     return np.random.poisson(rate, 1)[0]
 
 
-@nb.njit((nbfloat, nbint), cache=cache, parallel=rand_parallel) # Numba hugely increases performance
+@nb.njit(cache=cache, parallel=rand_parallel) # Numba hugely increases performance
 def n_poisson(rate, n):
     '''
     An array of Poisson trials.
@@ -728,7 +728,7 @@ def n_neg_binomial(rate, dispersion, n, step=1): # Numba not used due to incompa
     return samples
 
 
-@nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
+@nb.njit(cache=cache) # Numba hugely increases performance
 def choose(max_n, n):
     '''
     Choose a subset of items (e.g., people) without replacement.
@@ -744,7 +744,7 @@ def choose(max_n, n):
     return np.random.choice(max_n, n, replace=False)
 
 
-@nb.njit((nbint, nbint), cache=cache) # Numba hugely increases performance
+@nb.njit(cache=cache) # Numba hugely increases performance
 def choose_r(max_n, n):
     '''
     Choose a subset of items (e.g., people), with replacement.
