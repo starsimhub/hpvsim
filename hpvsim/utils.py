@@ -16,14 +16,14 @@ __all__ = []
 
 #%% The core functions
 
-def get_sources_targets(inf,           sus,            sex):
+def get_sources_targets(inf, sus, sex):
     ''' Get indices of sources, i.e. people with current infections '''
     sus_genotypes, sus_inds = (sus * sex).nonzero()
     inf_genotypes, inf_inds = (inf * sex).nonzero()
     return inf_genotypes, inf_inds, sus_genotypes, sus_inds
 
 
-def pair_lookup_vals(contacts_array, people_inds, genotypes,    n):
+def pair_lookup_vals(contacts_array, people_inds, genotypes, n):
     ft = hpd.default_float # nbfloat
     lookup = np.empty(n, ft) # Create a lookup array consisting of length len(people)
     lookup.fill(np.nan) # Fill it with NaNs
@@ -51,7 +51,7 @@ def unique(arr):
     return unique, counts
 
 
-def isin( arr,      search_inds):
+def isin(arr, search_inds):
     ''' Find search_inds in arr. Like np.isin() but faster '''
     n = len(arr)
     result = np.full(n, False)
@@ -62,12 +62,12 @@ def isin( arr,      search_inds):
     return result
 
 
-def findinds(arr,       vals):
+def findinds(arr, vals):
     ''' Finds indices of vals in arr, accounting for repeats '''
     return isin(arr,vals).nonzero()[0]
 
 
-def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p2,       n):
+def get_discordant_pairs(p1_inf_inds, p1_inf_gens, p2_sus_inds, p1,p2,n):
     '''
     Construct discordant partnerships
     '''
@@ -80,7 +80,7 @@ def get_discordant_pairs(p1_inf_inds,   p1_inf_gens,    p2_sus_inds, p1,       p
     return p1_source_inds, p1_genotypes
 
 
-def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
+def get_discordant_pairs2(p1_inf_inds, p2_sus_inds, p1, p2, n):
     '''
     Construct discordant partnerships
     '''
@@ -91,7 +91,7 @@ def get_discordant_pairs2(p1_inf_inds,  p2_sus_inds,    p1,       p2,       n):
     return p1_source_inds
 
 
-def compute_infections(betas,       targets):
+def compute_infections(betas, targets):
     '''
     Compute who infects whom
     '''
@@ -101,7 +101,7 @@ def compute_infections(betas,       targets):
     return target_inds
 
 
-def update_immunity(imm,            t,      t_imm_event, inds,      imm_kin,    peak_imm):
+def update_immunity(imm, t, t_imm_event, inds, imm_kin, peak_imm):
     '''
     Step immunity levels forward in time
     '''
