@@ -9,6 +9,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.2.6 (2022-10-12)
+--------------------------
+- Removes Numba since slower for small sims and only 10% faster for large sims.
+- Moves functions from ``utils.py`` into ``people.py``, ``sim.py``, and ``population.py``.
+- *GitHub info*: PR `326 <https://github.com/amath-idm/hpvsim/pull/326>`__
+
+
 Version 0.2.5 (2022-10-07)
 --------------------------
 - Adds people filtering (NB: not used, and later removed).
