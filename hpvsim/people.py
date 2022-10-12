@@ -569,13 +569,13 @@ class People(hpb.BasePeople):
             for g in range(self.pars['n_genotypes']):
                 nocin_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
                 if len(nocin_inds): # Reevaluate whether these women will develop dysplasia
-                    hpu.update_precin_hiv(self, nocin_inds, g, self.pars['hiv_pars']['dysp_rate'])
-                    hpu.set_dysp_status(self, nocin_inds, g, dt)
+                    self.update_precin_hiv(nocin_inds, g, self.pars['hiv_pars']['dysp_rate'])
+                    self.set_dysp_status(nocin_inds, g, dt)
 
                 cin_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
                 if len(cin_inds): # Reevaluate disease severity and progression speed for these women
-                    hpu.update_cin_hiv(self, cin_inds, g, self.pars['hiv_pars']['prog_rate'])
-                    hpu.set_cin_grades(self, cin_inds, g, dt)
+                    self.update_cin_hiv(cin_inds, g, self.pars['hiv_pars']['prog_rate'])
+                    self.set_cin_grades(cin_inds, g, dt)
 
         return len(hiv_inds)
 
