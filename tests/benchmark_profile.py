@@ -40,8 +40,6 @@ func_options = {
     'apply_int':     hpv.interventions.vaccinate_num.apply,
     'vaccinate':     hpv.interventions.vaccinate_num.vaccinate,
     'select_people': hpv.interventions.vaccinate_num.select_people,
-    'get_pairs':     hpv.utils.get_discordant_pairs,
-    'pair_lookup':   hpv.utils.pair_lookup_vals,
     'update_pre':    hpv.people.People.update_states_pre,
     'death':         hpv.people.People.apply_death_rates,
     'infect':        hpv.people.People.infect,
