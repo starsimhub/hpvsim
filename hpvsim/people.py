@@ -379,7 +379,7 @@ class People(hpb.BasePeople):
         return n_dissolved # Return the number of dissolved partnerships by layer
 
 
-    def create_parnterships(self, tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars, pref_weight=100):
+    def create_partnerships(self, tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars, pref_weight=100):
         '''
         Create partnerships. All the hard work of creating the contacts is done by hppop.make_contacts,
         which in turn relies on hpu.create_edgelist for creating the edgelist. This method is just a light wrapper
