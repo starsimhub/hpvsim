@@ -3,7 +3,6 @@ Set the defaults across each of the different files.
 '''
 
 import numpy as np
-import numba as nb
 import sciris as sc
 import pylab as pl
 from .settings import options as hpo # To set options
@@ -18,13 +17,9 @@ result_float = np.float64 # Always use float64 for results, for simplicity
 if hpo.precision == 32:
     default_float = np.float32
     default_int   = np.int32
-    nbfloat       = nb.float32
-    nbint         = nb.int32
 elif hpo.precision == 64: # pragma: no cover
     default_float = np.float64
     default_int   = np.int64
-    nbfloat       = nb.float64
-    nbint         = nb.int64
 else:
     raise NotImplementedError(f'Precision must be either 32 bit or 64 bit, not {hpo.precision}')
 

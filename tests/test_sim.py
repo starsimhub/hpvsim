@@ -19,7 +19,7 @@ def test_microsim():
 
     sim = hpv.Sim()
     pars = {
-        'n_agents': 100,
+        'n_agents': 500, # CK: values smaller than this fail
         'init_hpv_prev': .1,
         'n_years': 2,
         'genotypes': [16,18],

@@ -247,6 +247,87 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
     return scaled_acts
 
 
+def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
+                        layer_probs, pref_weight, cross_layer):
+    '''
+    Create partnerships for a single layer
+    Args:
+        partners            (int arr): array containing each agent's desired number of partners in this layer
+        current_partners    (int arr): array containing each agent's actual current number of partners in this layer
+        mixing              (float arr): mixing matrix
+        sex                 (bool arr): sex
+        age                 (float arr): age
+        is_active           (bool arr): whether or not people are sexually active
+        is_female           (bool arr): whether each person is female
+        layer_probs         (float arr): participation rates in this layer by age and sex
+        pref_weight         (float): weight that determines the extent to which people without their preferred number of partners are preferenced for selection
+        cross_layer         (float): proportion of females that have cross-layer relationships
+    '''
+
+    # Initialize
+    f           = [] # Initialize the female partners
+    m           = [] # Initialize the male partners
+    new_pship_inds, new_pship_counts = [], [] # Initialize the indices and counts of new partnerships
+
+    # Useful variables
+    n_agents        = len(sex)
+    n_layers        = current_partners.shape[0]
+    f_active        =  is_female & is_active
+    m_active        = ~is_female & is_active
+    underpartnered  = current_partners[lno, :] < partners  # Indices of underpartnered people
+
+    # Figure out how many new relationships to create by calculating the number of females
+    # who are underpartnered in this layer and either unpartnered in other layers or available
+    # for cross-layer participation
+    other_layers            = np.delete(np.arange(n_layers), lno)  # Indices of all other layers but this one
+    other_partners          = current_partners[other_layers, :].any(axis=0)  # Whether or not people already partnered in other layers
+    other_partners_f        = hpu.true(other_partners & f_active) # Indices of sexually active females with parthers in other layers
+    f_cross                 = hpu.binomial_filter(cross_layer, other_partners_f) # Indices of females who have cross-layer relationships
+    f_cross_layer           = np.full(n_agents, False, dtype=bool) # Construct a boolean array indicating whether people have cross-layer relationships
+    f_cross_layer[f_cross]  = True # Only true for the selected females
+    f_eligible              = is_female & is_active & underpartnered & (~other_partners | f_cross_layer)
+    f_eligible_inds         = hpu.true(f_eligible)
+
+    # Bin the females by age
+    bins        = layer_probs[0, :]  # Extract age bins
+    age_bins_f  = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
+    bin_range_f = np.unique(age_bins_f)  # Range of bins
+
+    for ab in bin_range_f:  # Loop over age bins
+        these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
+        f += these_f_contacts.tolist()
+    f = np.array(f)
+
+    # Probabilities for males to be selected for new relationships
+    m_probs                 = np.zeros(n_agents)    # Begin by assigning everyone equal probability of forming a new relationship
+    m_probs[m_active]       = 1                     # Only select sexually active males
+    m_probs[underpartnered] *= pref_weight          # Increase weight for those who are underpartnerned
+
+    # Draw male partners based on mixing matrices
+    if len(f) > 0:
+
+        bins            = mixing[:, 0]
+        m_active_inds   = hpu.true(m_active)  # Indices of active males
+        age_bins_f      = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
+        age_bins_m      = np.digitize(age[m_active_inds], bins=bins) - 1  # Age bins of active males
+        bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
+
+        for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
+            male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
+            this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
+            nonzero_weighting = hpu.true(this_weighting != 0)
+            selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
+            m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
+        m = np.array(m)
+
+        # Count how many contacts there actually are
+        new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
+        current_partners[lno, new_pship_inds] += new_pship_counts
+
+    return f, m, current_partners, new_pship_inds, new_pship_counts
+
+
+
 def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
                   sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
                   mixing=None, layer_probs=None, cross_layer=None,
@@ -257,7 +338,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
     '''
 
     # Create edgelist
-    f,m,current_partners,new_pship_inds,new_pship_counts = hpu.create_edgelist(
+    f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(
         lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
         layer_probs, pref_weight, cross_layer)
 
