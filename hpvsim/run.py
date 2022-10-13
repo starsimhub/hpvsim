@@ -391,7 +391,7 @@ class MultiSim(hpb.FlexPretty):
             return
 
 
-    def compare(self, t=None, sim_inds=None, output=False, do_plot=False, **kwargs):
+    def compare(self, t=None, sim_inds=None, output=False, do_plot=False, show_match=False, **kwargs):
         '''
         Create a dataframe compare sims at a single point in time.
 
@@ -400,6 +400,7 @@ class MultiSim(hpb.FlexPretty):
             sim_inds (list)    : list of integers of which sims to include (default: all)
             output   (bool)    : whether or not to return the comparison as a dataframe
             do_plot  (bool)    : whether or not to plot the comparison (see also plot_compare())
+            show_match (bool)  : whether to include a column for whether all sims match
             kwargs   (dict)    : passed to plot_compare()
 
         Returns:
@@ -421,7 +422,6 @@ class MultiSim(hpb.FlexPretty):
         resdict = defaultdict(dict)
         for i,s in enumerate(sim_inds):
             sim = self.sims[s]
-            day = sim.day(t) # Unlikely, but different sims might have different start days
             label = sim.label
             if not label: # Give it a label if it doesn't have one
                 label = f'Sim {i}'
@@ -429,7 +429,10 @@ class MultiSim(hpb.FlexPretty):
                 label += f' ({i})'
             for reskey in sim.result_keys():
                 res = sim.results[reskey]
-                val = res.values[day]
+                if res.values.ndim == 1:
+                    val = res.values[t]
+                elif res.values.ndim == 2:
+                    val = res.values[:,t].sum()
                 if res.scale: # Results that are scaled by population are ints
                     val = int(val)
                 resdict[label][reskey] = val
@@ -438,6 +441,9 @@ class MultiSim(hpb.FlexPretty):
             self.plot_compare(**kwargs)
 
         df = pd.DataFrame.from_dict(resdict).astype(object) # astype is necessary to prevent type coercion
+        if show_match: # From https://stackoverflow.com/questions/22701799/pandas-dataframe-find-rows-where-all-columns-equal
+            data = df.values
+            df['all_match'] = (data == data[:, [0]]).all(axis=1)
         if not output:
             print(f'Results for {daystr} in each sim:')
             print(df)

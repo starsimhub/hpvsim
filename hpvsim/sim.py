@@ -415,8 +415,7 @@ class Sim(hpb.BaseSim):
         # Create incidence and prevalence results
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
             for var,name,cmap in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
-                for which in ['incidence', 'prevalence']:
-                    results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
+                results[f'{lkey+var}_incidence'] = init_res(llab+name+' incidence', color=cmap(cstride), n_rows=g)
 
         # Create demographic flows
         for var, name, color in zip(hpd.dem_keys, hpd.dem_names, hpd.dem_colors):
@@ -451,8 +450,6 @@ class Sim(hpb.BaseSim):
         # Detections
         results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
         results['n_total_detectable_hpv'] = init_res('Number with detectable HPV')
-        results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
-        results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence', color=hpd.stock_colors[0](0.95))
 
         # Additional cancer results
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color='#fcba03')
@@ -923,26 +920,12 @@ class Sim(hpb.BaseSim):
         # Compute HPV incidence and prevalence
         self.results['total_hpv_incidence'][:]  = res['total_infections'][:] / res['n_total_susceptible'][:]
         self.results['hpv_incidence'][:]        = res['infections'][:] / res['n_susceptible'][:]
-        self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
-        self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
-        self.results['detectable_hpv_prevalence'][:] = res['n_detectable_hpv'][:] / res['n_alive'][:]
-        self.results['total_detectable_hpv_prevalence'][:] = res['n_total_detectable_hpv'][:] / res['n_alive'][:]
         self.results['hiv_incidence'][:] = res['total_hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
         self.results['hiv_prevalence'][:] = res['n_hiv'][:] / res['n_alive'][:]
 
-        # Compute CIN and cancer prevalence
-        alive_females = res['n_alive_by_sex'][0,:]
-        self.results['total_cin1_prevalence'][:]    = res['n_total_cin1'][:] / alive_females
-        self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / alive_females
-        self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / alive_females
-        self.results['total_cin_prevalence'][:]     = res['n_total_cin'][:] / alive_females
-        self.results['cin1_prevalence'][:]          = res['n_cin1'][:] / alive_females
-        self.results['cin2_prevalence'][:]          = res['n_cin2'][:] / alive_females
-        self.results['cin3_prevalence'][:]          = res['n_cin3'][:] / alive_females
-        self.results['cin_prevalence'][:]           = res['n_cin'][:] / alive_females
-
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
+        alive_females = res['n_alive_by_sex'][0,:]
         at_risk_females = alive_females - res['n_cancerous'][:,:].sum(axis=0)
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
