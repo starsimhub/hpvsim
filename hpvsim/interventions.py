@@ -15,6 +15,11 @@ from . import immunity as hpi
 from . import base as hpb
 from collections import defaultdict
 
+#%% Define data files
+datafiles = sc.objdict()
+for key in ['dx', 'tx', 'vx']:
+    datafiles[key] = hpd.datadir / f'products_{key}.csv'
+
 
 #%% Helper functions
 
@@ -1294,7 +1299,7 @@ def default_dx(prod_name=None):
     '''
     Create default diagnostic products
     '''
-    dfdx = pd.read_csv('../hpvsim/data/products_dx.csv') # Read in dataframe with parameters
+    dfdx = pd.read_csv(datafiles.dx) # Read in dataframe with parameters
     dxprods = dict(
         # Default primary screening diagnostics
         via             = dx(dfdx[dfdx.name == 'via'],              hierarchy=['positive', 'inadequate', 'negative']),
@@ -1314,7 +1319,7 @@ def default_tx(prod_name=None):
     '''
     Create default treatment products
     '''
-    dftx = pd.read_csv('../hpvsim/data/products_tx.csv') # Read in dataframe with parameters
+    dftx = pd.read_csv(datafiles.tx) # Read in dataframe with parameters
     txprods = dict()
     for name in dftx.name.unique():
         txprods[name] = tx(dftx[dftx.name==name])
@@ -1326,7 +1331,7 @@ def default_vx(prod_name=None):
     '''
     Create default vaccine products
     '''
-    dfvx = pd.read_csv('../hpvsim/data/products_vx.csv') # Read in dataframe with parameters
+    dfvx = pd.read_csv(datafiles.vx) # Read in dataframe with parameters
     vxprods = dict()
     for name in dfvx.name.unique():
         vxprods[name]       = vx(genotype_pars=dfvx[dfvx.name==name], imm_init=dict(dist='beta', par1=30, par2=2))

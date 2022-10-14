@@ -12,7 +12,7 @@ from hpvsim.data import get_data as data
 do_plot = 0
 do_save = 0
 
-n_agents = [2e3,50e3][0] # Swap between sizes
+n_agents = [1e3,50e3][0] # Swap between sizes
 
 
 #%% Define the tests
