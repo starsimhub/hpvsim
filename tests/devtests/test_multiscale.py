@@ -25,11 +25,11 @@ pars = dict(
 
 class multitest(hpv.Analyzer):
     
-    
     def initialize(self, sim):
         super().initialize()
+        self.states = ['n_sus', 'n_inf', 'n_can', 'alive','age']
         self.res = sc.objdict()
-        for k in ['n_sus', 'n_inf', 'n_can', 'new_inf', 'new_rec', 'new_can', 'cum_inf', 'cum_can', 'alive','age']:
+        for k in self.states:
             self.res[k + '_agents'] = np.zeros(sim.npts)
             self.res[k + '_people'] = np.zeros(sim.npts)
     
@@ -38,7 +38,7 @@ class multitest(hpv.Analyzer):
         dt = sim['dt']
         npts = sim.npts
         ppl = sim.people
-        self.res['t'] = np.arange(0, npts*dt, dt)
+        
         self.res['n_sus_agents'][ppl.t] = ppl.susceptible.sum()
         self.res['n_sus_people'][ppl.t] = (ppl.susceptible * ppl.scale).sum()
         self.res['n_inf_agents'][ppl.t] = (ppl.infectious.sum()).sum()
@@ -55,10 +55,12 @@ class multitest(hpv.Analyzer):
         self.res['age_people'][ppl.t] = np.average(ppl.age, weights=ppl.scale)
 
         if ppl.t == npts - 1:
-            self.res['cum_inf_agents'] = np.cumsum(self.res['new_inf_agents'])
-            self.res['cum_inf_people'] = np.cumsum(self.res['new_inf_people'])
-            self.res['cum_can_agents'] = np.cumsum(self.res['new_can_agents'])
-            self.res['cum_can_people'] = np.cumsum(self.res['new_can_people'])
+            self.res['t'] = np.arange(0, npts*dt, dt)
+            self.res['year'] = sim.yearvec
+            # self.res['cum_inf_agents'] = np.cumsum(self.res['new_inf_agents'])
+            # self.res['cum_inf_people'] = np.cumsum(self.res['new_inf_people'])
+            # self.res['cum_can_agents'] = np.cumsum(self.res['new_can_agents'])
+            # self.res['cum_can_people'] = np.cumsum(self.res['new_can_people'])
             
     @property
     def df(self):
@@ -68,15 +70,17 @@ class multitest(hpv.Analyzer):
         
         df = self.df
         
+        nrows,ncols = sc.getrowscols(len(df.columns)-2)
+        
         if fig is None:
             fig = plt.figure(figsize=(14, 10))
         else:
             plt.figure(fig)
 
         for i, key in enumerate(df.columns):
-            if key != 't':
-                plt.subplot(5, 5, i + 1)
-                plt.plot(df.t, df[key], color=color, alpha=alpha)
+            if key not in ['t', 'year']:
+                plt.subplot(nrows, ncols, i + 1)
+                plt.plot(df.year, df[key], color=color, alpha=alpha)
                 plt.title(key)
         plt.tight_layout()
         return fig
@@ -91,13 +95,18 @@ for use_multiscale in [False, True]:
         sim = hpv.Sim(pars, **simpars)
         sims.append(sim)
 
-msim = hpv.parallel(sims)
-df = msim.compare(output=True, show_match=True)
-print(df.to_string())
 
-fig = None
-for sim in msim.sims:
-    a = sim.get_analyzer()
-    fig = a.plot(fig=fig, alpha=0.3)
-
-T.toc('Done')
+if __name__ == '__main__':
+    
+    msim = hpv.parallel(sims)
+    df = msim.compare(output=True, show_match=True)
+    print(df.to_string())
+    
+    fig = None
+    for sim in msim.sims:
+        a = sim.get_analyzer()
+        color = ['b','r'][sim['use_multiscale']]
+        fig = a.plot(fig=fig, color=color, alpha=0.3)
+    plt.show()
+    
+    T.toc('Done')
