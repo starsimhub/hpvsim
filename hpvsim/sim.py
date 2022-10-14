@@ -416,7 +416,8 @@ class Sim(hpb.BaseSim):
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
             for var,name,cmap in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
                 for which in ['incidence', 'prevalence']:
-                    results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
+                    if which != 'prevalence' or var == 'hpv': # Only keep HPV prevalence results
+                        results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
 
         # Create demographic flows
         for var, name, color in zip(hpd.dem_keys, hpd.dem_names, hpd.dem_colors):
@@ -930,19 +931,9 @@ class Sim(hpb.BaseSim):
         self.results['hiv_incidence'][:] = res['total_hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
         self.results['hiv_prevalence'][:] = res['n_hiv'][:] / res['n_alive'][:]
 
-        # Compute CIN and cancer prevalence
-        alive_females = res['n_alive_by_sex'][0,:]
-        self.results['total_cin1_prevalence'][:]    = res['n_total_cin1'][:] / alive_females
-        self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / alive_females
-        self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / alive_females
-        self.results['total_cin_prevalence'][:]     = res['n_total_cin'][:] / alive_females
-        self.results['cin1_prevalence'][:]          = res['n_cin1'][:] / alive_females
-        self.results['cin2_prevalence'][:]          = res['n_cin2'][:] / alive_females
-        self.results['cin3_prevalence'][:]          = res['n_cin3'][:] / alive_females
-        self.results['cin_prevalence'][:]           = res['n_cin'][:] / alive_females
-
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
+        alive_females = res['n_alive_by_sex'][0,:]
         at_risk_females = alive_females - res['n_cancerous'][:,:].sum(axis=0)
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
