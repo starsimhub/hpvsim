@@ -68,6 +68,9 @@ class PeopleMeta(sc.prettyobj):
     # Set the properties of a person
     person = [
         State('uid',            default_int),           # Int
+        State('scale',          default_float,  1.0), # Float
+        State('level1',         bool,  True),
+        State('level2',         bool,  False),
         State('age',            default_float,  np.nan), # Float
         State('sex',            default_float,  np.nan), # Float
         State('debut',          default_float,  np.nan), # Float

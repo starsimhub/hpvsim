@@ -37,23 +37,24 @@ class multitest(hpv.Analyzer):
         
         dt = sim['dt']
         npts = sim.npts
+        ppl = sim.people
         self.res['t'] = np.arange(0, npts*dt, dt)
-        self.res['n_sus_agents'][self.ti] = self.susceptible.sum()
-        self.res['n_sus_people'][self.ti] = (self.susceptible * self.scale).sum()
-        self.res['n_inf_agents'][self.ti] = (self.infectious.sum()).sum()
-        self.res['n_inf_people'][self.ti] = (self.infectious.sum() * self.scale).sum()
-        self.res['n_can_agents'][self.ti] = self.cancerous.sum()
-        self.res['n_can_people'][self.ti] = (self.cancerous.sum(axis=0) * self.scale).sum()
+        self.res['n_sus_agents'][ppl.t] = ppl.susceptible.sum()
+        self.res['n_sus_people'][ppl.t] = (ppl.susceptible * ppl.scale).sum()
+        self.res['n_inf_agents'][ppl.t] = (ppl.infectious.sum()).sum()
+        self.res['n_inf_people'][ppl.t] = (ppl.infectious.sum() * ppl.scale).sum()
+        self.res['n_can_agents'][ppl.t] = ppl.cancerous.sum()
+        self.res['n_can_people'][ppl.t] = (ppl.cancerous.sum(axis=0) * ppl.scale).sum()
 
-        self.res['age_agents'][self.ti] = np.average(self.age, weights=(~self.removed))
-        self.res['age_people'][self.ti] = np.average(self.age, weights=(~self.removed)*self.scale)
+        self.res['age_agents'][ppl.t] = np.average(ppl.age, weights=(ppl.alive))
+        self.res['age_people'][ppl.t] = np.average(ppl.age, weights=(ppl.alive)*ppl.scale)
 
-        self.res['alive_agents'][self.ti] = (~self.removed).sum()
-        self.res['alive_people'][self.ti] = self.scale[~self.removed].sum()
-        self.res['age_agents'][self.ti] = np.average(self.age)
-        self.res['age_people'][self.ti] = np.average(self.age, weights=self.scale)
+        self.res['alive_agents'][ppl.t] = (ppl.alive).sum()
+        self.res['alive_people'][ppl.t] = ppl.scale[ppl.alive].sum()
+        self.res['age_agents'][ppl.t] = np.average(ppl.age)
+        self.res['age_people'][ppl.t] = np.average(ppl.age, weights=ppl.scale)
 
-        if self.ti == npts - 1:
+        if ppl.t == npts - 1:
             self.res['cum_inf_agents'] = np.cumsum(self.res['new_inf_agents'])
             self.res['cum_inf_people'] = np.cumsum(self.res['new_inf_people'])
             self.res['cum_can_agents'] = np.cumsum(self.res['new_can_agents'])
@@ -93,5 +94,10 @@ for use_multiscale in [False, True]:
 msim = hpv.parallel(sims)
 df = msim.compare(output=True, show_match=True)
 print(df.to_string())
+
+fig = None
+for sim in msim.sims:
+    a = sim.get_analyzer()
+    fig = a.plot(fig=fig, alpha=0.3)
 
 T.toc('Done')
