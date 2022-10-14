@@ -282,6 +282,8 @@ def get_genotype_choices():
         'hpv52': ['hpv52', '52'],
         'hpv56': ['hpv56', '56'],
         'hpv58': ['hpv58', '58'],
+        'hrhpv': ['hrhpv', 'ohrhpv', 'hr', 'ohr'],
+        'lrhpv': ['lrhpv', 'lr'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -479,6 +481,26 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.imm_boost    = 1.0 # TODO: look for data
     pars.hpv11.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
+    pars.hrhpv = sc.objdict()
+    pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=2.0) # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.dysp_rate    = 0.1 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.prog_rate    = 0.5 # same value as for all oncogenic types
+    pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
+    pars.hrhpv.rel_beta     = 0.94 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.sero_prob    = 0.53 # placeholder, currently assumed to be the same as for 31
+
+    pars.lrhpv = sc.objdict()
+    pars.lrhpv.dur_precin   = dict(dist='lognormal', par1=8.1/12, par2=0.4)  # placeholder, currently assumed to be the same as for 6
+    pars.lrhpv.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=1.0) # placeholder, currently assumed to be the same as for 6
+    pars.lrhpv.dysp_rate    = 0.01 # placeholder, currently assumed to be the same as for 6
+    pars.lrhpv.prog_rate    = 0.05 # placeholder, currently assumed to be the same as for 6
+    pars.lrhpv.prog_rate_sd = 0.005 # placeholder, currently assumed to be the same as for 6
+    pars.lrhpv.rel_beta     = 0.5 # placeholder, currently assumed to be the same as for 6
+    pars.lrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 6
+    pars.lrhpv.sero_prob    = 0.6  # placeholder, currently assumed to be the same as for 6
+
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
 
@@ -503,6 +525,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58 = med_imm,
             hpv6 = med_imm,
             hpv11 = med_imm,
+            hrhpv = med_imm,
+            lrhpv = med_imm
         ),
 
         hpv18 = dict(
@@ -518,6 +542,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv = med_imm,
+            lrhpv = med_imm
         ),
 
         hpv31=dict(
@@ -533,6 +559,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv=high_imm,
+            lrhpv=med_imm
         ),
 
         hpv33=dict(
@@ -548,6 +576,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv=high_imm,
+            lrhpv=med_imm
         ),
 
         hpv35=dict(
@@ -563,6 +593,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv=high_imm,
+            lrhpv=med_imm
         ),
 
         hpv45=dict(
@@ -578,6 +610,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv=high_imm,
+            lrhpv=med_imm
         ),
 
         hpv51=dict(
@@ -593,6 +627,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv=high_imm,
+            lrhpv=med_imm
         ),
 
         hpv52=dict(
@@ -608,6 +644,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv=high_imm,
+            lrhpv=med_imm
         ),
 
         hpv56=dict(
@@ -623,6 +661,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv=high_imm,
+            lrhpv=med_imm
         ),
 
         hpv58=dict(
@@ -638,8 +678,9 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=1.0,  # Default for own-immunity
             hpv6=med_imm,
             hpv11=med_imm,
+            hrhpv=high_imm,
+            lrhpv=med_imm
         ),
-
 
         hpv6=dict(
             hpv16=med_imm,
@@ -654,6 +695,8 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=1.0,  # Default for own-immunity
             hpv11=med_imm,
+            hrhpv=med_imm,
+            lrhpv=high_imm
         ),
 
         hpv11=dict(
@@ -669,6 +712,41 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=1.0,  # Default for own-immunity
+            hrhpv=med_imm,
+            lrhpv=high_imm
+        ),
+        hrhpv=dict(
+            hpv16=med_imm,
+            hpv18=med_imm,
+            hpv31=med_imm,
+            hpv33=med_imm,
+            hpv35=med_imm,
+            hpv45=med_imm,
+            hpv51=med_imm,
+            hpv52=med_imm,
+            hpv56=med_imm,
+            hpv58=med_imm,
+            hpv6=med_imm,
+            hpv11=med_imm,
+            hrhpv=med_imm,
+            lrhpv=med_imm
+        ),
+
+        lrhpv=dict(
+            hpv16=med_imm,
+            hpv18=med_imm,
+            hpv31=med_imm,
+            hpv33=med_imm,
+            hpv35=med_imm,
+            hpv45=med_imm,
+            hpv51=med_imm,
+            hpv52=med_imm,
+            hpv56=med_imm,
+            hpv58=med_imm,
+            hpv6=med_imm,
+            hpv11=med_imm,
+            hrhpv=med_imm,
+            lrhpv=1.0# Default for own-immunity
         ),
     )
 
