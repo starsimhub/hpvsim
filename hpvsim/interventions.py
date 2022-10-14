@@ -1326,7 +1326,7 @@ def default_vx(prod_name=None):
     '''
     Create default vaccine products
     '''
-    dfvx = pd.read_csv('../hpvsim/hpvsim/data/products_vx.csv') # Read in dataframe with parameters
+    dfvx = pd.read_csv('../hpvsim/data/products_vx.csv') # Read in dataframe with parameters
     vxprods = dict()
     for name in dfvx.name.unique():
         vxprods[name]       = vx(genotype_pars=dfvx[dfvx.name==name], imm_init=dict(dist='beta', par1=30, par2=2))
