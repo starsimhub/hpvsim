@@ -728,7 +728,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
-            hrhpv=1.0,# Default for own-immunity
+            hrhpv=med_imm,
             lrhpv=med_imm
         ),
 
