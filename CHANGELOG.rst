@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.2.7 (2022-10-14)
+--------------------------
+- Adds robust relative paths via ``hpv.defaults.datadir``
+- *GitHub info*: PR `333 <https://github.com/amath-idm/hpvsim/pull/333>`__
+
+
 Version 0.2.6 (2022-10-12)
 --------------------------
 - Removes Numba since slower for small sims and only 10% faster for large sims.
