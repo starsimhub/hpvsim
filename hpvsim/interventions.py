@@ -315,6 +315,7 @@ class RoutineDelivery(Intervention):
         return
 
     def initialize(self, sim):
+
         # Validate inputs
         if (self.years is not None) and (self.start_year is not None or self.end_year is not None):
             errormsg = 'Provide either a list of years or a start year, not both.'
@@ -322,22 +323,23 @@ class RoutineDelivery(Intervention):
 
         # If start_year and end_year are not provided, figure them out from the provided years or the sim
         if self.years is None:
-            if self.start_year is None: self.start_year = sim.res_yearvec[0]
-            if self.end_year is None:   self.end_year   = sim.res_yearvec[-1]
+            if self.start_year is None: self.start_year = sim['start']
+            if self.end_year is None:   self.end_year   = sim['end']
         else:
             self.start_year = self.years[0]
             self.end_year   = self.years[-1]
 
         # More validation
         if (self.start_year not in sim.yearvec) or (self.end_year not in sim.yearvec):
-            errormsg = 'Years for screening must be within simulation start and end dates.'
+            errormsg = 'Years must be within simulation start and end dates.'
             raise ValueError(errormsg)
 
         # Determine the timepoints at which the intervention will be applied
         self.start_point    = sc.findinds(sim.yearvec, self.start_year)[0]
-        self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0]
-        self.years          = np.arange(self.start_year, self.end_year)
-        self.timepoints     = np.arange(self.start_point, self.end_point)
+        self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0] + int(1/sim['dt']) - 1
+        self.years          = sc.inclusiverange(self.start_year, self.end_year)
+        self.timepoints     = sc.inclusiverange(self.start_point, self.end_point)
+        self.yearvec        = np.arange(self.start_year, self.end_year + int(1/sim['dt']) - 1, sim['dt'])
 
         # Get the probability input into a format compatible with timepoints
         if len(self.years) != len(self.prob):
@@ -347,7 +349,7 @@ class RoutineDelivery(Intervention):
                 errormsg = f'Length of years incompatible with length of probabilities: {len(self.years)} vs {len(self.prob)}'
                 raise ValueError(errormsg)
         else:
-            self.prob = sc.smoothinterp(np.arange(len(self.timepoints)), np.arange(len(self.years)), self.prob, smoothness=0)
+            self.prob = sc.smoothinterp(self.yearvec, self.years, self.prob, smoothness=0)
 
         # Lastly, adjust the annual probability by the sim's timestep
         self.prob = self.prob*sim['dt']
@@ -608,7 +610,7 @@ class BaseVaccination(Intervention):
         if len(self.sex)==1:
             conditions = conditions & (sim.people.sex == self.sex[0]) # Filter by sex
         if self.age_range is not None:
-            conditions = conditions & ((sim.people.age >= self.age_range[0]) & (sim.people.age <self.age_range[1])) # Filter by age
+            conditions = conditions & ((sim.people.age >= self.age_range[0]) & (sim.people.age < self.age_range[1])) # Filter by age
         if self.eligibility is not None:
             other_eligible  = sc.promotetoarray(self.eligibility(sim)) # Apply any other user-defined eligibility
             conditions      = conditions & other_eligible
@@ -625,6 +627,7 @@ class BaseVaccination(Intervention):
         else: do_apply = True
 
         if do_apply:
+
             # Select people for screening and then record the number of screens
             eligible_inds   = self.check_eligibility(sim) # Check eligibility
             if len(self.timepoints)==0: # No timepoints provided
