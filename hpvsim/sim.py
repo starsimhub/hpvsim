@@ -730,7 +730,7 @@ class Sim(hpb.BaseSim):
             latent_inds = hpu.true(people.latent[g,:])
             if len(latent_inds):
                 age_inds = np.digitize(people.age[latent_inds], self['hpv_reactivation']['age_cutoffs'])-1 # convert ages to indices
-                reactivation_probs = self['hpv_reactivation']['hpv_reactivation_probs'][age_inds]
+                reactivation_probs = self['hpv_reactivation']['hpv_reactivation_probs'][age_inds] * dt
 
                 if self['model_hiv']:
                     # determine if any of these inds have HIV and adjust their probs
