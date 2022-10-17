@@ -1,5 +1,5 @@
 '''
-Define options for hpvsim, mostly plotting and Numba options. All options should
+Define options for hpvsim, mostly plotting options. All options should
 be set using set() or directly, e.g.::
 
     hp.options(font_size=18)
@@ -132,7 +132,7 @@ class Options(sc.objdict):
     def disp(self):
         ''' Detailed representation '''
         output = 'hpvsim options (see also hp.options.help()):\n'
-        keylen = 14 # Maximum key length  -- "numba_parallel"
+        keylen = 10 # Maximum key length  -- "interactive"
         for k,v in self.items():
             keystr = sc.colorize(f'  {k:>{keylen}s}: ', fg='cyan', output=True)
             reprstr = sc.pp(v, output=True)
@@ -195,14 +195,8 @@ class Options(sc.objdict):
         optdesc.sep = 'Set thousands seperator for text output'
         options.sep = str(os.getenv('HPVSIM_SEP', ','))
 
-        optdesc.precision = 'Set arithmetic precision for Numba -- 32-bit by default for efficiency'
+        optdesc.precision = 'Set arithmetic precision -- 32-bit by default for efficiency'
         options.precision = int(os.getenv('HPVSIM_PRECISION', 32))
-
-        optdesc.numba_parallel = 'Set Numba multithreading -- none, safe, full; full multithreading is ~20% faster, but results become nondeterministic'
-        options.numba_parallel = str(os.getenv('HPVSIM_NUMBA_PARALLEL', 'none'))
-
-        optdesc.numba_cache = 'Set Numba caching -- saves on compilation time; disabling is not recommended'
-        options.numba_cache = bool(int(os.getenv('HPVSIM_NUMBA_CACHE', 1)))
 
         return optdesc, options
 
@@ -283,14 +277,8 @@ class Options(sc.objdict):
                 if value in [None, 'default']:
                     value = self.orig_options[key]
                 self[key] = value
-                numba_keys = ['precision', 'numba_parallel', 'numba_cache'] # Specify which keys require a reload
-                if key in numba_keys:
-                    reload_required = True
                 if key in 'backend':
                     pl.switch_backend(value)
-
-        if reload_required:
-            reload_numba()
 
         return
 
@@ -546,29 +534,6 @@ class Options(sc.objdict):
             pl.plot([3,1,4])
         '''
         return self.with_style(use=True, **kwargs)
-
-
-def reload_numba():
-    '''
-    Apply changes to Numba functions -- reloading modules is necessary for
-    changes to propagate. Not necessary to call directly if hp.options.set() is used.
-
-    **Example**::
-
-        import hpvsim as hp
-        hp.options.set(precision=64)
-        sim = hp.Sim()
-        sim.run()
-        assert sim.people.rel_trans.dtype == np.float64
-    '''
-    print('Reloading hpvsim so changes take effect...')
-    import importlib
-    import hpvsim as hp
-    importlib.reload(hp.defaults)
-    importlib.reload(hp.utils)
-    importlib.reload(hp)
-    print("Reload complete. Note: for some options to take effect, you may also need to delete hpvsim's __pycache__ folder.")
-    return
 
 
 def load_fonts(folder=None, rebuild=False, verbose=False, **kwargs):

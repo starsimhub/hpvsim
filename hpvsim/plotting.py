@@ -386,6 +386,8 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
                         geno_obj = sim['genotypes'][genotype]
                         if sc.isnumber(geno_obj): # TODO: figure out why this is sometimes an int and sometimes an obj
                             v_label = str(geno_obj)
+                        elif sc.isstring(geno_obj):
+                            v_label = geno_obj
                         else:
                             v_label = geno_obj.label
                         color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color

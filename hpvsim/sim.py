@@ -654,7 +654,7 @@ class Sim(hpb.BaseSim):
         n_people = len(people)
         n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
         tind = self.yearvec[t] - self['start']
-        people.create_parnterships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
+        people.create_partnerships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
 
         # Apply interventions
         for i,intervention in enumerate(self['interventions']):
@@ -662,31 +662,19 @@ class Sim(hpb.BaseSim):
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
         if self['use_waning']:
-            has_imm = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
-            if len(has_imm):
-                hpu.update_immunity(people.imm, t, people.t_imm_event, has_imm, imm_kin_pars, people.peak_imm)
+            inds = hpu.true(people.peak_imm.sum(axis=0)).astype(hpd.default_int)
+            if len(inds):
+                ss = people.t_imm_event[:, inds].shape
+                t_since_boost = (t - people.t_imm_event[:,inds]).ravel()
+                current_imm = imm_kin_pars[t_since_boost].reshape(ss) # Get people's current level of immunity
+                people.imm[:,inds] = current_imm*people.peak_imm[:,inds] # Set immunity relative to peak
+                    # return imm
         else:
             people.imm[:] = people.peak_imm
         hpimm.check_immunity(people)
 
-        # Precalculate aspects of transmission that don't depend on genotype (acts, condoms)
-        fs, ms, frac_acts, whole_acts, effective_condoms = [], [], [], [], []
-        contacts = people.contacts # Shorten
-        for lkey, layer in contacts.items():
-            fs.append(layer['f'])
-            ms.append(layer['m'])
-
-            # Get the number of acts per timestep for this partnership type
-            acts = layer['acts'] * dt
-            fa, wa = np.modf(acts)
-            frac_acts.append(fa)
-            whole_acts.append(wa.astype(hpd.default_int))
-            effective_condoms.append(hpd.default_float(condoms[lkey] * eff_condoms))
-
         # Shorten more variables
         gen_betas = np.array([g['rel_beta'] * beta for g in gen_pars.values()], dtype=hpd.default_float)
-        inf = people.infectious
-        sus = people.susceptible
         sus_imm = people.sus_imm
         hiv_rel_sus = np.ones(len(people), dtype=hpd.default_float)
         hiv_inds = hpu.true(people.hiv)
@@ -694,10 +682,6 @@ class Sim(hpb.BaseSim):
         mod = immune_compromise * self['hiv_pars']['rel_sus']
         mod[mod < 1] = 1
         hiv_rel_sus[hiv_inds] *= mod
-
-        # Get indices of infected/susceptible people by genotype
-        f_inf_genotypes, f_inf_inds, f_sus_genotypes, f_sus_inds = hpu.get_sources_targets(inf, sus, ~people.sex.astype(bool))  # Males and females infected with this genotype
-        m_inf_genotypes, m_inf_inds, m_sus_genotypes, m_sus_inds = hpu.get_sources_targets(inf, sus,  people.sex.astype(bool))  # Males and females infected with this genotype
 
         # Calculate relative transmissibility by stage of infection
         rel_trans_pars = self['rel_trans']
@@ -708,26 +692,36 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
         # Loop over layers
-        for lno,lkey in enumerate(contacts.keys()):
-            f = fs[lno]
-            m = ms[lno]
+
+        inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
+        sus = people.susceptible.copy()
+
+        for lkey, layer in people.contacts.items():
+            f = layer['f']
+            m = layer['m']
+            acts = layer['acts'] * dt
+            frac_acts, whole_acts = np.modf(acts)
+            whole_acts = whole_acts.astype(hpd.default_int)
+            effective_condoms = hpd.default_float(condoms[lkey] * eff_condoms)
 
             # Compute transmissions
             for g in range(ng):
-                f_source_inds = hpu.get_discordant_pairs2(f_inf_inds[f_inf_genotypes==g], m_sus_inds[m_sus_genotypes==g], f, m, n_people)
-                m_source_inds = hpu.get_discordant_pairs2(m_inf_inds[m_inf_genotypes==g], f_sus_inds[f_sus_genotypes==g], m, f, n_people)
 
-                foi_frac = 1 - frac_acts[lno] * gen_betas[g] * trans[:, None] * (1 - effective_condoms[lno])  # Probability of not getting infected from any fractional acts
-                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms[lno])) ** whole_acts[lno]  # Probability of not getting infected from whole acts
+                f_source_inds = (inf[g][f] & sus[g][m]).nonzero()[0]  # get female sources where female partner is infectious with genotype and male partner is susceptible to that genotype
+                m_source_inds = (inf[g][m] & sus[g][f]).nonzero()[0]  # get male sources where the male partner is infectious with genotype and the female partner is susceptible to that genotype
+
+                foi_frac = 1 - frac_acts * gen_betas[g] * trans[:, None] * (1 - effective_condoms)  # Probability of not getting infected from any fractional acts
+                foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms)) ** whole_acts  # Probability of not getting infected from whole acts
                 foi = (1 - (foi_whole * foi_frac)).astype(hpd.default_float)
 
-                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], f_inf_genotypes[f_inf_genotypes==g], foi[0,:]],
-                                    [m_source_inds, m[m_source_inds], f[m_source_inds], m_inf_genotypes[m_inf_genotypes==g], foi[1,:]]]
+                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], foi[0,:]],
+                                    [m_source_inds, m[m_source_inds], f[m_source_inds], foi[1,:]]]
 
                 # Compute transmissibility for each partnership
-                for pship_inds, sources, targets, genotypes, this_foi in discordant_pairs:
+                for pship_inds, sources, targets, this_foi in discordant_pairs:
                     betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * hiv_rel_sus[targets] * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
-                    target_inds = hpu.compute_infections(betas, targets)  # Calculate transmission
+                    transmissions = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
+                    target_inds   = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
 

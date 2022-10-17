@@ -675,7 +675,7 @@ class Calibration(sc.prettyobj):
                     ax.set_xlabel('Age group')
                     ax.set_title(self.result_properties[resname].name+', '+ date.replace('.0', ''))
                     ax.legend()
-                    pl.xticks(x, age_labels[resname])
+                    ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
 
             for rn, resname in enumerate(self.sim_results_keys):
@@ -700,7 +700,7 @@ class Calibration(sc.prettyobj):
                 ax.set_xlabel('Genotype')
                 ax.set_title(self.result_properties[resname].name + ', ' + str(date))
                 ax.legend()
-                pl.xticks(x, self.glabels)
+                ax.set_xticks(x, self.glabels)
                 plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
