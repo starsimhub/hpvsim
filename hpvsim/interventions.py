@@ -322,8 +322,8 @@ class RoutineDelivery(Intervention):
 
         # If start_year and end_year are not provided, figure them out from the provided years or the sim
         if self.years is None:
-            if self.start_year is None: self.start_year = sim.res_yearvec[0]
-            if self.end_year is None:   self.end_year   = sim.res_yearvec[-1]
+            if self.start_year is None: self.start_year = sim['start']
+            if self.end_year is None:   self.end_year   = sim['end']
         else:
             self.start_year = self.years[0]
             self.end_year   = self.years[-1]
@@ -335,9 +335,9 @@ class RoutineDelivery(Intervention):
 
         # Determine the timepoints at which the intervention will be applied
         self.start_point    = sc.findinds(sim.yearvec, self.start_year)[0]
-        self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0]
-        self.years          = np.arange(self.start_year, self.end_year)
-        self.timepoints     = np.arange(self.start_point, self.end_point)
+        self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0] + int(1/sim['dt']) - 1
+        self.years          = sc.inclusiverange(self.start_year, self.end_year)
+        self.timepoints     = sc.inclusiverange(self.start_point, self.end_point)
 
         # Get the probability input into a format compatible with timepoints
         if len(self.years) != len(self.prob):

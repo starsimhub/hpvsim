@@ -135,7 +135,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     st_interventions = soc_screen + triage_treat + new_screen
 
     ## Vaccination interventions
-    routine_years = np.arange(2020, base_pars['end']+1, dtype=int)
+    routine_years = np.arange(2020, base_pars['end'], dtype=int)
     routine_values = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
 
     routine_vx = hpv.routine_vx(
