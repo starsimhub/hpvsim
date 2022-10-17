@@ -9,6 +9,15 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.2.8 (2022-10-17)
+--------------------------
+- Fixes bug with intervention year interpolation
+- Changes reactivation probabilities to annual, not per time step
+- Refactor prognoses calls
+- *GitHub info*: PR `338 <https://github.com/amath-idm/hpvsim/pull/338>`__
+
+
+
 Version 0.2.7 (2022-10-14)
 --------------------------
 - Adds robust relative paths via ``hpv.datadir``
