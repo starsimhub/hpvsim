@@ -555,14 +555,15 @@ class People(hpb.BasePeople):
             self.set_hiv_prognoses(hiv_inds, year=year) # Set ART adherence for those with HIV
 
             for g in range(self.pars['n_genotypes']):
+                gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
                 nocin_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
                 if len(nocin_inds): # Reevaluate whether these women will develop dysplasia
-                    self.set_dysp_rates(nocin_inds, g, hiv_dysp_rate=self.pars['hiv_pars']['dysp_rate'])
+                    self.set_dysp_rates(nocin_inds, g, gpars, hiv_dysp_rate=self.pars['hiv_pars']['dysp_rate'])
                     self.set_dysp_status(nocin_inds, g, dt)
 
                 cin_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
                 if len(cin_inds): # Reevaluate disease severity and progression speed for these women
-                    self.set_severity(cin_inds, g, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
+                    self.set_severity(cin_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
                     self.set_cin_grades(cin_inds, g, dt)
 
         return len(hiv_inds)
