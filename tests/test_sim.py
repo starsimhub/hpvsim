@@ -33,17 +33,6 @@ def test_microsim():
     return sim
 
 
-def test_ccsim():
-    sc.heading('Cancer sim test')
-
-    sim = hpv.Sim().run()
-    for k in sim.summary.keys():
-        if 'cancer' in k:
-            print(k, sim.summary[k])
-
-    return sim
-
-
 def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest, turn off
     sc.heading('Basic sim test')
 
@@ -346,15 +335,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_ccsim()
-    # sim0 = test_microsim()
-    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
-    # sim3 = test_states()
-    # sim4 = test_flexible_inputs()
-    # sim5 = test_result_consistency()
-    # sim6 = test_location_loading()
-    # sim7 = test_resuming()
+    sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim2 = test_epi()
+    sim3 = test_states()
+    sim4 = test_flexible_inputs()
+    sim5 = test_result_consistency()
+    sim6 = test_location_loading()
+    sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')
