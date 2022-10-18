@@ -75,12 +75,9 @@ def make_pars(**kwargs):
     # Parameters for disease progression
     pars['severity_dist'] = dict(dist='lognormal', par1=None, par2=0.1) # Distribution of individual disease severity. Par1 is set to None because the mean is determined as a function of genotype and disease duration
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
-    pars['cancer_treat_prob'] = 0.1 # probability of receiving cancer treatment given symptom detection
+    pars['cancer_treat_prob']   = 0.1 # probability of receiving cancer treatment given symptom detection
     pars['hpv_control_prob']    = 0.44 # Probability that HPV is controlled latently vs. cleared
-    pars['hpv_reactivation'] = dict(
-        age_cutoffs             = np.array([0,       30,          50]),      # Age cutoffs (lower limits)
-        hpv_reactivation_probs = np.array([0.0001, 0.05, 0.04]),      # made this up, need to parameterize somehow
-    )
+    pars['hpv_reactivation']    = 0.025 # Placeholder
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta', par1=5, par2=3)  # beta distribution for initial level of immunity following infection clearance
