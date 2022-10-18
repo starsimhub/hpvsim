@@ -728,7 +728,12 @@ class People(hpb.BasePeople):
             return 0
 
         # Find anyone already infected with genotype (within same timestep from a diff partner), exclude
-        inds = inds[~self.infectious[g,inds]]
+        if len(hpu.true(self.infectious[g,inds])):
+            if offset is not None:
+                offset = offset[~self.infectious[g,inds]]
+            if dur is not None:
+                dur = dur[~self.infectious[g, inds]]
+            inds = inds[~self.infectious[g,inds]]
 
         dt = self.pars['dt']
 
