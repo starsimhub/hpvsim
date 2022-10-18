@@ -686,13 +686,14 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cin3] *= rel_trans_pars['cin3']
         rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
-        inf = people.infectious.copy()
+        inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
 
         # Loop over layers
         for lkey, layer in people.contacts.items():
 
-            sus = people.susceptible.copy()
-            
+            sus = people.susceptible.copy() # for each layer, update who's still susceptible
+
+            # Shorten variables
             f = layer['f']
             m = layer['m']
             acts = layer['acts'] * dt
@@ -700,7 +701,7 @@ class Sim(hpb.BaseSim):
             whole_acts = whole_acts.astype(hpd.default_int)
             effective_condoms = hpd.default_float(condoms[lkey] * eff_condoms)
 
-            # Compute transmissions
+            # Compute transmissions by genotype
             for g in range(ng):
 
                 f_source_inds = (inf[g][f] & sus[g][m]).nonzero()[0]  # get female sources where female partner is infectious with genotype and male partner is susceptible to that genotype
@@ -710,16 +711,16 @@ class Sim(hpb.BaseSim):
                 foi_whole = (1 - gen_betas[g] * trans[:, None] * (1 - effective_condoms)) ** whole_acts  # Probability of not getting infected from whole acts
                 foi = (1 - (foi_whole * foi_frac)).astype(hpd.default_float)
 
-                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], foi[0,:], 0],
-                                    [m_source_inds, m[m_source_inds], f[m_source_inds], foi[1,:], 1]]
+                discordant_pairs = [[f_source_inds, f[f_source_inds], m[f_source_inds], foi[0,:]],
+                                    [m_source_inds, m[m_source_inds], f[m_source_inds], foi[1,:]]]
 
                 # Compute transmissibility for each partnership
-                for pship_inds, sources, targets, this_foi, source_sex in discordant_pairs:
+                for pship_inds, sources, targets, this_foi in discordant_pairs:
                     betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * hiv_rel_sus[targets] * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
                     transmissions = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
                     target_inds   = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
-                    people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
+                    people.infect(inds=target_inds, g=g, layer=lkey)  # Infect people
 
         # Determine if there are any reactivated infections on this timestep
         for g in range(ng):
