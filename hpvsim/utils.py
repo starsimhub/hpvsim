@@ -260,7 +260,7 @@ def n_binomial(prob, n):
     return np.random.random(n) < prob
 
 
-def binomial_filter(prob, arr): # No speed gain from Numba
+def binomial_filter(prob, arr):
     '''
     Binomial "filter" -- the same as n_binomial, except return
     the elements of arr that succeeded.
