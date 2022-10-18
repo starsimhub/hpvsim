@@ -760,9 +760,14 @@ class Sim(hpb.BaseSim):
         for key,count in people.by_age_flows.items():
             self.results[key][:,idx] += count
 
-
         # Make stock updates every nth step, where n is the frequency of result output
-        if t % self.resfreq == 0:
+        if t % self.resfreq == self.resfreq-1:
+
+            if t == 99:
+                import traceback;
+                traceback.print_exc();
+                import pdb;
+                pdb.set_trace()
 
             # Create total stocks
             for key in hpd.total_stock_keys:

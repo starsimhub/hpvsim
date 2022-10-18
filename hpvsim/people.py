@@ -181,6 +181,12 @@ class People(hpb.BasePeople):
         self.total_flows['total_cin3s'] = self.flows['cin3s'].sum()
         self.total_flows['total_cins']  = self.flows['cins'].sum()
         self.total_flows['total_cancers']  = self.flows['cancers'].sum()
+
+        # if self.total_flows['total_cancers']>0:
+        #     import traceback;
+        #     traceback.print_exc();
+        #     import pdb;
+        #     pdb.set_trace()
         # self.total_flows['total_cancer_deaths']  = self.flows['cancer_deaths'].sum()
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
