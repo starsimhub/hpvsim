@@ -686,13 +686,13 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cin3] *= rel_trans_pars['cin3']
         rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
-        # Loop over layers
+        inf = people.infectious.copy()
 
+        # Loop over layers
         for lkey, layer in people.contacts.items():
 
-            inf = people.infectious.copy()
             sus = people.susceptible.copy()
-
+            
             f = layer['f']
             m = layer['m']
             acts = layer['acts'] * dt
