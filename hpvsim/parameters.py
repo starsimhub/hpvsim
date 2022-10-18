@@ -77,7 +77,7 @@ def make_pars(**kwargs):
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
     pars['cancer_treat_prob']   = 0.1 # probability of receiving cancer treatment given symptom detection
     pars['hpv_control_prob']    = 0.44 # Probability that HPV is controlled latently vs. cleared
-    pars['hpv_reactivation']    = 0.025
+    pars['hpv_reactivation']    = 0.025 # Placeholder
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta', par1=5, par2=3)  # beta distribution for initial level of immunity following infection clearance
