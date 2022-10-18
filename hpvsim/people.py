@@ -727,6 +727,9 @@ class People(hpb.BasePeople):
         if len(inds) == 0:
             return 0
 
+        # Find anyone already infected with genotype (within same timestep from a diff partner), exclude
+        inds = inds[~self.infectious[g,inds]]
+
         dt = self.pars['dt']
 
         # Deal with genotype parameters
