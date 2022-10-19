@@ -32,6 +32,7 @@ def make_pars(**kwargs):
     # Population parameters
     pars['n_agents']        = 20e3      # Number of agents
     pars['pop_scale']       = None      # How much to scale the population
+    pars['cancer_scale']    = None      # How much to scale cancer agents
     pars['use_multiscale']  = False     # Whether to use multiscale modeling
     pars['network']         = 'default' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle

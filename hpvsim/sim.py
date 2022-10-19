@@ -522,8 +522,17 @@ class Sim(hpb.BaseSim):
                 self['pop_scale'] = 1
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
-        # # Now set the rescale vec
-        # self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts)
+        
+        # Now set the cancer scale
+        if self['cancer_scale'] is None:
+            self['cancer_scale'] = self['pop_scale']
+        
+        # Check that cancer scale isn't larger than pop scale
+        cs = self['cancer_scale']
+        ps = self['pop_scale']
+        if cs > ps:
+            errormsg = f'Cancer scale {cs} is larger than population scale {ps}: it is very unlikely you actually want to do this'
+            raise ValueError(errormsg)
 
         return self
 

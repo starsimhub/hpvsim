@@ -4,7 +4,7 @@ Test multiscale assumptions
 
 import numpy as np
 import sciris as sc
-import pylab as plt
+import pylab as pl
 import hpvsim as hpv
 
 T = sc.timer()
@@ -27,6 +27,7 @@ class multitest(hpv.Analyzer):
     
     def initialize(self, sim):
         super().initialize()
+        self.label = sim.label
         self.states = ['n_sus', 'n_inf', 'n_can', 'alive','age']
         self.res = sc.objdict()
         for k in self.states:
@@ -73,16 +74,17 @@ class multitest(hpv.Analyzer):
         nrows,ncols = sc.getrowscols(len(df.columns)-2)
         
         if fig is None:
-            fig = plt.figure(figsize=(14, 10))
+            fig = pl.figure(figsize=(14, 10))
         else:
-            plt.figure(fig)
+            pl.figure(fig)
 
         for i, key in enumerate(df.columns):
             if key not in ['t', 'year']:
-                plt.subplot(nrows, ncols, i + 1)
-                plt.plot(df.year, df[key], color=color, alpha=alpha)
-                plt.title(key)
-        plt.tight_layout()
+                pl.subplot(nrows, ncols, i + 1)
+                pl.plot(df.year, df[key], color=color, alpha=alpha, label=self.label)
+                pl.title(key)
+                pl.legend()
+        pl.tight_layout()
         return fig
 
 
@@ -107,6 +109,7 @@ if __name__ == '__main__':
         a = sim.get_analyzer()
         color = ['b','r'][sim['use_multiscale']]
         fig = a.plot(fig=fig, color=color, alpha=0.3)
-    plt.show()
+    
+    pl.show()
     
     T.toc('Done')
