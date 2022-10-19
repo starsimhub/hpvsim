@@ -1063,7 +1063,7 @@ class BasePeople(FlexPretty):
         for k in self.keys():
             arr = self._data[k]
             
-            if self._inds:
+            if self._inds is not None:
                 row_inds = self._inds
             else:
                 row_inds = slice(None, self._n)
@@ -1093,10 +1093,15 @@ class BasePeople(FlexPretty):
         filtered = object.__new__(self.__class__) # Create a new People instance
         filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
         
-        if filtered._inds is None: # Not yet filtered: use the indices directly
+        if inds is None: # Reset filtering
+            filtered._inds = None
+        elif filtered._inds is None: # Not yet filtered: use the indices directly
             filtered._inds = inds
         else: # Already filtered: map them back onto the original People indices
             filtered._inds = filtered._inds[inds]
+        
+        # Apply new indices
+        filtered._map_arrays()
         
         return filtered
     
