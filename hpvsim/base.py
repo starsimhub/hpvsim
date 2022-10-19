@@ -18,7 +18,6 @@ from .version import __version__
 __all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', 'Contacts', 'Layer']
 
 # Default object getter/setter
-obj_get = object.__getattr__ 
 obj_set = object.__setattr__ 
 base_key = 'uid' # Define the key used by default for getting length, etc.
 
@@ -1070,9 +1069,9 @@ class BasePeople(FlexPretty):
                 row_inds = slice(None, self._n)
                 
             if arr.ndim == 1:
-                obj_set(k, arr[row_inds])
+                obj_set(self, k, arr[row_inds])
             elif arr.ndim == 2:
-                obj_set(k, arr[:, row_inds])
+                obj_set(self, k, arr[:, row_inds])
             else:
                 errormsg = 'Can only operate on 1D or 2D arrays'
                 raise TypeError(errormsg)
@@ -1115,11 +1114,12 @@ class BasePeople(FlexPretty):
         '''
         if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
             new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
-        elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
-            new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
+        elif len(criteria) == self._len_arrays: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
+            new_inds = criteria[self._inds].nonzero()[0] # Apply filtering before getting the new indices
         else:
-            errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
+            errormsg = f'"criteria" must be boolean array matching either current filter length ({len(self)}) or else the total number of agents ({self._len_arrays()}), not {len(criteria)}'
             raise ValueError(errormsg)
+        return self.filter_inds(new_inds)
     
     
     def unfilter(self):
@@ -1157,7 +1157,7 @@ class BasePeople(FlexPretty):
             # be lost the next time the arrays are resized
             raise Exception('Cannot assign directly to a dynamic array view - must index into the view instead e.g. `people.uid[:]=`')
         else:   # If not initialized, rely on the default behavior
-            obj_set(attr, value)
+            obj_set(self, attr, value)
         return
 
 
