@@ -20,8 +20,25 @@ __all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', '
 # Default object getter/setter
 obj_get = object.__getattr__ 
 obj_set = object.__setattr__ 
+base_key = 'uid' # Define the key used by default for getting length, etc.
 
 #%% Define simulation classes
+
+class FastODict(dict):
+    '''
+    A minimal ordered dict for maxmium speed
+    '''
+    
+    def __getitem__(self, key):
+        try:
+            return super().__getitem__(key)
+        except:
+            if isinstance(key, int):
+                dictkey = list(self.keys())[key]
+                return super().__getitem__(dictkey)
+            else:
+                errormsg = f'Could not understand key {key}'
+                raise sc.KeyNotFoundError(errormsg)
 
 class FlexPretty(sc.prettyobj):
     '''
@@ -914,7 +931,7 @@ class BasePeople(FlexPretty):
         self.t = 0 # Keep current simulation time
 
         # Private variables relaying to dynamic allocation
-        self._data = sc.odict()
+        self._data = FastODict()
         self._n = self.pars['n_agents']  # Number of agents (initial)
         self._s = self._n # Underlying array sizes
         self._inds = None # No filtering indices
@@ -926,7 +943,6 @@ class BasePeople(FlexPretty):
 
         # Assign UIDs
         self['uid'][:] = np.arange(self.pars['n_agents'])
-        self._base_key = 'uid' # Define UID as the base key
         
         return
 
@@ -934,10 +950,14 @@ class BasePeople(FlexPretty):
     def __len__(self):
         ''' Length of people '''
         try:
-            return len(obj_get(self, self._base_key))
+            return len(self.uid)
         except Exception as E:
-            print(f'Warning: could not get length of People (could not get self.{self._base_key}: {E})')
+            print(f'Warning: could not get length of People (could not get self.uid: {E})')
             return 0
+    
+    def _len_arrays(self):
+        ''' Length of underlying arrays '''
+        return 
 
 
     def set_pars(self, pars=None, hiv_pars=None):
