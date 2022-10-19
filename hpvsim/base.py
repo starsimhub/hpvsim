@@ -1117,7 +1117,9 @@ class BasePeople(FlexPretty):
             A filtered People object, which works just like a normal People object
             except only operates on a subset of indices.
         '''
-        if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
+        if criteria is None:
+            new_inds = None
+        elif len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
             new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
         elif len(criteria) == self._len_arrays: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
             new_inds = criteria[self._inds].nonzero()[0] # Apply filtering before getting the new indices
