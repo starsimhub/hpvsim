@@ -301,6 +301,11 @@ class People(hpb.BasePeople):
         max_cin1_inds = inds[is_cin1 & ~is_cin2] # Indices of those who don't progress beyond CIN1
         max_cin2_inds = inds[is_cin2 & ~is_cin3] # Indices of those who don't progress beyond CIN2
         max_cin3_inds = inds[is_cin3 & ~is_cancer] # Indices of those who don't progress beyond CIN3
+        
+        # Create new indices
+        if len(cancer_inds):
+            import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+        
     
         # Determine whether CIN1 clears or progresses to CIN2 # CK: TODO: refactor
         self.date_cin2[g, cin2_inds] = np.fmax(self.t, # Don't let people progress to CIN2 prior to the current timestep
