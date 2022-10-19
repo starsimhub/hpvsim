@@ -306,8 +306,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_new_interventions(do_plot=do_plot)
-    # sim1 = test_txvx_noscreen()
+    sim0 = test_new_interventions(do_plot=do_plot)
+    sim1 = test_txvx_noscreen()
     scens0 = test_vx_effect()
 
 

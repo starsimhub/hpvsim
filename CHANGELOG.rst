@@ -9,6 +9,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.2.9 (2022-10-18)
+--------------------------
+- Prevents infectious people from being passed to People.infect()
+- Fixes bugs with initialization within scenario runs 
+- *GitHub info*: PR `338 <https://github.com/amath-idm/hpvsim/pull/345>`__
+
+
 Version 0.2.8 (2022-10-17)
 --------------------------
 - Fixes bug with intervention year interpolation
