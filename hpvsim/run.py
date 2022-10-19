@@ -1009,7 +1009,6 @@ class Scenarios(hpb.ParsObj):
             # Create and run the simulations
             print_heading(f'Multirun for {scenkey}')
             scen_sim = sc.dcp(self.base_sim)
-            scen_sim.initialize(reset=True)
             scen_sim.scenkey = scenkey
             scen_sim.label = scenname
             scen_sim.scen = scen
@@ -1017,13 +1016,19 @@ class Scenarios(hpb.ParsObj):
             # Update the parameters, if provided, and re-initialize aspects of the simulation
             scen_sim.update_pars(allpars)
 
-            # If vaccination is provided, we need to re-initialize the people because the number of immunity sources is different
+            # Determine whether we need to reinitialize the people and the initial states - by default, don't reset either
+            reset_people = False
+            reset_init_states = False
+
             if 'interventions' in allpars.keys():
+                # If vaccination is provided, we need to re-initialize the people because the number of immunity sources is different
                 vaxintvs = [x for x in allpars['interventions'] if isinstance(x, hpi.BaseVaccination)]
-                vaxintvs += [x for x in allpars['interventions'] if isinstance(x, hpi.TherapeuticVaccination) and x.prophylactic == True]
                 if len(vaxintvs)>0:
-                    scen_sim.people = None # Set to None so they get re-initialized - WARNING, should be a better way to do this
-            scen_sim.initialized = False # Ensure it gets re-initialized
+                    reset_people = True
+                    reset_init_states = True
+
+            # Initialize the sim, including potentially the people and initial states
+            scen_sim.initialize(reset=reset_people, init_states=reset_init_states)
 
             run_args = dict(n_runs=self['n_runs'], noise=self['noise'], noisepar=self['noisepar'], keep_people=keep_people, verbose=verbose)
             if debug:

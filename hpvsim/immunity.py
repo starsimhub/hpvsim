@@ -80,7 +80,7 @@ class genotype(sc.prettyobj):
 
 # %% Immunity methods
 
-def init_immunity(sim, create=False):
+def init_immunity(sim, create=True):
     ''' Initialize immunity matrices with all genotypes and vaccines in the sim'''
 
     # Pull out all of the circulating genotypes for cross-immunity
