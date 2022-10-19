@@ -1009,7 +1009,6 @@ class Scenarios(hpb.ParsObj):
             # Create and run the simulations
             print_heading(f'Multirun for {scenkey}')
             scen_sim = sc.dcp(self.base_sim)
-            # scen_sim.initialize(reset=True)
             scen_sim.scenkey = scenkey
             scen_sim.label = scenname
             scen_sim.scen = scen
