@@ -24,22 +24,6 @@ base_key = 'uid' # Define the key used by default for getting length, etc.
 
 #%% Define simulation classes
 
-class FastODict(dict):
-    '''
-    A minimal ordered dict for maxmium speed
-    '''
-    
-    def __getitem__(self, key):
-        try:
-            return super().__getitem__(key)
-        except:
-            if isinstance(key, int):
-                dictkey = list(self.keys())[key]
-                return super().__getitem__(dictkey)
-            else:
-                errormsg = f'Could not understand key {key}'
-                raise sc.KeyNotFoundError(errormsg)
-
 class FlexPretty(sc.prettyobj):
     '''
     A class that supports multiple different display options: namely obj.brief()
@@ -931,7 +915,7 @@ class BasePeople(FlexPretty):
         self.t = 0 # Keep current simulation time
 
         # Private variables relaying to dynamic allocation
-        self._data = FastODict()
+        self._data = dict()
         self._n = self.pars['n_agents']  # Number of agents (initial)
         self._s = self._n # Underlying array sizes
         self._inds = None # No filtering indices
@@ -950,14 +934,16 @@ class BasePeople(FlexPretty):
     def __len__(self):
         ''' Length of people '''
         try:
-            return len(self.uid)
+            arr = getattr(self, base_key)
+            return len(arr)
         except Exception as E:
-            print(f'Warning: could not get length of People (could not get self.uid: {E})')
+            print(f'Warning: could not get length of People (could not get self.{base_key}: {E})')
             return 0
+    
     
     def _len_arrays(self):
         ''' Length of underlying arrays '''
-        return 
+        return len(self._data[base_key])
 
 
     def set_pars(self, pars=None, hiv_pars=None):
