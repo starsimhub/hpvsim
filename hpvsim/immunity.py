@@ -80,7 +80,7 @@ class genotype(sc.prettyobj):
 
 # %% Immunity methods
 
-def init_immunity(sim, create=False):
+def init_immunity(sim, create=True):
     ''' Initialize immunity matrices with all genotypes and vaccines in the sim'''
 
     # Pull out all of the circulating genotypes for cross-immunity
@@ -219,7 +219,13 @@ def check_immunity(people):
 
     '''
     immunity = people.pars['immunity'] # cross-immunity/own-immunity scalars to be applied to immunity level
-    people.sus_imm[:] = np.dot(immunity,people.imm) # Dot product gives immunity to all genotypes
+    try:
+        people.sus_imm[:] = np.dot(immunity,people.imm) # Dot product gives immunity to all genotypes
+    except:
+        import traceback;
+        traceback.print_exc();
+        import pdb;
+        pdb.set_trace()
     return
 
 

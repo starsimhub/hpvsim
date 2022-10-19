@@ -241,14 +241,74 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
     return sim
 
 
+
+def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Testing effect of prophylactic vaccination')
+
+    verbose = .1
+    debug_scens = 0
+
+    ### Create interventions
+    routine_vx_dose1 = hpv.routine_vx(
+        prob = 0.9,
+        start_year = 2023,
+        age_range = [9,10],
+        product = 'bivalent',
+        label = 'Bivalent dose 1'
+    )
+
+    second_dose_eligible = lambda sim: (sim.people.doses == 1) | (sim.t > (sim.people.date_vaccinated + 0.5 / sim['dt']))
+    routine_vx_dose2 = hpv.routine_vx(
+        prob = 0.8,
+        start_year = 2023,
+        product = 'bivalent2',
+        eligibility=second_dose_eligible,
+        label = 'Bivalent dose 2'
+    )
+
+    interventions = [routine_vx_dose1, routine_vx_dose2]
+    for intv in interventions: intv.do_plot=False
+
+    base_sim = hpv.Sim(pars=base_pars)
+
+    scenarios = {
+        'baseline': {
+            'name': 'Baseline',
+            'pars': {
+            }
+        },
+        'vx scaleup': {
+            'name': 'Vaccinate 90% of 9yos',
+            'pars': {
+                'interventions': interventions
+            }
+        },
+    }
+
+    metapars = {'n_runs': 3}
+    scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
+    scens.run(debug=debug_scens)
+    to_plot = {
+        'HPV prevalence': ['total_hpv_prevalence'],
+        'Age standardized cancer incidence (per 100,000 women)': ['asr_cancer'],
+        'Cancer deaths per 100,000 women': ['cancer_mortality'],
+        'Number vaccinated': ['cum_vaccinated'],
+    }
+    scens.plot(to_plot=to_plot)
+    return scens
+
+
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_new_interventions(do_plot=do_plot)
-    sim1 = test_txvx_noscreen()
+    # sim0 = test_new_interventions(do_plot=do_plot)
+    # sim1 = test_txvx_noscreen()
+    scens0 = test_vx_effect()
 
 
     sc.toc(T)

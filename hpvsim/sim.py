@@ -347,7 +347,7 @@ class Sim(hpb.BaseSim):
 
         return
 
-    def init_immunity(self, create=False):
+    def init_immunity(self, create=True):
         ''' Initialize immunity matrices '''
         hpimm.init_immunity(self, create=create)
         return
@@ -516,8 +516,6 @@ class Sim(hpb.BaseSim):
                 self['pop_scale'] = 1
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
-        # # Now set the rescale vec
-        # self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts)
 
         return self
 

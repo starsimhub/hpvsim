@@ -11,8 +11,9 @@ from hpvsim.data import get_data as data
 
 do_plot = 0
 do_save = 0
+debug = 1
 
-n_agents = [1e3,50e3][0] # Swap between sizes
+n_agents = [50e3,1e3][debug] # Swap between sizes
 
 
 #%% Define the tests
@@ -89,7 +90,7 @@ def test_impact_on_cancer():
 
     metapars = {'n_runs': 3}
     scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
-    scens.run()
+    scens.run(debug=debug)
     to_plot = {
         'HIV prevalence': [
             'hiv_prevalence',
@@ -112,7 +113,7 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv(model_hiv=True)
+    # sim0 = test_hiv(model_hiv=True)
     sim1 = test_impact_on_cancer()
     sc.toc(T)
     print('Done.')
