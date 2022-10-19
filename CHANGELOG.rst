@@ -13,6 +13,7 @@ Version 0.2.9 (2022-10-18)
 --------------------------
 - Prevents infectious people from being passed to People.infect()
 - Fixes bugs with initialization within scenario runs 
+- Remove ununsed prevalence results
 - *GitHub info*: PR `338 <https://github.com/amath-idm/hpvsim/pull/345>`__
 
 
