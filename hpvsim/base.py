@@ -17,6 +17,9 @@ from .version import __version__
 # Specify all externally visible classes this file defines
 __all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', 'Contacts', 'Layer']
 
+# Default object getter/setter
+obj_get = object.__getattr__ 
+obj_set = object.__setattr__ 
 
 #%% Define simulation classes
 
@@ -914,6 +917,7 @@ class BasePeople(FlexPretty):
         self._data = sc.odict()
         self._n = self.pars['n_agents']  # Number of agents (initial)
         self._s = self._n # Underlying array sizes
+        self._inds = None # No filtering indices
 
         # Initialize underlying storage and map arrays
         for state in self.meta.all_states:
@@ -922,6 +926,7 @@ class BasePeople(FlexPretty):
 
         # Assign UIDs
         self['uid'][:] = np.arange(self.pars['n_agents'])
+        self._base_key = 'uid' # Define UID as the base key
         
         return
 
@@ -929,9 +934,9 @@ class BasePeople(FlexPretty):
     def __len__(self):
         ''' Length of people '''
         try:
-            return len(self.uid)
+            return len(obj_get(self, self._base_key))
         except Exception as E:
-            print(f'Warning: could not get length of People (could not get self.uid: {E})')
+            print(f'Warning: could not get length of People (could not get self.{self._base_key}: {E})')
             return 0
 
 
@@ -1050,12 +1055,75 @@ class BasePeople(FlexPretty):
         This method should be called whenever the number of agents required changes
         (regardless of whether or not the underlying arrays have been resized)
         """
-
         for k in self.keys():
-            if self._data[k].ndim == 2:
-                super().__setattr__(k, self._data[k][:, :self._n])
+            arr = self._data[k]
+            
+            if self._inds:
+                row_inds = self._inds
             else:
-                super().__setattr__(k, self._data[k][:self._n])
+                row_inds = slice(None, self._n)
+                
+            if arr.ndim == 1:
+                obj_set(k, arr[row_inds])
+            elif arr.ndim == 2:
+                obj_set(k, arr[:, row_inds])
+            else:
+                errormsg = 'Can only operate on 1D or 2D arrays'
+                raise TypeError(errormsg)
+        return
+    
+
+    def filter_inds(self, inds):
+        """
+        Store indices to allow for easy filtering of the People object.
+
+        Args:
+            inds (array): filter by these indices
+
+        Returns:
+            A filtered People object, which works just like a normal People object
+            except only operates on a subset of indices.
+        """
+        # Create a new People object with the same properties as the original
+        filtered = object.__new__(self.__class__) # Create a new People instance
+        filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
+        
+        if filtered._inds is None: # Not yet filtered: use the indices directly
+            filtered._inds = inds
+        else: # Already filtered: map them back onto the original People indices
+            filtered._inds = filtered._inds[inds]
+        
+        return filtered
+    
+    
+    def filter(self, criteria):
+        '''
+        Store indices to allow for easy filtering of the People object.
+        
+        Args:
+            criteria (array): a boolean array for the filtering critria
+        
+        Returns:
+            A filtered People object, which works just like a normal People object
+            except only operates on a subset of indices.
+        '''
+        if len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
+            new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
+        elif len(criteria) == self.len_people: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
+            new_inds = criteria[filtered.inds].nonzero()[0] # Apply filtering before getting the new indices
+        else:
+            errormsg = f'"criteria" must be boolean array matching either current filter length ({self.len_inds}) or else the total number of people ({self.len_people}), not {len(criteria)}'
+            raise ValueError(errormsg)
+    
+    
+    def unfilter(self):
+        """
+        Set main simulation attributes to be views of the underlying data
+
+        This method should be called whenever the number of agents required changes
+        (regardless of whether or not the underlying arrays have been resized)
+        """
+        return self.filter_inds(inds=None)
 
 
     def __getitem__(self, key):
@@ -1083,7 +1151,7 @@ class BasePeople(FlexPretty):
             # be lost the next time the arrays are resized
             raise Exception('Cannot assign directly to a dynamic array view - must index into the view instead e.g. `people.uid[:]=`')
         else:   # If not initialized, rely on the default behavior
-            super().__setattr__(attr, value)
+            obj_set(attr, value)
         return
 
 
