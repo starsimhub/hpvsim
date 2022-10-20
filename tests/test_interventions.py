@@ -307,8 +307,8 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim0 = test_new_interventions(do_plot=do_plot)
-    sim1 = test_txvx_noscreen()
-    scens0 = test_vx_effect()
+    # sim1 = test_txvx_noscreen()
+    # scens0 = test_vx_effect()
 
 
     sc.toc(T)

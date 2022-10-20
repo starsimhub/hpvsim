@@ -22,10 +22,11 @@ step(): 78.4%
 import sciris as sc
 import hpvsim as hpv
 from test_sim import test_sim
+from test_interventions import test_new_interventions
 
-
-sim = test_sim(do_plot=False, n_agents=50e3)
-to_profile = 'step' # Must be one of the options listed below
+# sim1 = test_sim(do_plot=False, n_agents=50e3)
+sim = test_new_interventions()
+to_profile = 'apply_int' # Must be one of the options listed below
 
 func_options = {
     'initialize':    sim.initialize,
@@ -37,9 +38,10 @@ func_options = {
     'get_age':       hpv.data.get_age_distribution,
     'run':           sim.run,
     'step':          sim.step,
-    'apply_int':     hpv.interventions.vaccinate_num.apply,
-    'vaccinate':     hpv.interventions.vaccinate_num.vaccinate,
-    'select_people': hpv.interventions.vaccinate_num.select_people,
+    'apply_int':     hpv.interventions.treat_num.apply,
+    # 'apply_int':     hpv.interventions.vaccinate_num.apply,
+    # 'vaccinate':     hpv.interventions.vaccinate_num.vaccinate,
+    # 'select_people': hpv.interventions.vaccinate_num.select_people,
     'update_pre':    hpv.people.People.update_states_pre,
     'death':         hpv.people.People.apply_death_rates,
     'infect':        hpv.people.People.infect,
