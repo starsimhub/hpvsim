@@ -24,8 +24,8 @@ import hpvsim as hpv
 from test_sim import test_sim
 from test_interventions import test_new_interventions
 
-# sim1 = test_sim(do_plot=False, n_agents=50e3)
-sim = test_new_interventions()
+sim0 = test_sim(do_plot=False, n_agents=50e3) # For debugging regular sim
+sim1 = test_new_interventions() # For debuggin interventions
 to_profile = 'apply_int' # Must be one of the options listed below
 
 func_options = {
@@ -39,12 +39,9 @@ func_options = {
     'run':           sim.run,
     'step':          sim.step,
     'apply_int':     hpv.interventions.treat_num.apply,
-    # 'apply_int':     hpv.interventions.vaccinate_num.apply,
-    # 'vaccinate':     hpv.interventions.vaccinate_num.vaccinate,
-    # 'select_people': hpv.interventions.vaccinate_num.select_people,
     'update_pre':    hpv.people.People.update_states_pre,
     'death':         hpv.people.People.apply_death_rates,
     'infect':        hpv.people.People.infect,
 }
 
-sc.profile(run=sim.run, follow=func_options[to_profile])
+sc.profile(run=sim1.run, follow=func_options[to_profile])
