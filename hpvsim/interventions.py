@@ -950,9 +950,11 @@ class BaseTreatment(Intervention):
         Get indices of people who will acccept treatment; these people are then added to a queue or scheduled for receiving treatment
         '''
         accept_inds     = np.array([], dtype=hpd.default_int)
-        eligible_inds   = hpu.true(self.check_eligibility(sim)) # Apply eligiblity
-        if len(eligible_inds):
-            accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
+        is_eligible     = self.check_eligibility(sim) # Apply eligiblity
+        if len(self.eligibility(sim)):
+            eligible_inds   = hpu.itruei(is_eligible, sc.promotetoarray(self.eligibility(sim)))
+            if len(eligible_inds):
+                accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
         return accept_inds
 
     def get_candidates(self, sim):
