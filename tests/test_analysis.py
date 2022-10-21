@@ -199,12 +199,10 @@ def test_age_causal_analyzer():
 
     plt.figure()
 
-    for gi, glist in a.age_causal.items():
-        count, bins_count = np.histogram(glist, bins=10)
-        pdf = count / sum(count)
-        cdf = np.cumsum(pdf)
-        gtype = sim['genotype_map'][gi]
-        plt.plot(bins_count[1:], cdf, label=gtype)
+    count, bins_count = np.histogram(a.age_causal, bins=10)
+    pdf = count / sum(count)
+    cdf = np.cumsum(pdf)
+    plt.plot(bins_count[1:], cdf)
 
     plt.title('Distribution of age of causal HPV infection')
     plt.legend()
