@@ -985,7 +985,8 @@ class age_results(Analyzer):
 
 class age_causal_infection(Analyzer):
     '''
-    Determine the age at which people with cervical cancer were causally infected
+    Determine the age at which people with cervical cancer were causally infected and
+    time spent between infection and cancer.
     '''
 
     def __init__(self, start_year=None, **kwargs):
@@ -998,10 +999,10 @@ class age_causal_infection(Analyzer):
         self.years = sim.yearvec
         if self.start_year is None:
             self.start_year = sim['start']
-        self.age_causal = dict()
-        gtypes = sim['genotype_map'].keys()
-        for g in range(len(gtypes)):
-            self.age_causal[g] = []
+        self.age_causal = []
+        self.dwelltime = dict()
+        for state in ['hpv', 'cin1', 'cin2', 'cin3', 'total']:
+            self.dwelltime[state] = []
 
     def apply(self, sim):
         if sim.yearvec[sim.t] >= self.start_year:
@@ -1009,9 +1010,20 @@ class age_causal_infection(Analyzer):
             if len(cancer_inds):
                 current_age = sim.people.age[cancer_inds]
                 date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
-                offset = (sim.people.t - date_exposed) * sim['dt']
-                for i, age in enumerate(current_age):
-                    self.age_causal[cancer_genotypes[i]].append(age - offset[i])
+                date_cin1 = sim.people.date_cin1[cancer_genotypes, cancer_inds]
+                date_cin2 = sim.people.date_cin2[cancer_genotypes, cancer_inds]
+                date_cin3 = sim.people.date_cin3[cancer_genotypes, cancer_inds]
+                hpv_time = (date_cin1 - date_exposed) * sim['dt']
+                cin1_time = (date_cin2 - date_cin1) * sim['dt']
+                cin2_time = (date_cin3 - date_cin2) * sim['dt']
+                cin3_time = (sim.t - date_cin3) * sim['dt']
+                total_time = (sim.t - date_exposed) * sim['dt']
+                self.age_causal += (current_age - total_time).tolist()
+                self.dwelltime['hpv'] += hpv_time.tolist()
+                self.dwelltime['cin1'] += cin1_time.tolist()
+                self.dwelltime['cin2'] += cin2_time.tolist()
+                self.dwelltime['cin3'] += cin3_time.tolist()
+                self.dwelltime['total'] += total_time.tolist()
 
 
 class cancer_detection(Analyzer):
