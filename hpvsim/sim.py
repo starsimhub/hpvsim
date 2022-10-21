@@ -347,7 +347,7 @@ class Sim(hpb.BaseSim):
 
         return
 
-    def init_immunity(self, create=False):
+    def init_immunity(self, create=True):
         ''' Initialize immunity matrices '''
         hpimm.init_immunity(self, create=create)
         return
@@ -415,8 +415,7 @@ class Sim(hpb.BaseSim):
         # Create incidence and prevalence results
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
             for var,name,cmap in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
-                for which in ['incidence', 'prevalence']:
-                    results[f'{lkey+var}_{which}'] = init_res(llab+name+' '+which, color=cmap(cstride), n_rows=g)
+                results[f'{lkey+var}_incidence'] = init_res(llab+name+' incidence', color=cmap(cstride), n_rows=g)
 
         # Create demographic flows
         for var, name, color in zip(hpd.dem_keys, hpd.dem_names, hpd.dem_colors):
@@ -448,12 +447,6 @@ class Sim(hpb.BaseSim):
         results['cum_txvx_doses'] = init_res('Cumulative therapeutic vaccine doses')
         results['cum_tx_vaccinated'] = init_res('Total received therapeutic vaccine')
 
-        # Detections
-        results['n_detectable_hpv'] = init_res('Number with detectable HPV', n_rows=ng)
-        results['n_total_detectable_hpv'] = init_res('Number with detectable HPV')
-        results['detectable_hpv_prevalence'] = init_res('Detectable HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
-        results['total_detectable_hpv_prevalence'] = init_res('Total detectable HPV prevalence', color=hpd.stock_colors[0](0.95))
-
         # Additional cancer results
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color='#fcba03')
         results['cancer_mortality'] = init_res('Cancer mortality')
@@ -465,6 +458,8 @@ class Sim(hpb.BaseSim):
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
         results['hiv_incidence'] = init_res('HIV incidence rate')
         results['hiv_prevalence'] = init_res('HIV prevalence rate')
+        results['hpv_prevalence'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
+        results['total_hpv_prevalence'] = init_res('Total HPV prevalence', color=hpd.stock_colors[0](0.95))
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -521,8 +516,6 @@ class Sim(hpb.BaseSim):
                 self['pop_scale'] = 1
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
-        # # Now set the rescale vec
-        # self.rescale_vec   = self['pop_scale']*np.ones(self.res_npts)
 
         return self
 
@@ -691,12 +684,14 @@ class Sim(hpb.BaseSim):
         rel_trans[people.cin3] *= rel_trans_pars['cin3']
         rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
 
-        # Loop over layers
-
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
-        sus = people.susceptible.copy()
 
+        # Loop over layers
         for lkey, layer in people.contacts.items():
+
+            sus = people.susceptible.copy() # for each layer, update who's still susceptible
+
+            # Shorten variables
             f = layer['f']
             m = layer['m']
             acts = layer['acts'] * dt
@@ -704,7 +699,7 @@ class Sim(hpb.BaseSim):
             whole_acts = whole_acts.astype(hpd.default_int)
             effective_condoms = hpd.default_float(condoms[lkey] * eff_condoms)
 
-            # Compute transmissions
+            # Compute transmissions by genotype
             for g in range(ng):
 
                 f_source_inds = (inf[g][f] & sus[g][m]).nonzero()[0]  # get female sources where female partner is infectious with genotype and male partner is susceptible to that genotype
@@ -723,7 +718,7 @@ class Sim(hpb.BaseSim):
                     transmissions = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
                     target_inds   = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
-                    people.infect(inds=target_inds, g=g, layer=lkey)  # Actually infect people
+                    people.infect(inds=target_inds, g=g, layer=lkey)  # Infect people
 
         # Determine if there are any reactivated infections on this timestep
         for g in range(ng):
@@ -765,9 +760,8 @@ class Sim(hpb.BaseSim):
         for key,count in people.by_age_flows.items():
             self.results[key][:,idx] += count
 
-
         # Make stock updates every nth step, where n is the frequency of result output
-        if t % self.resfreq == 0:
+        if t % self.resfreq == self.resfreq-1:
 
             # Create total stocks
             for key in hpd.total_stock_keys:
@@ -924,21 +918,11 @@ class Sim(hpb.BaseSim):
         self.results['hpv_incidence'][:]        = res['infections'][:] / res['n_susceptible'][:]
         self.results['total_hpv_prevalence'][:] = res['n_total_infectious'][:] / res['n_alive'][:]
         self.results['hpv_prevalence'][:]       = res['n_infectious'][:] / res['n_alive'][:]
-        self.results['detectable_hpv_prevalence'][:] = res['n_detectable_hpv'][:] / res['n_alive'][:]
-        self.results['total_detectable_hpv_prevalence'][:] = res['n_total_detectable_hpv'][:] / res['n_alive'][:]
         self.results['hiv_incidence'][:] = res['total_hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
         self.results['hiv_prevalence'][:] = res['n_hiv'][:] / res['n_alive'][:]
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]
-        self.results['total_cin1_prevalence'][:]    = res['n_total_cin1'][:] / alive_females
-        self.results['total_cin2_prevalence'][:]    = res['n_total_cin2'][:] / alive_females
-        self.results['total_cin3_prevalence'][:]    = res['n_total_cin3'][:] / alive_females
-        self.results['total_cin_prevalence'][:]     = res['n_total_cin'][:] / alive_females
-        self.results['cin1_prevalence'][:]          = res['n_cin1'][:] / alive_females
-        self.results['cin2_prevalence'][:]          = res['n_cin2'][:] / alive_females
-        self.results['cin3_prevalence'][:]          = res['n_cin3'][:] / alive_females
-        self.results['cin_prevalence'][:]           = res['n_cin'][:] / alive_females
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)

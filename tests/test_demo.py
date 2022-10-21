@@ -54,10 +54,6 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            cin_prevalence=sc.objdict(
-                timepoints=['2019'],
-                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-            ),
             cancer_mortality=sc.objdict(
                 datafile=f'test_data/{location}_cancer_mortality.csv',
             ),

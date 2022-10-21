@@ -727,6 +727,12 @@ class People(hpb.BasePeople):
         if len(inds) == 0:
             return 0
 
+        # Check whether anyone is already infected with genotype - this should not happen because we only
+        # infect susceptible people
+        if len(hpu.true(self.infectious[g,inds])):
+            errormsg = f'Attempting to reinfect the following agents who are already infected with genotype {g}: {hpu.itruei(self.infectious[g,:],inds)}'
+            raise ValueError(errormsg)
+
         dt = self.pars['dt']
 
         # Deal with genotype parameters

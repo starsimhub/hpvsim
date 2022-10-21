@@ -104,9 +104,6 @@ def test_age_results(do_plot=True):
         'HPV prevalence': [
             'hpv_prevalence',
         ],
-        'CIN prevalence': [
-            'cin_prevalence',
-        ],
         'Cervical cancer incidence': [
             'total_cancer_incidence',
         ],

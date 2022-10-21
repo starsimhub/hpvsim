@@ -245,7 +245,7 @@ stock_names  = [state.label for state in PeopleMeta.stock_states]
 stock_colors = [state.cmap for state in PeopleMeta.stock_states]
 total_stock_keys = [state.name for state in PeopleMeta.stock_states if state.shape=='n_genotypes']
 
-# Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
+# Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
 inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',  'cancer']
 inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN',  'cancer']

@@ -32,7 +32,7 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
 
 
     az = hpv.age_results(
-        sc.objdict(total_cin_prevalence=sc.objdict(
+        sc.objdict(total_hpv_prevalence=sc.objdict(
             timepoints=['2025'],
             edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
         )),
@@ -73,9 +73,6 @@ def test_latency(do_plot=False, do_save=False, fig_path=None):
         to_plot = {
             'HPV prevalence': [
                 'total_hpv_prevalence',
-            ],
-            'CIN prevalence': [
-                'total_cin_prevalence',
             ],
             'Cancers per 100,000 women': [
                 'cancer_incidence',
