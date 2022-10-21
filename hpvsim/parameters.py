@@ -486,7 +486,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
     pars.hrhpv.rel_beta     = 0.94 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.sero_prob    = 0.8 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.sero_prob    = 0.5 # placeholder, currently assumed to be the same as for 31
 
     pars.lrhpv = sc.objdict()
     pars.lrhpv.dur_precin   = dict(dist='lognormal', par1=8.1/12, par2=0.4)  # placeholder, currently assumed to be the same as for 6
@@ -522,7 +522,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58 = med_imm,
             hpv6 = med_imm,
             hpv11 = med_imm,
-            hrhpv = med_imm,
+            hrhpv = 0.1,
             lrhpv = med_imm
         ),
 
@@ -539,7 +539,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
-            hrhpv = med_imm,
+            hrhpv = 0.1,
             lrhpv = med_imm
         ),
 
@@ -713,8 +713,8 @@ def get_cross_immunity(default=False, genotype=None):
             lrhpv=high_imm
         ),
         hrhpv=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
+            hpv16=0.1,
+            hpv18=0.1,
             hpv31=med_imm,
             hpv33=med_imm,
             hpv35=med_imm,
@@ -725,7 +725,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
-            hrhpv=med_imm,
+            hrhpv=0.1,
             lrhpv=med_imm
         ),
 
