@@ -8,20 +8,21 @@ import numpy as np
 import seaborn as sns
 import hpvsim as hpv
 import pytest
+import matplotlib.pyplot as plt
 
 do_plot = 0
 do_save = 0
 
-n_agents = [1e3,50e3][0] # Swap between sizes
+n_agents = [1e3,50e3][1] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,
-    'start': 2000,
+    'start': 1970,
     # 'burnin': 30,
     'end': 2050,
     'genotypes': [16, 18],
     'location': 'tanzania',
-    'dt': .5,
+    'dt': 0.5,
 }
 
 
@@ -167,6 +168,8 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     interventions =  st_interventions + vx_interventions
     for intv in interventions: intv.do_plot=False
 
+    sim0 = hpv.Sim(pars=base_pars)
+    sim0.run()
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
     to_plot = {
@@ -176,6 +179,15 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         'Treatments': ['resources_ablation', 'resources_excision', 'resources_radiation'],
     }
     sim.plot(to_plot=to_plot)
+
+    fig, ax = plt.subplots(1, 2)
+    for i, result in enumerate(['total_cancers', 'total_cins']):
+        ax[i].plot(sim0.results['year'], sim0.results[result].values, label='No Screening')
+        ax[i].plot(sim.results['year'], sim.results[result].values, label='Screening')
+        ax[i].set_ylabel(result)
+        ax[i].legend()
+    fig.show()
+
 
     return sim
 
@@ -298,6 +310,87 @@ def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
     return scens
 
 
+def test_screening():
+    sc.heading('Test new screening implementation')
+
+    verbose = .1
+    debug = 0
+
+    ### Create interventions
+    # Screen, triage, assign treatment, treat
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
+    routine_screen = hpv.routine_screening(
+        product='hpv',  # pass in string or product
+        prob=1.0,  # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
+        eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
+        age_range=[0, 100],
+        start_year=2020,
+        label='routine screening',
+    )
+
+
+    # New and old protocol: for those who've been confirmed positive in their secondary diagnostic, determine what kind of treatment to offer them
+    screen_positive = lambda sim: sim.get_intervention('routine screening').outcomes['positive']
+    assign_treatment = hpv.routine_triage(
+        prob = 1.0,
+        product = 'tx_assigner',
+        eligibility = screen_positive,
+        label = 'tx assigner'
+    )
+
+    ablation_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['ablation']
+    ablation = hpv.treat_num(
+        prob = 1.0,
+        product = 'ablation',
+        eligibility = ablation_eligible,
+        label = 'ablation'
+    )
+
+    excision_eligible = lambda sim: list(set(sim.get_intervention('tx assigner').outcomes['excision'].tolist() + sim.get_intervention('ablation').outcomes['unsuccessful'].tolist()))
+    excision = hpv.treat_num(
+        prob = 1.0,
+        product = 'excision',
+        eligibility = excision_eligible,
+        label = 'excision'
+    )
+
+    radiation_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['radiation']
+    radiation = hpv.treat_num(
+        prob = 1.0,
+        product = hpv.radiation(),
+        eligibility = radiation_eligible,
+        label = 'radiation'
+    )
+
+    soc_screen = [routine_screen]
+    triage_treat = [assign_treatment, ablation, excision, radiation]
+    interventions = soc_screen + triage_treat
+
+
+    for intv in interventions: intv.do_plot=False
+
+    sim0 = hpv.Sim(pars=base_pars)
+    sim0.run()
+    sim = hpv.Sim(pars=base_pars, interventions=interventions)
+    sim.run()
+    to_plot = {
+        'CINs': ['total_cins'],
+        'Screens': ['resources_routine screening'],
+        'Treatments': ['resources_ablation', 'resources_excision', 'resources_radiation'],
+    }
+    sim.plot(to_plot=to_plot)
+
+    fig, ax = plt.subplots(1, 2)
+    for i, result in enumerate(['total_cancers', 'total_cins']):
+        ax[i].plot(sim0.results['year'], sim0.results[result].values, label='No Screening')
+        ax[i].plot(sim.results['year'], sim.results[result].values, label='Screening')
+        ax[i].set_ylabel(result)
+        ax[i].legend()
+    fig.show()
+
+
+    return sim
+
 
 
 #%% Run as a script
@@ -308,6 +401,7 @@ if __name__ == '__main__':
 
     sim0 = test_new_interventions(do_plot=do_plot)
     sim1 = test_txvx_noscreen()
+    sim2 = test_screening()
     scens0 = test_vx_effect()
 
 
