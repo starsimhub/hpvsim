@@ -86,9 +86,10 @@ class multitest(hpv.Analyzer):
         return r
         
     
-    def plot(self, fig=None, color='b', alpha=1):
-        
-        r = self.df()
+def plot_compare_multiscale(msim, fig=None, alpha=0.3):
+    
+    def plot_single(analyzer, fig, alpha=1):
+        r = analyzer.df()
         
         nrows,ncols = sc.getrowscols((len(r.res.columns) + len(r.age.columns) - 3)*2, ncols=4)
         
@@ -97,27 +98,38 @@ class multitest(hpv.Analyzer):
         else:
             pl.figure(fig)
 
-        index = 0
+        ms = analyzer.multiscale
+        index = ms - 1
+        color = ['b','r'][ms]
         for i, key in enumerate(r.res.columns):
             if key not in ['t', 'year']:
-                index += 1
+                index += 2
                 pl.subplot(nrows, ncols, index)
-                pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, label=self.label)
+                pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, label=analyzer.label)
                 pl.title(key)
                 if showlegend:
                     pl.legend()
         
         for i, key in enumerate(r.age.columns):
             if key not in ['bins']:
-                index += 1
+                index += 2
                 pl.subplot(nrows, ncols, index)
-                pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, label=self.label)
+                pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, label=analyzer.label)
                 pl.title(key)
                 if showlegend:
                     pl.legend()
         
         pl.tight_layout()
         return fig
+    
+    fig = None
+    for sim in msim.sims:
+        a = sim.get_analyzer()
+        fig = plot_single(analyzer=a, fig=fig, alpha=alpha)
+    
+    pl.show()
+    
+    return fig
 
 
 sims = []
@@ -136,12 +148,6 @@ if __name__ == '__main__':
     df = msim.compare(output=True, show_match=True)
     df.disp()
     
-    fig = None
-    for sim in msim.sims:
-        a = sim.get_analyzer()
-        color = ['b','r'][sim['use_multiscale']]
-        fig = a.plot(fig=fig, color=color, alpha=0.3)
-    
-    pl.show()
+    plot_compare_multiscale(msim)
     
     T.toc('Done')
