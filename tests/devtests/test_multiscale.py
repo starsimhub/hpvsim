@@ -33,11 +33,12 @@ class multitest(hpv.Analyzer):
         for k in self.states:
             self.res[k + '_agents'] = np.zeros(sim.npts)
             self.res[k + '_people'] = np.zeros(sim.npts)
+        self.age = sc.objdict()
+        self.agebins = np.arange(0,101,10)
+    
     
     def apply(self, sim):
         
-        dt = sim['dt']
-        npts = sim.npts
         ppl = sim.people
         
         self.res['n_sus_agents'][ppl.t] = ppl.susceptible.sum()
@@ -55,35 +56,59 @@ class multitest(hpv.Analyzer):
         self.res['age_agents'][ppl.t] = np.average(ppl.age)
         self.res['age_people'][ppl.t] = np.average(ppl.age, weights=ppl.scale)
 
-        if ppl.t == npts - 1:
-            self.res['t'] = np.arange(0, npts*dt, dt)
-            self.res['year'] = sim.yearvec
-            # self.res['cum_inf_agents'] = np.cumsum(self.res['new_inf_agents'])
-            # self.res['cum_inf_people'] = np.cumsum(self.res['new_inf_people'])
-            # self.res['cum_can_agents'] = np.cumsum(self.res['new_can_agents'])
-            # self.res['cum_can_people'] = np.cumsum(self.res['new_can_people'])
-            
-    @property
-    def df(self):
-        return sc.dataframe(self.res)
+
+    def finalize(self, sim):
         
+        dt = sim['dt']
+        npts = sim.npts
+        
+        self.res['t'] = np.arange(0, npts*dt, dt)
+        self.res['year'] = sim.yearvec
+        ages = sim.people.age
+        date_cancerous = np.nansum(sim.people.date_cancerous, axis=0)
+        cancer_inci_inds = sc.findinds(date_cancerous) # WARNING, won't work if dead agents are removed
+        cancer_death_inds = sim.people.defined('date_dead_cancer')
+        self.age['bins'] = self.agebins[:-1] # Use start rather than edges
+        self.age['cancer_inci'], _   = np.histogram(ages[cancer_inci_inds], self.agebins)
+        self.age['cancer_deaths'], _ = np.histogram(ages[cancer_death_inds], self.agebins)
+        return
+    
+        
+    def df(self):
+        r = sc.objdict()
+        r.res = sc.dataframe(self.res)
+        r.age = sc.dataframe(self.age)
+        return r
+        
+    
     def plot(self, fig=None, color='b', alpha=1):
         
-        df = self.df
+        r = self.df()
         
-        nrows,ncols = sc.getrowscols(len(df.columns)-2)
+        nrows,ncols = sc.getrowscols(len(r.res.columns) + len(r.age.columns) - 3)
         
         if fig is None:
             fig = pl.figure(figsize=(14, 10))
         else:
             pl.figure(fig)
 
-        for i, key in enumerate(df.columns):
+        index = 0
+        for i, key in enumerate(r.res.columns):
             if key not in ['t', 'year']:
-                pl.subplot(nrows, ncols, i + 1)
-                pl.plot(df.year, df[key], color=color, alpha=alpha, label=self.label)
+                index += 1
+                pl.subplot(nrows, ncols, index)
+                pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, label=self.label)
                 pl.title(key)
                 pl.legend()
+        
+        for i, key in enumerate(r.age.columns):
+            if key not in ['bins']:
+                index += 1
+                pl.subplot(nrows, ncols, index)
+                pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, label=self.label)
+                pl.title(key)
+                pl.legend()
+        
         pl.tight_layout()
         return fig
 
@@ -100,7 +125,7 @@ for use_multiscale in [False, True]:
 
 if __name__ == '__main__':
     
-    msim = hpv.parallel(sims)
+    msim = hpv.parallel(sims, keep_people=True, parallel=False)
     df = msim.compare(output=True, show_match=True)
     print(df.to_string())
     
