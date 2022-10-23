@@ -31,6 +31,7 @@ def make_pars(**kwargs):
 
     # Population parameters
     pars['n_agents']        = 20e3      # Number of agents
+    pars['total_pop']       = None      # If defined, used for calculating the scale factor
     pars['pop_scale']       = None      # How much to scale the population
     pars['cancer_scale']    = None      # How much to scale cancer agents
     pars['use_multiscale']  = False     # Whether to use multiscale modeling

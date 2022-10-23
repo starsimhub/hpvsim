@@ -511,8 +511,14 @@ class Sim(hpb.BaseSim):
             self.init_states(age_brackets=age_brackets, init_hpv_prev=init_hpv_prev)
 
         # If no pop_scale has been provided, try to get it from the location
+        if self['total_pop'] is not None and total_pop is not None:
+            errormsg = 'You can either define total_pop explicitly or via the location, but not both'
+            raise ValueError(errormsg)
+        elif total_pop is None and self['total_pop'] is not None:
+            total_pop = self['total_pop']
+            
         if self['pop_scale'] is None:
-            if self['location'] is None or total_pop is None:
+            if total_pop is None:
                 self['pop_scale'] = 1
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
