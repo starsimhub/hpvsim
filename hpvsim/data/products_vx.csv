@@ -11,6 +11,8 @@ bivalent,hpv56,0.3
 bivalent,hpv58,0.3
 bivalent,hpv6,0.3
 bivalent,hpv11,0.3
+bivalent,hrhpv,0.5
+bivalent,lrhpv,0.3
 quadrivalent,hpv16,1
 quadrivalent,hpv18,1
 quadrivalent,hpv31,0.5
@@ -23,6 +25,8 @@ quadrivalent,hpv56,0.3
 quadrivalent,hpv58,0.3
 quadrivalent,hpv6,1
 quadrivalent,hpv11,1
+quadrivalent,hrhpv,0.5
+quadrivalent,lrhpv,1
 nonavalent,hpv16,1
 nonavalent,hpv18,1
 nonavalent,hpv31,1
@@ -35,3 +39,5 @@ nonavalent,hpv56,0.3
 nonavalent,hpv58,1
 nonavalent,hpv6,1
 nonavalent,hpv11,1
+nonavalent,hrhpv,1
+nonavalent,lrhpv,1

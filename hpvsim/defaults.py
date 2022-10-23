@@ -8,8 +8,10 @@ import pylab as pl
 from .settings import options as hpo # To set options
 
 # Specify all externally visible functions this file defines -- other things are available as e.g. hp.defaults.default_int
-__all__ = ['default_float', 'default_int', 'get_default_plots']
+__all__ = ['datadir', 'default_float', 'default_int', 'get_default_plots']
 
+# Define paths
+datadir = sc.path(sc.thisdir(__file__)) / 'data'
 
 #%% Specify what data types to use
 
@@ -246,7 +248,7 @@ stock_names  = [state.label for state in PeopleMeta.stock_states]
 stock_colors = [state.cmap for state in PeopleMeta.stock_states]
 total_stock_keys = [state.name for state in PeopleMeta.stock_states if state.shape=='n_genotypes']
 
-# Incidence and prevalence. Strong overlap with stocks, but with slightly different naming conventions
+# Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
 inci_keys   = ['hpv',       'cin1',         'cin2',         'cin3',         'cin',  'cancer']
 inci_names  = ['HPV',       'CIN1',         'CIN2',         'CIN3',         'CIN',  'cancer']

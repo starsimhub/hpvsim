@@ -189,158 +189,141 @@ class People(hpb.BasePeople):
         return
 
     
-    #%% Utility methods
+    #%% Disease progression methods
     def set_prognoses(self, inds, g, dt, hiv_pars=None):
         '''
-        Set prognoses for people following infection.
+        Set prognoses for people following infection. Wrapper method that calls
+        the 4 separate methods for setting and updating prognoses.
         '''
         gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-        self.set_dysp_rates(inds, g, gpars, hiv_pars=hiv_pars) # Set variables that determine the probability that dysplasia begins
-        dysp_inds = self.set_dysp_status(inds, g, dt) # Set people's dysplasia status
-        self.set_severity(dysp_inds, g, gpars, hiv_pars=hiv_pars) # Set dysplasia severity and duration
-        self.set_cin_grades(dysp_inds, g, dt) # Set CIN grades and dates over time
+        self.set_dysp_rates(inds, g, gpars, hiv_dysp_rate=hiv_pars['dysp_rate'])  # Set variables that determine the probability that dysplasia begins
+        dysp_inds = self.set_dysp_status(inds, g, dt)  # Set people's dysplasia status
+        self.set_severity(dysp_inds, g, gpars, hiv_prog_rate=hiv_pars['prog_rate'])  # Set dysplasia severity and duration
+        self.set_cin_grades(dysp_inds, g, dt)  # Set CIN grades and dates over time
         return
-    
-    
-    def set_dysp_rates(self, inds, g, gpars, hiv_pars):
+
+
+    def set_dysp_status(self, inds, g, dt):
+        '''
+        Use durations and dysplasia rates to determine whether HPV clears or progresses to dysplasia
+        '''
+        dur_precin  = self.dur_precin[g, inds]  # Array of durations of infection prior to dysplasia/clearance/control
+        dysp_rate   = self.dysp_rate[g, inds]  # Array of dysplasia rates
+        dysp_probs  = hpu.logf1(dur_precin, dysp_rate)  # Probability of developing dysplasia
+        has_dysp    = hpu.binomial_arr(dysp_probs)  # Boolean array of those who have dysplasia
+        nodysp_inds = inds[~has_dysp]  # Indices of those without dysplasia
+        dysp_inds   = inds[has_dysp]  # Indices of those with dysplasia
+
+        # Infection clears without causing dysplasia
+        self.date_clearance[g, nodysp_inds] = self.date_infectious[g, nodysp_inds]+ np.ceil(self.dur_infection[g, nodysp_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
+
+        # Infection progresses to dysplasia, which is initially classified as CIN1 - set dates for this
+        excl_inds = hpu.true(self.date_cin1[g, dysp_inds] < self.t)  # Don't count CIN1s that were acquired before now
+        self.date_cin1[g, dysp_inds[excl_inds]] = np.nan
+        self.date_cin1[g, dysp_inds] = np.fmin(self.date_cin1[g, dysp_inds],
+                                               self.date_infectious[g, dysp_inds] +
+                                               sc.randround(self.dur_precin[g, dysp_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
+
+        return dysp_inds
+
+
+    def set_severity(self, inds, g, gpars, hiv_prog_rate=None):
+        ''' Set dysplasia severity and duration for women who develop dysplasia '''
+
+        # Evaluate duration of dysplasia prior to clearance/control/progression to cancer
+        dur_dysp = hpu.sample(**gpars['dur_dysp'], size=len(inds))
+        self.dur_dysp[g, inds] = dur_dysp
+        self.dur_infection[g, inds] += dur_dysp
+
+        # Evaluate progression rates
+        self.prog_rate[g, inds] = hpu.sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=len(inds))
+        has_hiv = self.hiv[inds]
+        if has_hiv.any():  # Figure out if any of these women have HIV
+            immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
+            modified_prog_rate = immune_compromise * hiv_prog_rate  # Calculate the modification to make to the progression rate
+            modified_prog_rate[modified_prog_rate < 1] = 1
+            self.prog_rate[g, inds] = self.prog_rate[g, inds] * modified_prog_rate  # Store progression rates
+
+        # Set attributes
+        dur_dysp = self.dur_dysp[g, inds]  # Array of durations of dysplasia prior to clearance/control/cancer
+        prog_rate = self.prog_rate[g, inds]  # Array of progression rates
+        peak_dysp = hpu.logf1(dur_dysp, prog_rate)  # Maps durations + progression to severity
+        self.peak_dysp[g, inds] = peak_dysp  # Store peak dysplasia
+
+        return
+
+
+    def set_dysp_rates(self, inds, g, gpars, hiv_dysp_rate=None):
         '''
         Set dysplasia rates
         '''
         self.dysp_rate[g, inds] = gpars['dysp_rate']
         has_hiv = self.hiv[inds]
-        if has_hiv.any(): # Figure out if any of these women have HIV
-            self.update_precin_hiv(inds[has_hiv], g, hiv_pars['dysp_rate'])
+        if has_hiv.any():  # Figure out if any of these women have HIV
+            immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
+            modified_dysp_rate = immune_compromise * hiv_dysp_rate  # Calculate the modification to make to the dysplasia rate
+            modified_dysp_rate[modified_dysp_rate < 1] = 1
+            self.dysp_rate[g, inds] = self.dysp_rate[g, inds] * modified_dysp_rate  # Store dysplasia rates
         return
-    
-    
-    def update_precin_hiv(self, inds, g, hiv_dysp_rate):
-        '''
-        Update precin pathway for WLHIV
-        '''
-        immune_compromise = 1 - self.art_adherence[inds] # Get the degree of immunocompromise
-        modified_dysp_rate = immune_compromise * hiv_dysp_rate # Calculate the modification to make to the dysplasia rate
-        modified_dysp_rate[modified_dysp_rate < 1] = 1
-        self.dysp_rate[g, inds] = self.dysp_rate[g, inds] * modified_dysp_rate # Store dysplasia rates
-        return
-    
-    
-    def set_dysp_status(self, inds, g, dt):
-        '''
-        Use durations and dysplasia rates to determine whether HPV clears or progresses to dysplasia
-        '''
-        dur_precin  = self.dur_precin[g, inds]    # Array of durations of infection prior to dysplasia/clearance/control
-        dysp_rate   = self.dysp_rate[g, inds]     # Array of dysplasia rates
-        dysp_probs  = hpu.logf1(dur_precin, dysp_rate)  # Probability of developing dysplasia
-        has_dysp    = hpu.binomial_arr(dysp_probs)      # Boolean array of those who have dysplasia
-        nodysp_inds = inds[~has_dysp]               # Indices of those without dysplasia
-        dysp_inds   = inds[has_dysp]                # Indices of those with dysplasia
-    
-        # Infection clears without causing dysplasia
-        self.date_clearance[g, nodysp_inds] = self.date_infectious[g, nodysp_inds] \
-                                                 + np.ceil(self.dur_infection[g, nodysp_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
-    
-    
-        # Infection progresses to dysplasia, which is initially classified as CIN1 - set dates for this
-        excl_inds = hpu.true(self.date_cin1[g, dysp_inds] < self.t)  # Don't count CIN1s that were acquired before now
-        self.date_cin1[g, dysp_inds[excl_inds]] = np.nan
-        self.date_cin1[g, dysp_inds] = np.fmin(self.date_cin1[g, dysp_inds],
-                                                 self.date_infectious[g, dysp_inds] +
-                                                 sc.randround(self.dur_precin[g, dysp_inds] / dt))  # Date they develop CIN1 - minimum of the date from their new infection and any previous date
-    
-        return dysp_inds
-    
-    
-    def set_severity(self, inds, g, gpars, hiv_pars=None):
-        ''' Set dysplasia severity and duration for women who develop dysplasia '''
-    
-        # Evaluate duration of dysplasia prior to clearance/control/progression to cancer
-        dur_dysp = hpu.sample(**gpars['dur_dysp'], size=len(inds))
-        self.dur_dysp[g, inds] = dur_dysp
-        self.dur_infection[g, inds] += dur_dysp
-    
-        # Evaluate progression rates
-        self.prog_rate[g, inds] = hpu.sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=len(inds))
-        has_hiv = self.hiv[inds]
-        if has_hiv.any(): # Figure out if any of these women have HIV
-            self.update_cin_hiv(inds[has_hiv], g, hiv_pars['prog_rate']) # Update their progression rates if so
-    
-        return
-    
-    
-    def update_cin_hiv(self, inds, g, hiv_prog_rate):
-        '''
-        Update CIN pathway for WLHIV
-        '''
-        immune_compromise = 1 - self.art_adherence[inds] # Get the degree of immunocompromise
-        modified_prog_rate = immune_compromise * hiv_prog_rate # Calculate the modification to make to the progression rate
-        modified_prog_rate[modified_prog_rate < 1] = 1
-        self.prog_rate[g, inds] = self.prog_rate[g, inds] * modified_prog_rate # Store progression rates
-        return
-    
-    
+
     def set_cin_grades(self, inds, g, dt):
         '''
         Set CIN clinical grades and dates of progression
         '''
-    
-        dur_dysp    = self.dur_dysp[g, inds]      # Array of durations of dysplasia prior to clearance/control/cancer
-        prog_rate   = self.prog_rate[g, inds]     # Array of progression rates
-        peak_dysp   = hpu.logf1(dur_dysp, prog_rate)    # Maps durations + progression to severity
-        self.peak_dysp[g, inds] = peak_dysp       # Store peak dysplasia
-    
+
         # Map severity to clinical grades
         ccut = self.pars['clinical_cutoffs']
-        is_cin1   = peak_dysp>0 # Boolean arrays of people who attain each clinical grade
-        is_cin2   = peak_dysp>ccut['cin1']
-        is_cin3   = peak_dysp>ccut['cin2']
-        is_cancer = peak_dysp>ccut['cin3']
-        # cin1_inds = inds[is_cin1] # Indices of those progress at least to CIN2 # CK: TODO: why is this not used?
-        cin2_inds = inds[is_cin2] # Indices of those progress at least to CIN2
-        cin3_inds = inds[is_cin3] # Indices of those progress at least to CIN3
-        cancer_inds = inds[is_cancer] # Indices of those progress to cancer
-        max_cin1_inds = inds[is_cin1 & ~is_cin2] # Indices of those who don't progress beyond CIN1
-        max_cin2_inds = inds[is_cin2 & ~is_cin3] # Indices of those who don't progress beyond CIN2
-        max_cin3_inds = inds[is_cin3 & ~is_cancer] # Indices of those who don't progress beyond CIN3
-        
-        # Create new indices
-        if len(cancer_inds):
-            import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
-        
-    
-        # Determine whether CIN1 clears or progresses to CIN2 # CK: TODO: refactor
+        peak_dysp = self.peak_dysp[g, inds]
+        prog_rate = self.prog_rate[g, inds]
+        is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
+        is_cin2 = peak_dysp > ccut['cin1']
+        is_cin3 = peak_dysp > ccut['cin2']
+        is_cancer = peak_dysp > ccut['cin3']
+        cin1_inds = inds[is_cin1]  # Indices of those progress at least to CIN2
+        cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
+        cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
+        cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
+        max_cin1_inds = inds[is_cin1 & ~is_cin2]  # Indices of those who don't progress beyond CIN1
+        max_cin2_inds = inds[is_cin2 & ~is_cin3]  # Indices of those who don't progress beyond CIN2
+        max_cin3_inds = inds[is_cin3 & ~is_cancer]  # Indices of those who don't progress beyond CIN3
+
+        # Determine whether CIN1 clears or progresses to CIN2
         self.date_cin2[g, cin2_inds] = np.fmax(self.t, # Don't let people progress to CIN2 prior to the current timestep
-                                                 self.date_cin1[g, cin2_inds] + sc.randround(hpu.invlogf1(ccut['cin1'], prog_rate[is_cin2])/dt))
+                                               self.date_cin1[g, cin2_inds] +
+                                               sc.randround(hpu.invlogf1(ccut['cin1'], prog_rate[is_cin2]) / dt))
         time_to_clear_cin1 = hpu.sample(**self.pars['dur_cin1_clear'], size=len(max_cin1_inds))
         self.date_clearance[g, max_cin1_inds] = np.fmax(self.date_clearance[g, max_cin1_inds],
-                                                      self.date_cin1[g, max_cin1_inds] +
-                                                      sc.randround(time_to_clear_cin1 / dt))
+                                                        self.date_cin1[g, max_cin1_inds] +
+                                                        sc.randround(time_to_clear_cin1 / dt))
         self.dur_dysp[g, max_cin1_inds] += time_to_clear_cin1
-    
+
         # Determine whether CIN2 clears or progresses to CIN3
         self.date_cin3[g, cin3_inds] = np.fmax(self.t, # Don't let people progress to CIN3 prior to the current timestep
-                                                 self.date_cin1[g, cin3_inds] + sc.randround(hpu.invlogf1(ccut['cin2'], prog_rate[is_cin3])/dt))
+                                               self.date_cin1[g, cin3_inds] +
+                                               sc.randround(hpu.invlogf1(ccut['cin2'], prog_rate[is_cin3]) / dt))
         time_to_clear_cin2 = hpu.sample(**self.pars['dur_cin2_clear'], size=len(max_cin2_inds))
         self.date_clearance[g, max_cin2_inds] = np.fmax(self.date_clearance[g, max_cin2_inds],
-                                                      self.date_cin2[g, max_cin2_inds] +
-                                                      sc.randround(time_to_clear_cin2 / dt))
+                                                        self.date_cin2[g, max_cin2_inds] +
+                                                        sc.randround(time_to_clear_cin2 / dt))
         self.dur_dysp[g, max_cin2_inds] += time_to_clear_cin2
-    
+
         # Determine whether CIN3 clears or progresses to cancer
         self.date_cancerous[g, cancer_inds] = np.fmax(self.t,
-                                                        self.date_cin1[g, cancer_inds] + sc.randround(hpu.invlogf1(ccut['cin3'], prog_rate[is_cancer])/dt))
+                                                      self.date_cin1[g, cancer_inds] +
+                                                      sc.randround(hpu.invlogf1(ccut['cin3'], prog_rate[is_cancer]) / dt))
         time_to_clear_cin3 = hpu.sample(**self.pars['dur_cin3_clear'], size=len(max_cin3_inds))
         self.date_clearance[g, max_cin3_inds] = np.fmax(self.date_clearance[g, max_cin3_inds],
-                                                      self.date_cin3[g, max_cin3_inds] +
-                                                      sc.randround(time_to_clear_cin3 / dt))
+                                                        self.date_cin3[g, max_cin3_inds] +
+                                                        sc.randround(time_to_clear_cin3 / dt))
         self.dur_dysp[g, max_cin3_inds] += time_to_clear_cin3
-    
+
         # Record eventual deaths from cancer (assuming no survival without treatment)
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))
         self.date_dead_cancer[cancer_inds] = self.date_cancerous[g, cancer_inds] + sc.randround(dur_cancer / dt)
         self.dur_cancer[g, cancer_inds] = dur_cancer
-    
+
         return
-    
+
     
     def set_hiv_prognoses(self, inds, year=None):
         ''' Set HIV outcomes (for now only ART) '''
@@ -572,14 +555,15 @@ class People(hpb.BasePeople):
             self.set_hiv_prognoses(hiv_inds, year=year) # Set ART adherence for those with HIV
 
             for g in range(self.pars['n_genotypes']):
+                gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
                 nocin_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
                 if len(nocin_inds): # Reevaluate whether these women will develop dysplasia
-                    self.update_precin_hiv(nocin_inds, g, self.pars['hiv_pars']['dysp_rate'])
+                    self.set_dysp_rates(nocin_inds, g, gpars, hiv_dysp_rate=self.pars['hiv_pars']['dysp_rate'])
                     self.set_dysp_status(nocin_inds, g, dt)
 
                 cin_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
                 if len(cin_inds): # Reevaluate disease severity and progression speed for these women
-                    self.update_cin_hiv(cin_inds, g, self.pars['hiv_pars']['prog_rate'])
+                    self.set_severity(cin_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
                     self.set_cin_grades(cin_inds, g, dt)
 
         return len(hiv_inds)
@@ -742,6 +726,12 @@ class People(hpb.BasePeople):
 
         if len(inds) == 0:
             return 0
+
+        # Check whether anyone is already infected with genotype - this should not happen because we only
+        # infect susceptible people
+        if len(hpu.true(self.infectious[g,inds])):
+            errormsg = f'Attempting to reinfect the following agents who are already infected with genotype {g}: {hpu.itruei(self.infectious[g,:],inds)}'
+            raise ValueError(errormsg)
 
         dt = self.pars['dt']
 

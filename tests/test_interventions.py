@@ -12,12 +12,12 @@ import pytest
 do_plot = 0
 do_save = 0
 
-n_agents = [2e3,50e3][0] # Swap between sizes
+n_agents = [1e3,50e3][0] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,
-    'start': 1990,
-    'burnin': 30,
+    'start': 2000,
+    # 'burnin': 30,
     'end': 2050,
     'genotypes': [16, 18],
     'location': 'tanzania',
@@ -135,7 +135,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     st_interventions = soc_screen + triage_treat + new_screen
 
     ## Vaccination interventions
-    routine_years = np.arange(2020, base_pars['end']+1, dtype=int)
+    routine_years = np.arange(2020, base_pars['end'], dtype=int)
     routine_values = np.array([0,0,0,.1,.2,.3,.4,.5,.6,.7,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8,.8])
 
     routine_vx = hpv.routine_vx(
@@ -241,6 +241,65 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
     return sim
 
 
+
+def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Testing effect of prophylactic vaccination')
+
+    verbose = .1
+    debug_scens = 0
+
+    ### Create interventions
+    routine_vx_dose1 = hpv.routine_vx(
+        prob = 0.9,
+        start_year = 2023,
+        age_range = [9,10],
+        product = 'bivalent',
+        label = 'Bivalent dose 1'
+    )
+
+    second_dose_eligible = lambda sim: (sim.people.doses == 1) | (sim.t > (sim.people.date_vaccinated + 0.5 / sim['dt']))
+    routine_vx_dose2 = hpv.routine_vx(
+        prob = 0.8,
+        start_year = 2023,
+        product = 'bivalent2',
+        eligibility=second_dose_eligible,
+        label = 'Bivalent dose 2'
+    )
+
+    interventions = [routine_vx_dose1, routine_vx_dose2]
+    for intv in interventions: intv.do_plot=False
+
+    base_sim = hpv.Sim(pars=base_pars)
+
+    scenarios = {
+        'baseline': {
+            'name': 'Baseline',
+            'pars': {
+            }
+        },
+        'vx scaleup': {
+            'name': 'Vaccinate 90% of 9yos',
+            'pars': {
+                'interventions': interventions
+            }
+        },
+    }
+
+    metapars = {'n_runs': 3}
+    scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
+    scens.run(debug=debug_scens)
+    to_plot = {
+        'HPV prevalence': ['total_hpv_prevalence'],
+        'Age standardized cancer incidence (per 100,000 women)': ['asr_cancer'],
+        'Cancer deaths per 100,000 women': ['cancer_mortality'],
+        'Number vaccinated': ['cum_vaccinated'],
+    }
+    scens.plot(to_plot=to_plot)
+    return scens
+
+
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -249,6 +308,7 @@ if __name__ == '__main__':
 
     sim0 = test_new_interventions(do_plot=do_plot)
     sim1 = test_txvx_noscreen()
+    scens0 = test_vx_effect()
 
 
     sc.toc(T)
