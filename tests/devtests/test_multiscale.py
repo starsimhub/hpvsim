@@ -9,7 +9,7 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats = 4
+repeats = 10
 parallel = True
 showlegend = False
 
@@ -146,7 +146,8 @@ if __name__ == '__main__':
     
     msim = hpv.parallel(sims, keep_people=True, parallel=parallel)
     df = msim.compare(output=True, show_match=True)
-    df.disp()
+    if showlegend:
+        df.disp()
     
     plot_compare_multiscale(msim)
     
