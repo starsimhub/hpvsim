@@ -9,7 +9,9 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats = 2
+repeats = 4
+parallel = True
+showlegend = False
 
 pars = dict(
     n_agents  = 1e3,
@@ -35,6 +37,8 @@ class multitest(hpv.Analyzer):
             self.res[k + '_people'] = np.zeros(sim.npts)
         self.age = sc.objdict()
         self.agebins = np.arange(0,101,10)
+        self.multiscale = sim['use_multiscale']
+        return
     
     
     def apply(self, sim):
@@ -58,6 +62,7 @@ class multitest(hpv.Analyzer):
 
 
     def finalize(self, sim):
+        super().finalize()
         
         dt = sim['dt']
         npts = sim.npts
@@ -67,7 +72,7 @@ class multitest(hpv.Analyzer):
         ages = sim.people.age
         date_cancerous = np.nansum(sim.people.date_cancerous, axis=0)
         cancer_inci_inds = sc.findinds(date_cancerous) # WARNING, won't work if dead agents are removed
-        cancer_death_inds = sim.people.defined('date_dead_cancer')
+        cancer_death_inds = sc.findinds(sim.people.dead_cancer)
         self.age['bins'] = self.agebins[:-1] # Use start rather than edges
         self.age['cancer_inci'], _   = np.histogram(ages[cancer_inci_inds], self.agebins)
         self.age['cancer_deaths'], _ = np.histogram(ages[cancer_death_inds], self.agebins)
@@ -85,10 +90,10 @@ class multitest(hpv.Analyzer):
         
         r = self.df()
         
-        nrows,ncols = sc.getrowscols(len(r.res.columns) + len(r.age.columns) - 3)
+        nrows,ncols = sc.getrowscols((len(r.res.columns) + len(r.age.columns) - 3)*2, ncols=4)
         
         if fig is None:
-            fig = pl.figure(figsize=(14, 10))
+            fig = pl.figure(figsize=(18, 14))
         else:
             pl.figure(fig)
 
@@ -99,7 +104,8 @@ class multitest(hpv.Analyzer):
                 pl.subplot(nrows, ncols, index)
                 pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, label=self.label)
                 pl.title(key)
-                pl.legend()
+                if showlegend:
+                    pl.legend()
         
         for i, key in enumerate(r.age.columns):
             if key not in ['bins']:
@@ -107,7 +113,8 @@ class multitest(hpv.Analyzer):
                 pl.subplot(nrows, ncols, index)
                 pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, label=self.label)
                 pl.title(key)
-                pl.legend()
+                if showlegend:
+                    pl.legend()
         
         pl.tight_layout()
         return fig
@@ -125,9 +132,9 @@ for use_multiscale in [False, True]:
 
 if __name__ == '__main__':
     
-    msim = hpv.parallel(sims, keep_people=True, parallel=False)
+    msim = hpv.parallel(sims, keep_people=True, parallel=parallel)
     df = msim.compare(output=True, show_match=True)
-    print(df.to_string())
+    df.disp()
     
     fig = None
     for sim in msim.sims:

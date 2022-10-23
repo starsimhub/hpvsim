@@ -440,7 +440,7 @@ class MultiSim(hpb.FlexPretty):
         if do_plot:
             self.plot_compare(**kwargs)
 
-        df = pd.DataFrame.from_dict(resdict).astype(object) # astype is necessary to prevent type coercion
+        df = sc.dataframe(pd.DataFrame.from_dict(resdict).astype(object)) # astype is necessary to prevent type coercion
         if show_match: # From https://stackoverflow.com/questions/22701799/pandas-dataframe-find-rows-where-all-columns-equal
             data = df.values
             df['all_match'] = (data == data[:, [0]]).all(axis=1)
