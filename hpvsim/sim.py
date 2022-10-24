@@ -515,19 +515,7 @@ class Sim(hpb.BaseSim):
                 self['pop_scale'] = 1.0
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
-        
-        # Now set the cancer scale
-        if self['cancer_scale'] is None:
-            self['cancer_scale'] = self['pop_scale']
-        
-        # Check that cancer scale isn't larger than pop scale
-        cs = self['cancer_scale']
-        ps = self['pop_scale']
-        if cs > ps:
-            errormsg = f'Cancer scale {cs} is larger than population scale {ps}: it is very unlikely you actually want to do this'
-            raise ValueError(errormsg)
-        else:
-            self['cancer_ratio'] = int(np.round(ps/cs)) # Number of cancer agents for every non-cancer agent
+        self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
         
         # Finish initialization
         self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_pars) # Fully initialize the people

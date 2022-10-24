@@ -251,7 +251,7 @@ class People(hpb.BasePeople):
         dysp_arrs = sc.objdict() # Store severity arrays
         
         # Evaluate duration of dysplasia prior to clearance/control/progression to cancer
-        full_size = (len(inds), self.pars['cancer_ratio']) # Both indices and cancer agents
+        full_size = (len(inds), self.pars['ms_agent_ratio']) # Main axis is indices, but include columns for multiscale agents
         dur_dysp = hpu.sample(**gpars['dur_dysp'], size=full_size)
         self.dur_infection[g, inds] += dur_dysp[:,0] # TODO: should this be mean(axis=1) instead?
 
@@ -295,7 +295,7 @@ class People(hpb.BasePeople):
 
         # Map severity to clinical grades
         ccut = self.pars['clinical_cutoffs']
-        peak_dysp = dysp_arrs.peak_dysp[:,0]
+        peak_dysp = dysp_arrs.peak_dysp[:,0] # Everything beyond 0 is multiscale agents
         prog_rate = dysp_arrs.prog_rate[:,0]
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
         is_cin2 = peak_dysp > ccut['cin1']
@@ -308,6 +308,12 @@ class People(hpb.BasePeople):
         max_cin1_inds = inds[is_cin1 & ~is_cin2]  # Indices of those who don't progress beyond CIN1
         max_cin2_inds = inds[is_cin2 & ~is_cin3]  # Indices of those who don't progress beyond CIN2
         max_cin3_inds = inds[is_cin3 & ~is_cancer]  # Indices of those who don't progress beyond CIN3
+        
+        # Handle multiscale to create additional cancer agents
+        if self.pars['use_multiscale']:
+            full_cancer_bools = dysp_arrs.peak_dysp > ccut['cin3']
+            
+            
 
         # Determine whether CIN1 clears or progresses to CIN2
         self.date_cin2[g, cin2_inds] = np.fmax(self.t, # Don't let people progress to CIN2 prior to the current timestep
