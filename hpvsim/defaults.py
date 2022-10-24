@@ -69,8 +69,8 @@ class PeopleMeta(sc.prettyobj):
     person = [
         State('uid',            default_int),           # Int
         State('scale',          default_float,  1.0), # Float
-        State('level1',         bool,  True),
-        State('level2',         bool,  False),
+        State('level0',         bool,  True), # "Normal" people
+        State('level1',         bool,  False), # "High-resolution" people: e.g. cancer agents
         State('age',            default_float,  np.nan), # Float
         State('sex',            default_float,  np.nan), # Float
         State('debut',          default_float,  np.nan), # Float

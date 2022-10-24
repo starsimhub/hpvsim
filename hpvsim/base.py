@@ -1266,12 +1266,12 @@ class BasePeople(FlexPretty):
     @property
     def is_active(self):
         ''' Boolean array of everyone sexually active i.e. past debut '''
-        return (self.age>self.debut) & (self.alive)
+        return (self.age>self.debut) * (self.alive) * (self.level0)
 
     @property
     def is_virgin(self):
         ''' Boolean array of everyone not yet sexually active i.e. pre debut '''
-        return (self.age<self.debut) & (self.alive)
+        return (self.age<self.debut) * (self.alive)
 
     @property
     def alive_inds(self):

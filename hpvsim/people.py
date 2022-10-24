@@ -317,7 +317,6 @@ class People(hpb.BasePeople):
         self.date_clearance[g, max_cin1_inds] = np.fmax(self.date_clearance[g, max_cin1_inds],
                                                         self.date_cin1[g, max_cin1_inds] +
                                                         sc.randround(time_to_clear_cin1 / dt))
-        # self.dur_dysp[g, max_cin1_inds] += time_to_clear_cin1
 
         # Determine whether CIN2 clears or progresses to CIN3
         self.date_cin3[g, cin3_inds] = np.fmax(self.t, # Don't let people progress to CIN3 prior to the current timestep
@@ -327,7 +326,6 @@ class People(hpb.BasePeople):
         self.date_clearance[g, max_cin2_inds] = np.fmax(self.date_clearance[g, max_cin2_inds],
                                                         self.date_cin2[g, max_cin2_inds] +
                                                         sc.randround(time_to_clear_cin2 / dt))
-        # self.dur_dysp[g, max_cin2_inds] += time_to_clear_cin2
 
         # Determine whether CIN3 clears or progresses to cancer
         self.date_cancerous[g, cancer_inds] = np.fmax(self.t,
@@ -337,7 +335,6 @@ class People(hpb.BasePeople):
         self.date_clearance[g, max_cin3_inds] = np.fmax(self.date_clearance[g, max_cin3_inds],
                                                         self.date_cin3[g, max_cin3_inds] +
                                                         sc.randround(time_to_clear_cin3 / dt))
-        # self.dur_dysp[g, max_cin3_inds] += time_to_clear_cin3
 
         # Record eventual deaths from cancer (assuming no survival without treatment)
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))
