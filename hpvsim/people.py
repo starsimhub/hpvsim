@@ -439,7 +439,7 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
         self.no_dysp[genotype, inds] = False
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     def check_cin2(self, genotype):
@@ -448,7 +448,7 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cin2[genotype,:], self.date_cin2[genotype,:], filter_inds=filter_inds)
         self.cin2[genotype, inds] = True
         self.cin1[genotype, inds] = False # No longer counted as CIN1
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     def check_cin3(self, genotype):
@@ -457,7 +457,7 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cin3[genotype,:], self.date_cin3[genotype,:], filter_inds=filter_inds)
         self.cin3[genotype, inds] = True
         self.cin2[genotype, inds] = False # No longer counted as CIN2
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     def check_cancer(self, genotype):
@@ -472,10 +472,9 @@ class People(hpb.BasePeople):
         # Calculations for age-standardized cancer incidence
         cases_by_age = 0
         if len(inds)>0:
-            age_new_cases = self.age[inds] # Ages of new cases
-            cases_by_age = np.histogram(age_new_cases, self.asr_bins)[0]
+            cases_by_age = np.histogram(self.age[inds], bins=self.asr_bins, weights=self.scale[inds])[0]
 
-        return len(inds), cases_by_age
+        return self.scale_flows(inds), cases_by_age
 
 
     def check_cancer_deaths(self):
@@ -489,7 +488,7 @@ class People(hpb.BasePeople):
         # check which of these were detected by symptom or screening
         self.flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
 
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     def check_clearance(self, genotype):
