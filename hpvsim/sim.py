@@ -896,10 +896,10 @@ class Sim(hpb.BaseSim):
         self.finalize_analyzers()
         self.finalize_interventions()
 
-        # Scale the results
-        for reskey in self.result_keys():
-            if self.results[reskey].scale:
-                self.results[reskey].values *= self['pop_scale']
+        # # Scale the results
+        # for reskey in self.result_keys():
+        #     if self.results[reskey].scale:
+        #         self.results[reskey].values *= self['pop_scale']
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results

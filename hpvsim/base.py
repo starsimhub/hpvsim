@@ -310,45 +310,6 @@ class BaseSim(ParsObj):
         except:  # pragma: no cover # If it's None or missing
             return 0
 
-    @property
-    def scaled_pop_size(self):
-        ''' Get the total population size, i.e. the number of agents times the scale factor -- if it fails, assume none '''
-        try:
-            return self['n_agents']*self['pop_scale']
-        except:  # pragma: no cover # If it's None or missing
-            return 0
-
-    # @property
-    # def npts(self):
-    #     ''' Count the number of time points '''
-    #     try:
-    #         return int(self['n_days'] + 1)
-    #     except: # pragma: no cover
-    #         return 0
-
-    # @property
-    # def tvec(self):
-    #     ''' Create a time vector '''
-    #     try:
-    #         return np.arange(self.npts)
-    #     except: # pragma: no cover
-    #         return np.array([])
-
-    # @property
-    # def datevec(self):
-    #     '''
-    #     Create a vector of dates
-
-    #     Returns:
-    #         Array of `datetime` instances containing the date associated with each
-    #         simulation time step
-
-    #     '''
-    #     try:
-    #         return self['start_day'] + self.tvec * dt.timedelta(days=1)
-    #     except: # pragma: no cover
-    #         return np.array([])
-
 
     def get_t(self, dates, exact_match=False, return_date_format=None):
         '''
