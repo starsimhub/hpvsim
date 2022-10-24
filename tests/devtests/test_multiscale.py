@@ -9,16 +9,16 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats = 3
+repeats = 10
 parallel = True
 showlegend = False
 
-total_pop = 10e3
+large_pop = 10e3
 small_pop = 1e3
-ratio = total_pop/total_pop
+ratio = large_pop/small_pop
 
 pars = dict(
-    total_pop      = total_pop,
+    total_pop      = large_pop,
     ms_agent_ratio = ratio,
     start          = 1975,
     n_years        = 50,
@@ -28,10 +28,10 @@ pars = dict(
 )
 
 loop_pars = [
-    sc.objdict(n_agents=total_pop, use_multiscale=0),
-    sc.objdict(n_agents=total_pop, use_multiscale=1),
-    sc.objdict(n_agents=small_pop,  use_multiscale=0),
-    sc.objdict(n_agents=small_pop,  use_multiscale=1),
+    sc.objdict(n_agents=large_pop, use_multiscale=0),
+    sc.objdict(n_agents=large_pop, use_multiscale=1),
+    sc.objdict(n_agents=small_pop, use_multiscale=0),
+    sc.objdict(n_agents=small_pop, use_multiscale=1),
     ]
 
 
@@ -60,18 +60,18 @@ class multitest(hpv.Analyzer):
         
         self.res['n_sus_agents'][ppl.t] = ppl.susceptible.sum()
         self.res['n_sus_people'][ppl.t] = (ppl.susceptible * ppl.scale).sum()
-        self.res['n_inf_agents'][ppl.t] = (ppl.infectious.sum()).sum()
-        self.res['n_inf_people'][ppl.t] = (ppl.infectious.sum() * ppl.scale).sum()
+        self.res['n_inf_agents'][ppl.t] = ppl.infectious.sum()
+        self.res['n_inf_people'][ppl.t] = (ppl.infectious.sum(axis=0) * ppl.scale).sum()
         self.res['n_can_agents'][ppl.t] = ppl.cancerous.sum()
         self.res['n_can_people'][ppl.t] = (ppl.cancerous.sum(axis=0) * ppl.scale).sum()
 
-        self.res['age_agents'][ppl.t] = np.average(ppl.age, weights=(ppl.alive))
-        self.res['age_people'][ppl.t] = np.average(ppl.age, weights=(ppl.alive)*ppl.scale)
-
         self.res['alive_agents'][ppl.t] = (ppl.alive).sum()
         self.res['alive_people'][ppl.t] = ppl.scale[ppl.alive].sum()
-        self.res['age_agents'][ppl.t] = np.average(ppl.age)
-        self.res['age_people'][ppl.t] = np.average(ppl.age, weights=ppl.scale)
+        
+        self.res['age_agents'][ppl.t] = np.average(ppl.age, weights=(ppl.alive))
+        self.res['age_people'][ppl.t] = np.average(ppl.age, weights=(ppl.alive)*ppl.scale)
+        
+        return
 
 
     def finalize(self, sim):
@@ -79,16 +79,17 @@ class multitest(hpv.Analyzer):
         
         dt = sim['dt']
         npts = sim.npts
+        ppl = sim.people
         
         self.res['t'] = np.arange(0, npts*dt, dt)
         self.res['year'] = sim.yearvec
-        ages = sim.people.age
-        date_cancerous = np.nansum(sim.people.date_cancerous, axis=0)
+        ages = ppl.age
+        date_cancerous = np.nansum(ppl.date_cancerous, axis=0)
         cancer_inci_inds = sc.findinds(date_cancerous) # WARNING, won't work if dead agents are removed
-        cancer_death_inds = sc.findinds(sim.people.dead_cancer)
+        cancer_death_inds = sc.findinds(ppl.dead_cancer)
         self.age['bins'] = self.agebins[:-1] # Use start rather than edges
-        self.age['cancer_inci'], _   = np.histogram(ages[cancer_inci_inds], self.agebins)
-        self.age['cancer_deaths'], _ = np.histogram(ages[cancer_death_inds], self.agebins)
+        self.age['cancer_inci'], _   = np.histogram(ages[cancer_inci_inds], self.agebins, weights=ppl.scale[cancer_inci_inds])
+        self.age['cancer_deaths'], _ = np.histogram(ages[cancer_death_inds], self.agebins, weights=ppl.scale[cancer_death_inds])
         return
     
         
