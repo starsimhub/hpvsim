@@ -466,7 +466,7 @@ class MultiSim(hpb.FlexPretty):
         other options.
 
         Args:
-            to_plot      (list) : list or dict of which results to plot; see cv.get_default_plots() for structure
+            to_plot      (list) : list or dict of which results to plot; see hpv.get_default_plots() for structure
             inds         (list) : if not combined or reduced, the indices of the simulations to plot (if None, plot all)
             plot_sims    (bool) : whether to plot individual sims, even if combine() or reduce() has been used
             color_by_sim (bool) : if True, set colors based on the simulation type; otherwise, color by result type; True implies a scenario-style plotting, False implies sim-style plotting
@@ -615,7 +615,7 @@ class MultiSim(hpb.FlexPretty):
 
     def save(self, filename=None, keep_people=False, **kwargs):
         '''
-        Save to disk as a gzipped pickle. Load with cv.load(filename) or
+        Save to disk as a gzipped pickle. Load with hpv.load(filename) or
         hpv.MultiSim.load(filename).
 
         Args:
@@ -662,7 +662,7 @@ class MultiSim(hpb.FlexPretty):
 
         Args:
             msimfile (str): the name or path of the file to load from
-            kwargs: passed to cv.load()
+            kwargs: passed to hpv.load()
 
         Returns:
             msim (MultiSim): the loaded MultiSim object
@@ -914,7 +914,7 @@ class Scenarios(hpb.ParsObj):
         # Handle filename
         if scenfile is None:
             datestr = sc.getdate(obj=self.created, dateformat='%Y-%b-%d_%H.%M.%S')
-            scenfile = f'covasim_scenarios_{datestr}.scens'
+            scenfile = f'hpvsim_scenarios_{datestr}.scens'
         self.scenfile = scenfile
         self.label = label
 

@@ -77,8 +77,8 @@ def load_data(datafile, check_date=False, header='infer', calculate=True, **kwar
 
 def load(*args, update=True, verbose=True, **kwargs):
     '''
-    Convenience method for sc.loadobj() and equivalent to cv.Sim.load() or
-    cv.Scenarios.load().
+    Convenience method for sc.loadobj() and equivalent to hpv.Sim.load() or
+    hpv.Scenarios.load().
 
     Args:
         filename (str): file to load
@@ -93,8 +93,8 @@ def load(*args, update=True, verbose=True, **kwargs):
 
     **Examples**::
 
-        sim = cv.load('calib.sim') # Equivalent to cv.Sim.load('calib.sim')
-        scens = cv.load(filename='school-closures.scens', folder='schools')
+        sim = hpv.load('calib.sim') # Equivalent to hpv.Sim.load('calib.sim')
+        scens = hpv.load(filename='school-closures.scens', folder='schools')
     '''
     obj = sc.loadobj(*args, **kwargs)
     if hasattr(obj, 'version'):
@@ -102,14 +102,14 @@ def load(*args, update=True, verbose=True, **kwargs):
         v_obj = obj.version
         cmp = check_version(v_obj, verbose=False)
         if cmp != 0:
-            print(f'Note: you have Covasim v{v_curr}, but are loading an object from v{v_obj}')
+            print(f'Note: you have HPVsim v{v_curr}, but are loading an object from v{v_obj}')
     return obj
 
 
 def save(*args, **kwargs):
     '''
-    Convenience method for sc.saveobj() and equivalent to cv.Sim.save() or
-    cv.Scenarios.save().
+    Convenience method for sc.saveobj() and equivalent to hpv.Sim.save() or
+    hpv.Scenarios.save().
 
     Args:
         filename (str): file to save to
@@ -122,8 +122,8 @@ def save(*args, **kwargs):
 
     **Examples**::
 
-        cv.save('calib.sim', sim) # Equivalent to sim.save('calib.sim')
-        cv.save(filename='school-closures.scens', folder='schools', obj=scens)
+        hpv.save('calib.sim', sim) # Equivalent to sim.save('calib.sim')
+        hpv.save(filename='school-closures.scens', folder='schools', obj=scens)
     '''
     filepath = sc.saveobj(*args, **kwargs)
     return filepath
@@ -132,11 +132,11 @@ def save(*args, **kwargs):
 def savefig(filename=None, comments=None, fig=None, **kwargs):
     '''
     Wrapper for Matplotlib's ``pl.savefig()`` function which automatically stores
-    Covasim metadata in the figure.
+    HPVsim metadata in the figure.
 
     By default, saves (git) information from both the HPVsim version and the calling
     function. Additional comments can be added to the saved file as well. These can
-    be retrieved via ``cv.get_png_metadata()`` (or :py:func:`sciris.sc_plotting.loadmetadata`). Metadata can
+    be retrieved via ``hpv.get_png_metadata()`` (or :py:func:`sciris.sc_plotting.loadmetadata`). Metadata can
     also be stored for PDF, but cannot be automatically retrieved.
 
     Args:
@@ -147,8 +147,8 @@ def savefig(filename=None, comments=None, fig=None, **kwargs):
 
     **Example**::
 
-        cv.Sim().run().plot()
-        cv.savefig()
+        hpv.Sim().run().plot()
+        hpv.savefig()
     '''
 
     # Handle inputs
@@ -161,7 +161,7 @@ def savefig(filename=None, comments=None, fig=None, **kwargs):
 
     if filename is None: # pragma: no cover
         now = sc.getdate(dateformat='%Y-%b-%d_%H.%M.%S')
-        filename = f'covasim_{now}.png'
+        filename = f'hpvsim_{now}.png'
     filenamelist = sc.tolist(filename)
 
     if len(figlist) != len(filenamelist):
@@ -171,14 +171,14 @@ def savefig(filename=None, comments=None, fig=None, **kwargs):
     metadata = {}
     metadata['hpvsim version'] = hpv.__version__
     gitinfo = git_info()
-    for key,value in gitinfo['covasim'].items():
-        metadata[f'Covasim {key}'] = value
+    for key,value in gitinfo['hpvsim'].items():
+        metadata[f'HPVsim {key}'] = value
     for key,value in gitinfo['called_by'].items():
-        metadata[f'Covasim caller {key}'] = value
-    metadata['Covasim current time'] = sc.getdate()
-    metadata['Covasim calling file'] = sc.getcaller()
+        metadata[f'HPVsim caller {key}'] = value
+    metadata['HPVsim current time'] = sc.getdate()
+    metadata['HPVsim calling file'] = sc.getcaller()
     if comments:
-        metadata['Covasim comments'] = comments
+        metadata['HPVsim comments'] = comments
 
     # Loop over the figures (usually just one)
     for thisfig, thisfilename in zip(figlist, filenamelist):
@@ -205,7 +205,7 @@ __all__ += ['git_info', 'check_version', 'check_save_version', 'get_version_pars
 def git_info(filename=None, check=False, comments=None, old_info=None, die=False, indent=2, verbose=True, frame=2, **kwargs):
     '''
     Get current git information and optionally write it to disk. Simplest usage
-    is cv.git_info(__file__)
+    is hpv.git_info(__file__)
 
     Args:
         filename  (str): name of the file to write to or read from
@@ -220,10 +220,10 @@ def git_info(filename=None, check=False, comments=None, old_info=None, die=False
 
     **Examples**::
 
-        cv.git_info() # Return information
-        cv.git_info(__file__) # Writes to disk
-        cv.git_info('covasim_version.gitinfo') # Writes to disk
-        cv.git_info('covasim_version.gitinfo', check=True) # Checks that current version matches saved file
+        hpv.git_info() # Return information
+        hpv.git_info(__file__) # Writes to disk
+        hpv.git_info('hpvsim_version.gitinfo') # Writes to disk
+        hpv.git_info('hpvsim_version.gitinfo', check=True) # Checks that current version matches saved file
     '''
 
     # Handle the case where __file__ is supplied as the argument
@@ -232,11 +232,11 @@ def git_info(filename=None, check=False, comments=None, old_info=None, die=False
 
     # Get git info
     calling_file = sc.makefilepath(sc.getcaller(frame=frame, tostring=False)['filename'])
-    cv_info = {'version':hpv.__version__}
-    cv_info.update(sc.gitinfo(__file__, verbose=False))
+    hpv_info = {'version':hpv.__version__}
+    hpv_info.update(sc.gitinfo(__file__, verbose=False))
     caller_info = sc.gitinfo(calling_file, verbose=False)
     caller_info['filename'] = calling_file
-    info = {'covasim':cv_info, 'called_by':caller_info}
+    info = {'hpvsim':hpv_info, 'called_by':caller_info}
     if comments:
         info['comments'] = comments
 
@@ -253,9 +253,9 @@ def git_info(filename=None, check=False, comments=None, old_info=None, die=False
         if filename is not None:
             old_info = sc.loadjson(filename, **kwargs)
         string = ''
-        old_cv_info = old_info['covasim'] if 'covasim' in old_info else old_info
-        if cv_info != old_cv_info: # pragma: no cover
-            string = f'Git information differs: {cv_info} vs. {old_cv_info}'
+        old_hpv_info = old_info['hpvsim'] if 'hpvsim' in old_info else old_info
+        if hpv_info != old_hpv_info: # pragma: no cover
+            string = f'Git information differs: {hpv_info} vs. {old_hpv_info}'
             if die:
                 raise ValueError(string)
             elif verbose:
@@ -276,7 +276,7 @@ def check_version(expected, die=False, verbose=True):
 
     **Example**::
 
-        cv.check_version('>=1.7.0', die=True) # Will raise an exception if an older version is used
+        hpv.check_version('>=1.7.0', die=True) # Will raise an exception if an older version is used
     '''
     if expected.startswith('>'):
         valid = 1
@@ -289,7 +289,7 @@ def check_version(expected, die=False, verbose=True):
     compare = sc.compareversions(version, expected) # Returns -1, 0, or 1
     relation = ['older', '', 'newer'][compare+1] # Picks the right string
     if relation: # Versions mismatch, print warning or raise error
-        string = f'Note: Covasim is {relation} than expected ({version} vs. {expected})'
+        string = f'Note: HPVsim is {relation} than expected ({version} vs. {expected})'
         if die and compare != valid:
             raise ValueError(string)
         elif verbose:
@@ -302,7 +302,7 @@ def check_save_version(expected=None, filename=None, die=False, verbose=True, **
     A convenience function that bundles check_version with git_info and saves
     automatically to disk from the calling file. The idea is to put this at the
     top of an analysis script, and commit the resulting file, to keep track of
-    which version of Covasim was used.
+    which version of HPVsim was used.
 
     Args:
         expected (str): expected version information
@@ -311,9 +311,9 @@ def check_save_version(expected=None, filename=None, die=False, verbose=True, **
 
     **Examples**::
 
-        cv.check_save_version()
-        cv.check_save_version('1.3.2', filename='script.gitinfo', comments='This is the main analysis script')
-        cv.check_save_version('1.7.2', folder='gitinfo', comments={'SynthPops':sc.gitinfo(sp.__file__)})
+        hpv.check_save_version()
+        hpv.check_save_version('1.3.2', filename='script.gitinfo', comments='This is the main analysis script')
+        hpv.check_save_version('1.7.2', folder='gitinfo', comments={'SynthPops':sc.gitinfo(sp.__file__)})
     '''
 
     # First, check the version if supplied
@@ -332,14 +332,14 @@ def get_version_pars(version, verbose=True):
     '''
     Function for loading parameters from the specified version.
 
-    Parameters will be loaded for Covasim 'as at' the requested version i.e. the
+    Parameters will be loaded for HPVsim 'as at' the requested version i.e. the
     most recent set of parameters that is <= the requested version. Available
     parameter values are stored in the regression folder. If parameters are available
     for versions 1.3, and 1.4, then this function will return the following
 
     - If parameters for version '1.3' are requested, parameters will be returned from '1.3'
     - If parameters for version '1.3.5' are requested, parameters will be returned from '1.3', since
-      Covasim at version 1.3.5 would have been using the parameters defined at version 1.3.
+      HPVsim at version 1.3.5 would have been using the parameters defined at version 1.3.
     - If parameters for version '1.4' are requested, parameters will be returned from '1.4'
 
     Args:
@@ -372,7 +372,7 @@ def get_version_pars(version, verbose=True):
 
 def get_png_metadata(filename, output=False):
     '''
-    Read metadata from a PNG file. For use with images saved with cv.savefig().
+    Read metadata from a PNG file. For use with images saved with hpv.savefig().
     Requires pillow, an optional dependency. Metadata retrieval for PDF and SVG
     is not currently supported.
 
@@ -381,9 +381,9 @@ def get_png_metadata(filename, output=False):
 
     **Example**::
 
-        cv.Sim().run(do_plot=True)
-        cv.savefig('covasim.png')
-        cv.get_png_metadata('covasim.png')
+        hpv.Sim().run(do_plot=True)
+        hpv.savefig('hpvsim.png')
+        hpv.get_png_metadata('hpvsim.png')
     '''
     try:
         import PIL
@@ -393,7 +393,7 @@ def get_png_metadata(filename, output=False):
     im = PIL.Image.open(filename)
     metadata = {}
     for key,value in im.info.items():
-        if key.startswith('Covasim'):
+        if key.startswith('HPVsim'):
             metadata[key] = value
             if not output:
                 print(f'{key}: {value}')
@@ -416,8 +416,8 @@ def get_doubling_time(sim, series=None, interval=None, start_day=None, end_day=N
 
     **Examples**::
 
-        cv.get_doubling_time(sim, interval=[3,30]) # returns the doubling time over the given interval (single float)
-        cv.get_doubling_time(sim, interval=[3,30], moving_window=3) # returns doubling times calculated over moving windows (array)
+        hpv.get_doubling_time(sim, interval=[3,30]) # returns the doubling time over the given interval (single float)
+        hpv.get_doubling_time(sim, interval=[3,30], moving_window=3) # returns doubling times calculated over moving windows (array)
     '''
 
     # Set verbose level
@@ -601,7 +601,7 @@ __all__ += ['help']
 
 def help(pattern=None, source=False, ignorecase=True, flags=None, context=False, output=False):
     '''
-    Get help on Covasim in general, or search for a word/expression.
+    Get help on HPVsim in general, or search for a word/expression.
 
     Args:
         pattern    (str):  the word, phrase, or regex to search for
@@ -613,25 +613,25 @@ def help(pattern=None, source=False, ignorecase=True, flags=None, context=False,
 
     **Examples**::
 
-        cv.help()
-        cv.help('vaccine')
-        cv.help('contact', ignorecase=False, context=True)
-        cv.help('lognormal', source=True, context=True)
+        hpv.help()
+        hpv.help('vaccine')
+        hpv.help('contact', ignorecase=False, context=True)
+        hpv.help('lognormal', source=True, context=True)
 
     | New in version 3.1.2.
     '''
     defaultmsg = '''
-For general help using Covasim, the best place to start is the docs:
+For general help using HPVsim, the best place to start is the docs:
 
-    http://docs.covasim.org
+    http://docs.hpvsim.org
 
-To search for a keyword/phrase/regex in Covasim's docstrings, use e.g.:
+To search for a keyword/phrase/regex in HPVsim's docstrings, use e.g.:
 
-    >>> cv.help('vaccine')
+    >>> hpv.help('vaccine')
 
-See help(cv.help) for more information.
+See help(hpv.help) for more information.
 
-For help on Covasim options, see cv.options.help().
+For help on HPVsim options, see hpv.options.help().
 '''
     # No pattern is provided, print out default help message
     if pattern is None:
@@ -639,7 +639,7 @@ For help on Covasim options, see cv.options.help().
 
     else:
 
-        import covasim as cv # Here to avoid circular import
+        import hpvsim as hpv # Here to avoid circular import
 
         # Handle inputs
         flags = sc.promotetolist(flags)
@@ -657,12 +657,12 @@ For help on Covasim options, see cv.options.help().
             return ok
 
         # Get available functions/classes
-        funcs = [funcname for funcname in dir(cv) if func_ok(funcname, getattr(cv, funcname))] # Skip dunder methods and modules
+        funcs = [funcname for funcname in dir(hpv) if func_ok(funcname, getattr(hpv, funcname))] # Skip dunder methods and modules
 
         # Get docstrings or full source code
         docstrings = dict()
         for funcname in funcs:
-            f = getattr(cv, funcname)
+            f = getattr(hpv, funcname)
             if source: string = inspect.getsource(f)
             else:      string = f.__doc__
             docstrings[funcname] = string

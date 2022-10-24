@@ -155,7 +155,7 @@ class Sim(hpb.BaseSim):
             pop_keys = set(self.people.contacts.keys())
             if pop_keys != set(layer_keys): # pragma: no cover
                 if not len(pop_keys):
-                    errormsg = f'Your population does not have any layer keys, but your simulation does {layer_keys}. If you called cv.People() directly, you probably need cv.make_people() instead.'
+                    errormsg = f'Your population does not have any layer keys, but your simulation does {layer_keys}. If you called hpv.People() directly, you probably need hpv.make_people() instead.'
                     raise sc.KeyNotFoundError(errormsg)
                 else:
                     errormsg = f'Please update your parameter keys {layer_keys} to match population keys {pop_keys}. You may find sim.reset_layer_pars() helpful.'
@@ -1034,7 +1034,7 @@ class Sim(hpb.BaseSim):
 
         **Examples**::
 
-            sim = cv.Sim(label='Example sim', verbose=0) # Set to run silently
+            sim = hpv.Sim(label='Example sim', verbose=0) # Set to run silently
             sim.run() # Run the sim
             sim.summarize() # Print medium-length summary of the sim
             sim.summarize(t=24, full=True) # Print a "slice" of all sim results on day 24

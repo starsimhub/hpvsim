@@ -877,7 +877,7 @@ class People(hpb.BasePeople):
 
         **Example**::
 
-            sim = cv.Sim(pop_type='hybrid', verbose=0)
+            sim = hpv.Sim(pop_type='hybrid', verbose=0)
             sim.run()
             sim.people.story(12)
             sim.people.story(795)

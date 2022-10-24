@@ -181,7 +181,7 @@ class Options(sc.objdict):
         options.close = int(os.getenv('HPVSIM_CLOSE', False))
 
         optdesc.returnfig = 'Set whether or not to return figures from plotting functions'
-        options.returnfig = int(os.getenv('COVASIM_RETURNFIG', True))
+        options.returnfig = int(os.getenv('HPVSIM_RETURNFIG', True))
 
         optdesc.backend = 'Set the Matplotlib backend (use "agg" for non-interactive)'
         options.backend = os.getenv('HPVSIM_BACKEND', pl.get_backend())

@@ -170,7 +170,7 @@ class snapshot(Analyzer):
 
     **Example**::
 
-        sim = cv.Sim(analyzers=cv.snapshot('2015.4', '2020'))
+        sim = hpv.Sim(analyzers=hpv.snapshot('2015.4', '2020'))
         sim.run()
         snapshot = sim['analyzers'][0]
         people = snapshot.snapshots[0]            # Option 1
@@ -237,7 +237,7 @@ class age_pyramid(Analyzer):
 
     **Example**::
 
-        sim = cv.Sim(analyzers=hpv.age_pyramid('2015', '2020'))
+        sim = hpv.Sim(analyzers=hpv.age_pyramid('2015', '2020'))
         sim.run()
         age_pyramid = sim['analyzers'][0]
     '''

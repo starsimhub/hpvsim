@@ -129,8 +129,8 @@ class Result(object):
 
     **Example**::
 
-        import covasim as cv
-        r1 = cv.Result(name='test1', npts=10)
+        import hpvsim as hpv
+        r1 = hpv.Result(name='test1', npts=10)
         r1[:5] = 20
         print(r1.values)
     '''
@@ -199,7 +199,7 @@ class Result(object):
 def set_metadata(obj, **kwargs):
     ''' Set standard metadata for an object '''
     obj.created = kwargs.get('created', sc.now())
-    # obj.version = kwargs.get('version', cvv.__version__)
+    obj.version = kwargs.get('version', __version__)
     obj.git_info = kwargs.get('git_info', hpm.git_info())
     return
 
@@ -285,7 +285,7 @@ class BaseSim(ParsObj):
         ''' Set the metadata for the simulation -- creation time and filename '''
         set_metadata(self)
         if simfile is None:
-            self.simfile = 'covasim.sim'
+            self.simfile = 'hpvsim.sim'
         return
 
 
@@ -666,8 +666,8 @@ class BaseSim(ParsObj):
         Returns:
             shrunken (Sim): a Sim object with the listed attributes removed
         '''
-        from . import interventions as cvi # To avoid circular imports
-        from . import analysis as cva
+        from . import interventions as hpvi # To avoid circular imports
+        from . import analysis as hpva
 
         # By default, skip people (~90% of memory), the popdict (which is usually empty anyway), and _orig_pars (which is just a backup)
         if skip_attrs is None:
@@ -685,7 +685,7 @@ class BaseSim(ParsObj):
         # Shrink interventions and analyzers, with a lot of checking along the way
         for key in ['interventions', 'analyzers']:
             ias = self.pars[key] # List of interventions or analyzers
-            shrunken_ias = [ia.shrink(in_place=in_place) for ia in ias if isinstance(ia, (cvi.Intervention, cva.Analyzer))]
+            shrunken_ias = [ia.shrink(in_place=in_place) for ia in ias if isinstance(ia, (hpvi.Intervention, hpva.Analyzer))]
             self.pars[key] = shrunken_ias # Actually shrink, and re-store
 
         # Don't return if in place
@@ -741,14 +741,14 @@ class BaseSim(ParsObj):
 
         Args:
             filename (str): the name or path of the file to load from
-            kwargs: passed to cv.load()
+            kwargs: passed to hpv.load()
 
         Returns:
             sim (Sim): the loaded simulation object
 
         **Example**::
 
-            sim = cv.Sim.load('my-simulation.sim')
+            sim = hpv.Sim.load('my-simulation.sim')
         '''
         sim = hpm.load(filename, *args, **kwargs)
         if not isinstance(sim, BaseSim): # pragma: no cover
@@ -835,13 +835,13 @@ class BaseSim(ParsObj):
 
         **Examples**::
 
-            tp = cv.test_prob(symp_prob=0.1)
-            cb1 = cv.change_beta(days=5, changes=0.3, label='NPI')
-            cb2 = cv.change_beta(days=10, changes=0.3, label='Masks')
-            sim = cv.Sim(interventions=[tp, cb1, cb2])
-            cb1, cb2 = sim.get_interventions(cv.change_beta)
+            tp = hpv.test_prob(symp_prob=0.1)
+            cb1 = hpv.change_beta(days=5, changes=0.3, label='NPI')
+            cb2 = hpv.change_beta(days=10, changes=0.3, label='Masks')
+            sim = hpv.Sim(interventions=[tp, cb1, cb2])
+            cb1, cb2 = sim.get_interventions(hpv.change_beta)
             tp, cb2 = sim.get_interventions([0,2])
-            ind = sim.get_interventions(cv.change_beta, as_inds=True) # Returns [1,2]
+            ind = sim.get_interventions(hpv.change_beta, as_inds=True) # Returns [1,2]
             sim.get_interventions('summary') # Prints a summary
         '''
         return self._get_ia('interventions', label=label, partial=partial, as_inds=as_inds, as_list=True)
@@ -861,12 +861,12 @@ class BaseSim(ParsObj):
 
         **Examples**::
 
-            tp = cv.test_prob(symp_prob=0.1)
-            cb = cv.change_beta(days=5, changes=0.3, label='NPI')
-            sim = cv.Sim(interventions=[tp, cb])
+            tp = hpv.test_prob(symp_prob=0.1)
+            cb = hpv.change_beta(days=5, changes=0.3, label='NPI')
+            sim = hpv.Sim(interventions=[tp, cb])
             cb = sim.get_intervention('NPI')
             cb = sim.get_intervention('NP', partial=True)
-            cb = sim.get_intervention(cv.change_beta)
+            cb = sim.get_intervention(hpv.change_beta)
             cb = sim.get_intervention(1)
             cb = sim.get_intervention()
             tp = sim.get_intervention(first=True)
@@ -1488,9 +1488,9 @@ class BasePeople(FlexPretty):
 
         **Example**::
 
-            import covasim as cv
+            import hpvsim as hpv
             import networkx as nx
-            sim = cv.Sim(n_agents=50, pop_type='hybrid', contacts=dict(h=3, s=10, w=10, c=5)).run()
+            sim = hpv.Sim(n_agents=50, pop_type='hybrid', contacts=dict(h=3, s=10, w=10, c=5)).run()
             G = sim.people.to_graph()
             nodes = G.nodes(data=True)
             edges = G.edges(keys=True)
@@ -1533,7 +1533,7 @@ class BasePeople(FlexPretty):
 
         **Example**::
 
-            sim = cv.Sim()
+            sim = hpv.Sim()
             sim.initialize()
             sim.people.save() # Saves to a .ppl file
         '''
@@ -1545,7 +1545,7 @@ The People object has already been run (t = {self.t}), which is usually not the
 correct state to save it in since it cannot be re-initialized. If this is intentional,
 use sim.people.save(force=True). Otherwise, the correct approach is:
 
-    sim = cv.Sim(...)
+    sim = hpv.Sim(...)
     sim.initialize() # Create the people object but do not run
     sim.people.save() # Save people immediately after initialization
     sim.run() # The People object is
@@ -1554,7 +1554,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
 
         # Handle the filename
         if filename is None:
-            filename = 'covasim.ppl'
+            filename = 'hpvsim.ppl'
         filename = sc.makefilepath(filename=filename, **kwargs)
         self.filename = filename # Store the actual saved filename
         hpm.save(filename=filename, obj=self)
@@ -1569,15 +1569,15 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
 
         Args:
             filename (str): the name or path of the file to load from
-            args (list): passed to ``cv.load()``
-            kwargs (dict): passed to ``cv.load()``
+            args (list): passed to ``hpv.load()``
+            kwargs (dict): passed to ``hpv.load()``
 
         Returns:
             people (People): the loaded people object
 
         **Example**::
 
-            people = cv.people.load('my-people.ppl')
+            people = hpv.people.load('my-people.ppl')
         '''
         people = hpm.load(filename, *args, **kwargs)
         if not isinstance(people, BasePeople): # pragma: no cover
@@ -1785,7 +1785,7 @@ class Contacts(FlexDict):
 
         **Example**::
 
-            hospitals_layer = cv.Layer(label='hosp')
+            hospitals_layer = hpv.Layer(label='hosp')
             sim.people.contacts.add_layer(hospitals=hospitals_layer)
         '''
         for lkey,layer in kwargs.items():
@@ -1868,13 +1868,13 @@ class Layer(FlexDict):
         p1 = np.random.randint(n_people, size=n)
         p2 = np.random.randint(n_people, size=n)
         beta = np.ones(n)
-        layer = cv.Layer(p1=p1, p2=p2, beta=beta, label='rand')
-        layer = cv.Layer(dict(p1=p1, p2=p2, beta=beta), label='rand') # Alternate method
+        layer = hpv.Layer(p1=p1, p2=p2, beta=beta, label='rand')
+        layer = hpv.Layer(dict(p1=p1, p2=p2, beta=beta), label='rand') # Alternate method
 
         # Convert one layer to another with extra columns
         index = np.arange(n)
         self_conn = p1 == p2
-        layer2 = cv.Layer(**layer, index=index, self_conn=self_conn, label=layer.label)
+        layer2 = hpv.Layer(**layer, index=index, self_conn=self_conn, label=layer.label)
     '''
 
     def __init__(self, *args, label=None, **kwargs):
@@ -2067,14 +2067,14 @@ class Layer(FlexDict):
         # Check types
         if not isinstance(inds, np.ndarray):
             inds = sc.promotetoarray(inds)
-        if inds.dtype != np.int64:  # pragma: no cover # This is int64 since indices often come from cv.true(), which returns int64
+        if inds.dtype != np.int64:  # pragma: no cover # This is int64 since indices often come from hpv.true(), which returns int64
             inds = np.array(inds, dtype=np.int64)
 
         # Find the contacts
         contact_inds = hpu.find_contacts(self['f'], self['m'], inds)
         if as_array:
             contact_inds = np.fromiter(contact_inds, dtype=hpd.default_int)
-            contact_inds.sort()  # Sorting ensures that the results are reproducible for a given seed as well as being identical to previous versions of Covasim
+            contact_inds.sort()  # Sorting ensures that the results are reproducible for a given seed as well as being identical to previous versions of HPVsim
 
         return contact_inds
 
@@ -2092,7 +2092,7 @@ class Layer(FlexDict):
         changing contacts for people that are severe/critical).
 
         Args:
-            people (People): the Covasim People object, which is usually used to make new contacts
+            people (People): the HPVsim People object, which is usually used to make new contacts
             frac (float): the fraction of contacts to update on each timestep
         '''
         # Choose how many contacts to make

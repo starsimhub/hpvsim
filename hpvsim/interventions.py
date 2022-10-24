@@ -145,7 +145,7 @@ class Intervention:
                 which = json['which']
                 pars = json['pars']
                 parstr = ', '.join([f'{k}={v}' for k,v in pars.items()])
-                output = f"cv.{which}({parstr})"
+                output = f"hpv.{which}({parstr})"
             except Exception as E:
                 output = f'{type(self)} (error: {str(E)})' # If that fails, print why
             return output
