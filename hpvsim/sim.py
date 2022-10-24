@@ -519,7 +519,7 @@ class Sim(hpb.BaseSim):
             
         if self['pop_scale'] is None:
             if total_pop is None:
-                self['pop_scale'] = 1
+                self['pop_scale'] = 1.0
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
         
