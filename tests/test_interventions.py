@@ -5,20 +5,17 @@ Tests for single simulations
 #%% Imports and settings
 import sciris as sc
 import numpy as np
-import seaborn as sns
 import hpvsim as hpv
-import pytest
 import matplotlib.pyplot as plt
 
 do_plot = 0
 do_save = 0
 
-n_agents = [1e3,50e3][1] # Swap between sizes
+n_agents = [1e3,50e3][0] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,
-    'start': 1970,
-    # 'burnin': 30,
+    'start': 1990,
     'end': 2050,
     'genotypes': [16, 18],
     'location': 'tanzania',
@@ -28,12 +25,8 @@ base_pars = {
 
 #%% Define the tests
 
-
 def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test new intervention implementation')
-
-    verbose = .1
-    debug = 0
 
     ### Create interventions
     # Screen, triage, assign treatment, treat
@@ -196,9 +189,6 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
 def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Testing TxVx rollout without screening')
 
-    verbose = .1
-    debug = 0
-
     ### Create interventions
     # Campaign txvx
     campaign_txvx_dose1 = hpv.campaign_txvx(
@@ -257,7 +247,6 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
 def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Testing effect of prophylactic vaccination')
 
-    verbose = .1
     debug_scens = 0
 
     ### Create interventions
@@ -312,9 +301,6 @@ def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
 
 def test_screening():
     sc.heading('Test new screening implementation')
-
-    verbose = .1
-    debug = 0
 
     ### Create interventions
     # Screen, triage, assign treatment, treat
