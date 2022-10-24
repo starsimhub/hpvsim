@@ -13,21 +13,25 @@ repeats = 3
 parallel = True
 showlegend = False
 
+total_pop = 10e3
+small_pop = 1e3
+ratio = total_pop/total_pop
+
 pars = dict(
-    total_pop    = 5e3,
-    cancer_scale = 1,
-    start        = 1975,
-    n_years      = 50,
-    burnin       = 25,
-    genotypes    = [16,18],
-    verbose      = -1,
+    total_pop      = total_pop,
+    ms_agent_ratio = ratio,
+    start          = 1975,
+    n_years        = 50,
+    burnin         = 25,
+    genotypes      = [16,18],
+    verbose        = -1,
 )
 
 loop_pars = [
-    sc.objdict(n_agents=5_000, use_multiscale=0),
-    sc.objdict(n_agents=5_000, use_multiscale=1),
-    sc.objdict(n_agents=1_000,  use_multiscale=0),
-    sc.objdict(n_agents=1_000,  use_multiscale=1),
+    sc.objdict(n_agents=total_pop, use_multiscale=0),
+    sc.objdict(n_agents=total_pop, use_multiscale=1),
+    sc.objdict(n_agents=small_pop,  use_multiscale=0),
+    sc.objdict(n_agents=small_pop,  use_multiscale=1),
     ]
 
 
