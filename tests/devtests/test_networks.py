@@ -125,7 +125,7 @@ def test_network_time(do_plot=do_plot):
     sc.heading('Testing numbers of partners over time')
 
     pars = dict(n_agents=5e3,
-                start=1980,
+                start=1950,
                 end=2050,
                 dt=1.0,
                 location='india',
