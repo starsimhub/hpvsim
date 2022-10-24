@@ -1215,8 +1215,8 @@ class tx(Product):
         '''
         Find people within a given state/genotype. Returns indices
         '''
-        if self.ng==1:  theseinds = people[state][:, inds].any(axis=0)
-        else:           theseinds = hpu.true(people[state][g, inds])
+        if self.ng==1:  theseinds = sim.people[state].any(axis=0)
+        else:           theseinds = hpu.true(sim.people[state][g, :])
 
 
     def administer(self, sim, inds, return_format='dict'):
@@ -1230,7 +1230,7 @@ class tx(Product):
         for state in self.states: # Loop over states
             for g,genotype in sim['genotype_map'].items(): # Loop over genotypes in the sim
 
-                theseinds = hpu.true(people[state][g, inds]) # Extract people for whom this state is true for this genotype
+                theseinds = inds[hpu.true(people[state][g, inds])] # Extract people for whom this state is true for this genotype]
 
                 if len(theseinds):
 
@@ -1246,10 +1246,12 @@ class tx(Product):
                     if len(eff_treat_inds):
                         tx_successful += list(eff_treat_inds)
                         people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
-                        people[f'date_{state}'][:, eff_treat_inds] = np.nan
+                        people[f'date_{state}'][g, eff_treat_inds] = np.nan
 
                         # Clear infection for women who clear
-                        people['infectious'][g, eff_treat_inds] = False  # People whose HPV clears
+                        people.infectious[g, eff_treat_inds] = False  # People whose HPV clears
+                        people.susceptible[g, eff_treat_inds] = True
+                        people.inactive[g, eff_treat_inds] = False
                         people.dur_infection[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
                         hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
