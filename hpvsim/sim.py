@@ -888,11 +888,6 @@ class Sim(hpb.BaseSim):
         self.finalize_analyzers()
         self.finalize_interventions()
 
-        # # Scale the results
-        # for reskey in self.result_keys():
-        #     if self.results[reskey].scale:
-        #         self.results[reskey].values *= self['pop_scale']
-
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results
         self.t -= 1 # During the run, this keeps track of the next step; restore this be the final day of the sim
