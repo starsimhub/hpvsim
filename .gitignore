@@ -1,6 +1,6 @@
 # HPVsim-generated files
 *.obj
-data/files
+files/
 
 # Other files
 .idea
