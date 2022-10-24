@@ -7,6 +7,8 @@ import sys
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
+import matplotlib.pyplot as plt
+
 
 do_plot = 1
 do_save = 0
