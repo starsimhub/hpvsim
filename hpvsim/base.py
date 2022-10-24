@@ -1347,6 +1347,15 @@ class BasePeople(FlexPretty):
         else:
             out = len(inds)
         return out
+    
+    def count_any(self, key, weighted=True):
+        ''' Count the number of people for a given key for a 2D array if any value matches '''
+        inds = self[key].sum(axis=0).nonzero()[0]
+        if weighted:
+            out = self.scale[inds].sum()
+        else:
+            out = len(inds)
+        return out
 
     def count_by_genotype(self, key, genotype, weighted=True):
         ''' Count the number of people for a given key '''

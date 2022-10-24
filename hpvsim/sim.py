@@ -788,7 +788,7 @@ class Sim(hpb.BaseSim):
                     self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['susceptible']:
                     # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
-                    self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
+                    self.results[f'n_total_{key}'][idx] = people.count_any(key)
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
@@ -798,7 +798,7 @@ class Sim(hpb.BaseSim):
 
             # Update cancers and cancers by age
             cases_by_age = self.results['cancers_by_age'][:, idx]
-            denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous.any(axis=0)], self.pars['standard_pop'][0,])[0]
+            denom = np.histogram(self.people.age[self.people.alive * (self.people.sex==0) * ~self.people.cancerous.any(axis=0)], self.pars['standard_pop'][0,])[0]
             age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
             standard_pop = self.pars['standard_pop'][1, :-1]
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
