@@ -56,6 +56,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     if popdict is None:
 
         n_agents = int(sim['n_agents']) # Number of people
+        total_pop = None
 
         # Load age data by country if available, or use defaults.
         # Other demographic data like mortality and fertility are also available by
@@ -70,11 +71,11 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 try:
                     age_data  = hpdata.get_age_distribution(location, year=sim['start'])
                     pop_trend = hpdata.get_total_pop(location)
+                    total_pop = sum(age_data[:,2]) # Return the total population
                 except ValueError as E:
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
 
-        total_pop = sum(age_data[:,2]) # Return the total population
         uids, sexes, debuts, partners = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
 
         # Set ages, rounding to nearest timestep if requested

@@ -535,7 +535,7 @@ class Sim(hpb.BaseSim):
             raise ValueError(errormsg)
         else:
             self['cancer_ratio'] = int(np.round(ps/cs)) # Number of cancer agents for every non-cancer agent
-
+        
         return self
 
 
