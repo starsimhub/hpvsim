@@ -135,6 +135,8 @@ class People(hpb.BasePeople):
             else:
                 self[key] = value
         
+        # Set the scale factor
+        self.scale[:] = sim_pars['pop_scale']
         
         # Additional validation
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
