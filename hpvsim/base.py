@@ -1002,17 +1002,20 @@ class BasePeople(FlexPretty):
         Increase the number of agents stored
 
         Automatically reallocate underlying arrays if required
-
-        :param n: Number of new agents to add
-        :return:
+        
+        Args:
+            n (int): Number of new agents to add
         """
-        if (self._n + n) > self._s:
+        orig_n = self._n
+        if (orig_n + n) > self._s:
             n_new = int(self._s / 2)  # 50% growth
             for state in self.meta.all_states:
                 self._data[state.name] = np.concatenate([self._data[state.name], state.new(self.pars, n_new)], axis=self._data[state.name].ndim-1)
             self._s += n_new
         self._n += n
         self._map_arrays()
+        new_inds = np.arange(orig_n, self._n)
+        return new_inds
 
 
     def _map_arrays(self):
