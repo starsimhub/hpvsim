@@ -29,7 +29,7 @@ else:
 #%% Define all properties of people
 
 class State():
-    def __init__(self, name, dtype, fill_value=None, shape=None, label=None, cmap=None,
+    def __init__(self, name, dtype, fill_value=0, shape=None, label=None, cmap=None,
                  totalprefix=None):
         '''
         Args:
@@ -48,16 +48,14 @@ class State():
         self.label = label or name
         self.cmap = cmap
         self.totalprefix = totalprefix or ('total_' if shape else '')
+        return
+    
 
     def new(self, pars, n):
-        array_shape = n if self.shape is None else (pars[self.shape], n)
-
-        if self.fill_value is None:
-            return np.empty(array_shape, dtype=self.dtype)
-        elif self.fill_value == 0:
-            return np.zeros(array_shape, dtype=self.dtype)
-        else:
-            return np.full(array_shape, dtype=self.dtype, fill_value=self.fill_value)
+        shape = sc.tolist(self.shape) # e.g. convert 'n_genotypes' to ['n_genotypes']
+        shape = [pars[s] for s in shape] # e.g. convert ['n_genotypes'] to [2]
+        shape.append(n) # We always want to have shape n
+        return np.full(shape, dtype=self.dtype, fill_value=self.fill_value)
 
 
 class PeopleMeta(sc.prettyobj):

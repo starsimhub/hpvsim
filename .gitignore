@@ -1,10 +1,12 @@
+# HPVsim-generated files
+*.obj
+data/files
+
 # Other files
 .idea
 .vscode
 .DS_Store
 
-# HPVsim-generated files
-*.obj
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
