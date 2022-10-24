@@ -313,7 +313,10 @@ class People(hpb.BasePeople):
                 # Create the new agents and assign them the same properties as the existing agents
                 new_inds = self._grow(n_new_agents)
                 for state in self.meta.all_states:
-                    self[state.name][new_inds] = self[state.name][extra_source_inds]
+                    if state.ndim == 1:
+                        self[state.name][new_inds] = self[state.name][extra_source_inds]
+                    elif state.ndim == 2:
+                        self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
 
                 # Reset the level for the agents
                 self.level0[new_inds] = False

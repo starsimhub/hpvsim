@@ -612,7 +612,7 @@ class Sim(hpb.BaseSim):
             dur_precin = genotype_pars[genotype_map[g]]['dur_precin']
             dur_hpv = hpu.sample(**dur_precin, size=len(hpv_inds))
             t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
-            _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
+            self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
         # Check for CINs
         cin1_filters = (self.people.date_cin1<0) * (self.people.date_cin2 > 0)

@@ -50,6 +50,10 @@ class State(sc.prettyobj):
         self.totalprefix = totalprefix or ('total_' if shape else '')
         return
     
+    @property
+    def ndim(self):
+        return len(sc.tolist(self.shape))+1 # None -> 1, 'n_genotypes' -> 2, etc.
+    
 
     def new(self, pars, n):
         shape = sc.tolist(self.shape) # e.g. convert 'n_genotypes' to ['n_genotypes']
