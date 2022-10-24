@@ -686,7 +686,6 @@ class age_results(Analyzer):
         # Shorten variables that are used a lot
         ng = self.ng
         ppl = sim.people
-        age = ppl.age  # Get the age distribution
         
         def bin_ages(inds=None, bins=None):
             return np.histogram(ppl.age[inds], bins=bins, weights=ppl.scale)[0] # Bin the people
