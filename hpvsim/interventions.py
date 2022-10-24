@@ -643,9 +643,10 @@ class BaseVaccination(Intervention):
                 sim.people.date_vaccinated[accept_inds] = sim.t
                 sim.people.doses[accept_inds] += 1
                 idx = int(sim.t / sim.resfreq)
-                sim.results['new_vaccinated'][:,idx] += len(accept_inds)
-                sim.results['new_doses'][idx] += len(accept_inds)
-                self.n_products_used[idx] += len(accept_inds)
+                new = sim.people.scale_flows(accept_inds)
+                sim.results['new_vaccinated'][:,idx] += new
+                sim.results['new_doses'][idx] += new
+                self.n_products_used[idx] += new
 
         return
 
@@ -750,7 +751,7 @@ class BaseTest(Intervention):
         accept_inds     = select_people(eligible_inds, prob=prob) # Find people who accept
         if len(accept_inds):
             idx = int(sim.t / sim.resfreq)
-            self.n_products_used[idx] += len(accept_inds)
+            self.n_products_used[idx] += sim.people.scale_flows(accept_inds)
             self.outcomes = self.product.administer(sim, accept_inds) # Actually administer the diagnostic, filtering people into outcome categories
         return accept_inds
 
@@ -972,7 +973,7 @@ class BaseTreatment(Intervention):
         treat_inds = hpu.itruei(still_eligible, treat_candidates)
         self.outcomes = self.product.administer(sim, treat_inds)
         idx = int(sim.t / sim.resfreq)
-        self.n_products_used[idx] += len(treat_inds)
+        self.n_products_used[idx] += sim.people.scale_flows(treat_inds)
         return treat_inds
 
 
@@ -1070,16 +1071,17 @@ class BaseTxVx(BaseTreatment):
         eligible_inds = hpu.true(self.check_eligibility(sim))
         if len(eligible_inds):
             accept_inds = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
-            if len(accept_inds):
+            new = sim.people.scale_flows(accept_inds)
+            if new:
                 self.outcomes = self.product.administer(sim, accept_inds)
                 idx = int(sim.t / sim.resfreq)
-                self.n_products_used[idx] += len(accept_inds)
                 sim.people.tx_vaccinated[accept_inds] = True
                 sim.people.date_tx_vaccinated[accept_inds] = sim.t
                 sim.people.txvx_doses[accept_inds] += 1
                 idx = int(sim.t / sim.resfreq)
-                sim.results['new_tx_vaccinated'][idx] += len(accept_inds)
-                sim.results['new_txvx_doses'][idx] += len(accept_inds)
+                sim.results['new_tx_vaccinated'][idx] += new
+                sim.results['new_txvx_doses'][idx] += new
+                self.n_products_used[idx] += new
 
         return
 

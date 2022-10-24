@@ -500,7 +500,7 @@ class People(hpb.BasePeople):
         self.remove_people(inds, cause='cancer')
 
         # check which of these were detected by symptom or screening
-        self.flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
+        self.flows['detected_cancer_deaths'] += self.scale_flows(hpu.true(self.detected_cancer[inds]))
 
         return self.scale_flows(inds)
 
@@ -770,15 +770,15 @@ class People(hpb.BasePeople):
             self.date_exposed[g,inds] = base_t
 
         # Count reinfections and remove any previous dates
-        self.flows['reinfections'][g]           += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
-        self.total_flows['total_reinfections']  += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
+        self.flows['reinfections'][g]           += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
+        self.total_flows['total_reinfections']  += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         for key in ['date_clearance', 'date_cin1', 'date_cin2', 'date_cin3']:
             self[key][g, inds] = np.nan
 
         # Count reactivations and adjust latency status
         if layer == 'reactivation':
-            self.flows['reactivations'][g] += len(inds)
-            self.total_flows['total_reactivations'] += len(inds)
+            self.flows['reactivations'][g] += self.scale_flows(inds)
+            self.total_flows['total_reactivations'] += self.scale_flows(inds)
             self.latent[g, inds] = False # Adjust states -- no longer latent
 
         # Update states, genotype info, and flows
@@ -789,12 +789,12 @@ class People(hpb.BasePeople):
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
             # Create overall flows
-            self.total_flows['total_infections']    += len(inds) # Add the total count to the total flow data
-            self.flows['infections'][g]             += len(inds) # Add the count by genotype to the flow data
+            self.total_flows['total_infections']    += self.scale_flows(inds) # Add the total count to the total flow data
+            self.flows['infections'][g]             += self.scale_flows(inds) # Add the count by genotype to the flow data
 
             # Create by-sex flows
-            infs_female = len(hpu.true(self.is_female[inds]))
-            infs_male = len(hpu.true(self.is_male[inds]))
+            infs_female = self.scale_flows(hpu.true(self.is_female[inds]))
+            infs_male = self.scale_flows(hpu.true(self.is_male[inds]))
             self.flows_by_sex['total_infections_by_sex'][0] += infs_female
             self.flows_by_sex['total_infections_by_sex'][1] += infs_male
 
