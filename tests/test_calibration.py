@@ -8,7 +8,7 @@ import hpvsim as hpv
 
 do_plot = 1
 do_save = 0
-n_agents = 5e3
+n_agents = 2e3
 
 
 #%% Define the tests
@@ -45,7 +45,7 @@ def test_calibration():
                                 'test_data/south_africa_cancer_data_2020.csv',
                                 # 'test_data/south_africa_type_distribution_cancer.csv'
                             ],
-                            total_trials=5, n_workers=2)
+                            total_trials=3, n_workers=2)
     calib.calibrate()
     calib.plot(res_to_plot=4)
     return sim, calib
