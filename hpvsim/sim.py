@@ -533,6 +533,8 @@ class Sim(hpb.BaseSim):
         if cs > ps:
             errormsg = f'Cancer scale {cs} is larger than population scale {ps}: it is very unlikely you actually want to do this'
             raise ValueError(errormsg)
+        else:
+            self['cancer_ratio'] = int(np.round(ps/cs)) # Number of cancer agents for every non-cancer agent
 
         return self
 

@@ -34,6 +34,7 @@ def make_pars(**kwargs):
     pars['total_pop']       = None      # If defined, used for calculating the scale factor
     pars['pop_scale']       = None      # How much to scale the population
     pars['cancer_scale']    = None      # How much to scale cancer agents
+    pars['cancer_ratio']    = None      # Used internally to set the ratio between cancer vs. noncancer agents
     pars['use_multiscale']  = False     # Whether to use multiscale modeling
     pars['network']         = 'default' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle

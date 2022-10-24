@@ -697,7 +697,7 @@ class MultiSim(hpb.FlexPretty):
         '''
 
         # Handle arguments
-        if len(args) == 1 and isinstance(args[0], list):
+        if len(args) == 1 and isinstance(args[0], (list, tuple)):
             args = args[0] # A single list of MultiSims has been provided
 
         # Create the multisim from the base sim of the first argument

@@ -98,12 +98,13 @@ class Analyzer(sc.prettyobj):
     @staticmethod
     def reduce(analyzers, use_mean=False):
         '''
-        Create an analyzer from a list of analyzers, using
+        Create a reduced analyzer from a list of analyzers, using
+        
         Args:
             analyzers: list of analyzers
             use_mean (bool): whether to use medians (the default) or means to create the reduced analyzer
         '''
-        raise NotImplementedError
+        pass
 
 
     def to_json(self):

@@ -9,17 +9,19 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats = 10
+repeats = 5
 parallel = True
 showlegend = False
 
 pars = dict(
-    n_agents  = 1e3,
-    start     = 1975,
-    n_years   = 50,
-    burnin    = 25,
-    genotypes = [16,18],
-    verbose = -1,
+    n_agents     = 1e3,
+    pop_scale    = 10,
+    cancer_scale = 1,
+    start        = 1975,
+    n_years      = 50,
+    burnin       = 25,
+    genotypes    = [16,18],
+    verbose      = -1,
 )
 
 
@@ -100,6 +102,7 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
 
         ms = analyzer.multiscale
         index = ms - 1
+        label = ['default', 'multiscale'][ms]
         color = ['b','r'][ms]
         for i, key in enumerate(r.res.columns):
             if key not in ['t', 'year']:
@@ -115,11 +118,10 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
                 index += 2
                 pl.subplot(nrows, ncols, index)
                 pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, label=analyzer.label)
-                pl.title(key)
+                pl.title(f'{key} - {label}')
                 if showlegend:
                     pl.legend()
         
-        pl.tight_layout()
         return fig
     
     fig = None
@@ -127,27 +129,35 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
         a = sim.get_analyzer()
         fig = plot_single(analyzer=a, fig=fig, alpha=alpha)
     
+    sc.figlayout()
     pl.show()
     
     return fig
 
 
-sims = []
+msims = sc.autolist()
 for use_multiscale in [False, True]:
+    sims = sc.autolist()
     for r in range(repeats):
         label = ['default', 'multiscale'][use_multiscale]
         label += f'{r}'
         simpars = dict(use_multiscale=use_multiscale, rand_seed=r, label=label, analyzers=multitest())
         sim = hpv.Sim(pars, **simpars)
-        sims.append(sim)
+        sims += sim
+    msims += hpv.MultiSim(sims)
+msim = hpv.MultiSim.merge(*msims)
 
 
 if __name__ == '__main__':
     
-    msim = hpv.parallel(sims, keep_people=True, parallel=parallel)
-    df = msim.compare(output=True, show_match=True)
-    if showlegend:
-        df.disp()
+    msim.run(keep_people=True, parallel=parallel)
+    mm = msim.split()
+    for m in mm:
+        m.mean()
+    merged = hpv.MultiSim.merge(mm, base=True)
+    dfall = msim.compare(output=True, show_match=True)
+    dfmerged = merged.compare(output=True, show_match=True)
+    dfmerged.disp()
     
     plot_compare_multiscale(msim)
     
