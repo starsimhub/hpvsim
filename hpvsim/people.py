@@ -644,6 +644,7 @@ class People(hpb.BasePeople):
             self._grow(new_births)
             self['uid'][-new_births:] = uids
             self['age'][-new_births:] = 0
+            self['scale'][-new_births:] = self.pars['pop_scale']
             self['sex'][-new_births:] = sexes
             self['debut'][-new_births:] = debuts
             self['partners'][:,-new_births:] = partners
