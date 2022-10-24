@@ -635,7 +635,7 @@ class People(hpb.BasePeople):
             self['debut'][-new_births:] = debuts
             self['partners'][:,-new_births:] = partners
 
-        return new_births*self['pop_scale'] # These are not indices, so they scale differently
+        return new_births*self.pars['pop_scale'] # These are not indices, so they scale differently
 
 
     def check_migration(self, year=None):
@@ -684,7 +684,7 @@ class People(hpb.BasePeople):
         else:
             n_migrate = 0
 
-        return n_migrate*self['pop_scale'] # These are not indices, so they scale differently
+        return n_migrate*self.pars['pop_scale'] # These are not indices, so they scale differently
 
 
 
