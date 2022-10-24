@@ -111,6 +111,14 @@ class People(hpb.BasePeople):
         self.flows_by_age       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
 
         return
+    
+    
+    def scale_flows(self, inds):
+        '''
+        Return the scaled versions of the flows -- replacement for len(inds) 
+        followed by scale factor multiplication
+        '''
+        return self.scale[inds].sum()
 
 
     def increment_age(self):
@@ -566,7 +574,7 @@ class People(hpb.BasePeople):
                     self.set_severity(cin_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
                     self.set_cin_grades(cin_inds, g, dt)
 
-        return len(hiv_inds)
+        return self.scale_flows(hiv_inds)
 
 
     def apply_death_rates(self, year=None):
@@ -593,8 +601,8 @@ class People(hpb.BasePeople):
 
         # Get indices of people who die of other causes
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
-        deaths_female = len(hpu.true(self.is_female[death_inds]))
-        deaths_male = len(hpu.true(self.is_male[death_inds]))
+        deaths_female = self.scale_flows(hpu.true(self.is_female[death_inds]))
+        deaths_male = self.scale_flows(hpu.true(self.is_male[death_inds]))
         other_deaths = self.remove_people(death_inds, cause='other') # Apply deaths
 
         return other_deaths, deaths_female, deaths_male
@@ -627,7 +635,7 @@ class People(hpb.BasePeople):
             self['debut'][-new_births:] = debuts
             self['partners'][:,-new_births:] = partners
 
-        return new_births
+        return new_births*self['pop_scale'] # These are not indices, so they scale differently
 
 
     def check_migration(self, year=None):
@@ -676,7 +684,7 @@ class People(hpb.BasePeople):
         else:
             n_migrate = 0
 
-        return n_migrate
+        return n_migrate*self['pop_scale'] # These are not indices, so they scale differently
 
 
 
@@ -802,7 +810,7 @@ class People(hpb.BasePeople):
         if len(m_inds)>0:
             self.date_clearance[g, m_inds] = self.date_infectious[g, m_inds] + np.ceil(self.dur_infection[g, m_inds]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
-        return len(inds) # For incrementing counters
+        return self.scale_flows(inds) # For incrementing counters
 
 
     def remove_people(self, inds, cause=None):
@@ -841,7 +849,7 @@ class People(hpb.BasePeople):
                 if len(iinds):
                     self[future_date][genotypes_to_clear, inds[iinds]] = np.nan
 
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     #%% Analysis methods
