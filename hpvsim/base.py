@@ -1338,17 +1338,23 @@ class BasePeople(FlexPretty):
         ''' Return indices of people who are nan '''
         return np.isnan(self[key]).nonzero()[0]
 
-    def count(self, key):
+    def count(self, key, weighted=True):
         ''' Count the number of people for a given key '''
-        return np.count_nonzero(self[key])
+        inds = self[key].nonzero()[0]
+        if weighted:
+            out = self.scale[inds].sum()
+        else:
+            out = len(inds)
+        return out
 
-    def count_by_genotype(self, key, genotype):
+    def count_by_genotype(self, key, genotype, weighted=True):
         ''' Count the number of people for a given key '''
-        return np.count_nonzero(self[key][genotype,:])
-
-    def count_not(self, key):
-        ''' Count the number of people who do not have a property for a given key '''
-        return len(self[key]) - self.count(key)
+        inds = np.nonzero(self[key][genotype,:])[0]
+        if weighted:
+            out = self.scale[inds].sum()
+        else:
+            out = len(inds)
+        return out
 
     def keys(self):
         ''' Returns keys for all properties of the people object '''
@@ -1476,6 +1482,7 @@ class BasePeople(FlexPretty):
 
         return G
 
+
     def save(self, filename=None, force=False, **kwargs):
         '''
         Save to disk as a gzipped pickle.
@@ -1546,6 +1553,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
             raise TypeError(errormsg)
         return people
 
+
     def init_contacts(self, reset=False):
         ''' Initialize the contacts dataframe with the correct columns and data types '''
 
@@ -1558,6 +1566,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
             for key,layer in contacts.items():
                 self.contacts[key] = layer
         return
+
 
     def add_contacts(self, contacts, lkey=None, beta=None):
         '''
@@ -1605,6 +1614,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
                 self.contacts[lkey].validate()
 
         return
+
 
     def make_edgelist(self, contacts):
         '''
