@@ -84,11 +84,64 @@ def test_network(do_plot=True):
     return sim, a
 
 
+
+class rship_count(hpv.Analyzer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.n_edges = dict()
+        self.n_edges_norm = dict()
+        for rtype in ['m','c','o']:
+            self.n_edges[rtype] = []
+            self.n_edges_norm[rtype] = []
+
+    def apply(self, sim):
+        for rtype in ['m','c','o']:
+            self.n_edges[rtype].append(len(sim.people.contacts[rtype]))
+            self.n_edges_norm[rtype].append(len(sim.people.contacts[rtype])/len(sim.people.age>14))
+        return
+
+    def plot(self, do_save=False, filename=None, from_when=1990):
+        fig, ax = plt.subplots(2, 3, figsize=(15, 8))
+        yi = sc.findinds(sim.yearvec, from_when)[0]
+        for rn,rtype in enumerate(['m','c','o']):
+            ax[0,rn].plot(sim.yearvec[yi:], self.n_edges[rtype][yi:])
+            ax[0,rn].set_title(f'Edges - {rtype}')
+            ax[1,rn].plot(sim.yearvec[yi:], self.n_edges_norm[rtype][yi:])
+            ax[1,rn].set_title(f'Normalized edges - {rtype}')
+        plt.tight_layout()
+        if do_save:
+            fn = 'networks' or filename
+            fig.savefig(f'{filename}.png')
+        else:
+            plt.show()
+
+def test_network_time(do_plot=do_plot):
+    sc.heading('Testing numbers of partners over time')
+
+    pars = dict(n_agents=5e3,
+                start=1980,
+                end=2050,
+                dt=1.0,
+                location='india',
+                genotypes=[16,18,'hrhpv'],
+                )
+
+    sim = hpv.Sim(pars=pars, analyzers=rship_count())
+    sim.run()
+
+    a = sim.get_analyzer()
+    fig = a.plot()
+
+    return sim, a
+
+
+
 # %% Run as a script
 if __name__ == '__main__':
     T = sc.tic()
 
-    sim, a = test_network(do_plot=do_plot)
+    # sim0, a0 = test_network(do_plot=do_plot)
+    sim, a = test_network_time(do_plot=do_plot)
 
     sc.toc(T)
     print('Done.')
