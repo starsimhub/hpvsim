@@ -303,7 +303,8 @@ class People(hpb.BasePeople):
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
         if self.pars['use_multiscale'] and n_extra  > 1:
             self.scale[inds] /= n_extra # Shrink the weight of the original agents, but otherwise leave them the same
-            extra_cancer_bools = dysp_arrs.peak_dysp[:,1:] > ccut['cin3'] # Do n_extra-1 additional cancer draws
+            extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
+            extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
             extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
             n_new_agents = extra_cancer_counts.sum() # Total number of new agents
             if n_new_agents: # If we have more than 0, proceed
@@ -314,16 +315,16 @@ class People(hpb.BasePeople):
                 for state in self.meta.all_states:
                     self[state.name][new_inds] = self[state.name][extra_source_inds]
 
-                # Append these new agents to the cin1, cin2, cin3, and cancer indices
-                for is_inds in [is_cin1]
-                is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
-                is_cin2 = peak_dysp > ccut['cin1']
-                is_cin3 = peak_dysp > ccut['cin2']
-                is_cancer = peak_dysp > ccut['cin3']
-                cin1_inds = inds[is_cin1]  # Indices of those progress at least to CIN2
-                cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
-                cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
-                cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
+                # Reset the level for the agents
+                self.level0[new_inds] = False
+                self.level1[new_inds] = True
+                
+                # Sneakily add the new indices onto the existing vectors
+                inds = np.append(inds, new_inds)
+                new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
+                new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
+                peak_dysp     = np.append(peak_dysp, new_peak_dysp)
+                prog_rate     = np.append(prog_rate, new_prog_rate)
             
         # Now check indices, including with our new cancer agents
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
