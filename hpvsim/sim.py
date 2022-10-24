@@ -361,7 +361,7 @@ class Sim(hpb.BaseSim):
         The prefix "cum" is used for cumulative variables, i.e. counting the total number that have ever been in a given state at some point in the sim
 
         Arguments:
-            sim         (hp.Sim)        : a sim
+            sim         (hpv.Sim)       : a sim
             frequency   (str or float)  : the frequency with which to save results: accepts 'annual', 'dt', or a float which is interpreted as a fraction of a year, e.g. 0.2 will save results every 0.2 years
             add_data    (bool)          : whether or not to add data to the result structures
         '''
@@ -484,7 +484,7 @@ class Sim(hpb.BaseSim):
             init_states     (bool): whether to initialize states (default false when called directly)
             reset           (bool): whether to regenerate the people even if they already exist
             verbose         (int):  detail to print
-            kwargs          (dict): passed to hp.make_people()
+            kwargs          (dict): passed to hpv.make_people()
         '''
 
         # Handle inputs

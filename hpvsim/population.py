@@ -178,7 +178,7 @@ def validate_popdict(popdict, pars, verbose=True):
     try:
         popdict.keys() # Although not used directly, this is used in the error message below, and is a good proxy for a dict-like object
     except Exception as E:
-        errormsg = f'The popdict should be a dictionary or hp.People object, but instead is {type(popdict)}'
+        errormsg = f'The popdict should be a dictionary or hpv.People object, but instead is {type(popdict)}'
         raise TypeError(errormsg) from E
 
     # Check keys and lengths

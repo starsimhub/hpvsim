@@ -564,7 +564,7 @@ class Calibration(sc.prettyobj):
             do_save (bool): whether to save
             fig_path (str or filepath): filepath to save to
             do_show (bool): whether to show the figure
-            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+            kwargs (dict): passed to ``hpv.options.with_style()``; see that function for choices
         '''
 
         # Import Seaborn here since slow
@@ -572,7 +572,6 @@ class Calibration(sc.prettyobj):
             import seaborn as sns
             if plot_type.split('.')[1]=='boxplot':
                 extra_args=dict(boxprops=dict(alpha=.3))
-                dodge=True
             else: extra_args = dict()
             plot_func = getattr(sns, plot_type.split('.')[1])
         else:

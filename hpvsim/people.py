@@ -24,10 +24,10 @@ class People(hpb.BasePeople):
     argument is the population size, but typically the full parameters dictionary
     will get passed instead since it will be needed before the People object is
     initialized. However, ages, contacts, etc. will need to be created separately --
-    see ``hp.make_people()`` instead.
+    see ``hpv.make_people()`` instead.
 
     Note that this class handles the mechanics of updating the actual people, while
-    ``hp.BasePeople`` takes care of housekeeping (saving, loading, exporting, etc.).
+    ``hpv.BasePeople`` takes care of housekeeping (saving, loading, exporting, etc.).
     Please see the BasePeople class for additional methods.
 
     Args:
@@ -38,10 +38,10 @@ class People(hpb.BasePeople):
 
     **Examples**::
 
-        ppl1 = hp.People(2000)
+        ppl1 = hpv.People(2000)
 
-        sim = hp.Sim()
-        ppl2 = hp.People(sim.pars)
+        sim = hpv.Sim()
+        ppl2 = hpv.People(sim.pars)
     '''
     
     #%% Basic methods

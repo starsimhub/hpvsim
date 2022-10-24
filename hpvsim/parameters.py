@@ -17,7 +17,7 @@ def make_pars(**kwargs):
     '''
     Create the parameters for the simulation. Typically, this function is used
     internally rather than called by the user; e.g. typical use would be to do
-    sim = hp.Sim() and then inspect sim.pars, rather than calling this function
+    sim = hpv.Sim() and then inspect sim.pars, rather than calling this function
     directly.
 
     Args:

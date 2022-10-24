@@ -7,7 +7,7 @@ import sciris as sc
 import pylab as pl
 from .settings import options as hpo # To set options
 
-# Specify all externally visible functions this file defines -- other things are available as e.g. hp.defaults.default_int
+# Specify all externally visible functions this file defines -- other things are available as e.g. hpv.defaults.default_int
 __all__ = ['datadir', 'default_float', 'default_int', 'get_default_plots']
 
 # Define paths

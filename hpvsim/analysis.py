@@ -237,7 +237,7 @@ class age_pyramid(Analyzer):
 
     **Example**::
 
-        sim = cv.Sim(analyzers=hp.age_pyramid('2015', '2020'))
+        sim = cv.Sim(analyzers=hpv.age_pyramid('2015', '2020'))
         sim.run()
         age_pyramid = sim['analyzers'][0]
     '''
@@ -417,7 +417,7 @@ class age_pyramid(Analyzer):
             do_save (bool): whether to save
             fig_path (str or filepath): filepath to save to
             do_show (bool): whether to show the figure
-            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+            kwargs (dict): passed to ``hpv.options.with_style()``; see that function for choices
         '''
         import seaborn as sns # Import here since slow
 
@@ -519,7 +519,7 @@ class age_results(Analyzer):
 
     **Example**::
 
-        sim = hp.Sim(analyzers=hpv.age_results(
+        sim = hpv.Sim(analyzers=hpv.age_results(
         result_keys=sc.objdict(
             hpv_prevalence=sc.objdict(
                 timepoints=['1990'],
@@ -917,7 +917,7 @@ class age_results(Analyzer):
             do_save (bool): whether to save
             fig_path (str or filepath): filepath to save to
             do_show (bool): whether to show the figure
-            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+            kwargs (dict): passed to ``hpv.options.with_style()``; see that function for choices
         '''
 
         # Handle inputs
