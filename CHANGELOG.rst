@@ -10,7 +10,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 
 
-Version 0.2.10 (2022-10-23)
+Version 0.2.10 (2022-10-24)
 --------------------------
 - Fixes bug with treatment
 - *GitHub info*: PR `354 <https://github.com/amath-idm/hpvsim/pull/354>`__
