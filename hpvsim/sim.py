@@ -804,9 +804,9 @@ class Sim(hpb.BaseSim):
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
 
             # Save number alive
-            self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
-            self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
-            self.results['n_alive_by_sex'][1,idx] = len((people.alive*people.is_male).nonzero()[0])
+            self.results['n_alive'][idx] = people.scale_flows(people.alive.nonzero()[0])
+            self.results['n_alive_by_sex'][0,idx] = people.scale_flows((people.alive*people.is_female).nonzero()[0])
+            self.results['n_alive_by_sex'][1,idx] = people.scale_flows((people.alive*people.is_male).nonzero()[0])
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
