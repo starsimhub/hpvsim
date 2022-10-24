@@ -96,19 +96,23 @@ class rship_count(hpv.Analyzer):
             self.n_edges[rtype] = []
             self.n_edges_norm[rtype] = []
 
+    def initialize(self, sim):
+        super().initialize()
+        self.yearvec = sim.yearvec
+
     def apply(self, sim):
         for rtype in ['m','c','o']:
             self.n_edges[rtype].append(len(sim.people.contacts[rtype]))
             self.n_edges_norm[rtype].append(len(sim.people.contacts[rtype])/len(sim.people.age>14))
         return
 
-    def plot(self, do_save=False, filename=None, from_when=1990):
+    def plot(self, sdo_save=False, filename=None, from_when=1990):
         fig, ax = plt.subplots(2, 3, figsize=(15, 8))
-        yi = sc.findinds(sim.yearvec, from_when)[0]
+        yi = sc.findinds(self.yearvec, from_when)[0]
         for rn,rtype in enumerate(['m','c','o']):
-            ax[0,rn].plot(sim.yearvec[yi:], self.n_edges[rtype][yi:])
+            ax[0,rn].plot(self.yearvec[yi:], self.n_edges[rtype][yi:])
             ax[0,rn].set_title(f'Edges - {rtype}')
-            ax[1,rn].plot(sim.yearvec[yi:], self.n_edges_norm[rtype][yi:])
+            ax[1,rn].plot(self.yearvec[yi:], self.n_edges_norm[rtype][yi:])
             ax[1,rn].set_title(f'Normalized edges - {rtype}')
         plt.tight_layout()
         if do_save:
