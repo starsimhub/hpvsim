@@ -9,13 +9,12 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats = 5
+repeats = 3
 parallel = True
 showlegend = False
 
 pars = dict(
-    n_agents     = 1e3,
-    pop_scale    = 10,
+    total_pop    = 5e3,
     cancer_scale = 1,
     start        = 1975,
     n_years      = 50,
@@ -23,6 +22,13 @@ pars = dict(
     genotypes    = [16,18],
     verbose      = -1,
 )
+
+loop_pars = [
+    sc.objdict(n_agents=5_000, use_multiscale=0),
+    sc.objdict(n_agents=5_000, use_multiscale=1),
+    sc.objdict(n_agents=1_000,  use_multiscale=0),
+    sc.objdict(n_agents=1_000,  use_multiscale=1),
+    ]
 
 
 #% Define analyzer
@@ -40,6 +46,7 @@ class multitest(hpv.Analyzer):
         self.age = sc.objdict()
         self.agebins = np.arange(0,101,10)
         self.multiscale = sim['use_multiscale']
+        self.n_agents = sim['n_agents']
         return
     
     
@@ -93,34 +100,40 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
     def plot_single(analyzer, fig, alpha=1):
         r = analyzer.df()
         
-        nrows,ncols = sc.getrowscols((len(r.res.columns) + len(r.age.columns) - 3)*2, ncols=4)
+        nkinds = len(loop_pars)
+        nrows,ncols = sc.getrowscols((len(r.res.columns) + len(r.age.columns) - 3)*nkinds, ncols=nkinds*2)
         
         if fig is None:
-            fig = pl.figure(figsize=(18, 14))
+            fig = pl.figure(figsize=(30, 20))
         else:
             pl.figure(fig)
 
-        ms = analyzer.multiscale
-        index = ms - 1
-        label = ['default', 'multiscale'][ms]
-        color = ['b','r'][ms]
+        ms_bool = analyzer.multiscale
+        agent_bool = analyzer.n_agents != loop_pars[0].n_agents
+        index = 0
+        label = ['default', 'multiscale'][ms_bool]
+        label += f' (n={analyzer.n_agents})'
+        color = ['b','r'][ms_bool]
+        offset = 1 + 2*agent_bool + ms_bool
         for i, key in enumerate(r.res.columns):
+            title = f'{key}\n{label}'
             if key not in ['t', 'year']:
-                index += 2
-                pl.subplot(nrows, ncols, index)
+                pl.subplot(nrows, ncols, index+offset)
                 pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, label=analyzer.label)
-                pl.title(key)
+                pl.title(title)
                 if showlegend:
                     pl.legend()
+                index += nkinds
         
         for i, key in enumerate(r.age.columns):
+            title = f'{key}\n{label}'
             if key not in ['bins']:
-                index += 2
-                pl.subplot(nrows, ncols, index)
+                pl.subplot(nrows, ncols, index+offset)
                 pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, label=analyzer.label)
-                pl.title(f'{key} - {label}')
+                pl.title(title)
                 if showlegend:
                     pl.legend()
+                index += nkinds
         
         return fig
     
@@ -136,12 +149,12 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
 
 
 msims = sc.autolist()
-for use_multiscale in [False, True]:
+for p in loop_pars:
     sims = sc.autolist()
     for r in range(repeats):
-        label = ['default', 'multiscale'][use_multiscale]
+        label = ['default', 'multiscale'][p.use_multiscale]
         label += f'{r}'
-        simpars = dict(use_multiscale=use_multiscale, rand_seed=r, label=label, analyzers=multitest())
+        simpars = dict(**p, rand_seed=r, label=label, analyzers=multitest())
         sim = hpv.Sim(pars, **simpars)
         sims += sim
     msims += hpv.MultiSim(sims)
