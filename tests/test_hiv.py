@@ -4,10 +4,7 @@ Tests for single simulations
 
 #%% Imports and settings
 import sciris as sc
-import numpy as np
-import seaborn as sns
 import hpvsim as hpv
-from hpvsim.data import get_data as data
 
 do_plot = 0
 do_save = 0
@@ -25,7 +22,7 @@ def test_hiv(model_hiv=True):
         'n_agents': n_agents,
         'start': 1990,
         'burnin': 30,
-        'end': 2050,
+        'end': 2020,
         'genotypes': [16, 18],
         'location': 'south africa',
         'dt': .5,
@@ -46,9 +43,9 @@ def test_impact_on_cancer():
 
     pars = {
         'n_agents': n_agents,
-        'start': 1970,
+        'start': 1990,
         'burnin': 30,
-        'end': 2050,
+        'end': 2020,
         'genotypes': [16, 18],
         'location': 'south africa',
         'dt': .5,

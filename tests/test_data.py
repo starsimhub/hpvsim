@@ -21,7 +21,7 @@ def test_total_pop():
 
     for loc in locs:
         tp = hpv.data.get_total_pop(loc)
-        n_agents = round(tp.pop_size[0]/1e3)
+        n_agents = round(tp.pop_size[0]/10e3)
         start = tp.year[0]
         end = 2030
         r[loc] = tp
