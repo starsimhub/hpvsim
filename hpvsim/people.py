@@ -293,8 +293,8 @@ class People(hpb.BasePeople):
 
         # Map severity to clinical grades
         ccut = self.pars['clinical_cutoffs']
-        peak_dysp = dysp_arrs.peak_dysp
-        prog_rate = dysp_arrs.prog_rate
+        peak_dysp = dysp_arrs.peak_dysp[:,0]
+        prog_rate = dysp_arrs.prog_rate[:,0]
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
         is_cin2 = peak_dysp > ccut['cin1']
         is_cin3 = peak_dysp > ccut['cin2']
@@ -535,9 +535,9 @@ class People(hpb.BasePeople):
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
-        self.peak_dysp[genotype, inds] = np.nan
+        # self.peak_dysp[genotype, inds] = np.nan
         self.dysp_rate[genotype, inds] = np.nan
-        self.prog_rate[genotype, inds] = np.nan
+        # self.prog_rate[genotype, inds] = np.nan
 
         return
 
