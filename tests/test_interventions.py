@@ -34,7 +34,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     routine_screen = hpv.routine_screening(
         product='via',  # pass in string or product
         prob=0.03,  # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
-        eligibility=screen_eligible,  # pass in valid o of People OR indices OR callable that gets indices
+        eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
         age_range=[30, 50],
         start_year=2020,
         label='routine screening',
@@ -68,7 +68,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
         label = 'txvx assigner'
     )
 
-    # Do further testing for those who were referred for further testingp
+    # Do further testing for those who were referred for further testing
     to_triage_new = lambda sim: sim.get_intervention('txvx assigner').outcomes['triage']
     new_triage = hpv.routine_triage(
         start_year = 2030,
