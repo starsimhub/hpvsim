@@ -260,7 +260,7 @@ class People(hpb.BasePeople):
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
             modified_prog_rate = immune_compromise * hiv_prog_rate  # Calculate the modification to make to the progression rate
             modified_prog_rate[modified_prog_rate < 1] = 1
-            prog_rate *= modified_prog_rate  # Store progression rates
+            prog_rate *= modified_prog_rate[:, None]  # Store progression rates -- see https://stackoverflow.com/questions/19388152/numpy-element-wise-multiplication-of-an-array-and-a-vector
 
         # Calculate peak dysplasia
         peak_dysp = hpu.logf1(dur_dysp, prog_rate)  # Maps durations + progression to severity
@@ -582,8 +582,8 @@ class People(hpb.BasePeople):
 
                 cin_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
                 if len(cin_inds): # Reevaluate disease severity and progression speed for these women
-                    self.set_severity(cin_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
-                    self.set_cin_grades(cin_inds, g, dt)
+                    dysp_arrs = self.set_severity(cin_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
+                    self.set_cin_grades(cin_inds, g, dt, dysp_arrs=dysp_arrs)
 
         return self.scale_flows(hiv_inds)
 
