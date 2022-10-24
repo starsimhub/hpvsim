@@ -160,7 +160,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     ]
 
     # Ensure it's an integer
-    if size is not None:
+    if size is not None and not isinstance(size, tuple):
         size = int(size)
 
     # Compute distribution parameters and draw samples

@@ -74,26 +74,10 @@ class People(hpb.BasePeople):
 
         # Although we have called init(), we still need to call initialize()
         self.initialized = False
-
-        # Handle partners and contacts
-        if 'partners' in kwargs:
-            self.partners[:] = kwargs.pop('partners') # Store the desired concurrency
-        if 'current_partners' in kwargs:
-            self.current_partners[:] = kwargs.pop('current_partners') # Store current actual number - updated each step though
-            for ln,lkey in enumerate(self.layer_keys()):
-                self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
-        if 'contacts' in kwargs:
-            self.add_contacts(kwargs.pop('contacts')) # Also updated each step
-
-        # Handle all other values, e.g. age
-        for key,value in kwargs.items():
-            if strict:
-                self.set(key, value)
-            elif key in self._data:
-                self[key][:] = value
-            else:
-                self[key] = value
         
+        # Store kwargs here for now, to be dealt with during initialize()
+        self.kwargs = kwargs
+
         return
 
 
@@ -129,6 +113,30 @@ class People(hpb.BasePeople):
 
     def initialize(self, sim_pars=None, hiv_pars=None):
         ''' Perform initializations '''
+        super().initialize() # Initialize states
+        
+        # Handle partners and contacts
+        kwargs = self.kwargs
+        if 'partners' in kwargs:
+            self.partners[:] = kwargs.pop('partners') # Store the desired concurrency
+        if 'current_partners' in kwargs:
+            self.current_partners[:] = kwargs.pop('current_partners') # Store current actual number - updated each step though
+            for ln,lkey in enumerate(self.layer_keys()):
+                self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
+        if 'contacts' in kwargs:
+            self.add_contacts(kwargs.pop('contacts')) # Also updated each step
+
+        # Handle all other values, e.g. age
+        for key,value in kwargs.items():
+            if self._lock:
+                self.set(key, value)
+            elif key in self._data:
+                self[key][:] = value
+            else:
+                self[key] = value
+        
+        
+        # Additional validation
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
         self.set_pars(pars=sim_pars, hiv_pars=hiv_pars) # Replace the saved parameters with this simulation's
         self.initialized = True
@@ -206,8 +214,8 @@ class People(hpb.BasePeople):
         gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
         self.set_dysp_rates(inds, g, gpars, hiv_dysp_rate=hiv_pars['dysp_rate'])  # Set variables that determine the probability that dysplasia begins
         dysp_inds = self.set_dysp_status(inds, g, dt)  # Set people's dysplasia status
-        self.set_severity(dysp_inds, g, gpars, hiv_prog_rate=hiv_pars['prog_rate'])  # Set dysplasia severity and duration
-        self.set_cin_grades(dysp_inds, g, dt)  # Set CIN grades and dates over time
+        dysp_arrs = self.set_severity(dysp_inds, g, gpars, hiv_prog_rate=hiv_pars['prog_rate'])  # Set dysplasia severity and duration
+        self.set_cin_grades(dysp_inds, g, dt, dysp_arrs=dysp_arrs)  # Set CIN grades and dates over time
         return
 
 
@@ -237,28 +245,31 @@ class People(hpb.BasePeople):
 
     def set_severity(self, inds, g, gpars, hiv_prog_rate=None):
         ''' Set dysplasia severity and duration for women who develop dysplasia '''
-
+        
+        dysp_arrs = sc.objdict() # Store severity arrays
+        
         # Evaluate duration of dysplasia prior to clearance/control/progression to cancer
-        dur_dysp = hpu.sample(**gpars['dur_dysp'], size=len(inds))
-        self.dur_dysp[g, inds] = dur_dysp
-        self.dur_infection[g, inds] += dur_dysp
+        full_size = (len(inds), self.pars['cancer_ratio']) # Both indices and cancer agents
+        dur_dysp = hpu.sample(**gpars['dur_dysp'], size=full_size)
+        self.dur_infection[g, inds] += dur_dysp[:,0] # TODO: should this be mean(axis=1) instead?
 
         # Evaluate progression rates
-        self.prog_rate[g, inds] = hpu.sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=len(inds))
+        prog_rate = hpu.sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=full_size)
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
             modified_prog_rate = immune_compromise * hiv_prog_rate  # Calculate the modification to make to the progression rate
             modified_prog_rate[modified_prog_rate < 1] = 1
-            self.prog_rate[g, inds] = self.prog_rate[g, inds] * modified_prog_rate  # Store progression rates
+            prog_rate *= modified_prog_rate  # Store progression rates
 
-        # Set attributes
-        dur_dysp = self.dur_dysp[g, inds]  # Array of durations of dysplasia prior to clearance/control/cancer
-        prog_rate = self.prog_rate[g, inds]  # Array of progression rates
+        # Calculate peak dysplasia
         peak_dysp = hpu.logf1(dur_dysp, prog_rate)  # Maps durations + progression to severity
-        self.peak_dysp[g, inds] = peak_dysp  # Store peak dysplasia
+        
+        dysp_arrs.dur_dysp  = dur_dysp
+        dysp_arrs.prog_rate = prog_rate
+        dysp_arrs.peak_dysp = peak_dysp
 
-        return
+        return dysp_arrs
 
 
     def set_dysp_rates(self, inds, g, gpars, hiv_dysp_rate=None):
@@ -274,15 +285,16 @@ class People(hpb.BasePeople):
             self.dysp_rate[g, inds] = self.dysp_rate[g, inds] * modified_dysp_rate  # Store dysplasia rates
         return
 
-    def set_cin_grades(self, inds, g, dt):
+
+    def set_cin_grades(self, inds, g, dt, dysp_arrs):
         '''
         Set CIN clinical grades and dates of progression
         '''
 
         # Map severity to clinical grades
         ccut = self.pars['clinical_cutoffs']
-        peak_dysp = self.peak_dysp[g, inds]
-        prog_rate = self.prog_rate[g, inds]
+        peak_dysp = dysp_arrs.peak_dysp
+        prog_rate = dysp_arrs.prog_rate
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
         is_cin2 = peak_dysp > ccut['cin1']
         is_cin3 = peak_dysp > ccut['cin2']
@@ -303,7 +315,7 @@ class People(hpb.BasePeople):
         self.date_clearance[g, max_cin1_inds] = np.fmax(self.date_clearance[g, max_cin1_inds],
                                                         self.date_cin1[g, max_cin1_inds] +
                                                         sc.randround(time_to_clear_cin1 / dt))
-        self.dur_dysp[g, max_cin1_inds] += time_to_clear_cin1
+        # self.dur_dysp[g, max_cin1_inds] += time_to_clear_cin1
 
         # Determine whether CIN2 clears or progresses to CIN3
         self.date_cin3[g, cin3_inds] = np.fmax(self.t, # Don't let people progress to CIN3 prior to the current timestep
@@ -313,7 +325,7 @@ class People(hpb.BasePeople):
         self.date_clearance[g, max_cin2_inds] = np.fmax(self.date_clearance[g, max_cin2_inds],
                                                         self.date_cin2[g, max_cin2_inds] +
                                                         sc.randround(time_to_clear_cin2 / dt))
-        self.dur_dysp[g, max_cin2_inds] += time_to_clear_cin2
+        # self.dur_dysp[g, max_cin2_inds] += time_to_clear_cin2
 
         # Determine whether CIN3 clears or progresses to cancer
         self.date_cancerous[g, cancer_inds] = np.fmax(self.t,
@@ -323,7 +335,7 @@ class People(hpb.BasePeople):
         self.date_clearance[g, max_cin3_inds] = np.fmax(self.date_clearance[g, max_cin3_inds],
                                                         self.date_cin3[g, max_cin3_inds] +
                                                         sc.randround(time_to_clear_cin3 / dt))
-        self.dur_dysp[g, max_cin3_inds] += time_to_clear_cin3
+        # self.dur_dysp[g, max_cin3_inds] += time_to_clear_cin3
 
         # Record eventual deaths from cancer (assuming no survival without treatment)
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))

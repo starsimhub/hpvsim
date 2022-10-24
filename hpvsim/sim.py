@@ -501,17 +501,10 @@ class Sim(hpb.BaseSim):
             self.load_population(init_people=False)
 
         # Actually make the people
-        microstructure = self['network']
-        self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
-        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_pars) # Fully initialize the people
-        self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
-        if init_states:
-            init_hpv_prev = sc.dcp(self['init_hpv_prev'])
-            init_hpv_prev, age_brackets = self.validate_init_conditions(init_hpv_prev)
-            self.init_states(age_brackets=age_brackets, init_hpv_prev=init_hpv_prev)
-
-        # If no pop_scale has been provided, try to get it from the location
-        if self['total_pop'] is not None and total_pop is not None:
+        self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
+        
+        # Figure out the scale factors
+        if self['total_pop'] is not None and total_pop is not None: # If no pop_scale has been provided, try to get it from the location
             errormsg = 'You can either define total_pop explicitly or via the location, but not both'
             raise ValueError(errormsg)
         elif total_pop is None and self['total_pop'] is not None:
@@ -536,6 +529,14 @@ class Sim(hpb.BaseSim):
         else:
             self['cancer_ratio'] = int(np.round(ps/cs)) # Number of cancer agents for every non-cancer agent
         
+        # Finish initialization
+        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_pars) # Fully initialize the people
+        self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
+        if init_states:
+            init_hpv_prev = sc.dcp(self['init_hpv_prev'])
+            init_hpv_prev, age_brackets = self.validate_init_conditions(init_hpv_prev)
+            self.init_states(age_brackets=age_brackets, init_hpv_prev=init_hpv_prev)
+
         return self
 
 

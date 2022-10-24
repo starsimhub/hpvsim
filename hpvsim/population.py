@@ -125,7 +125,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     validate_popdict(popdict, sim.pars, verbose=verbose)
     people = hpppl.People(sim.pars, pop_trend=pop_trend, **popdict) # List for storing the people
 
-    sc.printv(f'Created {n_agents} agents, average age {people.age.mean():0.2f} years', 2, verbose)
+    sc.printv(f'Created {n_agents} agents, average age {ages.mean():0.2f} years', 2, verbose)
 
     return people, total_pop
 

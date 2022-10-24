@@ -879,15 +879,16 @@ class BasePeople(FlexPretty):
         self._n = self.pars['n_agents']  # Number of agents (initial)
         self._s = self._n # Underlying array sizes
         self._inds = None # No filtering indices
-
-        # Initialize underlying storage and map arrays
-        for state in self.meta.all_states:
-            self._data[state.name] = state.new(pars, self._n)
-        self._map_arrays()
-
-        # Assign UIDs
-        self['uid'][:] = np.arange(self.pars['n_agents'])
         
+        return
+
+
+    def initialize(self):
+        ''' Initialize underlying storage and map arrays '''
+        for state in self.meta.all_states:
+            self._data[state.name] = state.new(self.pars, self._n)
+        self._map_arrays()
+        self['uid'][:] = np.arange(self.pars['n_agents'])
         return
 
 
