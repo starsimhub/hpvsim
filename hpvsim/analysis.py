@@ -320,7 +320,7 @@ class age_pyramid(Analyzer):
             self.age_pyramids[date]['bins'] = self.bins # Copy here for convenience
             for sb,sex in enumerate(['m','f']): # Loop over each sex; sb stands for sex boolean, translating the labels to 0/1
                 inds = (sim.people.alive*(ppl.sex==sb)).nonzero()[0]
-                self.age_pyramids[date][sex] = np.histogram(ppl.age[inds], bins=self.edges, weights=ppl.scale)[0]  # Bin people
+                self.age_pyramids[date][sex] = np.histogram(ppl.age[inds], bins=self.edges, weights=ppl.scale[inds])[0]  # Bin people
 
 
     def finalize(self, sim):
@@ -688,17 +688,16 @@ class age_results(Analyzer):
         ppl = sim.people
         
         def bin_ages(inds=None, bins=None):
-            return np.histogram(ppl.age[inds], bins=bins, weights=ppl.scale)[0] # Bin the people
+            return np.histogram(ppl.age[inds], bins=bins, weights=ppl.scale[inds])[0] # Bin the people
             
 
         # Go through each result key and determine if this is a timepoint where age results are requested
         for result, result_dict in self.result_keys.items():
+            bins = result_dict.edges
             if sim.t in result_dict.timepoints:
-                bins = result_dict.edges
                 na = len(result_dict.bins)
                 ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
                 date = result_dict.dates[ind]  # Create the date which will be used to key the results
-                
 
                 if 'compute_fit' in result_dict.keys() and 'total' not in result:
                     thisdatadf = result_dict.data[(result_dict.data.year == float(date)) & (result_dict.data.name == result)]
