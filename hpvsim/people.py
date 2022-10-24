@@ -108,7 +108,7 @@ class People(hpb.BasePeople):
         self.flows_by_sex       = {f'{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'         : 0 for key in hpd.dem_keys}
         # self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
-        self.by_age_flows       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
+        self.flows_by_age       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
 
         return
 
@@ -168,7 +168,7 @@ class People(hpb.BasePeople):
             self.flows['cin3s'][g]              = self.check_cin3(g)
             new_cancers, cancers_by_age         = self.check_cancer(g)
             self.flows['cancers'][g]            += new_cancers
-            self.by_age_flows['cancers_by_age'] += cancers_by_age
+            self.flows_by_age['cancers_by_age'] += cancers_by_age
             self.flows['cins'][g]               = self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
             self.check_clearance(g)
 
