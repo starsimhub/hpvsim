@@ -316,6 +316,9 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
             male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
             this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
+            if this_weighting.sum() == 0:
+                this_weighting[:] = 1.0
+                print('Warning, no males were found for pairing, choosing randomly')
             nonzero_weighting = hpu.true(this_weighting != 0)
             selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
             m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
