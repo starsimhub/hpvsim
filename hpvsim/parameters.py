@@ -370,7 +370,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin   = dict(dist='lognormal', par1=14.9/12, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3.16, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3.16, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv18.dysp_rate    = 1.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.05 # Standard deviation of the progression rate
@@ -480,13 +480,13 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=2.0) # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=4.0) # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.dysp_rate    = 0.1 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.prog_rate    = 0.5 # same value as for all oncogenic types
     pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
     pars.hrhpv.rel_beta     = 0.94 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.sero_prob    = 0.53 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.sero_prob    = 0.5 # placeholder, currently assumed to be the same as for 31
 
     pars.lrhpv = sc.objdict()
     pars.lrhpv.dur_precin   = dict(dist='lognormal', par1=8.1/12, par2=0.4)  # placeholder, currently assumed to be the same as for 6
@@ -522,7 +522,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58 = med_imm,
             hpv6 = med_imm,
             hpv11 = med_imm,
-            hrhpv = med_imm,
+            hrhpv = 0.1,
             lrhpv = med_imm
         ),
 
@@ -539,7 +539,7 @@ def get_cross_immunity(default=False, genotype=None):
             hpv58=med_imm,
             hpv6=med_imm,
             hpv11=med_imm,
-            hrhpv = med_imm,
+            hrhpv = 0.1,
             lrhpv = med_imm
         ),
 
@@ -713,8 +713,8 @@ def get_cross_immunity(default=False, genotype=None):
             lrhpv=high_imm
         ),
         hrhpv=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
+            hpv16=0.1,
+            hpv18=0.1,
             hpv31=med_imm,
             hpv33=med_imm,
             hpv35=med_imm,
