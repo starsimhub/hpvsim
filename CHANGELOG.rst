@@ -15,7 +15,7 @@ Version 0.3.0 (2022-10-24)
 - *GitHub info*: PR `365 <https://github.com/amath-idm/hpvsim/pull/365>`__
 
 
-Version 0.2.10 (2022-10-23)
+Version 0.2.10 (2022-10-24)
 ---------------------------
 - Fixes bug with treatment
 - *GitHub info*: PR `354 <https://github.com/amath-idm/hpvsim/pull/354>`__
