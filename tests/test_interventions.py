@@ -43,13 +43,16 @@ def test_screen_prob():
     )
 
     sim = hpv.Sim(pars=base_pars, interventions=routine_screen)
-    sim.run()
+    sim.run(verbose=0)
 
     # Check that the right number of people are getting screened.
-    n_eligible = len(hpv.true((sim.people.age > 50) & (sim.people.is_female) ))
-    n_screened = len(hpv.true((sim.people.age > 50) & (sim.people.is_female) & (sim.people.screened)))
+    n_eligible = len(hpv.true((sim.people.age >= 50) & (sim.people.age <= 70) & (sim.people.is_female) ))
+    n_screened = len(hpv.true((sim.people.age >= 50) & (sim.people.age <= 70) & (sim.people.is_female) & (sim.people.screened)))
     # assert abs(n_screened/n_eligible-target_lifetime_prob)<tolerance, f'Expected approx {target_lifetime_prob} of women to have a lifetime screen, but we have {n_screened/n_eligible}'
-    print(f'✓ (Proportion screened ({n_screened/n_eligible:.2f}) is approx equal to target: ({target_lifetime_prob})')
+    if abs(n_screened/n_eligible-target_lifetime_prob)<tolerance:
+        print(f'✓ (Proportion screened ({n_screened/n_eligible:.2f}) is approx equal to target: ({target_lifetime_prob})')
+    else:
+        print(f'𐄂 (Proportion screened ({n_screened / n_eligible:.2f}) is not close to target: ({target_lifetime_prob})')
 
     return sim
 
