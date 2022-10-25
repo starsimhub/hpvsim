@@ -103,7 +103,9 @@ class rship_count(hpv.Analyzer):
     def apply(self, sim):
         for rtype in ['m','c','o']:
             self.n_edges[rtype].append(len(sim.people.contacts[rtype]))
-            self.n_edges_norm[rtype].append(len(sim.people.contacts[rtype])/len(sim.people.age>14))
+            age = sim.people.age[sim.people.is_active]
+            denom = ((age>14) * age<65).sum()
+            self.n_edges_norm[rtype].append(len(sim.people.contacts[rtype])/denom)
         return
 
     def plot(self, sdo_save=False, filename=None, from_when=1990):
