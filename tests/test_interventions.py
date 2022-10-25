@@ -124,11 +124,7 @@ def test_screen_prob():
     # Check that the right number of people are getting screened
     n_eligible = len(hpv.true((sim.people.age >= 50) & (sim.people.age <= 70) & (sim.people.is_female) ))
     n_screened = len(hpv.true((sim.people.age >= 50) & (sim.people.age <= 70) & (sim.people.is_female) & (sim.people.screened)))
-    # assert abs(n_screened/n_eligible-target_lifetime_prob)<tolerance, f'Expected approx {target_lifetime_prob} of women to have a lifetime screen, but we have {n_screened/n_eligible}'
-    if abs(n_screened/n_eligible-target_lifetime_prob)<tolerance:
-        print(f'✓ (Proportion screened ({n_screened/n_eligible:.2f}) is approx equal to target: ({target_lifetime_prob})')
-    else:
-        print(f'𐄂 (Proportion screened ({n_screened / n_eligible:.2f}) is not close to target: ({target_lifetime_prob})')
+    print(f'Proportion screened ({n_screened/n_eligible:.2f}) vs target: ({target_lifetime_prob})')
 
     # Check that the right number of people are getting triaged and assigned treatment
     a = sim.get_analyzer()
@@ -140,7 +136,7 @@ def test_screen_prob():
     print(f'Proportion treated with ablation ({sum(a.n_ablation)/sum(a.n_assigned_ablation):.2f}) vs target: ({target_ablation})')
     print(f'Proportion treated with excision ({sum(a.n_excision)/sum(a.n_assigned_excision):.2f}) vs target: ({target_excision})')
 
-    # Note, mismatches are inevitable with small pop sizes, but should be equal for large pop sizes
+    print('Note, mismatches in any of the above are inevitable with small pop sizes, but should be equal for large pop sizes.')
 
     return sim
 
