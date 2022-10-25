@@ -12,5 +12,6 @@ Full contents
    :maxdepth: 4
 
    overview
+   tutorials
    whats-new
    modules
