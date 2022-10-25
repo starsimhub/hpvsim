@@ -24,7 +24,7 @@ jobs:
         run: pip install pytest pytest-parallel
       - name: Run all tests
         working-directory: ./tests
-        run: pytest test_*.py --workers=auto --durations=0 --junitxml=test-results.xml # Run actual tests
+        run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml # Run actual tests
       - name: Upload test results
         uses: actions/upload-artifact@v1
         if: failure()
