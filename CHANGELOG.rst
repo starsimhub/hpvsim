@@ -9,9 +9,10 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
-Version 0.3.0 (2022-10-24)
+Version 0.3.0 (2022-10-25)
 --------------------------
-- Implements multiscale modeling
+- Implements multiscale modeling, but currently disabled
+- Minor release tidying
 - *GitHub info*: PR `365 <https://github.com/amath-idm/hpvsim/pull/365>`__
 
 
