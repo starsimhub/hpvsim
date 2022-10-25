@@ -146,11 +146,11 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
 
     ### Create interventions
     # Screen, triage, assign treatment, treat
-    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) #| (sim.t > (sim.people.date_screened + 5 / sim['dt']))
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine_screen = hpv.routine_screening(
         product='via',  # pass in string or product
-        prob=0.03,
-        eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
+        prob=0.1,
+        eligibility=screen_eligible,
         age_range=[30, 50],
         start_year=2020,
         label='routine screening',
@@ -503,11 +503,11 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_screen_prob()
-    # sim1 = test_all_interventions(do_plot=do_plot)
-    # sim2 = test_txvx_noscreen()
-    # sim3 = test_screening()
-    # scens0 = test_vx_effect()
+    sim0 = test_screen_prob()
+    sim1 = test_all_interventions(do_plot=do_plot)
+    sim2 = test_txvx_noscreen()
+    sim3 = test_screening()
+    scens0 = test_vx_effect()
 
 
     sc.toc(T)
