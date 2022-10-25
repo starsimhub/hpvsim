@@ -307,11 +307,12 @@ class RoutineDelivery(Intervention):
     '''
     Base class for any intervention that uses routine delivery; handles interpolation of input years.
     '''
-    def __init__(self, years=None, start_year=None, end_year=None, prob=None):
+    def __init__(self, years=None, start_year=None, end_year=None, prob=None, annual_prob=True):
         self.years      = years
         self.start_year = start_year
         self.end_year   = end_year
         self.prob       = sc.promotetoarray(prob)
+        self.annual_prob = annual_prob # Determines whether the probability is annual or per timestep
         return
 
     def initialize(self, sim):
@@ -351,8 +352,8 @@ class RoutineDelivery(Intervention):
         else:
             self.prob = sc.smoothinterp(self.yearvec, self.years, self.prob, smoothness=0)
 
-        # Lastly, adjust the annual probability by the sim's timestep
-        self.prob = self.prob*sim['dt']
+        # Lastly, adjust the annual probability by the sim's timestep, if it's an annual probability
+        if self.annual_prob: self.prob = self.prob*sim['dt']
 
         return
 
@@ -361,10 +362,11 @@ class CampaignDelivery(Intervention):
     '''
     Base class for any intervention that uses campaign delivery; handles interpolation of input years.
     '''
-    def __init__(self, years, interpolate=True, prob=None):
+    def __init__(self, years, interpolate=True, prob=None, annual_prob=True):
         self.years = sc.promotetoarray(years)
         self.interpolate = interpolate # Whether to space the intervention over the year (if true) or do them all at once (if false)
         self.prob       = sc.promotetoarray(prob)
+        self.annual_prob = annual_prob
         return
 
     def initialize(self, sim):
@@ -379,12 +381,15 @@ class CampaignDelivery(Intervention):
 
         # Get the probability input into a format compatible with timepoints
         if len(self.prob) == len(self.years) and self.interpolate:
-            self.prob = sc.smoothinterp(np.arange(len(self.timepoints)), np.arange(len(self.years)), self.prob, smoothness=0)*sim['dt']
+            self.prob = sc.smoothinterp(np.arange(len(self.timepoints)), np.arange(len(self.years)), self.prob, smoothness=0)
         elif len(self.prob) == 1:
             self.prob = np.array([self.prob[0]] * len(self.timepoints))
         else:
             errormsg = f'Length of years incompatible with length of probabilities: {len(self.years)} vs {len(self.prob)}'
             raise ValueError(errormsg)
+
+        # Lastly, adjust the annual probability by the sim's timestep, if it's an annual probability
+        if self.annual_prob: self.prob = self.prob*sim['dt']
 
         return
 
@@ -862,9 +867,9 @@ class routine_triage(BaseTriage, RoutineDelivery):
         triage2 = hpv.routine_triage(product='pos_screen_assessment', eligibility=screen_pos, prob=0.9, start_year=2030)
     '''
     def __init__(self, product=None, prob=None, eligibility=None, age_range=None,
-                         years=None, start_year=None, end_year=None, **kwargs):
+                         years=None, start_year=None, end_year=None, annual_prob=None, **kwargs):
         BaseTriage.__init__(self, product=product, age_range=age_range, eligibility=eligibility, **kwargs)
-        RoutineDelivery.__init__(self, prob=prob, start_year=start_year, end_year=end_year, years=years)
+        RoutineDelivery.__init__(self, prob=prob, start_year=start_year, end_year=end_year, years=years, annual_prob=annual_prob)
 
     def initialize(self, sim):
         RoutineDelivery.initialize(self, sim) # Initialize this first, as it ensures that prob is interpolated properly
@@ -881,9 +886,9 @@ class campaign_triage(BaseTriage, CampaignDelivery):
         triage1 = hpv.campaign_triage(product='pos_screen_assessment', eligibility=screen_pos, prob=0.9, years=2030)
     '''
     def __init__(self, product=None, age_range=None, sex=None, eligibility=None,
-                 prob=None, years=None, interpolate=None, **kwargs):
+                 prob=None, years=None, interpolate=None, annual_prob=None, **kwargs):
         BaseTriage.__init__(self, product=product, age_range=age_range, sex=sex, eligibility=eligibility, **kwargs)
-        CampaignDelivery.__init__(self, prob=prob, years=years, interpolate=interpolate)
+        CampaignDelivery.__init__(self, prob=prob, years=years, interpolate=interpolate, annual_prob=annual_prob)
 
     def initialize(self, sim):
         CampaignDelivery.initialize(self, sim) # Initialize this first, as it ensures that prob is interpolated properly
@@ -1094,9 +1099,9 @@ class routine_txvx(BaseTxVx, RoutineDelivery):
     '''
 
     def __init__(self, product=None, prob=None, age_range=None, eligibility=None,
-                 start_year=None, end_year=None, years=None, **kwargs):
+                 start_year=None, end_year=None, years=None, annual_prob=None, **kwargs):
         BaseTxVx.__init__(self, product=product, age_range=age_range, eligibility=eligibility, **kwargs)
-        RoutineDelivery.__init__(self, prob=prob, start_year=start_year, end_year=end_year, years=years)
+        RoutineDelivery.__init__(self, prob=prob, start_year=start_year, end_year=end_year, years=years, annual_prob=annual_prob)
 
     def initialize(self, sim):
         RoutineDelivery.initialize(self, sim) # Initialize this first, as it ensures that prob is interpolated properly
@@ -1113,9 +1118,9 @@ class campaign_txvx(BaseTxVx, CampaignDelivery):
     '''
 
     def __init__(self, product=None, prob=None, age_range=None, eligibility=None,
-                 years=None, interpolate=True, **kwargs):
+                 years=None, interpolate=True, annual_prob=None, **kwargs):
         BaseScreening.__init__(self, product=product, age_range=age_range, eligibility=eligibility, **kwargs)
-        CampaignDelivery.__init__(self, prob=prob, years=years, interpolate=interpolate)
+        CampaignDelivery.__init__(self, prob=prob, years=years, interpolate=interpolate, annual_prob=annual_prob)
 
     def initialize(self, sim):
         CampaignDelivery.initialize(self, sim) # Initialize this first, as it ensures that prob is interpolated properly

@@ -25,7 +25,7 @@ base_pars = {
 
 #%% Define the tests
 
-def test_all(do_plot=False, do_save=False, fig_path=None):
+def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test all interventions together')
 
     ### Create interventions
@@ -52,7 +52,8 @@ def test_all(do_plot=False, do_save=False, fig_path=None):
     to_triage = lambda sim: sim.get_intervention('routine screening').outcomes['positive']
     soc_triage = hpv.routine_triage(
         years = [2020,2029],
-        prob = 0.5, # acceptance rate
+        prob = 0.9, # acceptance rate
+        annual_prob=False, # This probability is per timestep, not annual
         product = 'via_triage',
         eligibility = to_triage,
         label = 'VIA triage (pre-txvx)'
@@ -63,6 +64,7 @@ def test_all(do_plot=False, do_save=False, fig_path=None):
     pos_screen_assesser = hpv.routine_triage(
         start_year=2030,
         prob = 1.0,
+        annual_prob=False,
         product = 'txvx_assigner',
         eligibility = screened_pos,
         label = 'txvx assigner'
@@ -72,7 +74,7 @@ def test_all(do_plot=False, do_save=False, fig_path=None):
     to_triage_new = lambda sim: sim.get_intervention('txvx assigner').outcomes['triage']
     new_triage = hpv.routine_triage(
         start_year = 2030,
-        prob = 0.3,
+        prob = 1.0,
         product = 'via_triage',
         eligibility = to_triage_new,
         label = 'VIA triage (post-txvx)'
@@ -91,6 +93,7 @@ def test_all(do_plot=False, do_save=False, fig_path=None):
     confirmed_positive = lambda sim: list(set(sim.get_intervention('VIA triage (pre-txvx)').outcomes['positive'].tolist() + sim.get_intervention('VIA triage (post-txvx)').outcomes['positive'].tolist()))
     assign_treatment = hpv.routine_triage(
         prob = 1.0,
+        annual_prob=False,
         product = 'tx_assigner',
         eligibility = confirmed_positive,
         label = 'tx assigner'
@@ -384,10 +387,10 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_new_interventions(do_plot=do_plot)
-    sim1 = test_txvx_noscreen()
-    sim2 = test_screening()
-    scens0 = test_vx_effect()
+    sim = test_all_interventions(do_plot=do_plot)
+    # sim1 = test_txvx_noscreen()
+    # sim2 = test_screening()
+    # scens0 = test_vx_effect()
 
 
     sc.toc(T)
