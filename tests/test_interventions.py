@@ -417,10 +417,10 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim0 = test_screen_prob()
-    sim1 = test_all_interventions(do_plot=do_plot)
-    sim2 = test_txvx_noscreen()
-    sim3 = test_screening()
-    scens0 = test_vx_effect()
+    # sim1 = test_all_interventions(do_plot=do_plot)
+    # sim2 = test_txvx_noscreen()
+    # sim3 = test_screening()
+    # scens0 = test_vx_effect()
 
 
     sc.toc(T)
