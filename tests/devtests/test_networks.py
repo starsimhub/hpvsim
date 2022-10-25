@@ -108,7 +108,7 @@ class rship_count(hpv.Analyzer):
             self.n_edges_norm[rtype].append(len(sim.people.contacts[rtype])/denom)
         return
 
-    def plot(self, sdo_save=False, filename=None, from_when=1990):
+    def plot(self, do_save=False, filename=None, from_when=1990):
         fig, ax = plt.subplots(2, 3, figsize=(15, 8))
         yi = sc.findinds(self.yearvec, from_when)[0]
         for rn,rtype in enumerate(['m','c','o']):
@@ -148,8 +148,9 @@ def test_network_time(do_plot=do_plot):
 if __name__ == '__main__':
     T = sc.tic()
 
-    # sim0, a0 = test_network(do_plot=do_plot)
-    sim, a = test_network_time(do_plot=do_plot)
+    sim0, a0 = test_network(do_plot=do_plot)
+    sim1, a1 = test_network_time(do_plot=do_plot)
+    ssim1, a1 = test_network_time(do_plot=do_plot)
 
     sc.toc(T)
     print('Done.')
