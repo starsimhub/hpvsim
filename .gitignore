@@ -1,6 +1,7 @@
 # HPVsim-generated files
 *.obj
 files/
+modules.rst
 
 # Other files
 .idea
