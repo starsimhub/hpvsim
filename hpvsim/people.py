@@ -302,32 +302,34 @@ class People(hpb.BasePeople):
         # Handle multiscale to create additional cancer agents
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
         if self.pars['use_multiscale'] and n_extra  > 1:
-            self.scale[inds] /= n_extra # Shrink the weight of the original agents, but otherwise leave them the same
-            extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
-            extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
-            extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
-            n_new_agents = extra_cancer_counts.sum() # Total number of new agents
-            if n_new_agents: # If we have more than 0, proceed
-                extra_source_inds = np.concatenate([[inds[i]]*count for i,count in enumerate(extra_cancer_counts) if count]).flatten() # Find the sources for these new agents
+            errormsg = 'Multiscale is not yet ready'
+            raise NotImplementedError(errormsg)
+            # self.scale[inds] /= n_extra # Shrink the weight of the original agents, but otherwise leave them the same
+            # extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
+            # extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
+            # extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
+            # n_new_agents = extra_cancer_counts.sum() # Total number of new agents
+            # if n_new_agents: # If we have more than 0, proceed
+            #     extra_source_inds = np.concatenate([[inds[i]]*count for i,count in enumerate(extra_cancer_counts) if count]).flatten() # Find the sources for these new agents
                 
-                # Create the new agents and assign them the same properties as the existing agents
-                new_inds = self._grow(n_new_agents)
-                for state in self.meta.all_states:
-                    if state.ndim == 1:
-                        self[state.name][new_inds] = self[state.name][extra_source_inds]
-                    elif state.ndim == 2:
-                        self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
+            #     # Create the new agents and assign them the same properties as the existing agents
+            #     new_inds = self._grow(n_new_agents)
+            #     for state in self.meta.all_states:
+            #         if state.ndim == 1:
+            #             self[state.name][new_inds] = self[state.name][extra_source_inds]
+            #         elif state.ndim == 2:
+            #             self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
 
-                # Reset the level for the agents
-                self.level0[new_inds] = False
-                self.level1[new_inds] = True
+            #     # Reset the level for the agents
+            #     self.level0[new_inds] = False
+            #     self.level1[new_inds] = True
                 
-                # Sneakily add the new indices onto the existing vectors
-                inds = np.append(inds, new_inds)
-                new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
-                new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
-                peak_dysp     = np.append(peak_dysp, new_peak_dysp)
-                prog_rate     = np.append(prog_rate, new_prog_rate)
+            #     # Sneakily add the new indices onto the existing vectors
+            #     inds = np.append(inds, new_inds)
+            #     new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
+            #     new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
+            #     peak_dysp     = np.append(peak_dysp, new_peak_dysp)
+            #     prog_rate     = np.append(prog_rate, new_prog_rate)
             
         # Now check indices, including with our new cancer agents
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
