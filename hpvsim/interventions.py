@@ -749,6 +749,7 @@ class BaseTest(Intervention):
         '''
         Deliver the diagnostics by finding who's eligible, finding who accepts, and applying the product.
         '''
+        self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         ti = sc.findinds(self.timepoints, sim.t)[0]
         prob            = self.prob[ti] # Get the proportion of people who will be tested this timestep
         eligible_inds   = self.check_eligibility(sim) # Check eligibility
