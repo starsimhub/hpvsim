@@ -150,7 +150,6 @@ if __name__ == '__main__':
 
     sim0, a0 = test_network(do_plot=do_plot)
     sim1, a1 = test_network_time(do_plot=do_plot)
-    ssim1, a1 = test_network_time(do_plot=do_plot)
 
     sc.toc(T)
     print('Done.')
