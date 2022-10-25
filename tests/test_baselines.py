@@ -22,6 +22,20 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     plot the sim by default.
     '''
 
+    # Define some interventions
+    screen      = hpv.routine_screening(start_year=2020, prob=0.1, product='via', label='screen')
+    to_triage   = lambda sim: sim.get_intervention('screen').outcomes['positive']
+    triage      = hpv.routine_triage(eligibility=to_triage, prob=1.0, product='via_triage', label='triage')
+    to_treat    = lambda sim: sim.get_intervention('triage').outcomes['positive']
+    assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=1.0, product='tx_assigner', label='assign_tx')
+    to_ablate   = lambda sim: sim.get_intervention('assign_tx').outcomes['ablation']
+    ablation    = hpv.treat_num(eligibility=to_ablate, prob=0.5, product='ablation')
+    to_excise   = lambda sim: sim.get_intervention('assign_tx').outcomes['excision']
+    excision    = hpv.treat_delay(eligibility=to_excise, prob=0.5, product='excision')
+    vx          = hpv.routine_vx(prob=0.8, start_year=2020, product='bivalent')
+    txvx        = hpv.routine_txvx(prob=0.8, start_year=2030, product='txvx1')
+
+
     # Define the parameters
     pars = dict(
         n_agents      = 20e3,       # Population size
@@ -29,6 +43,7 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
         verbose       = 0,          # Don't print details of the run
         rand_seed     = 2,          # Set a non-default seed
         genotypes     = [16, 18],   # Include the two genotypes of greatest general interest
+        interventions = [screen, triage, assign_tx, ablation, excision, vx, txvx],  # Include the most common interventions
     )
 
     # Create the sim

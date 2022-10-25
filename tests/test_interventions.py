@@ -25,8 +25,8 @@ base_pars = {
 
 #%% Define the tests
 
-def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
-    sc.heading('Test new intervention implementation')
+def test_all(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test all interventions together')
 
     ### Create interventions
     # Screen, triage, assign treatment, treat
@@ -226,7 +226,6 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
         eligibility=second_dose_eligible,
         label = 'routine txvx 2nd dose'
     )
-
 
     interventions = [campaign_txvx_dose1, campaign_txvx_dose2, routine_txvx_dose1, routine_txvx_dose2]
     for intv in interventions: intv.do_plot=False
