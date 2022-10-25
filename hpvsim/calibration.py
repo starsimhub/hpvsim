@@ -212,7 +212,8 @@ class Calibration(sc.prettyobj):
             trial_pars (dict): dictionary of parameters from a single trial. If not provided, best parameters will be used
             return_full (bool): whether to return a unified par dict ready for use in a sim, or the sim pars and genotype pars separately
 
-        Example:
+        **Example**::
+        
             sim = hpv.Sim(genotypes=[16, 18])
             calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
             genotype_pars = dict(hpv16=dict(prog_time=[3, 3, 10]))

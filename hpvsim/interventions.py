@@ -98,9 +98,11 @@ def get_subtargets(subtarget, sim):
 def select_people(inds, prob=None):
     '''
     Return an array of indices of people to who accept a service being offered
+
     Args:
         inds: array of indices of people offered a service (e.g. screening, triage, treatment)
         prob: acceptance probability
+
     Returns: Array of indices of people who accept
     '''
     accept_probs    = np.full_like(inds, fill_value=prob, dtype=hpd.default_float)
@@ -197,7 +199,7 @@ class Intervention:
         '''
         Finalize intervention
 
-        This method is run once as part of `sim.finalize()` enabling the intervention to perform any
+        This method is run once as part of ``sim.finalize()`` enabling the intervention to perform any
         final operations after the simulation is complete (e.g. rescaling)
         '''
         if self.finalized: # pragma: no cover
@@ -286,7 +288,7 @@ class Intervention:
         one-way export to produce a JSON-compatible representation of the
         intervention. In the first instance, the object dict will be returned.
         However, if an intervention itself contains non-standard variables as
-        attributes, then its `to_json` method will need to handle those.
+        attributes, then its ``to_json`` method will need to handle those.
 
         Note that simply printing an intervention will usually return a representation
         that can be used to recreate it.
@@ -480,13 +482,14 @@ class EventSchedule(Intervention):
     """
     Run functions on different days
 
-    This intervention is a a kind of generalization of `dynamic_pars` to allow more
+    This intervention is a a kind of generalization of ``dynamic_pars`` to allow more
     flexibility in triggering multiple, arbitrary operations and to more easily assemble
     multiple changes at different times. This intervention can be used to implement scale-up
     or other changes to interventions without needing to implement time-dependency in the
     intervention itself.
 
-    To use the intervention, simply index the intervention by `t` or by date, and then
+    To use the intervention, simply index the intervention by ``t`` or by date.
+
     Example:
 
     >>> iv = EventSchedule()
@@ -504,7 +507,7 @@ class EventSchedule(Intervention):
 
     def __setitem__(self, day, fcn):
         if day in self.schedule:
-            raise Exception("Use a list instead to assign multiple functions - or to really overwrite, delete the function for this day first i.e. `del schedule[day]` before performing `schedule[day]=...`")
+            raise Exception("Use a list instead to assign multiple functions - or to really overwrite, delete the function for this day first i.e. del schedule[day] before performing schedule[day]=...")
         self.schedule[day] = fcn
 
     def __delitem__(self, key):
@@ -662,7 +665,9 @@ class routine_vx(BaseVaccination, RoutineDelivery):
     '''
     Routine vaccination - an instance of base vaccination combined with routine delivery.
     See base classes for a description of input arguments.
-    Examples:
+
+    **Examples**::
+
         vx1 = hpv.routine_vx(product='bivalent', age_range=[9,10], prob=0.9, start_year=2025) # Vaccinate 90% of girls aged 9-10 every year
         vx2 = hpv.routine_vx(product='bivalent', age_range=[9,10], prob=0.9, sex=[0,1], years=np.arange(2020,2025)) # Screen 90% of girls and boys aged 9-10 every year from 2020-2025
         vx3 = hpv.routine_vx(product='quadrivalent', prob=np.linspace(0.2,0.8,5), years=np.arange(2020,2025)) # Scale up vaccination over 5 years starting in 2020
@@ -703,6 +708,7 @@ __all__ += ['BaseTest', 'BaseScreening', 'routine_screening', 'campaign_screenin
 class BaseTest(Intervention):
     '''
     Base class for screening and triage.
+
     Args:
          product        (str/Product)   : the diagnostic to use
          prob           (float/arr)     : annual probability of eligible women receiving the diagnostic
@@ -762,6 +768,7 @@ class BaseTest(Intervention):
 class BaseScreening(BaseTest):
     '''
     Base class for screening.
+
     Args:
         age_range (list/tuple/arr)  : age range for screening, e.g. [30,50]
         kwargs    (dict)            : passed to BaseTest
@@ -799,6 +806,7 @@ class BaseScreening(BaseTest):
 class BaseTriage(BaseTest):
     '''
     Base class for triage.
+
     Args:
         kwargs (dict): passed to BaseTest
     '''
@@ -817,7 +825,9 @@ class routine_screening(BaseScreening, RoutineDelivery):
     '''
     Routine screening - an instance of base screening combined with routine delivery.
     See base classes for a description of input arguments.
-    Examples:
+
+    **Examples**::
+
         screen1 = hpv.routine_screening(product='hpv', prob=0.02) # Screen 2% of the eligible population every year
         screen2 = hpv.routine_screening(product='hpv', prob=0.02, start_year=2020) # Screen 2% every year starting in 2020
         screen3 = hpv.routine_screening(product='hpv', prob=np.linspace(0.005,0.025,5), years=np.arange(2020,2025)) # Scale up screening over 5 years starting in 2020
@@ -836,7 +846,9 @@ class campaign_screening(BaseScreening, CampaignDelivery):
     '''
     Campaign screening - an instance of base screening combined with campaign delivery.
     See base classes for a description of input arguments.
-    Examples:
+
+    **Examples**::
+
         screen1 = hpv.campaign_screening(product='hpv', prob=0.2, years=2030) # Screen 20% of the eligible population in 2020
         screen2 = hpv.campaign_screening(product='hpv', prob=0.02, years=[2025,2030]) # Screen 20% of the eligible population in 2025 and again in 2030
     '''
@@ -854,7 +866,9 @@ class routine_triage(BaseTriage, RoutineDelivery):
     '''
     Routine triage - an instance of base triage combined with routine delivery.
     See base classes for a description of input arguments.
-    Examples:
+    
+    **Examples**::
+
         # Example 1: Triage 40% of the eligible population in all years
         triage1 = hpv.routine_triage(product='via_triage', prob=0.4)
 
@@ -876,7 +890,9 @@ class campaign_triage(BaseTriage, CampaignDelivery):
     '''
     Campaign triage - an instance of base triage combined with campaign delivery.
     See base classes for a description of input arguments.
-    Examples:
+    
+    **Examples**::
+
         # Example 1: In 2030, triage all positive screens into confirmatory testing or therapeutic vaccintion
         screened_pos = lambda sim: sim.get_intervention('screening').outcomes['positive']
         triage1 = hpv.campaign_triage(product='pos_screen_assessment', eligibility=screen_pos, prob=0.9, years=2030)
@@ -898,6 +914,7 @@ __all__ += ['BaseTreatment', 'treat_num', 'treat_delay', 'BaseTxVx', 'routine_tx
 class BaseTreatment(Intervention):
     '''
     Base treatment class.
+
     Args:
          product        (str/Product)   : the treatment product to use
          accept_prob     (float/arr)    : acceptance rate of treatment - interpreted as the % of women eligble for treatment who accept
@@ -980,6 +997,7 @@ class BaseTreatment(Intervention):
 class treat_num(BaseTreatment):
     '''
     Treat a fixed number of people each timestep.
+
     Args:
          max_capacity (int): maximum number who can be treated each timestep
     '''
@@ -1022,6 +1040,7 @@ class treat_num(BaseTreatment):
 class treat_delay(BaseTreatment):
     '''
     Treat people after a fixed delay
+
     Args:
          delay (int): years of delay between becoming eligible for treatment and receiving treatment.
     '''
@@ -1090,7 +1109,9 @@ class routine_txvx(BaseTxVx, RoutineDelivery):
     '''
     Routine delivery of therapeutic vaccine - an instance of treat_num combined
      with routine delivery. See base classes for a description of input arguments.
-    Examples:
+
+    **Examples**::
+
         txvx1 = hpv.routine_txvx(product='txvx1', prob=0.9, age_range=[25,26], start_year=2030) # Vaccinate 90% of 25yo women every year starting 2025
         txvx2 = hpv.routine_txvx(product='txvx1', prob=np.linspace(0.2,0.8,5), age_range=[25,26], years=np.arange(2030,2035)) # Scale up vaccination over 5 years starting in 2020
     '''
@@ -1169,6 +1190,7 @@ class dx(Product):
     def administer(self, sim, inds, return_format='dict'):
         '''
         Administer a testing product.
+
         Returns:
              if return_format=='array': an array of length len(inds) with integer entries that map each person to one of the result_states
              if return_format=='dict': a dictionary keyed by result_states with values containing the indices of people classified into this state
@@ -1348,5 +1370,3 @@ def default_vx(prod_name=None):
         vxprods[name+'3']   = vx(genotype_pars=dfvx[dfvx.name==name], imm_boost=1.1) # 3rd dose
     if prod_name is not None:   return vxprods[prod_name]
     else:                       return vxprods
-
-
