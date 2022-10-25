@@ -25,15 +25,44 @@ base_pars = {
 
 #%% Define the tests
 
+def test_screen_prob():
+    sc.heading('Test that screening probability selects the right number of people')
+
+    target_lifetime_prob = 0.6
+    age_range = [30, 50]
+    model_annual_prob = target_lifetime_prob/(age_range[1]-age_range[0])
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) # Only model a single lifetime screen
+    tolerance = 0.05 #  Allow it to be off by 5%
+
+    routine_screen = hpv.routine_screening(
+        product='via',  # pass in string or product
+        prob=model_annual_prob,  # This looks like it means that we screen 50% of the population each year
+        eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
+        age_range=age_range,
+        start_year=2000,
+    )
+
+    sim = hpv.Sim(pars=base_pars, interventions=routine_screen)
+    sim.run()
+
+    # Check that the right number of people are getting screened.
+    n_eligible = len(hpv.true((sim.people.age > 50) & (sim.people.is_female) ))
+    n_screened = len(hpv.true((sim.people.age > 50) & (sim.people.is_female) & (sim.people.screened)))
+    # assert abs(n_screened/n_eligible-target_lifetime_prob)<tolerance, f'Expected approx {target_lifetime_prob} of women to have a lifetime screen, but we have {n_screened/n_eligible}'
+    print(f'✓ (Proportion screened ({n_screened/n_eligible:.2f}) is approx equal to target: ({target_lifetime_prob})')
+
+    return sim
+
+
 def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Test all interventions together')
 
     ### Create interventions
     # Screen, triage, assign treatment, treat
-    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) #| (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine_screen = hpv.routine_screening(
         product='via',  # pass in string or product
-        prob=0.03,  # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
+        prob=0.03,
         eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
         age_range=[30, 50],
         start_year=2020,
@@ -387,10 +416,11 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_all_interventions(do_plot=do_plot)
-    # sim1 = test_txvx_noscreen()
-    # sim2 = test_screening()
-    # scens0 = test_vx_effect()
+    sim0 = test_screen_prob()
+    sim1 = test_all_interventions(do_plot=do_plot)
+    sim2 = test_txvx_noscreen()
+    sim3 = test_screening()
+    scens0 = test_vx_effect()
 
 
     sc.toc(T)
