@@ -421,7 +421,7 @@ class People(hpb.BasePeople):
 
         for lno,lkey in enumerate(self.layer_keys()):
             layer = self.contacts[lkey]
-            to_dissolve = (~self['alive'][layer['m']]) | (~self['alive'][layer['f']]) | ( (self.t*self.pars['dt']) > layer['end'])
+            to_dissolve = (~self['alive'][layer['m']]) + (~self['alive'][layer['f']]) + ( (self.t*self.pars['dt']) > layer['end']).astype(bool)
             dissolved = layer.pop_inds(to_dissolve) # Remove them from the contacts list
 
             # Update current number of partners
