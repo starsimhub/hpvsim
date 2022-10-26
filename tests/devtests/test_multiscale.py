@@ -13,7 +13,7 @@ repeats    = 5
 parallel   = 1
 showlegend = False
 
-large_pop = 100e3
+large_pop = 10e3
 small_pop = 1e3
 ratio = large_pop/small_pop
 
