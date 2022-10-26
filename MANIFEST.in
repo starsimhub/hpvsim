@@ -4,4 +4,4 @@ global-include *.rst
 recursive-include hpvsim *.py
 recursive-include hpvsim *.csv
 recursive-include hpvsim *.json
-global-exclude *.py[cod] __pycache__
+global-exclude *.py[cod] __pycache__ *.obj
