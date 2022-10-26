@@ -8,16 +8,17 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 0.2.11 (2022-10-25)
---------------------------
-- Changes the way dates of HPV clearance are assigned to use durations sampled
-- *GitHub info*: PR `374 <https://github.com/amath-idm/hpvsim/pull/374>`__
-
-Version 0.3.0 (2022-10-25)
+Version 0.3.0 (2022-10-26)
 --------------------------
 - Implements multiscale modeling, but currently disabled
 - Minor release tidying
 - *GitHub info*: PR `365 <https://github.com/amath-idm/hpvsim/pull/365>`__
+
+
+Version 0.2.11 (2022-10-25)
+--------------------------
+- Changes the way dates of HPV clearance are assigned to use durations sampled
+- *GitHub info*: PR `374 <https://github.com/amath-idm/hpvsim/pull/374>`__
 
 
 Version 0.2.10 (2022-10-24)
