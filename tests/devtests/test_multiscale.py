@@ -9,11 +9,11 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats    = 10
+repeats    = 20
 parallel   = 1
 showlegend = False
 
-large_pop = 2e3
+large_pop = 10e3
 small_pop = 1e3
 ratio = large_pop/small_pop
 
