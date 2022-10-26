@@ -70,17 +70,15 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta_dist']       = dict(dist='neg_binomial', par1=1.0, par2=1.0, step=0.01) # Distribution to draw individual level transmissibility TODO does this get used? if not remove.
     pars['beta']            = 0.25  # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']        = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Parameters for disease progression
-    pars['severity_dist'] = dict(dist='lognormal', par1=None, par2=0.1) # Distribution of individual disease severity. Par1 is set to None because the mean is determined as a function of genotype and disease duration
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
-    pars['cancer_treat_prob']   = 0.1 # probability of receiving cancer treatment given symptom detection
     pars['hpv_control_prob']    = 0.44 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation']    = 0.025 # Placeholder
+    pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta', par1=5, par2=3)  # beta distribution for initial level of immunity following infection clearance
@@ -102,13 +100,6 @@ def make_pars(**kwargs):
     # Vaccine parameters
     pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
-
-    # Screening and treatment parameters
-    pars['screen_pars']     = dict()  # Screening method that is being used; populated during initialization
-    pars['treat_pars'] = dict()  # Treatment method that is being used; populated during initialization
-
-    # Durations
-    pars['dur_cancer']      = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
 
     # Parameters determining relative transmissibility at each stage of disease
     pars['rel_trans_cin1']       = 1 # Transmissibility of people with CIN1 compared to those without dysplasia

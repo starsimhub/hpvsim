@@ -402,7 +402,7 @@ class Sim(hpb.BaseSim):
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
             for flow in hpd.flows:
                 if (flow.by_genotype and lkey=='') or lkey=='total_':
-                    results[f'{lkey + flow.name}'] = init_res(f'{llab} {flow.label}', color=flow.cmap(cstride), n_rows=g)
+                    results[f'{lkey + flow.name}'] = init_res(f'{(llab + flow.label).capitalize()}', color=flow.cmap(cstride), n_rows=g)
 
         # Create stocks
         for llabel,cstride,g in zip(['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
