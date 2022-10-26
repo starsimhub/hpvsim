@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.3.2 (2022-10-26)
+--------------------------
+- Minor updates with more tutorials, corrected file manifest, etc.
+- *GitHub info*: PR `380 <https://github.com/amath-idm/hpvsim/pull/380>`__
+
+
 Version 0.3.1 (2022-10-26)
 --------------------------
 - Fixes bug with screening
