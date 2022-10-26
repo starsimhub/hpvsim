@@ -12,6 +12,7 @@ from . import misc as hpm
 from . import plotting as hppl
 from . import defaults as hpd
 from . import parameters as hppar
+from . import interventions as hpi
 from .settings import options as hpo # For setting global options
 
 
@@ -1034,16 +1035,15 @@ class cancer_detection(Analyzer):
         treat_prob: Probability of receiving treatment for those with symptom-detected cancer
     '''
 
-    def __init__(self, symp_prob=0.01, treat_prob=0.01, **kwargs):
+    def __init__(self, symp_prob=0.01, treat_prob=0.01, product=None, **kwargs):
         super().__init__(**kwargs)
         self.symp_prob = symp_prob
         self.treat_prob = treat_prob
+        self.product = product or hpi.radiation()
 
     def initialize(self, sim):
         super().initialize(sim)
         self.dt = sim['dt']
-
-        # Add entries to results
 
 
     def apply(self, sim):
@@ -1066,12 +1066,8 @@ class cancer_detection(Analyzer):
                 sim.people.date_detected_cancer[is_detected_inds] = sim.t
                 treat_probs = np.full(len(is_detected_inds), self.treat_prob)
                 treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-                # if 'cancer_treatment' in sim.pars['treat_pars'].keys():
-                #     new_dur_cancer = hpu.sample(**sim.pars['treat_pars']['cancer_treatment']['dur'], size=len(treat_inds))
-                #     sim.people.date_dead_cancer[treat_inds] += np.ceil(new_dur_cancer / self.dt)
-                #     sim.people.treated[treat_inds] = True
-                #     sim.people.date_treated[treat_inds] = sim.t
-                #     new_treatments = len(treat_inds)
+                if len(treat_inds)>0:
+                    self.product.administer(sim, treat_inds)
 
         # Update flows
         sim.people.flows['detected_cancers'] = new_detections
