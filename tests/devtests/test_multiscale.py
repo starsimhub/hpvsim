@@ -16,6 +16,7 @@ showlegend = False
 large_pop = 10e3
 small_pop = 1e3
 ratio = large_pop/small_pop
+offset = 100
 
 pars = dict(
     total_pop      = large_pop,
@@ -176,7 +177,7 @@ for p in loop_pars:
     for r in range(repeats):
         label = ['default', 'multiscale'][p.use_multiscale]
         label += f'{r}'
-        simpars = dict(**p, rand_seed=r, label=label, analyzers=multitest())
+        simpars = dict(**p, rand_seed=r+offset, label=label, analyzers=multitest())
         sim = hpv.Sim(pars, **simpars)
         sims += sim
     msims += hpv.MultiSim(sims)
