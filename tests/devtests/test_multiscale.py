@@ -101,7 +101,7 @@ class multitest(hpv.Analyzer):
     
 def plot_compare_multiscale(msim, fig=None):
     
-    def plot_single(analyzer, shared, fig, alpha=1, lw=1):
+    def plot_single(analyzer, shared=None, fig=None, alpha=1, lw=1, factor=1):
         r = analyzer.df()
         
         nkinds = len(loop_pars)
@@ -119,13 +119,23 @@ def plot_compare_multiscale(msim, fig=None):
         label += f' (n={analyzer.n_agents})'
         color = ['b','r'][ms_bool]
         offset = 1 + 2*agent_bool + ms_bool
+        
+        # Handle shared
+        if isinstance(shared, dict):
+            if label in shared:
+                first = False
+            else:
+                first = True
+                shared[label] = sc.dcp(analyzer)
+            sh = shared[label]
+            
         for i, key in enumerate(r.res.columns):
             title = f'{key}\n{label}'
             if key not in ['t', 'year']:
                 pl.subplot(nrows, ncols, index+offset)
-                pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, lw=lw, label=analyzer.label)
-                if shared is not None: # Calculate average on the fly
-                    shared.res[key] += r.res[key] / shared.nsims
+                pl.plot(r.res.year, r.res[key]*factor, color=color, alpha=alpha, lw=lw, label=analyzer.label)
+                if shared is not None and not first: # Calculate average on the fly
+                    sh.res[key] += r.res[key]
                 pl.title(title)
                 if showlegend:
                     pl.legend()
@@ -135,9 +145,9 @@ def plot_compare_multiscale(msim, fig=None):
             title = f'{key}\n{label}'
             if key not in ['bins']:
                 pl.subplot(nrows, ncols, index+offset)
-                pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, lw=lw, label=analyzer.label)
-                if shared is not None:
-                    shared.age[key] += r.age[key] / shared.nsims
+                pl.plot(r.age.bins, r.age[key]*factor, color=color, alpha=alpha, lw=lw, label=analyzer.label)
+                if shared is not None and not first:
+                    sh.age[key] += r.age[key]
                 pl.title(title)
                 if showlegend:
                     pl.legend()
@@ -146,14 +156,13 @@ def plot_compare_multiscale(msim, fig=None):
         return fig
     
     fig = None
-    shared = sc.dcp(msim.sims[0].get_analyzer())
-    shared.nsims = len(msim.sims)
+    shared = sc.objdict()
     for s,sim in enumerate(msim.sims):
         a = sim.get_analyzer()
-        loop_shared = shared if s > 0 else None
-        fig = plot_single(analyzer=a, shared=loop_shared, fig=fig, alpha=0.1, lw=1)
+        fig = plot_single(analyzer=a, shared=shared, fig=fig, alpha=0.1, lw=1)
     
-    fig = plot_single(analyzer=shared, shared=None, fig=fig, alpha=1.0, lw=2)
+    for sh in shared.values():
+        fig = plot_single(analyzer=sh, shared=None, fig=fig, alpha=1.0, lw=2, factor=1/repeats)
     
     sc.figlayout()
     pl.show()
