@@ -102,10 +102,10 @@ def make_pars(**kwargs):
     pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
 
     # Parameters determining relative transmissibility at each stage of disease
-    pars['rel_trans_cin1']       = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans_cin2']       = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans_cin3']       = 1 # Baseline assumption, can be adjusted during calibration
-    pars['rel_trans_cancerous']  = 0.5 # Baseline assumption, can be adjusted during calibration
+    pars['rel_trans_cin1']       = 1 # Transmissibility of people with CIN1 compared to those without dysplasia
+    pars['rel_trans_cin2']       = 1 # Transmissibility of people with CIN2 compared to those without dysplasia
+    pars['rel_trans_cin3']       = 1 # Transmissibility of people with CIN3 compared to those without dysplasia
+    pars['rel_trans_cancerous']  = 0.5 # Transmissibility of people with cancer compared to those without dysplasia
 
     # Efficacy of protection
     pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
