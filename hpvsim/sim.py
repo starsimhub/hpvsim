@@ -684,12 +684,11 @@ class Sim(hpb.BaseSim):
         hiv_rel_sus[hiv_inds] *= mod
 
         # Calculate relative transmissibility by stage of infection
-        rel_trans_pars = self['rel_trans']
         rel_trans = people.infectious[:].astype(hpd.default_float)
-        rel_trans[people.cin1] *= rel_trans_pars['cin1']
-        rel_trans[people.cin2] *= rel_trans_pars['cin2']
-        rel_trans[people.cin3] *= rel_trans_pars['cin3']
-        rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
+        rel_trans[people.cin1] *= self['rel_trans_cin1']
+        rel_trans[people.cin2] *= self['rel_trans_cin2']
+        rel_trans[people.cin3] *= self['rel_trans_cin3']
+        rel_trans[people.cancerous] *= self['rel_trans_cancerous']
 
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
 
