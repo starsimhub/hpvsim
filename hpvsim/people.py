@@ -307,16 +307,21 @@ class People(hpb.BasePeople):
             self.scale[cancer_inds] = cancer_scale # Shrink the weight of the original agents, but otherwise leave them the same
             extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
             extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
+            extra_cancer_bools *= self.level0[inds, None] # Don't allow existing cancer agents to make more cancer agents
             extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
             n_new_agents = extra_cancer_counts.sum() # Total number of new agents
             if n_new_agents: # If we have more than 0, proceed
                 extra_source_lists = []
                 for i,count in enumerate(extra_cancer_counts):
                     ii = inds[i]
-                    if count and self.level0[ii]: # At least 1 new cancer agent, plus person is not already a cancer agent
+                    if count: # At least 1 new cancer agent, plus person is not already a cancer agent
                         extra_source_lists.append([ii]*count) # Duplicate the curret index count times
                 extra_source_inds = np.concatenate(extra_source_lists).flatten() # Assemble the sources for these new agents
                 n_new_agents = len(extra_source_inds) # The same as above, *unless* a cancer agent tried to spawn more cancer agents
+                # print('foo', self.t, n_new_agents, extra_source_inds)
+                # print('foo', len(cancer_inds), n_new_agents)
+                # if n_new_agents > 10*len(cancer_inds):
+                #     import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
                 
                 # Create the new agents and assign them the same properties as the existing agents
                 new_inds = self._grow(n_new_agents)

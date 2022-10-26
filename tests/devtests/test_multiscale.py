@@ -9,11 +9,11 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats = 10
-parallel = True
+repeats    = 5
+parallel   = 1
 showlegend = False
 
-large_pop = 10e3
+large_pop = 100e3
 small_pop = 1e3
 ratio = large_pop/small_pop
 
@@ -22,7 +22,6 @@ pars = dict(
     ms_agent_ratio = ratio,
     start          = 1975,
     n_years        = 50,
-    burnin         = 25,
     genotypes      = [16,18],
     verbose        = -1,
 )
