@@ -1168,7 +1168,7 @@ class linked_txvx(BaseTxVx):
 
 
 #%% Products
-__all__ += ['dx', 'tx', 'vx', 'radiation']
+__all__ += ['dx', 'tx', 'vx', 'radiation', 'default_dx', 'default_tx', 'default_vx']
 
 class Product(hpb.FlexPretty):
     ''' Generic product implementation '''
