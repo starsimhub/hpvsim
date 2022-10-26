@@ -105,9 +105,6 @@ def make_pars(**kwargs):
     pars['treat_pars'] = dict()  # Treatment method that is being used; populated during initialization
 
     # Durations
-    pars['dur_cin1_clear']  = dict(dist='lognormal', par1=0.5, par2=0.5)  # Time to clearance from CIN1 (years)
-    pars['dur_cin2_clear']  = dict(dist='lognormal', par1=1.0, par2=0.5)  # Time to clearance from CIN2 (years)
-    pars['dur_cin3_clear']  = dict(dist='lognormal', par1=1.5, par2=0.5)  # Time to clearance from CIN3 (years)
     pars['dur_cancer']      = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
 
     # Parameters determining relative transmissibility at each stage of disease
