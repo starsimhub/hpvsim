@@ -53,21 +53,21 @@ class MultiSim(hpb.FlexPretty):
 
     **Examples**::
 
-        sim = hp.Sim() # Create the sim
-        msim = hp.MultiSim(sim, n_runs=5) # Create the multisim
+        sim = hpv.Sim() # Create the sim
+        msim = hpv.MultiSim(sim, n_runs=5) # Create the multisim
         msim.run() # Run them in parallel
         msim.combine() # Combine into one sim
         msim.plot() # Plot results
 
-        sim = hp.Sim() # Create the sim
-        msim = hp.MultiSim(sim, n_runs=11, noise=0.1, keep_people=True) # Set up a multisim with noise
+        sim = hpv.Sim() # Create the sim
+        msim = hpv.MultiSim(sim, n_runs=11, noise=0.1, keep_people=True) # Set up a multisim with noise
         msim.run() # Run
         msim.reduce() # Compute statistics
         msim.plot() # Plot
 
-        sims = [hp.Sim(beta=0.015*(1+0.02*i)) for i in range(5)] # Create sims
+        sims = [hpv.Sim(beta=0.015*(1+0.02*i)) for i in range(5)] # Create sims
         for sim in sims: sim.run() # Run sims in serial
-        msim = hp.MultiSim(sims) # Convert to multisim
+        msim = hpv.MultiSim(sims) # Convert to multisim
         msim.plot() # Plot as single sim
     '''
 
@@ -233,7 +233,7 @@ class MultiSim(hpb.FlexPretty):
 
         **Example**::
 
-            msim = hp.MultiSim(hp.Sim())
+            msim = hpv.MultiSim(hpv.Sim())
             msim.run()
             msim.reduce()
             msim.summarize()
@@ -348,7 +348,7 @@ class MultiSim(hpb.FlexPretty):
 
         **Example**::
 
-            msim = hp.MultiSim(hp.Sim())
+            msim = hpv.MultiSim(hpv.Sim())
             msim.run()
             msim.combine()
             msim.summarize()
@@ -391,7 +391,7 @@ class MultiSim(hpb.FlexPretty):
             return
 
 
-    def compare(self, t=None, sim_inds=None, output=False, do_plot=False, **kwargs):
+    def compare(self, t=None, sim_inds=None, output=False, do_plot=False, show_match=False, **kwargs):
         '''
         Create a dataframe compare sims at a single point in time.
 
@@ -400,6 +400,7 @@ class MultiSim(hpb.FlexPretty):
             sim_inds (list)    : list of integers of which sims to include (default: all)
             output   (bool)    : whether or not to return the comparison as a dataframe
             do_plot  (bool)    : whether or not to plot the comparison (see also plot_compare())
+            show_match (bool)  : whether to include a column for whether all sims match
             kwargs   (dict)    : passed to plot_compare()
 
         Returns:
@@ -421,7 +422,6 @@ class MultiSim(hpb.FlexPretty):
         resdict = defaultdict(dict)
         for i,s in enumerate(sim_inds):
             sim = self.sims[s]
-            day = sim.day(t) # Unlikely, but different sims might have different start days
             label = sim.label
             if not label: # Give it a label if it doesn't have one
                 label = f'Sim {i}'
@@ -429,7 +429,10 @@ class MultiSim(hpb.FlexPretty):
                 label += f' ({i})'
             for reskey in sim.result_keys():
                 res = sim.results[reskey]
-                val = res.values[day]
+                if res.values.ndim == 1:
+                    val = res.values[t]
+                elif res.values.ndim == 2:
+                    val = res.values[:,t].sum()
                 if res.scale: # Results that are scaled by population are ints
                     val = int(val)
                 resdict[label][reskey] = val
@@ -437,7 +440,10 @@ class MultiSim(hpb.FlexPretty):
         if do_plot:
             self.plot_compare(**kwargs)
 
-        df = pd.DataFrame.from_dict(resdict).astype(object) # astype is necessary to prevent type coercion
+        df = sc.dataframe(pd.DataFrame.from_dict(resdict).astype(object)) # astype is necessary to prevent type coercion
+        if show_match: # From https://stackoverflow.com/questions/22701799/pandas-dataframe-find-rows-where-all-columns-equal
+            data = df.values
+            df['all_match'] = (data == data[:, [0]]).all(axis=1)
         if not output:
             print(f'Results for {daystr} in each sim:')
             print(df)
@@ -460,7 +466,7 @@ class MultiSim(hpb.FlexPretty):
         other options.
 
         Args:
-            to_plot      (list) : list or dict of which results to plot; see cv.get_default_plots() for structure
+            to_plot      (list) : list or dict of which results to plot; see hpv.get_default_plots() for structure
             inds         (list) : if not combined or reduced, the indices of the simulations to plot (if None, plot all)
             plot_sims    (bool) : whether to plot individual sims, even if combine() or reduce() has been used
             color_by_sim (bool) : if True, set colors based on the simulation type; otherwise, color by result type; True implies a scenario-style plotting, False implies sim-style plotting
@@ -477,8 +483,8 @@ class MultiSim(hpb.FlexPretty):
 
         **Examples**::
 
-            sim = hp.Sim()
-            msim = hp.MultiSim(sim)
+            sim = hpv.Sim()
+            msim = hpv.MultiSim(sim)
             msim.run()
             msim.plot() # Plots individual sims
             msim.reduce()
@@ -609,8 +615,8 @@ class MultiSim(hpb.FlexPretty):
 
     def save(self, filename=None, keep_people=False, **kwargs):
         '''
-        Save to disk as a gzipped pickle. Load with cv.load(filename) or
-        hp.MultiSim.load(filename).
+        Save to disk as a gzipped pickle. Load with hpv.load(filename) or
+        hpv.MultiSim.load(filename).
 
         Args:
             filename    (str)  : the name or path of the file to save to; if None, uses default
@@ -656,14 +662,14 @@ class MultiSim(hpb.FlexPretty):
 
         Args:
             msimfile (str): the name or path of the file to load from
-            kwargs: passed to cv.load()
+            kwargs: passed to hpv.load()
 
         Returns:
             msim (MultiSim): the loaded MultiSim object
 
         **Example**::
 
-            msim = hp.MultiSim.load('my-multisim.msim')
+            msim = hpv.MultiSim.load('my-multisim.msim')
         '''
         msim = hpm.load(msimfile, *args, **kwargs)
         if not isinstance(msim, MultiSim):
@@ -686,12 +692,12 @@ class MultiSim(hpb.FlexPretty):
 
         **Examples**:
 
-            mm1 = hp.MultiSim.merge(msim1, msim2, base=True)
-            mm2 = hp.MultiSim.merge([m1, m2, m3, m4], base=False)
+            mm1 = hpv.MultiSim.merge(msim1, msim2, base=True)
+            mm2 = hpv.MultiSim.merge([m1, m2, m3, m4], base=False)
         '''
 
         # Handle arguments
-        if len(args) == 1 and isinstance(args[0], list):
+        if len(args) == 1 and isinstance(args[0], (list, tuple)):
             args = args[0] # A single list of MultiSims has been provided
 
         # Create the multisim from the base sim of the first argument
@@ -732,13 +738,13 @@ class MultiSim(hpb.FlexPretty):
 
         **Examples**::
 
-            m1 = hp.MultiSim(hp.Sim(label='sim1'), initialize=True)
-            m2 = hp.MultiSim(hp.Sim(label='sim2'), initialize=True)
-            m3 = hp.MultiSim.merge(m1, m2)
+            m1 = hpv.MultiSim(hpv.Sim(label='sim1'), initialize=True)
+            m2 = hpv.MultiSim(hpv.Sim(label='sim2'), initialize=True)
+            m3 = hpv.MultiSim.merge(m1, m2)
             m3.run()
             m1b, m2b = m3.split()
 
-            msim = hp.MultiSim(hp.Sim(), n_runs=6)
+            msim = hpv.MultiSim(hpv.Sim(), n_runs=6)
             msim.run()
             m1, m2 = msim.split(inds=[[0,2,4], [1,3,5]])
             mlist1 = msim.split(chunks=[2,4]) # Equivalent to inds=[[0,1], [2,3,4,5]]
@@ -782,7 +788,7 @@ class MultiSim(hpb.FlexPretty):
 
         **Example**::
 
-            msim = hp.MultiSim(hp.Sim(verbose=0), label='Example multisim')
+            msim = hpv.MultiSim(hpv.Sim(verbose=0), label='Example multisim')
             msim.run()
             msim.disp() # Displays detailed output
         '''
@@ -803,7 +809,7 @@ class MultiSim(hpb.FlexPretty):
 
         **Example**::
 
-            msim = hp.MultiSim(hp.Sim(verbose=0), label='Example multisim')
+            msim = hpv.MultiSim(hpv.Sim(verbose=0), label='Example multisim')
             msim.run()
             msim.summarize() # Prints moderate length output
         '''
@@ -848,7 +854,7 @@ class MultiSim(hpb.FlexPretty):
 
         **Example**::
 
-            msim = hp.MultiSim(hp.Sim(verbose=0), label='Example multisim')
+            msim = hpv.MultiSim(hpv.Sim(verbose=0), label='Example multisim')
             msim.run()
             msim.brief() # Prints one-line output
          '''
@@ -892,7 +898,7 @@ class Scenarios(hpb.ParsObj):
 
     **Example**::
 
-        scens = hp.Scenarios()
+        scens = hpv.Scenarios()
 
     Returns:
         scens: a Scenarios object
@@ -908,7 +914,7 @@ class Scenarios(hpb.ParsObj):
         # Handle filename
         if scenfile is None:
             datestr = sc.getdate(obj=self.created, dateformat='%Y-%b-%d_%H.%M.%S')
-            scenfile = f'covasim_scenarios_{datestr}.scens'
+            scenfile = f'hpvsim_scenarios_{datestr}.scens'
         self.scenfile = scenfile
         self.label = label
 
@@ -1093,7 +1099,7 @@ class Scenarios(hpb.ParsObj):
         **Example**::
 
             scenarios = {'base': {'name':'Base','pars': {}}, 'beta': {'name':'Beta', 'pars': {'beta': 0.020}}}
-            scens = hp.Scenarios(scenarios=scenarios, label='Example scenarios')
+            scens = hpv.Scenarios(scenarios=scenarios, label='Example scenarios')
             scens.run()
             scens.compare(t=30) # Prints comparison for day 30
         '''
@@ -1147,7 +1153,7 @@ class Scenarios(hpb.ParsObj):
 
         **Example**::
 
-            scens = hp.Scenarios()
+            scens = hpv.Scenarios()
             scens.run()
             scens.plot()
         '''
@@ -1284,14 +1290,14 @@ class Scenarios(hpb.ParsObj):
 
         Args:
             scenfile (str): the name or path of the file to load from
-            kwargs: passed to hp.load()
+            kwargs: passed to hpv.load()
 
         Returns:
             scens (Scenarios): the loaded scenarios object
 
         **Example**::
 
-            scens = hp.Scenarios.load('my-scenarios.scens')
+            scens = hpv.Scenarios.load('my-scenarios.scens')
         '''
         scens = hpm.load(scenfile, *args, **kwargs)
         if not isinstance(scens, Scenarios):
@@ -1310,7 +1316,7 @@ class Scenarios(hpb.ParsObj):
 
         **Example**::
 
-            scens = hp.Scenarios(hp.Sim(), label='Example scenarios')
+            scens = hpv.Scenarios(hpv.Sim(), label='Example scenarios')
             scens.run(verbose=0) # Run silently
             scens.disp() # Displays detailed output
         '''
@@ -1331,7 +1337,7 @@ class Scenarios(hpb.ParsObj):
 
         **Example**::
 
-            scens = hp.Scenarios(hp.Sim(), label='Example scenarios')
+            scens = hpv.Scenarios(hpv.Sim(), label='Example scenarios')
             scens.run(verbose=0) # Run silently
             scens.summarize() # Prints moderate length output
         '''
@@ -1378,7 +1384,7 @@ class Scenarios(hpb.ParsObj):
 
         **Example**::
 
-            scens = hp.Scenarios(label='Example scenarios')
+            scens = hpv.Scenarios(label='Example scenarios')
             scens.run()
             scens.brief() # Prints one-line output
          '''
@@ -1413,8 +1419,8 @@ def single_run(sim, ind=0, reseed=True, noise=0.0, noisepar=None, keep_people=Fa
     **Example**::
 
         import hpvsim as hp
-        sim = hp.Sim() # Create a default simulation
-        sim = hp.single_run(sim) # Run it, equivalent(ish) to sim.run()
+        sim = hpv.Sim() # Create a default simulation
+        sim = hpv.single_run(sim) # Run it, equivalent(ish) to sim.run()
     '''
 
     # Set sim and run arguments

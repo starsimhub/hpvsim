@@ -13,9 +13,15 @@ Version 0.2.11 (2022-10-25)
 - Changes the way dates of HPV clearance are assigned to use durations sampled
 - *GitHub info*: PR `374 <https://github.com/amath-idm/hpvsim/pull/374>`__
 
+Version 0.3.0 (2022-10-25)
+--------------------------
+- Implements multiscale modeling, but currently disabled
+- Minor release tidying
+- *GitHub info*: PR `365 <https://github.com/amath-idm/hpvsim/pull/365>`__
+
 
 Version 0.2.10 (2022-10-24)
---------------------------
+---------------------------
 - Fixes bug with treatment
 - *GitHub info*: PR `354 <https://github.com/amath-idm/hpvsim/pull/354>`__
 

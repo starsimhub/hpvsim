@@ -26,7 +26,7 @@ class genotype(sc.prettyobj):
 
     **Example**::
 
-        hpv16    = hp.genotype('16') # Make a sim with only HPV16
+        hpv16    = hpv.genotype('16') # Make a sim with only HPV16
 
     '''
 

@@ -212,7 +212,8 @@ class Calibration(sc.prettyobj):
             trial_pars (dict): dictionary of parameters from a single trial. If not provided, best parameters will be used
             return_full (bool): whether to return a unified par dict ready for use in a sim, or the sim pars and genotype pars separately
 
-        Example:
+        **Example**::
+        
             sim = hpv.Sim(genotypes=[16, 18])
             calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
             genotype_pars = dict(hpv16=dict(prog_time=[3, 3, 10]))
@@ -564,7 +565,7 @@ class Calibration(sc.prettyobj):
             do_save (bool): whether to save
             fig_path (str or filepath): filepath to save to
             do_show (bool): whether to show the figure
-            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+            kwargs (dict): passed to ``hpv.options.with_style()``; see that function for choices
         '''
 
         # Import Seaborn here since slow
@@ -572,7 +573,6 @@ class Calibration(sc.prettyobj):
             import seaborn as sns
             if plot_type.split('.')[1]=='boxplot':
                 extra_args=dict(boxprops=dict(alpha=.3))
-                dodge=True
             else: extra_args = dict()
             plot_func = getattr(sns, plot_type.split('.')[1])
         else:

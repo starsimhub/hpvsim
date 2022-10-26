@@ -155,7 +155,7 @@ class Sim(hpb.BaseSim):
             pop_keys = set(self.people.contacts.keys())
             if pop_keys != set(layer_keys): # pragma: no cover
                 if not len(pop_keys):
-                    errormsg = f'Your population does not have any layer keys, but your simulation does {layer_keys}. If you called cv.People() directly, you probably need cv.make_people() instead.'
+                    errormsg = f'Your population does not have any layer keys, but your simulation does {layer_keys}. If you called hpv.People() directly, you probably need hpv.make_people() instead.'
                     raise sc.KeyNotFoundError(errormsg)
                 else:
                     errormsg = f'Please update your parameter keys {layer_keys} to match population keys {pop_keys}. You may find sim.reset_layer_pars() helpful.'
@@ -361,7 +361,7 @@ class Sim(hpb.BaseSim):
         The prefix "cum" is used for cumulative variables, i.e. counting the total number that have ever been in a given state at some point in the sim
 
         Arguments:
-            sim         (hp.Sim)        : a sim
+            sim         (hpv.Sim)       : a sim
             frequency   (str or float)  : the frequency with which to save results: accepts 'annual', 'dt', or a float which is interpreted as a fraction of a year, e.g. 0.2 will save results every 0.2 years
             add_data    (bool)          : whether or not to add data to the result structures
         '''
@@ -484,7 +484,7 @@ class Sim(hpb.BaseSim):
             init_states     (bool): whether to initialize states (default false when called directly)
             reset           (bool): whether to regenerate the people even if they already exist
             verbose         (int):  detail to print
-            kwargs          (dict): passed to hp.make_people()
+            kwargs          (dict): passed to hpv.make_people()
         '''
 
         # Handle inputs
@@ -501,21 +501,29 @@ class Sim(hpb.BaseSim):
             self.load_population(init_people=False)
 
         # Actually make the people
-        microstructure = self['network']
-        self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=microstructure, **kwargs)
+        self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
+        
+        # Figure out the scale factors
+        if self['total_pop'] is not None and total_pop is not None: # If no pop_scale has been provided, try to get it from the location
+            errormsg = 'You can either define total_pop explicitly or via the location, but not both'
+            raise ValueError(errormsg)
+        elif total_pop is None and self['total_pop'] is not None:
+            total_pop = self['total_pop']
+            
+        if self['pop_scale'] is None:
+            if total_pop is None:
+                self['pop_scale'] = 1.0
+            else:
+                self['pop_scale'] = total_pop/self['n_agents']
+        self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
+        
+        # Finish initialization
         self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])
             init_hpv_prev, age_brackets = self.validate_init_conditions(init_hpv_prev)
             self.init_states(age_brackets=age_brackets, init_hpv_prev=init_hpv_prev)
-
-        # If no pop_scale has been provided, try to get it from the location
-        if self['pop_scale'] is None:
-            if self['location'] is None or total_pop is None:
-                self['pop_scale'] = 1
-            else:
-                self['pop_scale'] = total_pop/self['n_agents']
 
         return self
 
@@ -604,7 +612,7 @@ class Sim(hpb.BaseSim):
             dur_precin = genotype_pars[genotype_map[g]]['dur_precin']
             dur_hpv = hpu.sample(**dur_precin, size=len(hpv_inds))
             t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
-            _ = self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
+            self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
         # Check for CINs
         cin1_filters = (self.people.date_cin1<0) * (self.people.date_cin2 > 0)
@@ -644,8 +652,7 @@ class Sim(hpb.BaseSim):
         # Update demographics, states, and partnerships
         self.people.update_states_pre(t=t, year=self.yearvec[t]) # This also ages people, applies deaths, and generates new births
         people = self.people # Shorten
-        n_people = len(people)
-        n_dissolved = people.dissolve_partnerships(t=t) # Dissolve partnerships
+        people.dissolve_partnerships(t=t) # Dissolve partnerships
         tind = self.yearvec[t] - self['start']
         people.create_partnerships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
 
@@ -757,7 +764,7 @@ class Sim(hpb.BaseSim):
         for key,count in people.flows_by_sex.items():
             for sex in range(2):
                 self.results[key][sex][idx] += count[sex]
-        for key,count in people.by_age_flows.items():
+        for key,count in people.flows_by_age.items():
             self.results[key][:,idx] += count
 
         # Make stock updates every nth step, where n is the frequency of result output
@@ -769,7 +776,7 @@ class Sim(hpb.BaseSim):
                     self.results[f'n_{key}'][g, idx] = people.count_by_genotype(key, g)
                 if key not in ['susceptible']:
                     # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
-                    self.results[f'n_total_{key}'][idx] = np.count_nonzero(people[key].sum(axis=0))
+                    self.results[f'n_total_{key}'][idx] = people.count_any(key)
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
@@ -779,15 +786,19 @@ class Sim(hpb.BaseSim):
 
             # Update cancers and cancers by age
             cases_by_age = self.results['cancers_by_age'][:, idx]
-            denom = np.histogram(self.people.age[self.people.alive&(self.people.sex==0)&~self.people.cancerous.any(axis=0)], self.pars['standard_pop'][0,])[0]
+            inds = people.alive * (self.people.sex==0) * ~people.cancerous.any(axis=0)
+            vals = self.people.age[inds]
+            bins = self.pars['standard_pop'][0,]
+            weights = people.scale[inds]
+            denom = np.histogram(vals, bins, weights=weights)[0]
             age_specific_incidence = sc.safedivide(cases_by_age, denom)*100e3
             standard_pop = self.pars['standard_pop'][1, :-1]
             self.results['asr_cancer'][idx] = np.dot(age_specific_incidence,standard_pop)
 
             # Save number alive
-            self.results['n_alive'][idx] = len(people.alive.nonzero()[0])
-            self.results['n_alive_by_sex'][0,idx] = len((people.alive*people.is_female).nonzero()[0])
-            self.results['n_alive_by_sex'][1,idx] = len((people.alive*people.is_male).nonzero()[0])
+            self.results['n_alive'][idx] = people.scale_flows(people.alive.nonzero()[0])
+            self.results['n_alive_by_sex'][0,idx] = people.scale_flows((people.alive*people.is_female).nonzero()[0])
+            self.results['n_alive_by_sex'][1,idx] = people.scale_flows((people.alive*people.is_male).nonzero()[0])
 
         # Apply analyzers
         for i,analyzer in enumerate(self['analyzers']):
@@ -876,11 +887,6 @@ class Sim(hpb.BaseSim):
         # Finalize analyzers and interventions
         self.finalize_analyzers()
         self.finalize_interventions()
-
-        # Scale the results
-        for reskey in self.result_keys():
-            if self.results[reskey].scale:
-                self.results[reskey].values *= self['pop_scale']
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results
@@ -1015,7 +1021,7 @@ class Sim(hpb.BaseSim):
 
         **Examples**::
 
-            sim = cv.Sim(label='Example sim', verbose=0) # Set to run silently
+            sim = hpv.Sim(label='Example sim', verbose=0) # Set to run silently
             sim.run() # Run the sim
             sim.summarize() # Print medium-length summary of the sim
             sim.summarize(t=24, full=True) # Print a "slice" of all sim results on day 24

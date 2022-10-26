@@ -21,10 +21,11 @@ jobs:
       - name: Install HPVsim
         run:  pip install -e .
       - name: Install tests
-        run: pip install pytest pytest-parallel
+        working-directory: ./tests
+        run: pip install -r requirements_test.txt
       - name: Run all tests
         working-directory: ./tests
-        run: pytest test_*.py --workers=auto --durations=0 --junitxml=test-results.xml # Run actual tests
+        run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml # Run actual tests
       - name: Upload test results
         uses: actions/upload-artifact@v1
         if: failure()
