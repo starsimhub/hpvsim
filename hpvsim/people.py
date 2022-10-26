@@ -304,7 +304,7 @@ class People(hpb.BasePeople):
         cancer_scale = self.pars['pop_scale'] / n_extra
         if self.pars['use_multiscale'] and n_extra  > 1:
             cancer_inds = inds[peak_dysp > ccut['cin3']] # Duplicated below, but avoids need to append extra arrays
-            self.scale[cancer_inds] = self.pars['pop_scale']#cancer_scale # Shrink the weight of the original agents, but otherwise leave them the same
+            self.scale[cancer_inds] = cancer_scale # Shrink the weight of the original agents, but otherwise leave them the same
             extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
             extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
             extra_cancer_bools *= self.level0[inds, None] # Don't allow existing cancer agents to make more cancer agents
@@ -334,7 +334,7 @@ class People(hpb.BasePeople):
                 # Reset the states for the new agents
                 self.level0[new_inds] = False
                 self.level1[new_inds] = True
-                self.scale[new_inds] = 0#cancer_scale
+                self.scale[new_inds] = cancer_scale
                 
                 # Sneakily add the new indices onto the existing vectors
                 inds = np.append(inds, new_inds)

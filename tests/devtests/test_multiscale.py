@@ -19,7 +19,7 @@ offset = 100
 
 pars = dict(
     total_pop      = large_pop,
-    ms_agent_ratio = 100,
+    ms_agent_ratio = 10,
     start          = 1975,
     n_years        = 50,
     genotypes      = [16,18],
