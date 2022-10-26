@@ -3,6 +3,5 @@ global-include requirements*.txt
 global-include *.rst
 recursive-include hpvsim *.py
 recursive-include hpvsim *.csv
-recursive-include hpvsim *.obj
-recursive-include hpvsim *.yaml
-global-exclude *.py[cod] __pycache__
+recursive-include hpvsim *.json
+global-exclude *.py[cod] __pycache__ *.obj
