@@ -9,7 +9,7 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats    = 20
+repeats    = 10
 parallel   = 1
 showlegend = False
 
@@ -118,7 +118,7 @@ def plot_compare_multiscale(msim, fig=None):
         index = 0
         label = ['default', 'multiscale'][ms_bool]
         label += f' (n={analyzer.n_agents})'
-        color = ['b','r'][ms_bool]
+        color = ['k','seagreen'][ms_bool]
         offset = 1 + 2*agent_bool + ms_bool
         
         # Handle shared
@@ -160,7 +160,7 @@ def plot_compare_multiscale(msim, fig=None):
     shared = sc.objdict()
     for s,sim in enumerate(msim.sims):
         a = sim.get_analyzer()
-        fig = plot_single(analyzer=a, shared=shared, fig=fig, alpha=0.1, lw=1)
+        fig = plot_single(analyzer=a, shared=shared, fig=fig, alpha=0.2, lw=1)
     
     for sh in shared.values():
         fig = plot_single(analyzer=sh, shared=None, fig=fig, alpha=1.0, lw=2, factor=1/repeats)
