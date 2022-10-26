@@ -33,7 +33,7 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     ablation    = hpv.treat_num(eligibility=to_ablate, prob=prob, product='ablation')
     to_excise   = lambda sim: sim.get_intervention('assign_tx').outcomes['excision']
     excision    = hpv.treat_delay(eligibility=to_excise, prob=prob, product='excision')
-    vx          = hpv.routine_vx(prob=prob, start_year=2020, product='bivalent')
+    vx          = hpv.routine_vx(prob=prob, start_year=2020, age_range=[9,10], product='bivalent')
     txvx        = hpv.routine_txvx(prob=prob, start_year=2040, product='txvx1')
 
 

@@ -217,12 +217,12 @@ def test_detection():
 
     pars = {
         'n_agents': n_agents,
-        'n_years': 70,
-        'burnin': 50,
-        'start': 1950,
+        'n_years': 50,
+        'burnin': 20,
+        'start': 1980,
         'genotypes': [16, 18],
         'location': 'tanzania',
-        'dt': 0.5,
+        'dt': 1.,
     }
 
     sim = hpv.Sim(pars=pars, analyzers=[hpv.cancer_detection()])
