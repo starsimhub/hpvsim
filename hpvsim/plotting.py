@@ -30,7 +30,7 @@ def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None
     defaults.legend  = sc.objdict(loc='best', frameon=False)
     defaults.date    = sc.objdict(as_dates=True, dateformat=None, rotation=None, start=None, end=None)
     defaults.show    = sc.objdict(data=True, ticks=True, interventions=True, legend=True, outer=False, tight=False, maximize=False)
-    defaults.style   = sc.objdict(style=None, dpi=None, font=None, fontsize=None, grid=None, facecolor=None) # Use Covasim global defaults
+    defaults.style   = sc.objdict(style=None, dpi=None, font=None, fontsize=None, grid=None, facecolor=None) # Use HPVsim global defaults
 
     # Handle directly supplied kwargs
     for dkey,default in defaults.items():
@@ -163,7 +163,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
     if n_cols is None:
         max_rows = 5 # Assumption -- if desired, the user can override this by setting n_cols manually
         n_cols = int((n_plots-1)//max_rows + 1) # This gives 1 column for 1-4, 2 for 5-8, etc.
-    n_rows,n_cols = sc.get_rows_cols(n_plots, ncols=n_cols) # Inconsistent naming due to Covasim/Matplotlib conventions
+    n_rows,n_cols = sc.get_rows_cols(n_plots, ncols=n_cols) # Inconsistent naming due to HPVsim/Matplotlib conventions
 
     return to_plot, n_cols, n_rows
 

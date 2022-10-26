@@ -7,7 +7,7 @@ import sciris as sc
 import pylab as pl
 from .settings import options as hpo # To set options
 
-# Specify all externally visible functions this file defines -- other things are available as e.g. hp.defaults.default_int
+# Specify all externally visible functions this file defines -- other things are available as e.g. hpv.defaults.default_int
 __all__ = ['datadir', 'default_float', 'default_int', 'get_default_plots']
 
 # Define paths
@@ -28,8 +28,8 @@ else:
 
 #%% Define all properties of people
 
-class State():
-    def __init__(self, name, dtype, fill_value=None, shape=None, label=None, cmap=None,
+class State(sc.prettyobj):
+    def __init__(self, name, dtype, fill_value=0, shape=None, label=None, cmap=None,
                  totalprefix=None):
         '''
         Args:
@@ -48,16 +48,18 @@ class State():
         self.label = label or name
         self.cmap = cmap
         self.totalprefix = totalprefix or ('total_' if shape else '')
+        return
+    
+    @property
+    def ndim(self):
+        return len(sc.tolist(self.shape))+1 # None -> 1, 'n_genotypes' -> 2, etc.
+    
 
     def new(self, pars, n):
-        array_shape = n if self.shape is None else (pars[self.shape], n)
-
-        if self.fill_value is None:
-            return np.empty(array_shape, dtype=self.dtype)
-        elif self.fill_value == 0:
-            return np.zeros(array_shape, dtype=self.dtype)
-        else:
-            return np.full(array_shape, dtype=self.dtype, fill_value=self.fill_value)
+        shape = sc.tolist(self.shape) # e.g. convert 'n_genotypes' to ['n_genotypes']
+        shape = [pars[s] for s in shape] # e.g. convert ['n_genotypes'] to [2]
+        shape.append(n) # We always want to have shape n
+        return np.full(shape, dtype=self.dtype, fill_value=self.fill_value)
 
 
 class PeopleMeta(sc.prettyobj):
@@ -70,6 +72,9 @@ class PeopleMeta(sc.prettyobj):
     # Set the properties of a person
     person = [
         State('uid',            default_int),           # Int
+        State('scale',          default_float,  1.0), # Float
+        State('level0',         bool,  True), # "Normal" people
+        State('level1',         bool,  False), # "High-resolution" people: e.g. cancer agents
         State('age',            default_float,  np.nan), # Float
         State('sex',            default_float,  np.nan), # Float
         State('debut',          default_float,  np.nan), # Float
@@ -168,15 +173,12 @@ class PeopleMeta(sc.prettyobj):
     durs = [
         State('dur_infection', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present
         State('dur_precin', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
-        State('dur_dysp', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has dysplasia
         State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
     ]
 
     # Markers of disease severity
     sev = [
         State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
-        State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of dysplasia to severity
-        State('peak_dysp', default_float, np.nan, shape='n_genotypes'), # Peak dysplasia, as represented by a value 0-1 that maps onto clinical thresholds for CIN grades
     ]
 
 

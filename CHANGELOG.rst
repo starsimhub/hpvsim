@@ -8,11 +8,19 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 0.2.12 (2022-10-26)
+
+Version 0.3.1 (2022-10-26)
 --------------------------
 - Fixes bug with screening
 - Increases test coverage
 - *GitHub info*: PR `373 <https://github.com/amath-idm/hpvsim/pull/373>`__
+
+
+Version 0.3.0 (2022-10-26)
+--------------------------
+- Implements multiscale modeling
+- Minor release tidying
+- *GitHub info*: PR `365 <https://github.com/amath-idm/hpvsim/pull/365>`__
 
 
 Version 0.2.11 (2022-10-25)
@@ -22,7 +30,7 @@ Version 0.2.11 (2022-10-25)
 
 
 Version 0.2.10 (2022-10-24)
---------------------------
+---------------------------
 - Fixes bug with treatment
 - *GitHub info*: PR `354 <https://github.com/amath-idm/hpvsim/pull/354>`__
 

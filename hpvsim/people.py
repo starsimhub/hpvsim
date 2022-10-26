@@ -24,10 +24,10 @@ class People(hpb.BasePeople):
     argument is the population size, but typically the full parameters dictionary
     will get passed instead since it will be needed before the People object is
     initialized. However, ages, contacts, etc. will need to be created separately --
-    see ``hp.make_people()`` instead.
+    see ``hpv.make_people()`` instead.
 
     Note that this class handles the mechanics of updating the actual people, while
-    ``hp.BasePeople`` takes care of housekeeping (saving, loading, exporting, etc.).
+    ``hpv.BasePeople`` takes care of housekeeping (saving, loading, exporting, etc.).
     Please see the BasePeople class for additional methods.
 
     Args:
@@ -38,10 +38,10 @@ class People(hpb.BasePeople):
 
     **Examples**::
 
-        ppl1 = hp.People(2000)
+        ppl1 = hpv.People(2000)
 
-        sim = hp.Sim()
-        ppl2 = hp.People(sim.pars)
+        sim = hpv.Sim()
+        ppl2 = hpv.People(sim.pars)
     '''
     
     #%% Basic methods
@@ -74,26 +74,10 @@ class People(hpb.BasePeople):
 
         # Although we have called init(), we still need to call initialize()
         self.initialized = False
-
-        # Handle partners and contacts
-        if 'partners' in kwargs:
-            self.partners[:] = kwargs.pop('partners') # Store the desired concurrency
-        if 'current_partners' in kwargs:
-            self.current_partners[:] = kwargs.pop('current_partners') # Store current actual number - updated each step though
-            for ln,lkey in enumerate(self.layer_keys()):
-                self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
-        if 'contacts' in kwargs:
-            self.add_contacts(kwargs.pop('contacts')) # Also updated each step
-
-        # Handle all other values, e.g. age
-        for key,value in kwargs.items():
-            if strict:
-                self.set(key, value)
-            elif key in self._data:
-                self[key][:] = value
-            else:
-                self[key] = value
         
+        # Store kwargs here for now, to be dealt with during initialize()
+        self.kwargs = kwargs
+
         return
 
 
@@ -108,9 +92,17 @@ class People(hpb.BasePeople):
         self.flows_by_sex       = {f'{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'         : 0 for key in hpd.dem_keys}
         # self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
-        self.by_age_flows       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
+        self.flows_by_age       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
 
         return
+    
+    
+    def scale_flows(self, inds):
+        '''
+        Return the scaled versions of the flows -- replacement for len(inds) 
+        followed by scale factor multiplication
+        '''
+        return self.scale[inds].sum()
 
 
     def increment_age(self):
@@ -121,6 +113,32 @@ class People(hpb.BasePeople):
 
     def initialize(self, sim_pars=None, hiv_pars=None):
         ''' Perform initializations '''
+        super().initialize() # Initialize states
+        
+        # Handle partners and contacts
+        kwargs = self.kwargs
+        if 'partners' in kwargs:
+            self.partners[:] = kwargs.pop('partners') # Store the desired concurrency
+        if 'current_partners' in kwargs:
+            self.current_partners[:] = kwargs.pop('current_partners') # Store current actual number - updated each step though
+            for ln,lkey in enumerate(self.layer_keys()):
+                self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
+        if 'contacts' in kwargs:
+            self.add_contacts(kwargs.pop('contacts')) # Also updated each step
+
+        # Handle all other values, e.g. age
+        for key,value in kwargs.items():
+            if self._lock:
+                self.set(key, value)
+            elif key in self._data:
+                self[key][:] = value
+            else:
+                self[key] = value
+        
+        # Set the scale factor
+        self.scale[:] = sim_pars['pop_scale']
+        
+        # Additional validation
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
         self.set_pars(pars=sim_pars, hiv_pars=hiv_pars) # Replace the saved parameters with this simulation's
         self.initialized = True
@@ -168,7 +186,7 @@ class People(hpb.BasePeople):
             self.flows['cin3s'][g]              = self.check_cin3(g)
             new_cancers, cancers_by_age         = self.check_cancer(g)
             self.flows['cancers'][g]            += new_cancers
-            self.by_age_flows['cancers_by_age'] += cancers_by_age
+            self.flows_by_age['cancers_by_age'] += cancers_by_age
             self.flows['cins'][g]               = self.flows['cin1s'][g]+self.flows['cin2s'][g]+self.flows['cin3s'][g]
             self.check_clearance(g)
 
@@ -198,8 +216,8 @@ class People(hpb.BasePeople):
         gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
         self.set_dysp_rates(inds, g, gpars, hiv_dysp_rate=hiv_pars['dysp_rate'])  # Set variables that determine the probability that dysplasia begins
         dysp_inds = self.set_dysp_status(inds, g, dt)  # Set people's dysplasia status
-        self.set_severity(dysp_inds, g, gpars, hiv_prog_rate=hiv_pars['prog_rate'])  # Set dysplasia severity and duration
-        self.set_cin_grades(dysp_inds, g, dt)  # Set CIN grades and dates over time
+        dysp_arrs = self.set_severity(dysp_inds, g, gpars, hiv_prog_rate=hiv_pars['prog_rate'])  # Set dysplasia severity and duration
+        self.set_cin_grades(dysp_inds, g, dt, dysp_arrs=dysp_arrs)  # Set CIN grades and dates over time
         return
 
 
@@ -229,28 +247,32 @@ class People(hpb.BasePeople):
 
     def set_severity(self, inds, g, gpars, hiv_prog_rate=None):
         ''' Set dysplasia severity and duration for women who develop dysplasia '''
-
+        
+        dysp_arrs = sc.objdict() # Store severity arrays
+        
         # Evaluate duration of dysplasia prior to clearance/control/progression to cancer
-        dur_dysp = hpu.sample(**gpars['dur_dysp'], size=len(inds))
-        self.dur_dysp[g, inds] = dur_dysp
-        self.dur_infection[g, inds] += dur_dysp
+        n_cols = self.pars['ms_agent_ratio'] if self.pars['use_multiscale'] else 1
+        full_size = (len(inds), n_cols) # Main axis is indices, but include columns for multiscale agents
+        dur_dysp = hpu.sample(**gpars['dur_dysp'], size=full_size)
+        self.dur_infection[g, inds] += dur_dysp[:,0] # TODO: should this be mean(axis=1) instead?
 
         # Evaluate progression rates
-        self.prog_rate[g, inds] = hpu.sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=len(inds))
+        prog_rate = hpu.sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=full_size)
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
             modified_prog_rate = immune_compromise * hiv_prog_rate  # Calculate the modification to make to the progression rate
             modified_prog_rate[modified_prog_rate < 1] = 1
-            self.prog_rate[g, inds] = self.prog_rate[g, inds] * modified_prog_rate  # Store progression rates
+            prog_rate *= modified_prog_rate[:, None]  # Store progression rates -- see https://stackoverflow.com/questions/19388152/numpy-element-wise-multiplication-of-an-array-and-a-vector
 
-        # Set attributes
-        dur_dysp = self.dur_dysp[g, inds]  # Array of durations of dysplasia prior to clearance/control/cancer
-        prog_rate = self.prog_rate[g, inds]  # Array of progression rates
+        # Calculate peak dysplasia
         peak_dysp = hpu.logf1(dur_dysp, prog_rate)  # Maps durations + progression to severity
-        self.peak_dysp[g, inds] = peak_dysp  # Store peak dysplasia
+        
+        dysp_arrs.dur_dysp  = dur_dysp
+        dysp_arrs.prog_rate = prog_rate
+        dysp_arrs.peak_dysp = peak_dysp
 
-        return
+        return dysp_arrs
 
 
     def set_dysp_rates(self, inds, g, gpars, hiv_dysp_rate=None):
@@ -266,15 +288,61 @@ class People(hpb.BasePeople):
             self.dysp_rate[g, inds] = self.dysp_rate[g, inds] * modified_dysp_rate  # Store dysplasia rates
         return
 
-    def set_cin_grades(self, inds, g, dt):
+
+    def set_cin_grades(self, inds, g, dt, dysp_arrs):
         '''
         Set CIN clinical grades and dates of progression
         '''
 
         # Map severity to clinical grades
         ccut = self.pars['clinical_cutoffs']
-        peak_dysp = self.peak_dysp[g, inds]
-        prog_rate = self.prog_rate[g, inds]
+        peak_dysp = dysp_arrs.peak_dysp[:,0] # Everything beyond 0 is multiscale agents
+        prog_rate = dysp_arrs.prog_rate[:,0]
+        dur_dysp  = dysp_arrs.dur_dysp[:,0]
+
+        # Handle multiscale to create additional cancer agents
+        n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
+        cancer_scale = self.pars['pop_scale'] / n_extra
+        if self.pars['use_multiscale'] and n_extra  > 1:
+            cancer_inds = inds[peak_dysp > ccut['cin3']] # Duplicated below, but avoids need to append extra arrays
+            self.scale[cancer_inds] = cancer_scale # Shrink the weight of the original agents, but otherwise leave them the same
+            extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
+            extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
+            extra_cancer_bools *= self.level0[inds, None] # Don't allow existing cancer agents to make more cancer agents
+            extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
+            n_new_agents = extra_cancer_counts.sum() # Total number of new agents
+            if n_new_agents: # If we have more than 0, proceed
+                extra_source_lists = []
+                for i,count in enumerate(extra_cancer_counts):
+                    ii = inds[i]
+                    if count: # At least 1 new cancer agent, plus person is not already a cancer agent
+                        extra_source_lists.append([ii]*count) # Duplicate the curret index count times
+                extra_source_inds = np.concatenate(extra_source_lists).flatten() # Assemble the sources for these new agents
+                n_new_agents = len(extra_source_inds) # The same as above, *unless* a cancer agent tried to spawn more cancer agents
+                
+                # Create the new agents and assign them the same properties as the existing agents
+                new_inds = self._grow(n_new_agents)
+                for state in self.meta.all_states:
+                    if state.ndim == 1:
+                        self[state.name][new_inds] = self[state.name][extra_source_inds]
+                    elif state.ndim == 2:
+                        self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
+
+                # Reset the states for the new agents
+                self.level0[new_inds] = False
+                self.level1[new_inds] = True
+                self.scale[new_inds] = cancer_scale
+                
+                # Sneakily add the new indices onto the existing vectors
+                inds = np.append(inds, new_inds)
+                new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
+                new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
+                new_dur_dysp  = dysp_arrs.dur_dysp[:,1:][extra_cancer_bools]
+                peak_dysp     = np.append(peak_dysp, new_peak_dysp)
+                prog_rate     = np.append(prog_rate, new_prog_rate)
+                dur_dysp      = np.append(dur_dysp,  new_dur_dysp)
+            
+        # Now check indices, including with our new cancer agents
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
         is_cin2 = peak_dysp > ccut['cin1']
         is_cin3 = peak_dysp > ccut['cin2']
@@ -282,15 +350,18 @@ class People(hpb.BasePeople):
         cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
         cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
         cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
-        max_cin1_inds = inds[is_cin1 & ~is_cin2]  # Indices of those who don't progress beyond CIN1
-        max_cin2_inds = inds[is_cin2 & ~is_cin3]  # Indices of those who don't progress beyond CIN2
-        max_cin3_inds = inds[is_cin3 & ~is_cancer]  # Indices of those who don't progress beyond CIN3
+        max_cin1_bools = is_cin1 * ~is_cin2   # Boolean of those who don't progress beyond CIN1
+        max_cin2_bools = is_cin2 * ~is_cin3   # Boolean of those who don't progress beyond CIN2
+        max_cin3_bools = is_cin3 * ~is_cancer # Boolean of those who don't progress beyond CIN3
+        max_cin1_inds = inds[max_cin1_bools]  # Indices of those who don't progress beyond CIN1
+        max_cin2_inds = inds[max_cin2_bools]  # Indices of those who don't progress beyond CIN2
+        max_cin3_inds = inds[max_cin3_bools]  # Indices of those who don't progress beyond CIN3
 
         # Determine whether CIN1 clears or progresses to CIN2
         self.date_cin2[g, cin2_inds] = np.fmax(self.t, # Don't let people progress to CIN2 prior to the current timestep
                                                self.date_cin1[g, cin2_inds] +
                                                sc.randround(hpu.invlogf1(ccut['cin1'], prog_rate[is_cin2]) / dt))
-        time_to_clear_cin1 = self.dur_dysp[g,max_cin1_inds]
+        time_to_clear_cin1 = dur_dysp[max_cin1_bools]
         self.date_clearance[g, max_cin1_inds] = np.fmax(self.date_clearance[g, max_cin1_inds],
                                                         self.date_cin1[g, max_cin1_inds] +
                                                         sc.randround(time_to_clear_cin1 / dt))
@@ -301,7 +372,7 @@ class People(hpb.BasePeople):
                                                sc.randround(hpu.invlogf1(ccut['cin2'], prog_rate[is_cin3]) / dt))
 
         # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
-        time_to_clear_cin2 = self.dur_dysp[g,max_cin2_inds] - (self.date_cin2[g, max_cin2_inds] - self.date_cin1[g, max_cin2_inds]) * self.pars['dt']
+        time_to_clear_cin2 = dur_dysp[max_cin2_bools] - (self.date_cin2[g, max_cin2_inds] - self.date_cin1[g, max_cin2_inds]) * self.pars['dt']
         self.date_clearance[g, max_cin2_inds] = np.fmax(self.date_clearance[g, max_cin2_inds],
                                                         self.date_cin2[g, max_cin2_inds] +
                                                         sc.randround(time_to_clear_cin2 / dt))
@@ -312,7 +383,7 @@ class People(hpb.BasePeople):
                                                       sc.randround(hpu.invlogf1(ccut['cin3'], prog_rate[is_cancer]) / dt))
 
         # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
-        time_to_clear_cin3 = self.dur_dysp[g, max_cin3_inds] - (self.date_cin3[g, max_cin3_inds] - self.date_cin1[g, max_cin3_inds]) * self.pars['dt']
+        time_to_clear_cin3 = dur_dysp[max_cin3_bools] - (self.date_cin3[g, max_cin3_inds] - self.date_cin1[g, max_cin3_inds]) * self.pars['dt']
         self.date_clearance[g, max_cin3_inds] = np.fmax(self.date_clearance[g, max_cin3_inds],
                                                         self.date_cin3[g, max_cin3_inds] +
                                                         sc.randround(time_to_clear_cin3 / dt))
@@ -355,7 +426,7 @@ class People(hpb.BasePeople):
 
         for lno,lkey in enumerate(self.layer_keys()):
             layer = self.contacts[lkey]
-            to_dissolve = (~self['alive'][layer['m']]) | (~self['alive'][layer['f']]) | ( (self.t*self.pars['dt']) > layer['end'])
+            to_dissolve = (~self['alive'][layer['m']]) + (~self['alive'][layer['f']]) + ( (self.t*self.pars['dt']) > layer['end']).astype(bool)
             dissolved = layer.pop_inds(to_dissolve) # Remove them from the contacts list
 
             # Update current number of partners
@@ -431,7 +502,7 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
         self.no_dysp[genotype, inds] = False
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     def check_cin2(self, genotype):
@@ -440,7 +511,7 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cin2[genotype,:], self.date_cin2[genotype,:], filter_inds=filter_inds)
         self.cin2[genotype, inds] = True
         self.cin1[genotype, inds] = False # No longer counted as CIN1
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     def check_cin3(self, genotype):
@@ -449,7 +520,7 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cin3[genotype,:], self.date_cin3[genotype,:], filter_inds=filter_inds)
         self.cin3[genotype, inds] = True
         self.cin2[genotype, inds] = False # No longer counted as CIN2
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     def check_cancer(self, genotype):
@@ -464,10 +535,9 @@ class People(hpb.BasePeople):
         # Calculations for age-standardized cancer incidence
         cases_by_age = 0
         if len(inds)>0:
-            age_new_cases = self.age[inds] # Ages of new cases
-            cases_by_age = np.histogram(age_new_cases, self.asr_bins)[0]
+            cases_by_age = np.histogram(self.age[inds], bins=self.asr_bins, weights=self.scale[inds])[0]
 
-        return len(inds), cases_by_age
+        return self.scale_flows(inds), cases_by_age
 
 
     def check_cancer_deaths(self):
@@ -479,9 +549,9 @@ class People(hpb.BasePeople):
         self.remove_people(inds, cause='cancer')
 
         # check which of these were detected by symptom or screening
-        self.flows['detected_cancer_deaths'] += len(hpu.true(self.detected_cancer[inds]))
+        self.flows['detected_cancer_deaths'] += self.scale_flows(hpu.true(self.detected_cancer[inds]))
 
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     def check_clearance(self, genotype):
@@ -516,9 +586,9 @@ class People(hpb.BasePeople):
         self.cin1[genotype, inds] = False
         self.cin2[genotype, inds] = False
         self.cin3[genotype, inds] = False
-        self.peak_dysp[genotype, inds] = np.nan
+        # self.peak_dysp[genotype, inds] = np.nan
         self.dysp_rate[genotype, inds] = np.nan
-        self.prog_rate[genotype, inds] = np.nan
+        # self.prog_rate[genotype, inds] = np.nan
 
         return
 
@@ -563,10 +633,10 @@ class People(hpb.BasePeople):
 
                 cin_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_cin1[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
                 if len(cin_inds): # Reevaluate disease severity and progression speed for these women
-                    self.set_severity(cin_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
-                    self.set_cin_grades(cin_inds, g, dt)
+                    dysp_arrs = self.set_severity(cin_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
+                    self.set_cin_grades(cin_inds, g, dt, dysp_arrs=dysp_arrs)
 
-        return len(hiv_inds)
+        return self.scale_flows(hiv_inds)
 
 
     def apply_death_rates(self, year=None):
@@ -593,8 +663,8 @@ class People(hpb.BasePeople):
 
         # Get indices of people who die of other causes
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
-        deaths_female = len(hpu.true(self.is_female[death_inds]))
-        deaths_male = len(hpu.true(self.is_male[death_inds]))
+        deaths_female = self.scale_flows(hpu.true(self.is_female[death_inds]))
+        deaths_male = self.scale_flows(hpu.true(self.is_male[death_inds]))
         other_deaths = self.remove_people(death_inds, cause='other') # Apply deaths
 
         return other_deaths, deaths_female, deaths_male
@@ -613,21 +683,22 @@ class People(hpb.BasePeople):
 
         if new_births is None:
             this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1], smoothness=0)[0]/1e3
-            new_births = sc.randround(this_birth_rate*self.n_alive) # Crude births per 1000
+            new_births = sc.randround(this_birth_rate*self.n_alive_level0) # Crude births per 1000
 
         if new_births>0:
             # Generate other characteristics of the new people
             uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
 
             # Grow the arrays
-            self._grow(new_births)
-            self['uid'][-new_births:] = uids
-            self['age'][-new_births:] = 0
-            self['sex'][-new_births:] = sexes
-            self['debut'][-new_births:] = debuts
-            self['partners'][:,-new_births:] = partners
+            new_inds = self._grow(new_births)
+            self.uid[new_inds]        = uids
+            self.age[new_inds]        = 0
+            self.scale[new_inds]      = self.pars['pop_scale']
+            self.sex[new_inds]        = sexes
+            self.debut[new_inds]      = debuts
+            self.partners[:,new_inds] = partners
 
-        return new_births
+        return new_births*self.pars['pop_scale'] # These are not indices, so they scale differently
 
 
     def check_migration(self, year=None):
@@ -658,7 +729,7 @@ class People(hpb.BasePeople):
             # Do basic calculations
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
-            alive_inds = hpu.true(self.alive)
+            alive_inds = hpu.true(self.alive_level0)
             n_alive = len(alive_inds) # Actual number of alive agents
             expected = np.interp(year, data_years, data_pop)*scale
             n_migrate = int(expected - n_alive)
@@ -676,7 +747,7 @@ class People(hpb.BasePeople):
         else:
             n_migrate = 0
 
-        return n_migrate
+        return n_migrate*self.pars['pop_scale'] # These are not indices, so they scale differently
 
 
 
@@ -748,15 +819,15 @@ class People(hpb.BasePeople):
             self.date_exposed[g,inds] = base_t
 
         # Count reinfections and remove any previous dates
-        self.flows['reinfections'][g]           += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
-        self.total_flows['total_reinfections']  += len((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
+        self.flows['reinfections'][g]           += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
+        self.total_flows['total_reinfections']  += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         for key in ['date_clearance', 'date_cin1', 'date_cin2', 'date_cin3']:
             self[key][g, inds] = np.nan
 
         # Count reactivations and adjust latency status
         if layer == 'reactivation':
-            self.flows['reactivations'][g] += len(inds)
-            self.total_flows['total_reactivations'] += len(inds)
+            self.flows['reactivations'][g] += self.scale_flows(inds)
+            self.total_flows['total_reactivations'] += self.scale_flows(inds)
             self.latent[g, inds] = False # Adjust states -- no longer latent
 
         # Update states, genotype info, and flows
@@ -767,12 +838,12 @@ class People(hpb.BasePeople):
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
         if offset is None:
             # Create overall flows
-            self.total_flows['total_infections']    += len(inds) # Add the total count to the total flow data
-            self.flows['infections'][g]             += len(inds) # Add the count by genotype to the flow data
+            self.total_flows['total_infections']    += self.scale_flows(inds) # Add the total count to the total flow data
+            self.flows['infections'][g]             += self.scale_flows(inds) # Add the count by genotype to the flow data
 
             # Create by-sex flows
-            infs_female = len(hpu.true(self.is_female[inds]))
-            infs_male = len(hpu.true(self.is_male[inds]))
+            infs_female = self.scale_flows(hpu.true(self.is_female[inds]))
+            infs_male = self.scale_flows(hpu.true(self.is_male[inds]))
             self.flows_by_sex['total_infections_by_sex'][0] += infs_female
             self.flows_by_sex['total_infections_by_sex'][1] += infs_male
 
@@ -802,7 +873,7 @@ class People(hpb.BasePeople):
         if len(m_inds)>0:
             self.date_clearance[g, m_inds] = self.date_infectious[g, m_inds] + np.ceil(self.dur_infection[g, m_inds]/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
-        return len(inds) # For incrementing counters
+        return self.scale_flows(inds) # For incrementing counters
 
 
     def remove_people(self, inds, cause=None):
@@ -841,7 +912,7 @@ class People(hpb.BasePeople):
                 if len(iinds):
                     self[future_date][genotypes_to_clear, inds[iinds]] = np.nan
 
-        return len(inds)
+        return self.scale_flows(inds)
 
 
     #%% Analysis methods
@@ -877,7 +948,7 @@ class People(hpb.BasePeople):
 
         **Example**::
 
-            sim = cv.Sim(pop_type='hybrid', verbose=0)
+            sim = hpv.Sim(pop_type='hybrid', verbose=0)
             sim.run()
             sim.people.story(12)
             sim.people.story(795)

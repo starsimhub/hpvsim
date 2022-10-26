@@ -56,6 +56,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     if popdict is None:
 
         n_agents = int(sim['n_agents']) # Number of people
+        total_pop = None
 
         # Load age data by country if available, or use defaults.
         # Other demographic data like mortality and fertility are also available by
@@ -70,11 +71,11 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 try:
                     age_data  = hpdata.get_age_distribution(location, year=sim['start'])
                     pop_trend = hpdata.get_total_pop(location)
+                    total_pop = sum(age_data[:,2]) # Return the total population
                 except ValueError as E:
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
 
-        total_pop = sum(age_data[:,2]) # Return the total population
         uids, sexes, debuts, partners = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
 
         # Set ages, rounding to nearest timestep if requested
@@ -124,7 +125,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     validate_popdict(popdict, sim.pars, verbose=verbose)
     people = hpppl.People(sim.pars, pop_trend=pop_trend, **popdict) # List for storing the people
 
-    sc.printv(f'Created {n_agents} agents, average age {people.age.mean():0.2f} years', 2, verbose)
+    sc.printv(f'Created {n_agents} agents, average age {ages.mean():0.2f} years', 2, verbose)
 
     return people, total_pop
 
@@ -178,7 +179,7 @@ def validate_popdict(popdict, pars, verbose=True):
     try:
         popdict.keys() # Although not used directly, this is used in the error message below, and is a good proxy for a dict-like object
     except Exception as E:
-        errormsg = f'The popdict should be a dictionary or hp.People object, but instead is {type(popdict)}'
+        errormsg = f'The popdict should be a dictionary or hpv.People object, but instead is {type(popdict)}'
         raise TypeError(errormsg) from E
 
     # Check keys and lengths
@@ -315,6 +316,9 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
             male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
             this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
+            if this_weighting.sum() == 0:
+                this_weighting[:] = 1.0
+                print('Warning, no males were found for pairing, choosing randomly')
             nonzero_weighting = hpu.true(this_weighting != 0)
             selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
             m += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list

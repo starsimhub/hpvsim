@@ -98,12 +98,13 @@ class Analyzer(sc.prettyobj):
     @staticmethod
     def reduce(analyzers, use_mean=False):
         '''
-        Create an analyzer from a list of analyzers, using
+        Create a reduced analyzer from a list of analyzers, using
+        
         Args:
             analyzers: list of analyzers
             use_mean (bool): whether to use medians (the default) or means to create the reduced analyzer
         '''
-        raise NotImplementedError
+        pass
 
 
     def to_json(self):
@@ -169,7 +170,7 @@ class snapshot(Analyzer):
 
     **Example**::
 
-        sim = cv.Sim(analyzers=cv.snapshot('2015.4', '2020'))
+        sim = hpv.Sim(analyzers=hpv.snapshot('2015.4', '2020'))
         sim.run()
         snapshot = sim['analyzers'][0]
         people = snapshot.snapshots[0]            # Option 1
@@ -236,7 +237,7 @@ class age_pyramid(Analyzer):
 
     **Example**::
 
-        sim = cv.Sim(analyzers=hp.age_pyramid('2015', '2020'))
+        sim = hpv.Sim(analyzers=hpv.age_pyramid('2015', '2020'))
         sim.run()
         age_pyramid = sim['analyzers'][0]
     '''
@@ -315,12 +316,11 @@ class age_pyramid(Analyzer):
 
             date = self.dates[ind]
             self.age_pyramids[date] = sc.objdict() # Initialize the dictionary
-            scale = sim['pop_scale']
-            age = sim.people.age # Get the age distribution
+            ppl = sim.people
             self.age_pyramids[date]['bins'] = self.bins # Copy here for convenience
             for sb,sex in enumerate(['m','f']): # Loop over each sex; sb stands for sex boolean, translating the labels to 0/1
-                inds = (sim.people.alive*(sim.people.sex==sb)).nonzero()[0]
-                self.age_pyramids[date][sex] = np.histogram(age[inds], bins=self.edges)[0]*scale  # Bin people
+                inds = (sim.people.alive*(ppl.sex==sb)).nonzero()[0]
+                self.age_pyramids[date][sex] = np.histogram(ppl.age[inds], bins=self.edges, weights=ppl.scale[inds])[0]  # Bin people
 
 
     def finalize(self, sim):
@@ -416,7 +416,7 @@ class age_pyramid(Analyzer):
             do_save (bool): whether to save
             fig_path (str or filepath): filepath to save to
             do_show (bool): whether to show the figure
-            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+            kwargs (dict): passed to ``hpv.options.with_style()``; see that function for choices
         '''
         import seaborn as sns # Import here since slow
 
@@ -518,7 +518,7 @@ class age_results(Analyzer):
 
     **Example**::
 
-        sim = hp.Sim(analyzers=hpv.age_results(
+        sim = hpv.Sim(analyzers=hpv.age_results(
         result_keys=sc.objdict(
             hpv_prevalence=sc.objdict(
                 timepoints=['1990'],
@@ -685,15 +685,19 @@ class age_results(Analyzer):
 
         # Shorten variables that are used a lot
         ng = self.ng
+        ppl = sim.people
+        
+        def bin_ages(inds=None, bins=None):
+            return np.histogram(ppl.age[inds], bins=bins, weights=ppl.scale[inds])[0] # Bin the people
+            
 
         # Go through each result key and determine if this is a timepoint where age results are requested
         for result, result_dict in self.result_keys.items():
+            bins = result_dict.edges
             if sim.t in result_dict.timepoints:
                 na = len(result_dict.bins)
                 ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
                 date = result_dict.dates[ind]  # Create the date which will be used to key the results
-                age = sim.people.age  # Get the age distribution
-                scale = sim['pop_scale']  # Determine current scale factor
 
                 if 'compute_fit' in result_dict.keys() and 'total' not in result:
                     thisdatadf = result_dict.data[(result_dict.data.year == float(date)) & (result_dict.data.name == result)]
@@ -707,21 +711,21 @@ class age_results(Analyzer):
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
                 if result[0] == 'n' or 'prevalence' in result:
                     attr = self.convert_rname_stocks(result) # Convert to a people attribute
-                    if attr in sim.people.keys():
+                    if attr in ppl.keys():
                         if 'total' in result:
-                            inds = sim.people[attr].any(axis=0).nonzero()  # Pull out people for which this state is true
-                            self.results[result][date] = np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
+                            inds = ppl[attr].any(axis=0).nonzero()[-1]  # Pull out people for which this state is true
+                            self.results[result][date] = bin_ages(inds, bins)
                         else:
                             for g in range(ng):
-                                inds = sim.people[attr][g, :].nonzero()
-                                self.results[result][date][g, :] = np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
+                                inds = ppl[attr][g, :].nonzero()[-1]
+                                self.results[result][date][g, :] = bin_ages(inds, bins)  # Bin the people
 
                         if 'prevalence' in result:
                             # Need to divide by the right denominator
                             if 'hpv' in result:  # Denominator is whole population
-                                denom = (np.histogram(age, bins=result_dict.edges)[0] * scale)
+                                denom = bin_ages(inds=None, bins=bins)
                             else:  # Denominator is females
-                                denom = (np.histogram(age[sim.people.f_inds], bins=result_dict.edges)[0] * scale)
+                                denom = bin_ages(inds=ppl.f_inds, bins=bins)
                             if 'total' not in result: denom = denom[None, :]
                             self.results[result][date] = self.results[result][date] / denom
 
@@ -730,18 +734,16 @@ class age_results(Analyzer):
                             hpv_test_pars = hppar.get_screen_pars('hpv')
                             for state in ['precin', 'cin1', 'cin2', 'cin3']:
                                 for g in range(ng):
-                                    hpv_pos_probs = np.zeros(len(sim.people))
-                                    tp_inds = hpu.true(sim.people[state][g, :])
+                                    hpv_pos_probs = np.zeros(len(ppl))
+                                    tp_inds = hpu.true(ppl[state][g, :])
                                     hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][
                                         sim['genotype_map'][g]]
                                     hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
                                     if 'total' in result:
-                                        self.results[result][date] += np.histogram(age[hpv_pos_inds], bins=result_dict.edges)[
-                                            0] * scale  # Bin the people
+                                        self.results[result][date] += bin_ages(hpv_pos_inds, bins)
                                     else:
-                                        self.results[result][date][g, :] += np.histogram(age[hpv_pos_inds], bins=result_dict.edges)[
-                                                                          0] * scale  # Bin the people
-                            denom = (np.histogram(age, bins=result_dict.edges)[0] * scale)
+                                        self.results[result][date][g, :] += bin_ages(hpv_pos_inds, bins)
+                            denom = bin_ages(inds=None, bins=bins)
                             if 'total' in result: denom = denom * ng
                             self.results[result][date] = self.results[result][date] / denom
 
@@ -753,39 +755,37 @@ class age_results(Analyzer):
             # the timepoints that belong to the requested year.
             if sim.t in result_dict.calcpoints:
                 date = self.date # Stored just above for use here
-                scale = sim['pop_scale'] # Determine current scale factor
-                age = sim.people.age # Get the age distribution
 
                 # Figure out if it's a flow or incidence
                 if result.replace('total_', '') in hpd.flow_keys+hpd.total_flow_keys or 'incidence' in result or 'mortality' in result:
                     attr1, attr2 = self.convert_rname_flows(result)
                     if result[:5] == 'total' or 'mortality' in result:  # Results across all genotypes
                         if result == 'detected_cancer_deaths':
-                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2]) * (sim.people['detected_cancer'])).nonzero()
+                            inds = ((ppl[attr1] == sim.t) * (ppl[attr2]) * (ppl['detected_cancer'])).nonzero()[-1]
                         else:
-                            inds = ((sim.people[attr1] == sim.t) * (sim.people[attr2])).nonzero()
-                        self.results[result][date] += np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
+                            inds = ((ppl[attr1] == sim.t) * (ppl[attr2])).nonzero()[-1]
+                        self.results[result][date] += bin_ages(inds, bins)  # Bin the people
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
-                            inds = ((sim.people[attr1][g, :] == sim.t) * (sim.people[attr2][g, :])).nonzero()
-                            self.results[result][date][g, :] += np.histogram(age[inds[-1]], bins=result_dict.edges)[0] * scale  # Bin the people
+                            inds = ((ppl[attr1][g, :] == sim.t) * (ppl[attr2][g, :])).nonzero()[-1]
+                            self.results[result][date][g, :] += bin_ages(inds, bins)  # Bin the people
 
                     # Figure out if this is the last timepoint in the year we're calculating results for
                     if sim.t == self.timepoint+self.resfreq-1:
                         if 'incidence' in result:
                             # Need to divide by the right denominator
                             if 'hpv' in result:  # Denominator is susceptible population
-                                denom = (np.histogram(age[sim.people.sus_pool], bins=result_dict.edges)[0] * scale)
+                                denom = bin_ages(inds=ppl.sus_pool, bins=bins)
                             else:  # Denominator is females at risk for cancer
-                                denom = (np.histogram(age[sc.findinds(sim.people.is_female_alive & ~sim.people.cancerous.any(axis=0))], bins=result_dict.edges)[
-                                             0] * scale) / 1e5  # CIN and cancer are per 100,000 women
+                                inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
+                                denom = bin_ages(inds, bins) / 1e5  # CIN and cancer are per 100,000 women
                             if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
                             self.results[result][date] = self.results[result][date] / denom
 
                         if 'mortality' in result:
                             # Need to divide by the right denominator
                             # first need to find people who died of other causes today and add them back into denom
-                            denom = np.histogram(age[hpu.true(sim.people.is_female_alive)], bins=result_dict.edges)[0] * scale
+                            denom = bin_ages(inds=ppl.is_female_alive, bins=bins)
                             scale_factor =  1e5  # per 100,000 women
                             denom /= scale_factor
                             self.results[result][date] = self.results[result][date] / denom
@@ -916,7 +916,7 @@ class age_results(Analyzer):
             do_save (bool): whether to save
             fig_path (str or filepath): filepath to save to
             do_show (bool): whether to show the figure
-            kwargs (dict): passed to ``hp.options.with_style()``; see that function for choices
+            kwargs (dict): passed to ``hpv.options.with_style()``; see that function for choices
         '''
 
         # Handle inputs

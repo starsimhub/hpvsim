@@ -17,6 +17,9 @@ from .version import __version__
 # Specify all externally visible classes this file defines
 __all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', 'Contacts', 'Layer']
 
+# Default object getter/setter
+obj_set = object.__setattr__ 
+base_key = 'uid' # Define the key used by default for getting length, etc.
 
 #%% Define simulation classes
 
@@ -126,8 +129,8 @@ class Result(object):
 
     **Example**::
 
-        import covasim as cv
-        r1 = cv.Result(name='test1', npts=10)
+        import hpvsim as hpv
+        r1 = hpv.Result(name='test1', npts=10)
         r1[:5] = 20
         print(r1.values)
     '''
@@ -196,7 +199,7 @@ class Result(object):
 def set_metadata(obj, **kwargs):
     ''' Set standard metadata for an object '''
     obj.created = kwargs.get('created', sc.now())
-    # obj.version = kwargs.get('version', cvv.__version__)
+    obj.version = kwargs.get('version', __version__)
     obj.git_info = kwargs.get('git_info', hpm.git_info())
     return
 
@@ -282,7 +285,7 @@ class BaseSim(ParsObj):
         ''' Set the metadata for the simulation -- creation time and filename '''
         set_metadata(self)
         if simfile is None:
-            self.simfile = 'covasim.sim'
+            self.simfile = 'hpvsim.sim'
         return
 
 
@@ -306,45 +309,6 @@ class BaseSim(ParsObj):
             return len(self.people)
         except:  # pragma: no cover # If it's None or missing
             return 0
-
-    @property
-    def scaled_pop_size(self):
-        ''' Get the total population size, i.e. the number of agents times the scale factor -- if it fails, assume none '''
-        try:
-            return self['n_agents']*self['pop_scale']
-        except:  # pragma: no cover # If it's None or missing
-            return 0
-
-    # @property
-    # def npts(self):
-    #     ''' Count the number of time points '''
-    #     try:
-    #         return int(self['n_days'] + 1)
-    #     except: # pragma: no cover
-    #         return 0
-
-    # @property
-    # def tvec(self):
-    #     ''' Create a time vector '''
-    #     try:
-    #         return np.arange(self.npts)
-    #     except: # pragma: no cover
-    #         return np.array([])
-
-    # @property
-    # def datevec(self):
-    #     '''
-    #     Create a vector of dates
-
-    #     Returns:
-    #         Array of `datetime` instances containing the date associated with each
-    #         simulation time step
-
-    #     '''
-    #     try:
-    #         return self['start_day'] + self.tvec * dt.timedelta(days=1)
-    #     except: # pragma: no cover
-    #         return np.array([])
 
 
     def get_t(self, dates, exact_match=False, return_date_format=None):
@@ -663,8 +627,8 @@ class BaseSim(ParsObj):
         Returns:
             shrunken (Sim): a Sim object with the listed attributes removed
         '''
-        from . import interventions as cvi # To avoid circular imports
-        from . import analysis as cva
+        from . import interventions as hpvi # To avoid circular imports
+        from . import analysis as hpva
 
         # By default, skip people (~90% of memory), the popdict (which is usually empty anyway), and _orig_pars (which is just a backup)
         if skip_attrs is None:
@@ -682,7 +646,7 @@ class BaseSim(ParsObj):
         # Shrink interventions and analyzers, with a lot of checking along the way
         for key in ['interventions', 'analyzers']:
             ias = self.pars[key] # List of interventions or analyzers
-            shrunken_ias = [ia.shrink(in_place=in_place) for ia in ias if isinstance(ia, (cvi.Intervention, cva.Analyzer))]
+            shrunken_ias = [ia.shrink(in_place=in_place) for ia in ias if isinstance(ia, (hpvi.Intervention, hpva.Analyzer))]
             self.pars[key] = shrunken_ias # Actually shrink, and re-store
 
         # Don't return if in place
@@ -738,14 +702,14 @@ class BaseSim(ParsObj):
 
         Args:
             filename (str): the name or path of the file to load from
-            kwargs: passed to cv.load()
+            kwargs: passed to hpv.load()
 
         Returns:
             sim (Sim): the loaded simulation object
 
         **Example**::
 
-            sim = cv.Sim.load('my-simulation.sim')
+            sim = hpv.Sim.load('my-simulation.sim')
         '''
         sim = hpm.load(filename, *args, **kwargs)
         if not isinstance(sim, BaseSim): # pragma: no cover
@@ -832,13 +796,13 @@ class BaseSim(ParsObj):
 
         **Examples**::
 
-            tp = cv.test_prob(symp_prob=0.1)
-            cb1 = cv.change_beta(days=5, changes=0.3, label='NPI')
-            cb2 = cv.change_beta(days=10, changes=0.3, label='Masks')
-            sim = cv.Sim(interventions=[tp, cb1, cb2])
-            cb1, cb2 = sim.get_interventions(cv.change_beta)
+            tp = hpv.test_prob(symp_prob=0.1)
+            cb1 = hpv.change_beta(days=5, changes=0.3, label='NPI')
+            cb2 = hpv.change_beta(days=10, changes=0.3, label='Masks')
+            sim = hpv.Sim(interventions=[tp, cb1, cb2])
+            cb1, cb2 = sim.get_interventions(hpv.change_beta)
             tp, cb2 = sim.get_interventions([0,2])
-            ind = sim.get_interventions(cv.change_beta, as_inds=True) # Returns [1,2]
+            ind = sim.get_interventions(hpv.change_beta, as_inds=True) # Returns [1,2]
             sim.get_interventions('summary') # Prints a summary
         '''
         return self._get_ia('interventions', label=label, partial=partial, as_inds=as_inds, as_list=True)
@@ -858,12 +822,12 @@ class BaseSim(ParsObj):
 
         **Examples**::
 
-            tp = cv.test_prob(symp_prob=0.1)
-            cb = cv.change_beta(days=5, changes=0.3, label='NPI')
-            sim = cv.Sim(interventions=[tp, cb])
+            tp = hpv.test_prob(symp_prob=0.1)
+            cb = hpv.change_beta(days=5, changes=0.3, label='NPI')
+            sim = hpv.Sim(interventions=[tp, cb])
             cb = sim.get_intervention('NPI')
             cb = sim.get_intervention('NP', partial=True)
-            cb = sim.get_intervention(cv.change_beta)
+            cb = sim.get_intervention(hpv.change_beta)
             cb = sim.get_intervention(1)
             cb = sim.get_intervention()
             tp = sim.get_intervention(first=True)
@@ -911,28 +875,36 @@ class BasePeople(FlexPretty):
         self.t = 0 # Keep current simulation time
 
         # Private variables relaying to dynamic allocation
-        self._data = sc.odict()
+        self._data = dict()
         self._n = self.pars['n_agents']  # Number of agents (initial)
         self._s = self._n # Underlying array sizes
-
-        # Initialize underlying storage and map arrays
-        for state in self.meta.all_states:
-            self._data[state.name] = state.new(pars, self._n)
-        self._map_arrays()
-
-        # Assign UIDs
-        self['uid'][:] = np.arange(self.pars['n_agents'])
+        self._inds = None # No filtering indices
         
+        return
+
+
+    def initialize(self):
+        ''' Initialize underlying storage and map arrays '''
+        for state in self.meta.all_states:
+            self._data[state.name] = state.new(self.pars, self._n)
+        self._map_arrays()
+        self['uid'][:] = np.arange(self.pars['n_agents'])
         return
 
 
     def __len__(self):
         ''' Length of people '''
         try:
-            return len(self.uid)
+            arr = getattr(self, base_key)
+            return len(arr)
         except Exception as E:
-            print(f'Warning: could not get length of People (could not get self.uid: {E})')
+            print(f'Warning: could not get length of People (could not get self.{base_key}: {E})')
             return 0
+    
+    
+    def _len_arrays(self):
+        ''' Length of underlying arrays '''
+        return len(self._data[base_key])
 
 
     def set_pars(self, pars=None, hiv_pars=None):
@@ -1030,17 +1002,20 @@ class BasePeople(FlexPretty):
         Increase the number of agents stored
 
         Automatically reallocate underlying arrays if required
-
-        :param n: Number of new agents to add
-        :return:
+        
+        Args:
+            n (int): Number of new agents to add
         """
-        if (self._n + n) > self._s:
+        orig_n = self._n
+        if (orig_n + n) > self._s:
             n_new = int(self._s / 2)  # 50% growth
             for state in self.meta.all_states:
                 self._data[state.name] = np.concatenate([self._data[state.name], state.new(self.pars, n_new)], axis=self._data[state.name].ndim-1)
             self._s += n_new
         self._n += n
         self._map_arrays()
+        new_inds = np.arange(orig_n, self._n)
+        return new_inds
 
 
     def _map_arrays(self):
@@ -1050,12 +1025,83 @@ class BasePeople(FlexPretty):
         This method should be called whenever the number of agents required changes
         (regardless of whether or not the underlying arrays have been resized)
         """
-
         for k in self.keys():
-            if self._data[k].ndim == 2:
-                super().__setattr__(k, self._data[k][:, :self._n])
+            arr = self._data[k]
+            
+            if self._inds is not None:
+                row_inds = self._inds
             else:
-                super().__setattr__(k, self._data[k][:self._n])
+                row_inds = slice(None, self._n)
+                
+            if arr.ndim == 1:
+                obj_set(self, k, arr[row_inds])
+            elif arr.ndim == 2:
+                obj_set(self, k, arr[:, row_inds])
+            else:
+                errormsg = 'Can only operate on 1D or 2D arrays'
+                raise TypeError(errormsg)
+        return
+    
+
+    def filter_inds(self, inds):
+        """
+        Store indices to allow for easy filtering of the People object.
+
+        Args:
+            inds (array): filter by these indices
+
+        Returns:
+            A filtered People object, which works just like a normal People object
+            except only operates on a subset of indices.
+        """
+        # Create a new People object with the same properties as the original
+        filtered = object.__new__(self.__class__) # Create a new People instance
+        filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
+        
+        if inds is None: # Reset filtering
+            filtered._inds = None
+        elif filtered._inds is None: # Not yet filtered: use the indices directly
+            filtered._inds = inds
+        else: # Already filtered: map them back onto the original People indices
+            filtered._inds = filtered._inds[inds]
+        
+        # Apply new indices
+        filtered._map_arrays()
+        
+        return filtered
+    
+    
+    def filter(self, criteria):
+        '''
+        Store indices to allow for easy filtering of the People object.
+        
+        Args:
+            criteria (array): a boolean array for the filtering critria
+        
+        Returns:
+            A filtered People object, which works just like a normal People object
+            except only operates on a subset of indices.
+        '''
+        if criteria is None:
+            new_inds = None
+        elif len(criteria) == len(self): # Main use case: a new filter applied on an already filtered object, e.g. filtered.filter(filtered.age > 5)
+            new_inds = criteria.nonzero()[0] # Criteria is already filtered, just get the indices
+        elif len(criteria) == self._len_arrays: # Alternative: a filter on the underlying People object is applied to the filtered object, e.g. filtered.filter(people.age > 5)
+            new_inds = criteria[self._inds].nonzero()[0] # Apply filtering before getting the new indices
+        else:
+            errormsg = f'"criteria" must be boolean array matching either current filter length ({len(self)}) or else the total number of agents ({self._len_arrays()}), not {len(criteria)}'
+            raise ValueError(errormsg)
+        return self.filter_inds(new_inds)
+    
+    
+    def unfilter(self):
+        """
+        Set main simulation attributes to be views of the underlying data
+
+        This method should be called whenever the number of agents required changes
+        (regardless of whether or not the underlying arrays have been resized)
+        """
+        return self.filter_inds(inds=None)
 
 
     def __getitem__(self, key):
@@ -1083,7 +1129,7 @@ class BasePeople(FlexPretty):
             # be lost the next time the arrays are resized
             raise Exception('Cannot assign directly to a dynamic array view - must index into the view instead e.g. `people.uid[:]=`')
         else:   # If not initialized, rely on the default behavior
-            super().__setattr__(attr, value)
+            obj_set(self, attr, value)
         return
 
 
@@ -1223,37 +1269,52 @@ class BasePeople(FlexPretty):
     @property
     def is_active(self):
         ''' Boolean array of everyone sexually active i.e. past debut '''
-        return (self.age>self.debut) & (self.alive)
+        return ((self.age>self.debut) * (self.alive) * (self.level0)).astype(bool)
 
     @property
     def is_virgin(self):
         ''' Boolean array of everyone not yet sexually active i.e. pre debut '''
-        return (self.age<self.debut) & (self.alive)
+        return ((self.age<self.debut) * self.alive).astype(bool)
 
     @property
     def alive_inds(self):
-        ''' Boolean array of everyone alive '''
+        ''' Indices of everyone alive '''
         return self.true('alive')
+    
+    @property
+    def alive_level0(self):
+        ''' Indices of everyone alive who is a level 0 agent '''
+        return (self.alive * self.level0).astype(bool)
+
+    @property
+    def alive_level0_inds(self):
+        ''' Indices of everyone alive who is a level 0 agent '''
+        return self.alive_level0.nonzero()[0]
 
     @property
     def n_alive(self):
         ''' Number of people alive '''
         return len(self.alive_inds)
-
+    
+    @property
+    def n_alive_level0(self):
+        ''' Number of people alive '''
+        return len(self.alive_level0_inds)
+    
     @property
     def infected(self):
         '''
         Boolean array of everyone infected. Union of infectious and inactive.
         Includes people with cancer, people with latent infections, and people with active infections
         '''
-        return self.infectious | self.inactive
+        return (self.infectious + self.inactive).astype(bool)
 
     @property
     def cin(self):
         '''
         Boolean array of everyone with dysplasia. Union of CIN1, CIN2, CIN3
         '''
-        return self.cin1 | self.cin2 | self.cin3
+        return (self.cin1 + self.cin2 + self.cin3).astype(bool)
 
     @property
     def precin(self):
@@ -1262,7 +1323,7 @@ class BasePeople(FlexPretty):
         with transient infections that will clear on their own plus those where
         dysplasia isn't established yet
         '''
-        return self.infectious & self.no_dysp
+        return (self.infectious * self.no_dysp).astype(bool)
 
     @property
     def latent(self):
@@ -1270,7 +1331,7 @@ class BasePeople(FlexPretty):
         Boolean array of everyone with latent infection. By definition, these
         people have no dysplasia and inactive infection status.
         '''
-        return self.inactive & self.no_dysp
+        return (self.inactive * self.no_dysp).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
@@ -1296,17 +1357,32 @@ class BasePeople(FlexPretty):
         ''' Return indices of people who are nan '''
         return np.isnan(self[key]).nonzero()[0]
 
-    def count(self, key):
+    def count(self, key, weighted=True):
         ''' Count the number of people for a given key '''
-        return np.count_nonzero(self[key])
+        inds = self[key].nonzero()[0]
+        if weighted:
+            out = self.scale[inds].sum()
+        else:
+            out = len(inds)
+        return out
+    
+    def count_any(self, key, weighted=True):
+        ''' Count the number of people for a given key for a 2D array if any value matches '''
+        inds = self[key].sum(axis=0).nonzero()[0]
+        if weighted:
+            out = self.scale[inds].sum()
+        else:
+            out = len(inds)
+        return out
 
-    def count_by_genotype(self, key, genotype):
+    def count_by_genotype(self, key, genotype, weighted=True):
         ''' Count the number of people for a given key '''
-        return np.count_nonzero(self[key][genotype,:])
-
-    def count_not(self, key):
-        ''' Count the number of people who do not have a property for a given key '''
-        return len(self[key]) - self.count(key)
+        inds = np.nonzero(self[key][genotype,:])[0]
+        if weighted:
+            out = self.scale[inds].sum()
+        else:
+            out = len(inds)
+        return out
 
     def keys(self):
         ''' Returns keys for all properties of the people object '''
@@ -1407,9 +1483,9 @@ class BasePeople(FlexPretty):
 
         **Example**::
 
-            import covasim as cv
+            import hpvsim as hpv
             import networkx as nx
-            sim = cv.Sim(n_agents=50, pop_type='hybrid', contacts=dict(h=3, s=10, w=10, c=5)).run()
+            sim = hpv.Sim(n_agents=50, pop_type='hybrid', contacts=dict(h=3, s=10, w=10, c=5)).run()
             G = sim.people.to_graph()
             nodes = G.nodes(data=True)
             edges = G.edges(keys=True)
@@ -1434,6 +1510,7 @@ class BasePeople(FlexPretty):
 
         return G
 
+
     def save(self, filename=None, force=False, **kwargs):
         '''
         Save to disk as a gzipped pickle.
@@ -1452,7 +1529,7 @@ class BasePeople(FlexPretty):
 
         **Example**::
 
-            sim = cv.Sim()
+            sim = hpv.Sim()
             sim.initialize()
             sim.people.save() # Saves to a .ppl file
         '''
@@ -1464,7 +1541,7 @@ The People object has already been run (t = {self.t}), which is usually not the
 correct state to save it in since it cannot be re-initialized. If this is intentional,
 use sim.people.save(force=True). Otherwise, the correct approach is:
 
-    sim = cv.Sim(...)
+    sim = hpv.Sim(...)
     sim.initialize() # Create the people object but do not run
     sim.people.save() # Save people immediately after initialization
     sim.run() # The People object is
@@ -1473,7 +1550,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
 
         # Handle the filename
         if filename is None:
-            filename = 'covasim.ppl'
+            filename = 'hpvsim.ppl'
         filename = sc.makefilepath(filename=filename, **kwargs)
         self.filename = filename # Store the actual saved filename
         hpm.save(filename=filename, obj=self)
@@ -1488,21 +1565,22 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
 
         Args:
             filename (str): the name or path of the file to load from
-            args (list): passed to ``cv.load()``
-            kwargs (dict): passed to ``cv.load()``
+            args (list): passed to ``hpv.load()``
+            kwargs (dict): passed to ``hpv.load()``
 
         Returns:
             people (People): the loaded people object
 
         **Example**::
 
-            people = cv.people.load('my-people.ppl')
+            people = hpv.people.load('my-people.ppl')
         '''
         people = hpm.load(filename, *args, **kwargs)
         if not isinstance(people, BasePeople): # pragma: no cover
             errormsg = f'Cannot load object of {type(people)} as a People object'
             raise TypeError(errormsg)
         return people
+
 
     def init_contacts(self, reset=False):
         ''' Initialize the contacts dataframe with the correct columns and data types '''
@@ -1516,6 +1594,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
             for key,layer in contacts.items():
                 self.contacts[key] = layer
         return
+
 
     def add_contacts(self, contacts, lkey=None, beta=None):
         '''
@@ -1563,6 +1642,7 @@ use sim.people.save(force=True). Otherwise, the correct approach is:
                 self.contacts[lkey].validate()
 
         return
+
 
     def make_edgelist(self, contacts):
         '''
@@ -1704,7 +1784,7 @@ class Contacts(FlexDict):
 
         **Example**::
 
-            hospitals_layer = cv.Layer(label='hosp')
+            hospitals_layer = hpv.Layer(label='hosp')
             sim.people.contacts.add_layer(hospitals=hospitals_layer)
         '''
         for lkey,layer in kwargs.items():
@@ -1787,13 +1867,13 @@ class Layer(FlexDict):
         p1 = np.random.randint(n_people, size=n)
         p2 = np.random.randint(n_people, size=n)
         beta = np.ones(n)
-        layer = cv.Layer(p1=p1, p2=p2, beta=beta, label='rand')
-        layer = cv.Layer(dict(p1=p1, p2=p2, beta=beta), label='rand') # Alternate method
+        layer = hpv.Layer(p1=p1, p2=p2, beta=beta, label='rand')
+        layer = hpv.Layer(dict(p1=p1, p2=p2, beta=beta), label='rand') # Alternate method
 
         # Convert one layer to another with extra columns
         index = np.arange(n)
         self_conn = p1 == p2
-        layer2 = cv.Layer(**layer, index=index, self_conn=self_conn, label=layer.label)
+        layer2 = hpv.Layer(**layer, index=index, self_conn=self_conn, label=layer.label)
     '''
 
     def __init__(self, *args, label=None, **kwargs):
@@ -1986,14 +2066,14 @@ class Layer(FlexDict):
         # Check types
         if not isinstance(inds, np.ndarray):
             inds = sc.promotetoarray(inds)
-        if inds.dtype != np.int64:  # pragma: no cover # This is int64 since indices often come from cv.true(), which returns int64
+        if inds.dtype != np.int64:  # pragma: no cover # This is int64 since indices often come from hpv.true(), which returns int64
             inds = np.array(inds, dtype=np.int64)
 
         # Find the contacts
         contact_inds = hpu.find_contacts(self['f'], self['m'], inds)
         if as_array:
             contact_inds = np.fromiter(contact_inds, dtype=hpd.default_int)
-            contact_inds.sort()  # Sorting ensures that the results are reproducible for a given seed as well as being identical to previous versions of Covasim
+            contact_inds.sort()  # Sorting ensures that the results are reproducible for a given seed as well as being identical to previous versions of HPVsim
 
         return contact_inds
 
@@ -2011,7 +2091,7 @@ class Layer(FlexDict):
         changing contacts for people that are severe/critical).
 
         Args:
-            people (People): the Covasim People object, which is usually used to make new contacts
+            people (People): the HPVsim People object, which is usually used to make new contacts
             frac (float): the fraction of contacts to update on each timestep
         '''
         # Choose how many contacts to make

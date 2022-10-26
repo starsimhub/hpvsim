@@ -17,7 +17,7 @@ def make_pars(**kwargs):
     '''
     Create the parameters for the simulation. Typically, this function is used
     internally rather than called by the user; e.g. typical use would be to do
-    sim = hp.Sim() and then inspect sim.pars, rather than calling this function
+    sim = hpv.Sim() and then inspect sim.pars, rather than calling this function
     directly.
 
     Args:
@@ -31,8 +31,11 @@ def make_pars(**kwargs):
 
     # Population parameters
     pars['n_agents']        = 20e3      # Number of agents
+    pars['total_pop']       = None      # If defined, used for calculating the scale factor
     pars['pop_scale']       = None      # How much to scale the population
-    pars['network']         = 'default'  # What type of sexual network to use -- 'random', 'basic', other options TBC
+    pars['use_multiscale']  = False     # Whether to use multiscale modeling
+    pars['ms_agent_ratio']  = 1         # Ratio of scale factor of cancer agents to normal agents -- must be an integer
+    pars['network']         = 'default' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
     pars['birth_rates']     = None      # Birth rates, loaded below

@@ -6,7 +6,6 @@ Numerical utilities for running hpvsim.
 
 import numpy as np # For numerics
 import sciris as sc # For additional utilities
-from . import defaults as hpd # To set default types
 
 
 # What functions are externally visible -- note, this gets populated in each section below
@@ -129,9 +128,9 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
 
     **Examples**::
 
-        hp.sample() # returns Unif(0,1)
-        hp.sample(dist='normal', par1=3, par2=0.5) # returns Normal(μ=3, σ=0.5)
-        hp.sample(dist='lognormal_int', par1=5, par2=3) # returns a lognormally distributed set of values with mean 5 and std 3
+        hpv.sample() # returns Unif(0,1)
+        hpv.sample(dist='normal', par1=3, par2=0.5) # returns Normal(μ=3, σ=0.5)
+        hpv.sample(dist='lognormal_int', par1=5, par2=3) # returns a lognormally distributed set of values with mean 5 and std 3
 
     Notes:
         Lognormal distributions are parameterized with reference to the underlying normal distribution (see:
@@ -161,7 +160,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     ]
 
     # Ensure it's an integer
-    if size is not None:
+    if size is not None and not isinstance(size, tuple):
         size = int(size)
 
     # Compute distribution parameters and draw samples
@@ -255,7 +254,7 @@ def n_binomial(prob, n):
 
     **Example**::
 
-        outcomes = hp.n_binomial(0.5, 100) # Perform 100 coin-flips
+        outcomes = hpv.n_binomial(0.5, 100) # Perform 100 coin-flips
     '''
     return np.random.random(n) < prob
 
@@ -274,7 +273,7 @@ def binomial_filter(prob, arr):
 
     **Example**::
 
-        inds = hp.binomial_filter(0.5, np.arange(20)**2) # Return which values out of the (arbitrary) array passed the coin flip
+        inds = hpv.binomial_filter(0.5, np.arange(20)**2) # Return which values out of the (arbitrary) array passed the coin flip
     '''
     return arr[(np.random.random(len(arr)) < prob).nonzero()[0]]
 
@@ -291,7 +290,7 @@ def binomial_arr(prob_arr):
 
     **Example**::
 
-        outcomes = hp.binomial_arr([0.1, 0.1, 0.2, 0.2, 0.8, 0.8]) # Perform 6 trials with different probabilities
+        outcomes = hpv.binomial_arr([0.1, 0.1, 0.2, 0.2, 0.8, 0.8]) # Perform 6 trials with different probabilities
     '''
     return np.random.random(len(prob_arr)) < prob_arr
 
@@ -309,7 +308,7 @@ def n_multinomial(probs, n): # No speed gain from Numba
 
     **Example**::
 
-        outcomes = hp.n_multinomial(np.ones(6)/6.0, 50)+1 # Return 50 die-rolls
+        outcomes = hpv.n_multinomial(np.ones(6)/6.0, 50)+1 # Return 50 die-rolls
     '''
     return np.searchsorted(np.cumsum(probs), np.random.random(n))
 
@@ -323,7 +322,7 @@ def poisson(rate):
 
     **Example**::
 
-        outcome = hp.poisson(100) # Single Poisson trial with mean 100
+        outcome = hpv.poisson(100) # Single Poisson trial with mean 100
     '''
     return np.random.poisson(rate, 1)[0]
 
@@ -338,14 +337,14 @@ def n_poisson(rate, n):
 
     **Example**::
 
-        outcomes = hp.n_poisson(100, 20) # 20 Poisson trials with mean 100
+        outcomes = hpv.n_poisson(100, 20) # 20 Poisson trials with mean 100
     '''
     return np.random.poisson(rate, n)
 
 
 def n_neg_binomial(rate, dispersion, n, step=1): # Numba not used due to incompatible implementation
     '''
-    An array of negative binomial trials. See hp.sample() for more explanation.
+    An array of negative binomial trials. See hpv.sample() for more explanation.
 
     Args:
         rate (float): the rate of the process (mean, same as Poisson)
@@ -355,8 +354,8 @@ def n_neg_binomial(rate, dispersion, n, step=1): # Numba not used due to incompa
 
     **Example**::
 
-        outcomes = hp.n_neg_binomial(100, 1, 50) # 50 negative binomial trials with mean 100 and dispersion roughly equal to mean (large-mean limit)
-        outcomes = hp.n_neg_binomial(1, 100, 20) # 20 negative binomial trials with mean 1 and dispersion still roughly equal to mean (approximately Poisson)
+        outcomes = hpv.n_neg_binomial(100, 1, 50) # 50 negative binomial trials with mean 100 and dispersion roughly equal to mean (large-mean limit)
+        outcomes = hpv.n_neg_binomial(1, 100, 20) # 20 negative binomial trials with mean 1 and dispersion still roughly equal to mean (approximately Poisson)
     '''
     nbn_n = dispersion
     nbn_p = dispersion/(rate/step + dispersion)
@@ -374,7 +373,7 @@ def choose(max_n, n):
 
     **Example**::
 
-        choices = hp.choose(5, 2) # choose 2 out of 5 people with equal probability (without repeats)
+        choices = hpv.choose(5, 2) # choose 2 out of 5 people with equal probability (without repeats)
     '''
     return np.random.choice(max_n, n, replace=False)
 
@@ -389,7 +388,7 @@ def choose_r(max_n, n):
 
     **Example**::
 
-        choices = hp.choose_r(5, 10) # choose 10 out of 5 people with equal probability (with repeats)
+        choices = hpv.choose_r(5, 10) # choose 10 out of 5 people with equal probability (with repeats)
     '''
     return np.random.choice(max_n, n, replace=True)
 
@@ -405,7 +404,7 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
 
     **Example**::
 
-        choices = hp.choose_w([0.2, 0.5, 0.1, 0.1, 0.1], 2) # choose 2 out of 5 people with nonequal probability.
+        choices = hpv.choose_w([0.2, 0.5, 0.1, 0.1, 0.1], 2) # choose 2 out of 5 people with nonequal probability.
     '''
     probs = np.array(probs)
     n_choices = len(probs)
@@ -437,7 +436,7 @@ def true(arr):
 
     **Example**::
 
-        inds = hp.true(np.array([1,0,0,1,1,0,1])) # Returns array([0, 3, 4, 6])
+        inds = hpv.true(np.array([1,0,0,1,1,0,1])) # Returns array([0, 3, 4, 6])
     '''
     return arr.nonzero()[-1]
 
@@ -451,7 +450,7 @@ def false(arr):
 
     **Example**::
 
-        inds = hp.false(np.array([1,0,0,1,1,0,1]))
+        inds = hpv.false(np.array([1,0,0,1,1,0,1]))
     '''
     return np.logical_not(arr).nonzero()[-1]
 
@@ -465,7 +464,7 @@ def defined(arr):
 
     **Example**::
 
-        inds = hp.defined(np.array([1,np.nan,0,np.nan,1,0,1]))
+        inds = hpv.defined(np.array([1,np.nan,0,np.nan,1,0,1]))
     '''
     return (~np.isnan(arr)).nonzero()[-1]
 
@@ -479,7 +478,7 @@ def undefined(arr):
 
     **Example**::
 
-        inds = hp.defined(np.array([1,np.nan,0,np.nan,1,0,1]))
+        inds = hpv.defined(np.array([1,np.nan,0,np.nan,1,0,1]))
     '''
     return np.isnan(arr).nonzero()[-1]
 
@@ -494,7 +493,7 @@ def itrue(arr, inds):
 
     **Example**::
 
-        inds = hp.itrue(np.array([True,False,True,True]), inds=np.array([5,22,47,93]))
+        inds = hpv.itrue(np.array([True,False,True,True]), inds=np.array([5,22,47,93]))
     '''
     return inds[arr]
 
@@ -509,7 +508,7 @@ def ifalse(arr, inds):
 
     **Example**::
 
-        inds = hp.ifalse(np.array([True,False,True,True]), inds=np.array([5,22,47,93]))
+        inds = hpv.ifalse(np.array([True,False,True,True]), inds=np.array([5,22,47,93]))
     '''
     return inds[np.logical_not(arr)]
 
@@ -524,7 +523,7 @@ def idefined(arr, inds):
 
     **Example**::
 
-        inds = hp.idefined(np.array([3,np.nan,np.nan,4]), inds=np.array([5,22,47,93]))
+        inds = hpv.idefined(np.array([3,np.nan,np.nan,4]), inds=np.array([5,22,47,93]))
     '''
     return inds[~np.isnan(arr)]
 
@@ -539,7 +538,7 @@ def iundefined(arr, inds):
 
     **Example**::
 
-        inds = hp.iundefined(np.array([3,np.nan,np.nan,4]), inds=np.array([5,22,47,93]))
+        inds = hpv.iundefined(np.array([3,np.nan,np.nan,4]), inds=np.array([5,22,47,93]))
     '''
     return inds[np.isnan(arr)]
 
@@ -555,7 +554,7 @@ def itruei(arr, inds):
 
     **Example**::
 
-        inds = hp.itruei(np.array([True,False,True,True,False,False,True,False]), inds=np.array([0,1,3,5]))
+        inds = hpv.itruei(np.array([True,False,True,True,False,False,True,False]), inds=np.array([0,1,3,5]))
     '''
     return inds[arr[inds]]
 
@@ -570,7 +569,7 @@ def ifalsei(arr, inds):
 
     **Example**::
 
-        inds = hp.ifalsei(np.array([True,False,True,True,False,False,True,False]), inds=np.array([0,1,3,5]))
+        inds = hpv.ifalsei(np.array([True,False,True,True,False,False,True,False]), inds=np.array([0,1,3,5]))
     '''
     return inds[np.logical_not(arr[inds])]
 
@@ -585,7 +584,7 @@ def idefinedi(arr, inds):
 
     **Example**::
 
-        inds = hp.idefinedi(np.array([4,np.nan,0,np.nan,np.nan,4,7,4,np.nan]), inds=np.array([0,1,3,5]))
+        inds = hpv.idefinedi(np.array([4,np.nan,0,np.nan,np.nan,4,7,4,np.nan]), inds=np.array([0,1,3,5]))
     '''
     return inds[~np.isnan(arr[inds])]
 
@@ -600,7 +599,7 @@ def iundefinedi(arr, inds):
 
     **Example**::
 
-        inds = hp.iundefinedi(np.array([4,np.nan,0,np.nan,np.nan,4,7,4,np.nan]), inds=np.array([0,1,3,5]))
+        inds = hpv.iundefinedi(np.array([4,np.nan,0,np.nan,np.nan,4,7,4,np.nan]), inds=np.array([0,1,3,5]))
     '''
     return inds[np.isnan(arr[inds])]
 
@@ -615,8 +614,8 @@ def dtround(arr, dt, ceil=True):
 
     **Example**::
 
-        dtround = hp.dtround(np.array([0.23,0.61,20.53])) # Returns array([0.2, 0.6, 20.6])
-        dtround = hp.dtround(np.array([0.23,0.61,20.53]),ceil=True) # Returns array([0.4, 0.8, 20.6])
+        dtround = hpv.dtround(np.array([0.23,0.61,20.53])) # Returns array([0.2, 0.6, 20.6])
+        dtround = hpv.dtround(np.array([0.23,0.61,20.53]),ceil=True) # Returns array([0.4, 0.8, 20.6])
     '''
     if ceil:
         return np.ceil(arr * (1/dt)) / (1/dt)

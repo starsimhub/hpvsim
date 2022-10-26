@@ -2,11 +2,11 @@
 Define options for hpvsim, mostly plotting options. All options should
 be set using set() or directly, e.g.::
 
-    hp.options(font_size=18)
+    hpv.options(font_size=18)
 
 To reset default options, use::
 
-    hp.options('default')
+    hpv.options('default')
 
 Note: "options" is used to refer to the choices available (e.g., DPI), while "settings"
 is used to refer to the choices made (e.g., DPI=150).
@@ -49,15 +49,15 @@ class Options(sc.objdict):
     '''
     Set options for hpvsim.
 
-    Use ``hp.options.set('defaults')`` to reset all values to default, or ``hp.options.set(dpi='default')``
-    to reset one parameter to default. See ``hp.options.help(detailed=True)`` for
+    Use ``hpv.options.set('defaults')`` to reset all values to default, or ``hpv.options.set(dpi='default')``
+    to reset one parameter to default. See ``hpv.options.help(detailed=True)`` for
     more information.
 
-    Options can also be saved and loaded using ``hp.options.save()`` and ``hp.options.load()``.
-    See ``hp.options.context()`` and ``hp.options.with_style()`` to set options
+    Options can also be saved and loaded using ``hpv.options.save()`` and ``hpv.options.load()``.
+    See ``hpv.options.context()`` and ``hpv.options.with_style()`` to set options
     temporarily.
 
-    Common options are (see also ``hp.options.help(detailed=True)``):
+    Common options are (see also ``hpv.options.help(detailed=True)``):
 
         - verbose:        default verbosity for simulations to use
         - style:          the plotting style to use
@@ -73,12 +73,12 @@ class Options(sc.objdict):
 
     **Examples**::
 
-        hp.options(dpi=150) # Larger size
-        hp.options(style='simple', font='Rosario') # Change to the "simple" hpvsim style with a custom font
-        hp.options.set(fontsize=18, show=False, backend='agg', precision=64) # Multiple changes
-        hp.options(interactive=False) # Turn off interactive plots
-        hp.options(jupyter=True) # Defaults for Jupyter
-        hp.options('defaults') # Reset to default options
+        hpv.options(dpi=150) # Larger size
+        hpv.options(style='simple', font='Rosario') # Change to the "simple" hpvsim style with a custom font
+        hpv.options.set(fontsize=18, show=False, backend='agg', precision=64) # Multiple changes
+        hpv.options(interactive=False) # Turn off interactive plots
+        hpv.options(jupyter=True) # Defaults for Jupyter
+        hpv.options('defaults') # Reset to default options
 
     '''
 
@@ -92,7 +92,7 @@ class Options(sc.objdict):
 
 
     def __call__(self, *args, **kwargs):
-        '''Allow ``hp.options(dpi=150)`` instead of ``hp.options.set(dpi=150)`` '''
+        '''Allow ``hpv.options(dpi=150)`` instead of ``hpv.options.set(dpi=150)`` '''
         return self.set(*args, **kwargs)
 
 
@@ -104,7 +104,7 @@ class Options(sc.objdict):
     def __repr__(self):
         ''' Brief representation '''
         output = sc.objectid(self)
-        output += 'hpvsim options (see also hp.options.disp()):\n'
+        output += 'hpvsim options (see also hpv.options.disp()):\n'
         output += sc.pp(self.to_dict(), output=True)
         return output
 
@@ -124,14 +124,14 @@ class Options(sc.objdict):
             self.set(**reset)
             self.delattribute('on_entry')
         except AttributeError as E:
-            errormsg = 'Please use hp.options.context() if using a with block'
+            errormsg = 'Please use hpv.options.context() if using a with block'
             raise AttributeError(errormsg) from E
         return
 
 
     def disp(self):
         ''' Detailed representation '''
-        output = 'hpvsim options (see also hp.options.help()):\n'
+        output = 'hpvsim options (see also hpv.options.help()):\n'
         keylen = 10 # Maximum key length  -- "interactive"
         for k,v in self.items():
             keystr = sc.colorize(f'  {k:>{keylen}s}: ', fg='cyan', output=True)
@@ -146,7 +146,7 @@ class Options(sc.objdict):
     def get_orig_options():
         '''
         Set the default options for hpvsim -- not to be called by the user, use
-        ``hp.options.set('defaults')`` instead.
+        ``hpv.options.set('defaults')`` instead.
         '''
 
         # Options acts like a class, but is actually an objdict for simplicity
@@ -181,7 +181,7 @@ class Options(sc.objdict):
         options.close = int(os.getenv('HPVSIM_CLOSE', False))
 
         optdesc.returnfig = 'Set whether or not to return figures from plotting functions'
-        options.returnfig = int(os.getenv('COVASIM_RETURNFIG', True))
+        options.returnfig = int(os.getenv('HPVSIM_RETURNFIG', True))
 
         optdesc.backend = 'Set the Matplotlib backend (use "agg" for non-interactive)'
         options.backend = os.getenv('HPVSIM_BACKEND', pl.get_backend())
@@ -203,7 +203,7 @@ class Options(sc.objdict):
 
     def set(self, key=None, value=None, **kwargs):
         '''
-        Actually change the style. See ``hp.options.help()`` for more information.
+        Actually change the style. See ``hpv.options.help()`` for more information.
 
         Args:
             key    (str):    the parameter to modify, or 'defaults' to reset everything to default values
@@ -212,7 +212,7 @@ class Options(sc.objdict):
 
         **Example**::
 
-            hp.options.set(dpi=50) # Equivalent to hp.options(dpi=50)
+            hpv.options.set(dpi=50) # Equivalent to hpv.options(dpi=50)
         '''
 
         reload_required = False
@@ -271,7 +271,7 @@ class Options(sc.objdict):
             if key not in self:
                 keylist = self.orig_options.keys()
                 keys = '\n'.join(keylist)
-                errormsg = f'Option "{key}" not recognized; options are "defaults" or:\n{keys}\n\nSee help(hp.options.set) for more information.'
+                errormsg = f'Option "{key}" not recognized; options are "defaults" or:\n{keys}\n\nSee help(hpv.options.set) for more information.'
                 raise sc.KeyNotFoundError(errormsg)
             else:
                 if value in [None, 'default']:
@@ -287,23 +287,23 @@ class Options(sc.objdict):
         '''
         Alias to set() for non-plotting options, for use in a "with" block.
 
-        Note: for plotting options, use ``hp.options.with_style()``, which is linked
+        Note: for plotting options, use ``hpv.options.with_style()``, which is linked
         to Matplotlib's context manager. If you set plotting options with this,
         they won't have any effect.
 
         **Examples**::
 
             # Silence all output
-            with hp.options.context(verbose=0):
-                hp.Sim().run()
+            with hpv.options.context(verbose=0):
+                hpv.Sim().run()
 
             # Convert warnings to errors
-            with hp.options.context(warnings='error'):
-                hp.Sim(location='not a location').initialize()
+            with hpv.options.context(warnings='error'):
+                hpv.Sim(location='not a location').initialize()
 
             # Use with_style(), not context(), for plotting options
-            with hp.options.with_style(dpi=50):
-                hp.Sim().run().plot()
+            with hpv.options.with_style(dpi=50):
+                hpv.Sim().run().plot()
 
         '''
 
@@ -339,10 +339,10 @@ class Options(sc.objdict):
 
         **Example**::
 
-            hp.options.help(detailed=True)
+            hpv.options.help(detailed=True)
         '''
 
-        # If not detailed, just print the docstring for hp.options
+        # If not detailed, just print the docstring for hpv.options
         if not detailed:
             print(self.__doc__)
             return
@@ -374,14 +374,14 @@ class Options(sc.objdict):
 
         sc.heading('Methods:', spacesafter=0)
         print('''
-    hp.options(key=value) -- set key to value
-    hp.options[key] -- get or set key
-    hp.options.set() -- set option(s)
-    hp.options.get_default() -- get default setting(s)
-    hp.options.load() -- load settings from file
-    hp.options.save() -- save settings to file
-    hp.options.to_dict() -- convert to dictionary
-    hp.options.style() -- create style context for plotting
+    hpv.options(key=value) -- set key to value
+    hpv.options[key] -- get or set key
+    hpv.options.set() -- set option(s)
+    hpv.options.get_default() -- get default setting(s)
+    hpv.options.load() -- load settings from file
+    hpv.options.save() -- save settings to file
+    hpv.options.to_dict() -- convert to dictionary
+    hpv.options.style() -- create style context for plotting
 ''')
 
         if output:
@@ -448,11 +448,11 @@ class Options(sc.objdict):
         Combine all Matplotlib style information, and either apply it directly
         or create a style context.
 
-        To set globally, use ``hp.options.use_style()``. Otherwise, use ``hp.options.with_style()``
+        To set globally, use ``hpv.options.use_style()``. Otherwise, use ``hpv.options.with_style()``
         as part of a ``with`` block to set the style just for that block (using
         this function outsde of a with block and with ``use=False`` has no effect, so
         don't do that!). To set non-style options (e.g. warnings, verbosity) as
-        a context, see ``hp.options.context()``.
+        a context, see ``hpv.options.context()``.
 
         Args:
             style_args (dict): a dictionary of style arguments
@@ -470,7 +470,7 @@ class Options(sc.objdict):
 
         **Examples**::
 
-            with hp.options.with_style(dpi=300): # Use default options, but higher DPI
+            with hpv.options.with_style(dpi=300): # Use default options, but higher DPI
                 pl.plot([1,3,6])
         '''
         # Handle inputs
@@ -525,7 +525,7 @@ class Options(sc.objdict):
 
         **Example**::
 
-            hp.options.use_style() # Set hpvsim options as default
+            hpv.options.use_style() # Set hpvsim options as default
             pl.figure()
             pl.plot([1,3,7])
 
@@ -540,7 +540,7 @@ def load_fonts(folder=None, rebuild=False, verbose=False, **kwargs):
     '''
     Helper function to load custom fonts for plotting -- (usually) not for the user.
 
-    Note: if fonts don't load, try running ``hp.settings.load_fonts(rebuild=True)``,
+    Note: if fonts don't load, try running ``hpv.settings.load_fonts(rebuild=True)``,
     and/or rebooting the system.
 
     Args:
