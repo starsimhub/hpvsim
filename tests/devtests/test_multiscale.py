@@ -9,11 +9,11 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats    = 5
+repeats    = 10
 parallel   = 1
 showlegend = False
 
-large_pop = 10e3
+large_pop = 2e3
 small_pop = 1e3
 ratio = large_pop/small_pop
 
@@ -99,9 +99,9 @@ class multitest(hpv.Analyzer):
         return r
         
     
-def plot_compare_multiscale(msim, fig=None, alpha=0.3):
+def plot_compare_multiscale(msim, fig=None):
     
-    def plot_single(analyzer, fig, alpha=1):
+    def plot_single(analyzer, shared, fig, alpha=1, lw=1):
         r = analyzer.df()
         
         nkinds = len(loop_pars)
@@ -123,7 +123,9 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
             title = f'{key}\n{label}'
             if key not in ['t', 'year']:
                 pl.subplot(nrows, ncols, index+offset)
-                pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, label=analyzer.label)
+                pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, lw=lw, label=analyzer.label)
+                if shared is not None: # Calculate average on the fly
+                    shared.res[key] += r.res[key] / shared.nsims
                 pl.title(title)
                 if showlegend:
                     pl.legend()
@@ -133,7 +135,9 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
             title = f'{key}\n{label}'
             if key not in ['bins']:
                 pl.subplot(nrows, ncols, index+offset)
-                pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, label=analyzer.label)
+                pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, lw=lw, label=analyzer.label)
+                if shared is not None:
+                    shared.age[key] += r.age[key] / shared.nsims
                 pl.title(title)
                 if showlegend:
                     pl.legend()
@@ -142,9 +146,14 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
         return fig
     
     fig = None
-    for sim in msim.sims:
+    shared = sc.dcp(msim.sims[0].get_analyzer())
+    shared.nsims = len(msim.sims)
+    for s,sim in enumerate(msim.sims):
         a = sim.get_analyzer()
-        fig = plot_single(analyzer=a, fig=fig, alpha=alpha)
+        loop_shared = shared if s > 0 else None
+        fig = plot_single(analyzer=a, shared=loop_shared, fig=fig, alpha=0.1, lw=1)
+    
+    fig = plot_single(analyzer=shared, shared=None, fig=fig, alpha=1.0, lw=2)
     
     sc.figlayout()
     pl.show()
