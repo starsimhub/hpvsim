@@ -1269,37 +1269,47 @@ class BasePeople(FlexPretty):
     @property
     def is_active(self):
         ''' Boolean array of everyone sexually active i.e. past debut '''
-        return (self.age>self.debut) * (self.alive) * (self.level0)
+        return ((self.age>self.debut) * (self.alive) * (self.level0)).astype(bool)
 
     @property
     def is_virgin(self):
         ''' Boolean array of everyone not yet sexually active i.e. pre debut '''
-        return (self.age<self.debut) * (self.alive)
+        return ((self.age<self.debut) * self.alive).astype(bool)
 
     @property
     def alive_inds(self):
-        ''' Boolean array of everyone alive '''
+        ''' Indices of everyone alive '''
         return self.true('alive')
+    
+    @property
+    def alive_level0_inds(self):
+        ''' Indices of everyone alive who is a level 0 agent '''
+        return (self.alive * self.level0).nonzero()[0]
 
     @property
     def n_alive(self):
         ''' Number of people alive '''
         return len(self.alive_inds)
-
+    
+    @property
+    def n_alive_level0(self):
+        ''' Number of people alive '''
+        return len(self.alive_level0_inds)
+    
     @property
     def infected(self):
         '''
         Boolean array of everyone infected. Union of infectious and inactive.
         Includes people with cancer, people with latent infections, and people with active infections
         '''
-        return self.infectious | self.inactive
+        return (self.infectious + self.inactive).astype(bool)
 
     @property
     def cin(self):
         '''
         Boolean array of everyone with dysplasia. Union of CIN1, CIN2, CIN3
         '''
-        return self.cin1 | self.cin2 | self.cin3
+        return (self.cin1 + self.cin2 + self.cin3).astype(bool)
 
     @property
     def precin(self):
@@ -1308,7 +1318,7 @@ class BasePeople(FlexPretty):
         with transient infections that will clear on their own plus those where
         dysplasia isn't established yet
         '''
-        return self.infectious & self.no_dysp
+        return (self.infectious * self.no_dysp).astype(bool)
 
     @property
     def latent(self):
@@ -1316,7 +1326,7 @@ class BasePeople(FlexPretty):
         Boolean array of everyone with latent infection. By definition, these
         people have no dysplasia and inactive infection status.
         '''
-        return self.inactive & self.no_dysp
+        return (self.inactive * self.no_dysp).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''

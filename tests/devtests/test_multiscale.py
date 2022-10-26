@@ -11,7 +11,6 @@ T = sc.timer()
 
 repeats    = 10
 parallel   = 1
-showlegend = False
 
 large_pop = 10e3
 small_pop = 1e3
@@ -138,8 +137,6 @@ def plot_compare_multiscale(msim, fig=None):
                 if shared is not None and not first: # Calculate average on the fly
                     sh.res[key] += r.res[key]
                 pl.title(title)
-                if showlegend:
-                    pl.legend()
                 index += nkinds
         
         for i, key in enumerate(r.age.columns):
@@ -150,8 +147,6 @@ def plot_compare_multiscale(msim, fig=None):
                 if shared is not None and not first:
                     sh.age[key] += r.age[key]
                 pl.title(title)
-                if showlegend:
-                    pl.legend()
                 index += nkinds
         
         return fig

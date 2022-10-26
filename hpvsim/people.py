@@ -323,25 +323,25 @@ class People(hpb.BasePeople):
                 # if n_new_agents > 10*len(cancer_inds):
                 #     import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
                 
-                # # Create the new agents and assign them the same properties as the existing agents
-                # new_inds = self._grow(n_new_agents)
-                # for state in self.meta.all_states:
-                #     if state.ndim == 1:
-                #         self[state.name][new_inds] = self[state.name][extra_source_inds]
-                #     elif state.ndim == 2:
-                #         self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
+                # Create the new agents and assign them the same properties as the existing agents
+                new_inds = self._grow(n_new_agents)
+                for state in self.meta.all_states:
+                    if state.ndim == 1:
+                        self[state.name][new_inds] = self[state.name][extra_source_inds]
+                    elif state.ndim == 2:
+                        self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
 
-                # # Reset the states for the new agents
-                # self.level0[new_inds] = False
-                # self.level1[new_inds] = True
-                # self.scale[new_inds] = 0#cancer_scale
+                # Reset the states for the new agents
+                self.level0[new_inds] = False
+                self.level1[new_inds] = True
+                self.scale[new_inds] = 0#cancer_scale
                 
-                # # Sneakily add the new indices onto the existing vectors
-                # inds = np.append(inds, new_inds)
-                # new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
-                # new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
-                # peak_dysp     = np.append(peak_dysp, new_peak_dysp)
-                # prog_rate     = np.append(prog_rate, new_prog_rate)
+                # Sneakily add the new indices onto the existing vectors
+                inds = np.append(inds, new_inds)
+                new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
+                new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
+                peak_dysp     = np.append(peak_dysp, new_peak_dysp)
+                prog_rate     = np.append(prog_rate, new_prog_rate)
             
         # Now check indices, including with our new cancer agents
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
@@ -678,7 +678,7 @@ class People(hpb.BasePeople):
 
         if new_births is None:
             this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1], smoothness=0)[0]/1e3
-            new_births = sc.randround(this_birth_rate*self.n_alive) # Crude births per 1000
+            new_births = sc.randround(this_birth_rate*self.n_alive_level0) # Crude births per 1000
 
         if new_births>0:
             # Generate other characteristics of the new people
@@ -724,7 +724,7 @@ class People(hpb.BasePeople):
             # Do basic calculations
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
-            alive_inds = hpu.true(self.alive)
+            alive_inds = hpu.true(self.alive_level0)
             n_alive = len(alive_inds) # Actual number of alive agents
             expected = np.interp(year, data_years, data_pop)*scale
             n_migrate = int(expected - n_alive)
