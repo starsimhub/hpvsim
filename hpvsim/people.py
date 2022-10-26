@@ -298,6 +298,7 @@ class People(hpb.BasePeople):
         ccut = self.pars['clinical_cutoffs']
         peak_dysp = dysp_arrs.peak_dysp[:,0] # Everything beyond 0 is multiscale agents
         prog_rate = dysp_arrs.prog_rate[:,0]
+        dur_dysp  = dysp_arrs.dur_dysp[:,0]
 
         # Handle multiscale to create additional cancer agents
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
@@ -340,8 +341,10 @@ class People(hpb.BasePeople):
                 inds = np.append(inds, new_inds)
                 new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
                 new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
+                new_dur_dysp  = dysp_arrs.dur_dysp[:,1:][extra_cancer_bools]
                 peak_dysp     = np.append(peak_dysp, new_peak_dysp)
                 prog_rate     = np.append(prog_rate, new_prog_rate)
+                dur_dysp      = np.append(dur_dysp,  new_dur_dysp)
             
         # Now check indices, including with our new cancer agents
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
@@ -351,15 +354,18 @@ class People(hpb.BasePeople):
         cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
         cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
         cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
-        max_cin1_inds = inds[is_cin1 & ~is_cin2]  # Indices of those who don't progress beyond CIN1
-        max_cin2_inds = inds[is_cin2 & ~is_cin3]  # Indices of those who don't progress beyond CIN2
-        max_cin3_inds = inds[is_cin3 & ~is_cancer]  # Indices of those who don't progress beyond CIN3
+        max_cin1_bools = is_cin1 * ~is_cin2   # Boolean of those who don't progress beyond CIN1
+        max_cin2_bools = is_cin2 * ~is_cin3   # Boolean of those who don't progress beyond CIN2
+        max_cin3_bools = is_cin3 * ~is_cancer # Boolean of those who don't progress beyond CIN3
+        max_cin1_inds = inds[max_cin1_bools]  # Indices of those who don't progress beyond CIN1
+        max_cin2_inds = inds[max_cin2_bools]  # Indices of those who don't progress beyond CIN2
+        max_cin3_inds = inds[max_cin3_bools]  # Indices of those who don't progress beyond CIN3
 
         # Determine whether CIN1 clears or progresses to CIN2
         self.date_cin2[g, cin2_inds] = np.fmax(self.t, # Don't let people progress to CIN2 prior to the current timestep
                                                self.date_cin1[g, cin2_inds] +
                                                sc.randround(hpu.invlogf1(ccut['cin1'], prog_rate[is_cin2]) / dt))
-        time_to_clear_cin1 = self.dur_dysp[g,max_cin1_inds]
+        time_to_clear_cin1 = dur_dysp[max_cin1_bools]
         self.date_clearance[g, max_cin1_inds] = np.fmax(self.date_clearance[g, max_cin1_inds],
                                                         self.date_cin1[g, max_cin1_inds] +
                                                         sc.randround(time_to_clear_cin1 / dt))
@@ -370,7 +376,7 @@ class People(hpb.BasePeople):
                                                sc.randround(hpu.invlogf1(ccut['cin2'], prog_rate[is_cin3]) / dt))
 
         # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
-        time_to_clear_cin2 = self.dur_dysp[g,max_cin2_inds] - (self.date_cin2[g, max_cin2_inds] - self.date_cin1[g, max_cin2_inds]) * self.pars['dt']
+        time_to_clear_cin2 = dur_dysp[max_cin2_bools] - (self.date_cin2[g, max_cin2_inds] - self.date_cin1[g, max_cin2_inds]) * self.pars['dt']
         self.date_clearance[g, max_cin2_inds] = np.fmax(self.date_clearance[g, max_cin2_inds],
                                                         self.date_cin2[g, max_cin2_inds] +
                                                         sc.randround(time_to_clear_cin2 / dt))
@@ -381,7 +387,7 @@ class People(hpb.BasePeople):
                                                       sc.randround(hpu.invlogf1(ccut['cin3'], prog_rate[is_cancer]) / dt))
 
         # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
-        time_to_clear_cin3 = self.dur_dysp[g, max_cin3_inds] - (self.date_cin3[g, max_cin3_inds] - self.date_cin1[g, max_cin3_inds]) * self.pars['dt']
+        time_to_clear_cin3 = dur_dysp[max_cin3_bools] - (self.date_cin3[g, max_cin3_inds] - self.date_cin1[g, max_cin3_inds]) * self.pars['dt']
         self.date_clearance[g, max_cin3_inds] = np.fmax(self.date_clearance[g, max_cin3_inds],
                                                         self.date_cin3[g, max_cin3_inds] +
                                                         sc.randround(time_to_clear_cin3 / dt))
