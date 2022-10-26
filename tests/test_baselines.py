@@ -23,22 +23,24 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     '''
 
     # Define some interventions
-    screen      = hpv.routine_screening(start_year=2020, prob=0.1, product='via', label='screen')
+    prob = 0.02
+    screen      = hpv.routine_screening(start_year=2040, prob=prob, product='via', label='screen')
     to_triage   = lambda sim: sim.get_intervention('screen').outcomes['positive']
-    triage      = hpv.routine_triage(eligibility=to_triage, prob=1.0, product='via_triage', label='triage')
+    triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product='via_triage', label='triage')
     to_treat    = lambda sim: sim.get_intervention('triage').outcomes['positive']
-    assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=1.0, product='tx_assigner', label='assign_tx')
+    assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product='tx_assigner', label='assign_tx')
     to_ablate   = lambda sim: sim.get_intervention('assign_tx').outcomes['ablation']
-    ablation    = hpv.treat_num(eligibility=to_ablate, prob=0.5, product='ablation')
+    ablation    = hpv.treat_num(eligibility=to_ablate, prob=prob, product='ablation')
     to_excise   = lambda sim: sim.get_intervention('assign_tx').outcomes['excision']
-    excision    = hpv.treat_delay(eligibility=to_excise, prob=0.5, product='excision')
-    vx          = hpv.routine_vx(prob=0.8, start_year=2020, product='bivalent')
-    txvx        = hpv.routine_txvx(prob=0.8, start_year=2030, product='txvx1')
+    excision    = hpv.treat_delay(eligibility=to_excise, prob=prob, product='excision')
+    vx          = hpv.routine_vx(prob=prob, start_year=2020, product='bivalent')
+    txvx        = hpv.routine_txvx(prob=prob, start_year=2040, product='txvx1')
 
 
     # Define the parameters
     pars = dict(
-        n_agents      = 20e3,       # Population size
+        n_agents      = 10e3,       # Population size
+        start         = 2000,       # Starting year
         n_years       = 40,         # Number of years to simulate
         verbose       = 0,          # Don't print details of the run
         rand_seed     = 2,          # Set a non-default seed
@@ -164,6 +166,8 @@ def test_benchmark(do_save=do_save, repeats=1, verbose=True):
                 'n_agents': sim['n_agents'],
                 'n_genotypes': sim['n_genotypes'],
                 'n_years':   sim['n_years'],
+                'n_interventions': len(sim['interventions']),
+                'n_analyzers': len(sim['analyzers']),
                 },
             'cpu_performance': ratio,
             }
@@ -195,7 +199,7 @@ if __name__ == '__main__':
     hpv.options.set(interactive=do_plot)
     T = sc.tic()
 
-    json = test_benchmark(do_save=do_save, repeats=5) # Run this first so benchmarking is available even if results are different
+    # json = test_benchmark(do_save=do_save, repeats=5) # Run this first so benchmarking is available even if results are different
     new  = test_baseline()
     make_sim(do_plot=do_plot)
 

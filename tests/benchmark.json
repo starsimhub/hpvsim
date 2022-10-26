@@ -1,12 +1,14 @@
 {
   "time": {
-    "initialize": 0.016,
-    "run": 7.593
+    "initialize": 0.011,
+    "run": 1.703
   },
   "parameters": {
-    "n_agents": 20000,
+    "n_agents": 10000,
     "n_genotypes": 2,
-    "n_years": 40
+    "n_years": 40,
+    "n_interventions": 7,
+    "n_analyzers": 0
   },
-  "cpu_performance": 0.8556588481317073
+  "cpu_performance": 0.955219121308027
 }
