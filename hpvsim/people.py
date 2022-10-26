@@ -348,7 +348,6 @@ class People(hpb.BasePeople):
         is_cin2 = peak_dysp > ccut['cin1']
         is_cin3 = peak_dysp > ccut['cin2']
         is_cancer = peak_dysp > ccut['cin3']
-        cin1_inds = inds[is_cin1]  # Indices of those progress at least to CIN2
         cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
         cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
         cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
@@ -360,7 +359,7 @@ class People(hpb.BasePeople):
         self.date_cin2[g, cin2_inds] = np.fmax(self.t, # Don't let people progress to CIN2 prior to the current timestep
                                                self.date_cin1[g, cin2_inds] +
                                                sc.randround(hpu.invlogf1(ccut['cin1'], prog_rate[is_cin2]) / dt))
-        time_to_clear_cin1 = hpu.sample(**self.pars['dur_cin1_clear'], size=len(max_cin1_inds))
+        time_to_clear_cin1 = self.dur_dysp[g,max_cin1_inds]
         self.date_clearance[g, max_cin1_inds] = np.fmax(self.date_clearance[g, max_cin1_inds],
                                                         self.date_cin1[g, max_cin1_inds] +
                                                         sc.randround(time_to_clear_cin1 / dt))
@@ -369,7 +368,9 @@ class People(hpb.BasePeople):
         self.date_cin3[g, cin3_inds] = np.fmax(self.t, # Don't let people progress to CIN3 prior to the current timestep
                                                self.date_cin1[g, cin3_inds] +
                                                sc.randround(hpu.invlogf1(ccut['cin2'], prog_rate[is_cin3]) / dt))
-        time_to_clear_cin2 = hpu.sample(**self.pars['dur_cin2_clear'], size=len(max_cin2_inds))
+
+        # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
+        time_to_clear_cin2 = self.dur_dysp[g,max_cin2_inds] - (self.date_cin2[g, max_cin2_inds] - self.date_cin1[g, max_cin2_inds]) * self.pars['dt']
         self.date_clearance[g, max_cin2_inds] = np.fmax(self.date_clearance[g, max_cin2_inds],
                                                         self.date_cin2[g, max_cin2_inds] +
                                                         sc.randround(time_to_clear_cin2 / dt))
@@ -378,7 +379,9 @@ class People(hpb.BasePeople):
         self.date_cancerous[g, cancer_inds] = np.fmax(self.t,
                                                       self.date_cin1[g, cancer_inds] +
                                                       sc.randround(hpu.invlogf1(ccut['cin3'], prog_rate[is_cancer]) / dt))
-        time_to_clear_cin3 = hpu.sample(**self.pars['dur_cin3_clear'], size=len(max_cin3_inds))
+
+        # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
+        time_to_clear_cin3 = self.dur_dysp[g, max_cin3_inds] - (self.date_cin3[g, max_cin3_inds] - self.date_cin1[g, max_cin3_inds]) * self.pars['dt']
         self.date_clearance[g, max_cin3_inds] = np.fmax(self.date_clearance[g, max_cin3_inds],
                                                         self.date_cin3[g, max_cin3_inds] +
                                                         sc.randround(time_to_clear_cin3 / dt))
