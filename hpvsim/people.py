@@ -319,10 +319,6 @@ class People(hpb.BasePeople):
                         extra_source_lists.append([ii]*count) # Duplicate the curret index count times
                 extra_source_inds = np.concatenate(extra_source_lists).flatten() # Assemble the sources for these new agents
                 n_new_agents = len(extra_source_inds) # The same as above, *unless* a cancer agent tried to spawn more cancer agents
-                # print('foo', self.t, n_new_agents, extra_source_inds)
-                # print('foo', len(cancer_inds), n_new_agents)
-                # if n_new_agents > 10*len(cancer_inds):
-                #     import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
                 
                 # Create the new agents and assign them the same properties as the existing agents
                 new_inds = self._grow(n_new_agents)
