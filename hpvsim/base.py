@@ -1282,9 +1282,14 @@ class BasePeople(FlexPretty):
         return self.true('alive')
     
     @property
+    def alive_level0(self):
+        ''' Indices of everyone alive who is a level 0 agent '''
+        return (self.alive * self.level0).astype(bool)
+
+    @property
     def alive_level0_inds(self):
         ''' Indices of everyone alive who is a level 0 agent '''
-        return (self.alive * self.level0).nonzero()[0]
+        return self.alive_level0.nonzero()[0]
 
     @property
     def n_alive(self):
