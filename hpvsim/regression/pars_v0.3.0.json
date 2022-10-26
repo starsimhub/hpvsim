@@ -1380,21 +1380,6 @@
   "vaccine_map": {},
   "screen_pars": {},
   "treat_pars": {},
-  "dur_cin1_clear": {
-    "dist": "lognormal",
-    "par1": 0.5,
-    "par2": 0.5
-  },
-  "dur_cin2_clear": {
-    "dist": "lognormal",
-    "par1": 1.0,
-    "par2": 0.5
-  },
-  "dur_cin3_clear": {
-    "dist": "lognormal",
-    "par1": 1.5,
-    "par2": 0.5
-  },
   "dur_cancer": {
     "dist": "lognormal",
     "par1": 12.0,
