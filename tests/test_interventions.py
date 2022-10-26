@@ -318,8 +318,6 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
         label = 'campaign txvx'
     )
 
-
-
     second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
     campaign_txvx_dose2 = hpv.campaign_txvx(
         prob = 0.7,
