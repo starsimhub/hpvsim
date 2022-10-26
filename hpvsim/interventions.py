@@ -960,7 +960,7 @@ class BaseTreatment(Intervention):
         in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
         alive           = sim.people.alive
         nocancer        = ~sim.people.cancerous.any(axis=0)
-        conditions      = (females & in_age_range & alive & nocancer)
+        conditions      = (females * in_age_range * alive * nocancer)
         return conditions
 
     def get_accept_inds(self, sim):

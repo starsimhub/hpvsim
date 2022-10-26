@@ -9,20 +9,19 @@ import hpvsim as hpv
 
 T = sc.timer()
 
-repeats = 10
-parallel = True
-showlegend = False
+repeats    = 10
+parallel   = 1
 
 large_pop = 10e3
 small_pop = 1e3
 ratio = large_pop/small_pop
+offset = 100
 
 pars = dict(
     total_pop      = large_pop,
-    ms_agent_ratio = ratio,
+    ms_agent_ratio = 10,
     start          = 1975,
     n_years        = 50,
-    burnin         = 25,
     genotypes      = [16,18],
     verbose        = -1,
 )
@@ -100,9 +99,9 @@ class multitest(hpv.Analyzer):
         return r
         
     
-def plot_compare_multiscale(msim, fig=None, alpha=0.3):
+def plot_compare_multiscale(msim, fig=None):
     
-    def plot_single(analyzer, fig, alpha=1):
+    def plot_single(analyzer, shared=None, fig=None, alpha=1, lw=1, factor=1):
         r = analyzer.df()
         
         nkinds = len(loop_pars)
@@ -118,34 +117,48 @@ def plot_compare_multiscale(msim, fig=None, alpha=0.3):
         index = 0
         label = ['default', 'multiscale'][ms_bool]
         label += f' (n={analyzer.n_agents})'
-        color = ['b','r'][ms_bool]
+        color = ['k','seagreen'][ms_bool]
         offset = 1 + 2*agent_bool + ms_bool
+        
+        # Handle shared
+        if isinstance(shared, dict):
+            if label in shared:
+                first = False
+            else:
+                first = True
+                shared[label] = sc.dcp(analyzer)
+            sh = shared[label]
+            
         for i, key in enumerate(r.res.columns):
             title = f'{key}\n{label}'
             if key not in ['t', 'year']:
                 pl.subplot(nrows, ncols, index+offset)
-                pl.plot(r.res.year, r.res[key], color=color, alpha=alpha, label=analyzer.label)
+                pl.plot(r.res.year, r.res[key]*factor, color=color, alpha=alpha, lw=lw, label=analyzer.label)
+                if shared is not None and not first: # Calculate average on the fly
+                    sh.res[key] += r.res[key]
                 pl.title(title)
-                if showlegend:
-                    pl.legend()
                 index += nkinds
         
         for i, key in enumerate(r.age.columns):
             title = f'{key}\n{label}'
             if key not in ['bins']:
                 pl.subplot(nrows, ncols, index+offset)
-                pl.plot(r.age.bins, r.age[key], color=color, alpha=alpha, label=analyzer.label)
+                pl.plot(r.age.bins, r.age[key]*factor, color=color, alpha=alpha, lw=lw, label=analyzer.label)
+                if shared is not None and not first:
+                    sh.age[key] += r.age[key]
                 pl.title(title)
-                if showlegend:
-                    pl.legend()
                 index += nkinds
         
         return fig
     
     fig = None
-    for sim in msim.sims:
+    shared = sc.objdict()
+    for s,sim in enumerate(msim.sims):
         a = sim.get_analyzer()
-        fig = plot_single(analyzer=a, fig=fig, alpha=alpha)
+        fig = plot_single(analyzer=a, shared=shared, fig=fig, alpha=0.2, lw=1)
+    
+    for sh in shared.values():
+        fig = plot_single(analyzer=sh, shared=None, fig=fig, alpha=1.0, lw=2, factor=1/repeats)
     
     sc.figlayout()
     pl.show()
@@ -159,7 +172,7 @@ for p in loop_pars:
     for r in range(repeats):
         label = ['default', 'multiscale'][p.use_multiscale]
         label += f'{r}'
-        simpars = dict(**p, rand_seed=r, label=label, analyzers=multitest())
+        simpars = dict(**p, rand_seed=r+offset, label=label, analyzers=multitest())
         sim = hpv.Sim(pars, **simpars)
         sims += sim
     msims += hpv.MultiSim(sims)

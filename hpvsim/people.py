@@ -298,38 +298,49 @@ class People(hpb.BasePeople):
         ccut = self.pars['clinical_cutoffs']
         peak_dysp = dysp_arrs.peak_dysp[:,0] # Everything beyond 0 is multiscale agents
         prog_rate = dysp_arrs.prog_rate[:,0]
+        dur_dysp  = dysp_arrs.dur_dysp[:,0]
 
         # Handle multiscale to create additional cancer agents
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
+        cancer_scale = self.pars['pop_scale'] / n_extra
         if self.pars['use_multiscale'] and n_extra  > 1:
-            errormsg = 'Multiscale is not yet ready'
-            raise NotImplementedError(errormsg)
-            # self.scale[inds] /= n_extra # Shrink the weight of the original agents, but otherwise leave them the same
-            # extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
-            # extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
-            # extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
-            # n_new_agents = extra_cancer_counts.sum() # Total number of new agents
-            # if n_new_agents: # If we have more than 0, proceed
-            #     extra_source_inds = np.concatenate([[inds[i]]*count for i,count in enumerate(extra_cancer_counts) if count]).flatten() # Find the sources for these new agents
+            cancer_inds = inds[peak_dysp > ccut['cin3']] # Duplicated below, but avoids need to append extra arrays
+            self.scale[cancer_inds] = cancer_scale # Shrink the weight of the original agents, but otherwise leave them the same
+            extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
+            extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
+            extra_cancer_bools *= self.level0[inds, None] # Don't allow existing cancer agents to make more cancer agents
+            extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
+            n_new_agents = extra_cancer_counts.sum() # Total number of new agents
+            if n_new_agents: # If we have more than 0, proceed
+                extra_source_lists = []
+                for i,count in enumerate(extra_cancer_counts):
+                    ii = inds[i]
+                    if count: # At least 1 new cancer agent, plus person is not already a cancer agent
+                        extra_source_lists.append([ii]*count) # Duplicate the curret index count times
+                extra_source_inds = np.concatenate(extra_source_lists).flatten() # Assemble the sources for these new agents
+                n_new_agents = len(extra_source_inds) # The same as above, *unless* a cancer agent tried to spawn more cancer agents
                 
-            #     # Create the new agents and assign them the same properties as the existing agents
-            #     new_inds = self._grow(n_new_agents)
-            #     for state in self.meta.all_states:
-            #         if state.ndim == 1:
-            #             self[state.name][new_inds] = self[state.name][extra_source_inds]
-            #         elif state.ndim == 2:
-            #             self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
+                # Create the new agents and assign them the same properties as the existing agents
+                new_inds = self._grow(n_new_agents)
+                for state in self.meta.all_states:
+                    if state.ndim == 1:
+                        self[state.name][new_inds] = self[state.name][extra_source_inds]
+                    elif state.ndim == 2:
+                        self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
 
-            #     # Reset the level for the agents
-            #     self.level0[new_inds] = False
-            #     self.level1[new_inds] = True
+                # Reset the states for the new agents
+                self.level0[new_inds] = False
+                self.level1[new_inds] = True
+                self.scale[new_inds] = cancer_scale
                 
-            #     # Sneakily add the new indices onto the existing vectors
-            #     inds = np.append(inds, new_inds)
-            #     new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
-            #     new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
-            #     peak_dysp     = np.append(peak_dysp, new_peak_dysp)
-            #     prog_rate     = np.append(prog_rate, new_prog_rate)
+                # Sneakily add the new indices onto the existing vectors
+                inds = np.append(inds, new_inds)
+                new_peak_dysp = extra_peak_dysp[extra_cancer_bools]
+                new_prog_rate = dysp_arrs.prog_rate[:,1:][extra_cancer_bools]
+                new_dur_dysp  = dysp_arrs.dur_dysp[:,1:][extra_cancer_bools]
+                peak_dysp     = np.append(peak_dysp, new_peak_dysp)
+                prog_rate     = np.append(prog_rate, new_prog_rate)
+                dur_dysp      = np.append(dur_dysp,  new_dur_dysp)
             
         # Now check indices, including with our new cancer agents
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
@@ -339,15 +350,18 @@ class People(hpb.BasePeople):
         cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
         cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
         cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
-        max_cin1_inds = inds[is_cin1 & ~is_cin2]  # Indices of those who don't progress beyond CIN1
-        max_cin2_inds = inds[is_cin2 & ~is_cin3]  # Indices of those who don't progress beyond CIN2
-        max_cin3_inds = inds[is_cin3 & ~is_cancer]  # Indices of those who don't progress beyond CIN3
+        max_cin1_bools = is_cin1 * ~is_cin2   # Boolean of those who don't progress beyond CIN1
+        max_cin2_bools = is_cin2 * ~is_cin3   # Boolean of those who don't progress beyond CIN2
+        max_cin3_bools = is_cin3 * ~is_cancer # Boolean of those who don't progress beyond CIN3
+        max_cin1_inds = inds[max_cin1_bools]  # Indices of those who don't progress beyond CIN1
+        max_cin2_inds = inds[max_cin2_bools]  # Indices of those who don't progress beyond CIN2
+        max_cin3_inds = inds[max_cin3_bools]  # Indices of those who don't progress beyond CIN3
 
         # Determine whether CIN1 clears or progresses to CIN2
         self.date_cin2[g, cin2_inds] = np.fmax(self.t, # Don't let people progress to CIN2 prior to the current timestep
                                                self.date_cin1[g, cin2_inds] +
                                                sc.randround(hpu.invlogf1(ccut['cin1'], prog_rate[is_cin2]) / dt))
-        time_to_clear_cin1 = self.dur_dysp[g,max_cin1_inds]
+        time_to_clear_cin1 = dur_dysp[max_cin1_bools]
         self.date_clearance[g, max_cin1_inds] = np.fmax(self.date_clearance[g, max_cin1_inds],
                                                         self.date_cin1[g, max_cin1_inds] +
                                                         sc.randround(time_to_clear_cin1 / dt))
@@ -358,7 +372,7 @@ class People(hpb.BasePeople):
                                                sc.randround(hpu.invlogf1(ccut['cin2'], prog_rate[is_cin3]) / dt))
 
         # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
-        time_to_clear_cin2 = self.dur_dysp[g,max_cin2_inds] - (self.date_cin2[g, max_cin2_inds] - self.date_cin1[g, max_cin2_inds]) * self.pars['dt']
+        time_to_clear_cin2 = dur_dysp[max_cin2_bools] - (self.date_cin2[g, max_cin2_inds] - self.date_cin1[g, max_cin2_inds]) * self.pars['dt']
         self.date_clearance[g, max_cin2_inds] = np.fmax(self.date_clearance[g, max_cin2_inds],
                                                         self.date_cin2[g, max_cin2_inds] +
                                                         sc.randround(time_to_clear_cin2 / dt))
@@ -369,7 +383,7 @@ class People(hpb.BasePeople):
                                                       sc.randround(hpu.invlogf1(ccut['cin3'], prog_rate[is_cancer]) / dt))
 
         # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
-        time_to_clear_cin3 = self.dur_dysp[g, max_cin3_inds] - (self.date_cin3[g, max_cin3_inds] - self.date_cin1[g, max_cin3_inds]) * self.pars['dt']
+        time_to_clear_cin3 = dur_dysp[max_cin3_bools] - (self.date_cin3[g, max_cin3_inds] - self.date_cin1[g, max_cin3_inds]) * self.pars['dt']
         self.date_clearance[g, max_cin3_inds] = np.fmax(self.date_clearance[g, max_cin3_inds],
                                                         self.date_cin3[g, max_cin3_inds] +
                                                         sc.randround(time_to_clear_cin3 / dt))
@@ -412,7 +426,7 @@ class People(hpb.BasePeople):
 
         for lno,lkey in enumerate(self.layer_keys()):
             layer = self.contacts[lkey]
-            to_dissolve = (~self['alive'][layer['m']]) | (~self['alive'][layer['f']]) | ( (self.t*self.pars['dt']) > layer['end'])
+            to_dissolve = (~self['alive'][layer['m']]) + (~self['alive'][layer['f']]) + ( (self.t*self.pars['dt']) > layer['end']).astype(bool)
             dissolved = layer.pop_inds(to_dissolve) # Remove them from the contacts list
 
             # Update current number of partners
@@ -669,7 +683,7 @@ class People(hpb.BasePeople):
 
         if new_births is None:
             this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1], smoothness=0)[0]/1e3
-            new_births = sc.randround(this_birth_rate*self.n_alive) # Crude births per 1000
+            new_births = sc.randround(this_birth_rate*self.n_alive_level0) # Crude births per 1000
 
         if new_births>0:
             # Generate other characteristics of the new people
@@ -715,7 +729,7 @@ class People(hpb.BasePeople):
             # Do basic calculations
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
-            alive_inds = hpu.true(self.alive)
+            alive_inds = hpu.true(self.alive_level0)
             n_alive = len(alive_inds) # Actual number of alive agents
             expected = np.interp(year, data_years, data_pop)*scale
             n_migrate = int(expected - n_alive)
