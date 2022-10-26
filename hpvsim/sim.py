@@ -402,7 +402,7 @@ class Sim(hpb.BaseSim):
         for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
             for flow in hpd.flows:
                 if (flow.by_genotype and lkey=='') or lkey=='total_':
-                    results[f'{lkey + flow.name}'] = init_res(f'{llab} {flow.label}', color=flow.cmap(cstride), n_rows=g)
+                    results[f'{lkey + flow.name}'] = init_res(f'{(llab + flow.label).capitalize()}', color=flow.cmap(cstride), n_rows=g)
 
         # Create stocks
         for llabel,cstride,g in zip(['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
@@ -684,12 +684,11 @@ class Sim(hpb.BaseSim):
         hiv_rel_sus[hiv_inds] *= mod
 
         # Calculate relative transmissibility by stage of infection
-        rel_trans_pars = self['rel_trans']
         rel_trans = people.infectious[:].astype(hpd.default_float)
-        rel_trans[people.cin1] *= rel_trans_pars['cin1']
-        rel_trans[people.cin2] *= rel_trans_pars['cin2']
-        rel_trans[people.cin3] *= rel_trans_pars['cin3']
-        rel_trans[people.cancerous] *= rel_trans_pars['cancerous']
+        rel_trans[people.cin1] *= self['rel_trans_cin1']
+        rel_trans[people.cin2] *= self['rel_trans_cin2']
+        rel_trans[people.cin3] *= self['rel_trans_cin3']
+        rel_trans[people.cancerous] *= self['rel_trans_cancerous']
 
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
 

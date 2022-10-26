@@ -22,13 +22,30 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     plot the sim by default.
     '''
 
+    # Define some interventions
+    prob = 0.02
+    screen      = hpv.routine_screening(start_year=2040, prob=prob, product='via', label='screen')
+    to_triage   = lambda sim: sim.get_intervention('screen').outcomes['positive']
+    triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product='via_triage', label='triage')
+    to_treat    = lambda sim: sim.get_intervention('triage').outcomes['positive']
+    assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product='tx_assigner', label='assign_tx')
+    to_ablate   = lambda sim: sim.get_intervention('assign_tx').outcomes['ablation']
+    ablation    = hpv.treat_num(eligibility=to_ablate, prob=prob, product='ablation')
+    to_excise   = lambda sim: sim.get_intervention('assign_tx').outcomes['excision']
+    excision    = hpv.treat_delay(eligibility=to_excise, prob=prob, product='excision')
+    vx          = hpv.routine_vx(prob=prob, start_year=2020, age_range=[9,10], product='bivalent')
+    txvx        = hpv.routine_txvx(prob=prob, start_year=2040, product='txvx1')
+
+
     # Define the parameters
     pars = dict(
-        n_agents      = 20e3,       # Population size
+        n_agents      = 10e3,       # Population size
+        start         = 2000,       # Starting year
         n_years       = 40,         # Number of years to simulate
         verbose       = 0,          # Don't print details of the run
         rand_seed     = 2,          # Set a non-default seed
         genotypes     = [16, 18],   # Include the two genotypes of greatest general interest
+        interventions = [screen, triage, assign_tx, ablation, excision, vx, txvx],  # Include the most common interventions
     )
 
     # Create the sim
@@ -149,6 +166,8 @@ def test_benchmark(do_save=do_save, repeats=1, verbose=True):
                 'n_agents': sim['n_agents'],
                 'n_genotypes': sim['n_genotypes'],
                 'n_years':   sim['n_years'],
+                'n_interventions': len(sim['interventions']),
+                'n_analyzers': len(sim['analyzers']),
                 },
             'cpu_performance': ratio,
             }

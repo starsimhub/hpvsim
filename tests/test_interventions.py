@@ -25,16 +25,132 @@ base_pars = {
 
 #%% Define the tests
 
-def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
-    sc.heading('Test new intervention implementation')
+def test_screen_prob():
+    sc.heading('Test that screening selects the right number of people')
+
+    target_lifetime_prob = 0.6
+    target_triage = 0.8
+    target_ablation = 0.7
+    target_excision = 0.6
+    age_range = [30, 50]
+    len_age_range = age_range[1]-age_range[0]
+    model_annual_prob = 1 - (1 - target_lifetime_prob)**(1/len_age_range)
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) # Only model a single lifetime screen
+    tolerance = 0.05 #  Allow it to be off by 5%
+
+    screen = hpv.routine_screening(
+        product='via',  # pass in string or product
+        prob=model_annual_prob,  # This looks like it means that we screen 50% of the population each year
+        eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
+        age_range=age_range,
+        start_year=2000,
+        label='screen'
+    )
+
+    to_triage = lambda sim: sim.get_intervention('screen').outcomes['positive']
+    triage = hpv.routine_triage(
+        product='via_triage',  # pass in string or product
+        prob=target_triage,
+        annual_prob=False,
+        eligibility=to_triage,  # pass in valid state of People OR indices OR callable that gets indices
+        label='triage'
+    )
+
+    to_treat = lambda sim: sim.get_intervention('triage').outcomes['positive']
+    assign_tx = hpv.routine_triage(
+        product='tx_assigner',  # pass in string or product
+        prob=target_triage,
+        annual_prob=False,
+        eligibility=to_treat,
+        label='assign_tx'
+    )
+
+    to_ablate = lambda sim: sim.get_intervention('assign_tx').outcomes['ablation']
+    ablation = hpv.treat_num(
+        product='ablation',  # pass in string or product
+        prob=target_ablation,
+        annual_prob=False,
+        eligibility=to_ablate,
+        label='ablation'
+    )
+
+    to_excise = lambda sim: sim.get_intervention('assign_tx').outcomes['excision']
+    excision = hpv.treat_delay(
+        product='excision',  # pass in string or product
+        prob=target_excision,
+        annual_prob=False,
+        eligibility=to_excise,
+        label='excision'
+    )
+
+    # Check that the right number of people are getting screened, triaged, and treated
+    class intv_counter(hpv.Analyzer):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.n_screened = []
+            self.n_screened_pos = []
+            self.n_triaged = []
+            self.n_triaged_pos = []
+            self.n_assigned_tx = []
+            self.n_assigned_ablation = []
+            self.n_assigned_excision = []
+            self.n_ablation = []
+            self.n_excision = []
+
+        def initialize(self, sim):
+            super().initialize()
+            self.yearvec = sim.yearvec
+
+        def apply(self, sim):
+            self.n_screened.append(sum([len(v) for v in sim.get_intervention('screen').outcomes.values()]))
+            self.n_screened_pos.append(len(sim.get_intervention('screen').outcomes['positive']))
+            self.n_triaged.append(sum([len(v) for v in sim.get_intervention('triage').outcomes.values()]))
+            self.n_triaged_pos.append(len(sim.get_intervention('triage').outcomes['positive']))
+            self.n_assigned_tx.append(sum([len(v) for v in sim.get_intervention('assign_tx').outcomes.values()]))
+            self.n_assigned_ablation.append(len(sim.get_intervention('assign_tx').outcomes['ablation']))
+            self.n_assigned_excision.append(len(sim.get_intervention('assign_tx').outcomes['excision']))
+            self.n_ablation.append(sum([len(v) for v in sim.get_intervention('ablation').outcomes.values()]))
+            self.n_excision.append(sum([len(v) for v in sim.get_intervention('excision').outcomes.values()]))
+
+        def finalize(self, sim=None):
+            for att in ['n_screened','n_screened_pos','n_triaged','n_triaged_pos','n_assigned_tx',
+                        'n_assigned_ablation','n_assigned_excision',
+                        'n_ablation','n_excision',]:
+                setattr(self,att,sc.promotetoarray(getattr(self,att)))
+
+    sim = hpv.Sim(pars=base_pars, interventions=[screen, triage, assign_tx, ablation, excision], analyzers=[intv_counter()])
+    sim.run(verbose=0)
+
+    # Check that the right number of people are getting screened
+    n_eligible = len(hpv.true((sim.people.age >= 50) & (sim.people.age <= 70) & (sim.people.is_female) ))
+    n_screened = len(hpv.true((sim.people.age >= 50) & (sim.people.age <= 70) & (sim.people.is_female) & (sim.people.screened)))
+    print(f'Proportion screened ({n_screened/n_eligible:.2f}) vs target: ({target_lifetime_prob})')
+
+    # Check that the right number of people are getting triaged and assigned treatment
+    a = sim.get_analyzer()
+    if target_triage==1:
+        assert np.array_equal(a.n_screened_pos, a.n_triaged)
+        assert np.array_equal(a.n_triaged_pos, a.n_assigned_tx)
+    print(f'Proportion triaged ({sum(a.n_triaged)/sum(a.n_screened_pos):.2f}) vs target: ({target_triage})')
+    print(f'Proportion assigned treatment ({sum(a.n_assigned_tx)/sum(a.n_triaged_pos):.2f}) vs target: ({target_triage})')
+    print(f'Proportion treated with ablation ({sum(a.n_ablation)/sum(a.n_assigned_ablation):.2f}) vs target: ({target_ablation})')
+    print(f'Proportion treated with excision ({sum(a.n_excision)/sum(a.n_assigned_excision):.2f}) vs target: ({target_excision})')
+
+    print('Note, mismatches in any of the above are inevitable with small pop sizes, but should be equal for large pop sizes.')
+
+    return sim
+
+
+def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
+    sc.heading('Test all interventions together')
 
     ### Create interventions
     # Screen, triage, assign treatment, treat
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine_screen = hpv.routine_screening(
         product='via',  # pass in string or product
-        prob=0.03,  # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
-        eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
+        prob=0.1,
+        eligibility=screen_eligible,
         age_range=[30, 50],
         start_year=2020,
         label='routine screening',
@@ -52,7 +168,8 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     to_triage = lambda sim: sim.get_intervention('routine screening').outcomes['positive']
     soc_triage = hpv.routine_triage(
         years = [2020,2029],
-        prob = 0.5, # acceptance rate
+        prob = 0.9, # acceptance rate
+        annual_prob=False, # This probability is per timestep, not annual
         product = 'via_triage',
         eligibility = to_triage,
         label = 'VIA triage (pre-txvx)'
@@ -63,6 +180,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     pos_screen_assesser = hpv.routine_triage(
         start_year=2030,
         prob = 1.0,
+        annual_prob=False,
         product = 'txvx_assigner',
         eligibility = screened_pos,
         label = 'txvx assigner'
@@ -72,7 +190,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     to_triage_new = lambda sim: sim.get_intervention('txvx assigner').outcomes['triage']
     new_triage = hpv.routine_triage(
         start_year = 2030,
-        prob = 0.3,
+        prob = 1.0,
         product = 'via_triage',
         eligibility = to_triage_new,
         label = 'VIA triage (post-txvx)'
@@ -91,6 +209,7 @@ def test_new_interventions(do_plot=False, do_save=False, fig_path=None):
     confirmed_positive = lambda sim: list(set(sim.get_intervention('VIA triage (pre-txvx)').outcomes['positive'].tolist() + sim.get_intervention('VIA triage (post-txvx)').outcomes['positive'].tolist()))
     assign_treatment = hpv.routine_triage(
         prob = 1.0,
+        annual_prob=False,
         product = 'tx_assigner',
         eligibility = confirmed_positive,
         label = 'tx assigner'
@@ -199,6 +318,8 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
         label = 'campaign txvx'
     )
 
+
+
     second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) | (sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
     campaign_txvx_dose2 = hpv.campaign_txvx(
         prob = 0.7,
@@ -226,7 +347,6 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
         eligibility=second_dose_eligible,
         label = 'routine txvx 2nd dose'
     )
-
 
     interventions = [campaign_txvx_dose1, campaign_txvx_dose2, routine_txvx_dose1, routine_txvx_dose2]
     for intv in interventions: intv.do_plot=False
@@ -385,9 +505,10 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_new_interventions(do_plot=do_plot)
-    sim1 = test_txvx_noscreen()
-    sim2 = test_screening()
+    sim0 = test_screen_prob()
+    sim1 = test_all_interventions(do_plot=do_plot)
+    sim2 = test_txvx_noscreen()
+    sim3 = test_screening()
     scens0 = test_vx_effect()
 
 
