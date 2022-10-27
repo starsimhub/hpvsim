@@ -566,11 +566,11 @@ class BaseSim(ParsObj):
         '''
         resdict = self.export_results(for_json=False)
         df = pd.DataFrame.from_dict(resdict)
-        df['date'] = self.datevec
-        new_columns = ['t','date'] + df.columns[1:-1].tolist() # Get column order
+        df['year'] = self.res_yearvec
+        new_columns = ['t','year'] + df.columns[1:-1].tolist() # Get column order
         df = df.reindex(columns=new_columns) # Reorder so 't' and 'date' are first
         if date_index:
-            df = df.set_index('date')
+            df = df.set_index('year')
         return df
 
 

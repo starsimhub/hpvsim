@@ -65,7 +65,7 @@ class Options(sc.objdict):
         - font:           the font family/face used for the plots
         - fontsize:       the font size used for the plots
         - interactive:    convenience method to set show, close, and backend
-        - jupyter:        defaults for Jupyter (change backend and figure close/return)
+        - jupyter:        defaults for Jupyter (change backend and figure return)
         - show:           whether to show figures
         - close:          whether to close the figures
         - backend:        which Matplotlib backend to use
@@ -201,7 +201,7 @@ class Options(sc.objdict):
         return optdesc, options
 
 
-    def set(self, key=None, value=None, **kwargs):
+    def set(self, key=None, value=None, use=False, **kwargs):
         '''
         Actually change the style. See ``hpv.options.help()`` for more information.
 
@@ -228,18 +228,17 @@ class Options(sc.objdict):
         # Handle Jupyter
         if 'jupyter' in kwargs.keys() and kwargs['jupyter']:
             jupyter = kwargs['jupyter']
-            kwargs['returnfig'] = False # We almost never want to return figs from Jupyter, since then they appear twice
-            try: # This makes plots much nicer, but isn't available on all systems
+            if jupyter == True:
+                jupyter = 'retina' # Default option for True
+            try: 
                 if not os.environ.get('SPHINX_BUILD'): # Custom check implemented in conf.py to skip this if we're inside Sphinx
-                    try: # First try interactive
-                        assert jupyter not in ['default', 'retina'] # Hack to intentionally go to the other part of the loop
+                    if jupyter == 'retina': # This makes plots much nicer, but isn't available on all systems
+                        import matplotlib_inline
+                        matplotlib_inline.backend_inline.set_matplotlib_formats('retina')
+                    elif jupyter in ['widget', 'interactive']: # Or use interactive
                         from IPython import get_ipython
                         magic = get_ipython().magic
                         magic('%matplotlib widget')
-                    except: # Then try retina
-                        assert jupyter != 'default'
-                        import matplotlib_inline
-                        matplotlib_inline.backend_inline.set_matplotlib_formats('retina')
             except:
                 pass
 
@@ -277,9 +276,25 @@ class Options(sc.objdict):
                 if value in [None, 'default']:
                     value = self.orig_options[key]
                 self[key] = value
-                if key in 'backend':
-                    pl.switch_backend(value)
 
+                matplotlib_keys = ['fontsize', 'font', 'dpi', 'backend']
+                if key in matplotlib_keys:
+                    self.set_matplotlib_global(key, value)
+
+        if use:
+            self.use_style()
+
+        return
+
+
+    def set_matplotlib_global(self, key, value):
+        ''' Set a global option for Matplotlib -- not for users '''
+        if value: # Don't try to reset any of these to a None value
+            if   key == 'fontsize': pl.rcParams['font.size']   = value
+            elif key == 'font':     pl.rcParams['font.family'] = value
+            elif key == 'dpi':      pl.rcParams['figure.dpi']  = value
+            elif key == 'backend':  pl.switch_backend(value)
+            else: raise KeyError(f'Key {key} not found')
         return
 
 
