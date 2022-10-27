@@ -11,8 +11,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 Version 0.3.2 (2022-10-26)
 --------------------------
-- Fixes bug with screening
-- Increases coverage of baseline test
+- Additional tutorials and minor release tidying
 - *GitHub info*: PR `380 <https://github.com/amath-idm/hpvsim/pull/380>`__
 
 
