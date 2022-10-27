@@ -24,7 +24,7 @@ Version 0.3.0 (2022-10-26)
 
 
 Version 0.2.11 (2022-10-25)
---------------------------
+---------------------------
 - Changes the way dates of HPV clearance are assigned to use durations sampled
 - *GitHub info*: PR `374 <https://github.com/amath-idm/hpvsim/pull/374>`__
 
