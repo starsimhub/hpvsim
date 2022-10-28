@@ -42,7 +42,7 @@ setup(
         'numpy',
         'numba',
         'scipy',
-        'pandas>=1.4.0', 
+        'pandas', 
         'sciris>=2.0.4',
         'matplotlib',
         'seaborn',
