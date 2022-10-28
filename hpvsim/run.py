@@ -1023,8 +1023,8 @@ class Scenarios(hpb.ParsObj):
             scen_sim.update_pars(allpars)
 
             # Determine whether we need to reinitialize the people and the initial states - by default, don't reset either
-            reset_people = False
-            reset_init_states = False
+            reset_people = True #False
+            reset_init_states = True #False
 
             if 'interventions' in allpars.keys():
                 # If vaccination is provided, we need to re-initialize the people because the number of immunity sources is different

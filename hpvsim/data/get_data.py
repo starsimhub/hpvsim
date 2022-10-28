@@ -13,7 +13,6 @@ import os
 import sys
 import zipfile
 from urllib import request
-import wbgapi as wb
 import numpy as np
 import pandas as pd
 import sciris as sc
@@ -101,6 +100,11 @@ def get_ex_data(force=None, tidy=None):
 def get_birth_data(start=1960, end=2020):
     ''' Import crude birth rates from WB '''
     sc.heading('Downloading World Bank birth rate data...')
+    try:
+        import wbgapi as wb
+    except Exception as E:
+        errormsg = f'Could not import wbgapi: cannot download raw data'
+        raise ModuleNotFoundError(errormsg) from E
     T = sc.timer()
     birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
     d = dict()
