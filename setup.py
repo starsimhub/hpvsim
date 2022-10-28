@@ -43,10 +43,9 @@ setup(
         'numba',
         'scipy',
         'pandas>=1.4.0', 
-        'sciris>=2.0.0',
+        'sciris>=2.0.4',
         'matplotlib',
         'seaborn',
-        'wbgapi',
         'optuna',
     ],
 )
