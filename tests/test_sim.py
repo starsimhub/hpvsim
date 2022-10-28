@@ -327,7 +327,34 @@ def test_resuming():
     return s1
 
 
+def test_rel_trans():
+    # Set base parameters -- these will be shared across all scenarios
+    basepars = {'n_agents':10e3}
 
+    # Configure the settings for each scenario
+    scenarios = {'baseline': {
+                  'name':'Baseline',
+                  'pars': {}
+                  },
+                'high_rel_trans_cin3': {
+                  'name':'High rel trans CIN3 (1.5)',
+                  'pars': {
+                      'rel_trans_cin3': 1.5,
+                      }
+                  },
+                'low_rel_trans_cin3': {
+                  'name':'Low rel trans CIN3 (0.5)',
+                  'pars': {
+                      'rel_trans_cin3': 0.5,
+                      }
+                  },
+                 }
+
+    # Run and plot the scenarios
+    scens = hpv.Scenarios(basepars=basepars, scenarios=scenarios)
+    scens.run()
+    scens.plot()
+    return scens
 
 #%% Run as a script
 if __name__ == '__main__':
@@ -335,14 +362,15 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_states()
-    sim4 = test_flexible_inputs()
-    sim5 = test_result_consistency()
-    sim6 = test_location_loading()
-    sim7 = test_resuming()
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim2 = test_epi()
+    # sim3 = test_states()
+    # sim4 = test_flexible_inputs()
+    # sim5 = test_result_consistency()
+    # sim6 = test_location_loading()
+    # sim7 = test_resuming()
+    scens = test_rel_trans()
 
     sc.toc(T)
     print('Done.')
