@@ -1110,18 +1110,20 @@ class BaseTxVx(BaseTreatment):
         # If anyone is eligible according to the user-defined conditions, try to vaccinate them
         if len(extra_conditions):
             eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions)) # First make sure they're generally eligible
-            if len(eligible_inds): # If so, proceed
-                accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
-                new = sim.people.scale_flows(accept_inds) # Scale
-                if new:
-                    self.outcomes = self.product.administer(sim, accept_inds) # Administer
-                    sim.people.tx_vaccinated[accept_inds] = True
-                    sim.people.date_tx_vaccinated[accept_inds] = sim.t
-                    sim.people.txvx_doses[accept_inds] += 1
-                    idx = int(sim.t / sim.resfreq)
-                    sim.results['new_tx_vaccinated'][idx] += new
-                    sim.results['new_txvx_doses'][idx] += new
-                    self.n_products_used[idx] += new
+        else:
+            eligible_inds = hpu.true(is_eligible)
+        if len(eligible_inds): # If so, proceed
+            accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
+            new = sim.people.scale_flows(accept_inds) # Scale
+            if new:
+                self.outcomes = self.product.administer(sim, accept_inds) # Administer
+                sim.people.tx_vaccinated[accept_inds] = True
+                sim.people.date_tx_vaccinated[accept_inds] = sim.t
+                sim.people.txvx_doses[accept_inds] += 1
+                idx = int(sim.t / sim.resfreq)
+                sim.results['new_tx_vaccinated'][idx] += new
+                sim.results['new_txvx_doses'][idx] += new
+                self.n_products_used[idx] += new
 
         return
 
