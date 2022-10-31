@@ -1091,27 +1091,30 @@ class BaseTxVx(BaseTreatment):
     def __init__(self, **kwargs):
         BaseTreatment.__init__(self, **kwargs)
 
+
     def deliver(self, sim):
         '''
         Deliver the intervention. This applies on a single timestep, whereas apply() methods
         apply on every timestep and can selectively call this method.
         '''
-        is_eligible     = self.check_eligibility(sim) # Apply general eligiblity
+        is_eligible = self.check_eligibility(sim) # Apply general eligiblity
+
+        # Apply extra user-defined eligibility conditions, if given
         if self.eligibility is not None:
-            extra_conditions = self.eligibility(sim) # Apply extra user-defined eligibility conditions
-        else:
-            extra_conditions = np.array([])
+            extra_conditions = self.eligibility(sim)
 
-        # Checking self.eligibility can return either a boolean array of indices. Convert to indices.
-        if (len(extra_conditions)==len(is_eligible)) & (len(extra_conditions)>0):
-            if sc.checktype(extra_conditions[0],'bool'):
-                extra_conditions = hpu.true(extra_conditions)
+            # Checking self.eligibility() can return either a boolean array of indices. Convert to indices.
+            if (len(extra_conditions) == len(is_eligible)) & (len(extra_conditions) > 0):
+                if sc.checktype(extra_conditions[0], 'bool'):
+                    extra_conditions = hpu.true(extra_conditions)
 
-        # If anyone is eligible according to the user-defined conditions, try to vaccinate them
-        if len(extra_conditions):
-            eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions)) # First make sure they're generally eligible
+            # Combine the extra conditions with general eligibility
+            eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions))  # First make sure they're generally eligible
+
         else:
             eligible_inds = hpu.true(is_eligible)
+
+        # Get anyone eligible and apply acceptance rates
         if len(eligible_inds): # If so, proceed
             accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
             new = sim.people.scale_flows(accept_inds) # Scale
