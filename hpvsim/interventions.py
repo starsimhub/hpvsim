@@ -1096,20 +1096,30 @@ class BaseTxVx(BaseTreatment):
         Deliver the intervention. This applies on a single timestep, whereas apply() methods
         apply on every timestep and can selectively call this method.
         '''
-        eligible_inds = hpu.true(self.check_eligibility(sim))
-        if len(eligible_inds):
-            accept_inds = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
-            new = sim.people.scale_flows(accept_inds)
-            if new:
-                self.outcomes = self.product.administer(sim, accept_inds)
-                idx = int(sim.t / sim.resfreq)
-                sim.people.tx_vaccinated[accept_inds] = True
-                sim.people.date_tx_vaccinated[accept_inds] = sim.t
-                sim.people.txvx_doses[accept_inds] += 1
-                idx = int(sim.t / sim.resfreq)
-                sim.results['new_tx_vaccinated'][idx] += new
-                sim.results['new_txvx_doses'][idx] += new
-                self.n_products_used[idx] += new
+        is_eligible     = self.check_eligibility(sim) # Apply general eligiblity
+        extra_conditions = self.eligibility(sim) # Apply extra user-defined eligibility conditions
+
+        # Checking self.eligibility can return either a boolean array of indices. Convert to indices.
+        if (len(extra_conditions)==len(is_eligible)) & (len(extra_conditions)>0):
+            if sc.checktype(extra_conditions[0],'bool'):
+                extra_conditions = hpu.true(extra_conditions)
+
+        # If anyone is eligible according to the user-defined conditions, try to vaccinate them
+        if len(extra_conditions):
+            eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions)) # First make sure they're generally eligible
+            if len(eligible_inds): # If so, proceed
+                accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
+                new = sim.people.scale_flows(accept_inds) # Scale
+                if new:
+                    self.outcomes = self.product.administer(sim, accept_inds) # Administer
+                    idx = int(sim.t / sim.resfreq)
+                    sim.people.tx_vaccinated[accept_inds] = True
+                    sim.people.date_tx_vaccinated[accept_inds] = sim.t
+                    sim.people.txvx_doses[accept_inds] += 1
+                    idx = int(sim.t / sim.resfreq)
+                    sim.results['new_tx_vaccinated'][idx] += new
+                    sim.results['new_txvx_doses'][idx] += new
+                    self.n_products_used[idx] += new
 
         return
 
