@@ -1105,14 +1105,13 @@ class BaseTxVx(BaseTreatment):
                 extra_conditions = hpu.true(extra_conditions)
 
         # If anyone is eligible according to the user-defined conditions, try to vaccinate them
-        if len(extra_conditions):
+        if len(extra_conditions): # and self.label=='campaign txvx 2nd dose':
             eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions)) # First make sure they're generally eligible
             if len(eligible_inds): # If so, proceed
                 accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
                 new = sim.people.scale_flows(accept_inds) # Scale
                 if new:
                     self.outcomes = self.product.administer(sim, accept_inds) # Administer
-                    idx = int(sim.t / sim.resfreq)
                     sim.people.tx_vaccinated[accept_inds] = True
                     sim.people.date_tx_vaccinated[accept_inds] = sim.t
                     sim.people.txvx_doses[accept_inds] += 1
