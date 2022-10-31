@@ -16,9 +16,7 @@ The structure is as follows:
 Installation
 ------------
 
-Run ``pip install -e .`` to install ``hpvsim`` and its dependencies. This will make ``hpvsim`` available on the Python path.
-
-Run ``get_birth_data.py`` and ``get_death_data.py`` to update the data folder, if desired.
+The easiest way to install is simply via pip: ``pip install hpvsim``. Alternatively, you can clone this repository, then run ``pip install -e .`` (don't forget the dot!) in this folder to install ``hpvsim`` and its dependencies. This will make ``hpvsim`` available on the Python path. The first time HPVsim is imported, it will automatically download the required data files.
 
 
 Usage
