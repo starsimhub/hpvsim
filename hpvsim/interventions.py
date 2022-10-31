@@ -1097,7 +1097,7 @@ class BaseTxVx(BaseTreatment):
         apply on every timestep and can selectively call this method.
         '''
         is_eligible     = self.check_eligibility(sim) # Apply general eligiblity
-        if self.eligibility(sim) is not None:
+        if self.eligibility is not None:
             extra_conditions = self.eligibility(sim) # Apply extra user-defined eligibility conditions
         else:
             extra_conditions = np.array([])
