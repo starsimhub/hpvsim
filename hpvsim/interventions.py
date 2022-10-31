@@ -337,12 +337,15 @@ class RoutineDelivery(Intervention):
             errormsg = 'Years must be within simulation start and end dates.'
             raise ValueError(errormsg)
 
+        # Adjustment to get the right end point
+        adj_factor = int(1/sim['dt']) - 1 if sim['dt']<1 else 1
+
         # Determine the timepoints at which the intervention will be applied
         self.start_point    = sc.findinds(sim.yearvec, self.start_year)[0]
-        self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0] + int(1/sim['dt']) - 1
+        self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0] + adj_factor
         self.years          = sc.inclusiverange(self.start_year, self.end_year)
         self.timepoints     = sc.inclusiverange(self.start_point, self.end_point)
-        self.yearvec        = np.arange(self.start_year, self.end_year + int(1/sim['dt']) - 1, sim['dt'])
+        self.yearvec        = np.arange(self.start_year, self.end_year + adj_factor, sim['dt'])
 
         # Get the probability input into a format compatible with timepoints
         if len(self.years) != len(self.prob):
@@ -1093,20 +1096,32 @@ class BaseTxVx(BaseTreatment):
         Deliver the intervention. This applies on a single timestep, whereas apply() methods
         apply on every timestep and can selectively call this method.
         '''
-        eligible_inds = hpu.true(self.check_eligibility(sim))
-        if len(eligible_inds):
-            accept_inds = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
-            new = sim.people.scale_flows(accept_inds)
-            if new:
-                self.outcomes = self.product.administer(sim, accept_inds)
-                idx = int(sim.t / sim.resfreq)
-                sim.people.tx_vaccinated[accept_inds] = True
-                sim.people.date_tx_vaccinated[accept_inds] = sim.t
-                sim.people.txvx_doses[accept_inds] += 1
-                idx = int(sim.t / sim.resfreq)
-                sim.results['new_tx_vaccinated'][idx] += new
-                sim.results['new_txvx_doses'][idx] += new
-                self.n_products_used[idx] += new
+        is_eligible     = self.check_eligibility(sim) # Apply general eligiblity
+        if self.eligibility is not None:
+            extra_conditions = self.eligibility(sim) # Apply extra user-defined eligibility conditions
+        else:
+            extra_conditions = np.array([])
+
+        # Checking self.eligibility can return either a boolean array of indices. Convert to indices.
+        if (len(extra_conditions)==len(is_eligible)) & (len(extra_conditions)>0):
+            if sc.checktype(extra_conditions[0],'bool'):
+                extra_conditions = hpu.true(extra_conditions)
+
+        # If anyone is eligible according to the user-defined conditions, try to vaccinate them
+        if len(extra_conditions): # and self.label=='campaign txvx 2nd dose':
+            eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions)) # First make sure they're generally eligible
+            if len(eligible_inds): # If so, proceed
+                accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
+                new = sim.people.scale_flows(accept_inds) # Scale
+                if new:
+                    self.outcomes = self.product.administer(sim, accept_inds) # Administer
+                    sim.people.tx_vaccinated[accept_inds] = True
+                    sim.people.date_tx_vaccinated[accept_inds] = sim.t
+                    sim.people.txvx_doses[accept_inds] += 1
+                    idx = int(sim.t / sim.resfreq)
+                    sim.results['new_tx_vaccinated'][idx] += new
+                    sim.results['new_txvx_doses'][idx] += new
+                    self.n_products_used[idx] += new
 
         return
 

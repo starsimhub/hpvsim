@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.3.4 (2022-10-31)
+--------------------------
+- Bugfixes for therapeutic vaccination
+- *GitHub info*: PR `394 <https://github.com/amath-idm/hpvsim/pull/394>`__
+
+
 Version 0.3.3 (2022-10-30)
 --------------------------
 - Changes to therapeautic vaccine efficacy assumptions
