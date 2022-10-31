@@ -780,6 +780,10 @@ class Sim(hpb.BaseSim):
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
                     self.results[f'n_total_{key}'][idx] = people.count(key)
 
+            # Create stocks of interventions
+            for key in [state.name for state in hpd.PeopleMeta.intv_states]:
+                self.results[f'n_{key}'][idx] = people.count(key)
+
             # Count total hiv infections
             self.results['n_hiv'][idx] = people.count('hiv')
 
