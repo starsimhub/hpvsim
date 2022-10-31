@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.3.5 (2022-10-31)
+--------------------------
+- Store stocks related to interventions
+- *GitHub info*: PR `395 <https://github.com/amath-idm/hpvsim/pull/395>`__
+
+
 Version 0.3.4 (2022-10-31)
 --------------------------
 - Bugfixes for therapeutic vaccination
