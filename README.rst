@@ -16,7 +16,7 @@ The structure is as follows:
 Installation
 ------------
 
-The easiest way to install is simply via pip: ``pip install hpvsim``. Alternatively, you can clone this repository, then run ``pip install -e .`` (don't forget the dot!) in this folder to install ``hpvsim`` and its dependencies. This will make ``hpvsim`` available on the Python path. The first time HPVsim is imported, it will automatically download the required data files.
+The easiest way to install is simply via pip: ``pip install hpvsim``. Alternatively, you can clone this repository, then run ``pip install -e .`` (don't forget the dot!) in this folder to install ``hpvsim`` and its dependencies. This will make ``hpvsim`` available on the Python path. The first time HPVsim is imported, it will automatically download the required data files (~30 MB).
 
 
 Usage
