@@ -1108,7 +1108,7 @@ class BaseTxVx(BaseTreatment):
                 extra_conditions = hpu.true(extra_conditions)
 
         # If anyone is eligible according to the user-defined conditions, try to vaccinate them
-        if len(extra_conditions): # and self.label=='campaign txvx 2nd dose':
+        if len(extra_conditions):
             eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions)) # First make sure they're generally eligible
             if len(eligible_inds): # If so, proceed
                 accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
