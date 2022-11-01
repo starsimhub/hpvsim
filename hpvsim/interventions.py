@@ -367,9 +367,9 @@ class CampaignDelivery(Intervention):
     '''
     Base class for any intervention that uses campaign delivery; handles interpolation of input years.
     '''
-    def __init__(self, years, interpolate=True, prob=None, annual_prob=True):
+    def __init__(self, years, interpolate=None, prob=None, annual_prob=True):
         self.years = sc.promotetoarray(years)
-        self.interpolate = interpolate # Whether to space the intervention over the year (if true) or do them all at once (if false)
+        self.interpolate = interpolate or True # Whether to space the intervention over the year (if true) or do them all at once (if false)
         self.prob       = sc.promotetoarray(prob)
         self.annual_prob = annual_prob
         return

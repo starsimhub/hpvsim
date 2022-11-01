@@ -68,7 +68,7 @@ def make_ints():
     test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
     test_and_vac_txvx_campaign_testing = hpv.campaign_screening(
         product='hpv1618',
-        prob=0.7,
+        prob=1.0,
         eligibility=test_eligible,
         age_range=[25,50],
         years=[2030],
@@ -79,7 +79,7 @@ def make_ints():
     test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
     test_and_vac_txvx_routine_testing = hpv.routine_screening(
         product='hpv1618',
-        prob=.7,
+        prob=1.0,
         eligibility=test_eligible,
         age_range=[25,26],
         start_year=2031,
@@ -90,7 +90,7 @@ def make_ints():
                                         + sim.get_intervention('txvx_campaign_testing').outcomes['positive'].tolist()))
     test_and_vac_deliver_txvx = hpv.linked_txvx(
         annual_prob=False,
-        prob=0.9,
+        prob=1.0,
         product='txvx1',
         eligibility=screened_pos,
         label='txvx'
