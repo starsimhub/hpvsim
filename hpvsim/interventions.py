@@ -1120,17 +1120,22 @@ class BaseTxVx(BaseTreatment):
 
         # Get anyone eligible and apply acceptance rates
         if len(eligible_inds): # If so, proceed
-            accept_inds = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
-            new = sim.people.scale_flows(accept_inds) # Scale
-            if new:
+            accept_inds = select_people(eligible_inds, prob=self.prob[0]) # Select people who accept
+            new_vx_inds = hpu.ifalsei(sim.people.tx_vaccinated, accept_inds) # Figure out people who are getting vaccinated for the first time
+
+            n_new_doses  = sim.people.scale_flows(accept_inds) # Scale
+            n_new_people = sim.people.scale_flows(new_vx_inds) # Scale
+
+            if n_new_doses:
                 self.outcomes = self.product.administer(sim, accept_inds) # Administer
                 sim.people.tx_vaccinated[accept_inds] = True
                 sim.people.date_tx_vaccinated[accept_inds] = sim.t
                 sim.people.txvx_doses[accept_inds] += 1
+
                 idx = int(sim.t / sim.resfreq)
-                sim.results['new_tx_vaccinated'][idx] += new
-                sim.results['new_txvx_doses'][idx] += new
-                self.n_products_used[idx] += new
+                sim.results['new_tx_vaccinated'][idx] += n_new_people
+                sim.results['new_txvx_doses'][idx] += n_new_doses
+                self.n_products_used[idx] += n_new_doses
 
         return
 
