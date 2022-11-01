@@ -67,18 +67,18 @@ def make_ints():
 
     # test and vaccinate
     # Run a one-time campaign to test & vaccinate everyone aged 25-50
-    test_eligible = lambda sim: (sim.people.txvx_doses == 0)
+    test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
     test_and_vac_txvx_campaign_testing = hpv.campaign_screening(
         product='hpv',
         prob=0.7,
         eligibility=test_eligible,
-        age_range=[25,50],
+        age_range=[26,50],
         years=[2030],
         label='txvx_campaign_testing'
     )
 
     # In addition, run routine vaccination of everyone aged 25
-    test_eligible = lambda sim: (sim.people.txvx_doses == 0)
+    test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
     test_and_vac_txvx_routine_testing = hpv.routine_screening(
         product='hpv',
         prob=.7,
@@ -95,7 +95,6 @@ def make_ints():
         prob=1.0,
         product='txvx_assigner',
         eligibility=screened_pos,
-        start_year=2030,
         label='txvx assigner'
     )
 
@@ -108,8 +107,7 @@ def make_ints():
         label='routine txvx'
     )
 
-    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) & (
-                sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
+    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
     test_and_vac_txvx_dose2 = hpv.linked_txvx(
         prob=0.9,
         annual_prob=False,
