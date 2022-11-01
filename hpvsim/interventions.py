@@ -1296,11 +1296,6 @@ class tx(Product):
                     eff_probs = np.full(len(theseinds), efficacy, dtype=hpd.default_float)  # Assign probabilities of treatment success
                     to_eff_treat = hpu.binomial_arr(eff_probs)  # Determine who will have effective treatment
                     eff_treat_inds = theseinds[to_eff_treat]
-                    if state=='cin1':
-                        import traceback;
-                        traceback.print_exc();
-                        import pdb;
-                        pdb.set_trace()
                     if len(eff_treat_inds):
                         tx_successful += list(eff_treat_inds)
                         people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
