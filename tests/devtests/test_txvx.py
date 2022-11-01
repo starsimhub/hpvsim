@@ -32,7 +32,7 @@ def make_mv_ints():
     ### Create interventions
     mass_vac_campaign_txvx_dose1 = hpv.campaign_txvx(
         annual_prob=False,
-        prob=0.9,
+        prob=1,
         years=[2030],
         age_range=[25, 50],
         product='txvx1',
@@ -42,7 +42,7 @@ def make_mv_ints():
     second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
     mass_vac_campaign_txvx_dose2 = hpv.campaign_txvx(
         annual_prob=False,
-        prob=0.9,
+        prob=1,
         years=[2030],
         product='txvx2',
         eligibility=second_dose_eligible,
@@ -51,7 +51,7 @@ def make_mv_ints():
 
     mass_vac_routine_txvx_dose1 = hpv.routine_txvx(
         annual_prob=False,
-        prob=0.9,
+        prob=1,
         start_year=2031,
         age_range=[25, 26],
         product='txvx1',
@@ -60,7 +60,7 @@ def make_mv_ints():
 
     mass_vac_routine_txvx_dose2 = hpv.routine_txvx(
         annual_prob=False,
-        prob=0.9,
+        prob=1,
         start_year=2031,
         age_range=[25, 26],
         product='txvx2',
@@ -117,7 +117,7 @@ def make_tnv_ints():
 
     second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
     test_and_vac_txvx_dose2 = hpv.linked_txvx(
-        prob=0.9,
+        prob=1,
         annual_prob=False,
         product='txvx2',
         eligibility=second_dose_eligible,
@@ -178,7 +178,7 @@ def make_tnv_perf_sens_ints():
 
     second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
     test_and_vac_txvx_dose2 = hpv.linked_txvx(
-        prob=0.9,
+        prob=1,
         annual_prob=False,
         product='txvx2',
         eligibility=second_dose_eligible,
@@ -221,24 +221,24 @@ def test_both(debug_scens=0):
     base_sim = hpv.Sim(pars=base_pars)
 
     scenarios = {
-        'No vaccination': {
-            'name': 'No vaccination',
-            'pars': {
-                'interventions': []
-            }
-        },
-        'Mass vaccination': {
-            'name': 'Mass vaccination',
-            'pars': {
-                'interventions': mv_ints
-            }
-        },
-        'Test and vaccinate': {
-            'name': 'Test and vaccinate',
-            'pars': {
-                'interventions': tnv_ints
-            }
-        },
+        # 'No vaccination': {
+        #     'name': 'No vaccination',
+        #     'pars': {
+        #         'interventions': []
+        #     }
+        # },
+        # 'Mass vaccination': {
+        #     'name': 'Mass vaccination',
+        #     'pars': {
+        #         'interventions': mv_ints
+        #     }
+        # },
+        # 'Test and vaccinate': {
+        #     'name': 'Test and vaccinate',
+        #     'pars': {
+        #         'interventions': tnv_ints
+        #     }
+        # },
         'Test and vaccinate perf sens': {
             'name': 'Test and vaccinate perf sens',
             'pars': {
