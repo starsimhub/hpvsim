@@ -1102,7 +1102,7 @@ class BaseTxVx(BaseTreatment):
 
         # Apply extra user-defined eligibility conditions, if given
         if self.eligibility is not None:
-            extra_conditions = self.eligibility(sim)
+            extra_conditions = sc.promotetoarray(self.eligibility(sim))
 
             # Checking self.eligibility() can return either a boolean array of indices. Convert to indices.
             if (len(extra_conditions) == len(is_eligible)) & (len(extra_conditions) > 0):
@@ -1110,7 +1110,10 @@ class BaseTxVx(BaseTreatment):
                     extra_conditions = hpu.true(extra_conditions)
 
             # Combine the extra conditions with general eligibility
-            eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions))  # First make sure they're generally eligible
+            if len(extra_conditions)>0:
+                eligible_inds = hpu.itruei(is_eligible, extra_conditions)  # First make sure they're generally eligible
+            else:
+                eligible_inds = np.array([])
 
         else:
             eligible_inds = hpu.true(is_eligible)
@@ -1237,7 +1240,6 @@ class dx(Product):
                 if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype) # also filter by genotype, if this test is by genotype
                 thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
                 probs = [thisdf[thisdf.result==result].probability.values[0] for result in self.hierarchy] # Pull out the result probabilities in the order specified by the result hierarchy
-
                 # Sort people into one of the possible result states and then update their overall results (aggregating over genotypes)
                 this_gtype_results = hpu.n_multinomial(probs, len(theseinds))
                 results[theseinds] = np.minimum(this_gtype_results, results[theseinds])

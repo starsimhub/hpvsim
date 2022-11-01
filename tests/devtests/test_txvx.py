@@ -37,12 +37,10 @@ def make_ints():
         label='campaign txvx'
     )
 
-    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1) & (
-                sim.t > (sim.people.date_tx_vaccinated + 0.5 / sim['dt']))
+    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
     mass_vac_campaign_txvx_dose2 = hpv.campaign_txvx(
-        prob=0.7,
+        prob=0.9,
         years=[2030],
-        age_range=[25, 50],
         product='txvx2',
         eligibility=second_dose_eligible,
         label='campaign txvx 2nd dose'
@@ -57,7 +55,7 @@ def make_ints():
     )
 
     mass_vac_routine_txvx_dose2 = hpv.routine_txvx(
-        prob=0.7,
+        prob=0.9,
         start_year=2031,
         age_range=[25, 26],
         product='txvx2',
@@ -69,10 +67,10 @@ def make_ints():
     # Run a one-time campaign to test & vaccinate everyone aged 25-50
     test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
     test_and_vac_txvx_campaign_testing = hpv.campaign_screening(
-        product='hpv',
+        product='hpv1618',
         prob=0.7,
         eligibility=test_eligible,
-        age_range=[26,50],
+        age_range=[25,50],
         years=[2030],
         label='txvx_campaign_testing'
     )
@@ -80,11 +78,11 @@ def make_ints():
     # In addition, run routine vaccination of everyone aged 25
     test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
     test_and_vac_txvx_routine_testing = hpv.routine_screening(
-        product='hpv',
+        product='hpv1618',
         prob=.7,
         eligibility=test_eligible,
         age_range=[25,26],
-        start_year=2030,
+        start_year=2031,
         label='txvx_routine_testing'
     )
 
@@ -95,7 +93,7 @@ def make_ints():
         prob=0.9,
         product='txvx1',
         eligibility=screened_pos,
-        label='routine txvx'
+        label='txvx'
     )
 
     second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
@@ -104,7 +102,7 @@ def make_ints():
         annual_prob=False,
         product='txvx2',
         eligibility=second_dose_eligible,
-        label='routine txvx 2nd dose'
+        label='txvx 2nd dose'
     )
 
     mv_ints = [
@@ -147,6 +145,12 @@ def test_both(debug_scens=0):
     base_sim = hpv.Sim(pars=base_pars)
 
     scenarios = {
+        'No vaccination': {
+            'name': 'No vaccination',
+            'pars': {
+                'interventions': []
+            }
+        },
         'Mass vaccination': {
             'name': 'Test and vaccinate',
             'pars': {
@@ -167,8 +171,10 @@ def test_both(debug_scens=0):
     to_plot = {
         'Total tx vaccinated': ['n_tx_vaccinated'],
         'Newly tx vaccinated': ['new_tx_vaccinated'],
-        'Cumulative tx vaccinated': ['cum_tx_vaccinated'],
-        'Tx_doses': ['new_txvx_doses']
+        # 'Cumulative tx vaccinated': ['cum_tx_vaccinated'],
+        # 'Tx_doses': ['new_txvx_doses'],
+        'CINs': ['total_cins'],
+        'Cancers': ['total_cancers'],
     }
     scens.plot(to_plot=to_plot)
     return scens
@@ -181,8 +187,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim = test_tnv()
-    scens0 = test_both(debug_scens = 0)
+    sim = test_tnv()
+    # scens0 = test_both(debug_scens = 0)
 
 
     sc.toc(T)
