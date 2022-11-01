@@ -80,7 +80,7 @@ def make_mv_ints():
 def make_tnv_ints(product=None):
     sc.heading('Making test & vaccination interventions')
 
-    if product='perf_sens':
+    if product=='perf_sens':
         import pandas as pd
         hpv_test_pars = pd.read_csv('hpv_test_pars.csv')
         test_product = hpv.dx(hpv_test_pars, hierarchy=['positive', 'inadequate', 'negative'])
@@ -218,7 +218,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_single(which='tnv', product='perf_sens')
+    sim = test_single(which='mv')
+    # sim = test_single(which='tnv', product='perf_sens')
     # scens0 = test_both(debug_scens = 0)
 
 

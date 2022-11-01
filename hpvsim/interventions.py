@@ -762,6 +762,12 @@ class BaseTest(Intervention):
         ti = sc.findinds(self.timepoints, sim.t)[0]
         prob = self.prob[ti] # Get the proportion of people who will be tested this timestep
         eligible_inds = self.check_eligibility(sim) # Check eligibility
+
+        # import traceback;
+        # traceback.print_exc();
+        # import pdb;
+        # pdb.set_trace()
+
         accept_inds = select_people(eligible_inds, prob=prob) # Find people who accept
         if len(accept_inds):
             idx = int(sim.t / sim.resfreq)
