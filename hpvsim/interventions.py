@@ -792,7 +792,7 @@ class BaseScreening(BaseTest):
         the screening interval.
         '''
         active_females  = sim.people.is_female & sim.people.is_active
-        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age < self.age_range[1])
+        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
         conditions      = (active_females & in_age_range)
         if self.eligibility is not None:
             other_eligible  = sc.promotetoarray(self.eligibility(sim))
