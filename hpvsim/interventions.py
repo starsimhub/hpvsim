@@ -338,14 +338,14 @@ class RoutineDelivery(Intervention):
             raise ValueError(errormsg)
 
         # Adjustment to get the right end point
-        adj_factor = int(1/sim['dt']) - 1 if sim['dt']<1 else 1
+        adj_factor = int(1/sim['dt'])-1 if sim['dt']<1 else 1
 
         # Determine the timepoints at which the intervention will be applied
         self.start_point    = sc.findinds(sim.yearvec, self.start_year)[0]
         self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0] + adj_factor
         self.years          = sc.inclusiverange(self.start_year, self.end_year)
         self.timepoints     = sc.inclusiverange(self.start_point, self.end_point)
-        self.yearvec        = np.arange(self.start_year, self.end_year + adj_factor, sim['dt'])
+        self.yearvec        = np.arange(self.start_year, self.end_year+adj_factor, sim['dt'])
 
         # Get the probability input into a format compatible with timepoints
         if len(self.years) != len(self.prob):
@@ -357,8 +357,8 @@ class RoutineDelivery(Intervention):
         else:
             self.prob = sc.smoothinterp(self.yearvec, self.years, self.prob, smoothness=0)
 
-        # Lastly, adjust the annual probability by the sim's timestep, if it's an annual probability
-        if self.annual_prob: self.prob = self.prob*sim['dt']
+        # Lastly, adjust the probability by the sim's timestep, if it's an annual probability
+        if self.annual_prob: self.prob = 1-(1-self.prob)**sim['dt']
 
         return
 
@@ -369,8 +369,8 @@ class CampaignDelivery(Intervention):
     '''
     def __init__(self, years, interpolate=None, prob=None, annual_prob=True):
         self.years = sc.promotetoarray(years)
-        self.interpolate = interpolate or True # Whether to space the intervention over the year (if true) or do them all at once (if false)
-        self.prob       = sc.promotetoarray(prob)
+        self.interpolate = True if interpolate is None else interpolate
+        self.prob = sc.promotetoarray(prob)
         self.annual_prob = annual_prob
         return
 
@@ -385,16 +385,14 @@ class CampaignDelivery(Intervention):
             self.timepoints = np.array([sc.findinds(sim.yearvec,year)[0] for year in self.years])
 
         # Get the probability input into a format compatible with timepoints
-        if len(self.prob) == len(self.years) and self.interpolate:
-            self.prob = sc.smoothinterp(np.arange(len(self.timepoints)), np.arange(len(self.years)), self.prob, smoothness=0)
-        elif len(self.prob) == 1:
+        if len(self.prob) == 1:
             self.prob = np.array([self.prob[0]] * len(self.timepoints))
         else:
             errormsg = f'Length of years incompatible with length of probabilities: {len(self.years)} vs {len(self.prob)}'
             raise ValueError(errormsg)
 
         # Lastly, adjust the annual probability by the sim's timestep, if it's an annual probability
-        if self.annual_prob: self.prob = self.prob*sim['dt']
+        if self.annual_prob: self.prob = 1-(1-self.prob)**sim['dt']
 
         return
 
@@ -760,9 +758,9 @@ class BaseTest(Intervention):
         Deliver the diagnostics by finding who's eligible, finding who accepts, and applying the product.
         '''
         ti = sc.findinds(self.timepoints, sim.t)[0]
-        prob            = self.prob[ti] # Get the proportion of people who will be tested this timestep
-        eligible_inds   = self.check_eligibility(sim) # Check eligibility
-        accept_inds     = select_people(eligible_inds, prob=prob) # Find people who accept
+        prob = self.prob[ti] # Get the proportion of people who will be tested this timestep
+        eligible_inds = self.check_eligibility(sim) # Check eligibility
+        accept_inds = select_people(eligible_inds, prob=prob) # Find people who accept
         if len(accept_inds):
             idx = int(sim.t / sim.resfreq)
             self.n_products_used[idx] += sim.people.scale_flows(accept_inds)

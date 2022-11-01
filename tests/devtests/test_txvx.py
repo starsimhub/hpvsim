@@ -25,8 +25,8 @@ base_pars = {
 
 
 #%% Define the tests
-def make_ints():
-    sc.heading('Making therapeutic vaccine interventions')
+def make_mv_ints():
+    sc.heading('Making mass vaccination interventions')
 
     ### Create interventions
     mass_vac_campaign_txvx_dose1 = hpv.campaign_txvx(
@@ -62,6 +62,18 @@ def make_ints():
         eligibility=second_dose_eligible,
         label='routine txvx 2nd dose'
     )
+    mv_ints = [
+        mass_vac_campaign_txvx_dose1,
+        mass_vac_campaign_txvx_dose2,
+        mass_vac_routine_txvx_dose1,
+        mass_vac_routine_txvx_dose2
+    ]
+
+    return mv_ints
+
+
+def make_tnv_ints():
+    sc.heading('Making test & vaccination interventions')
 
     # test and vaccinate
     # Run a one-time campaign to test & vaccinate everyone aged 25-50
@@ -105,13 +117,6 @@ def make_ints():
         label='txvx 2nd dose'
     )
 
-    mv_ints = [
-        mass_vac_campaign_txvx_dose1,
-        mass_vac_campaign_txvx_dose2,
-        mass_vac_routine_txvx_dose1,
-        mass_vac_routine_txvx_dose2
-    ]
-
     tnv_ints = [
         test_and_vac_txvx_campaign_testing,
         test_and_vac_txvx_routine_testing,
@@ -119,13 +124,14 @@ def make_ints():
         test_and_vac_txvx_dose2,
     ]
 
-    return mv_ints, tnv_ints
+    return tnv_ints
+
 
 
 def test_tnv(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Testing t&v')
 
-    mv_ints, tnv_ints = make_ints()
+    tnv_ints = make_tnv_ints()
     sim = hpv.Sim(pars=base_pars, interventions=tnv_ints)
     sim.run()
     to_plot = {
@@ -141,7 +147,8 @@ def test_tnv(do_plot=False, do_save=False, fig_path=None):
 def test_both(debug_scens=0):
     sc.heading('Testing T&V and MV')
 
-    mv_ints, tnv_ints = make_ints()
+    tnv_ints = make_tnv_ints()
+    mv_ints = make_mv_ints()
     base_sim = hpv.Sim(pars=base_pars)
 
     scenarios = {
