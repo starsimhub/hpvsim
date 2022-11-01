@@ -90,20 +90,11 @@ def make_ints():
 
     screened_pos = lambda sim: list(set(sim.get_intervention('txvx_routine_testing').outcomes['positive'].tolist()
                                         + sim.get_intervention('txvx_campaign_testing').outcomes['positive'].tolist()))
-    test_and_vac_txvx_assigner = hpv.routine_triage(
-        annual_prob=False,
-        prob=1.0,
-        product='txvx_assigner',
-        eligibility=screened_pos,
-        label='txvx assigner'
-    )
-
-    txvx_eligible = lambda sim: sim.get_intervention('txvx assigner').outcomes['txvx']
     test_and_vac_deliver_txvx = hpv.linked_txvx(
         annual_prob=False,
         prob=0.9,
         product='txvx1',
-        eligibility=txvx_eligible,
+        eligibility=screened_pos,
         label='routine txvx'
     )
 
@@ -191,7 +182,7 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim = test_tnv()
+    sim = test_tnv()
     scens0 = test_both(debug_scens = 0)
 
 
