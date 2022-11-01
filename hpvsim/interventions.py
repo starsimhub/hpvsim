@@ -759,7 +759,6 @@ class BaseTest(Intervention):
         '''
         Deliver the diagnostics by finding who's eligible, finding who accepts, and applying the product.
         '''
-        self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         ti = sc.findinds(self.timepoints, sim.t)[0]
         prob            = self.prob[ti] # Get the proportion of people who will be tested this timestep
         eligible_inds   = self.check_eligibility(sim) # Check eligibility
@@ -793,7 +792,7 @@ class BaseScreening(BaseTest):
         the screening interval.
         '''
         active_females  = sim.people.is_female & sim.people.is_active
-        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
+        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age < self.age_range[1])
         conditions      = (active_females & in_age_range)
         if self.eligibility is not None:
             other_eligible  = sc.promotetoarray(self.eligibility(sim))
@@ -804,6 +803,7 @@ class BaseScreening(BaseTest):
         '''
         Perform screening by finding who's eligible, finding who accepts, and applying the product.
         '''
+        self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         if sim.t in self.timepoints:
             accept_inds = self.deliver(sim)
             sim.people.screened[accept_inds] = True
@@ -826,6 +826,7 @@ class BaseTriage(BaseTest):
         return sc.promotetoarray(self.eligibility(sim))
 
     def apply(self, sim):
+        self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         if sim.t in self.timepoints: _ = self.deliver(sim)
         return
 
@@ -1091,27 +1092,30 @@ class BaseTxVx(BaseTreatment):
     def __init__(self, **kwargs):
         BaseTreatment.__init__(self, **kwargs)
 
+
     def deliver(self, sim):
         '''
         Deliver the intervention. This applies on a single timestep, whereas apply() methods
         apply on every timestep and can selectively call this method.
         '''
-        is_eligible     = self.check_eligibility(sim) # Apply general eligiblity
+        is_eligible = self.check_eligibility(sim) # Apply general eligiblity
+
+        # Apply extra user-defined eligibility conditions, if given
         if self.eligibility is not None:
-            extra_conditions = self.eligibility(sim) # Apply extra user-defined eligibility conditions
-        else:
-            extra_conditions = np.array([])
+            extra_conditions = self.eligibility(sim)
 
-        # Checking self.eligibility can return either a boolean array of indices. Convert to indices.
-        if (len(extra_conditions)==len(is_eligible)) & (len(extra_conditions)>0):
-            if sc.checktype(extra_conditions[0],'bool'):
-                extra_conditions = hpu.true(extra_conditions)
+            # Checking self.eligibility() can return either a boolean array of indices. Convert to indices.
+            if (len(extra_conditions) == len(is_eligible)) & (len(extra_conditions) > 0):
+                if sc.checktype(extra_conditions[0], 'bool'):
+                    extra_conditions = hpu.true(extra_conditions)
 
-        # If anyone is eligible according to the user-defined conditions, try to vaccinate them
-        if len(extra_conditions): # and self.label=='campaign txvx 2nd dose':
-            eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions)) # First make sure they're generally eligible
+            # Combine the extra conditions with general eligibility
+            eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions))  # First make sure they're generally eligible
+
         else:
             eligible_inds = hpu.true(is_eligible)
+
+        # Get anyone eligible and apply acceptance rates
         if len(eligible_inds): # If so, proceed
             accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
             new = sim.people.scale_flows(accept_inds) # Scale
