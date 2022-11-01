@@ -117,7 +117,6 @@ def make_ints():
     tnv_ints = [
         test_and_vac_txvx_campaign_testing,
         test_and_vac_txvx_routine_testing,
-        test_and_vac_txvx_assigner,
         test_and_vac_deliver_txvx,
         test_and_vac_txvx_dose2,
     ]
@@ -182,7 +181,7 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_tnv()
+    # sim = test_tnv()
     scens0 = test_both(debug_scens = 0)
 
 
