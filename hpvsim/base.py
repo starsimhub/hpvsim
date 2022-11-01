@@ -1274,7 +1274,7 @@ class BasePeople(FlexPretty):
     @property
     def is_female_adult(self):
         ''' Boolean array of everyone eligible for screening '''
-        return ((self.age>self.debut) * (self.is_female) * (self.alive)
+        return ((self.age>self.debut) * (self.is_female) * (self.alive)).astype(bool)
 
     @property
     def is_virgin(self):
