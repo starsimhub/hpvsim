@@ -218,8 +218,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_single(which='mv')
-    # sim = test_single(which='tnv', product='perf_sens')
+    # sim = test_single(which='mv')
+    sim = test_single(which='tnv', product='perf_sens')
     # scens0 = test_both(debug_scens = 0)
 
 
