@@ -426,7 +426,7 @@ hpv1618,susceptible,hrhpv,inadequate,0.01
 hpv1618,susceptible,lrhpv,positive,0
 hpv1618,susceptible,lrhpv,negative,1
 hpv1618,susceptible,lrhpv,inadequate,0
-hpv1618,latent,hpv16,positive,0.99
+hpv1618,latent,hpv16,positive,0
 hpv1618,latent,hpv16,negative,0.99
 hpv1618,latent,hpv16,inadequate,0.01
 hpv1618,latent,hpv18,positive,0
