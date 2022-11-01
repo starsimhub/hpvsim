@@ -791,12 +791,12 @@ class BaseScreening(BaseTest):
         females in age range, plus any additional user-defined eligibility, which often includes
         the screening interval.
         '''
-        active_females  = sim.people.is_female & sim.people.is_active
-        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
-        conditions      = (active_females & in_age_range)
+        active_females  = sim.people.is_female #* sim.people.is_active
+        in_age_range    = (sim.people.age >= self.age_range[0]) * (sim.people.age <= self.age_range[1])
+        conditions      = (active_females * in_age_range)
         if self.eligibility is not None:
             other_eligible  = sc.promotetoarray(self.eligibility(sim))
-            conditions      = conditions & other_eligible
+            conditions      = conditions * other_eligible
         return hpu.true(conditions)
 
     def apply(self, sim):
@@ -967,7 +967,7 @@ class BaseTreatment(Intervention):
         Check people's eligibility for treatment
         '''
         females         = sim.people.is_female
-        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
+        in_age_range    = (sim.people.age >= self.age_range[0]) * (sim.people.age <= self.age_range[1])
         alive           = sim.people.alive
         nocancer        = ~sim.people.cancerous.any(axis=0)
         conditions      = (females * in_age_range * alive * nocancer)
