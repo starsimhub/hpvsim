@@ -10,7 +10,7 @@ import hpvsim as hpv
 do_plot = 0
 do_save = 0
 
-n_agents = [1e3,50e3][0] # Swap between sizes
+n_agents = [1e3,50e3][1] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,
@@ -19,8 +19,9 @@ base_pars = {
     'genotypes': [16, 18],
     'location': 'tanzania',
     'dt': 0.5,
-    # 'use_multiscale': True,
-    # 'ms_agent_ratio': 100
+    'hpv_control_prob': 0.0,
+    'use_multiscale': True,
+    'ms_agent_ratio': 100
 }
 
 
@@ -30,7 +31,8 @@ def make_mv_ints():
 
     ### Create interventions
     mass_vac_campaign_txvx_dose1 = hpv.campaign_txvx(
-        prob=0.7,
+        annual_prob=False,
+        prob=0.9,
         years=[2030],
         age_range=[25, 50],
         product='txvx1',
@@ -39,6 +41,7 @@ def make_mv_ints():
 
     second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
     mass_vac_campaign_txvx_dose2 = hpv.campaign_txvx(
+        annual_prob=False,
         prob=0.9,
         years=[2030],
         product='txvx2',
@@ -47,7 +50,8 @@ def make_mv_ints():
     )
 
     mass_vac_routine_txvx_dose1 = hpv.routine_txvx(
-        prob=0.7,
+        annual_prob=False,
+        prob=0.9,
         start_year=2031,
         age_range=[25, 26],
         product='txvx1',
@@ -55,6 +59,7 @@ def make_mv_ints():
     )
 
     mass_vac_routine_txvx_dose2 = hpv.routine_txvx(
+        annual_prob=False,
         prob=0.9,
         start_year=2031,
         age_range=[25, 26],
@@ -79,7 +84,8 @@ def make_tnv_ints():
     # Run a one-time campaign to test & vaccinate everyone aged 25-50
     test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
     test_and_vac_txvx_campaign_testing = hpv.campaign_screening(
-        product='hpv1618',
+        annual_prob=False,
+        product='hpv',
         prob=1.0,
         eligibility=test_eligible,
         age_range=[25,50],
@@ -90,7 +96,69 @@ def make_tnv_ints():
     # In addition, run routine vaccination of everyone aged 25
     test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
     test_and_vac_txvx_routine_testing = hpv.routine_screening(
-        product='hpv1618',
+        annual_prob=False,
+        product='hpv',
+        prob=1.0,
+        eligibility=test_eligible,
+        age_range=[25,26],
+        start_year=2031,
+        label='txvx_routine_testing'
+    )
+
+    screened_pos = lambda sim: list(set(sim.get_intervention('txvx_routine_testing').outcomes['positive'].tolist()
+                                        + sim.get_intervention('txvx_campaign_testing').outcomes['positive'].tolist()))
+    test_and_vac_deliver_txvx = hpv.linked_txvx(
+        annual_prob=False,
+        prob=1.0,
+        product='txvx1',
+        eligibility=screened_pos,
+        label='txvx'
+    )
+
+    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
+    test_and_vac_txvx_dose2 = hpv.linked_txvx(
+        prob=0.9,
+        annual_prob=False,
+        product='txvx2',
+        eligibility=second_dose_eligible,
+        label='txvx 2nd dose'
+    )
+
+    tnv_ints = [
+        test_and_vac_txvx_campaign_testing,
+        test_and_vac_txvx_routine_testing,
+        test_and_vac_deliver_txvx,
+        test_and_vac_txvx_dose2,
+    ]
+
+    return tnv_ints
+
+
+
+def make_tnv_perf_sens_ints():
+    sc.heading('Making test & vaccination with perf sensitivity interventions')
+    import pandas as pd
+    hpv_test_pars = pd.read_csv('hpv_test_pars.csv')
+    test_product = hpv.dx(hpv_test_pars, hierarchy=['positive', 'inadequate', 'negative'])
+
+    # test and vaccinate
+    # Run a one-time campaign to test & vaccinate everyone aged 25-50
+    test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
+    test_and_vac_txvx_campaign_testing = hpv.campaign_screening(
+        annual_prob=False,
+        product=test_product,
+        prob=1.0,
+        eligibility=test_eligible,
+        age_range=[25,50],
+        years=[2030],
+        label='txvx_campaign_testing'
+    )
+
+    # In addition, run routine vaccination of everyone aged 25
+    test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
+    test_and_vac_txvx_routine_testing = hpv.routine_screening(
+        annual_prob=False,
+        product=test_product,
         prob=1.0,
         eligibility=test_eligible,
         age_range=[25,26],
@@ -149,6 +217,7 @@ def test_both(debug_scens=0):
 
     tnv_ints = make_tnv_ints()
     mv_ints = make_mv_ints()
+    tvn_perf_sens_ints = make_tnv_perf_sens_ints()
     base_sim = hpv.Sim(pars=base_pars)
 
     scenarios = {
@@ -159,15 +228,21 @@ def test_both(debug_scens=0):
             }
         },
         'Mass vaccination': {
+            'name': 'Mass vaccination',
+            'pars': {
+                'interventions': mv_ints
+            }
+        },
+        'Test and vaccinate': {
             'name': 'Test and vaccinate',
             'pars': {
                 'interventions': tnv_ints
             }
         },
-        'Test and vaccinate': {
-            'name': 'Mass vaccination',
+        'Test and vaccinate perf sens': {
+            'name': 'Test and vaccinate perf sens',
             'pars': {
-                'interventions': mv_ints
+                'interventions': tvn_perf_sens_ints
             }
         },
     }
@@ -178,8 +253,6 @@ def test_both(debug_scens=0):
     to_plot = {
         'Total tx vaccinated': ['n_tx_vaccinated'],
         'Newly tx vaccinated': ['new_tx_vaccinated'],
-        # 'Cumulative tx vaccinated': ['cum_tx_vaccinated'],
-        # 'Tx_doses': ['new_txvx_doses'],
         'CINs': ['total_cins'],
         'Cancers': ['total_cancers'],
     }
