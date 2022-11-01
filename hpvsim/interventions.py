@@ -338,14 +338,14 @@ class RoutineDelivery(Intervention):
             raise ValueError(errormsg)
 
         # Adjustment to get the right end point
-        adj_factor = int(1/sim['dt']) - 1 if sim['dt']<1 else 1
+        adj_factor = int(1/sim['dt'])-1 if sim['dt']<1 else 1
 
         # Determine the timepoints at which the intervention will be applied
         self.start_point    = sc.findinds(sim.yearvec, self.start_year)[0]
         self.end_point      = sc.findinds(sim.yearvec, self.end_year)[0] + adj_factor
         self.years          = sc.inclusiverange(self.start_year, self.end_year)
         self.timepoints     = sc.inclusiverange(self.start_point, self.end_point)
-        self.yearvec        = np.arange(self.start_year, self.end_year + adj_factor, sim['dt'])
+        self.yearvec        = np.arange(self.start_year, self.end_year+adj_factor, sim['dt'])
 
         # Get the probability input into a format compatible with timepoints
         if len(self.years) != len(self.prob):
@@ -357,8 +357,8 @@ class RoutineDelivery(Intervention):
         else:
             self.prob = sc.smoothinterp(self.yearvec, self.years, self.prob, smoothness=0)
 
-        # Lastly, adjust the annual probability by the sim's timestep, if it's an annual probability
-        if self.annual_prob: self.prob = self.prob*sim['dt']
+        # Lastly, adjust the probability by the sim's timestep, if it's an annual probability
+        if self.annual_prob: self.prob = 1-(1-self.prob)**sim['dt']
 
         return
 
@@ -367,10 +367,10 @@ class CampaignDelivery(Intervention):
     '''
     Base class for any intervention that uses campaign delivery; handles interpolation of input years.
     '''
-    def __init__(self, years, interpolate=True, prob=None, annual_prob=True):
+    def __init__(self, years, interpolate=None, prob=None, annual_prob=True):
         self.years = sc.promotetoarray(years)
-        self.interpolate = interpolate # Whether to space the intervention over the year (if true) or do them all at once (if false)
-        self.prob       = sc.promotetoarray(prob)
+        self.interpolate = True if interpolate is None else interpolate
+        self.prob = sc.promotetoarray(prob)
         self.annual_prob = annual_prob
         return
 
@@ -394,7 +394,7 @@ class CampaignDelivery(Intervention):
             raise ValueError(errormsg)
 
         # Lastly, adjust the annual probability by the sim's timestep, if it's an annual probability
-        if self.annual_prob: self.prob = self.prob*sim['dt']
+        if self.annual_prob: self.prob = 1-(1-self.prob)**sim['dt']
 
         return
 
@@ -759,11 +759,10 @@ class BaseTest(Intervention):
         '''
         Deliver the diagnostics by finding who's eligible, finding who accepts, and applying the product.
         '''
-        self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         ti = sc.findinds(self.timepoints, sim.t)[0]
-        prob            = self.prob[ti] # Get the proportion of people who will be tested this timestep
-        eligible_inds   = self.check_eligibility(sim) # Check eligibility
-        accept_inds     = select_people(eligible_inds, prob=prob) # Find people who accept
+        prob = self.prob[ti] # Get the proportion of people who will be tested this timestep
+        eligible_inds = self.check_eligibility(sim) # Check eligibility
+        accept_inds = select_people(eligible_inds, prob=prob) # Find people who accept
         if len(accept_inds):
             idx = int(sim.t / sim.resfreq)
             self.n_products_used[idx] += sim.people.scale_flows(accept_inds)
@@ -792,18 +791,19 @@ class BaseScreening(BaseTest):
         females in age range, plus any additional user-defined eligibility, which often includes
         the screening interval.
         '''
-        active_females  = sim.people.is_female & sim.people.is_active
-        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
-        conditions      = (active_females & in_age_range)
+        adult_females   = sim.people.is_female_adult
+        in_age_range    = (sim.people.age >= self.age_range[0]) * (sim.people.age <= self.age_range[1])
+        conditions      = (adult_females * in_age_range).astype(bool)
         if self.eligibility is not None:
             other_eligible  = sc.promotetoarray(self.eligibility(sim))
-            conditions      = conditions & other_eligible
+            conditions      = conditions * other_eligible
         return hpu.true(conditions)
 
     def apply(self, sim):
         '''
         Perform screening by finding who's eligible, finding who accepts, and applying the product.
         '''
+        self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         if sim.t in self.timepoints:
             accept_inds = self.deliver(sim)
             sim.people.screened[accept_inds] = True
@@ -826,6 +826,7 @@ class BaseTriage(BaseTest):
         return sc.promotetoarray(self.eligibility(sim))
 
     def apply(self, sim):
+        self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
         if sim.t in self.timepoints: _ = self.deliver(sim)
         return
 
@@ -966,7 +967,7 @@ class BaseTreatment(Intervention):
         Check people's eligibility for treatment
         '''
         females         = sim.people.is_female
-        in_age_range    = (sim.people.age >= self.age_range[0]) & (sim.people.age <= self.age_range[1])
+        in_age_range    = (sim.people.age >= self.age_range[0]) * (sim.people.age <= self.age_range[1])
         alive           = sim.people.alive
         nocancer        = ~sim.people.cancerous.any(axis=0)
         conditions      = (females * in_age_range * alive * nocancer)
@@ -1091,37 +1092,45 @@ class BaseTxVx(BaseTreatment):
     def __init__(self, **kwargs):
         BaseTreatment.__init__(self, **kwargs)
 
+
     def deliver(self, sim):
         '''
         Deliver the intervention. This applies on a single timestep, whereas apply() methods
         apply on every timestep and can selectively call this method.
         '''
-        is_eligible     = self.check_eligibility(sim) # Apply general eligiblity
+        is_eligible = self.check_eligibility(sim) # Apply general eligiblity
+
+        # Apply extra user-defined eligibility conditions, if given
         if self.eligibility is not None:
-            extra_conditions = self.eligibility(sim) # Apply extra user-defined eligibility conditions
+            extra_conditions = sc.promotetoarray(self.eligibility(sim))
+
+            # Checking self.eligibility() can return either a boolean array of indices. Convert to indices.
+            if (len(extra_conditions) == len(is_eligible)) & (len(extra_conditions) > 0):
+                if sc.checktype(extra_conditions[0], 'bool'):
+                    extra_conditions = hpu.true(extra_conditions)
+
+            # Combine the extra conditions with general eligibility
+            if len(extra_conditions)>0:
+                eligible_inds = hpu.itruei(is_eligible, extra_conditions)  # First make sure they're generally eligible
+            else:
+                eligible_inds = np.array([])
+
         else:
-            extra_conditions = np.array([])
+            eligible_inds = hpu.true(is_eligible)
 
-        # Checking self.eligibility can return either a boolean array of indices. Convert to indices.
-        if (len(extra_conditions)==len(is_eligible)) & (len(extra_conditions)>0):
-            if sc.checktype(extra_conditions[0],'bool'):
-                extra_conditions = hpu.true(extra_conditions)
-
-        # If anyone is eligible according to the user-defined conditions, try to vaccinate them
-        if len(extra_conditions): # and self.label=='campaign txvx 2nd dose':
-            eligible_inds = hpu.itruei(is_eligible, sc.promotetoarray(extra_conditions)) # First make sure they're generally eligible
-            if len(eligible_inds): # If so, proceed
-                accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
-                new = sim.people.scale_flows(accept_inds) # Scale
-                if new:
-                    self.outcomes = self.product.administer(sim, accept_inds) # Administer
-                    sim.people.tx_vaccinated[accept_inds] = True
-                    sim.people.date_tx_vaccinated[accept_inds] = sim.t
-                    sim.people.txvx_doses[accept_inds] += 1
-                    idx = int(sim.t / sim.resfreq)
-                    sim.results['new_tx_vaccinated'][idx] += new
-                    sim.results['new_txvx_doses'][idx] += new
-                    self.n_products_used[idx] += new
+        # Get anyone eligible and apply acceptance rates
+        if len(eligible_inds): # If so, proceed
+            accept_inds = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
+            new = sim.people.scale_flows(accept_inds) # Scale
+            if new:
+                self.outcomes = self.product.administer(sim, accept_inds) # Administer
+                sim.people.tx_vaccinated[accept_inds] = True
+                sim.people.date_tx_vaccinated[accept_inds] = sim.t
+                sim.people.txvx_doses[accept_inds] += 1
+                idx = int(sim.t / sim.resfreq)
+                sim.results['new_tx_vaccinated'][idx] += new
+                sim.results['new_txvx_doses'][idx] += new
+                self.n_products_used[idx] += new
 
         return
 
@@ -1231,7 +1240,6 @@ class dx(Product):
                 if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype) # also filter by genotype, if this test is by genotype
                 thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
                 probs = [thisdf[thisdf.result==result].probability.values[0] for result in self.hierarchy] # Pull out the result probabilities in the order specified by the result hierarchy
-
                 # Sort people into one of the possible result states and then update their overall results (aggregating over genotypes)
                 this_gtype_results = hpu.n_multinomial(probs, len(theseinds))
                 results[theseinds] = np.minimum(this_gtype_results, results[theseinds])

@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.3.6 (2022-11-01)
+--------------------------
+- Fix bug related to screening eligibility. NB, this has a sizeable impact on results - screening strategies will be much more effective after this fix. 
+- *GitHub info*: PR `396 <https://github.com/amath-idm/hpvsim/pull/396>`__
+
+
 Version 0.3.5 (2022-10-31)
 --------------------------
 - Store stocks related to interventions
