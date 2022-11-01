@@ -77,69 +77,16 @@ def make_mv_ints():
     return mv_ints
 
 
-def make_tnv_ints():
+def make_tnv_ints(product=None):
     sc.heading('Making test & vaccination interventions')
 
-    # test and vaccinate
-    # Run a one-time campaign to test & vaccinate everyone aged 25-50
-    test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
-    test_and_vac_txvx_campaign_testing = hpv.campaign_screening(
-        annual_prob=False,
-        product='hpv',
-        prob=1.0,
-        eligibility=test_eligible,
-        age_range=[25,50],
-        years=[2030],
-        label='txvx_campaign_testing'
-    )
+    if product=='perf_sens':
+        import pandas as pd
+        hpv_test_pars = pd.read_csv('hpv_test_pars.csv')
+        test_product = hpv.dx(hpv_test_pars, hierarchy=['positive', 'inadequate', 'negative'])
+    else:
+        test_product = 'hpv'
 
-    # In addition, run routine vaccination of everyone aged 25
-    test_eligible = lambda sim: ((sim.people.txvx_doses==0) & (sim.people.screens==0))
-    test_and_vac_txvx_routine_testing = hpv.routine_screening(
-        annual_prob=False,
-        product='hpv',
-        prob=1.0,
-        eligibility=test_eligible,
-        age_range=[25,26],
-        start_year=2031,
-        label='txvx_routine_testing'
-    )
-
-    screened_pos = lambda sim: list(set(sim.get_intervention('txvx_routine_testing').outcomes['positive'].tolist()
-                                        + sim.get_intervention('txvx_campaign_testing').outcomes['positive'].tolist()))
-    test_and_vac_deliver_txvx = hpv.linked_txvx(
-        annual_prob=False,
-        prob=1.0,
-        product='txvx1',
-        eligibility=screened_pos,
-        label='txvx'
-    )
-
-    second_dose_eligible = lambda sim: (sim.people.txvx_doses == 1)
-    test_and_vac_txvx_dose2 = hpv.linked_txvx(
-        prob=1,
-        annual_prob=False,
-        product='txvx2',
-        eligibility=second_dose_eligible,
-        label='txvx 2nd dose'
-    )
-
-    tnv_ints = [
-        test_and_vac_txvx_campaign_testing,
-        test_and_vac_txvx_routine_testing,
-        test_and_vac_deliver_txvx,
-        test_and_vac_txvx_dose2,
-    ]
-
-    return tnv_ints
-
-
-
-def make_tnv_perf_sens_ints():
-    sc.heading('Making test & vaccination with perf sensitivity interventions')
-    import pandas as pd
-    hpv_test_pars = pd.read_csv('hpv_test_pars.csv')
-    test_product = hpv.dx(hpv_test_pars, hierarchy=['positive', 'inadequate', 'negative'])
 
     # test and vaccinate
     # Run a one-time campaign to test & vaccinate everyone aged 25-50
@@ -196,11 +143,15 @@ def make_tnv_perf_sens_ints():
 
 
 
-def test_tnv(do_plot=False, do_save=False, fig_path=None):
-    sc.heading('Testing t&v')
+def test_single(which='tnv', product=None, do_plot=False, do_save=False, fig_path=None):
+    sc.heading(f'Testing {which}')
 
-    tnv_ints = make_tnv_ints()
-    sim = hpv.Sim(pars=base_pars, interventions=tnv_ints)
+    if which == 'tnv':
+        ints = make_tnv_ints(product=product)
+    elif which == 'mv':
+        ints = make_mv_ints()
+
+    sim = hpv.Sim(pars=base_pars, interventions=ints)
     sim.run()
     to_plot = {
         'Total tx vaccinated': ['n_tx_vaccinated'],
@@ -267,8 +218,9 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim = test_tnv()
-    scens0 = test_both(debug_scens = 0)
+    sim = test_single(which='mv')
+    # sim = test_single(which='tnv', product='perf_sens')
+    # scens0 = test_both(debug_scens = 0)
 
 
     sc.toc(T)
