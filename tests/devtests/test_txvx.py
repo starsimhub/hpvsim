@@ -194,7 +194,7 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim = test_tnv()
+    # sim = test_tnv()
     scens0 = test_both(debug_scens = 0)
 
 

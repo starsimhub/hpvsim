@@ -1120,7 +1120,7 @@ class BaseTxVx(BaseTreatment):
 
         # Get anyone eligible and apply acceptance rates
         if len(eligible_inds): # If so, proceed
-            accept_inds     = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
+            accept_inds = select_people(eligible_inds, prob=self.prob[0])  # Select people who accept
             new = sim.people.scale_flows(accept_inds) # Scale
             if new:
                 self.outcomes = self.product.administer(sim, accept_inds) # Administer
