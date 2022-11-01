@@ -385,7 +385,9 @@ class CampaignDelivery(Intervention):
             self.timepoints = np.array([sc.findinds(sim.yearvec,year)[0] for year in self.years])
 
         # Get the probability input into a format compatible with timepoints
-        if len(self.prob) == 1:
+        if len(self.prob) == len(self.years) and self.interpolate:
+            self.prob = sc.smoothinterp(np.arange(len(self.timepoints)), np.arange(len(self.years)), self.prob, smoothness=0)
+        elif len(self.prob) == 1:
             self.prob = np.array([self.prob[0]] * len(self.timepoints))
         else:
             errormsg = f'Length of years incompatible with length of probabilities: {len(self.years)} vs {len(self.prob)}'

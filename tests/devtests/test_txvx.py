@@ -195,7 +195,7 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim = test_tnv()
-    # scens0 = test_both(debug_scens = 0)
+    scens0 = test_both(debug_scens = 0)
 
 
     sc.toc(T)
