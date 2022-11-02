@@ -636,6 +636,7 @@ class BaseVaccination(Intervention):
         # if the timepoint matches one of the requested timepoints.
         if len(self.timepoints)>0 and (sim.t not in self.timepoints): do_apply = False
         else: do_apply = True
+        accept_inds = np.array([])
 
         if do_apply:
 
@@ -645,7 +646,7 @@ class BaseVaccination(Intervention):
                 prob = self.prob
             else: # Get the proportion of people who screen on this timestep
                 prob = self.prob[sc.findinds(self.timepoints, sim.t)[0]]
-            accept_inds     = select_people(eligible_inds, prob=prob)
+            accept_inds = select_people(eligible_inds, prob=prob)
 
             if len(accept_inds):
                 self.product.administer(sim.people, accept_inds) # Administer the product
@@ -809,6 +810,7 @@ class BaseScreening(BaseTest):
         Perform screening by finding who's eligible, finding who accepts, and applying the product.
         '''
         self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
+        accept_inds = np.array([])
         if sim.t in self.timepoints:
             accept_inds = self.deliver(sim)
             sim.people.screened[accept_inds] = True
@@ -832,6 +834,7 @@ class BaseTriage(BaseTest):
 
     def apply(self, sim):
         self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
+        accept_inds = np.array([])
         if sim.t in self.timepoints: accept_inds = self.deliver(sim)
         return accept_inds
 
