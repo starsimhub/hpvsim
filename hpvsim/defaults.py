@@ -82,6 +82,7 @@ class PeopleMeta(sc.prettyobj):
         State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
         State('vaccine_source', default_int,    -1), # Index of the prophylactic vaccine that individual received
         State('screens',        default_int,    0),  # Number of screens given per person
+        State('art_adherence',  default_float, 0, label='adherence on ART', cmap=pl.cm.Oranges)
     ]
 
     # Set the states that a person can be in
@@ -125,7 +126,6 @@ class PeopleMeta(sc.prettyobj):
 
     hiv_states = [
         State('hiv',        bool, False, label='infected with HIV', cmap=pl.cm.GnBu),
-        State('art_adherence',        default_float, 0, label='adherence on ART', cmap=pl.cm.Oranges)
     ]
 
     # Additional intervention states
@@ -246,6 +246,7 @@ stock_keys   = [state.name for state in PeopleMeta.stock_states]
 stock_names  = [state.label for state in PeopleMeta.stock_states]
 stock_colors = [state.cmap for state in PeopleMeta.stock_states]
 total_stock_keys = [state.name for state in PeopleMeta.stock_states if state.shape=='n_genotypes']
+other_stock_keys = [state.name for state in PeopleMeta.intv_states+PeopleMeta.hiv_states]
 
 # Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes

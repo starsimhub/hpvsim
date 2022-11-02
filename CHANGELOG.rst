@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.3.7 (2022-11-01)
+--------------------------
+- Fix to ensure consistent results for the number of txvx doses 
+- *GitHub info*: PR `411 <https://github.com/amath-idm/hpvsim/pull/411>`__
+
+
 Version 0.3.6 (2022-11-01)
 --------------------------
 - Fix bug related to screening eligibility. NB, this has a sizeable impact on results - screening strategies will be much more effective after this fix. 

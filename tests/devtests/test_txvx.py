@@ -160,6 +160,7 @@ def test_single(which='tnv', product=None, do_plot=False, do_save=False, fig_pat
         'Tx_doses': ['new_txvx_doses']
     }
     sim.plot(to_plot=to_plot)
+
     return sim
 
 

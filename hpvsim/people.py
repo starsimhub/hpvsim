@@ -890,14 +890,12 @@ class People(hpb.BasePeople):
             errormsg = f'Cause of death must be one of "other", "cancer", or "emigration", not {cause}.'
             raise ValueError(errormsg)
 
-        self.susceptible[:, inds] = False
-        self.infectious[:, inds] = False
-        self.inactive[:, inds] = False
-        self.cin1[:, inds] = False
-        self.cin2[:, inds] = False
-        self.cin3[:, inds] = False
-        self.cancerous[:, inds] = False
+        # Set states to false
         self.alive[inds] = False
+        for state in hpd.total_stock_keys:
+            self[state][:, inds] = False
+        for state in hpd.other_stock_keys:
+            self[state][inds] = False
 
         # Wipe future dates
         future_dates = [date.name for date in self.meta.dates]
