@@ -617,7 +617,7 @@ class BaseVaccination(Intervention):
         '''
         Determine who is eligible for vaccination
         '''
-        conditions = np.full(len(sim.people), True, dtype=bool) # Start by assuming everyone is eligible
+        conditions = sim.people.alive # Start by assuming everyone alive is eligible
         if len(self.sex)==1:
             conditions = conditions & (sim.people.sex == self.sex[0]) # Filter by sex
         if self.age_range is not None:
@@ -648,18 +648,23 @@ class BaseVaccination(Intervention):
             accept_inds     = select_people(eligible_inds, prob=prob)
 
             if len(accept_inds):
-                self.product.administer(sim.people, accept_inds) # Actually change people's immunity
-                # Update people's state and dates, as well as results and doses
+                self.product.administer(sim.people, accept_inds) # Administer the product
+
+                # Update people's state and dates
                 sim.people.vaccinated[accept_inds] = True
                 sim.people.date_vaccinated[accept_inds] = sim.t
                 sim.people.doses[accept_inds] += 1
-                idx = int(sim.t / sim.resfreq)
-                new = sim.people.scale_flows(accept_inds)
-                sim.results['new_vaccinated'][:,idx] += new
-                sim.results['new_doses'][idx] += new
-                self.n_products_used[idx] += new
 
-        return
+                # Update results
+                idx = int(sim.t / sim.resfreq)
+                new_vx_inds = hpu.ifalsei(sim.people.vaccinated, accept_inds)  # Figure out people who are getting vaccinated for the first time
+                n_new_doses = sim.people.scale_flows(accept_inds)  # Scale
+                n_new_people = sim.people.scale_flows(new_vx_inds)  # Scale
+                sim.results['new_vaccinated'][:,idx] += n_new_people
+                sim.results['new_doses'][idx] += n_new_doses
+                self.n_products_used[idx] += n_new_doses
+
+        return accept_inds
 
 
     def shrink(self, in_place=True):
@@ -809,7 +814,7 @@ class BaseScreening(BaseTest):
             sim.people.screened[accept_inds] = True
             sim.people.screens[accept_inds] += 1
             sim.people.date_screened[accept_inds] = sim.t
-        return
+        return accept_inds
 
 
 class BaseTriage(BaseTest):
@@ -827,8 +832,8 @@ class BaseTriage(BaseTest):
 
     def apply(self, sim):
         self.outcomes = {k:np.array([], dtype=hpd.default_int) for k in self.product.hierarchy}
-        if sim.t in self.timepoints: _ = self.deliver(sim)
-        return
+        if sim.t in self.timepoints: accept_inds = self.deliver(sim)
+        return accept_inds
 
 
 class routine_screening(BaseScreening, RoutineDelivery):
@@ -1082,7 +1087,8 @@ class treat_delay(BaseTreatment):
         scheduler, and then will treat anyone scheduled for treatment on this timestep.
         '''
         self.add_to_schedule(sim)
-        BaseTreatment.apply(self, sim)
+        treat_inds = BaseTreatment.apply(self, sim)
+        return treat_inds
 
 
 class BaseTxVx(BaseTreatment):
@@ -1119,6 +1125,7 @@ class BaseTxVx(BaseTreatment):
             eligible_inds = hpu.true(is_eligible)
 
         # Get anyone eligible and apply acceptance rates
+        accept_inds = np.array([])
         if len(eligible_inds): # If so, proceed
             accept_inds = select_people(eligible_inds, prob=self.prob[0]) # Select people who accept
             new_vx_inds = hpu.ifalsei(sim.people.tx_vaccinated, accept_inds) # Figure out people who are getting vaccinated for the first time
@@ -1136,7 +1143,7 @@ class BaseTxVx(BaseTreatment):
                 sim.results['new_txvx_doses'][idx] += n_new_doses
                 self.n_products_used[idx] += n_new_doses
 
-        return
+        return accept_inds
 
 
 class routine_txvx(BaseTxVx, RoutineDelivery):
@@ -1160,7 +1167,10 @@ class routine_txvx(BaseTxVx, RoutineDelivery):
         BaseTxVx.initialize(self, sim) # Initialize this next - this actually calls BaseTreatment.initialize() and ensures products will be counted
 
     def apply(self, sim):
-        if sim.t in self.timepoints: self.deliver(sim)
+        accept_inds = np.array([])
+        if sim.t in self.timepoints:
+            accept_inds = self.deliver(sim)
+        return accept_inds
 
 
 class campaign_txvx(BaseTxVx, CampaignDelivery):
@@ -1179,7 +1189,10 @@ class campaign_txvx(BaseTxVx, CampaignDelivery):
         BaseTxVx.initialize(self, sim) # Initialize this next - this actually calls BaseTreatment.initialize() and ensures products will be counted
 
     def apply(self, sim):
-        if sim.t in self.timepoints: self.deliver(sim)
+        accept_inds = np.array([])
+        if sim.t in self.timepoints:
+            accept_inds = self.deliver(sim)
+        return accept_inds
 
 
 class linked_txvx(BaseTxVx):
@@ -1192,7 +1205,8 @@ class linked_txvx(BaseTxVx):
         BaseTxVx.__init__(self, **kwargs)
 
     def apply(self, sim):
-        BaseTxVx.deliver(self, sim)
+        accept_inds = BaseTxVx.deliver(self, sim)
+        return accept_inds
 
 
 #%% Products
