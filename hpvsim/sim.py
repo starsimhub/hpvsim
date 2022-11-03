@@ -541,7 +541,6 @@ class Sim(hpb.BaseSim):
 
         return
 
-    #
     # def finalize_interventions(self):
     #     for intervention in self['interventions']:
     #         if isinstance(intervention, hpi.Intervention):
@@ -886,7 +885,7 @@ class Sim(hpb.BaseSim):
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
-        self.finalize_interventions()
+        # self.finalize_interventions()
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results

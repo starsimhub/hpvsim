@@ -1382,9 +1382,9 @@ class radiation(Product):
         people.date_dead_cancer[inds] += np.ceil(new_dur_cancer / people.pars['dt'])
 
         # Store treatment and dates
-        sim.people.cancer_treated[treat_inds] = True
-        sim.people.cancer_treatments[treat_inds] += 1
-        sim.people.date_cancer_treated[treat_inds] = sim.t
+        sim.people.cancer_treated[inds] = True
+        sim.people.cancer_treatments[inds] += 1
+        sim.people.date_cancer_treated[inds] = sim.t
 
         return inds
 
