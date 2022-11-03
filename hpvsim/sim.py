@@ -447,6 +447,20 @@ class Sim(hpb.BaseSim):
         results['cum_txvx_doses'] = init_res('Cumulative therapeutic vaccine doses')
         results['cum_tx_vaccinated'] = init_res('Total received therapeutic vaccine')
 
+        # Screen & treat results
+        results['new_screens'] = init_res('New screens')
+        results['new_screened'] = init_res('Newly screened')
+        results['new_cin_treatments'] = init_res('New CIN treatments')
+        results['new_cin_treated'] = init_res('Newly treated for CINs')
+        results['new_cancer_treatments'] = init_res('New cancer treatments')
+        results['new_cancer_treated'] = init_res('Newly treated for cancer')
+        results['cum_screens'] = init_res('Cumulative screens')
+        results['cum_screened'] = init_res('Cumulative number screened')
+        results['cum_cin_treatments'] = init_res('Cumulative CIN treatments')
+        results['cum_cin_treated'] = init_res('Cumulative number treated for CINs')
+        results['cum_cancer_treatments'] = init_res('Cumulative cancer treatments')
+        results['cum_cancer_treated'] = init_res('Cumulative number treated for cancer')
+
         # Additional cancer results
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color='#fcba03')
         results['cancer_mortality'] = init_res('Cancer mortality')
