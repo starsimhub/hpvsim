@@ -1409,7 +1409,7 @@ class radiation(Product):
         n_new_radiaitons = sim.people.scale_flows(inds)  # Scale
         n_new_people = sim.people.scale_flows(new_cctreat_inds)  # Scale
         sim.results['new_cancer_treated'][idx] += n_new_people
-        sim.results['new_cancer_treatments'][idx] += n_new_doses
+        sim.results['new_cancer_treatments'][idx] += n_new_radiaitons
 
         return inds
 
