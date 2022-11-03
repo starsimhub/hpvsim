@@ -539,17 +539,14 @@ class Sim(hpb.BaseSim):
             if isinstance(intervention, hpi.Intervention):
                 intervention.initialize(self)
 
-        # Set the number of immunity sources
-        # self['n_imm_sources'] += len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
-        # self['n_imm_sources'] = self['immunity'].shape[0]
         return
 
-
-    def finalize_interventions(self):
-        for intervention in self['interventions']:
-            if isinstance(intervention, hpi.Intervention):
-                if hasattr(intervention,'n_products_used'):
-                    self.results[f'resources_{intervention.label}'] = intervention.n_products_used
+    #
+    # def finalize_interventions(self):
+    #     for intervention in self['interventions']:
+    #         if isinstance(intervention, hpi.Intervention):
+    #             if hasattr(intervention,'n_products_used'):
+    #                 self.results[f'resources_{intervention.label}'] = intervention.n_products_used
 
 
     def init_analyzers(self):
