@@ -1003,12 +1003,21 @@ class BaseTreatment(Intervention):
         '''
         Perform treatment by getting candidates, checking their eligibility, and then treating them.
         '''
+        # Get indices of who will get treated
         treat_candidates = self.get_candidates(sim) # NB, this needs to be implemented by derived classes
         still_eligible = self.check_eligibility(sim)
         treat_inds = hpu.itruei(still_eligible, treat_candidates)
+
+        # Store treatment and dates
+        sim.people.cin_treated[treat_inds] = True
+        sim.people.cin_treatments[treat_inds] += 1
+        sim.people.date_cin_treated[treat_inds] = sim.t
+
+        # Administer treatment and store products used
         self.outcomes = self.product.administer(sim, treat_inds)
         idx = int(sim.t / sim.resfreq)
         self.n_products_used[idx] += sim.people.scale_flows(treat_inds)
+
         return treat_inds
 
 
@@ -1371,6 +1380,12 @@ class radiation(Product):
         people = sim.people
         new_dur_cancer = hpu.sample(**self.dur, size=len(inds))
         people.date_dead_cancer[inds] += np.ceil(new_dur_cancer / people.pars['dt'])
+
+        # Store treatment and dates
+        sim.people.cancer_treated[treat_inds] = True
+        sim.people.cancer_treatments[treat_inds] += 1
+        sim.people.date_cancer_treated[treat_inds] = sim.t
+
         return inds
 
 

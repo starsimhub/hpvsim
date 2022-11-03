@@ -82,6 +82,8 @@ class PeopleMeta(sc.prettyobj):
         State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
         State('vaccine_source', default_int,    -1), # Index of the prophylactic vaccine that individual received
         State('screens',        default_int,    0),  # Number of screens given per person
+        State('cin_treatments', default_int,    0),  # Number of CIN treatments given per person
+        State('cancer_treatments', default_int,    0),  # Number of cancer treatments given per person
         State('art_adherence',  default_float, 0, label='adherence on ART', cmap=pl.cm.Oranges)
     ]
 
