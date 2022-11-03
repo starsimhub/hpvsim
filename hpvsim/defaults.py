@@ -132,7 +132,8 @@ class PeopleMeta(sc.prettyobj):
     intv_states = [
         State('detected_cancer',    bool,   False), # Whether the person's cancer has been detected
         State('screened',           bool,   False), # Whether the person has been screened (how does this change over time?)
-        State('treated',            bool,   False), # Whether the person has been treated
+        State('cin_treated',        bool,   False), # Whether the person has been treated for CINs
+        State('cancer_treated',     bool,   False), # Whether the person has been treated for cancer
         State('vaccinated',         bool,   False), # Whether the person has received the prophylactic vaccine
         State('tx_vaccinated',      bool,   False), # Whether the person has received the therapeutic vaccine
     ]
