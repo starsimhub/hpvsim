@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.3.8 (2022-11-02)
+--------------------------
+- Store treatment properties as part of sim.people
+- *GitHub info*: PR `413 <https://github.com/amath-idm/hpvsim/pull/413>`__
+
+
 Version 0.3.7 (2022-11-01)
 --------------------------
 - Fix to ensure consistent results for the number of txvx doses 

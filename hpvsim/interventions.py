@@ -816,6 +816,16 @@ class BaseScreening(BaseTest):
             sim.people.screened[accept_inds] = True
             sim.people.screens[accept_inds] += 1
             sim.people.date_screened[accept_inds] = sim.t
+
+            # Store results
+            idx = int(sim.t / sim.resfreq)
+            new_screen_inds = hpu.ifalsei(sim.people.screened, accept_inds)  # Figure out people who are getting screened for the first time
+            n_new_people = sim.people.scale_flows(new_screen_inds)  # Scale
+            n_new_screens = sim.people.scale_flows(accept_inds)  # Scale
+            n_new_screens = sim.people.scale_flows(accept_inds)  # Scale
+            sim.results['new_screened'][idx] += n_new_people
+            sim.results['new_screens'][idx] += n_new_screens
+
         return accept_inds
 
 
@@ -1003,12 +1013,28 @@ class BaseTreatment(Intervention):
         '''
         Perform treatment by getting candidates, checking their eligibility, and then treating them.
         '''
+        # Get indices of who will get treated
         treat_candidates = self.get_candidates(sim) # NB, this needs to be implemented by derived classes
         still_eligible = self.check_eligibility(sim)
         treat_inds = hpu.itruei(still_eligible, treat_candidates)
-        self.outcomes = self.product.administer(sim, treat_inds)
+
+        # Store treatment and dates
+        sim.people.cin_treated[treat_inds] = True
+        sim.people.cin_treatments[treat_inds] += 1
+        sim.people.date_cin_treated[treat_inds] = sim.t
+
+        # Store results
         idx = int(sim.t / sim.resfreq)
+        new_treat_inds = hpu.ifalsei(sim.people.cin_treated, treat_inds)  # Figure out people who are getting radiation for the first time
+        n_new_cin_treatments = sim.people.scale_flows(treat_inds)  # Scale
+        n_new_people = sim.people.scale_flows(new_treat_inds)  # Scale
+        sim.results['new_cin_treated'][idx] += n_new_people
+        sim.results['new_cin_treatments'][idx] += n_new_cin_treatments
+
+        # Administer treatment and store products used
+        self.outcomes = self.product.administer(sim, treat_inds)
         self.n_products_used[idx] += sim.people.scale_flows(treat_inds)
+
         return treat_inds
 
 
@@ -1371,6 +1397,20 @@ class radiation(Product):
         people = sim.people
         new_dur_cancer = hpu.sample(**self.dur, size=len(inds))
         people.date_dead_cancer[inds] += np.ceil(new_dur_cancer / people.pars['dt'])
+
+        # Store treatment and dates
+        sim.people.cancer_treated[inds] = True
+        sim.people.cancer_treatments[inds] += 1
+        sim.people.date_cancer_treated[inds] = sim.t
+
+        # Store results
+        idx = int(sim.t / sim.resfreq)
+        new_cctreat_inds = hpu.ifalsei(sim.people.cancer_treated, inds)  # Figure out people who are getting radiation for the first time
+        n_new_radiaitons = sim.people.scale_flows(inds)  # Scale
+        n_new_people = sim.people.scale_flows(new_cctreat_inds)  # Scale
+        sim.results['new_cancer_treated'][idx] += n_new_people
+        sim.results['new_cancer_treatments'][idx] += n_new_radiaitons
+
         return inds
 
 

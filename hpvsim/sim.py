@@ -447,6 +447,20 @@ class Sim(hpb.BaseSim):
         results['cum_txvx_doses'] = init_res('Cumulative therapeutic vaccine doses')
         results['cum_tx_vaccinated'] = init_res('Total received therapeutic vaccine')
 
+        # Screen & treat results
+        results['new_screens'] = init_res('New screens')
+        results['new_screened'] = init_res('Newly screened')
+        results['new_cin_treatments'] = init_res('New CIN treatments')
+        results['new_cin_treated'] = init_res('Newly treated for CINs')
+        results['new_cancer_treatments'] = init_res('New cancer treatments')
+        results['new_cancer_treated'] = init_res('Newly treated for cancer')
+        results['cum_screens'] = init_res('Cumulative screens')
+        results['cum_screened'] = init_res('Cumulative number screened')
+        results['cum_cin_treatments'] = init_res('Cumulative CIN treatments')
+        results['cum_cin_treated'] = init_res('Cumulative number treated for CINs')
+        results['cum_cancer_treatments'] = init_res('Cumulative cancer treatments')
+        results['cum_cancer_treated'] = init_res('Cumulative number treated for cancer')
+
         # Additional cancer results
         results['detected_cancer_incidence'] = init_res('Detected cancer incidence', color='#fcba03')
         results['cancer_mortality'] = init_res('Cancer mortality')
@@ -539,17 +553,13 @@ class Sim(hpb.BaseSim):
             if isinstance(intervention, hpi.Intervention):
                 intervention.initialize(self)
 
-        # Set the number of immunity sources
-        # self['n_imm_sources'] += len([x for x in self['interventions'] if isinstance(x, hpi.BaseVaccination)])
-        # self['n_imm_sources'] = self['immunity'].shape[0]
         return
 
-
-    def finalize_interventions(self):
-        for intervention in self['interventions']:
-            if isinstance(intervention, hpi.Intervention):
-                if hasattr(intervention,'n_products_used'):
-                    self.results[f'resources_{intervention.label}'] = intervention.n_products_used
+    # def finalize_interventions(self):
+    #     for intervention in self['interventions']:
+    #         if isinstance(intervention, hpi.Intervention):
+    #             if hasattr(intervention,'n_products_used'):
+    #                 self.results[f'resources_{intervention.label}'] = intervention.n_products_used
 
 
     def init_analyzers(self):
@@ -889,7 +899,7 @@ class Sim(hpb.BaseSim):
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
-        self.finalize_interventions()
+        # self.finalize_interventions()
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results

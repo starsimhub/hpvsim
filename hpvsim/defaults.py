@@ -82,6 +82,8 @@ class PeopleMeta(sc.prettyobj):
         State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
         State('vaccine_source', default_int,    -1), # Index of the prophylactic vaccine that individual received
         State('screens',        default_int,    0),  # Number of screens given per person
+        State('cin_treatments', default_int,    0),  # Number of CIN treatments given per person
+        State('cancer_treatments', default_int,    0),  # Number of cancer treatments given per person
         State('art_adherence',  default_float, 0, label='adherence on ART', cmap=pl.cm.Oranges)
     ]
 
@@ -132,7 +134,8 @@ class PeopleMeta(sc.prettyobj):
     intv_states = [
         State('detected_cancer',    bool,   False), # Whether the person's cancer has been detected
         State('screened',           bool,   False), # Whether the person has been screened (how does this change over time?)
-        State('treated',            bool,   False), # Whether the person has been treated
+        State('cin_treated',        bool,   False), # Whether the person has been treated for CINs
+        State('cancer_treated',     bool,   False), # Whether the person has been treated for cancer
         State('vaccinated',         bool,   False), # Whether the person has received the prophylactic vaccine
         State('tx_vaccinated',      bool,   False), # Whether the person has received the therapeutic vaccine
     ]

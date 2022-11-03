@@ -285,10 +285,10 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
     to_plot = {
-        'Screens': ['resources_routine screening', 'resources_campaign screening'],
-        'Vaccines': ['resources_routine vx', 'resources_campaign vx'],
-        'Therapeutic vaccine': ['resources_txvx'],
-        'Treatments': ['resources_ablation', 'resources_excision', 'resources_radiation'],
+        'Screens': ['new_screens', 'new_screened'],
+        'Vaccines': ['new_total_vaccinated', 'new_doses'],
+        'Therapeutic vaccine': ['new_tx_vaccinated', 'new_txvx_doses'],
+        'Treatments': ['new_cin_treatments', 'new_cin_treated'],
     }
     sim.plot(to_plot=to_plot)
 
@@ -352,8 +352,8 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
     to_plot = {
-        'Therapeutic vaccine': ['resources_campaign txvx', 'resources_campaign txvx 2nd dose',
-                                'resources_routine txvx', 'resources_routine txvx 2nd dose'],
+        # 'Therapeutic vaccine': ['resources_campaign txvx', 'resources_campaign txvx 2nd dose',
+        #                         'resources_routine txvx', 'resources_routine txvx 2nd dose'],
         'Number vaccinated': ['new_tx_vaccinated', 'cum_tx_vaccinated'],
     }
     sim.plot(to_plot=to_plot)
@@ -479,8 +479,8 @@ def test_screening():
     sim.run()
     to_plot = {
         'CINs': ['total_cins'],
-        'Screens': ['resources_routine screening'],
-        'Treatments': ['resources_ablation', 'resources_excision', 'resources_radiation'],
+        # 'Screens': ['screens'],
+        # 'Treatments': ['resources_ablation', 'resources_excision', 'resources_radiation'],
     }
     sim.plot(to_plot=to_plot)
 
