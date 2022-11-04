@@ -1030,6 +1030,7 @@ class age_causal_infection(Analyzer):
 class cancer_detection(Analyzer):
     '''
     Cancer detection via symptoms
+    
     Args:
         symp_prob: Probability of having cancer detected via symptoms, rather than screening
         treat_prob: Probability of receiving treatment for those with symptom-detected cancer

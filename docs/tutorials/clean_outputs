@@ -5,4 +5,4 @@ echo `ls -1 ./my-*.* 2> /dev/null`
 echo '...in 1 second'
 sleep 1
 rm -vf ./my-*.*
-# rm -vf ./covasim_calibration.db
+# rm -vf ./hpvsim_calibration.db
