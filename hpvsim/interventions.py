@@ -557,6 +557,7 @@ __all__ += ['BaseVaccination', 'routine_vx', 'campaign_vx']
 class BaseVaccination(Intervention):
     '''
     Base vaccination class for determining who will receive a vaccine.
+
     Args:
          product        (str/Product)   : the vaccine to use
          prob           (float/arr)     : annual probability of eligible population getting vaccinated
@@ -1205,7 +1206,7 @@ class routine_txvx(BaseTxVx, RoutineDelivery):
 class campaign_txvx(BaseTxVx, CampaignDelivery):
     '''
     Campaign delivery of therapeutic vaccine - an instance of treat_num combined
-     with campaign delivery. See base classes for a description of input arguments.
+    with campaign delivery. See base classes for a description of input arguments.
     '''
 
     def __init__(self, product=None, prob=None, age_range=None, eligibility=None,

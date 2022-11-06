@@ -324,6 +324,7 @@ class BaseSim(ParsObj):
             t (int or str): the time point in the simulation cloesst to the requested date
 
         **Examples**::
+        
             sim.get_t('2015-03-01') # Get the closest timepoint to the specified date
             sim.get_t(3) # Will return 3
             sim.get_t('2015') # Can use strings

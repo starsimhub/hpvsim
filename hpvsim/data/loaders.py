@@ -215,10 +215,12 @@ def get_total_pop(location=None):
 def get_death_rates(location=None, by_sex=True, overall=False):
     '''
     Load death rates for a given country or countries.
+
     Args:
         location (str or list): name of the country or countries to load the age distribution for
         by_sex (bool): whether to rates by sex
         overall (bool): whether to load total rate
+
     Returns:
         death_rates (dict): death rates by age and sex
     '''
@@ -255,10 +257,12 @@ def get_death_rates(location=None, by_sex=True, overall=False):
 def get_life_expectancy(location=None, by_sex=True, overall=False):
     '''
     Load life expectancy by age for a given country or countries.
+
     Args:
         location (str or list): name of the country or countries to load the age distribution for
         by_sex (bool): whether to rates by sex
         overall (bool): whether to load total rate
+        
     Returns:
         life_expectancy (dict): life expectancy by age and sex
     '''
