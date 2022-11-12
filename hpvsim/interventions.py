@@ -1349,12 +1349,9 @@ class tx(Product):
                         people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
                         people[f'date_{state}'][g, eff_treat_inds] = np.nan
 
-                        # Clear infection for women who clear
-                        people.infectious[g, eff_treat_inds] = False  # People whose HPV clears
-                        people.susceptible[g, eff_treat_inds] = True
-                        people.inactive[g, eff_treat_inds] = False
+                        # Set date of clearance of infection on next timestep
+                        people['date_clearance'][g, eff_treat_inds] = people.t + 1
                         people.dur_infection[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
-                        hpi.update_peak_immunity(people, eff_treat_inds, imm_pars=people.pars, imm_source=g)
 
         tx_successful = np.array(list(set(tx_successful)))
         tx_unsuccessful = np.setdiff1d(inds, tx_successful)
