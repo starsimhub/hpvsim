@@ -952,7 +952,7 @@ def get_life_expectancy(location, verbose=False):
         raise NotImplementedError('Cannot load HIV data without a specified location')
 
 
-def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
+def get_hiv_data(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
     '''
     Load HIV incidence and art coverage data, if provided
     ART adherance calculations use life expectancy data to infer lifetime average coverage

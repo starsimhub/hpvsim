@@ -68,8 +68,8 @@ class Sim(hpb.BaseSim):
 
     def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
         ''' Load any data files that are used to create additional parameters, if provided '''
-        self.hiv_pars = sc.objdict()
-        self.hiv_pars.infection_rates, self.hiv_pars.art_adherence = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        self.hiv_data = sc.objdict()
+        self.hiv_data.infection_rates, self.hiv_data.art_adherence = hppar.get_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return
 
 
@@ -228,6 +228,12 @@ class Sim(hpb.BaseSim):
         if not sc.isnumber(self['verbose']): # pragma: no cover
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
+
+        # Handle HIV
+        if self['model_hiv']:
+            if self.hiv_data['infection_rates'] is None or self.hiv_data['art_adherence'] is None:
+                errormsg = 'Data on HIV infection rates and ART adherence must be provided if model_hiv is True.'
+                raise ValueError(errormsg)
 
         return
 
