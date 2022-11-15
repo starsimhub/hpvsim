@@ -52,7 +52,14 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     }
     pars = sc.mergedicts(pars, kwargs)
 
-    sim = hpv.Sim(pars=pars)
+    # Create some genotype pars
+    genotype_pars = {
+        16: {
+            'dysp_rate': 1.6
+        }
+    }
+
+    sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars)
     sim.set_seed(seed)
 
     # Optionally plot

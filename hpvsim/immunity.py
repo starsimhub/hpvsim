@@ -11,73 +11,6 @@ from . import parameters as hppar
 from . import interventions as hpi
 
 
-
-# %% Define genotype class -- all other functions are for internal use only
-
-__all__ = ['genotype']
-
-
-class genotype(sc.prettyobj):
-    '''
-    Add a new genotype to the sim
-
-    Args:
-        genotype (str): name of genotype
-
-    **Example**::
-
-        hpv16    = hpv.genotype('16') # Make a sim with only HPV16
-
-    '''
-
-    def __init__(self, genotype):
-        self.index     = None # Index of the genotype in the sim; set later
-        self.label     = None # Genotype label (used as a dict key)
-        self.p         = None # This is where the parameters will be stored
-        self.parse(genotype=genotype) #
-        self.initialized = False
-        return
-
-
-    def parse(self, genotype=None):
-        ''' Unpack genotype information, which must be given as a string '''
-
-        choices, mapping = hppar.get_genotype_choices()
-        known_genotype_pars = hppar.get_genotype_pars()
-
-        if isinstance(genotype, str):
-
-            label = genotype.lower()
-            if label in mapping:
-                label = mapping[label]
-                genotype_pars = known_genotype_pars[label]
-            else:
-                errormsg = f'The selected genotype "{genotype}" is not implemented; choices are:\n{sc.pp(choices, doprint=False)}'
-                raise NotImplementedError(errormsg)
-
-        else:
-            errormsg = f'Could not understand {type(genotype)}, please specify as a predefined genotype:\n{sc.pp(choices, doprint=False)}'
-            raise ValueError(errormsg)
-
-        # Set label and parameters
-        self.label = label
-        self.p = genotype_pars
-
-        return
-
-
-    def initialize(self, sim):
-        ''' Update genotype info in sim '''
-        sim['genotype_pars'][self.label] = self.p  # Store the parameters
-        self.index = list(sim['genotype_pars'].keys()).index(self.label) # Find where we are in the list
-        sim['genotype_map'][self.index]  = self.label # Use that to populate the reverse mapping
-        sim['imm_boost'] = list(sim['imm_boost']) + [self.p['imm_boost']]
-        self.initialized = True
-        return
-
-
-
-
 # %% Immunity methods
 
 def init_immunity(sim, create=True):
@@ -168,10 +101,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
         prior_imm_inds = inds[has_imm]
 
         if len(prior_imm_inds):
-            if isinstance(imm_pars['imm_boost'], Iterable):
-                boost = imm_pars['imm_boost'][imm_source]
-            else:
-                boost = imm_pars['imm_boost']
+            boost = genotype_pars['imm_boost']
             people.peak_imm[imm_source, prior_imm_inds] *= is_seroconvert[has_imm] * boost
 
         if len(no_prior_imm_inds):
