@@ -68,8 +68,8 @@ class Sim(hpb.BaseSim):
 
     def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
         ''' Load any data files that are used to create additional parameters, if provided '''
-        self.hiv_pars = sc.objdict()
-        self.hiv_pars.infection_rates, self.hiv_pars.art_adherence = hppar.get_hiv_pars(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        self.hiv_data = sc.objdict()
+        self.hiv_data.infection_rates, self.hiv_data.art_adherence = hppar.get_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return
 
 
@@ -229,6 +229,12 @@ class Sim(hpb.BaseSim):
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
 
+        # Handle HIV
+        if self['model_hiv']:
+            if self.hiv_data['infection_rates'] is None or self.hiv_data['art_adherence'] is None:
+                errormsg = 'Data on HIV infection rates and ART adherence must be provided if model_hiv is True.'
+                raise ValueError(errormsg)
+
         return
 
 
@@ -304,42 +310,59 @@ class Sim(hpb.BaseSim):
 
 
     def init_genotypes(self):
-        ''' Initialize the genotypes '''
+        ''' Initialize the genotype parameters '''
         if self._orig_pars and 'genotypes' in self._orig_pars:
             self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
 
-        genotype_options = hppar.get_genotype_pars().keys()
+        default_gpars   = hppar.get_genotype_pars()
+        user_gpars      = sc.dcp(self['genotype_pars'])
+        self['genotype_pars'] = sc.objdict()
+
+        # Handle special input cases
         if self['genotypes'] == 'all':
-            self['genotypes'] = genotype_options
-
-        for i, g in enumerate(self['genotypes']):
-
-            # Genotypes can be provided in different formats. Here we convert them to hpv.genotype objects
-            if sc.isnumber(g): g = f'hpv{g}' # Convert e.g. 16 to hpv16
-            if sc.checktype(g,str):
-                if not g in genotype_options:
-                    errormsg = f'Genotype {i} ({g}) is not one of the inbuilt options.'
-                    raise ValueError(errormsg)
-                else:
-                    g = hpimm.genotype(g)
-
-            # Initialize genotypes
-            if isinstance(g, hpimm.genotype):
-                if not g.initialized:
-                    g.initialize(self)
-            else:  # pragma: no cover
-                errormsg = f'Cannot understand genotype {i} ({g}). Please provide it as an integer, string, or hpv.genotype object.'
-                raise TypeError(errormsg)
-
+            self['genotypes'] = default_gpars.keys()
         if not len(self['genotypes']):
             print('No genotypes provided, will assume only simulating HPV16 by default')
-            hpv16 = hpimm.genotype('hpv16')
-            hpv16.initialize(self)
-            self['genotypes'] = [hpv16]
+            self['genotypes'] = ['hpv16']
+
+        # Loop over genotypes
+        for i, g in enumerate(self['genotypes']):
+
+            # Standardize format of genotype inputs
+            if sc.isnumber(g): g = f'hpv{g}' # Convert e.g. 16 to hpv16
+            if sc.checktype(g,str):
+                if not g in default_gpars.keys():
+                    errormsg = f'Genotype {i} ({g}) is not one of the inbuilt options.'
+                    raise ValueError(errormsg)
+            else:
+                errormsg = f'Format {type(g)} is not understood.'
+                raise ValueError(errormsg)
+
+            # Add to genotype_par dict
+            self['genotype_pars'][g] = default_gpars[g]
+            self['genotype_map'][i] = g
+
+        # Loop over user-supplied genotype parameters that can overwrite values
+        if len(user_gpars):
+            for g,gpars in user_gpars.items():
+
+                # Standardize format of genotype inputs
+                if sc.isnumber(g): g = f'hpv{g}'  # Convert e.g. 16 to hpv16
+                if sc.checktype(g, str):
+                    if not g in self['genotype_pars'].keys():
+                        errormsg = f'Parameters provided for genotype {g}, but it is not in the sim.'
+                        raise ValueError(errormsg)
+                    else:
+                        for gparname,gparval in gpars.items():
+                            if gparname in self['genotype_pars'][g].keys():
+                                printmsg = f"Resetting parameter '{gparname}' from {self['genotype_pars'][g][gparname]} to {gparval} for genotype {g}"
+                                sc.printv(printmsg, 1, self['verbose'])
+                                self['genotype_pars'][g][gparname] = gparval
+                            else:
+                                errormsg = f"Parameter {gparname} does not exist for genotype {g}"
+                                raise ValueError(errormsg)
 
         len_pars = len(self['genotype_pars'])
-        len_map = len(self['genotype_map'])
-        assert len_pars == len_map, f"genotype_pars and genotype_map must be the same length, but they're not: {len_pars} ≠ {len_map}"
         self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
 
         # Set the number of immunity sources
@@ -532,7 +555,7 @@ class Sim(hpb.BaseSim):
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
         
         # Finish initialization
-        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_pars) # Fully initialize the people
+        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_data) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])

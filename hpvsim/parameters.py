@@ -176,7 +176,7 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         age_act_pars = dict(m=dict(peak=35, retirement=75, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
                             c=dict(peak=25, retirement=75, debut_ratio=0.5, retirement_ratio=0.1),
                             o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
-        dur_pship   = dict(m=dict(dist='normal_pos', par1=8,par2=3),
+        dur_pship   = dict(m=dict(dist='normal_pos', par1=8, par2=3),
                            c=dict(dist='normal_pos', par1=1, par2=1),
                            o=dict(dist='normal_pos', par1=0.1, par2=0.05)),
         condoms     = dict(m=0.01, c=0.5, o=0.6),  # Default proportion of acts in which condoms are used
@@ -952,7 +952,7 @@ def get_life_expectancy(location, verbose=False):
         raise NotImplementedError('Cannot load HIV data without a specified location')
 
 
-def get_hiv_pars(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
+def get_hiv_data(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
     '''
     Load HIV incidence and art coverage data, if provided
     ART adherance calculations use life expectancy data to infer lifetime average coverage

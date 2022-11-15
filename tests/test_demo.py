@@ -24,7 +24,6 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
                 dt=.5,
                 network='default',
                 location=location,
-                genotypes=[16,18,35,45,52,58],
                 verbose=0.1
                 )
 
@@ -39,14 +38,6 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
 
     pars['hpv_control_prob'] = 0.4
     pars['beta'] = 0.217
-
-    # Initialize genotypes
-    hpv16   = hpv.genotype('HPV16')
-    hpv18   = hpv.genotype('HPV18')
-    hpv35   = hpv.genotype('HPV35')
-    hpv45   = hpv.genotype('HPV45')
-    hpv52   = hpv.genotype('HPV52')
-    hpv58   = hpv.genotype('HPV58')
 
     az = hpv.age_results(
         result_keys=sc.objdict(
@@ -64,7 +55,7 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
     )
 
     analyzers = [az]
-    genotypes = [hpv16, hpv18, hpv35, hpv45, hpv52, hpv58]
+    genotypes = [16, 18, 35, 45, 52, 58]
     interventions = []
 
     # Create sim
