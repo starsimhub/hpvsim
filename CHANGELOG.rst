@@ -9,6 +9,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.3.9 (2022-11-15)
+--------------------------
+- Simplifies genotype initialization, adds checks for HIV runs.
+- Since the last release, changes were also made to virological clearance rates for people receiving treatment - previously all treated people would clear infection, but now some may control latently instead.
+- *GitHub info*: PRs `421 <https://github.com/amath-idm/hpvsim/pull/421>`__ and `420 <https://github.com/amath-idm/hpvsim/pull/420>`__
+
+
 Version 0.3.8 (2022-11-02)
 --------------------------
 - Store treatment properties as part of sim.people
