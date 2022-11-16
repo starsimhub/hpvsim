@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.0 (2022-11-16)
+--------------------------
+- Adds merge method for scenarios and fixes printing bugs
+- *GitHub info*: PRs `422 <https://github.com/amath-idm/hpvsim/pull/422>`__
+
+
 Version 0.3.9 (2022-11-15)
 --------------------------
 - Simplifies genotype initialization, adds checks for HIV runs.
