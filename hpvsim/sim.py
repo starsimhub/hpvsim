@@ -1071,8 +1071,16 @@ class Sim(hpb.BaseSim):
         string = f'Simulation{labelstr} summary:\n'
         for key in self.result_keys():
             if full or key.startswith('total') and 'by_sex' not in key:
-                val = np.round(summary[key])
-                string += f'   {val:10,.0f} {self.results[key].name.lower()}\n'.replace(',', sep) # Use replace since it's more flexible
+                val = summary[key]
+                printval = f'   {val:10,.0f} '
+                label = self.results[key].name.lower().replace(',', sep)
+                if 'incidence' in key or 'prevalence' in key:
+                    if key in ['total_hpv_prevalence', 'total_hpv_incidence']:
+                        printval = f'   {val*100:10.2f} '
+                        label += ' (/100)'
+                    else:
+                        label += ' (/100,000)'
+                string += printval + label + '\n'
 
         # Print or return string
         if not output:
