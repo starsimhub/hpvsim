@@ -1,5 +1,5 @@
 '''
-Plot network outputs
+Scenario merging
 ''' 
 import os
 import pytest

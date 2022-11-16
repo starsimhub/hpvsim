@@ -1394,6 +1394,39 @@ class Scenarios(hpb.ParsObj):
         else:
             return string
 
+    @staticmethod
+    def merge(*args):
+        '''
+        Merge two or more scenarios to create a single scenario object
+        Args:
+            args (Scenarios): the Scenarios to merge (either a list, or separate)
+        Returns:
+            scen (Scenarios): a new Scenario object
+        '''
+
+        # Handle arguments
+        if len(args) == 1 and isinstance(args[0], (list, tuple)):
+            args = args[0]
+
+        # Create the scenarios from the base sim of the first argument
+        scens = Scenarios(sim=sc.dcp(args[0].base_sim), scenarios={})
+        scens.sims = []
+        base_res = args[0].results
+        res_keys = base_res.keys()
+
+        # Copy over sims and results
+        for scen in args:
+            scens.sims += sc.dcp(scen.sims)
+            scens.scenarios = sc.mergedicts(scens.scenarios, scen.scenarios)
+            res = scen.results
+
+            for rkey in res_keys: # Loop over result keys
+                for skey in res[rkey].keys():
+                    scens.results[rkey][skey] = res[rkey][skey]
+
+        return scens
+
+
 
 def single_run(sim, ind=0, reseed=True, noise=0.0, noisepar=None, keep_people=False, run_args=None, sim_args=None, verbose=None, do_run=True, **kwargs):
     '''

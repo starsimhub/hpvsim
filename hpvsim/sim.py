@@ -1076,7 +1076,7 @@ class Sim(hpb.BaseSim):
                 label = self.results[key].name.lower().replace(',', sep)
                 if 'incidence' in key or 'prevalence' in key:
                     if key in ['total_hpv_prevalence', 'total_hpv_incidence']:
-                        printval = f'   {val:10.2f} '
+                        printval = f'   {val*100:10.2f} '
                         label += ' (/100)'
                     else:
                         label += ' (/100,000)'
