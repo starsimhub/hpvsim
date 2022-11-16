@@ -333,24 +333,6 @@ def test_resuming():
 
     return s1
 
-def test_temp():
-
-    pars = {
-        'n_agents': 1000,
-        'start': 1990,
-        'burnin': 30,
-        'end': 2050,
-        'genotypes': [16, 18],
-        'dt': .5,
-        'model_hiv': 0,
-        'pop_scale': 1_000,
-    }
-
-    sim = hpv.Sim(pars)
-    sim.run()
-    sim.plot()
-    return sim
-
 
 #%% Run as a script
 if __name__ == '__main__':
