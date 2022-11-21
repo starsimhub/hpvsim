@@ -39,6 +39,9 @@ def make_pars(**kwargs):
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
     pars['birth_rates']     = None      # Birth rates, loaded below
+    pars['death_rates']     = None      # Death rates, loaded below
+    pars['rel_birth']       = 1.0       # Birth rate scale factor
+    pars['rel_death']       = 1.0       # Death rate scale factor
 
     # Initialization parameters
     pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence

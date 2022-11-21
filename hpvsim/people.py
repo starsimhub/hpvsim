@@ -682,7 +682,9 @@ class People(hpb.BasePeople):
         assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
         if new_births is None:
-            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1], smoothness=0)[0]/1e3
+            years = self.pars['birth_rates'][0]
+            rates = self.pars['birth_rates'][1]
+            this_birth_rate = self.pars['rel_birth']*np.interp(year, years, rates)/1e3
             new_births = sc.randround(this_birth_rate*self.n_alive_level0) # Crude births per 1000
 
         if new_births>0:
