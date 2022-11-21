@@ -44,8 +44,9 @@ def make_pars(**kwargs):
     pars['rel_death']       = 1.0       # Death rate scale factor
 
     # Initialization parameters
-    pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence
+    pars['init_hpv_prev'] = sc.dcp(hpd.default_init_prev) # Initial prevalence
     pars['init_hpv_dist'] = None  # Initial type distribution
+    pars['rel_init_prev'] = 1.0 # Initial prevalence scale factor
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation

@@ -405,6 +405,9 @@ class Sim(hpb.BaseSim):
             else:
                 resfreq = int(frequency / self['dt'])
         self.resfreq = resfreq
+        if not self.resfreq > 0:
+            errormsg = f'The results frequence should be a positive integer, not {self.resfreq}: dt may be too large'
+            raise ValueError(errormsg)
 
         # Construct the tvec that will be used with the results
         points_to_use = np.arange(0, self.npts, self.resfreq)
@@ -615,8 +618,8 @@ class Sim(hpb.BaseSim):
 
         # Assign probabilities of having HPV to each age/sex group
         hpv_probs = np.full(len(self.people), np.nan, dtype=hpd.default_float)
-        hpv_probs[self.people.f_inds] = init_hpv_prev['f'][age_inds[self.people.f_inds]]
-        hpv_probs[self.people.m_inds] = init_hpv_prev['m'][age_inds[self.people.m_inds]]
+        hpv_probs[self.people.f_inds] = init_hpv_prev['f'][age_inds[self.people.f_inds]]*self.pars['rel_init_prev']
+        hpv_probs[self.people.m_inds] = init_hpv_prev['m'][age_inds[self.people.m_inds]]*self.pars['rel_init_prev']
         hpv_probs[~self.people.is_active] = 0 # Blank out people who are not yet sexually active
 
         # Get indices of people who have HPV
