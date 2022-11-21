@@ -36,7 +36,6 @@ def test_screen_prob():
     len_age_range = age_range[1]-age_range[0]
     model_annual_prob = 1 - (1 - target_lifetime_prob)**(1/len_age_range)
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) # Only model a single lifetime screen
-    tolerance = 0.05 #  Allow it to be off by 5%
 
     screen = hpv.routine_screening(
         product='via',  # pass in string or product
