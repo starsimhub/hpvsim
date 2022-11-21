@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 do_plot = 0
 do_save = 0
 
-n_agents = [1e3,50e3][0] # Swap between sizes
+n_agents = [500,50e3][0] # Swap between sizes
 
 base_pars = {
     'n_agents': n_agents,
