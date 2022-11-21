@@ -16,12 +16,9 @@ pars = dict(
 debug = 1
 repeats = [10,3][debug]
 ms_agent_ratios = [[1, 3, 10, 30, 100, 300, 1000], [1, 3, 10, 30]][debug]
-n_agents = [[100, 300, 1000, 3000, 10000], [100, 300, 1000]][debug]
+n_agents = [[100, 200, 500, 1000, 2000, 5000, 10000], [100, 200, 500, 1000]][debug]
 
-# Create the sim
-sims = []
-
-
+# Run the sims -- not parallelized to collect timings
 data = []
 count = 0
 for n in n_agents:
@@ -45,11 +42,16 @@ for n in n_agents:
             )
             data.append(row)
 
+#%% Analysis
+
 df = sc.dataframe(data)
 
 g = df.groupby(['n', 'ms'])
+sc.heading('Means')
 print(g.mean())
+sc.heading('STDs')
 print(g.std())
+sc.heading('CoVs')
 print(g.std()/g.mean())
 
 #%% Plot sims
