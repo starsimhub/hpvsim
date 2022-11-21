@@ -9,6 +9,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.1 (2022-11-21)
+--------------------------
+- Fixes age of migration
+- Adds scale parameter for vital dynamics
+- *GitHub info*: PRs `423 <https://github.com/amath-idm/hpvsim/pull/423>`__
+
+
 Version 0.4.0 (2022-11-16)
 --------------------------
 - Adds merge method for scenarios and fixes printing bugs
