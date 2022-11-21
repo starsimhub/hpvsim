@@ -18,7 +18,7 @@ def test_demo(datafile=None, do_plot=True, do_save=False):
 
     sc.heading('Creating a demo project')
 
-    pars = dict(n_agents=5e3,
+    pars = dict(n_agents=2e3,
                 start=1950,
                 end=2020,
                 dt=.5,

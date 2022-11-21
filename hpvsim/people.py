@@ -660,6 +660,7 @@ class People(hpb.BasePeople):
         death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
         death_probs[self.age>100] = 1 # Just remove anyone >100
         death_probs[~self.alive] = 0
+        death_probs *= self.pars['rel_death'] # Adjust overall death probabilities
 
         # Get indices of people who die of other causes
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
@@ -670,29 +671,31 @@ class People(hpb.BasePeople):
         return other_deaths, deaths_female, deaths_male
 
 
-    def add_births(self, year=None, new_births=None):
+    def add_births(self, year=None, new_births=None, ages=0):
         '''
         Add more people to the population
 
         Specify either the year from which to retrieve the birth rate, or the absolute number
         of new people to add. Must specify one or the other. People are added in-place to the
-        current `People` instance
+        current `People` instance.
         '''
 
         assert (year is None) != (new_births is None), 'Must set either year or n_births, not both'
 
         if new_births is None:
-            this_birth_rate = sc.smoothinterp(year, self.pars['birth_rates'][0], self.pars['birth_rates'][1], smoothness=0)[0]/1e3
+            years = self.pars['birth_rates'][0]
+            rates = self.pars['birth_rates'][1]
+            this_birth_rate = self.pars['rel_birth']*np.interp(year, years, rates)/1e3
             new_births = sc.randround(this_birth_rate*self.n_alive_level0) # Crude births per 1000
 
         if new_births>0:
             # Generate other characteristics of the new people
             uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
-
+            
             # Grow the arrays
             new_inds = self._grow(new_births)
             self.uid[new_inds]        = uids
-            self.age[new_inds]        = 0
+            self.age[new_inds]        = ages
             self.scale[new_inds]      = self.pars['pop_scale']
             self.sex[new_inds]        = sexes
             self.debut[new_inds]      = debuts
@@ -740,9 +743,12 @@ class People(hpb.BasePeople):
                 migrate_inds = alive_inds[inds]
                 self.remove_people(migrate_inds, cause='emigration') # Remove people
 
-            # Apply immigration -- TODO, add age?
+            # Apply immigration
             elif n_migrate > 0:
-                self.add_births(new_births=n_migrate)
+                inds = hpu.choose(n_alive, n_migrate) # Randomly sample existing people in the population
+                age_inds = alive_inds[inds] # Pull out indices of agents whose ages should be duplicated
+                ages = self.age[age_inds] # Pull out those ages
+                self.add_births(new_births=n_migrate, ages=ages)
 
         else:
             n_migrate = 0

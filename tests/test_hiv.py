@@ -10,7 +10,7 @@ do_plot = 0
 do_save = 0
 debug = 1
 
-n_agents = [50e3,1e3][debug] # Swap between sizes
+n_agents = [50e3,500][debug] # Swap between sizes
 
 
 #%% Define the tests
@@ -37,6 +37,7 @@ def test_hiv(model_hiv=True):
     sim.run()
     sim.plot(to_plot=['hiv_prevalence'])
     return sim
+
 
 def test_impact_on_cancer():
     sc.heading('Testing hiv')
@@ -85,7 +86,7 @@ def test_impact_on_cancer():
         }
     }
 
-    metapars = {'n_runs': 3}
+    metapars = {'n_runs': 2}
     scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
     scens.run(debug=debug)
     to_plot = {

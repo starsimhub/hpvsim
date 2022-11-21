@@ -39,10 +39,14 @@ def make_pars(**kwargs):
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
     pars['birth_rates']     = None      # Birth rates, loaded below
+    pars['death_rates']     = None      # Death rates, loaded below
+    pars['rel_birth']       = 1.0       # Birth rate scale factor
+    pars['rel_death']       = 1.0       # Death rate scale factor
 
     # Initialization parameters
-    pars['init_hpv_prev']   = hpd.default_init_prev # Initial prevalence
+    pars['init_hpv_prev'] = sc.dcp(hpd.default_init_prev) # Initial prevalence
     pars['init_hpv_dist'] = None  # Initial type distribution
+    pars['rel_init_prev'] = 1.0 # Initial prevalence scale factor
 
     # Simulation parameters
     pars['start']           = 2015.         # Start of the simulation

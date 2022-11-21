@@ -74,13 +74,13 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_agents=5e3, n_years=10, dt=0.5, network='random', beta=0.05, eff_condoms=1.0)
+    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, network='random', beta=0.05, eff_condoms=0.6)
     sim = hpv.Sim(pars=base_pars)
     sim.initialize()
 
     # Define the parameters to vary
     vary_pars   = ['model_hiv',     'beta',          'acts',             'condoms',          'debut',            'init_hpv_prev', ] # Parameters
-    vary_vals   = [[False, True],   [0.0001, 0.99],    [1, 200],           [0.01,1.0],         [15,25],             [0.01,0.8]] # Values
+    vary_vals   = [[False, True],   [0.0001, 0.99],    [1, 200],           [0.01,0.8],         [15,25],             [0.01,0.8]] # Values
     vary_rels   = ['pos',           'pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
     vary_what   = ['total_hpv_prevalence', 'total_hpv_incidence',    'total_hpv_incidence',      'total_hpv_incidence', 'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
 
