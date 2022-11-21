@@ -4,7 +4,7 @@ import hpvsim as hpv
 
 # Define the parameters
 pars = dict(
-    n_agents      = 5e3,       # Population size
+    total_pop     = 10e3,       # Population size
     start         = 1980,       # Starting year
     n_years       = 50,         # Number of years to simulate
     genotypes     = [16, 18],   # Include the two genotypes of greatest general interest
@@ -13,9 +13,10 @@ pars = dict(
     use_multiscale = True,
 )
 
-repeats = 3
-ms_agent_ratios = [1, 3, 10, 30, 100]#, 300, 1000]
-n_agents = [100, 300, 1000]#, 3000, 10000]
+debug = 1
+repeats = [10,3][debug]
+ms_agent_ratios = [[1, 3, 10, 30, 100, 300, 1000], [1, 3, 10, 30]][debug]
+n_agents = [[100, 300, 1000, 3000, 10000], [100, 300, 1000]][debug]
 
 # Create the sim
 sims = []
@@ -33,10 +34,18 @@ for n in n_agents:
             T = sc.timer()
             sim.run()
             sim.time = T.tocout()
-            row = [n, ms, r, sim.time, sim.results.total_infections.values.sum(), sim.results.total_cancer_deaths.values.sum()]
+            row = dict(
+                n=n, 
+                ms=ms, 
+                seed=r,
+                time=sim.time, 
+                n_agents=len(sim.people), 
+                infs=sim.results.total_infections.values.sum(), 
+                deaths=sim.results.total_cancer_deaths.values.sum()
+            )
             data.append(row)
 
-df = sc.dataframe(columns=['n', 'ms', 'r', 'time', 'infs', 'deaths'], data=data)
+df = sc.dataframe(data)
 
 g = df.groupby(['n', 'ms'])
 print(g.mean())
