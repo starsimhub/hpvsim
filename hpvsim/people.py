@@ -660,6 +660,7 @@ class People(hpb.BasePeople):
         death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
         death_probs[self.age>100] = 1 # Just remove anyone >100
         death_probs[~self.alive] = 0
+        death_probs *= self.pars['rel_death'] # Adjust overall death probabilities
 
         # Get indices of people who die of other causes
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
