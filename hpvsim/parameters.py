@@ -85,12 +85,14 @@ def make_pars(**kwargs):
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
 
     # Parameters used to calculate immunity
-    pars['imm_init']        = dict(dist='beta', par1=5, par2=3)  # beta distribution for initial level of immunity following infection clearance
+    pars['imm_init']        = dict(dist='beta_mean', par1=0.625, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance
     pars['imm_decay']       = dict(form=None)  # decay rate, with half life in years
     pars['imm_kin']         = None  # Constructed during sim initialization using the nab_decay parameters
     pars['imm_boost']       = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity']        = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
     pars['immunity_map']    = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
+    pars['cross_imm_med']   = 0.3
+    pars['cross_imm_high']  = 0.5
 
     # all genotype properties get populated by user in init_genotypes()
     pars['genotypes']       = []  # Genotypes of the virus; populated by the user below
@@ -494,248 +496,246 @@ def get_genotype_pars(default=False, genotype=None):
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
 
-def get_cross_immunity(default=False, genotype=None):
+def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, default=False, genotype=None):
     '''
     Get the cross immunity between each genotype in a sim
     '''
-    med_imm = 0.3
-    high_imm = 0.5
     pars = dict(
         # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
         hpv16 = dict(
             hpv16  = 1.0, # Default for own-immunity
-            hpv18 = high_imm,
-            hpv31  = high_imm,
-            hpv33 = high_imm,
-            hpv35 = high_imm,
-            hpv45 = high_imm,
-            hpv51 = med_imm,
-            hpv52 = med_imm,
-            hpv56 = med_imm,
-            hpv58 = med_imm,
-            hpv6 = med_imm,
-            hpv11 = med_imm,
+            hpv18 = cross_imm_high,
+            hpv31  = cross_imm_high,
+            hpv33 = cross_imm_high,
+            hpv35 = cross_imm_high,
+            hpv45 = cross_imm_high,
+            hpv51 = cross_imm_med,
+            hpv52 = cross_imm_med,
+            hpv56 = cross_imm_med,
+            hpv58 = cross_imm_med,
+            hpv6 = cross_imm_med,
+            hpv11 = cross_imm_med,
             hrhpv = 0.1,
-            lrhpv = med_imm
+            lrhpv = cross_imm_med
         ),
 
         hpv18 = dict(
-            hpv16=high_imm,
+            hpv16=cross_imm_high,
             hpv18=1.0,  # Default for own-immunity
-            hpv31=high_imm,
-            hpv33=high_imm,
-            hpv35=high_imm,
-            hpv45=high_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
+            hpv31=cross_imm_high,
+            hpv33=cross_imm_high,
+            hpv35=cross_imm_high,
+            hpv45=cross_imm_high,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
             hrhpv = 0.1,
-            lrhpv = med_imm
+            lrhpv = cross_imm_med
         ),
 
         hpv31=dict(
-            hpv16=high_imm,
-            hpv18=high_imm,
+            hpv16=cross_imm_high,
+            hpv18=cross_imm_high,
             hpv31=1.0,  # Default for own-immunity
-            hpv33=high_imm,
-            hpv35=high_imm,
-            hpv45=high_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=high_imm,
-            lrhpv=med_imm
+            hpv33=cross_imm_high,
+            hpv35=cross_imm_high,
+            hpv45=cross_imm_high,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_high,
+            lrhpv=cross_imm_med
         ),
 
         hpv33=dict(
-            hpv16=high_imm,
-            hpv18=high_imm,
-            hpv31=high_imm,
+            hpv16=cross_imm_high,
+            hpv18=cross_imm_high,
+            hpv31=cross_imm_high,
             hpv33=1.0,  # Default for own-immunity
-            hpv35=high_imm,
-            hpv45=high_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=high_imm,
-            lrhpv=med_imm
+            hpv35=cross_imm_high,
+            hpv45=cross_imm_high,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_high,
+            lrhpv=cross_imm_med
         ),
 
         hpv35=dict(
-            hpv16=high_imm,
-            hpv18=high_imm,
-            hpv31=high_imm,
-            hpv33=high_imm,
+            hpv16=cross_imm_high,
+            hpv18=cross_imm_high,
+            hpv31=cross_imm_high,
+            hpv33=cross_imm_high,
             hpv35=1.0,  # Default for own-immunity
-            hpv45=high_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=high_imm,
-            lrhpv=med_imm
+            hpv45=cross_imm_high,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_high,
+            lrhpv=cross_imm_med
         ),
 
         hpv45=dict(
-            hpv16=high_imm,
-            hpv18=high_imm,
-            hpv31=high_imm,
-            hpv33=high_imm,
-            hpv35=high_imm,
+            hpv16=cross_imm_high,
+            hpv18=cross_imm_high,
+            hpv31=cross_imm_high,
+            hpv33=cross_imm_high,
+            hpv35=cross_imm_high,
             hpv45=1.0,  # Default for own-immunity
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=high_imm,
-            lrhpv=med_imm
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_high,
+            lrhpv=cross_imm_med
         ),
 
         hpv51=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
-            hpv31=med_imm,
-            hpv33=med_imm,
-            hpv35=med_imm,
-            hpv45=med_imm,
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv31=cross_imm_med,
+            hpv33=cross_imm_med,
+            hpv35=cross_imm_med,
+            hpv45=cross_imm_med,
             hpv51=1.0,  # Default for own-immunity
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=high_imm,
-            lrhpv=med_imm
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_high,
+            lrhpv=cross_imm_med
         ),
 
         hpv52=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
-            hpv31=med_imm,
-            hpv33=med_imm,
-            hpv35=med_imm,
-            hpv45=med_imm,
-            hpv51=med_imm,
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv31=cross_imm_med,
+            hpv33=cross_imm_med,
+            hpv35=cross_imm_med,
+            hpv45=cross_imm_med,
+            hpv51=cross_imm_med,
             hpv52=1.0,  # Default for own-immunity
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=high_imm,
-            lrhpv=med_imm
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_high,
+            lrhpv=cross_imm_med
         ),
 
         hpv56=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
-            hpv31=med_imm,
-            hpv33=med_imm,
-            hpv35=med_imm,
-            hpv45=med_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv31=cross_imm_med,
+            hpv33=cross_imm_med,
+            hpv35=cross_imm_med,
+            hpv45=cross_imm_med,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
             hpv56=1.0,  # Default for own-immunity
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=high_imm,
-            lrhpv=med_imm
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_high,
+            lrhpv=cross_imm_med
         ),
 
         hpv58=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
-            hpv31=med_imm,
-            hpv33=med_imm,
-            hpv35=med_imm,
-            hpv45=med_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv31=cross_imm_med,
+            hpv33=cross_imm_med,
+            hpv35=cross_imm_med,
+            hpv45=cross_imm_med,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
             hpv58=1.0,  # Default for own-immunity
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=high_imm,
-            lrhpv=med_imm
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_high,
+            lrhpv=cross_imm_med
         ),
 
         hpv6=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
-            hpv31=med_imm,
-            hpv33=med_imm,
-            hpv35=med_imm,
-            hpv45=med_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv31=cross_imm_med,
+            hpv33=cross_imm_med,
+            hpv35=cross_imm_med,
+            hpv45=cross_imm_med,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
             hpv6=1.0,  # Default for own-immunity
-            hpv11=med_imm,
-            hrhpv=med_imm,
-            lrhpv=high_imm
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_med,
+            lrhpv=cross_imm_high
         ),
 
         hpv11=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
-            hpv31=med_imm,
-            hpv33=med_imm,
-            hpv35=med_imm,
-            hpv45=med_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv31=cross_imm_med,
+            hpv33=cross_imm_med,
+            hpv35=cross_imm_med,
+            hpv45=cross_imm_med,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
             hpv11=1.0,  # Default for own-immunity
-            hrhpv=med_imm,
-            lrhpv=high_imm
+            hrhpv=cross_imm_med,
+            lrhpv=cross_imm_high
         ),
         hrhpv=dict(
             hpv16=0.1,
             hpv18=0.1,
-            hpv31=med_imm,
-            hpv33=med_imm,
-            hpv35=med_imm,
-            hpv45=med_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=med_imm,
-            lrhpv=med_imm
+            hpv31=cross_imm_med,
+            hpv33=cross_imm_med,
+            hpv35=cross_imm_med,
+            hpv45=cross_imm_med,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_med,
+            lrhpv=cross_imm_med
         ),
 
         lrhpv=dict(
-            hpv16=med_imm,
-            hpv18=med_imm,
-            hpv31=med_imm,
-            hpv33=med_imm,
-            hpv35=med_imm,
-            hpv45=med_imm,
-            hpv51=med_imm,
-            hpv52=med_imm,
-            hpv56=med_imm,
-            hpv58=med_imm,
-            hpv6=med_imm,
-            hpv11=med_imm,
-            hrhpv=med_imm,
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv31=cross_imm_med,
+            hpv33=cross_imm_med,
+            hpv35=cross_imm_med,
+            hpv45=cross_imm_med,
+            hpv51=cross_imm_med,
+            hpv52=cross_imm_med,
+            hpv56=cross_imm_med,
+            hpv58=cross_imm_med,
+            hpv6=cross_imm_med,
+            hpv11=cross_imm_med,
+            hrhpv=cross_imm_med,
             lrhpv=1.0# Default for own-immunity
         ),
     )

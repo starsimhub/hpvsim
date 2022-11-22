@@ -41,7 +41,7 @@ def init_immunity(sim, create=True):
         immunity = np.ones((ng, ng), dtype=hpd.default_float)  # Fill with defaults
 
         # Next, overwrite these defaults with any known immunity values about specific genotypes
-        default_cross_immunity = hppar.get_cross_immunity()
+        default_cross_immunity = hppar.get_cross_immunity(cross_imm_med=sim['cross_imm_med'], cross_imm_high=sim['cross_imm_high'])
         for i in range(ng):
             sim['immunity_map'][i] = 'infection'
             label_i = sim['genotype_map'][i]

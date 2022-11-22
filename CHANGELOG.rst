@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.2 (2022-11-21)
+--------------------------
+- Changes to parameterization of immunity
+- *GitHub info*: PRs `425 <https://github.com/amath-idm/hpvsim/pull/425>`__
+
+
 Version 0.4.1 (2022-11-21)
 --------------------------
 - Fixes age of migration
