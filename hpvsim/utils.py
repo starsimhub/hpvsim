@@ -182,6 +182,10 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
             samples = np.zeros(size)
         if '_int' in dist:
             samples = np.round(samples)
+    elif dist == 'beta_mean': # Calculate a and b using mean (par1) and variance (par2) https://stats.stackexchange.com/questions/12232/calculating-the-parameters-of-a-beta-distribution-using-the-mean-and-variance
+        a       = ((1 - par1)/par2 - 1/par1) * par1**2
+        b       = a * (1 / par1 - 1)
+        samples = np.random.beta(a=a, b=b, size=size, **kwargs)
     else:
         errormsg = f'The selected distribution "{dist}" is not implemented; choices are: {sc.newlinejoin(choices)}'
         raise NotImplementedError(errormsg)
