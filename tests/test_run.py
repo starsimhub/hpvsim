@@ -228,6 +228,16 @@ def test_complex_scenarios(do_plot=do_plot, do_save=False, fig_path=None):
     return scens
 
 
+def test_sweeps(do_plot=do_plot):
+    sc.heading('Test sweeps')
+    sim = hpv.Sim()
+    sweep = hpv.Sweep(base_sim=sim,
+                      sweep_pars={'beta': [0.01, 0.1], 'hpv_control_prob': [0, 0.5]},
+                      sweep_vars=['total_cancers'],
+                      n_draws=100)
+    sweep.plot()
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
