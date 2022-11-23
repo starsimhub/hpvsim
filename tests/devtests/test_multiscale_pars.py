@@ -2,6 +2,8 @@ import sciris as sc
 import pylab as pl
 import hpvsim as hpv
 
+T = sc.timer()
+
 # Define the parameters
 pars = dict(
     total_pop     = 10e3,       # Population size
@@ -13,7 +15,7 @@ pars = dict(
     use_multiscale = True,
 )
 
-debug = 1
+debug = 0
 repeats = [10,3][debug]
 ms_agent_ratios = [[1, 3, 10, 30, 100, 300, 1000], [1, 3, 10, 30]][debug]
 n_agents = [[100, 200, 500, 1000, 2000, 5000, 10000], [100, 200, 500, 1000]][debug]
@@ -41,6 +43,7 @@ for n in n_agents:
                 deaths=sim.results.total_cancer_deaths.values.sum()
             )
             data.append(row)
+    
 
 #%% Analysis
 
@@ -53,6 +56,9 @@ sc.heading('STDs')
 print(g.std())
 sc.heading('CoVs')
 print(g.std()/g.mean())
+
+
+T.toc()
 
 #%% Plot sims
 # for key in ['n_alive', 'n_total_infected', 'total_hpv_prevalence']:
