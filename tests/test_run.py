@@ -234,8 +234,11 @@ def test_sweeps(do_plot=do_plot):
     sweep = hpv.Sweep(base_sim=sim,
                       sweep_pars={'beta': [0.01, 0.1], 'hpv_control_prob': [0, 0.5]},
                       sweep_vars=['total_cancers'],
-                      n_draws=100)
-    sweep.plot()
+                      n_draws=4)
+    if do_plot:
+        sweep.plot()
+
+    return sweep
 
 
 #%% Run as a script
@@ -245,13 +248,14 @@ if __name__ == '__main__':
     hpv.options.set(interactive=do_plot)
     T = sc.tic()
 
-    sim1   = test_singlerun()
-    sims2  = test_multirun(do_plot=do_plot)
-    msim1  = test_multisim_reduce(do_plot=do_plot)
-    msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
-    m1,m2  = test_multisim_advanced()
-    scens1 = test_simple_scenarios(do_plot=do_plot)
-    scens2 = test_complex_scenarios(do_plot=do_plot)
+    # sim1   = test_singlerun()
+    # sims2  = test_multirun(do_plot=do_plot)
+    # msim1  = test_multisim_reduce(do_plot=do_plot)
+    # msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
+    # m1,m2  = test_multisim_advanced()
+    # scens1 = test_simple_scenarios(do_plot=do_plot)
+    # scens2 = test_complex_scenarios(do_plot=do_plot)
+    sweep = test_sweeps(do_plot=False)
 
     sc.toc(T)
     print('Done.')
