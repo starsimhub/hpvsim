@@ -306,25 +306,33 @@ class People(hpb.BasePeople):
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
         cancer_scale = self.pars['pop_scale'] / n_extra
         if self.pars['use_multiscale'] and n_extra  > 1:
-            cin3_inds = inds[peak_dysp > ccut['cin2']]  # Indices of those progress at least to CIN3
-            cancer_probs = np.full(len(cin3_inds), fill_value=cancer_prob)
+            is_cin3 = peak_dysp > ccut['cin2']
+            cancer_probs = np.zeros(len(inds))
+            cancer_probs[is_cin3] = cancer_prob
             is_cancer = hpu.binomial_arr(cancer_probs)
-            cancer_inds = cin3_inds[is_cancer] # Duplicated below, but avoids need to append extra arrays
-            self.scale[cancer_inds] = cancer_scale # Shrink the weight of the original agents, but otherwise leave them the same
-            extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
-            extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
-            extra_cancer_bools *= self.level0[inds, None] # Don't allow existing cancer agents to make more cancer agents
-            extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
-            n_new_agents = extra_cancer_counts.sum() # Total number of new agents
-            if n_new_agents: # If we have more than 0, proceed
+            cancer_inds = inds[is_cancer]  # Duplicated below, but avoids need to append extra arrays
+            self.scale[cancer_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
+            extra_peak_dysp = dysp_arrs.peak_dysp[:, 1:]
+            extra_cin3_bools = extra_peak_dysp > ccut['cin2']
+            extra_cancer_probs = np.zeros(extra_cin3_bools.shape)
+            extra_cancer_probs[extra_cin3_bools] = cancer_prob
+            extra_cancer_bools = np.full(extra_cin3_bools.shape, fill_value=False)
+            for i in range(len(extra_cin3_bools)):
+                extra_cancer_bools[i,:] = hpu.binomial_arr(extra_cancer_probs[i,:])
+            extra_cancer_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
+            extra_cancer_counts = extra_cancer_bools.sum(axis=1)  # Find out how many new cancer cases we have
+            n_new_agents = extra_cancer_counts.sum()  # Total number of new agents
+            if n_new_agents:  # If we have more than 0, proceed
                 extra_source_lists = []
-                for i,count in enumerate(extra_cancer_counts):
+                for i, count in enumerate(extra_cancer_counts):
                     ii = inds[i]
-                    if count: # At least 1 new cancer agent, plus person is not already a cancer agent
-                        extra_source_lists.append([ii]*count) # Duplicate the curret index count times
-                extra_source_inds = np.concatenate(extra_source_lists).flatten() # Assemble the sources for these new agents
-                n_new_agents = len(extra_source_inds) # The same as above, *unless* a cancer agent tried to spawn more cancer agents
-                
+                    if count:  # At least 1 new cancer agent, plus person is not already a cancer agent
+                        extra_source_lists.append([ii] * int(count))  # Duplicate the curret index count times
+                extra_source_inds = np.concatenate(
+                    extra_source_lists).flatten()  # Assemble the sources for these new agents
+                n_new_agents = len(
+                    extra_source_inds)  # The same as above, *unless* a cancer agent tried to spawn more cancer agents
+
                 # Create the new agents and assign them the same properties as the existing agents
                 new_inds = self._grow(n_new_agents)
                 for state in self.meta.all_states:
