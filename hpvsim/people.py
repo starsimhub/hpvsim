@@ -356,7 +356,7 @@ class People(hpb.BasePeople):
         is_cancer = hpu.binomial_arr(cancer_probs)
         cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
         cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
-        cancer_inds = inds[is_cancer]
+        cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
         max_cin1_bools = is_cin1 * ~is_cin2   # Boolean of those who don't progress beyond CIN1
         max_cin2_bools = is_cin2 * ~is_cin3   # Boolean of those who don't progress beyond CIN2
         max_cin3_bools = is_cin3 * ~is_cancer # Boolean of those who don't progress beyond CIN3
