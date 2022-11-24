@@ -11,19 +11,19 @@ if rerun:
 
     # Define the parameters
     pars = dict(
-        total_pop     = 10e3,       # Population size
-        start         = 1980,       # Starting year
-        n_years       = 50,         # Number of years to simulate
-        genotypes     = [16, 18],   # Include the two genotypes of greatest general interest
-        verbose = 0,
-        rel_init_prev = 4.0,
+        total_pop      = 10e3,       # Population size
+        start          = 1980,       # Starting year
+        n_years        = 50,         # Number of years to simulate
+        genotypes      = [16, 18],   # Include the two genotypes of greatest general interest
+        verbose        = 0,
+        rel_init_prev  = 4.0,
         use_multiscale = True,
     )
     
     debug = 0
     repeats = [10,3][debug]
-    ms_agent_ratios = [[1, 3, 10, 30, 100, 300, 1000], [1, 3, 10, 30]][debug]
-    n_agents = [[100, 200, 500, 1000, 2000, 5000, 10000], [100, 200, 500, 1000]][debug]
+    ms_agent_ratios = [[1, 3, 10, 30, 100], [1, 3, 10, 30]][debug]
+    n_agents = [[100, 200, 500, 1e3, 2e3, 5e3, 10e3, 20e3, 50e3, 100e3], [100, 200, 500, 1000]][debug]
     
     # Run the sims -- not parallelized to collect timings
     data = []
