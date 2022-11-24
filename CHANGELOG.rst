@@ -8,6 +8,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 0.4.3 (2022-11-23)
+--------------------------
+- Changes to progression to cancer -- no longer based on clinical cutoffs, now stochastically applied by genotype to CIN3 agents
+- *GitHub info*: PRs `430 <https://github.com/amath-idm/hpvsim/pull/430>`__
+
 
 Version 0.4.2 (2022-11-21)
 --------------------------
