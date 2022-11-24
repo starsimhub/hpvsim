@@ -354,13 +354,17 @@ class People(hpb.BasePeople):
                 peak_dysp     = np.append(peak_dysp, new_peak_dysp)
                 prog_rate     = np.append(prog_rate, new_prog_rate)
                 dur_dysp      = np.append(dur_dysp,  new_dur_dysp)
+                is_cancer = np.append(is_cancer, np.full(len(new_inds), fill_value=True))
             
         # Now check indices, including with our new cancer agents
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
         is_cin2 = peak_dysp > ccut['cin1']
         is_cin3 = peak_dysp > ccut['cin2']
         cancer_probs = np.zeros(len(inds))
-        cancer_probs[is_cin3] = cancer_prob
+        if self.pars['use_multiscale'] and n_extra > 1:
+            cancer_probs[is_cancer] = 1 # Make sure inds that got assigned cancer above dont get stochastically missed
+        else:
+            cancer_probs[is_cin3] = cancer_prob
         is_cancer = hpu.binomial_arr(cancer_probs)
         cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
         cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
