@@ -306,9 +306,9 @@ class People(hpb.BasePeople):
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
         cancer_scale = self.pars['pop_scale'] / n_extra
         if self.pars['use_multiscale'] and n_extra  > 1:
-            cancer_probs = np.full(len(peak_dysp > ccut['cin2']), fill_value=cancer_prob)
-            is_cancer = hpu.binomial_arr(cancer_probs)
             cin3_inds = inds[peak_dysp > ccut['cin2']]  # Indices of those progress at least to CIN3
+            cancer_probs = np.full(len(cin3_inds), fill_value=cancer_prob)
+            is_cancer = hpu.binomial_arr(cancer_probs)
             cancer_inds = cin3_inds[is_cancer] # Duplicated below, but avoids need to append extra arrays
             self.scale[cancer_inds] = cancer_scale # Shrink the weight of the original agents, but otherwise leave them the same
             extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
