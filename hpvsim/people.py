@@ -257,7 +257,7 @@ class People(hpb.BasePeople):
         self.dur_infection[g, inds] += dur_dysp[:,0] # TODO: should this be mean(axis=1) instead?
 
         # Evaluate progression rates
-        prog_rate = hpu.sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=full_size)
+        prog_rate = hpu.sample(dist='normal_pos', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=full_size)
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
