@@ -61,8 +61,6 @@ else:
 
 #%% Analysis
 
-
-
 g = df.groupby(['n', 'ms'])
 gm = g.mean()
 gs = g.std()
@@ -75,29 +73,19 @@ print(gs)
 sc.heading('CoVs')
 print(gc)
 
+quantity = ['infs', 'deaths'][1]
 fig = pl.figure()
 index = gc.reset_index()
 colors = sc.vectocolor(pl.log(index['ms'].values), cmap='parula')
 sizes = 2*(index['n'].values)**(1/2)
-pl.scatter(gm['time'].values, gc['deaths'].values, lw=0, marker='o', c=colors, s=sizes, alpha=0.7)
+pl.scatter(gm['time'].values, gc[quantity].values, lw=0, marker='o', c=colors, s=sizes, alpha=0.7)
 pl.gca().set_xscale('log')
 pl.gca().set_yscale('log')
-pl.xlabel('Time (s)')
-pl.ylabel('Coefficient of variation')
+pl.xlabel('Time per simulation (s)')
+pl.ylabel(f'Coefficient of variation in {quantity}')
+pl.title('Dot color = multiscale agent ratio\nDot size = number of agents')
 pl.show()
 
 
 total = T.timings[:].sum()
 print(f'Done: {total:0.0f} s')
-
-#%% Plot sims
-# for key in ['n_alive', 'n_total_infected', 'total_hpv_prevalence']:
-
-#     fig = pl.figure()
-#     dtcols = sc.vectocolor(-pl.log(dts))
-#     for i,s in enumerate(msim.sims):
-#         res = s.results
-#         pl.plot(res.year, res[key], label=s.label, c=dtcols[i], lw=3, alpha=0.7)
-#     pl.title(key)
-    
-#     pl.legend()
