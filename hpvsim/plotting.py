@@ -23,7 +23,7 @@ def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None
     # Set defaults
     defaults = sc.objdict()
     defaults.fig     = sc.objdict(figsize=(10, 8), num=None)
-    defaults.plot    = sc.objdict(lw=1.5, alpha= 0.7, cmap='plasma')
+    defaults.plot    = sc.objdict(lw=1.5, alpha= 0.7)
     defaults.scatter = sc.objdict(s=20, marker='s', alpha=0.7, zorder=1.75, datastride=1) # NB: 1.75 is above grid lines but below plots
     defaults.axis    = sc.objdict(left=0.10, bottom=0.08, right=0.95, top=0.95, wspace=0.30, hspace=0.30)
     defaults.fill    = sc.objdict(alpha=0.2)
@@ -595,7 +595,7 @@ def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, sc
 
 
 def plot_heatmap(sweep, xx, yy, to_plot=None, x=None, y=None, yi=None, xi=None, zscale=1, xpar=None, ypar=None,
-                 add_contours=True, contour_args=None,
+                 add_contours=True, contour_args=None, cmap='plasma',
                  fig_args=None, plot_args=None, axis_args=None, legend_args=None, show_args=None, style_args=None,
                  fig=None, ax=None, do_save=None, do_show=None, fig_path=None):
     '''
@@ -630,11 +630,11 @@ def plot_heatmap(sweep, xx, yy, to_plot=None, x=None, y=None, yi=None, xi=None, 
                 z_min = min(z)
                 z_max = max(z)
                 zz = sc.gauss2d(x, y, z, xi, yi, scale=scale, xscale=1, yscale=1, grid=True)
-                scolors = sc.vectocolor(z, cmap=args.plot['cmap'], minval=z_min, maxval=z_max)
+                scolors = sc.vectocolor(z, cmap=cmap, minval=z_min, maxval=z_max)
 
                 # Plot heatmap
                 axa = fig.add_subplot(gs[rn, cn])
-                ima = axa.contourf(xx, yy, zz, cmap=args.plot['cmap'], levels=np.linspace(z_min, z_max, 100))
+                ima = axa.contourf(xx, yy, zz, cmap=cmap, levels=np.linspace(z_min, z_max, 100))
 
                 # Optionally add scatter
                 if (x is not None) and (y is not None) and (scolors is not None):
