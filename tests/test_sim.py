@@ -74,7 +74,7 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, network='random', beta=0.05, eff_condoms=0.6)
+    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, network='random', beta=0.05, eff_condoms=1.0)
     sim = hpv.Sim(pars=base_pars)
     sim.initialize()
 
