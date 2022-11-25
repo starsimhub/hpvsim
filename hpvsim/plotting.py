@@ -17,13 +17,13 @@ __all__ = ['plot_sim', 'plot_scens', 'plot_scen_age_results', 'plot_result', 'pl
 #%% Plotting helper functions
 
 def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None, fill_args=None,
-                legend_args=None, date_args=None, show_args=None, style_args=None, **kwargs):
+                legend_args=None, date_args=None, show_args=None, style_args=None, contour_args=None, **kwargs):
     ''' Handle input arguments -- merge user input with defaults; see sim.plot for documentation '''
 
     # Set defaults
     defaults = sc.objdict()
     defaults.fig     = sc.objdict(figsize=(10, 8), num=None)
-    defaults.plot    = sc.objdict(lw=1.5, alpha= 0.7)
+    defaults.plot    = sc.objdict(lw=1.5, alpha= 0.7, cmap='plasma')
     defaults.scatter = sc.objdict(s=20, marker='s', alpha=0.7, zorder=1.75, datastride=1) # NB: 1.75 is above grid lines but below plots
     defaults.axis    = sc.objdict(left=0.10, bottom=0.08, right=0.95, top=0.95, wspace=0.30, hspace=0.30)
     defaults.fill    = sc.objdict(alpha=0.2)
@@ -31,6 +31,7 @@ def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None
     defaults.date    = sc.objdict(as_dates=True, dateformat=None, rotation=None, start=None, end=None)
     defaults.show    = sc.objdict(data=True, ticks=True, interventions=True, legend=True, outer=False, tight=False, maximize=False)
     defaults.style   = sc.objdict(style=None, dpi=None, font=None, fontsize=None, grid=None, facecolor=None) # Use HPVsim global defaults
+    defaults.contours= sc.objdict(levels=7, linewidths=0.5, colors='k')
 
     # Handle directly supplied kwargs
     for dkey,default in defaults.items():
@@ -58,6 +59,7 @@ def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None
     args.date    = sc.mergedicts(defaults.date,    date_args)
     args.show    = sc.mergedicts(defaults.show,    show_args)
     args.style   = sc.mergedicts(defaults.style,   style_args)
+    args.contours= sc.mergedicts(defaults.contours, contour_args)
 
     # Handle potential rcParams keys
     keys = list(kwargs.keys())
@@ -590,6 +592,65 @@ def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, sc
         title_grid_legend(ax, res.name, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
     return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+
+
+def plot_heatmap(sweep, xx, yy, to_plot=None, x=None, y=None, yi=None, xi=None, zscale=1, xpar=None, ypar=None,
+                 add_contours=True, contour_args=None,
+                 fig_args=None, plot_args=None, axis_args=None, legend_args=None, show_args=None, style_args=None,
+                 fig=None, ax=None, do_save=None, do_show=None, fig_path=None):
+    '''
+    Plot heatmaps
+    '''
+
+    # Handle inputs
+    axis_args = sc.mergedicts(axis_args, dict(wspace=0.35)) # Set right margin to be smaller
+    args = handle_args(fig_args=fig_args, plot_args=plot_args, axis_args=axis_args, contour_args=contour_args,
+                       legend_args=legend_args, show_args=show_args, style_args=style_args)
+
+    # Figure out axes
+    n_plots = len(to_plot)
+    n_rows, n_cols = sc.get_rows_cols(n_plots)
+    n_cols_true = 2*n_cols # Add one more columns per column, for storing the heatmap colorbars
+    width_ratios = [20, 1]*n_cols
+    npts = 100
+    scale = 0.08
+
+    # Plot
+    with hpo.with_style(args.style):
+        fig = pl.figure(**args.fig)
+        gs = fig.add_gridspec(n_rows, n_cols_true, width_ratios=width_ratios)
+        pl.subplots_adjust(**args.axis)
+        pn, coln = 0, 0
+
+        for rn in range(n_rows):
+            for cn in range(0,n_cols*2,2): # Increment by two columns each time
+
+                res_to_plot = to_plot[pn]
+                z = np.array(sweep.resdf[res_to_plot]) / zscale
+                z_min = min(z)
+                z_max = max(z)
+                zz = sc.gauss2d(x, y, z, xi, yi, scale=scale, xscale=1, yscale=1, grid=True)
+                scolors = sc.vectocolor(z, cmap=args.plot['cmap'], minval=z_min, maxval=z_max)
+
+                # Plot heatmap
+                axa = fig.add_subplot(gs[rn, cn])
+                ima = axa.contourf(xx, yy, zz, cmap=args.plot['cmap'], levels=np.linspace(z_min, z_max, 100))
+
+                # Optionally add scatter
+                if (x is not None) and (y is not None) and (scolors is not None):
+                    axa.scatter(x, y, marker='o', c=scolors, edgecolor=[0.3] * 3, s=50, linewidth=0.1, alpha=0.5)
+                if add_contours:
+                    axa.contour(xx, yy, zz, **args.contours)
+                axa.set_xlabel(xpar)
+                axa.set_ylabel(ypar)
+
+                # Colorbar
+                axc = fig.add_subplot(gs[rn, cn+1])
+                pl.colorbar(ima, cax=axc)
+
+                pn += 1
+
+    return tidy_up(fig, do_save, fig_path, do_show, args)
 
 
 # def plot_compare(df, log_scale=True, fig_args=None, axis_args=None, style_args=None, grid=False,

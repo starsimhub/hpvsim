@@ -233,10 +233,11 @@ def test_sweeps(do_plot=do_plot):
     sim = hpv.Sim()
     sweep = hpv.Sweep(base_sim=sim,
                       sweep_pars={'beta': [0.01, 0.1], 'hpv_control_prob': [0, 0.5]},
-                      sweep_vars=['total_cancers'],
+                      sweep_vars=['total_cancers', 'total_infections'],
                       n_draws=4)
+    sweep.run(reduce=True, from_year=2020)
     if do_plot:
-        sweep.plot()
+        sweep.plot_heatmap(to_plot='total_infections')
 
     return sweep
 
@@ -255,7 +256,7 @@ if __name__ == '__main__':
     # m1,m2  = test_multisim_advanced()
     # scens1 = test_simple_scenarios(do_plot=do_plot)
     # scens2 = test_complex_scenarios(do_plot=do_plot)
-    sweep = test_sweeps(do_plot=False)
+    sweep = test_sweeps(do_plot=True)
 
     sc.toc(T)
     print('Done.')
