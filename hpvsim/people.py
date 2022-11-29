@@ -527,10 +527,17 @@ class People(hpb.BasePeople):
         ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
+
+        # First, set the SIR properties. Once a person has cancer, their are designated
+        # as inactive for all genotypes they may be infected with
+        self.susceptible[:, inds] = False # No longer susceptible to any genotype
+        self.infectious[:, inds] = False # No longer counted as infectious
+        self.date_clearance[:, inds] = np.nan # Remove their clearance dates
+        self.inactive[:, inds] = True # If this person has any other infections from any other genotypes, set them to inactive
+
+        # Next, set the dysplasia properties
         self.cancerous[genotype, inds] = True
         self.cin3[genotype, inds] = False # No longer counted as CIN3
-        self.susceptible[:, inds] = False # No longer susceptible to any new genotypes
-        self.date_clearance[:, inds] = np.nan
 
         # Calculations for age-standardized cancer incidence
         cases_by_age = 0

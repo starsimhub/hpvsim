@@ -74,7 +74,7 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, network='random', beta=0.05, eff_condoms=0.6)
+    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, genotypes=[16], network='random', beta=0.05, eff_condoms=0.6)
     sim = hpv.Sim(pars=base_pars)
     sim.initialize()
 
@@ -137,7 +137,7 @@ def test_states():
     sc.heading('Test states')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_years=10, dt=0.5, network='random', beta=0.05)
+    base_pars = dict(n_years=20, dt=0.5, network='random', beta=0.05)
 
     class check_states(hpv.Analyzer):
 
@@ -161,7 +161,13 @@ def test_states():
                 d4 = ~(people.cin2[g,:] & people.cin3[g,:]).all()
                 d5 = ~(people.cin3[g,:] & people.cancerous[g,:]).all()
 
-                if not np.array([s1, s2, s3, s4, d1, d2, d3, d4, d5]).all():
+                # If there's anyone with dysplasia & inactive infection, they must have cancer
+                sd1inds = hpv.true(people.cin[g,:] & people.inactive[g,:])
+                sd1 = True
+                if len(sd1inds)>0:
+                    sd1 = people.cancerous[:,sd1inds].any(axis=0)
+
+                if not np.array([s1, s2, s3, s4, d1, d2, d3, d4, d5, sd1]).all():
                     self.okay = False
 
             return
@@ -178,7 +184,7 @@ def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
-    sim = hpv.Sim(n_agents=100, label='test_label')
+    sim = hpv.Sim(n_agents=100, genotypes=[16], label='test_label')
     sim.reset_layer_pars()
     sim.initialize()
     sim.reset_layer_pars()
@@ -240,7 +246,7 @@ def test_result_consistency():
 
     # Create sim
     n_agents = 1e3
-    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, genotypes=['hpv16','hpv18'], label='test_results')
+    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, label='test_results')
     sim.run()
 
     # Check that infections by genotype sum up the the correct totals
@@ -303,7 +309,7 @@ def test_resuming():
     sc.heading('Test that resuming a run works')
 
     n_agents = 5e3
-    s0 = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, label='test_resume')
+    s0 = hpv.Sim(n_agents=n_agents, genotypes=[16], n_years=10, dt=0.5, label='test_resume')
     s1 = s0.copy()
     s0.run()
 
