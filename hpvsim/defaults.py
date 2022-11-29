@@ -416,15 +416,14 @@ def get_default_plots(which='default', kind='sim', sim=None):
                     'total_hpv_prevalence',
                     'hpv_prevalence',
                 ],
-                'HPV incidence': [
-                    'total_hpv_incidence',
-                    'hpv_incidence',
-                ],
-                'CINs and cancers per 100,000 women': [
+                'CINs per 100,000 women': [
                     'total_cin_incidence',
                     'cin_incidence',
-                    'total_cancer_incidence',
                     ],
+                'Cancers per 100,000 women': [
+                    'total_cancer_incidence',
+                    'asr_cancer'
+                ],
             })
 
         else: # pragma: no cover
