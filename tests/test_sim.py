@@ -254,7 +254,7 @@ def test_result_consistency():
     # of any genotype that occured each period. Thus, sim.results['infections'] can technically
     # be greater than the total population size, for example if half the population got infected
     # with 2 genotypes simultaneously.
-    assert (sim.results['infections'][:].sum(axis=0)==sim.results['total_infections'][:]).all() # Check flows by genotype are equal to total flows
+    assert np.allclose(sim.results['infections'][:].sum(axis=0),sim.results['total_infections'][:]) # Check flows by genotype are equal to total flows
 
     # The test below was faulty, but leaving it here (commented out) is instructive.
     # Specifically, the total number of people infectious by genotype (sim.results['n_infectious'])
@@ -346,14 +346,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_states()
-    sim4 = test_flexible_inputs()
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim2 = test_epi()
+    # sim3 = test_states()
+    # sim4 = test_flexible_inputs()
     sim5 = test_result_consistency()
-    sim6 = test_location_loading()
-    sim7 = test_resuming()
+    # sim6 = test_location_loading()
+    # sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')
