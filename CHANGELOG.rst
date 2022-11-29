@@ -9,6 +9,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.3 (2022-11-28)
+--------------------------
+- Prevents immunity values from exceeding 1
+- CHanges default genotypes to 16, 18, and other high-risk
+- *GitHub info*: PRs `458 <https://github.com/amath-idm/hpvsim/pull/458>`__
+
+
 Version 0.4.2 (2022-11-21)
 --------------------------
 - Changes to parameterization of immunity
