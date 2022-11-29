@@ -9,7 +9,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
-Version 0.4.3 (2022-11-28)
+Version 0.4.3 (2022-11-29)
 --------------------------
 - Prevents immunity values from exceeding 1
 - Changes default genotypes to 16, 18, and other high-risk
