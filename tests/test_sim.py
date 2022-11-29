@@ -79,10 +79,10 @@ def test_epi():
     sim.initialize()
 
     # Define the parameters to vary
-    vary_pars   = ['model_hiv',     'beta',          'acts',             'condoms',          'debut',            'init_hpv_prev', ] # Parameters
-    vary_vals   = [[False, True],   [0.0001, 0.99],    [1, 200],         [0.01,0.9],         [15,25],             [0.01,0.8]] # Values
-    vary_rels   = ['pos',           'pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['total_hpv_prevalence', 'total_hpv_incidence',    'total_hpv_incidence',      'total_hpv_incidence', 'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
+    vary_pars   = ['model_hiv',             'beta',                 'acts',                 'debut',                'init_hpv_prev', ] # Parameters
+    vary_vals   = [[False, True],           [0.0001, 0.99],         [1, 200],               [15,25],                [0.01,0.8]] # Values
+    vary_rels   = ['pos',                   'pos',                  'pos',                  'neg',                  'pos'] # Expected association with epi outcomes
+    vary_what   = ['total_hpv_prevalence', 'total_hpv_incidence',   'total_hpv_incidence',  'total_hpv_incidence',  'total_cancer_incidence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -155,7 +155,7 @@ def test_states():
                 s3  = ~(people.susceptible[g,:] & people.inactive[g,:]).any()
                 s4  = ~(people.infectious[g,:] & people.inactive[g,:]).any()
 
-                d1 = (people.no_dysp[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous | removed).all()
+                d1 = (people.no_dysp[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
                 d2 = ~(people.no_dysp[g,:] & people.cin1[g,:]).all()
                 d3 = ~(people.cin1[g,:] & people.cin2[g,:]).all()
                 d4 = ~(people.cin2[g,:] & people.cin3[g,:]).all()
