@@ -74,9 +74,14 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']            = 0.25  # Per-act transmission probability; absolute value, calibrated
-    pars['transf2m']        = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
-    pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
+    pars['beta']                = 0.25  # Per-act transmission probability; absolute value, calibrated
+    pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
+    pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
+    pars['rel_trans_cin1']      = 1     # Transmissibility of people with CIN1 compared to those without dysplasia
+    pars['rel_trans_cin2']      = 1     # Transmissibility of people with CIN2 compared to those without dysplasia
+    pars['rel_trans_cin3']      = 1     # Transmissibility of people with CIN3 compared to those without dysplasia
+    pars['rel_trans_cancerous'] = 0.5   # Transmissibility of people with cancer compared to those without dysplasia
+    pars['eff_condoms']         = 0.7   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
 
     # Parameters for disease progression
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
@@ -87,34 +92,14 @@ def make_pars(**kwargs):
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.625, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance
     pars['imm_decay']       = dict(form=None)  # decay rate, with half life in years
-    pars['imm_kin']         = None  # Constructed during sim initialization using the nab_decay parameters
     pars['imm_boost']       = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity']        = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
-    pars['immunity_map']    = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
     pars['cross_imm_med']   = 0.3
     pars['cross_imm_high']  = 0.5
 
-    # all genotype properties get populated by user in init_genotypes()
-    pars['genotypes']       = []  # Genotypes of the virus; populated by the user below
-    pars['genotype_map']    = dict()  # Reverse mapping from number to genotype key
-    pars['genotype_pars']   = sc.objdict()  # Populated just below
-
-    # Genotype parameters
-    pars['n_genotypes']     = 1 # The number of genotypes circulating in the population
-    pars['n_imm_sources']   = 1 # The number of immunity sources circulating in the population
-
-    # Vaccine parameters
-    pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
-    pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
-
-    # Parameters determining relative transmissibility at each stage of disease
-    pars['rel_trans_cin1']       = 1 # Transmissibility of people with CIN1 compared to those without dysplasia
-    pars['rel_trans_cin2']       = 1 # Transmissibility of people with CIN2 compared to those without dysplasia
-    pars['rel_trans_cin3']       = 1 # Transmissibility of people with CIN3 compared to those without dysplasia
-    pars['rel_trans_cancerous']  = 0.5 # Transmissibility of people with cancer compared to those without dysplasia
-
-    # Efficacy of protection
-    pars['eff_condoms']     = 0.7  # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
+    # Genotype parametres
+    pars['genotypes']       = [16, 18, 'hrhpv']  # Genotypes to model
+    pars['genotype_pars']   = sc.objdict()  # Can be directly modified by passing in arguments listed in get_genotype_pars
 
     # HIV parameters
     pars['hiv_pars'] = {
@@ -133,6 +118,16 @@ def make_pars(**kwargs):
     # Population distribution of the World Standard Population, used to calculate age-standardised rates (ASR) of incidence
     pars['standard_pop']    = np.array([[  0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75,    80,    85, 100],
                                         [.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005,   0]])
+
+    # The following variables are stored within the pars dict for ease of access, but should not be directly specified.
+    # Rather, they are automaticall constructed during sim initialization.
+    pars['immunity_map']    = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
+    pars['imm_kin']         = None  # Constructed during sim initialization using the nab_decay parameters
+    pars['genotype_map']    = dict()  # Reverse mapping from number to genotype key
+    pars['n_genotypes']     = 1 # The number of genotypes circulating in the population
+    pars['n_imm_sources']   = 1 # The number of immunity sources circulating in the population
+    pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
+    pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
 
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
