@@ -104,7 +104,6 @@ class PeopleMeta(sc.prettyobj):
         State('susceptible',    bool, True,     'n_genotypes', label='susceptible', cmap=pl.cm.Greens),                 # Allowable dysp states: no_dysp
         State('infectious',     bool, False,    'n_genotypes', label='infectious', cmap=pl.cm.Purples),                 # Allowable dysp states: no_dysp, cin1, cin2, cin3
         State('inactive',       bool, False,    'n_genotypes', label='with inactive infection', cmap=pl.cm.Oranges),    # Allowable dysp states: no_dysp, cancer in at least one genotype
-        State('ineligible',     bool, False,    'n_genotypes', label='ineligible for infection', cmap=pl.cm.Oranges),   # Allowable dysp states: no_dysp, cancer
     ]
 
     dysp_states = [
