@@ -85,7 +85,7 @@ def make_pars(**kwargs):
 
     # Parameters for disease progression
     pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
-    pars['hpv_control_prob']    = 0.44 # Probability that HPV is controlled latently vs. cleared
+    pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation']    = 0.025 # Placeholder
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
 
