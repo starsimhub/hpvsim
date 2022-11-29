@@ -265,11 +265,11 @@ def test_result_consistency():
     # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
     # Check that CINs by grade sum up the the correct totals
-    assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
-    assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
+    assert np.allclose((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]),sim.results['total_cins'][:])
+    assert np.allclose((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]), sim.results['cins'][:])
 
     # Check that cancers by age sum to the correct totals
-    assert ((sim.results['cancers_by_age'][:].sum(axis=0)-sim.results['cancers'][:])<1e-3).all()
+    assert np.allclose(sim.results['cancers_by_age'][:].sum(axis=0),sim.results['total_cancers'][:])
 
     # Check demographics
     assert (sim['n_agents'] == n_agents)
@@ -346,14 +346,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
-    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
-    # sim3 = test_states()
-    # sim4 = test_flexible_inputs()
+    sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim2 = test_epi()
+    sim3 = test_states()
+    sim4 = test_flexible_inputs()
     sim5 = test_result_consistency()
-    # sim6 = test_location_loading()
-    # sim7 = test_resuming()
+    sim6 = test_location_loading()
+    sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')
