@@ -118,7 +118,7 @@ def handle_show_return(do_show=None, fig=None, figs=None):
             return fig
 
 
-def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True, analyzers=None):
+def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
     ''' Handle which quantities to plot '''
 
     # Allow default kind to be overwritten by to_plot -- used by msim.plot()
@@ -395,7 +395,7 @@ def plot_time_series(ax, sim, reskey, resnum, args, colors=None, labels=None, pl
 
 #%% Core plotting functions that unite the individual plotting functions to create figures for sims, scenarios, multisims, etc
 
-def plot_sim(to_plot=None, sim=None, analyzers=None, fig=None, ax=None, do_save=None, fig_path=None,
+def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=None,
              fig_args=None, plot_args=None, scatter_args=None, axis_args=None, fill_args=None,
              legend_args=None, date_args=None, show_args=None, style_args=None, n_cols=None,
              grid=True, commaticks=True, setylim=True, log_scale=False, colors=None, labels=None,
@@ -405,7 +405,7 @@ def plot_sim(to_plot=None, sim=None, analyzers=None, fig=None, ax=None, do_save=
     # Handle inputs
     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
                        legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
-    to_plot, n_cols, n_rows = handle_to_plot('sim', to_plot, n_cols, sim, analyzers=analyzers)
+    to_plot, n_cols, n_rows = handle_to_plot('sim', to_plot, n_cols, sim)
 
     # Do the plotting
     with hpo.with_style(args.style):
