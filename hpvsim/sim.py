@@ -581,17 +581,16 @@ class Sim(hpb.BaseSim):
 
         return
 
-    # def finalize_interventions(self):
-    #     for intervention in self['interventions']:
-    #         if isinstance(intervention, hpi.Intervention):
-    #             if hasattr(intervention,'n_products_used'):
-    #                 self.results[f'resources_{intervention.label}'] = intervention.n_products_used
-
 
     def init_analyzers(self):
         ''' Initialize the analyzers '''
         if self._orig_pars and 'analyzers' in self._orig_pars:
             self['analyzers'] = self._orig_pars.pop('analyzers') # Restore
+
+        # Add default analyzers
+        if (len(self['analyzers'])==0) and self['use_default_analyzers'] and (len(self['default_analyzers'])>0):
+            for analyzer_name in self['default_analyzers']:
+                self['analyzers'] += hpa.analyzer_map[analyzer_name]
 
         for analyzer in self['analyzers']:
             if isinstance(analyzer, hpa.Analyzer):

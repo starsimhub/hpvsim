@@ -110,10 +110,12 @@ def make_pars(**kwargs):
     }
 
     # Events and interventions
-    pars['interventions']   = []   # The interventions present in this simulation; populated by the user
-    pars['analyzers']       = []   # Custom analysis functions; populated by the user
-    pars['timelimit']       = None # Time limit for the simulation (seconds)
-    pars['stopping_func']   = None # A function to call to stop the sim partway through
+    pars['interventions']           = sc.autolist()   # The interventions present in this simulation; populated by the user
+    pars['use_default_analyzers']   = True  # Whether or not to use default analyzers if none are provided
+    pars['default_analyzers']       = ['age_results']  # List of default analysis functions to include if no others are specified
+    pars['analyzers']               = sc.autolist()   # Custom analysis functions; populated by the user
+    pars['timelimit']               = None # Time limit for the simulation (seconds)
+    pars['stopping_func']           = None # A function to call to stop the sim partway through
 
     # Population distribution of the World Standard Population, used to calculate age-standardised rates (ASR) of incidence
     pars['standard_pop']    = np.array([[  0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75,    80,    85, 100],

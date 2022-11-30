@@ -340,7 +340,7 @@ def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None,
          scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
          show_args=None, style_args=None, n_cols=None, grid=True, commaticks=True,
          setylim=True, log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False,
-         fig=None, ax=None, plot_burnin=False, **kwargs):
+         fig=None, ax=None, plot_burnin=False, by_genotype=False, **kwargs):
     ''' Plot the results of a single simulation -- see Sim.plot() for documentation '''
 
     # Handle inputs
