@@ -118,7 +118,7 @@ def handle_show_return(do_show=None, fig=None, figs=None):
             return fig
 
 
-def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
+def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True, analyzers=None):
     ''' Handle which quantities to plot '''
 
     # Allow default kind to be overwritten by to_plot -- used by msim.plot()
@@ -158,7 +158,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
 
     to_plot = sc.odict(sc.dcp(to_plot)) # In case it's supplied as a dict
 
-    # Handle rows and columns -- assume 5 is the most rows we would want
+    # Get total number of plots and calculate rows and columns
     n_plots = len(to_plot)
     if n_cols is None:
         max_rows = 5 # Assumption -- if desired, the user can override this by setting n_cols manually
@@ -334,70 +334,103 @@ def set_line_options(input_args, reskey, resnum, default):
 
 
 
-#%% Core plotting functions
+#%% Individual plotting functions to create particular plots
+def plot_time_series(ax, sim, reskey, resnum, args, colors=None, labels=None, plot_burnin=False):
+    ''' Plot time series data, i.e. the usual contents of sim.results '''
 
-def plot_sim(to_plot=None, sim=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
-         scatter_args=None, axis_args=None, fill_args=None, legend_args=None, date_args=None,
-         show_args=None, style_args=None, n_cols=None, grid=True, commaticks=True,
-         setylim=True, log_scale=False, colors=None, labels=None, do_show=None, sep_figs=False,
-         fig=None, ax=None, plot_burnin=False, by_genotype=False, **kwargs):
+    # Initialize some variables
+    bi = 0 if plot_burnin else int(sim['burnin'])
+    total_keys = sim.result_keys('total')
+    sex_keys = sim.result_keys('by_sex')
+    genotype_keys = sim.result_keys('genotype')
+    res_t = sim.results['year'][bi:]
+    res = sim.results[reskey]
+
+    # The exact plotting call depends on what kind of core result key we're dealing with
+    # Simplest case: it's a total result, i.e. not disagreggated by genotype or sex
+    if reskey in total_keys:
+        color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
+        label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
+        ax.plot(res_t, res.values[bi:], label=label, **args.plot, c=color)  # Plot result
+
+    elif reskey in sex_keys:
+        n_sexes = 2
+        sex_colors = ['#4679A2', '#A24679']
+        sex_labels = ['males', 'females']
+        for sex in range(n_sexes):
+            # Colors and labels
+            v_color = sex_colors[sex]
+            v_label = sex_labels[sex]  # TODO this should also come from the sim
+            color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
+            label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
+            if label:   label += f' - {v_label}'
+            else:       label = v_label
+            ax.plot(res_t, res.values[sex, bi:], label=label, **args.plot, c=color)  # Plot result
+
+    elif reskey in genotype_keys:
+        ng = sim['n_genotypes']
+        for genotype in range(ng):
+            # Colors and labels
+            v_color = res.color[genotype]
+            geno_obj = sim['genotypes'][genotype]
+            if sc.isnumber(geno_obj):  # TODO: figure out why this is sometimes an int and sometimes an obj
+                v_label = str(geno_obj)
+            elif sc.isstring(geno_obj):
+                v_label = geno_obj
+            else:
+                v_label = geno_obj.label
+            color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
+            label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
+            if label:
+                label += f' - {v_label}'
+            else:
+                label = v_label
+            ax.plot(res_t, res.values[genotype, bi:], label=label, **args.plot, c=color)  # Plot result
+
+    else:
+        raise ValueError(f'Result {reskey} not understood.')
+
+    return ax, color
+
+
+#%% Core plotting functions that unite the individual plotting functions to create figures for sims, scenarios, multisims, etc
+
+def plot_sim(to_plot=None, sim=None, analyzers=None, fig=None, ax=None, do_save=None, fig_path=None,
+             fig_args=None, plot_args=None, scatter_args=None, axis_args=None, fill_args=None,
+             legend_args=None, date_args=None, show_args=None, style_args=None, n_cols=None,
+             grid=True, commaticks=True, setylim=True, log_scale=False, colors=None, labels=None,
+             do_show=None, sep_figs=False, plot_burnin=False, **kwargs):
     ''' Plot the results of a single simulation -- see Sim.plot() for documentation '''
 
     # Handle inputs
     args = handle_args(fig_args=fig_args, plot_args=plot_args, scatter_args=scatter_args, axis_args=axis_args, fill_args=fill_args,
                        legend_args=legend_args, show_args=show_args, date_args=date_args, style_args=style_args, **kwargs)
-    to_plot, n_cols, n_rows = handle_to_plot('sim', to_plot, n_cols, sim=sim)
+    to_plot, n_cols, n_rows = handle_to_plot('sim', to_plot, n_cols, sim, analyzers=analyzers)
 
     # Do the plotting
-    bi = 0 if plot_burnin else int(sim['burnin'])
     with hpo.with_style(args.style):
+
+        # Create the figures
         fig, figs = create_figs(args, sep_figs, fig, ax)
-        total_keys = sim.result_keys('total') # Consider a more robust way to do this
-        sex_keys = sim.result_keys('by_sex')
+
+        # Create subsets of plot keys; different plotting subroutines are called depending on the plot type
+        main_keys = sim.result_keys()
+        special_keys = sc.objdict() # Initialize list of keys that are handled differently
+
         for pnum,title,keylabels in to_plot.enumitems():
             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
-            for resnum,reskey in enumerate(keylabels):
-                res_t = sim.results['year'][bi:]
-                res = sim.results[reskey]
-                if reskey in total_keys:
-                    color = set_line_options(colors, reskey, resnum, res.color)  # Choose the color
-                    label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
-                    ax.plot(res_t, res.values[bi:], label=label, **args.plot, c=color)  # Plot result
-                elif reskey in sex_keys:
-                    n_sexes = 2
-                    sex_colors = ['#4679A2', '#A24679']
-                    sex_labels = ['males', 'females']
-                    for sex in range(n_sexes):
-                        # Colors and labels
-                        v_color = sex_colors[sex]
-                        v_label = sex_labels[sex]  # TODO this should also come from the sim
-                        color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
-                        label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
-                        if label:
-                            label += f' - {v_label}'
-                        else:
-                            label = v_label
-                        ax.plot(res_t, res.values[sex, bi:], label=label, **args.plot, c=color)  # Plot result
-                else:
-                    ng = sim['n_genotypes']
-                    for genotype in range(ng):
-                        # Colors and labels
-                        v_color = res.color[genotype]
-                        geno_obj = sim['genotypes'][genotype]
-                        if sc.isnumber(geno_obj): # TODO: figure out why this is sometimes an int and sometimes an obj
-                            v_label = str(geno_obj)
-                        elif sc.isstring(geno_obj):
-                            v_label = geno_obj
-                        else:
-                            v_label = geno_obj.label
-                        color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
-                        label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
-                        if label: label += f' - {v_label}'
-                        else:     label = v_label
-                        ax.plot(res_t, res.values[genotype,bi:], label=label, **args.plot, c=color)  # Plot result
 
-                if args.show['data']:
-                    plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
+            for resnum,reskey in enumerate(keylabels):
+
+                # Most common case: it's a time series result, possibly with data
+                if reskey in main_keys:
+                    ax, color = plot_time_series(ax, sim, reskey, resnum, args, labels=labels, colors=colors, plot_burnin=plot_burnin)
+                    if args.show['data']:
+                        plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
+
+                # All other cases: any custom special plots are handled here
+                elif reskey in special_keys:
+                    pass
 
             # if args.show['interventions']:
             #     plot_interventions(sim, ax) # Plot the interventions

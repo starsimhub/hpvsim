@@ -920,16 +920,92 @@ class age_results(Analyzer):
         return self.result_keys[key].mismatch
 
 
-    def plot(self, fig_args=None, axis_args=None, data_args=None, width=0.8,
-             do_save=None, fig_path=None, do_show=True, **kwargs):
+    def get_to_plot(self):
+        ''' Get dict of plots to make '''
+
+        # Figure out rows and columns
+        if len(self.results) == 0:
+            errormsg = 'Cannot plot since no age results were recorded)'
+            raise ValueError(errormsg)
+        else:
+            to_plot = sc.objdict()
+            for rkey,resdict in self.results.items():
+                for date in self.result_args[rkey]['dates']:
+                    datestr = date.split('.')[0] # TODO fix this
+                    to_plot[self.result_args[rkey].name + ' by age, ' + datestr] = ['age_results_'+rkey+'_'+datestr]
+        return to_plot
+
+
+    def get_nplots(self):
+        ''' Get number of plots to make '''
+
+        if len(self.results) == 0:
+            errormsg = 'Cannot plot since no age results were recorded)'
+            raise ValueError(errormsg)
+        else:
+            dates_per_result = [len(rk['dates']) for rk in self.result_args.values()]
+            n_plots = sum(dates_per_result)
+        return n_plots
+
+
+    def plot_single(self, ax, rkey, date, plot_args=None, scatter_args=None):
+        '''
+        Function to plot a single age result for a single date. Requires an axis as
+        input and will generally be called by a helper function rather than directly.
+        '''
+        args = sc.objdict()
+        args.plot       = sc.objdict(sc.mergedicts(dict(linestyle='--'), plot_args))
+        args.scatter    = sc.objdict(sc.mergedicts(dict(marker='s'), scatter_args))
+
+        resdict = self.results[rkey] # Extract the result dictionary...
+        resargs = self.result_args[rkey] # ... and the result arguments
+
+        x = np.arange(len(resargs.age_labels)) # Create the label locations
+
+        # Pull out data dataframe, if available
+        if 'data' in resargs.keys():
+            thisdatadf = resargs.data[(resargs.data.year == float(date)) & (resargs.data.name == rkey)]
+            unique_genotypes = thisdatadf.genotype.unique()
+
+        # Plot by genotype
+        if 'total' not in rkey and 'mortality' not in rkey:
+            for g in range(self.ng):
+
+                glabel = self.glabels[g].upper()
+                ax.plot(x, resdict[date][g,:], color=resargs.color[g], **args.plot, label=glabel)
+
+                if ('data' in resargs.keys()) and (len(thisdatadf) > 0):
+                    # check if this genotype is in dataframe
+                    if self.glabels[g].upper() in unique_genotypes:
+                        ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
+                        ax.scatter(x, ydata, color=self.result_args[rkey].color[g], **args.scatter, label=f'Data - {glabel}')
+
+        # Plot totals
+        else:
+            ax.plot(x, resdict[date], color=resargs.color, **args.plot, label='Model')
+            if ('data' in resargs.keys()) and (len(thisdatadf) > 0):
+                ydata = np.array(thisdatadf.value)
+                ax.scatter(x, ydata,  color=resargs.color, **args.scatter, label='Data')
+
+        # Labels and legends
+        ax.set_xlabel('Age')
+        ax.set_title(resargs.name+' - '+date.split('.')[0])
+        ax.legend()
+        pl.xticks(x, resargs.age_labels)
+
+        return ax
+
+
+    def plot(self, fig_args=None, axis_args=None, plot_args=None, scatter_args=None,
+             do_save=None, fig_path=None, do_show=True, fig=None, ax=None, **kwargs):
         '''
         Plot the age results
 
         Args:
             fig_args (dict): passed to pl.figure()
             axis_args (dict): passed to pl.subplots_adjust()
-            data_args (dict): 'width', 'color', and 'offset' arguments for the data
-            width (float): width of the bars
+            plot_args (dict): passed to plot_single
+            scatter_args (dict): passed to plot_single
             do_save (bool): whether to save
             fig_path (str or filepath): filepath to save to
             do_show (bool): whether to show the figure
@@ -939,62 +1015,22 @@ class age_results(Analyzer):
         # Handle inputs
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
         axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
-        d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
-        all_args = sc.mergedicts(fig_args, axis_args, d_args)
+        all_args = sc.mergedicts(fig_args, axis_args)
 
         # Initialize
         fig = pl.figure(**fig_args)
-
-        # Figure out rows and columns
-        if len(self.results) == 0:
-            errormsg = 'Cannot plot since no age results were recorded)'
-            raise ValueError(errormsg)
-        else:
-            dates_per_result = [len(rk['dates']) for rk in self.result_args.values()]
-            n_plots = sum(dates_per_result)
-            n_rows, n_cols = sc.get_rows_cols(n_plots)
+        n_plots = self.get_nplots()
+        n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Make the figure(s)
         with hpo.with_style(**kwargs):
             plot_count=1
             for rkey,resdict in self.results.items():
-
                 pl.subplots_adjust(**axis_args)
-
                 for date in self.result_args[rkey]['dates']:
-
-                    # Start making plot
                     ax = pl.subplot(n_rows, n_cols, plot_count)
-                    x = np.arange(len(self.result_args[rkey].age_labels))  # the label locations
-                    if 'data' in self.result_args[rkey].keys():
-                        thisdatadf = self.result_args[rkey].data[(self.result_args[rkey].data.year == float(date))&(self.result_args[rkey].data.name == rkey)]
-                        unique_genotypes = thisdatadf.genotype.unique()
-
-                    if 'total' not in rkey and 'mortality' not in rkey:
-                        # Prepare plot settings
-                        for g in range(self.ng):
-                            glabel = self.glabels[g].upper()
-                            ax.plot(x, resdict[date][g,:], color=self.result_args[rkey].color[g], linestyle='--', label=f'Model - {glabel}')
-                            if ('data' in self.result_args[rkey].keys()) and (len(thisdatadf) > 0):
-                                # check if this genotype is in dataframe
-                                if self.glabels[g].upper() in unique_genotypes:
-                                    ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
-                                    ax.scatter(x, ydata, color=self.result_args[rkey].color[g], marker='s', label=f'Data - {glabel}')
-
-                    else:
-                        if ('data' in self.result_args[rkey].keys()) and (len(thisdatadf) > 0):
-                            ax.plot(x, resdict[date], color=self.result_args[rkey].color, linestyle='--', label='Model')
-                            ydata = np.array(thisdatadf.value)
-                            ax.scatter(x, ydata,  color=self.result_args[rkey].color, marker='s', label='Data')
-                        else:
-                            ax.plot(x, resdict[date], color=self.result_args[rkey].color, linestyle='--', label='Model')
-                    ax.set_xlabel('Age group')
-                    ax.set_title(self.result_args[rkey].name+' - '+date.split('.')[0])
-                    ax.legend()
-                    pl.xticks(x, self.result_args[rkey].age_labels)
-
+                    ax = self.plot_single(ax, rkey, date, plot_args=plot_args, scatter_args=scatter_args)
                     plot_count+=1
-
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
 
