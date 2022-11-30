@@ -15,6 +15,7 @@ Version 0.4.3 (2022-11-29)
 - Changes default genotypes to 16, 18, and other high-risk
 - Changes default hpv control prob to 0
 - Adds age of cancer to analyzer
+- Changes to default plotting styles
 - *GitHub info*: PRs `458 <https://github.com/amath-idm/hpvsim/pull/458>`__
 
 
