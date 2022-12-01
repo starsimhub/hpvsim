@@ -414,11 +414,9 @@ def get_default_plots(which='default', kind='sim', sim=None):
             plots = sc.odict({
                 'HPV prevalence': [
                     'total_hpv_prevalence',
-                    'hpv_prevalence',
                 ],
                 'CINs per 100,000 women': [
                     'total_cin_incidence',
-                    'cin_incidence',
                     ],
                 'Cancers per 100,000 women': [
                     'total_cancer_incidence',

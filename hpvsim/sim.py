@@ -1091,15 +1091,11 @@ class Sim(hpb.BaseSim):
             return string
 
 
-    def plot(self, analyzers=None, plot_analyzers=True, *args, **kwargs):
+    def plot(self, *args, **kwargs):
         '''
-        Plot the outputs of the model, optionally including the analyzers
+        Plot the outputs of the model
         '''
-        if plot_analyzers:
-            if analyzers is None and self['use_default_analyzers'] and (len(self['default_analyzers'])>0):
-                    analyzers = self['default_analyzers']
-            analyzers = [self.get_analyzer(a) for a in analyzers]
-        fig = hpplt.plot_sim(sim=self, analyzers=analyzers, *args, **kwargs)
+        fig = hpplt.plot_sim(sim=self, *args, **kwargs)
         return fig
 
 
