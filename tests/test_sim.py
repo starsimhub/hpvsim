@@ -79,29 +79,45 @@ def test_epi():
     sim.initialize()
 
     # Define the parameters to vary
-    vary_pars   = ['model_hiv',             'beta',                 'acts',                 'debut',                'init_hpv_prev', ] # Parameters
-    vary_vals   = [[False, True],           [0.0001, 0.99],         [1, 200],               [15,25],                [0.01,0.8]] # Values
-    vary_rels   = ['pos',                   'pos',                  'pos',                  'neg',                  'pos'] # Expected association with epi outcomes
-    vary_what   = ['total_hpv_prevalence', 'total_hpv_incidence',   'total_hpv_incidence',  'total_hpv_incidence',  'total_cancer_incidence'] # Epi outcomes to check
+    class ParEffects():
+        def __init__(self, par, range, variable):
+            self.par = par
+            self.range = range
+            self.variable = variable
+            return
+
+    par_effects = [
+        ParEffects('model_hiv',     [False, True],  'total_infections'),
+        ParEffects('beta',          [0.01, 0.99],   'total_infections'),
+        ParEffects('condoms',       [0.90, 0.10],   'total_infections'),
+        ParEffects('acts',          [1, 200],       'total_infections'),
+        ParEffects('debut',         [25, 15],       'total_infections'),
+        ParEffects('init_hpv_prev', [0.1, 0.8],     'total_infections'),
+    ]
+    # vary_pars   = ['model_hiv',         'beta',             'condoms',          'acts',             'debut',            'init_hpv_prev', ] # Parameters
+    # vary_vals   = [[False, True],       [0.01, 0.99],     [0.1,0.9],          [1, 200],           [15,25],            [0.01,0.8]] # Values
+    # vary_rels   = ['pos',               'pos',              'neg',              'pos',              'neg',              'pos'] # Expected association with epi outcomes
+    # vary_what   = ['total_infections',  'total_infections', 'total_infections', 'total_infections', 'total_infections', 'total_cancers'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
-    for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
-        if vpar=='acts':
-            bp = sc.dcp(sim[vpar]['a'])
-            lo = {'a':{**bp, 'par1': vval[0]}}
-            hi = {'a':{**bp, 'par1': vval[1]}}
-        elif vpar=='condoms':
-            lo = {'a':vval[0]}
-            hi = {'a':vval[1]}
-        elif vpar=='debut':
-            bp = sc.dcp(sim[vpar]['f'])
-            lo = {sk:{**bp, 'par1':vval[0]} for sk in ['f','m']}
-            hi = {sk:{**bp, 'par1':vval[1]} for sk in ['f','m']}
+    for par_effect in par_effects:
+    # for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
+        if par_effect.par=='acts':
+            bp = sc.dcp(sim[par_effect.par]['a'])
+            lo = {'a':{**bp, 'par1': par_effect.range[0]}}
+            hi = {'a':{**bp, 'par1': par_effect.range[1]}}
+        elif par_effect.par=='condoms':
+            lo = {'a':par_effect.range[0]}
+            hi = {'a':par_effect.range[1]}
+        elif par_effect.par=='debut':
+            bp = sc.dcp(sim[par_effect.par]['f'])
+            lo = {sk:{**bp, 'par1':par_effect.range[0]} for sk in ['f','m']}
+            hi = {sk:{**bp, 'par1':par_effect.range[1]} for sk in ['f','m']}
         else:
-            lo = vval[0]
-            hi = vval[1]
+            lo = par_effect.range[0]
+            hi = par_effect.range[1]
 
-        if vpar == 'model_hiv':
+        if par_effect.par == 'model_hiv':
             base_pars['location'] = 'south africa'
             hiv_datafile = 'test_data/hiv_incidence_south_africa.csv'
             art_datafile = 'test_data/art_coverage_south_africa.csv'
@@ -109,26 +125,19 @@ def test_epi():
             hiv_datafile = None
             art_datafile = None
 
-        pars0 = sc.mergedicts(base_pars, {vpar: lo})  # Use lower parameter bound
-        pars1 = sc.mergedicts(base_pars, {vpar: hi})  # Use upper parameter bound
+        pars0 = sc.mergedicts(base_pars, {par_effect.par: lo})  # Use lower parameter bound
+        pars1 = sc.mergedicts(base_pars, {par_effect.par: hi})  # Use upper parameter bound
 
         # Run the simulations and pull out the results
-        s0 = hpv.Sim(pars0, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{vpar} {vval[0]}').run()
-        s1 = hpv.Sim(pars1, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{vpar} {vval[1]}').run()
-        res0 = s0.summary
-        res1 = s1.summary
+        s0 = hpv.Sim(pars0, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{par_effect.par} {par_effect.range[0]}').run()
+        s1 = hpv.Sim(pars1, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{par_effect.par} {par_effect.range[1]}').run()
 
         # Check results
-        key=vwhat
-        v0 = res0[key]
-        v1 = res1[key]
-        print(f'Checking {key:20s} ... ', end='')
-        if vrel=='pos':
-            assert v0 <= v1, f'Expected {key} to be lower with {vpar}={lo} than with {vpar}={hi}, but {v0} > {v1})'
-            print(f'✓ ({v0} <= {v1})')
-        elif vrel=='neg':
-            assert v0 >= v1, f'Expected {key} to be higher with {vpar}={lo} than with {vpar}={hi}, but {v0} < {v1})'
-            print(f'✓ ({v0} => {v1})')
+        v0 = s0.results[par_effect.variable][:].sum()
+        v1 = s1.results[par_effect.variable][:].sum()
+        print(f'Checking {par_effect.variable:20s} ... ', end='')
+        assert v0 <= v1, f'Expected {par_effect.variable} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
+        print(f'✓ ({v0} <= {v1})')
 
     return
 
