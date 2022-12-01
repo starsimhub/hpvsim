@@ -133,6 +133,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
     # If it matches a result key, convert to a list
     reskeys = sim.result_keys('total')
     genkeys = sim.result_keys('genotype')
+    # special_keys =
     allkeys = reskeys + genkeys
     if to_plot in allkeys:
         to_plot = sc.tolist(to_plot)
@@ -150,6 +151,8 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
             if reskey in allkeys:
                 name = sim.results[reskey].name
                 to_plot[name] = [reskey] # Use the result name as the key and the reskey as the value
+            elif reskey in []:
+                pass
             else:
                 invalid += reskey
         if len(invalid):
@@ -369,9 +372,10 @@ def plot_time_series(ax, sim, reskey, resnum, args, colors=None, labels=None, pl
 
     elif reskey in genotype_keys:
         ng = sim['n_genotypes']
+        g_colors = sc.gridcolors(ng)
         for genotype in range(ng):
             # Colors and labels
-            v_color = res.color[genotype]
+            g_color = g_colors[genotype]
             geno_obj = sim['genotypes'][genotype]
             if sc.isnumber(geno_obj):  # TODO: figure out why this is sometimes an int and sometimes an obj
                 v_label = str(geno_obj)
@@ -379,7 +383,7 @@ def plot_time_series(ax, sim, reskey, resnum, args, colors=None, labels=None, pl
                 v_label = geno_obj
             else:
                 v_label = geno_obj.label
-            color = set_line_options(colors, reskey, resnum, v_color)  # Choose the color
+            color = set_line_options(colors, reskey, resnum, g_color)  # Choose the color
             label = set_line_options(labels, reskey, resnum, res.name)  # Choose the label
             if label:
                 label += f' - {v_label}'
@@ -430,7 +434,7 @@ def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=N
 
                 # All other cases: any custom special plots are handled here
                 elif reskey in special_keys:
-                    pass
+                    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
 
             # if args.show['interventions']:
             #     plot_interventions(sim, ax) # Plot the interventions

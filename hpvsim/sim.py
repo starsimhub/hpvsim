@@ -425,23 +425,22 @@ class Sim(hpb.BaseSim):
         results = dict()
 
         # Create flows
-        for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+        for lkey,llab,g in zip(['total_',''], ['Total ',''], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
             for flow in hpd.flows:
                 if (flow.by_genotype and lkey=='') or lkey=='total_':
-                    results[f'{lkey + flow.name}'] = init_res(f'{(llab + flow.label).capitalize()}', color=flow.cmap(cstride), n_rows=g)
+                    results[f'{lkey + flow.name}'] = init_res(f'{(llab + flow.label).capitalize()}', color=flow.color, n_rows=g)
 
         # Create stocks
-        for llabel,cstride,g in zip(['Total number','Number'], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):
+        for llabel,g in zip(['Total number','Number'], [0,ng]):
             for stock in hpd.PeopleMeta.stock_states:
                 if (stock.shape=='n_genotypes' and llabel=='Number') or llabel=='Total number':
                     lkey = stock.totalprefix if llabel == 'Total number' else ''
-                    color = stock.cmap(cstride) if stock.cmap is not None else None
-                    results[f'n_{lkey+stock.name}'] = init_res(f'{llabel} {stock.label}', color=color, n_rows=g)
+                    results[f'n_{lkey+stock.name}'] = init_res(f'{llabel} {stock.label}', color=stock.color, n_rows=g)
 
         # Create incidence and prevalence results
-        for lkey,llab,cstride,g in zip(['total_',''], ['Total ',''], [0.95,np.linspace(0.2,0.8,ng)], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
-            for var,name,cmap in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
-                results[f'{lkey+var}_incidence'] = init_res(llab+name+' incidence', color=cmap(cstride), n_rows=g)
+        for lkey,llab,g in zip(['total_',''], ['Total ',''], [0,ng]):  # key, label, and color stride by level (total vs genotype-specific)
+            for var,name,color in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
+                results[f'{lkey+var}_incidence'] = init_res(llab+name+' incidence', color=color, n_rows=g)
 
         # Create demographic flows
         for var, name, color in zip(hpd.dem_keys, hpd.dem_names, hpd.dem_colors):
@@ -498,8 +497,8 @@ class Sim(hpb.BaseSim):
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
         results['hiv_incidence'] = init_res('HIV incidence rate')
         results['hiv_prevalence'] = init_res('HIV prevalence rate')
-        results['hpv_prevalence'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0](np.linspace(0.9,0.5,ng)))
-        results['total_hpv_prevalence'] = init_res('Total HPV prevalence', color=hpd.stock_colors[0](0.95))
+        results['hpv_prevalence'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0])
+        results['total_hpv_prevalence'] = init_res('Total HPV prevalence', color=hpd.stock_colors[0])
 
         # Time vector
         results['year'] = self.res_yearvec

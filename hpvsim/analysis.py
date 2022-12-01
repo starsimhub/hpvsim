@@ -546,7 +546,7 @@ class age_results(Analyzer):
         self.die            = die  # Whether or not to raise an exception
         self.start          = None # Store the start year of the simulation
         self.edges          = edges or np.array([0., 15., 20., 25., 30., 35., 40., 45., 50., 55., 60., 65., 70., 75., 80., 85., 100.])
-        self.timepoints     = sc.promotetolist(timepoints) or [2020.]
+        self.timepoints     = sc.promotetolist(timepoints) or default_timepoints
         self.result_keys    = result_keys or ['total_infections', 'total_cancers']
         self.results        = sc.odict() # Store the age results
 
@@ -682,7 +682,7 @@ class age_results(Analyzer):
         mapping = {
             'infections': ['date_infectious', 'infectious'],
             'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
-            'cins':  ['date_cin1', 'cins'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
+            'cins':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
             'cin1': ['date_cin1', 'cin1'],
             'cin2': ['date_cin2', 'cin2'],
             'cin3': ['date_cin3', 'cin3'],
@@ -936,7 +936,7 @@ class age_results(Analyzer):
         return to_plot
 
 
-    def get_nplots(self):
+    def get_n_plots(self):
         ''' Get number of plots to make '''
 
         if len(self.results) == 0:
@@ -1019,7 +1019,7 @@ class age_results(Analyzer):
 
         # Initialize
         fig = pl.figure(**fig_args)
-        n_plots = self.get_nplots()
+        n_plots = self.get_n_plots()
         n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Make the figure(s)
@@ -1034,6 +1034,120 @@ class age_results(Analyzer):
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
 
+
+class type_distributions(Analyzer):
+    '''
+    Pull out type distribution at a given timepoint, used for default plots
+
+    Args:
+
+    **Example**::
+        sim = hpv.Sim(analyzers=hpv.type_distributions(timepoints=2020))
+    '''
+
+    def __init__(self, dysp_states=None, timepoints=None, **kwargs):
+        super().__init__(**kwargs) # Initialize the Analyzer object
+        self.timepoints     = timepoints
+        self.results        = {}
+        self.ng             = None
+        self.labels         = sc.autolist()
+
+        if dysp_states is None:
+            self.dysp_states    = hpd.type_keys
+            self.labels         = hpd.type_names
+        else:
+            for dysp_state in dysp_states:
+                if dysp_state in hpd.type_keys:
+                    idx = hpd.type_keys.index(dysp_state)
+                    self.labels += hpd.type_names[idx]
+                else:
+                    errormsg = f'Dysplasia state {dysp_state} not understood, use one from {hpd.type_keys}.'
+                    raise ValueError(errormsg)
+        return
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        if self.timepoints is None:
+            self.timepoints = sim['end']
+        self.timepoints = sc.promotetolist(self.timepoints)
+        self.results = {int(tp):sc.objdict() for tp in self.timepoints}
+        self.ng = sim['n_genotypes']
+        self.g_labels = sim['genotypes']
+        return
+
+    def apply(self, sim):
+        ''' Do nothing here - all the work is done in finalize '''
+        pass
+
+    def finalize(self, sim):
+        for tp in self.timepoints:
+            idx = sc.findinds(sim.res_yearvec, tp)[0]
+            for state in self.dysp_states:
+                self.results[tp][state] = sim.results[state][:,idx]
+        return
+
+
+    def plot(self, fig_args=None, axis_args=None, bar_args=None, scatter_args=None,
+             do_save=None, fig_path=None, do_show=None, **kwargs):
+        ''' Create plot '''
+        fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
+        axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
+        all_args = sc.mergedicts(fig_args, axis_args, bar_args, scatter_args)
+
+        # Initialize
+        fig = pl.figure(**fig_args)
+        n_plots = self.get_n_plots()
+        n_rows, n_cols = sc.get_rows_cols(n_plots)
+
+        # Make the figure(s)
+        with hpo.with_style(**kwargs):
+            plot_count=1
+            for date,resdict in self.results.items():
+                pl.subplots_adjust(**axis_args)
+                ax = pl.subplot(n_rows, n_cols, plot_count)
+                ax = self.plot_single(ax, date, bar_args=bar_args, scatter_args=scatter_args)
+                plot_count+=1
+
+        return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
+
+
+    def get_n_plots(self):
+        ''' Get number of plots to make '''
+        return len(self.timepoints)
+
+
+    def plot_single(self, ax, date, bar_args=None, scatter_args=None):
+        '''
+        Function to plot type distribution for a single date. Requires an axis as
+        input and will generally be called by a helper function rather than directly.
+        '''
+        args = sc.objdict()
+        args.bar        = sc.objdict(sc.mergedicts(dict(width=0.15), bar_args))
+        args.scatter    = sc.objdict(sc.mergedicts(dict(marker='s'), scatter_args))
+        resdict = self.results[date] # Extract the result dictionary
+
+        # Grouped bar plot with n_groups bars (one for each state) and ng bars per group
+        n_bars_per_group = self.ng
+        n_groups = len(resdict)
+        x = np.arange(n_groups)
+        width = args.bar.width
+
+        # Set position of bar on x axis
+        xpositions = [x]
+        for group_no in range(1,n_bars_per_group):
+            xpositions.append([xi+width for xi in xpositions[-1]])
+
+        # Plot bars
+        for bar_no in range(n_bars_per_group):
+            ydata = [resdict[k][bar_no] for k in range(n_groups)] # Have to rearrange
+            ax.bar(xpositions[bar_no], ydata, width, label=self.g_labels[bar_no])
+
+        # Add xticks on the middle of the group bars
+        ax.set_xticks([r + width for r in range(len(x))], self.labels)
+        ax.legend()
+        ax.set_title('HPV types by cytology')
+
+        return ax
 
 
 class age_causal_infection(Analyzer):
@@ -1135,6 +1249,7 @@ analyzer_map = {
     'snapshot': snapshot(default_timepoints),
     'age_pyramid': age_pyramid(default_timepoints),
     'age_results': age_results(),
+    'type_distributions': type_distributions(),
     'age_causal_infection': age_causal_infection(),
     'cancer_detection': cancer_detection(),
 }
