@@ -9,7 +9,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
-Version 0.4.2 (2022-12-01)
+Version 0.4.3 (2022-12-01)
 --------------------------
 - Fixes bug with growth function
 - *GitHub info*: PRs `459 <https://github.com/amath-idm/hpvsim/pull/459>`__
