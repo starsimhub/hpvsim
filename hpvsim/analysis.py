@@ -19,7 +19,6 @@ from .settings import options as hpo # For setting global options
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection',
            'cancer_detection', 'analyzer_map']
 
-default_timepoints = [2020.] # Define default timepoints for all snapshot-type analyzers
 
 class Analyzer(sc.prettyobj):
     '''
@@ -182,9 +181,8 @@ class snapshot(Analyzer):
         people = snapshot.get()                   # Option 5
     '''
 
-    def __init__(self, timepoints, *args, die=True, **kwargs):
+    def __init__(self, timepoints=None, *args, die=True, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
-        timepoints = sc.promotetolist(timepoints) # Combine multiple timepoints
         self.timepoints     = timepoints
         self.die            = die  # Whether or not to raise an exception
         self.dates          = None # Representations in terms of years, e.g. 2020.4, set during initialization
@@ -195,6 +193,8 @@ class snapshot(Analyzer):
 
     def initialize(self, sim):
         self.start = sim['start'] # Store the simulation start
+        if self.timepoints is None:
+            self.timepoints = [sim['end']]
         self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
         self.initialized = True
         return
@@ -244,9 +244,8 @@ class age_pyramid(Analyzer):
         age_pyramid = sim['analyzers'][0]
     '''
 
-    def __init__(self, timepoints, *args, edges=None, age_labels=None, datafile=None, die=False, **kwargs):
+    def __init__(self, timepoints=None, *args, edges=None, age_labels=None, datafile=None, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
-        timepoints          = sc.promotetolist(timepoints) # Combine multiple timepoints
         self.timepoints     = timepoints
         self.edges          = edges # Edges of bins
         self.datafile       = datafile # Data file to load
@@ -267,7 +266,7 @@ class age_pyramid(Analyzer):
         self.start = sim['start']   # Store the simulation start
         self.end   = sim['end']     # Store simulation end
         if self.timepoints is None:
-            self.timepoints = self.end # If no day is supplied, use the last day
+            self.timepoints = [self.end] # If no day is supplied, use the last day
         self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
         max_hist_time = self.timepoints[-1]
         max_sim_time = sim['end']
@@ -546,52 +545,52 @@ class age_results(Analyzer):
         self.die            = die  # Whether or not to raise an exception
         self.start          = None # Store the start year of the simulation
         self.edges          = edges or np.array([0., 15., 20., 25., 30., 35., 40., 45., 50., 55., 60., 65., 70., 75., 80., 85., 100.])
-        self.timepoints     = sc.promotetolist(timepoints) or default_timepoints
+        self.timepoints     = timepoints
         self.result_keys    = result_keys or ['total_infections', 'total_cancers']
         self.results        = sc.odict() # Store the age results
-
-        # Handle which results to make. Specification of the results to make is stored in result_args
-        if result_args is None: # Make defaults if none are provided
-            self.result_args = sc.objdict()
-            for rkey in self.result_keys:
-                self.result_args[rkey] = sc.objdict(timepoints=self.timepoints, edges=self.edges)
-        elif sc.checktype(result_args, dict): # Ensure it's an object dict
-            self.result_args = sc.objdict(result_args)
-        else: # Raise an error
-            errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(result_args)}.'
-            raise TypeError(errormsg)
-
+        self.result_args    = result_args
         return
 
 
     def initialize(self, sim):
 
-        if not self.initialized:
+        super().initialize()
 
-            super().initialize()
-            # Handle timepoints and dates
-            self.start = sim['start']  # Store the simulation start
-            self.end = sim['end']  # Store simulation end
+        # Handle timepoints and dates
+        self.start = sim['start']  # Store the simulation start
+        self.end = sim['end']  # Store simulation end
+        if self.timepoints is None:
+            self.timepoints = [sim['end']]
+            self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
 
-            # Handle dt - if we're storing annual results we'll need to aggregate them over
-            # several consecutive timesteps
-            self.dt = sim['dt']
-            self.resfreq = sim.resfreq
+        # Handle which results to make. Specification of the results to make is stored in result_args
+        if self.result_args is None: # Make defaults if none are provided
+            self.result_args = sc.objdict()
+            for rkey in self.result_keys:
+                self.result_args[rkey] = sc.objdict(timepoints=self.dates, edges=self.edges)
+        elif sc.checktype(self.result_args, dict): # Ensure it's an object dict
+            self.result_args = sc.objdict(self.result_args)
+        else: # Raise an error
+            errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(result_args)}.'
+            raise TypeError(errormsg)
 
-            self.validate_results(sim)
+        # Handle dt - if we're storing annual results we'll need to aggregate them over
+        # several consecutive timesteps
+        self.dt = sim['dt']
+        self.resfreq = sim.resfreq
 
-            # Store genotypes
-            self.ng = sim['n_genotypes']
-            self.glabels = [g.upper() for g in sim['genotype_map'].values()]
+        self.validate_results(sim)
 
-            # Store colors
-            for rkey in self.result_args.keys():
-                self.result_args[rkey].color = sim.results[rkey].color
-                self.result_args[rkey].name = sim.results[rkey].name
+        # Store genotypes
+        self.ng = sim['n_genotypes']
+        self.glabels = [g.upper() for g in sim['genotype_map'].values()]
 
-            self.initialized = True
-        else:
-            print('Warning, already initialized')
+        # Store colors
+        for rkey in self.result_args.keys():
+            self.result_args[rkey].color = sim.results[rkey].color
+            self.result_args[rkey].name = sim.results[rkey].name
+
+        self.initialized = True
 
         return
 
@@ -641,7 +640,13 @@ class age_results(Analyzer):
                         errormsg = 'Did not provide timepoints for this age analyzer'
                         raise ValueError(errormsg)
 
-                rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints, return_date_format='str')  # Ensure timepoints and dates are in the right format
+                try:
+                    rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints, return_date_format='str')  # Ensure timepoints and dates are in the right format
+                except:
+                    import traceback;
+                    traceback.print_exc();
+                    import pdb;
+                    pdb.set_trace()
                 max_hist_time = rdict.timepoints[-1]
                 max_sim_time = sim['end']
                 if max_hist_time > max_sim_time:
@@ -1246,8 +1251,8 @@ class cancer_detection(Analyzer):
 
 #%% Additional utilities
 analyzer_map = {
-    'snapshot': snapshot(default_timepoints),
-    'age_pyramid': age_pyramid(default_timepoints),
+    'snapshot': snapshot(),
+    'age_pyramid': age_pyramid(),
     'age_results': age_results(),
     'type_distributions': type_distributions(),
     'age_causal_infection': age_causal_infection(),
