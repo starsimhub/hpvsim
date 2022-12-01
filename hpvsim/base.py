@@ -1008,8 +1008,9 @@ class BasePeople(FlexPretty):
             n (int): Number of new agents to add
         """
         orig_n = self._n
-        if (orig_n + n) > self._s:
-            n_new = int(self._s / 2)  # 50% growth
+        new_total = orig_n + n
+        if new_total > self._s:
+            n_new = max(n, int(self._s / 2))  # Minimum 50% growth
             for state in self.meta.all_states:
                 self._data[state.name] = np.concatenate([self._data[state.name], state.new(self.pars, n_new)], axis=self._data[state.name].ndim-1)
             self._s += n_new
