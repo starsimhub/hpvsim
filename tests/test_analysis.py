@@ -47,10 +47,10 @@ def test_defaults():
     sim1.initialize()
     assert len(sim1['analyzers'])==0
 
-    # Check that defaults get overwritten if alternatives are supplies
+    # Check that new ones get added, not replaced
     sim2 = hpv.Sim(analyzers=hpv.age_results())
     sim2.initialize()
-    assert len(sim2['analyzers'])==2
+    assert len(sim2['analyzers'])==3
 
     return
 

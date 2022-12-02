@@ -105,7 +105,7 @@ class Calibration(sc.prettyobj):
             self.target_data.append(hpm.load_data(datafile))
 
         sim_results = sc.objdict()
-        age_result_keys = sc.objdict()
+        age_result_args = sc.objdict()
 
         # Go through each of the target keys and determine how we are going to get the results from sim
         for targ in self.target_data:
@@ -114,7 +114,7 @@ class Calibration(sc.prettyobj):
                 errormsg = f'Only support one set of targets per datafile, {len(targ_keys)} provided'
                 raise ValueError(errormsg)
             if 'age' in targ.columns:
-                age_result_keys[targ_keys[0]] = sc.objdict(
+                age_result_args[targ_keys[0]] = sc.objdict(
                     datafile=sc.dcp(targ),
                     compute_fit=True,
                 )
@@ -123,22 +123,22 @@ class Calibration(sc.prettyobj):
                     data=sc.dcp(targ)
                 )
 
-        ar = hpa.age_results(result_keys=age_result_keys)
+        ar = hpa.age_results(result_args=age_result_args)
         self.sim['analyzers'] += [ar]
         self.sim.initialize()
         for rkey in sim_results.keys():
             sim_results[rkey].timepoints = sim.get_t(sim_results[rkey].data.year.unique()[0], return_date_format='str')[0]//sim.resfreq
             if 'weights' not in sim_results[rkey].data.columns:
                 sim_results[rkey].weights = np.ones(len(sim_results[rkey].data))
-        self.age_results_keys = age_result_keys.keys()
+        self.age_results_keys = age_result_args.keys()
         self.sim_results = sim_results
         self.sim_results_keys = sim_results.keys()
 
-        self.result_properties = sc.objdict()
+        self.result_args = sc.objdict()
         for rkey in self.age_results_keys + self.sim_results_keys:
-            self.result_properties[rkey] = sc.objdict()
-            self.result_properties[rkey].name = self.sim.results[rkey].name
-            self.result_properties[rkey].color = self.sim.results[rkey].color
+            self.result_args[rkey] = sc.objdict()
+            self.result_args[rkey].name = self.sim.results[rkey].name
+            self.result_args[rkey].color = self.sim.results[rkey].color
 
         # Temporarily store a filename
         self.tmp_filename = 'tmp_calibration_%05i.obj'
@@ -645,7 +645,7 @@ class Calibration(sc.prettyobj):
                             # Plot data
                             if glabel in unique_genotypes:
                                 ydata = np.array(thisdatadf[thisdatadf.genotype == glabel].value)
-                                ax.scatter(x, ydata, color=self.result_properties[resname].color[g], marker='s', label=f'Data - {glabel}')
+                                ax.scatter(x, ydata, color=self.result_args[resname].color[g], marker='s', label=f'Data - {glabel}')
 
                             # Construct a dataframe with things in the most logical order for plotting
                             for run_num, run in enumerate(analyzer_results):
@@ -660,7 +660,7 @@ class Calibration(sc.prettyobj):
                     else:
                         # Plot data
                         ydata = np.array(thisdatadf.value)
-                        ax.scatter(x, ydata, color=self.result_properties[resname].color, marker='s', label='Data')
+                        ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data')
 
                         # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(analyzer_results):
@@ -669,11 +669,11 @@ class Calibration(sc.prettyobj):
 
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values})
-                        ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, color=self.result_properties[resname].color, **extra_args)
+                        ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, color=self.result_args[resname].color, **extra_args)
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_properties[resname].name+', '+ date.replace('.0', ''))
+                    ax.set_title(self.result_args[resname].name+', '+ date.replace('.0', ''))
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
@@ -685,7 +685,7 @@ class Calibration(sc.prettyobj):
                 values = []
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
-                ax.scatter(x, ydata, color=self.result_properties[resname].color[0], marker='s', label='Data')
+                ax.scatter(x, ydata, color=self.result_args[resname].color[0], marker='s', label='Data')
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
@@ -698,7 +698,7 @@ class Calibration(sc.prettyobj):
                 # Set title and labels
                 date = thisdatadf.year[0]
                 ax.set_xlabel('Genotype')
-                ax.set_title(self.result_properties[resname].name + ', ' + str(date))
+                ax.set_title(self.result_args[resname].name + ', ' + str(date))
                 ax.legend()
                 ax.set_xticks(x, self.glabels)
                 plot_count += 1

@@ -902,22 +902,24 @@ class age_results(Analyzer):
 
     def compute(self, key):
         res = []
-        for name, group in self.result_keys[key].data.groupby(['genotype', 'year']):
+        resargs = self.result_args[key]
+        results = self.results[key]
+        for name, group in resargs.data.groupby(['genotype', 'year']):
             genotype = name[0]
             year = str(name[1]) + '.0'
             if 'total' in key or 'cancer' in key:
-                sim_res = list(self.results[key][year])
+                sim_res = list(results[year])
                 res.extend(sim_res)
             else:
-                sim_res = list(self.results[key][year][self.glabels.index(genotype)])
+                sim_res = list(results[year][self.glabels.index(genotype)])
                 res.extend(sim_res)
-        self.result_keys[key].data['model_output'] = res
-        self.result_keys[key].data['diffs'] = self.result_keys[key].data['model_output'] - self.result_keys[key].data['value']
-        self.result_keys[key].data['gofs'] = hpm.compute_gof(self.result_keys[key].data['value'].values, self.result_keys[key].data['model_output'].values)
-        self.result_keys[key].data['losses'] = self.result_keys[key].data['gofs'].values * self.result_keys[key].weights
-        self.result_keys[key].mismatch = self.result_keys[key].data['losses'].sum()
+        self.result_args[key].data['model_output'] = res
+        self.result_args[key].data['diffs'] = resargs.data['model_output'] - resargs.data['value']
+        self.result_args[key].data['gofs'] = hpm.compute_gof(resargs.data['value'].values, resargs.data['model_output'].values)
+        self.result_args[key].data['losses'] = resargs.data['gofs'].values * resargs.weights
+        self.result_args[key].mismatch = resargs.data['losses'].sum()
 
-        return self.result_keys[key].mismatch
+        return self.result_args[key].mismatch
 
 
     def get_to_plot(self):
