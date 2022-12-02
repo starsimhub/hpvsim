@@ -1196,7 +1196,10 @@ class age_causal_infection(Analyzer):
                 self.dwelltime['cin2'] += cin2_time.tolist()
                 self.dwelltime['cin3'] += cin3_time.tolist()
                 self.dwelltime['total'] += total_time.tolist()
+        return
 
+    def finalize(self, sim=None):
+        ''' Convert things to arrays '''
 
 class cancer_detection(Analyzer):
     '''

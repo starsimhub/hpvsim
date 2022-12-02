@@ -1336,9 +1336,9 @@ class BasePeople(FlexPretty):
     def latent(self):
         '''
         Boolean array of everyone with latent infection. By definition, these
-        people have no dysplasia and inactive infection status.
+        people have no dysplasia, no cancer, and inactive infection status.
         '''
-        return (self.inactive * self.no_dysp).astype(bool)
+        return (self.inactive * self.no_dysp * ~self.cancerous.any(axis=0)).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''

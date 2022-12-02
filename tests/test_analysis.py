@@ -177,7 +177,7 @@ def test_reduce_analyzers():
     return sim, reduced_analyzer
 
 
-def test_age_causal_analyzer():
+def test_age_causal_analyzer(do_plot=True):
     sc.heading('Test age causal infection analyzer')
 
     pars = {
@@ -201,19 +201,19 @@ def test_age_causal_analyzer():
 
     sim = hpv.Sim(pars=pars, analyzers=hpv.age_causal_infection(start_year=2000))
     sim.run()
-    a = sim.get_analyzer(hpv.age_causal_infection)
 
-    plt.figure()
-
+    a = sim.get_analyzer('age_causal_infection')
     count, bins_count = np.histogram(a.age_causal, bins=10)
     pdf = count / sum(count)
     cdf = np.cumsum(pdf)
-    plt.plot(bins_count[1:], cdf)
 
-    plt.title('Distribution of age of causal HPV infection')
-    plt.legend()
-    plt.xlabel('Age')
-    plt.show()
+    if do_plot:
+        plt.figure()
+        plt.plot(bins_count[1:], cdf)
+        plt.title('Distribution of age of causal HPV infection')
+        plt.legend()
+        plt.xlabel('Age')
+        plt.show()
 
     return sim, a
 
@@ -248,7 +248,7 @@ if __name__ == '__main__':
     sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()
-    # sim3, a3    = test_age_causal_analyzer()
+    sim3, a3    = test_age_causal_analyzer()
     sim4, a4    = test_detection()
 
     sc.toc(T)

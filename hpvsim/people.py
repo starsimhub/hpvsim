@@ -56,7 +56,7 @@ class People(hpb.BasePeople):
         # Other initialization
         self.pop_trend = pop_trend
         self.init_contacts() # Initialize the contacts
-        self.infection_log = [] # Record of infections - keys for ['source','target','date','layer']
+        self.ng = self.pars['n_genotypes']
 
         self.lag_bins = np.linspace(0,50,51)
         self.rship_lags = dict()
@@ -83,15 +83,13 @@ class People(hpb.BasePeople):
 
     def init_flows(self):
         ''' Initialize flows to be zero '''
-        ng = self.pars['n_genotypes']
         df = hpd.default_float
-        self.flows              = {f'{key}'         : np.zeros(ng, dtype=df) for key in hpd.flow_keys}
+        self.flows              = {f'{key}'         : np.zeros(self.ng, dtype=df) for key in hpd.flow_keys}
         for tf in hpd.total_flow_keys:
             self.flows[tf]      = 0
         self.total_flows        = {f'total_{key}'   : 0 for key in hpd.flow_keys}
         self.flows_by_sex       = {f'{key}'         : np.zeros(2, dtype=df) for key in hpd.by_sex_keys}
         self.demographic_flows  = {f'{key}'         : 0 for key in hpd.dem_keys}
-        # self.intv_flows         = {f'{key}'         : 0 for key in hpd.intv_flow_keys}
         self.flows_by_age       = {'cancers_by_age' : np.zeros(len(self.asr_bins)-1)}
 
         return
@@ -527,22 +525,26 @@ class People(hpb.BasePeople):
         ''' Check for new progressions to cancer '''
         filter_inds = self.true_by_genotype('cin3', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
-
-        # First, set the SIR properties. Once a person has cancer, their are designated
-        # as inactive for all genotypes they may be infected with
-        self.susceptible[:, inds] = False # No longer susceptible to any genotype
-        self.infectious[:, inds] = False # No longer counted as infectious
-        self.date_clearance[:, inds] = np.nan # Remove their clearance dates
-        self.inactive[:, inds] = True # If this person has any other infections from any other genotypes, set them to inactive
-
-        # Next, set the dysplasia properties
-        self.cancerous[genotype, inds] = True
-        self.cin3[genotype, inds] = False # No longer counted as CIN3
-
-        # Calculations for age-standardized cancer incidence
         cases_by_age = 0
-        if len(inds)>0:
-            cases_by_age = np.histogram(self.age[inds], bins=self.asr_bins, weights=self.scale[inds])[0]
+
+        if len(inds):
+            # First, set the SIR properties. Once a person has cancer, their are designated
+            # as inactive for all genotypes they may be infected with
+            self.susceptible[:, inds] = False # No longer susceptible to any genotype
+            self.infectious[:, inds]  = False # No longer counted as infectious with any genotype
+            self.date_clearance[:, inds] = np.nan # Remove their clearance dates for all genotypes
+            for g in range(self.ng):
+                if g!=genotype:
+                    self.date_cancerous[g, inds] = np.nan # Remove their date of cancer for all genotypes but the one currently causing cancer
+            self.inactive[:, inds] = True # If this person has any other infections from any other genotypes, set them to inactive
+
+            # Next, set the dysplasia properties
+            self.cancerous[genotype, inds] = True
+            self.cin3[genotype, inds] = False # No longer counted as CIN3
+
+            # Calculations for age-standardized cancer incidence
+            if len(inds)>0:
+                cases_by_age = np.histogram(self.age[inds], bins=self.asr_bins, weights=self.scale[inds])[0]
 
         return self.scale_flows(inds), cases_by_age
 
@@ -823,7 +825,6 @@ class People(hpb.BasePeople):
         genotype_pars   = self.pars['genotype_pars']
         genotype_map    = self.pars['genotype_map']
         dur_precin      = genotype_pars[genotype_map[g]]['dur_precin']
-        # dysp_rate       = genotype_pars[genotype_map[g]]['dysp_rate']
 
         # Set date of infection and exposure
         base_t = self.t + offset if offset is not None else self.t
