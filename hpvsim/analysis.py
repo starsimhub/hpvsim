@@ -856,10 +856,10 @@ class age_results(Analyzer):
                 errormsg = 'The list of analyzers provided to age_results.reduce have different result keys.'
                 raise ValueError(errormsg)
             for reskey in base_analyzer.results.keys():
-                if not np.array_equal(base_analyzer.result_keys[reskey]['timepoints'],analyzer.result_keys[reskey]['timepoints']):
+                if not np.array_equal(base_analyzer.result_args[reskey]['timepoints'],analyzer.result_args[reskey]['timepoints']):
                     errormsg = 'The list of analyzers provided to age_results.reduce have different timepoints.'
                     raise ValueError(errormsg)
-                if not np.array_equal(base_analyzer.result_keys[reskey]['edges'],analyzer.result_keys[reskey]['edges']):
+                if not np.array_equal(base_analyzer.result_args[reskey]['edges'],analyzer.result_args[reskey]['edges']):
                     errormsg = 'The list of analyzers provided to age_pyramid.reduce have different age bin edges.'
                     raise ValueError(errormsg)
 
