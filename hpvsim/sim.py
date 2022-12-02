@@ -587,9 +587,10 @@ class Sim(hpb.BaseSim):
             self['analyzers'] = self._orig_pars.pop('analyzers') # Restore
 
         # Add default analyzers
-        if (len(self['analyzers'])==0) and self['use_default_analyzers'] and (len(self['default_analyzers'])>0):
+        if self['use_default_analyzers'] and (len(self['default_analyzers'])>0):
             for analyzer_name in self['default_analyzers']:
-                self['analyzers'] += hpa.analyzer_map[analyzer_name]
+                if not self.get_analyzer(analyzer_name, die=False): # Only add in the default if the same type hasn't been provided
+                    self['analyzers'].insert(0, hpa.analyzer_map[analyzer_name])
 
         for analyzer in self['analyzers']:
             if isinstance(analyzer, hpa.Analyzer):

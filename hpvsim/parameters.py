@@ -112,7 +112,7 @@ def make_pars(**kwargs):
     # Events and interventions
     pars['interventions']           = sc.autolist()   # The interventions present in this simulation; populated by the user
     pars['use_default_analyzers']   = True  # Whether or not to use default analyzers if none are provided
-    pars['default_analyzers']       = ['type_distributions']  # List of default analysis functions to include if no others are specified
+    pars['default_analyzers']       = ['age_results', 'type_distributions']  # List of default analysis functions to include if no others are specified
     pars['analyzers']               = sc.autolist()   # Custom analysis functions; populated by the user
     pars['timelimit']               = None # Time limit for the simulation (seconds)
     pars['stopping_func']           = None # A function to call to stop the sim partway through

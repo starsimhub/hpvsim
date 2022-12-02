@@ -33,6 +33,28 @@ def test_snapshot():
     return people4
 
 
+def test_defaults():
+
+    sc.heading('Testing default analyzer behavior')
+
+    # Check that defaults get added
+    sim0 = hpv.Sim()
+    sim0.initialize()
+    assert len(sim0['analyzers'])==2 # 2 analyzers added by default
+
+    # Check that defaults don't get added if they're not supposed to
+    sim1 = hpv.Sim(use_default_analyzers=False)
+    sim1.initialize()
+    assert len(sim1['analyzers'])==0
+
+    # Check that defaults get overwritten if alternatives are supplies
+    sim2 = hpv.Sim(analyzers=hpv.age_results())
+    sim2.initialize()
+    assert len(sim2['analyzers'])==2
+
+    return
+
+
 def test_age_pyramids(do_plot=True):
 
     sc.heading('Testing age pyramids')
@@ -80,7 +102,7 @@ def test_age_results(do_plot=True):
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            hpv_incidence=sc.objdict(
+            total_infections=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
@@ -98,7 +120,7 @@ def test_age_results(do_plot=True):
     sim = hpv.Sim(pars, genotypes=[16, 18], analyzers=[az1])
 
     sim.run()
-    a = sim.get_analyzer(0)
+    a = sim.get_analyzer('age_results')
 
     to_plot = {
         'HPV prevalence': [
@@ -160,9 +182,9 @@ def test_reduce_analyzers():
 
         sim.run()
 
-        age_pyr = sim.get_analyzer(0)
+        age_pyr = sim.get_analyzer('age_pyramid')
         age_pyramids.append(age_pyr)
-        age_res = sim.get_analyzer(1)
+        age_res = sim.get_analyzer('age_results')
         age_results.append(age_res)
 
     # reduced_analyzer = hpv.age_pyramid.reduce(age_pyramids)
@@ -193,7 +215,7 @@ def test_age_causal_analyzer():
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
 
-    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection(start_year=2000)])
+    sim = hpv.Sim(pars=pars, analyzers=hpv.age_causal_infection(start_year=2000))
     sim.run()
     a = sim.get_analyzer(hpv.age_causal_infection)
 
@@ -238,10 +260,11 @@ if __name__ == '__main__':
     T = sc.tic()
 
     people      = test_snapshot()
+    test_defaults()
     sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()
-    sim3, a3    = test_age_causal_analyzer()
+    # sim3, a3    = test_age_causal_analyzer()
     sim4, a4    = test_detection()
 
     sc.toc(T)

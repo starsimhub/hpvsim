@@ -560,7 +560,7 @@ class age_results(Analyzer):
         self.start = sim['start']  # Store the simulation start
         self.end = sim['end']  # Store simulation end
         if self.timepoints is None:
-            self.timepoints = [sim['end']]
+            self.timepoints = [f'{sim["end"]}']
             self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
 
         # Handle which results to make. Specification of the results to make is stored in result_args
@@ -605,68 +605,63 @@ class age_results(Analyzer):
             else:
                 self.results[rk] = sc.objdict()
 
-                # Handle the data file
-                # If data is provided, extract timepoints, edges, age bins and labels from that
-                if 'datafile' in rdict.keys():
-                    if sc.isstring(rdict.datafile):
-                        rdict.data = hpm.load_data(rdict.datafile, check_date=False)
-                    else:
-                        rdict.data = rdict.datafile  # Use it directly
-                        rdict.datafile = None
-
-                    # extract edges, age bins and labels from that
-                    # Handle edges, age bins, and labels
-                    rdict.timepoints = rdict.data.year.unique()
-                    rdict.age_labels = []
-                    rdict.edges = np.array(rdict.data.age.unique(), dtype=float)
-                    rdict.edges = np.append(rdict.edges, 100)
-                    rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
-                    self.results[rk]['bins'] = rdict.bins
-                    rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
-                                            range(len(rdict.bins) - 1)]
-                    rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
-
+            # Handle the data file
+            # If data is provided, extract timepoints, edges, age bins and labels from that
+            if 'datafile' in rdict.keys():
+                if sc.isstring(rdict.datafile):
+                    rdict.data = hpm.load_data(rdict.datafile, check_date=False)
                 else:
-                    # Handle edges, age bins, and labels
-                    rdict.age_labels = []
-                    if (not hasattr(rdict,'edges')) or rdict.edges is None:  # Default age bins
-                        rdict.edges = np.linspace(0, 100, 11)
-                    rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
-                    self.results[rk]['bins'] = rdict.bins
-                    rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
-                                        range(len(rdict.bins) - 1)]
-                    rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
-                    if 'timepoints' not in rdict.keys():
-                        errormsg = 'Did not provide timepoints for this age analyzer'
-                        raise ValueError(errormsg)
+                    rdict.data = rdict.datafile  # Use it directly
+                    rdict.datafile = None
 
-                try:
-                    rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints, return_date_format='str')  # Ensure timepoints and dates are in the right format
-                except:
-                    import traceback;
-                    traceback.print_exc();
-                    import pdb;
-                    pdb.set_trace()
-                max_hist_time = rdict.timepoints[-1]
-                max_sim_time = sim['end']
-                if max_hist_time > max_sim_time:
-                    errormsg = f'Cannot create age results for {rdict.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
+                # extract edges, age bins and labels from that
+                # Handle edges, age bins, and labels
+                rdict.timepoints = rdict.data.year.unique()
+                rdict.age_labels = []
+                rdict.edges = np.array(rdict.data.age.unique(), dtype=float)
+                rdict.edges = np.append(rdict.edges, 100)
+                rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
+                self.results[rk]['bins'] = rdict.bins
+                rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
+                                        range(len(rdict.bins) - 1)]
+                rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
+
+            else:
+                # Handle edges, age bins, and labels
+                rdict.age_labels = []
+                if (not hasattr(rdict,'edges')) or rdict.edges is None:  # Default age bins
+                    rdict.edges = np.linspace(0, 100, 11)
+                rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
+                self.results[rk]['bins'] = rdict.bins
+                rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
+                                    range(len(rdict.bins) - 1)]
+                rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
+                if 'timepoints' not in rdict.keys():
+                    errormsg = 'Did not provide timepoints for this age analyzer'
                     raise ValueError(errormsg)
 
-                rdict.calcpoints = []
-                for tpi, tp in enumerate(rdict.timepoints):
-                    rdict.calcpoints += [tp + i for i in range(int(1 / self.dt))]
+            if not rdict.get('dates') or rdict.dates is None:
+                rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints, return_date_format='str')  # Ensure timepoints and dates are in the right format
+            max_hist_time = rdict.timepoints[-1]
+            max_sim_time = sim['end']
+            if max_hist_time > max_sim_time:
+                errormsg = f'Cannot create age results for {rdict.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
+                raise ValueError(errormsg)
 
-                if 'compute_fit' in rdict.keys() and rdict.compute_fit:
-                    if rdict.data is None:
-                        errormsg = 'Cannot compute fit without data'
-                        raise ValueError(errormsg)
+            rdict.calcpoints = []
+            for tpi, tp in enumerate(rdict.timepoints):
+                rdict.calcpoints += [tp + i for i in range(int(1 / self.dt))]
+
+            if 'compute_fit' in rdict.keys() and rdict.compute_fit:
+                if rdict.data is None:
+                    errormsg = 'Cannot compute fit without data'
+                    raise ValueError(errormsg)
+                else:
+                    if 'weights' in rdict.data.columns:
+                        rdict.weights = rdict.data['weights'].values
                     else:
-                        if 'weights' in rdict.data.columns:
-                            rdict.weights = rdict.data['weights'].values
-                        else:
-                            rdict.weights = np.ones(len(rdict.data))
-                        rdict.mismatch = 0  # The final value
+                        rdict.weights = np.ones(len(rdict.data))
+                    rdict.mismatch = 0  # The final value
 
 
     def convert_rname_stocks(self, rname):
@@ -878,7 +873,7 @@ class age_results(Analyzer):
             raw[reskey] = {}
             reduced_analyzer.results[reskey] = sc.objdict()
             reduced_analyzer.results[reskey]['bins'] = base_analyzer.results[reskey]['bins']
-            for date,tp in zip(base_analyzer.result_keys[reskey].dates, base_analyzer.result_keys[reskey].timepoints):
+            for date,tp in zip(base_analyzer.result_args[reskey].dates, base_analyzer.result_args[reskey].timepoints):
                 ashape = analyzer.results[reskey][date].shape # Figure out dimensions
                 new_ashape = ashape + (len(analyzers),)
                 raw[reskey][date] = np.zeros(new_ashape)
@@ -974,16 +969,17 @@ class age_results(Analyzer):
 
         # Plot by genotype
         if 'total' not in rkey and 'mortality' not in rkey:
+            colors = sc.gridcolors(self.ng) # Overwrite default colors with genotype colors
             for g in range(self.ng):
-
+                color = colors[g]
                 glabel = self.glabels[g].upper()
-                ax.plot(x, resdict[date][g,:], color=resargs.color[g], **args.plot, label=glabel)
+                ax.plot(x, resdict[date][g,:], color=color, **args.plot, label=glabel)
 
                 if ('data' in resargs.keys()) and (len(thisdatadf) > 0):
                     # check if this genotype is in dataframe
                     if self.glabels[g].upper() in unique_genotypes:
                         ydata = np.array(thisdatadf[thisdatadf.genotype==self.glabels[g].upper()].value)
-                        ax.scatter(x, ydata, color=self.result_args[rkey].color[g], **args.scatter, label=f'Data - {glabel}')
+                        ax.scatter(x, ydata, color=color, **args.scatter, label=f'Data - {glabel}')
 
         # Plot totals
         else:
