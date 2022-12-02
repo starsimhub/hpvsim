@@ -1247,11 +1247,11 @@ class cancer_detection(Analyzer):
 
 #%% Additional utilities
 analyzer_map = {
-    'snapshot': snapshot(),
-    'age_pyramid': age_pyramid(),
-    'age_results': age_results(),
-    'type_distributions': type_distributions(),
-    'age_causal_infection': age_causal_infection(),
-    'cancer_detection': cancer_detection(),
+    'snapshot': snapshot,
+    'age_pyramid': age_pyramid,
+    'age_results': age_results,
+    'type_distributions': type_distributions,
+    'age_causal_infection': age_causal_infection,
+    'cancer_detection': cancer_detection,
 }
 

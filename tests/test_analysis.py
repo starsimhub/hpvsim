@@ -118,27 +118,11 @@ def test_age_results(do_plot=True):
     )
 
     sim = hpv.Sim(pars, genotypes=[16, 18], analyzers=[az1])
-
     sim.run()
     a = sim.get_analyzer('age_results')
 
-    to_plot = {
-        'HPV prevalence': [
-            'hpv_prevalence',
-        ],
-        'Cervical cancer incidence': [
-            'total_cancer_incidence',
-        ],
-        'Cervical cancer mortality': [
-            'cancer_mortality',
-        ],
-    }
-
     # Check plot()
-    if do_plot:
-        sim.plot(to_plot=to_plot)
-        fig0 = sim.get_analyzer(0).plot()
-        # fig1 = sim.get_analyzer(1).plot()
+    if do_plot: a.plot()
 
     return sim, a
 
