@@ -11,11 +11,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 Version 0.4.4 (2022-12-01)
 --------------------------
-- Prevents immunity values from exceeding 1
 - Changes default genotypes to 16, 18, and other high-risk
 - Changes default hpv control prob to 0
 - Adds age of cancer to analyzer
 - Changes to default plotting styles
+- Various bugfixes: prevents immunity values from exceeding 1, ensures people with cancer aren't given second cancers
 - *GitHub info*: PRs `458 <https://github.com/amath-idm/hpvsim/pull/458>`__
 
 
