@@ -1059,6 +1059,10 @@ class type_distributions(Analyzer):
             self.dysp_states    = hpd.type_keys
             self.labels         = hpd.type_names
         else:
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
             for dysp_state in dysp_states:
                 if dysp_state in hpd.type_keys:
                     idx = hpd.type_keys.index(dysp_state)
@@ -1252,6 +1256,7 @@ class cancer_detection(Analyzer):
 
 #%% Additional utilities
 analyzer_map = {
+    'default': [age_results, type_distributions],
     'snapshot': snapshot,
     'age_pyramid': age_pyramid,
     'age_results': age_results,

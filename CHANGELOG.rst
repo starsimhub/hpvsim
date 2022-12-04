@@ -11,8 +11,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 Version 0.4.4 (2022-12-01)
 --------------------------
-- Changes default genotypes to 16, 18, and other high-risk
-- Changes default hpv control prob to 0
+- Changes to several default parameters: default genotypes are now 16, 18, and other high-risk; default hpv control prob is now 0; default analyzers are now added to capture cancers and infections by age and type distributions.
 - Adds age of cancer to analyzer
 - Changes to default plotting styles
 - Various bugfixes: prevents immunity values from exceeding 1, ensures people with cancer aren't given second cancers

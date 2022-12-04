@@ -20,7 +20,7 @@ def test_snapshot():
 
     pars = dict(n_years=10, dt=0.5)
 
-    sim = hpv.Sim(pars, analyzers=hpv.snapshot(['2016', '2019']))
+    sim = hpv.Sim(pars, analyzers=['default', hpv.snapshot(['2016', '2019'])])
     sim.run()
     snapshot = sim.get_analyzer()
     people1 = snapshot.snapshots[0]         # Option 1
@@ -43,12 +43,12 @@ def test_defaults():
     assert len(sim0['analyzers'])==2 # 2 analyzers added by default
 
     # Check that defaults don't get added if they're not supposed to
-    sim1 = hpv.Sim(use_default_analyzers=False)
+    sim1 = hpv.Sim(analyzers = [])
     sim1.initialize()
     assert len(sim1['analyzers'])==0
 
     # Check that new ones get added, not replaced
-    sim2 = hpv.Sim(analyzers=hpv.age_results())
+    sim2 = hpv.Sim(analyzers=['default', hpv.age_results()])
     sim2.initialize()
     assert len(sim2['analyzers'])==3
 

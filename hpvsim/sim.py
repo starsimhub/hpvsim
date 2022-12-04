@@ -586,10 +586,23 @@ class Sim(hpb.BaseSim):
         if self._orig_pars and 'analyzers' in self._orig_pars:
             self['analyzers'] = self._orig_pars.pop('analyzers') # Restore
 
-        # Add default analyzers
-        if self['use_default_analyzers'] and (len(self['default_analyzers'])>0):
-            for analyzer_name in self['default_analyzers']:
-                self['analyzers'].insert(0, hpa.analyzer_map[analyzer_name]())
+        # Interpret analyzers
+        choices = hpa.analyzer_map.keys()
+        orig_analyzers = sc.dcp(self['analyzers'])
+        self['analyzers'] = sc.autolist() # Copy the original and rebuild it
+
+        for ai,analyzer in enumerate(orig_analyzers):
+            if isinstance(analyzer, str):
+                # Try to turn strings into analyzers
+                if not analyzer in choices:
+                    errormsg = f'Analyzer {analyzer} not understood: choices are {choices}.'
+                    raise ValueError(errormsg)
+                else:
+                    analyzer_list = sc.tolist(hpa.analyzer_map[analyzer]) # If not a list, turn it into one - for consistency of processing
+                    for az in analyzer_list:
+                        self['analyzers'] += az() # Unpack list
+            else:
+                self['analyzers'] += analyzer # Just add it in
 
         for analyzer in self['analyzers']:
             if isinstance(analyzer, hpa.Analyzer):
