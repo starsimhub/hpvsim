@@ -43,11 +43,13 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
-        'start': 1980,
+        'start': 1950,
         'burnin': 30,
         'end': 2030,
         'location': 'tanzania',
         'dt': .5,
+        'use_multiscale': True,
+        'ms_agent_ratio': 100,
         'genotypes': [16,18]
     }
     pars = sc.mergedicts(pars, kwargs)
@@ -94,10 +96,6 @@ def test_epi():
         ParEffects('debut',         [25, 15],       'total_infections'),
         ParEffects('init_hpv_prev', [0.1, 0.8],     'total_infections'),
     ]
-    # vary_pars   = ['model_hiv',         'beta',             'condoms',          'acts',             'debut',            'init_hpv_prev', ] # Parameters
-    # vary_vals   = [[False, True],       [0.01, 0.99],     [0.1,0.9],          [1, 200],           [15,25],            [0.01,0.8]] # Values
-    # vary_rels   = ['pos',               'pos',              'neg',              'pos',              'neg',              'pos'] # Expected association with epi outcomes
-    # vary_what   = ['total_infections',  'total_infections', 'total_infections', 'total_infections', 'total_infections', 'total_cancers'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for par_effect in par_effects:

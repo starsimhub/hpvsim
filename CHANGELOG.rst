@@ -9,7 +9,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
-Version 0.4.4 (2022-12-01)
+Version 0.4.5 (2022-12-05)
 --------------------------
 - Changes to several default parameters: use_multiscale is now True by default; default genotypes are now 16, 18, and other high-risk; and default hpv control prob is now 0.
  - Default analyzers have been added to capture cancers and infections by age and type distributions.
@@ -19,9 +19,15 @@ Version 0.4.4 (2022-12-01)
 - *GitHub info*: PRs `458 <https://github.com/amath-idm/hpvsim/pull/458>`__
 
 
+Version 0.4.4 (2022-12-05)
+--------------------------
+- Changes to progression to cancer -- no longer based on clinical cutoffs, now stochastically applied by genotype to CIN3 agents
+- *GitHub info*: PRs `430 <https://github.com/amath-idm/hpvsim/pull/430>`__
+
+
 Version 0.4.3 (2022-12-01)
 --------------------------
-- Fixes bug with growth function
+- Fixes bug with population growth function
 - *GitHub info*: PRs `459 <https://github.com/amath-idm/hpvsim/pull/459>`__
 
 
