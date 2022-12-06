@@ -79,7 +79,7 @@ def make_pars(**kwargs):
     pars['transm2f']        = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
 
     # Parameters for disease progression
-    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67, 'cin3':0.99} # Parameters the control the clinical cliassification of dysplasia
+    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67} # Parameters the control the clinical cliassification of dysplasia
     pars['hpv_control_prob']    = 0.44 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation']    = 0.025 # Placeholder
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
@@ -360,6 +360,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
+    pars.hpv16.cancer_prob  = 0.25 # Share of CIN3s that will go on to cancer
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
     pars.hpv16.sero_prob    = 0.65 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -370,6 +371,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 0.72  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv18.cancer_prob  = 0.15  # Share of CIN3s that will go on to cancer
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
     pars.hpv18.sero_prob    = 0.6 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -380,6 +382,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv31.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv31.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv31.rel_beta     = 0.94 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv31.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
     pars.hpv31.imm_boost    = 1.0 # TODO: look for data
     pars.hpv31.sero_prob    = 0.53 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -390,6 +393,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv33.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv33.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv33.rel_beta     = 0.26 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv33.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
     pars.hpv33.imm_boost    = 1.0 # TODO: look for data
     pars.hpv33.sero_prob    = 0.6  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -400,6 +404,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv35.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv35.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv35.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv35.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
     pars.hpv35.imm_boost    = 1.0 # TODO: look for data
     pars.hpv35.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -410,6 +415,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv45.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv45.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv45.rel_beta     = 0.77 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv45.cancer_prob  = 0.15  # Share of CIN3s that will go on to cancer
     pars.hpv45.imm_boost    = 1.0 # TODO: look for data
     pars.hpv45.sero_prob    = 0.25  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -420,6 +426,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv51.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv51.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv51.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv51.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
     pars.hpv51.imm_boost    = 1.0 # TODO: look for data
     pars.hpv51.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -430,6 +437,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv52.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv52.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv52.rel_beta     = 0.623 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv52.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
     pars.hpv52.imm_boost    = 1.0 # TODO: look for data
     pars.hpv52.sero_prob    = 0.5  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -440,6 +448,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv56.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv56.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv56.rel_beta     = 0.6 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv56.cancer_prob  = 0.15  # Share of CIN3s that will go on to cancer
     pars.hpv56.imm_boost    = 1.0 # TODO: look for data
     pars.hpv56.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -450,6 +459,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv58.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv58.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv58.rel_beta     = 0.6 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv58.cancer_prob  = 0.15  # Share of CIN3s that will go on to cancer
     pars.hpv58.imm_boost    = 1.0 # TODO: look for data
     pars.hpv58.sero_prob    = 0.65  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -460,6 +470,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv6.prog_rate     = 0.05 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv6.prog_rate_sd  = 0.005 # Standard deviation of the progression rate
     pars.hpv6.rel_beta      = 0.8 # Relative transmissibility, generally calibrated to match available type distributions
+    pars.hpv6.cancer_prob   = 0.0 # Share of CIN3s that will go on to cancer
     pars.hpv6.imm_boost     = 1.0 # TODO: look for data
     pars.hpv6.sero_prob     = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -470,6 +481,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv11.prog_rate    = 0.05 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv11.prog_rate_sd = 0.005 # Standard deviation of the progression rate
     pars.hpv11.rel_beta     = 0.5 # Relative transmissibility, generally calibrated to match available type distributions
+    pars.hpv11.cancer_prob  = 0.0  # Share of CIN3s that will go on to cancer
     pars.hpv11.imm_boost    = 1.0 # TODO: look for data
     pars.hpv11.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -480,6 +492,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.prog_rate    = 0.5 # same value as for all oncogenic types
     pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
     pars.hrhpv.rel_beta     = 0.94 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.cancer_prob  = 0.25  # Share of CIN3s that will go on to cancer
     pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.sero_prob    = 0.5 # placeholder, currently assumed to be the same as for 31
 
@@ -490,6 +503,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.lrhpv.prog_rate    = 0.05 # placeholder, currently assumed to be the same as for 6
     pars.lrhpv.prog_rate_sd = 0.005 # placeholder, currently assumed to be the same as for 6
     pars.lrhpv.rel_beta     = 0.5 # placeholder, currently assumed to be the same as for 6
+    pars.lrhpv.cancer_prob  = 0.0  # Share of CIN3s that will go on to cancer
     pars.lrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 6
     pars.lrhpv.sero_prob    = 0.6  # placeholder, currently assumed to be the same as for 6
 

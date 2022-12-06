@@ -42,12 +42,14 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
 
     # Create and run the simulation
     pars = {
-        'n_agents': 5e3,
-        'start': 1980,
+        'n_agents': 50e3,
+        'start': 1950,
         'burnin': 30,
         'end': 2030,
         'location': 'tanzania',
         'dt': .5,
+        'use_multiscale': True,
+        'ms_agent_ratio': 100,
         'genotypes': [16,18]
     }
     pars = sc.mergedicts(pars, kwargs)
@@ -79,10 +81,10 @@ def test_epi():
     sim.initialize()
 
     # Define the parameters to vary
-    vary_pars   = ['model_hiv',     'beta',          'acts',             'condoms',          'debut',            'init_hpv_prev', ] # Parameters
-    vary_vals   = [[False, True],   [0.0001, 0.99],    [1, 200],         [0.01,0.9],         [15,25],             [0.01,0.8]] # Values
-    vary_rels   = ['pos',           'pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['total_hpv_prevalence', 'total_hpv_incidence',    'total_hpv_incidence',      'total_hpv_incidence', 'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
+    vary_pars   = ['model_hiv',     'beta',          'acts',             'debut',            'init_hpv_prev', ] # Parameters
+    vary_vals   = [[False, True],   [0.0001, 0.99],    [1, 200],         [15,25],             [0.01,0.8]] # Values
+    vary_rels   = ['pos',           'pos',           'pos',              'neg',              'pos'] # Expected association with epi outcomes
+    vary_what   = ['total_hpv_prevalence', 'total_hpv_incidence',    'total_hpv_incidence', 'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
     for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
@@ -263,7 +265,7 @@ def test_result_consistency():
     assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
 
     # Check that cancers by age sum to the correct totals
-    assert ((sim.results['cancers_by_age'][:].sum(axis=0)-sim.results['cancers'][:])<1e-3).all()
+    assert ((sim.results['cancers_by_age'][:].sum(axis=0)-sim.results['cancers'][:].sum(axis=0))<1e-3).all()
 
     # Check demographics
     assert (sim['n_agents'] == n_agents)
