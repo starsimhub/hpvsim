@@ -42,12 +42,14 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
 
     # Create and run the simulation
     pars = {
-        'n_agents': 5e3,
-        'start': 1980,
+        'n_agents': 50e3,
+        'start': 1950,
         'burnin': 30,
         'end': 2030,
         'location': 'tanzania',
         'dt': .5,
+        'use_multiscale': True,
+        'ms_agent_ratio': 100,
         'genotypes': [16,18]
     }
     pars = sc.mergedicts(pars, kwargs)

@@ -296,7 +296,7 @@ def binomial_arr(prob_arr):
 
         outcomes = hpv.binomial_arr([0.1, 0.1, 0.2, 0.2, 0.8, 0.8]) # Perform 6 trials with different probabilities
     '''
-    return np.random.random(len(prob_arr)) < prob_arr
+    return np.random.random(prob_arr.shape) < prob_arr
 
 
 def n_multinomial(probs, n): # No speed gain from Numba

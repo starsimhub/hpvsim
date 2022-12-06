@@ -314,11 +314,9 @@ class People(hpb.BasePeople):
             self.scale[cancer_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
             extra_peak_dysp = dysp_arrs.peak_dysp[:, 1:]
             extra_cin3_bools = extra_peak_dysp > ccut['cin2']
-            extra_cancer_probs = np.zeros(extra_cin3_bools.shape)
-            extra_cancer_probs[extra_cin3_bools] = cancer_prob
-            extra_cancer_bools = np.full(extra_cin3_bools.shape, fill_value=False)
-            for i in range(len(extra_cin3_bools)):
-                extra_cancer_bools[i,:] = hpu.binomial_arr(extra_cancer_probs[i,:])
+            extra_cancer_probs = np.zeros_like(extra_cin3_bools, dtype=hpd.default_float) # For storing probs that CIN3 agents will advance to cancer
+            extra_cancer_probs[extra_cin3_bools] = cancer_prob # Prob of cancer is zero for agents without CIN3
+            extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs)
             extra_cancer_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
             extra_cancer_counts = extra_cancer_bools.sum(axis=1)  # Find out how many new cancer cases we have
             n_new_agents = extra_cancer_counts.sum()  # Total number of new agents
