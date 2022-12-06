@@ -14,6 +14,12 @@ Version 0.4.3 (2022-11-23)
 - *GitHub info*: PRs `430 <https://github.com/amath-idm/hpvsim/pull/430>`__
 
 
+Version 0.4.3 (2022-12-01)
+--------------------------
+- Fixes bug with growth function
+- *GitHub info*: PRs `459 <https://github.com/amath-idm/hpvsim/pull/459>`__
+
+
 Version 0.4.2 (2022-11-21)
 --------------------------
 - Changes to parameterization of immunity
