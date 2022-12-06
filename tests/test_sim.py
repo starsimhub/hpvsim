@@ -50,7 +50,8 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
         'dt': .5,
         'use_multiscale': True,
         'ms_agent_ratio': 100,
-        'genotypes': [16,18]
+        'genotypes': [16,18],
+        'analyzers': [],
     }
     pars = sc.mergedicts(pars, kwargs)
 
@@ -353,14 +354,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
-    sim3 = test_states()
-    sim4 = test_flexible_inputs()
-    sim5 = test_result_consistency()
-    sim6 = test_location_loading()
-    sim7 = test_resuming()
+    # sim2 = test_epi()
+    # sim3 = test_states()
+    # sim4 = test_flexible_inputs()
+    # sim5 = test_result_consistency()
+    # sim6 = test_location_loading()
+    # sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')
