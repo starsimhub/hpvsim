@@ -297,27 +297,38 @@ class People(hpb.BasePeople):
         peak_dysp = dysp_arrs.peak_dysp[:,0] # Everything beyond 0 is multiscale agents
         prog_rate = dysp_arrs.prog_rate[:,0]
         dur_dysp  = dysp_arrs.dur_dysp[:,0]
+        gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
+        cancer_prob = gpars['cancer_prob']
 
         # Handle multiscale to create additional cancer agents
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
         cancer_scale = self.pars['pop_scale'] / n_extra
         if self.pars['use_multiscale'] and n_extra  > 1:
-            cancer_inds = inds[peak_dysp > ccut['cin3']] # Duplicated below, but avoids need to append extra arrays
-            self.scale[cancer_inds] = cancer_scale # Shrink the weight of the original agents, but otherwise leave them the same
-            extra_peak_dysp = dysp_arrs.peak_dysp[:,1:]
-            extra_cancer_bools = extra_peak_dysp > ccut['cin3'] # Do n_extra-1 additional cancer draws
-            extra_cancer_bools *= self.level0[inds, None] # Don't allow existing cancer agents to make more cancer agents
-            extra_cancer_counts = extra_cancer_bools.sum(axis=1) # Find out how many new cancer cases we have
-            n_new_agents = extra_cancer_counts.sum() # Total number of new agents
-            if n_new_agents: # If we have more than 0, proceed
+            is_cin3 = peak_dysp > ccut['cin2']
+            cancer_probs = np.zeros(len(inds))
+            cancer_probs[is_cin3] = cancer_prob
+            is_cancer = hpu.binomial_arr(cancer_probs)
+            cancer_inds = inds[is_cancer]  # Duplicated below, but avoids need to append extra arrays
+            self.scale[cancer_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
+            extra_peak_dysp = dysp_arrs.peak_dysp[:, 1:]
+            extra_cin3_bools = extra_peak_dysp > ccut['cin2']
+            extra_cancer_probs = np.zeros_like(extra_cin3_bools, dtype=hpd.default_float) # For storing probs that CIN3 agents will advance to cancer
+            extra_cancer_probs[extra_cin3_bools] = cancer_prob # Prob of cancer is zero for agents without CIN3
+            extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs)
+            extra_cancer_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
+            extra_cancer_counts = extra_cancer_bools.sum(axis=1)  # Find out how many new cancer cases we have
+            n_new_agents = extra_cancer_counts.sum()  # Total number of new agents
+            if n_new_agents:  # If we have more than 0, proceed
                 extra_source_lists = []
-                for i,count in enumerate(extra_cancer_counts):
+                for i, count in enumerate(extra_cancer_counts):
                     ii = inds[i]
-                    if count: # At least 1 new cancer agent, plus person is not already a cancer agent
-                        extra_source_lists.append([ii]*count) # Duplicate the curret index count times
-                extra_source_inds = np.concatenate(extra_source_lists).flatten() # Assemble the sources for these new agents
-                n_new_agents = len(extra_source_inds) # The same as above, *unless* a cancer agent tried to spawn more cancer agents
-                
+                    if count:  # At least 1 new cancer agent, plus person is not already a cancer agent
+                        extra_source_lists.append([ii] * int(count))  # Duplicate the curret index count times
+                extra_source_inds = np.concatenate(
+                    extra_source_lists).flatten()  # Assemble the sources for these new agents
+                n_new_agents = len(
+                    extra_source_inds)  # The same as above, *unless* a cancer agent tried to spawn more cancer agents
+
                 # Create the new agents and assign them the same properties as the existing agents
                 new_inds = self._grow(n_new_agents)
                 for state in self.meta.all_states:
@@ -339,12 +350,18 @@ class People(hpb.BasePeople):
                 peak_dysp     = np.append(peak_dysp, new_peak_dysp)
                 prog_rate     = np.append(prog_rate, new_prog_rate)
                 dur_dysp      = np.append(dur_dysp,  new_dur_dysp)
+                is_cancer = np.append(is_cancer, np.full(len(new_inds), fill_value=True))
             
         # Now check indices, including with our new cancer agents
         is_cin1 = peak_dysp > 0  # Boolean arrays of people who attain each clinical grade
         is_cin2 = peak_dysp > ccut['cin1']
         is_cin3 = peak_dysp > ccut['cin2']
-        is_cancer = peak_dysp > ccut['cin3']
+        cancer_probs = np.zeros(len(inds))
+        if self.pars['use_multiscale'] and n_extra > 1:
+            cancer_probs[is_cancer] = 1 # Make sure inds that got assigned cancer above dont get stochastically missed
+        else:
+            cancer_probs[is_cin3] = cancer_prob
+        is_cancer = hpu.binomial_arr(cancer_probs)
         cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
         cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
         cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
@@ -376,9 +393,10 @@ class People(hpb.BasePeople):
                                                         sc.randround(time_to_clear_cin2 / dt))
 
         # Determine whether CIN3 clears or progresses to cancer
+        time_to_cancer = dur_dysp[is_cancer] - (self.date_cin3[g, cancer_inds] - self.date_cin1[g, cancer_inds]) * self.pars['dt']
         self.date_cancerous[g, cancer_inds] = np.fmax(self.t,
-                                                      self.date_cin1[g, cancer_inds] +
-                                                      sc.randround(hpu.invlogf1(ccut['cin3'], prog_rate[is_cancer]) / dt))
+                                                      self.date_cin3[g, cancer_inds] +
+                                                      sc.randround(time_to_cancer / dt))
 
         # Compute how much dysplasia time is left for those who clear (total dysplasia duration - dysplasia time spent prior to this grade)
         time_to_clear_cin3 = dur_dysp[max_cin3_bools] - (self.date_cin3[g, max_cin3_inds] - self.date_cin1[g, max_cin3_inds]) * self.pars['dt']
