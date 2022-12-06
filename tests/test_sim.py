@@ -42,7 +42,7 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
 
     # Create and run the simulation
     pars = {
-        'n_agents': 50e3,
+        'n_agents': 5e3,
         'start': 1950,
         'burnin': 30,
         'end': 2030,
