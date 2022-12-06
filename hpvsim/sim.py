@@ -211,7 +211,7 @@ class Sim(hpb.BaseSim):
             errormsg = f'Population type "{choice}" not available; choices are: {choicestr}'
             raise ValueError(errormsg)
 
-        # Handle analyzers and interventions - TODO, genotypes will also go here
+        # Handle analyzers and interventions
         for key in ['interventions', 'analyzers']: # Ensure all of them are lists
             self[key] = sc.dcp(sc.tolist(self[key], keepnone=False)) # All of these have initialize functions that run into issues if they're reused
         for i,interv in enumerate(self['interventions']):
@@ -571,47 +571,50 @@ class Sim(hpb.BaseSim):
         ''' Initialize and validate the interventions '''
 
         # Initialization
-        if self._orig_pars and 'interventions' in self._orig_pars:
-            self['interventions'] = self._orig_pars.pop('interventions') # Restore
+        self.interventions = sc.autolist()
 
+        # Translate the intervention specs into actual interventions
         for i,intervention in enumerate(self['interventions']):
             if isinstance(intervention, hpi.Intervention):
                 intervention.initialize(self)
+                self.interventions += intervention
 
         return
 
 
     def init_analyzers(self):
         ''' Initialize the analyzers '''
-        if self._orig_pars and 'analyzers' in self._orig_pars:
-            self['analyzers'] = self._orig_pars.pop('analyzers') # Restore
+
+        self.analyzers = sc.autolist()
+
+        def convert_analyzer(analyzer):
+            ''' Helper function to turn strings into analyzers '''
+            choices = hpa.analyzer_map.keys()
+            if not analyzer in choices:
+                errormsg = f'Analyzer {analyzer} not understood: choices are {choices}.'
+                raise ValueError(errormsg)
+            else:
+                analyzer = hpa.analyzer_map[analyzer]
+            return analyzer
 
         # Interpret analyzers
-        choices = hpa.analyzer_map.keys()
-        orig_analyzers = sc.dcp(self['analyzers'])
-        self['analyzers'] = sc.autolist() # Copy the original and rebuild it
-
-        for ai,analyzer in enumerate(orig_analyzers):
+        for ai,analyzer in enumerate(self['analyzers']):
             if isinstance(analyzer, str):
-                # Try to turn strings into analyzers
-                if not analyzer in choices:
-                    errormsg = f'Analyzer {analyzer} not understood: choices are {choices}.'
-                    raise ValueError(errormsg)
-                else:
-                    analyzer_list = sc.tolist(hpa.analyzer_map[analyzer]) # If not a list, turn it into one - for consistency of processing
-                    for az in analyzer_list:
-                        self['analyzers'] += az() # Unpack list
+                analyzer_list = sc.tolist(convert_analyzer(analyzer)) # If not a list, turn it into one - for consistency of processing
+                for az in analyzer_list:
+                    if isinstance(az, str): az = convert_analyzer(az) # It might still be a string
+                    self.analyzers += az() # Unpack list
             else:
-                self['analyzers'] += analyzer # Just add it in
+                self.analyzers += analyzer # Just add it in
 
-        for analyzer in self['analyzers']:
+        for analyzer in self.analyzers:
             if isinstance(analyzer, hpa.Analyzer):
                 analyzer.initialize(self)
         return
 
 
     def finalize_analyzers(self):
-        for analyzer in self['analyzers']:
+        for analyzer in self.analyzers:
             if isinstance(analyzer, hpa.Analyzer):
                 analyzer.finalize(self)
 
@@ -704,7 +707,7 @@ class Sim(hpb.BaseSim):
         people.create_partnerships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
 
         # Apply interventions
-        for i,intervention in enumerate(self['interventions']):
+        for i,intervention in enumerate(self.interventions):
             intervention(self) # If it's a function, call it directly
 
         # Assign sus_imm values, i.e. the protection against infection based on prior immune history
@@ -851,7 +854,7 @@ class Sim(hpb.BaseSim):
             self.results['n_alive_by_sex'][1,idx] = people.scale_flows((people.alive*people.is_male).nonzero()[0])
 
         # Apply analyzers
-        for i,analyzer in enumerate(self['analyzers']):
+        for i,analyzer in enumerate(self.analyzers):
             analyzer(self)
 
         # Tidy up

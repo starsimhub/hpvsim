@@ -133,14 +133,23 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
     # If it matches a result key, convert to a list
     reskeys = sim.result_keys('total')
     genkeys = sim.result_keys('genotype')
-    # special_keys =
-    allkeys = reskeys + genkeys
-    if to_plot in allkeys:
+    analyzer_keys = [a.label for a in sim.get_analyzers()]
+    mainkeys = reskeys + genkeys
+    if to_plot in mainkeys:
         to_plot = sc.tolist(to_plot)
+    n_extra_plots = 0 # Keep track of the number of extra plots from analyzers
 
     # If not specified or specified as another string, load defaults
     if to_plot is None or isinstance(to_plot, str):
         to_plot = hpd.get_default_plots(which=to_plot, kind=kind, sim=sim)
+
+        # Add default analyzers, if they exist
+        if 'defaults' in sim['analyzers']:
+            for default_analyzer in hpd.default_analyzers:
+                az = sim.get_analyzer(default_analyzer)
+                n_plots, _ = az.get_to_plot()
+                n_extra_plots += n_plots-1 # Subtract 1 because 1 will be added already
+                to_plot[default_analyzer] = [default_analyzer]
 
     # If a list of keys has been supplied or constructed
     if isinstance(to_plot, list):
@@ -148,11 +157,13 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
         to_plot = sc.odict() # Create the dict
         invalid = sc.autolist()
         for reskey in to_plot_list:
-            if reskey in allkeys:
+            if reskey in mainkeys:
                 name = sim.results[reskey].name
                 to_plot[name] = [reskey] # Use the result name as the key and the reskey as the value
-            elif reskey in []:
-                pass
+            elif reskey in analyzer_keys:
+                n_plots, _ = sim.get_analyzer(reskey).get_to_plot()
+                n_extra_plots += n_plots-1
+                to_plot[reskey] = [reskey]
             else:
                 invalid += reskey
         if len(invalid):
@@ -162,7 +173,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
     to_plot = sc.odict(sc.dcp(to_plot)) # In case it's supplied as a dict
 
     # Get total number of plots and calculate rows and columns
-    n_plots = len(to_plot)
+    n_plots = len(to_plot) + n_extra_plots
     if n_cols is None:
         max_rows = 5 # Assumption -- if desired, the user can override this by setting n_cols manually
         n_cols = int((n_plots-1)//max_rows + 1) # This gives 1 column for 1-4, 2 for 5-8, etc.
@@ -419,26 +430,43 @@ def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=N
 
         # Create subsets of plot keys; different plotting subroutines are called depending on the plot type
         main_keys = sim.result_keys()
-        special_keys = sc.objdict() # Initialize list of keys that are handled differently
+        analyzer_keys = [a.label for a in sim.get_analyzers()] # List of analyzer labels
+        do_sharex = False
 
-        for pnum,title,keylabels in to_plot.enumitems():
-            ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
+        # Determine if we're going to add any analyzer plots
+        add_analyzers = False
+        for pkey in to_plot.keys():
+            if pkey in analyzer_keys:
+                add_analyzers = True
+        if not add_analyzers: do_sharex = True
 
-            for resnum,reskey in enumerate(keylabels):
-
-                # Most common case: it's a time series result, possibly with data
-                if reskey in main_keys:
+        # First, iterate through and pull out the main plot keys for creating time series plots
+        pnum1 = -1
+        for title,keylabels in to_plot.items():
+            if title not in analyzer_keys:
+                pnum1 += 1
+                sharex = None if do_sharex is False else ax
+                ax = create_subplots(figs, fig, sharex, n_rows, n_cols, pnum1, args.fig, sep_figs, log_scale, title)
+                for resnum,reskey in enumerate(keylabels):
                     ax, color = plot_time_series(ax, sim, reskey, resnum, args, labels=labels, colors=colors, plot_burnin=plot_burnin)
                     if args.show['data']:
                         plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
+                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
-                # All other cases: any custom special plots are handled here
-                elif reskey in special_keys:
-                    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
-
+        # Now iterate through again and pull out the analyzer plot keys
+        pnum2 = 1
+        for azkey in to_plot.keys():
+            if azkey in analyzer_keys:
+                az = sim.get_analyzer(azkey) # Get the actual analyzer
+                title = azkey # Temp
+                n_plots, to_plot_args = az.get_to_plot()
+                for to_plot_arg in to_plot_args:
+                    ax = create_subplots(figs, fig, None, n_rows, n_cols, pnum1+pnum2, args.fig, sep_figs, log_scale, title)
+                    az.plot_single(ax, *sc.tolist(to_plot_arg), args.plot)
+                    title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
+                    pnum2 += 1
             # if args.show['interventions']:
             #     plot_interventions(sim, ax) # Plot the interventions
-            title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
         output = tidy_up(fig, figs, do_save, fig_path, do_show, args)
 

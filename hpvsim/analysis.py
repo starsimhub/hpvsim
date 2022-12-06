@@ -921,24 +921,7 @@ class age_results(Analyzer):
 
         return self.result_args[key].mismatch
 
-
     def get_to_plot(self):
-        ''' Get dict of plots to make '''
-
-        # Figure out rows and columns
-        if len(self.results) == 0:
-            errormsg = 'Cannot plot since no age results were recorded)'
-            raise ValueError(errormsg)
-        else:
-            to_plot = sc.objdict()
-            for rkey,resdict in self.results.items():
-                for date in self.result_args[rkey]['dates']:
-                    datestr = date.split('.')[0] # TODO fix this
-                    to_plot[self.result_args[rkey].name + ' by age, ' + datestr] = ['age_results_'+rkey+'_'+datestr]
-        return to_plot
-
-
-    def get_n_plots(self):
         ''' Get number of plots to make '''
 
         if len(self.results) == 0:
@@ -947,7 +930,11 @@ class age_results(Analyzer):
         else:
             dates_per_result = [len(rk['dates']) for rk in self.result_args.values()]
             n_plots = sum(dates_per_result)
-        return n_plots
+            to_plot_args = []
+            for rkey in self.result_keys:
+                for date in self.result_args[rkey]['dates']:
+                    to_plot_args.append([rkey,date])
+        return n_plots, to_plot_args
 
 
     def plot_single(self, ax, rkey, date, plot_args=None, scatter_args=None):
@@ -1118,9 +1105,11 @@ class type_distributions(Analyzer):
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
 
 
-    def get_n_plots(self):
-        ''' Get number of plots to make '''
-        return len(self.timepoints)
+    def get_to_plot(self):
+        ''' Get plots to make '''
+        n_plots = len(self.timepoints)
+        to_plot_args = self.timepoints
+        return n_plots, to_plot_args
 
 
     def plot_single(self, ax, date, bar_args=None, scatter_args=None):
@@ -1256,7 +1245,7 @@ class cancer_detection(Analyzer):
 
 #%% Additional utilities
 analyzer_map = {
-    'default': [age_results, type_distributions],
+    'defaults': hpd.default_analyzers,
     'snapshot': snapshot,
     'age_pyramid': age_pyramid,
     'age_results': age_results,

@@ -370,6 +370,10 @@ default_init_prev = {
     'f'             : np.array([ 0.0, 0.05, 0.07, 0.05, 0.02, 0.01, 0.0005, 0]),
 }
 
+default_analyzers = [
+    'type_distributions',
+    'age_results',
+]
 
 #%% Default plotting settings
 
