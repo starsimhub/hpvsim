@@ -24,10 +24,10 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     '''
 
     # Define some products
-    dfvia = hpv.dx(pd.read_csv('tests/test_data/test_via.csv'), hierarchy=['positive', 'inadequate', 'negative'])
-    dfvia_triage = hpv.dx(pd.read_csv('tests/test_data/test_via_triage.csv'),
+    dfvia = hpv.dx(pd.read_csv('test_data/test_via.csv'), hierarchy=['positive', 'inadequate', 'negative'])
+    dfvia_triage = hpv.dx(pd.read_csv('test_data/test_via_triage.csv'),
                           hierarchy=['positive', 'inadequate', 'negative'])
-    dftx_assigner = hpv.dx(pd.read_csv('tests/test_data/test_tx_assigner.csv'),
+    dftx_assigner = hpv.dx(pd.read_csv('test_data/test_tx_assigner.csv'),
                            hierarchy=['radiation', 'excision', 'ablation', 'none'])
 
     # Define some interventions
