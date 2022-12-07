@@ -986,16 +986,16 @@ class Sim(hpb.BaseSim):
         self.results['hpv_incidence'][:]            = res['infections'][:] / res['n_susceptible'][:]
         self.results.genotype['hpv_incidence'][:]   = res.genotype['infections'][:] / res.genotype['n_susceptible'][:]
         self.results['hpv_prevalence'][:]           = res['n_infectious'][:] / res['n_alive'][:]
-        self.results.genotype['hpv_prevalence'][:]  = res.genotype['n_infectious'][:] / res.genotype['n_alive'][:]
-        self.results['hiv_incidence'][:] = res['total_hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
-        self.results['hiv_prevalence'][:] = res['n_hiv'][:] / res['n_alive'][:]
+        self.results.genotype['hpv_prevalence'][:]  = res.genotype['n_infectious'][:] / res['n_alive'][:]
+        self.results['hiv_incidence'][:]            = res['hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
+        self.results['hiv_prevalence'][:]           = res['n_hiv'][:] / res['n_alive'][:]
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
-        at_risk_females = alive_females - res['n_cancerous'][:,:].sum(axis=0)
+        at_risk_females = alive_females - res['n_cancerous'][:]
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
         self.results['cin1_incidence'][:]           = res['cin1s'][:] / demoninator
@@ -1013,11 +1013,11 @@ class Sim(hpb.BaseSim):
         denominator = alive_females/scale_factor
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
-        # Compute HPV type distribution by cytology
-        for which in hpd.type_keys:
-            subkey = which[:-6] # Switch from e.g. cin1_types to cin1, i.e. remove the _types part of the key
-            if subkey=='cancer': subkey='cancerous' # different naming convention for cancer
-            res[which][:, (res[f'n_total_{subkey}'][:]>0)] = res[f'n_{subkey}'][:,(res[f'n_total_{subkey}'][:]>0)]/res[f'n_total_{subkey}'][(res[f'n_total_{subkey}'][:]>0)] # ugly line to calculate type distributions
+        # # Compute HPV type distribution by cytology
+        # for which in hpd.type_keys:
+        #     subkey = which[:-6] # Switch from e.g. cin1_types to cin1, i.e. remove the _types part of the key
+        #     if subkey=='cancer': subkey='cancerous' # different naming convention for cancer
+        #     res[which][:, (res[f'n_total_{subkey}'][:]>0)] = res[f'n_{subkey}'][:,(res[f'n_total_{subkey}'][:]>0)]/res[f'n_total_{subkey}'][(res[f'n_total_{subkey}'][:]>0)] # ugly line to calculate type distributions
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])

@@ -267,10 +267,10 @@ by_sex_keys    = ['infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',                    '#000000']
 
-# Type distributions by cytology
-type_keys  = ['precin_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
-type_names = ['Normal', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
-type_colors = [pl.cm.GnBu, pl.cm.Oranges, pl.cm.Oranges,  pl.cm.Oranges, pl.cm.Reds]
+# # Type distributions by cytology
+# type_keys  = ['precin_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
+# type_names = ['Normal', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
+# type_colors = [pl.cm.GnBu, pl.cm.Oranges, pl.cm.Oranges,  pl.cm.Oranges, pl.cm.Reds]
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
@@ -379,9 +379,9 @@ default_analyzers = [
 
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
-    'total_infections',
-    'total_cins',
-    'total_cancers',
+    'infections',
+    'cins',
+    'cancers',
 ]
 
 
@@ -417,24 +417,24 @@ def get_default_plots(which='default', kind='sim', sim=None):
         if is_sim:
             plots = sc.odict({
                 'HPV prevalence': [
-                    'total_hpv_prevalence',
+                    'hpv_prevalence',
                 ],
                 'CINs per 100,000 women': [
-                    'total_cin_incidence',
+                    'cin_incidence',
                     ],
                 'Cancers per 100,000 women': [
-                    'total_cancer_incidence',
-                    'asr_cancer'
+                    'cancer_incidence',
+                    'asr_cancer_incidence'
                 ],
             })
 
         else: # pragma: no cover
             plots = sc.odict({
                 'HPV incidence': [
-                    'total_hpv_incidence',
+                    'hpv_prevalence',
                 ],
                 'Cancers per 100,000 women': [
-                    'total_cancer_incidence',
+                    'cancer_incidence',
                     ],
             })
 
