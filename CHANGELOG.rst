@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.5 (2022-12-06)
+--------------------------
+- Removes default screening products pending review
+- *GitHub info*: PRs `464 <https://github.com/amath-idm/hpvsim/pull/464>`__
+
+
 Version 0.4.4 (2022-12-05)
 --------------------------
 - Changes to progression to cancer -- no longer based on clinical cutoffs, now stochastically applied by genotype to CIN3 agents
