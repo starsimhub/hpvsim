@@ -185,7 +185,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
         start_year=2030,
         prob = 1.0,
         annual_prob=False,
-        product = dftx_assigner,
+        product = 'txvx_assigner',
         eligibility = screened_pos,
         label = 'txvx assigner'
     )
@@ -369,7 +369,7 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
 def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Testing effect of prophylactic vaccination')
 
-    debug_scens = 0
+    debug_scens = 1
 
     ### Create interventions
     routine_vx_dose1 = hpv.routine_vx(

@@ -1422,7 +1422,6 @@ def default_dx(prod_name=None):
     dxprods = dict(
         # Diagnostics used to determine of subsequent care pathways
         txvx_assigner   = dx(dfdx[dfdx.name == 'txvx_assigner'],    hierarchy=['triage', 'txvx', 'none']),
-        tx_assigner     = dx(dfdx[dfdx.name == 'tx_assigner'],      hierarchy=['radiation', 'excision', 'ablation', 'none']),
     )
     if prod_name is not None:   return dxprods[prod_name]
     else:                       return dxprods
