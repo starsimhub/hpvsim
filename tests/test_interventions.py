@@ -6,6 +6,7 @@ Tests for single simulations
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
+import pandas as pd
 import matplotlib.pyplot as plt
 
 do_plot = 0
@@ -21,6 +22,10 @@ base_pars = {
     'location': 'tanzania',
     'dt': 0.5,
 }
+
+dfvia = hpv.dx(pd.read_csv('test_data/test_via.csv'), hierarchy=['positive', 'inadequate', 'negative'])
+dfvia_triage = hpv.dx(pd.read_csv('test_data/test_via_triage.csv'), hierarchy=['positive', 'inadequate', 'negative'])
+dftx_assigner = hpv.dx(pd.read_csv('test_data/test_tx_assigner.csv'), hierarchy=['radiation', 'excision', 'ablation', 'none'])
 
 
 #%% Define the tests
@@ -38,7 +43,7 @@ def test_screen_prob():
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) # Only model a single lifetime screen
 
     screen = hpv.routine_screening(
-        product='via',  # pass in string or product
+        product=dfvia,
         prob=model_annual_prob,  # This looks like it means that we screen 50% of the population each year
         eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
         age_range=age_range,
@@ -48,7 +53,7 @@ def test_screen_prob():
 
     to_triage = lambda sim: sim.get_intervention('screen').outcomes['positive']
     triage = hpv.routine_triage(
-        product='via_triage',  # pass in string or product
+        product=dfvia_triage,  # pass in string or product
         prob=target_triage,
         annual_prob=False,
         eligibility=to_triage,  # pass in valid state of People OR indices OR callable that gets indices
@@ -57,7 +62,7 @@ def test_screen_prob():
 
     to_treat = lambda sim: sim.get_intervention('triage').outcomes['positive']
     assign_tx = hpv.routine_triage(
-        product='tx_assigner',  # pass in string or product
+        product=dftx_assigner,
         prob=target_triage,
         annual_prob=False,
         eligibility=to_treat,
@@ -147,7 +152,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     # Screen, triage, assign treatment, treat
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine_screen = hpv.routine_screening(
-        product='via',  # pass in string or product
+        product=dfvia,  # pass in string or product
         prob=0.1,
         eligibility=screen_eligible,
         age_range=[30, 50],
@@ -156,7 +161,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     )
 
     campaign_screen = hpv.campaign_screening(
-        product='via',
+        product=dfvia,
         prob=0.3,
         age_range=[30, 70],
         years=2030,
@@ -169,7 +174,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
         years = [2020,2029],
         prob = 0.9, # acceptance rate
         annual_prob=False, # This probability is per timestep, not annual
-        product = 'via_triage',
+        product = dfvia_triage,
         eligibility = to_triage,
         label = 'VIA triage (pre-txvx)'
     )
@@ -190,7 +195,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     new_triage = hpv.routine_triage(
         start_year = 2030,
         prob = 1.0,
-        product = 'via_triage',
+        product = dfvia_triage,
         eligibility = to_triage_new,
         label = 'VIA triage (post-txvx)'
     )
@@ -209,7 +214,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     assign_treatment = hpv.routine_triage(
         prob = 1.0,
         annual_prob=False,
-        product = 'tx_assigner',
+        product = dftx_assigner,
         eligibility = confirmed_positive,
         label = 'tx assigner'
     )
@@ -364,7 +369,7 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
 def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Testing effect of prophylactic vaccination')
 
-    debug_scens = 0
+    debug_scens = 1
 
     ### Create interventions
     routine_vx_dose1 = hpv.routine_vx(
@@ -423,7 +428,7 @@ def test_screening():
     # Screen, triage, assign treatment, treat
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine_screen = hpv.routine_screening(
-        product='hpv',  # pass in string or product
+        product=dfvia,
         prob=1.0,  # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
         eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
         age_range=[0, 100],
@@ -436,7 +441,7 @@ def test_screening():
     screen_positive = lambda sim: sim.get_intervention('routine screening').outcomes['positive']
     assign_treatment = hpv.routine_triage(
         prob = 1.0,
-        product = 'tx_assigner',
+        product = dftx_assigner,
         eligibility = screen_positive,
         label = 'tx assigner'
     )
