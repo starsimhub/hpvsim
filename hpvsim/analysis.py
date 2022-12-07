@@ -546,7 +546,7 @@ class age_results(Analyzer):
         self.start          = None # Store the start year of the simulation
         self.edges          = edges or np.array([0., 15., 20., 25., 30., 35., 40., 45., 50., 55., 60., 65., 70., 75., 80., 85., 100.])
         self.timepoints     = timepoints
-        self.result_keys    = result_keys or ['total_infections', 'total_cancers']
+        self.result_keys    = result_keys or ['infections', 'cancers']
         self.results        = sc.odict() # Store the age results
         self.result_args    = result_args
         return
@@ -574,8 +574,7 @@ class age_results(Analyzer):
             errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(result_args)}.'
             raise TypeError(errormsg)
 
-        # Handle dt - if we're storing annual results we'll need to aggregate them over
-        # several consecutive timesteps
+        # Handle dt - if we're storing annual results we'll need to aggregate them over several consecutive timesteps
         self.dt = sim['dt']
         self.resfreq = sim.resfreq
 
@@ -596,7 +595,7 @@ class age_results(Analyzer):
 
 
     def validate_results(self, sim):
-        choices = sim.result_keys()
+        choices = sim.result_keys('total')+['genotype_'+k for k in sim.result_keys('genotype')]
         for rk, rdict in self.result_args.items():
             if rk not in choices:
                 strm = '\n'.join(choices)
@@ -666,7 +665,7 @@ class age_results(Analyzer):
 
     def convert_rname_stocks(self, rname):
         ''' Helper function for converting stock result names to people attributes '''
-        attr = rname.replace('total_', '').replace('_prevalence', '')  # Strip out terms that aren't stored in the people
+        attr = rname.replace('_prevalence', '')  # Strip out terms that aren't stored in the people
         if attr[0] == 'n': attr = attr[2:] # Remove n, used to identify stocks
         if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
         if attr == 'cancer': attr = 'cancerous'
@@ -674,7 +673,7 @@ class age_results(Analyzer):
 
     def convert_rname_flows(self, rname):
         ''' Helper function for converting flow result names to people attributes '''
-        attr = rname.replace('total_', '').replace('_incidence', '')  # Name of the actual state
+        attr = rname.replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
         if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
         if attr == 'cancer_mortality': attr = 'cancer_deaths'
@@ -710,26 +709,36 @@ class age_results(Analyzer):
 
         # Go through each result key and determine if this is a timepoint where age results are requested
         for result, result_dict in self.result_args.items():
+
+            # Establish initial quantities
             bins = result_dict.edges
+            na = len(result_dict.bins)
+            if 'genotype' in result: # Results by genotype
+                result_name = result[9:]
+                size = (na, ng)
+                by_genotype = True
+            else: # Total results
+                result_name = result[:]
+                size = na
+                by_genotype = False
+
             if sim.t in result_dict.timepoints:
-                na = len(result_dict.bins)
+
                 ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
                 date = result_dict.dates[ind]  # Create the date which will be used to key the results
+                self.results[result][date] = np.zeros(size)
 
-                if 'compute_fit' in result_dict.keys() and 'total' not in result:
+                if 'compute_fit' in result_dict.keys():
                     thisdatadf = result_dict.data[(result_dict.data.year == float(date)) & (result_dict.data.name == result)]
                     unique_genotypes = thisdatadf.genotype.unique()
                     ng = len(unique_genotypes)
 
-                size = na if 'total' in result or 'cancer' in result else (ng, na)
-                self.results[result][date] = np.zeros(size)
-
                 # Both annual stocks and prevalence require us to calculate the current stocks.
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
-                if result[0] == 'n' or 'prevalence' in result:
-                    attr = self.convert_rname_stocks(result) # Convert to a people attribute
+                if result_name[0] == 'n' or 'prevalence' in result_name:
+                    attr = self.convert_rname_stocks(result_name) # Convert to a people attribute
                     if attr in ppl.keys():
-                        if 'total' in result:
+                        if not by_genotype:
                             inds = ppl[attr].any(axis=0).nonzero()[-1]  # Pull out people for which this state is true
                             self.results[result][date] = bin_ages(inds, bins)
                         else:
@@ -743,41 +752,23 @@ class age_results(Analyzer):
                                 denom = bin_ages(inds=None, bins=bins)
                             else:  # Denominator is females
                                 denom = bin_ages(inds=ppl.f_inds, bins=bins)
-                            if 'total' not in result: denom = denom[None, :]
-                            self.results[result][date] = self.results[result][date] / denom
-
-                    else:
-                        if 'detectable' in result:
-                            hpv_test_pars = hppar.get_screen_pars('hpv')
-                            for state in ['precin', 'cin1', 'cin2', 'cin3']:
-                                for g in range(ng):
-                                    hpv_pos_probs = np.zeros(len(ppl))
-                                    tp_inds = hpu.true(ppl[state][g, :])
-                                    hpv_pos_probs[tp_inds] = hpv_test_pars['test_positivity'][state][
-                                        sim['genotype_map'][g]]
-                                    hpv_pos_inds = hpu.true(hpu.binomial_arr(hpv_pos_probs))
-                                    if 'total' in result:
-                                        self.results[result][date] += bin_ages(hpv_pos_inds, bins)
-                                    else:
-                                        self.results[result][date][g, :] += bin_ages(hpv_pos_inds, bins)
-                            denom = bin_ages(inds=None, bins=bins)
-                            if 'total' in result: denom = denom * ng
+                            if by_genotype: denom = denom[None, :]
                             self.results[result][date] = self.results[result][date] / denom
 
                 self.date = date # Need to store the date for subsequent calcpoints
                 self.timepoint = sim.t # Need to store the timepoints for subsequent calcpoints
 
-
             # Both annual new cases and incidence require us to calculate the new cases over all
             # the timepoints that belong to the requested year.
             if sim.t in result_dict.calcpoints:
                 date = self.date # Stored just above for use here
+                self.results[result][date] = np.zeros(size)
 
                 # Figure out if it's a flow or incidence
-                if result.replace('total_', '') in hpd.flow_keys+hpd.total_flow_keys or 'incidence' in result or 'mortality' in result:
-                    attr1, attr2 = self.convert_rname_flows(result)
-                    if result[:5] == 'total' or 'mortality' in result:  # Results across all genotypes
-                        if result == 'detected_cancer_deaths':
+                if result_name in hpd.flow_keys or 'incidence' in result_name or 'mortality' in result_name:
+                    attr1, attr2 = self.convert_rname_flows(result_name)
+                    if not by_genotype:  # Results across all genotypes
+                        if result_name == 'detected_cancer_deaths':
                             inds = ((ppl[attr1] == sim.t) * (ppl[attr2]) * (ppl['detected_cancer'])).nonzero()[-1]
                         else:
                             inds = ((ppl[attr1] == sim.t) * (ppl[attr2])).nonzero()[-1]
@@ -937,7 +928,7 @@ class age_results(Analyzer):
         return n_plots, to_plot_args
 
 
-    def plot_single(self, ax, rkey, date, plot_args=None, scatter_args=None):
+    def plot_single(self, ax, rkey, date, by_genotype, plot_args=None, scatter_args=None):
         '''
         Function to plot a single age result for a single date. Requires an axis as
         input and will generally be called by a helper function rather than directly.
@@ -957,7 +948,7 @@ class age_results(Analyzer):
             unique_genotypes = thisdatadf.genotype.unique()
 
         # Plot by genotype
-        if 'total' not in rkey and 'mortality' not in rkey:
+        if by_genotype:
             colors = sc.gridcolors(self.ng) # Overwrite default colors with genotype colors
             for g in range(self.ng):
                 color = colors[g]
@@ -1009,7 +1000,7 @@ class age_results(Analyzer):
 
         # Initialize
         fig = pl.figure(**fig_args)
-        n_plots = self.get_n_plots()
+        n_plots, _ = self.get_to_plot()
         n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Make the figure(s)
@@ -1017,9 +1008,10 @@ class age_results(Analyzer):
             plot_count=1
             for rkey,resdict in self.results.items():
                 pl.subplots_adjust(**axis_args)
+                by_genotype=True if 'genotype' in rkey else False
                 for date in self.result_args[rkey]['dates']:
                     ax = pl.subplot(n_rows, n_cols, plot_count)
-                    ax = self.plot_single(ax, rkey, date, plot_args=plot_args, scatter_args=scatter_args)
+                    ax = self.plot_single(ax, rkey, date, by_genotype, plot_args=plot_args, scatter_args=scatter_args)
                     plot_count+=1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
@@ -1043,19 +1035,15 @@ class type_distributions(Analyzer):
         self.labels         = sc.autolist()
 
         if dysp_states is None:
-            self.dysp_states    = hpd.type_keys
-            self.labels         = hpd.type_names
+            self.dysp_states    = hpd.cytology_keys
+            self.labels         = hpd.cytology_names
         else:
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
             for dysp_state in dysp_states:
-                if dysp_state in hpd.type_keys:
-                    idx = hpd.type_keys.index(dysp_state)
-                    self.labels += hpd.type_names[idx]
+                if dysp_state in hpd.cytology_keys:
+                    idx = hpd.cytology_keys.index(dysp_state)
+                    self.labels += hpd.cytology_names[idx]
                 else:
-                    errormsg = f'Dysplasia state {dysp_state} not understood, use one from {hpd.type_keys}.'
+                    errormsg = f'Dysplasia state {dysp_state} not understood, use one from {hpd.cytology_keys}.'
                     raise ValueError(errormsg)
         return
 

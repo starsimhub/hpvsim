@@ -355,7 +355,7 @@ def plot_time_series(ax, sim, reskey, resnum, args, colors=None, labels=None, pl
     # Initialize some variables
     bi = 0 if plot_burnin else int(sim['burnin'])
     total_keys = sim.result_keys('total')
-    sex_keys = sim.result_keys('by_sex')
+    sex_keys = sim.result_keys('sex')
     genotype_keys = sim.result_keys('genotype')
     res_t = sim.results['year'][bi:]
     res = sim.results[reskey]

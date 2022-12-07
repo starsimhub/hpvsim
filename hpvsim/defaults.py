@@ -267,10 +267,9 @@ by_sex_keys    = ['infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',                    '#000000']
 
-# # Type distributions by cytology
-# type_keys  = ['precin_types', 'cin1_types', 'cin2_types', 'cin3_types', 'cancer_types']
-# type_names = ['Normal', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
-# type_colors = [pl.cm.GnBu, pl.cm.Oranges, pl.cm.Oranges,  pl.cm.Oranges, pl.cm.Reds]
+# Cytology states
+cytology_keys   = ['precin', 'cin1', 'cin2', 'cin3', 'cancer']
+cytology_names  = ['Normal', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)

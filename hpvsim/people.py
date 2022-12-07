@@ -518,9 +518,8 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
         self.no_dysp[genotype, inds] = False
-
         # Age calculations
-        if len(inds) > 0: cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
 
         return cases_by_age, self.scale_flows(inds)
 
