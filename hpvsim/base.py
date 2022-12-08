@@ -191,6 +191,23 @@ class Result(object):
         return len(self.values)
 
 
+    def __sum__(self):
+        ''' To allow sum(result) instead of result.values.sum() '''
+        return self.values.sum()
+
+    # Numpy methods
+    def sum(self):
+        ''' To allow result.sum() instead of result.values.sum() '''
+        return self.values.sum()
+
+    def mean(self):
+        ''' To allow result.mean() instead of result.values.mean() '''
+        return self.values.mean()
+
+    def median(self):
+        ''' To allow result.median() instead of result.values.median() '''
+        return self.values.median()
+
     @property
     def npts(self):
         return len(self.values)
@@ -233,8 +250,8 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.results['infections'][:].sum()
-                cancers = self.results['cancers'][:].sum()
+                infections = self.results['infections'].sum()
+                cancers = self.results['cancers'].sum()
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
