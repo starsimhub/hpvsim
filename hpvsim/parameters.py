@@ -110,8 +110,8 @@ def make_pars(**kwargs):
     }
 
     # Events and interventions
-    pars['interventions']   = sc.autolist()   # The interventions present in this simulation; populated by the user
-    pars['analyzers']       = ['defaults']  # List of analysis functions
+    pars['interventions']   = sc.autolist() # The interventions present in this simulation; populated by the user
+    pars['analyzers']       = sc.autolist() # The functions present in this simulation; populated by the user
     pars['timelimit']       = None # Time limit for the simulation (seconds)
     pars['stopping_func']   = None # A function to call to stop the sim partway through
 

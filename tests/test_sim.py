@@ -22,12 +22,11 @@ def test_microsim():
         'n_agents': 500, # CK: values smaller than this fail
         'init_hpv_prev': .1,
         'n_years': 2,
+        'burnin': 0,
         'genotypes': [16,18],
-        'analyzers':'age_results',
         }
     sim.update_pars(pars)
     sim.run()
-    sim.disp()
     sim.summarize()
     sim.brief()
 
@@ -52,7 +51,6 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
         'use_multiscale': True,
         'ms_agent_ratio': 100,
         'genotypes': [16,18],
-        'analyzers': 'age_results',
     }
     pars = sc.mergedicts(pars, kwargs)
 

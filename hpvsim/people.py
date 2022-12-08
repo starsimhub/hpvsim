@@ -868,6 +868,7 @@ class People(hpb.BasePeople):
         if layer == 'reactivation':
             self.genotype_flows['reactivations'][g] += self.scale_flows(inds)
             self.flows['reactivations']             += self.scale_flows(inds)
+            self.age_flows['reactivations']         += np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
             self.latent[g, inds] = False # Adjust states -- no longer latent
 
         # Update states, genotype info, and flows
@@ -880,6 +881,7 @@ class People(hpb.BasePeople):
             # Create overall flows
             self.flows['infections']                += self.scale_flows(inds) # Add the total count to the total flow data
             self.genotype_flows['infections'][g]    += self.scale_flows(inds) # Add the count by genotype to the flow data
+            self.age_flows['infections'][:]         += np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
 
             # Create by-sex flows
             infs_female = self.scale_flows(hpu.true(self.is_female[inds]))

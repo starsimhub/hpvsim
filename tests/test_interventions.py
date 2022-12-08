@@ -52,11 +52,8 @@ def test_screen_prob():
     )
 
     to_triage = lambda sim: sim.get_intervention('screen').outcomes['positive']
-    triage = hpv.routine_triage(
-        product=dfvia_triage,  # pass in string or product
-        prob=target_triage,
-        annual_prob=False,
-        eligibility=to_triage,  # pass in valid state of People OR indices OR callable that gets indices
+    triage = hpv.routine_triage(product='via_triage', prob=0.5, eligibility=to_triage)
+
         label='triage'
     )
 

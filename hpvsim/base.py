@@ -233,8 +233,8 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['total_infections']
-                cancers = self.summary['total_cancers']
+                infections = self.results['infections'][:].sum()
+                cancers = self.results['cancers'][:].sum()
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
@@ -401,10 +401,8 @@ class BaseSim(ParsObj):
 
         '''
         keys = []
-        choices = ['total', 'genotype', 'all', 'sex', 'age']
-        if which in ['all']:
-            keys = [k for k,res in self.results.items() if isinstance(res, Result)]
-        elif which in ['total']:
+        subchoices = ['total', 'genotype', 'sex', 'age', 'type_dysp']
+        if which in ['total']:
             keys = [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
         elif which in ['sex']:
             keys = [k for k, res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
@@ -412,10 +410,45 @@ class BaseSim(ParsObj):
             keys = [k for k, res in self.results.age.items() if isinstance(res, Result)]
         elif which in ['genotype']:
             keys = [k for k,res in self.results.genotype.items() if isinstance(res, Result)]
+        elif which in ['type_dysp']:
+            keys = [k for k, res in self.results.type_dysp.items() if isinstance(res, Result)]
+        elif which =='all':
+            keys = []
+            for subchoice in subchoices: # Recurse over options
+                keys += self.result_keys(subchoice)
         else:
-            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(choices)}'
+            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(subchoices+["all"])}'
             raise ValueError(errormsg)
         return keys
+
+
+    def result_types(self, reskeys):
+        '''
+        Figure out what kind of result it is, which determines what plotting style to use
+        '''
+
+        # If it's a single item, make it a list but remember to return a single item
+        return_list = True
+        if isinstance(reskeys, str):
+            return_list = False
+            reskeys = sc.tolist(reskeys)
+
+        # Construct list of result types
+        result_types = sc.autolist()
+        for rkey in reskeys:
+            for type_option in ['total', 'genotype', 'sex', 'age', 'type_dysp']:
+                if rkey in self.result_keys(type_option):
+                    result_types += type_option
+
+        # Check that each result is of exactly one type
+        if len(result_types) != len(reskeys):
+            errormsg = f"Can't determine unique result types for result_keys {reskeys}."
+            raise ValueError(errormsg)
+
+        if return_list:
+            return result_types
+        else:
+            return result_types[0]
 
 
     def copy(self):

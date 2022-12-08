@@ -1035,15 +1035,15 @@ class type_distributions(Analyzer):
         self.labels         = sc.autolist()
 
         if dysp_states is None:
-            self.dysp_states    = hpd.cytology_keys
-            self.labels         = hpd.cytology_names
+            self.dysp_states    = hpd.type_dysp_keys
+            self.labels         = hpd.type_dysp_names
         else:
             for dysp_state in dysp_states:
                 if dysp_state in hpd.cytology_keys:
                     idx = hpd.cytology_keys.index(dysp_state)
                     self.labels += hpd.cytology_names[idx]
                 else:
-                    errormsg = f'Dysplasia state {dysp_state} not understood, use one from {hpd.cytology_keys}.'
+                    errormsg = f'Dysplasia state {dysp_state} not understood, use one from {hpd.type_dysp_keys}.'
                     raise ValueError(errormsg)
         return
 
@@ -1065,7 +1065,10 @@ class type_distributions(Analyzer):
         for tp in self.timepoints:
             idx = sc.findinds(sim.res_yearvec, tp)[0]
             for state in self.dysp_states:
-                self.results[tp][state] = sim.results[state][:,idx]
+                if sim.results[state][idx]==0:
+                    self.results[tp][state] = np.zeros_like(sim.results.genotype[state+'_by_genotype'][:,idx])
+                else:
+                    self.results[tp][state] = sc.safedivide(sim.results.genotype[state+'_by_genotype'][:,idx], sim.results[state][idx])
         return
 
 
@@ -1078,7 +1081,7 @@ class type_distributions(Analyzer):
 
         # Initialize
         fig = pl.figure(**fig_args)
-        n_plots = self.get_n_plots()
+        n_plots,_ = self.get_to_plot()
         n_rows, n_cols = sc.get_rows_cols(n_plots)
 
         # Make the figure(s)
@@ -1087,7 +1090,7 @@ class type_distributions(Analyzer):
             for date,resdict in self.results.items():
                 pl.subplots_adjust(**axis_args)
                 ax = pl.subplot(n_rows, n_cols, plot_count)
-                ax = self.plot_single(ax, date, bar_args=bar_args, scatter_args=scatter_args)
+                ax = hppl.plot_type_bars(ax, date)
                 plot_count+=1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
@@ -1098,40 +1101,6 @@ class type_distributions(Analyzer):
         n_plots = len(self.timepoints)
         to_plot_args = self.timepoints
         return n_plots, to_plot_args
-
-
-    def plot_single(self, ax, date, bar_args=None, scatter_args=None):
-        '''
-        Function to plot type distribution for a single date. Requires an axis as
-        input and will generally be called by a helper function rather than directly.
-        '''
-        args = sc.objdict()
-        args.bar        = sc.objdict(sc.mergedicts(dict(width=0.15), bar_args))
-        args.scatter    = sc.objdict(sc.mergedicts(dict(marker='s'), scatter_args))
-        resdict = self.results[date] # Extract the result dictionary
-
-        # Grouped bar plot with n_groups bars (one for each state) and ng bars per group
-        n_bars_per_group = self.ng
-        n_groups = len(resdict)
-        x = np.arange(n_groups)
-        width = args.bar.width
-
-        # Set position of bar on x axis
-        xpositions = [x]
-        for group_no in range(1,n_bars_per_group):
-            xpositions.append([xi+width for xi in xpositions[-1]])
-
-        # Plot bars
-        for bar_no in range(n_bars_per_group):
-            ydata = [resdict[k][bar_no] for k in range(n_groups)] # Have to rearrange
-            ax.bar(xpositions[bar_no], ydata, width, label=self.g_labels[bar_no])
-
-        # Add xticks on the middle of the group bars
-        ax.set_xticks([r + width for r in range(len(x))], self.labels)
-        ax.legend()
-        ax.set_title('HPV types by cytology')
-
-        return ax
 
 
 class age_causal_infection(Analyzer):

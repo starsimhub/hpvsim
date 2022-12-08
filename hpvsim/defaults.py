@@ -254,7 +254,7 @@ other_stock_keys = [state.name for state in PeopleMeta.intv_states+PeopleMeta.hi
 # Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
 inci_keys   = ['hpv',       'cin1',     'cin2',     'cin3',     'cin',      'cancer']
-inci_names  = ['HPV',       'CIN1',     'CIN2',     'CIN3',     'CIN',      'cancer']
+inci_names  = ['HPV',       'CIN1',     'CIN2',     'CIN3',     'CIN',      'Cancer']
 inci_colors = ['#c78f65',   '#c1ad71',  '#c1981d',  '#b86113',  '#c1ad71',  '#5f5cd2']
 
 # Demographics
@@ -267,9 +267,9 @@ by_sex_keys    = ['infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',                    '#000000']
 
-# Cytology states
-cytology_keys   = ['precin', 'cin1', 'cin2', 'cin3', 'cancer']
-cytology_names  = ['Normal', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
+# Results for storing type distribution by dysplasia
+type_dysp_keys   = ['n_precin', 'n_cin1', 'n_cin2', 'n_cin3', 'n_cancerous']
+type_dysp_names  = ['Normal', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
@@ -383,6 +383,15 @@ overview_plots = [
     'cancers',
 ]
 
+class plot_args():
+    ''' Mini class for defining default plot specifications '''
+    def __init__(self, keys, name=None, plot_type=None, year=None):
+        self.keys = sc.tolist(keys)
+        self.name = name
+        self.plot_type = plot_type or 'time_series'
+        self.year = year
+        return
+
 
 def get_default_plots(which='default', kind='sim', sim=None):
     '''
@@ -414,17 +423,13 @@ def get_default_plots(which='default', kind='sim', sim=None):
     if which in ['none', 'default', 'epi']:
 
         if is_sim:
-            plots = sc.odict({
-                'HPV prevalence': [
-                    'hpv_prevalence',
-                ],
-                'CINs per 100,000 women': [
-                    'cin_incidence',
-                    ],
-                'Cancers per 100,000 women': [
-                    'cancer_incidence',
-                    'asr_cancer_incidence'
-                ],
+            plots = sc.objdict({
+                'HPV prevalence': 'hpv_prevalence',
+                'CIN incidence (per 100,000 women)': 'cin_incidence',
+                'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
+                'Infections by age': 'infections_by_age',
+                'Cancers by age': 'cancers_by_age',
+                'HPV types by cytology': 'type_dysp',
             })
 
         else: # pragma: no cover

@@ -17,20 +17,21 @@ __all__ = ['plot_sim', 'plot_scens', 'plot_scen_age_results', 'plot_result', 'pl
 #%% Plotting helper functions
 
 def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None, fill_args=None,
-                legend_args=None, date_args=None, show_args=None, style_args=None, **kwargs):
+                bar_args=None, legend_args=None, date_args=None, show_args=None, style_args=None, **kwargs):
     ''' Handle input arguments -- merge user input with defaults; see sim.plot for documentation '''
 
     # Set defaults
     defaults = sc.objdict()
-    defaults.fig     = sc.objdict(figsize=(10, 8), num=None)
-    defaults.plot    = sc.objdict(lw=1.5, alpha= 0.7)
-    defaults.scatter = sc.objdict(s=20, marker='s', alpha=0.7, zorder=1.75, datastride=1) # NB: 1.75 is above grid lines but below plots
-    defaults.axis    = sc.objdict(left=0.10, bottom=0.08, right=0.95, top=0.95, wspace=0.30, hspace=0.30)
-    defaults.fill    = sc.objdict(alpha=0.2)
-    defaults.legend  = sc.objdict(loc='best', frameon=False)
-    defaults.date    = sc.objdict(as_dates=True, dateformat=None, rotation=None, start=None, end=None)
-    defaults.show    = sc.objdict(data=True, ticks=True, interventions=True, legend=True, outer=False, tight=False, maximize=False)
-    defaults.style   = sc.objdict(style=None, dpi=None, font=None, fontsize=None, grid=None, facecolor=None) # Use HPVsim global defaults
+    defaults.fig        = sc.objdict(figsize=(10, 8), num=None)
+    defaults.plot       = sc.objdict(lw=1.5, alpha= 0.7)
+    defaults.scatter    = sc.objdict(s=20, marker='s', alpha=0.7, zorder=1.75, datastride=1) # NB: 1.75 is above grid lines but below plots
+    defaults.axis       = sc.objdict(left=0.10, bottom=0.08, right=0.95, top=0.95, wspace=0.30, hspace=0.30)
+    defaults.fill       = sc.objdict(alpha=0.2)
+    defaults.bar        = sc.objdict(width=0.15)
+    defaults.legend     = sc.objdict(loc='best', frameon=False)
+    defaults.date       = sc.objdict(as_dates=True, dateformat=None, rotation=None, start=None, end=None)
+    defaults.show       = sc.objdict(data=True, ticks=True, interventions=True, legend=True, outer=False, tight=False, maximize=False)
+    defaults.style      = sc.objdict(style=None, dpi=None, font=None, fontsize=None, grid=None, facecolor=None) # Use HPVsim global defaults
 
     # Handle directly supplied kwargs
     for dkey,default in defaults.items():
@@ -49,15 +50,16 @@ def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None
 
     # Merge arguments together
     args = sc.objdict()
-    args.fig     = sc.mergedicts(defaults.fig,     fig_args)
-    args.plot    = sc.mergedicts(defaults.plot,    plot_args)
-    args.scatter = sc.mergedicts(defaults.scatter, scatter_args)
-    args.axis    = sc.mergedicts(defaults.axis,    axis_args)
-    args.fill    = sc.mergedicts(defaults.fill,    fill_args)
-    args.legend  = sc.mergedicts(defaults.legend,  legend_args)
-    args.date    = sc.mergedicts(defaults.date,    date_args)
-    args.show    = sc.mergedicts(defaults.show,    show_args)
-    args.style   = sc.mergedicts(defaults.style,   style_args)
+    args.fig        = sc.mergedicts(defaults.fig,       fig_args)
+    args.plot       = sc.mergedicts(defaults.plot,      plot_args)
+    args.scatter    = sc.mergedicts(defaults.scatter,   scatter_args)
+    args.axis       = sc.mergedicts(defaults.axis,      axis_args)
+    args.fill       = sc.mergedicts(defaults.fill,      fill_args)
+    args.bar        = sc.mergedicts(defaults.bar,       bar_args)
+    args.legend     = sc.mergedicts(defaults.legend,    legend_args)
+    args.date       = sc.mergedicts(defaults.date,      date_args)
+    args.show       = sc.mergedicts(defaults.show,      show_args)
+    args.style      = sc.mergedicts(defaults.style,     style_args)
 
     # Handle potential rcParams keys
     keys = list(kwargs.keys())
@@ -130,47 +132,84 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
         errormsg = 'Cannot plot since results are not ready yet -- did you run the sim?'
         raise RuntimeError(errormsg)
 
-    # If it matches a result key, convert to a list
-    reskeys = sim.result_keys('total')
-    genkeys = sim.result_keys('genotype')
-    analyzer_keys = [a.label for a in sim.get_analyzers()]
-    mainkeys = reskeys + genkeys
-    if to_plot in mainkeys:
-        to_plot = sc.tolist(to_plot)
+    # Define allowable choices for plotting - default plot type depends on result type
+    allkeys = sim.result_keys('all')
+    time_series_keys = sim.result_keys('total')+sim.result_keys('genotype')+sim.result_keys('sex')+sim.result_keys('type_dysp')
+    age_dist_keys = sim.result_keys('age')
+    type_dysp_keys = ['type_dysp']
+    valid_keys = allkeys+type_dysp_keys
+    def check_plot_type(which):
+        if which in time_series_keys: return 'time_series'
+        elif which in age_dist_keys: return 'age_dist'
+        elif which in type_dysp_keys: return 'type_dysp'
+        else:
+            raise ValueError(f'Plot type of {which} not understood.')
+
+    analyzer_keys = [a.label for a in sim.get_analyzers()] # Defaults = whatever analyzer.plot() gives
     n_extra_plots = 0 # Keep track of the number of extra plots from analyzers
+
+    # If to_plot is a single key, turn it into a list
+    if to_plot in allkeys: to_plot = sc.tolist(to_plot)
 
     # If not specified or specified as another string, load defaults
     if to_plot is None or isinstance(to_plot, str):
         to_plot = hpd.get_default_plots(which=to_plot, kind=kind, sim=sim)
 
-        # Add default analyzers, if they exist
-        if 'defaults' in sim['analyzers']:
-            for default_analyzer in hpd.default_analyzers:
-                az = sim.get_analyzer(default_analyzer)
-                n_plots, _ = az.get_to_plot()
-                n_extra_plots += n_plots-1 # Subtract 1 because 1 will be added already
-                to_plot[default_analyzer] = [default_analyzer]
+    # If it's a dictionary, translate it to a list but store the names
+    names = None
+    if isinstance(to_plot, dict):
+        to_plot_orig = to_plot # Hold onto original
+        names = to_plot.keys()
+        to_plot = [k for k in to_plot.values()]
 
-    # If a list of keys has been supplied or constructed
+    # Validate list
     if isinstance(to_plot, list):
-        to_plot_list = to_plot # Store separately
-        to_plot = sc.odict() # Create the dict
+        to_plot_orig = to_plot[:] # Hold onto original for the moment
+        to_plot = sc.autolist()
         invalid = sc.autolist()
-        for reskey in to_plot_list:
-            if reskey in mainkeys:
-                name = sim.results[reskey].name
-                to_plot[name] = [reskey] # Use the result name as the key and the reskey as the value
-            elif reskey in analyzer_keys:
-                n_plots, _ = sim.get_analyzer(reskey).get_to_plot()
-                n_extra_plots += n_plots-1
-                to_plot[reskey] = [reskey]
-            else:
-                invalid += reskey
-        if len(invalid):
-            errormsg = f'The following key(s) are invalid:\n{sc.strjoin(invalid)}\n\nValid main keys are:\n{sc.strjoin(reskeys)}\n\nValid genotype keys are:\n{sc.strjoin(genkeys)}'
-            raise sc.KeyNotFoundError(errormsg)
 
-    to_plot = sc.odict(sc.dcp(to_plot)) # In case it's supplied as a dict
+        # Loop over items in list and validate them
+        for rn,reskey in enumerate(to_plot_orig):
+
+            # If it's a string, we construct default plot args by checking what kind of result it is
+            if isinstance(reskey, str):
+                if reskey in valid_keys:
+                    if names is not None: name = names[rn]
+                    else: name = sim.results[reskey].name
+                    if reskey in time_series_keys:
+                        to_plot += hpd.plot_args(reskey, name=name)
+                    elif reskey in age_dist_keys:
+                        to_plot += hpd.plot_args(reskey, name=name, plot_type='age_dist', year=sim.results['year'][-1])
+                    elif reskey in type_dysp_keys:
+                        to_plot += hpd.plot_args(reskey, name=name, plot_type='type_dysp', year=sim.results['year'][-1])
+                else:
+                    invalid += reskey
+
+            # If it's plot args, we validate the years and continue
+            elif isinstance(reskey, hpd.plot_args):
+                if reskey.years == 'last': reskey.year = sim.results['year'][-1]
+                to_plot += reskey # Just add it directly
+
+            # If it's a list, we ned to choose a single plot type
+            elif isinstance(reskey, list):
+                if names is not None: name = names[rn]
+                else: name = sim.results[reskey[0]].name # Use the name of the first result
+                plot_types = [check_plot_type(rkey) for rkey in reskey]
+                if 'time_series' in plot_types: # If no other info is provided, assume we want to plot them all as time series
+                    plot_type = 'time_series'
+                    year=None
+                elif 'age_dist' in plot_types:
+                    plot_type = 'age_dist'
+                    year = sim.results['year'][-1]
+                else:
+                    plot_type = 'type_dysp'
+                    year = sim.results['year'][-1]
+                to_plot += hpd.plot_args(reskey, name=name, plot_type=plot_type, year=year)
+
+        # Raise an error if there are any invalid keys
+        if len(invalid):
+            errormsg = f'The following key(s) are invalid:\n{sc.strjoin(invalid)}\n\nValid keys are:\n{sc.strjoin(valid_keys)}.'
+            raise sc.KeyNotFoundError(errormsg)
 
     # Get total number of plots and calculate rows and columns
     n_plots = len(to_plot) + n_extra_plots
@@ -408,6 +447,51 @@ def plot_time_series(ax, sim, reskey, resnum, args, colors=None, labels=None, pl
     return ax, color
 
 
+def plot_type_bars(sim, ax, date, args):
+    '''
+    Plot HPV types by cytology
+    '''
+
+    idx = sc.findinds(sim.res_yearvec, date)[0]
+    labels = [td.name for td in sim.results.type_dysp.values()]
+    resdict = sc.objdict({tdkey: td.values[:,idx] for tdkey, td in sim.results.type_dysp.items()})
+    g_labels = sim['genotypes']
+
+    # Grouped bar plot with n_groups bars (one for each state) and ng bars per group
+    n_bars_per_group = sim['n_genotypes']
+    n_groups = len(resdict)
+    x = np.arange(n_groups)
+    width = args.bar.width
+
+    # Set position of bar on x axis
+    xpositions = [x]
+    for group_no in range(1, n_bars_per_group):
+        xpositions.append([xi + width for xi in xpositions[-1]])
+
+    # Plot bars
+    for bar_no in range(n_bars_per_group):
+        ydata = [resdict[k][bar_no] for k in range(n_groups)]  # Have to rearrange
+        ax.bar(xpositions[bar_no], ydata, **args.bar, label=g_labels[bar_no])
+
+    # Add xticks on the middle of the group bars
+    ax.set_xticks([r + width for r in range(len(x))], labels)
+
+    return ax
+
+
+def plot_age_dist(sim, ax, reskey, date, args):
+    '''
+    Function to plot a single age result for a single date. Requires an axis as
+    input and will generally be called by a helper function rather than directly.
+    '''
+    idx = sc.findinds(sim.res_yearvec, date)[0]
+    res = sim.results.age[reskey]
+    x = sim['age_bins'][:-1]
+    ax.plot(x, res.values[:,idx], color=res.color, **args.plot, label=res.name)
+    return ax
+
+
+
 #%% Core plotting functions that unite the individual plotting functions to create figures for sims, scenarios, multisims, etc
 
 def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=None,
@@ -428,45 +512,34 @@ def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=N
         # Create the figures
         fig, figs = create_figs(args, sep_figs, fig, ax)
 
-        # Create subsets of plot keys; different plotting subroutines are called depending on the plot type
-        main_keys = sim.result_keys()
-        analyzer_keys = [a.label for a in sim.get_analyzers()] # List of analyzer labels
+        # Determine whether to share x axis
         do_sharex = False
+        plot_types = [tp.plot_type for tp in to_plot]
+        if len(set(plot_types))==1: do_sharex = True
 
-        # Determine if we're going to add any analyzer plots
-        add_analyzers = False
-        for pkey in to_plot.keys():
-            if pkey in analyzer_keys:
-                add_analyzers = True
-        if not add_analyzers: do_sharex = True
+        # Iterate through to_plot to figure out what to plot & how to plot it
+        for pnum,plot_arg in enumerate(to_plot):
+            sharex = ax if do_sharex else None
+            title = plot_arg.name
+            plot_type = plot_arg.plot_type
+            ax = create_subplots(figs, fig, sharex, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
 
-        # First, iterate through and pull out the main plot keys for creating time series plots
-        pnum1 = -1
-        for title,keylabels in to_plot.items():
-            if title not in analyzer_keys:
-                pnum1 += 1
-                sharex = None if do_sharex is False else ax
-                ax = create_subplots(figs, fig, sharex, n_rows, n_cols, pnum1, args.fig, sep_figs, log_scale, title)
-                for resnum,reskey in enumerate(keylabels):
+            if plot_type == 'time_series':
+                for resnum,reskey in enumerate(plot_arg.keys):
                     ax, color = plot_time_series(ax, sim, reskey, resnum, args, labels=labels, colors=colors, plot_burnin=plot_burnin)
                     if args.show['data']:
                         plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
-                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
+                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show)
 
-        # Now iterate through again and pull out the analyzer plot keys
-        pnum2 = 1
-        for azkey in to_plot.keys():
-            if azkey in analyzer_keys:
-                az = sim.get_analyzer(azkey) # Get the actual analyzer
-                title = azkey # Temp
-                n_plots, to_plot_args = az.get_to_plot()
-                for to_plot_arg in to_plot_args:
-                    ax = create_subplots(figs, fig, None, n_rows, n_cols, pnum1+pnum2, args.fig, sep_figs, log_scale, title)
-                    az.plot_single(ax, *sc.tolist(to_plot_arg), args.plot)
-                    title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
-                    pnum2 += 1
-            # if args.show['interventions']:
-            #     plot_interventions(sim, ax) # Plot the interventions
+            elif plot_type == 'type_dysp':
+                ax = plot_type_bars(sim, ax, plot_arg.year, args)
+                title_grid_legend(ax, title, grid, commaticks, setylim, sc.mergedicts(args.legend,dict(title=int(plot_arg.year))), args.show)
+
+            elif plot_type == 'age_dist':
+                for resnum,reskey in enumerate(plot_arg.keys):
+                    ax = plot_age_dist(sim, ax, reskey, plot_arg.year, args)
+                title_grid_legend(ax, title, grid, commaticks, setylim, sc.mergedicts(args.legend,dict(title=int(plot_arg.year))), args.show)
+
 
         output = tidy_up(fig, figs, do_save, fig_path, do_show, args)
 
