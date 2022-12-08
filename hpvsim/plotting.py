@@ -178,7 +178,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
                     if names is not None: name = names[rn]
                     else:
                         if reskey in allkeys:
-                            name = sim.results[reskey.split('_')[0]].name
+                            name = sim.results[reskey].name
                         elif reskey == 'type_dysp':
                             name = 'HPV types by cytology'
                     if reskey in time_series_keys:
