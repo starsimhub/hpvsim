@@ -258,8 +258,8 @@ def test_result_consistency():
     # of any genotype that occured each period. Thus, sim.results['infections'] can technically
     # be greater than the total population size, for example if half the population got infected
     # with 2 genotypes simultaneously.
-    assert np.allclose(sim.results.genotype['infections_by_genotype'][:].sum(axis=0),sim.results['infections'][:]) # Check flows by genotype are equal to total flows
-    assert np.allclose(sim.results.age['infections_by_age'][:].sum(axis=0),sim.results['infections'][:]) # Check flows by genotype are equal to total flows
+    assert np.allclose(sim.results['infections_by_genotype'][:].sum(axis=0),sim.results['infections'][:]) # Check flows by genotype are equal to total flows
+    assert np.allclose(sim.results['infections_by_age'][:].sum(axis=0),sim.results['infections'][:]) # Check flows by genotype are equal to total flows
 
     # The test below was faulty, but leaving it here (commented out) is instructive.
     # Specifically, the total number of people infectious by genotype (sim.results['n_infectious'])
@@ -273,11 +273,11 @@ def test_result_consistency():
 
     # Check that CINs by grade sum up the the correct totals
     assert np.allclose((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]),sim.results['cins'][:])
-    assert np.allclose((sim.results.genotype['cin1s_by_genotype'][:] + sim.results.genotype['cin2s_by_genotype'][:] + sim.results.genotype['cin3s_by_genotype'][:]), sim.results.genotype['cins_by_genotype'][:])
+    assert np.allclose((sim.results['cin1s_by_genotype'][:] + sim.results['cin2s_by_genotype'][:] + sim.results['cin3s_by_genotype'][:]), sim.results['cins_by_genotype'][:])
 
     # Check that results by age sum to the correct totals
-    assert np.allclose(sim.results.age['cancers_by_age'][:].sum(axis=0),sim.results['cancers'][:])
-    assert np.allclose(sim.results.age['infections_by_age'][:].sum(axis=0),sim.results['infections'][:])
+    assert np.allclose(sim.results['cancers_by_age'][:].sum(axis=0),sim.results['cancers'][:])
+    assert np.allclose(sim.results['infections_by_age'][:].sum(axis=0),sim.results['infections'][:])
 
     # Check demographics
     assert (sim['n_agents'] == n_agents)

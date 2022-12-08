@@ -407,11 +407,11 @@ class BaseSim(ParsObj):
         elif which in ['sex']:
             keys = [k for k, res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
         elif which in ['age']:
-            keys = [k for k, res in self.results.age.items() if isinstance(res, Result)]
+            keys = [k for k, res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
         elif which in ['genotype']:
-            keys = [k for k,res in self.results.genotype.items() if isinstance(res, Result)]
+            keys = [k for k,res in self.results.items() if 'by_genotype' in k and isinstance(res, Result)]
         elif which in ['type_dysp']:
-            keys = [k for k, res in self.results.type_dysp.items() if isinstance(res, Result)]
+            keys = [k for k, res in self.results.items() if 'genotype_shares' in k and isinstance(res, Result)]
         elif which =='all':
             keys = []
             for subchoice in subchoices: # Recurse over options

@@ -463,8 +463,11 @@ def plot_type_bars(sim, ax, date, args):
     '''
 
     idx = sc.findinds(sim.res_yearvec, date)[0]
-    labels = [td.name for td in sim.results.type_dysp.values()]
-    resdict = sc.objdict({tdkey: td.values[:,idx] for tdkey, td in sim.results.type_dysp.items()})
+    labels = sc.autolist()
+    resdict = sc.objdict()
+    for rkey in sim.result_keys('type_dysp'):
+        labels += sim.results[rkey].name
+        resdict[rkey] = sim.results[rkey][:,idx]
     g_labels = sim['genotypes']
 
     # Grouped bar plot with n_groups bars (one for each state) and ng bars per group
@@ -495,7 +498,7 @@ def plot_age_dist(sim, ax, reskey, date, args):
     input and will generally be called by a helper function rather than directly.
     '''
     idx = sc.findinds(sim.res_yearvec, date)[0]
-    res = sim.results.age[reskey]
+    res = sim.results[reskey]
     x = sim['age_bins'][:-1]
     ax.plot(x, res.values[:,idx], color=res.color, **args.plot, label=res.name)
     return ax
@@ -572,9 +575,10 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
     with hpo.with_style(args.style):
         fig, figs = create_figs(args, sep_figs, fig, ax)
         default_colors = sc.gridcolors(ncolors=len(scens.sims))
-        for pnum,title,reskeys in to_plot.enumitems():
+        for pnum,plot_arg in enumerate(to_plot):
+            title = plot_arg.name
             ax = create_subplots(figs, fig, ax, n_rows, n_cols, pnum, args.fig, sep_figs, log_scale, title)
-            reskeys = sc.promotetolist(reskeys) # In case it's a string
+            reskeys = sc.promotetolist(plot_arg.keys) # In case it's a string
             for reskey in reskeys:
                 res_t = scens.res_yearvec
                 resdata = scens.results[reskey]
@@ -582,7 +586,7 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
                     sim = scens.sims[scenkey][0] # Pull out the first sim in the list for this scenario
                     bi = 0 if plot_burnin else int(sim['burnin'])
                     genotypekeys = sim.result_keys('genotype')
-                    sexkeys = sim.result_keys('by_sex')
+                    sexkeys = sim.result_keys('sex')
                     if reskey in genotypekeys:
                         ng = sim['n_genotypes']
                         genotype_colors = sc.gridcolors(ng)
