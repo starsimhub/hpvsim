@@ -31,12 +31,12 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
                            hierarchy=['radiation', 'excision', 'ablation', 'none'])
 
     # Define some interventions
-    prob = 0.0
-    screen      = hpv.routine_screening(start_year=2040, prob=0.05, product='via', label='screen')
+    prob = 0.02
+    screen      = hpv.routine_screening(start_year=2040, prob=prob, product=dfvia, label='screen')
     to_triage   = lambda sim: sim.get_intervention('screen').outcomes['positive']
-    triage      = hpv.routine_triage(eligibility=to_triage, prob=0.5, product='via_triage', label='triage')
+    triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product=dfvia_triage, label='triage')
     to_treat    = lambda sim: sim.get_intervention('triage').outcomes['positive']
-    assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=0.9, product='tx_assigner', label='assign_tx')
+    assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product=dftx_assigner, label='assign_tx')
     to_ablate   = lambda sim: sim.get_intervention('assign_tx').outcomes['ablation']
     ablation    = hpv.treat_num(eligibility=to_ablate, prob=prob, product='ablation')
     to_excise   = lambda sim: sim.get_intervention('assign_tx').outcomes['excision']
