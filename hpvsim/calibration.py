@@ -639,7 +639,7 @@ class Calibration(sc.prettyobj):
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in resname and 'cancer' not in resname:
+                    if 'genotype' in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
                             # Plot data

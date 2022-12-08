@@ -536,7 +536,7 @@ class age_results(Analyzer):
         age_results = sim['analyzers'][0]
 
     # Alternatively, use standard timepoints and age buckets across all results
-        sim = hpv.Sim(analyzers=hpv.age_results(result_keys=['total_cancers']))
+        sim = hpv.Sim(analyzers=hpv.age_results(result_keys=['cancers']))
     '''
 
     def __init__(self, result_keys=None, die=False, edges=None, timepoints=None, result_args=None, **kwargs):
@@ -595,7 +595,7 @@ class age_results(Analyzer):
 
 
     def validate_results(self, sim):
-        choices = sim.result_keys('total')+['genotype_'+k for k in sim.result_keys('genotype')]
+        choices = sim.result_keys('total')+[k for k in sim.result_keys('genotype')]
         for rk, rdict in self.result_args.items():
             if rk not in choices:
                 strm = '\n'.join(choices)
@@ -722,6 +722,7 @@ class age_results(Analyzer):
                 size = na
                 by_genotype = False
 
+            # This section is completed for stocks
             if sim.t in result_dict.timepoints:
 
                 ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
@@ -761,11 +762,11 @@ class age_results(Analyzer):
             # Both annual new cases and incidence require us to calculate the new cases over all
             # the timepoints that belong to the requested year.
             if sim.t in result_dict.calcpoints:
-                date = self.date # Stored just above for use here
-                self.results[result][date] = np.zeros(size)
 
                 # Figure out if it's a flow or incidence
                 if result_name in hpd.flow_keys or 'incidence' in result_name or 'mortality' in result_name:
+
+                    date = self.date  # Stored just above for use here
                     attr1, attr2 = self.convert_rname_flows(result_name)
                     if not by_genotype:  # Results across all genotypes
                         if result_name == 'detected_cancer_deaths':
@@ -898,12 +899,13 @@ class age_results(Analyzer):
         for name, group in resargs.data.groupby(['genotype', 'year']):
             genotype = name[0]
             year = str(name[1]) + '.0'
-            if 'total' in key or 'cancer' in key:
-                sim_res = list(results[year])
-                res.extend(sim_res)
-            else:
+            if 'genotype' in key:
                 sim_res = list(results[year][self.glabels.index(genotype)])
                 res.extend(sim_res)
+            else:
+                sim_res = list(results[year])
+                res.extend(sim_res)
+
         self.result_args[key].data['model_output'] = res
         self.result_args[key].data['diffs'] = resargs.data['model_output'] - resargs.data['value']
         self.result_args[key].data['gofs'] = hpm.compute_gof(resargs.data['value'].values, resargs.data['model_output'].values)
@@ -977,6 +979,7 @@ class age_results(Analyzer):
         return ax
 
 
+
     def plot(self, fig_args=None, axis_args=None, plot_args=None, scatter_args=None,
              do_save=None, fig_path=None, do_show=True, fig=None, ax=None, **kwargs):
         '''
@@ -1015,92 +1018,6 @@ class age_results(Analyzer):
                     plot_count+=1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
-
-
-class type_distributions(Analyzer):
-    '''
-    Pull out type distribution at a given timepoint, used for default plots
-
-    Args:
-
-    **Example**::
-        sim = hpv.Sim(analyzers=hpv.type_distributions(timepoints=2020))
-    '''
-
-    def __init__(self, dysp_states=None, timepoints=None, **kwargs):
-        super().__init__(**kwargs) # Initialize the Analyzer object
-        self.timepoints     = timepoints
-        self.results        = {}
-        self.ng             = None
-        self.labels         = sc.autolist()
-
-        if dysp_states is None:
-            self.dysp_states    = hpd.type_dysp_keys
-            self.labels         = hpd.type_dysp_names
-        else:
-            for dysp_state in dysp_states:
-                if dysp_state in hpd.cytology_keys:
-                    idx = hpd.cytology_keys.index(dysp_state)
-                    self.labels += hpd.cytology_names[idx]
-                else:
-                    errormsg = f'Dysplasia state {dysp_state} not understood, use one from {hpd.type_dysp_keys}.'
-                    raise ValueError(errormsg)
-        return
-
-    def initialize(self, sim):
-        super().initialize(sim)
-        if self.timepoints is None:
-            self.timepoints = sim['end']
-        self.timepoints = sc.promotetolist(self.timepoints)
-        self.results = {int(tp):sc.objdict() for tp in self.timepoints}
-        self.ng = sim['n_genotypes']
-        self.g_labels = sim['genotypes']
-        return
-
-    def apply(self, sim):
-        ''' Do nothing here - all the work is done in finalize '''
-        pass
-
-    def finalize(self, sim):
-        for tp in self.timepoints:
-            idx = sc.findinds(sim.res_yearvec, tp)[0]
-            for state in self.dysp_states:
-                if sim.results[state][idx]==0:
-                    self.results[tp][state] = np.zeros_like(sim.results.genotype[state+'_by_genotype'][:,idx])
-                else:
-                    self.results[tp][state] = sc.safedivide(sim.results.genotype[state+'_by_genotype'][:,idx], sim.results[state][idx])
-        return
-
-
-    def plot(self, fig_args=None, axis_args=None, bar_args=None, scatter_args=None,
-             do_save=None, fig_path=None, do_show=None, **kwargs):
-        ''' Create plot '''
-        fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
-        axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
-        all_args = sc.mergedicts(fig_args, axis_args, bar_args, scatter_args)
-
-        # Initialize
-        fig = pl.figure(**fig_args)
-        n_plots,_ = self.get_to_plot()
-        n_rows, n_cols = sc.get_rows_cols(n_plots)
-
-        # Make the figure(s)
-        with hpo.with_style(**kwargs):
-            plot_count=1
-            for date,resdict in self.results.items():
-                pl.subplots_adjust(**axis_args)
-                ax = pl.subplot(n_rows, n_cols, plot_count)
-                ax = hppl.plot_type_bars(ax, date)
-                plot_count+=1
-
-        return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
-
-
-    def get_to_plot(self):
-        ''' Get plots to make '''
-        n_plots = len(self.timepoints)
-        to_plot_args = self.timepoints
-        return n_plots, to_plot_args
 
 
 class age_causal_infection(Analyzer):
@@ -1202,7 +1119,6 @@ class cancer_detection(Analyzer):
 
 #%% Additional utilities
 analyzer_map = {
-    'defaults': hpd.default_analyzers,
     'snapshot': snapshot,
     'age_pyramid': age_pyramid,
     'age_results': age_results,

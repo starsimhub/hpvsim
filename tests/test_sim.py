@@ -267,7 +267,9 @@ def test_result_consistency():
     # because of the possibility of coinfections within a single person.
     # So sim.results['n_total_infectious'] represents the total number of people who have 1+ infections
     # whereas sim.results['n_infectious'] represents the total number of people infected with each genotype.
-    # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
+    # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check stocks by genotype are equal to stocks flows
+    # assert np.allclose(sim.results.age['n_infectious_by_age'][:].sum(axis=0),sim.results['n_infectious'][:]) # Check stocks by age are equal to stocks flows
+
 
     # Check that CINs by grade sum up the the correct totals
     assert np.allclose((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]),sim.results['cins'][:])
@@ -352,14 +354,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
-    sim = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
-    # sim3 = test_states()
-    # sim4 = test_flexible_inputs()
-    # sim5 = test_result_consistency()
-    # sim6 = test_location_loading()
-    # sim7 = test_resuming()
+    sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim2 = test_epi()
+    sim3 = test_states()
+    sim4 = test_flexible_inputs()
+    sim5 = test_result_consistency()
+    sim6 = test_location_loading()
+    sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')

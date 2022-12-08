@@ -20,7 +20,7 @@ def test_snapshot():
 
     pars = dict(n_years=10, dt=0.5)
 
-    sim = hpv.Sim(pars, analyzers=['defaults', hpv.snapshot(['2016', '2019'])])
+    sim = hpv.Sim(pars, analyzers=hpv.snapshot(['2016', '2019']))
     sim.run()
     snapshot = sim.get_analyzer()
     people1 = snapshot.snapshots[0]         # Option 1
@@ -31,28 +31,6 @@ def test_snapshot():
     assert people1 == people2, 'Snapshot options should match but do not'
     assert people3 != people4, 'Snapshot options should not match but do'
     return people4
-
-
-def test_defaults():
-
-    sc.heading('Testing default analyzer behavior')
-
-    # Check that defaults get added
-    sim0 = hpv.Sim()
-    sim0.initialize()
-    assert len(sim0.analyzers)==2 # 2 analyzers added by default
-
-    # Check that defaults don't get added if they're not supposed to
-    sim1 = hpv.Sim(analyzers = [])
-    sim1.initialize()
-    assert len(sim1.analyzers)==0
-
-    # Check that new ones get added, not replaced
-    sim2 = hpv.Sim(analyzers=['defaults', hpv.age_results()])
-    sim2.initialize()
-    assert len(sim2.analyzers)==3
-
-    return
 
 
 def test_age_pyramids(do_plot=True):
@@ -102,11 +80,11 @@ def test_age_results(do_plot=True):
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            total_infections=sc.objdict(
+            infections=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            total_cancer_incidence=sc.objdict(
+            cancer_incidence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             ),
@@ -146,14 +124,12 @@ def test_reduce_analyzers():
 
         az = hpv.age_results(
             result_keys=sc.objdict(
-                total_cancer_incidence=sc.objdict(
+                cancer_incidence=sc.objdict(
                     timepoints=['2020'],
-                    # datafile=f'test_data/{location}_cancer_cases.csv',
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 ),
                 cancer_mortality=sc.objdict(
                     timepoints=['2020'],
-                    # datafile=f'test_data/{location}_cancer_deaths.csv',
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 )
             )
@@ -231,7 +207,7 @@ def test_detection():
         'dt': 1.,
     }
 
-    sim = hpv.Sim(pars=pars, analyzers=['defaults', 'cancer_detection'])
+    sim = hpv.Sim(pars=pars, analyzers='cancer_detection')
     sim.run()
     a = sim.get_analyzer(hpv.cancer_detection)
 
@@ -244,7 +220,6 @@ if __name__ == '__main__':
     T = sc.tic()
 
     people      = test_snapshot()
-    test_defaults()
     sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()

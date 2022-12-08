@@ -497,12 +497,14 @@ class Sim(hpb.BaseSim):
         # Other results
         results['n_alive'] = init_res('Number alive')
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
+        results['n_alive_by_age'] = init_res('Number alive by age', n_rows=na)
         results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
         results['hiv_incidence'] = init_res('HIV incidence')
         results['hiv_prevalence'] = init_res('HIV prevalence')
         results['hpv_prevalence'] = init_res('HPV prevalence', color=hpd.stock_colors[0])
         results.genotype['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0])
+        results.age['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -690,6 +692,7 @@ class Sim(hpb.BaseSim):
         dt = self['dt'] # Timestep
         t = self.t
         ng = self['n_genotypes']
+        na = len(self.pars['age_bins']) - 1 # Number of age bins
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         beta = self['beta']
@@ -807,14 +810,7 @@ class Sim(hpb.BaseSim):
         for key,count in people.demographic_flows.items():
             self.results[key][idx] += count
         for key,count in people.genotype_flows.items():
-            try:
-                flow_ind = [flow.name for flow in hpd.flows].index(key)
-            except:
-                import traceback;
-                traceback.print_exc();
-                import pdb;
-                pdb.set_trace()
-
+            flow_ind = [flow.name for flow in hpd.flows].index(key)
             if hpd.flows[flow_ind].by_genotype:
                 for genotype in range(ng):
                     self.results.genotype[key+'_by_genotype'][genotype][idx] += count[genotype]
@@ -829,8 +825,15 @@ class Sim(hpb.BaseSim):
 
             # Create total stocks
             for key in hpd.total_stock_keys:
+
+                # Stocks by genotype
                 for g in range(ng):
                     self.results.genotype[f'n_{key}_by_genotype'][g, idx] = people.count_by_genotype(key, g)
+                # Stocks by age
+                inds = hpu.true(people[key])
+                self.results.age[f'n_{key}_by_age'][:, idx] = np.histogram(people.age[inds], bins=people.age_bins, weights=people.scale[inds])[0]
+
+                # Total stocks
                 if key not in ['susceptible']:
                     # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
                     self.results[f'n_{key}'][idx] = people.count_any(key)
@@ -857,9 +860,11 @@ class Sim(hpb.BaseSim):
             self.results['asr_cancer_incidence'][idx] = np.dot(age_specific_incidence,standard_pop)
 
             # Save number alive
-            self.results['n_alive'][idx] = people.scale_flows(people.alive.nonzero()[0])
+            alive_inds = hpu.true(people.alive)
+            self.results['n_alive'][idx] = people.scale_flows(alive_inds)
             self.results['n_alive_by_sex'][0,idx] = people.scale_flows((people.alive*people.is_female).nonzero()[0])
             self.results['n_alive_by_sex'][1,idx] = people.scale_flows((people.alive*people.is_male).nonzero()[0])
+            self.results['n_alive_by_age'][:,idx] = np.histogram(people.age[alive_inds], bins=people.age_bins, weights=people.scale[alive_inds])[0]
 
         # Apply analyzers
         for i,analyzer in enumerate(self.analyzers):
@@ -985,6 +990,7 @@ class Sim(hpb.BaseSim):
         self.results.genotype['hpv_incidence_by_genotype'][:]   = res.genotype['infections_by_genotype'][:] / res.genotype['n_susceptible_by_genotype'][:]
         self.results['hpv_prevalence'][:]           = res['n_infectious'][:] / res['n_alive'][:]
         self.results.genotype['hpv_prevalence_by_genotype'][:]  = res.genotype['n_infectious_by_genotype'][:] / res['n_alive'][:]
+        self.results.age['hpv_prevalence_by_age'][:]  = res.age['n_infectious_by_age'][:] / res['n_alive_by_age'][:]
         self.results['hiv_incidence'][:]            = res['hiv_infections'][:] / (res['n_alive'][:]-res['n_hiv'][:])
         self.results['hiv_prevalence'][:]           = res['n_hiv'][:] / res['n_alive'][:]
 
