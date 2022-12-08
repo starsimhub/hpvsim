@@ -388,7 +388,7 @@ class plot_args():
     def __init__(self, keys, name=None, plot_type=None, year=None):
         self.keys = sc.tolist(keys)
         self.name = name
-        self.plot_type = plot_type or 'time_series'
+        self.plot_type = plot_type
         self.year = year
         return
 

@@ -38,7 +38,7 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
 
     # Settings
     seed = 1
-    verbose = 1
+    verbose = 0.1
 
     # Create and run the simulation
     pars = {
@@ -48,9 +48,6 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
         'end': 2030,
         'location': 'tanzania',
         'dt': .5,
-        'use_multiscale': True,
-        'ms_agent_ratio': 100,
-        'genotypes': [16,18],
     }
     pars = sc.mergedicts(pars, kwargs)
 
@@ -63,10 +60,10 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
 
     sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars)
     sim.set_seed(seed)
+    sim.run(verbose=verbose)
 
     # Optionally plot
     if do_plot:
-        sim.run(verbose=verbose)
         sim.plot(do_save=do_save)
 
     return sim
@@ -89,12 +86,12 @@ def test_epi():
             return
 
     par_effects = [
-        ParEffects('model_hiv',     [False, True],  'total_infections'),
-        ParEffects('beta',          [0.01, 0.99],   'total_infections'),
-        ParEffects('condoms',       [0.90, 0.10],   'total_infections'),
-        ParEffects('acts',          [1, 200],       'total_infections'),
-        ParEffects('debut',         [25, 15],       'total_infections'),
-        ParEffects('init_hpv_prev', [0.1, 0.8],     'total_infections'),
+        # ParEffects('model_hiv',     [False, True],  'cancers'),
+        ParEffects('beta',          [0.01, 0.99],   'infections'),
+        ParEffects('condoms',       [0.90, 0.10],   'infections'),
+        ParEffects('acts',          [1, 200],       'infections'),
+        ParEffects('debut',         [25, 15],       'infections'),
+        ParEffects('init_hpv_prev', [0.1, 0.8],     'infections'),
     ]
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
@@ -172,7 +169,7 @@ def test_states():
                 sd1inds = hpv.true(people.cin[g,:] & people.inactive[g,:])
                 sd1 = True
                 if len(sd1inds)>0:
-                    sd1 = people.cancerous[:,sd1inds].any(axis=0)
+                    sd1 = people.cancerous[:,sd1inds].any(axis=0).all()
 
                 if not np.array([s1, s2, s3, s4, d1, d2, d3, d4, d5, sd1]).all():
                     self.okay = False
@@ -261,7 +258,8 @@ def test_result_consistency():
     # of any genotype that occured each period. Thus, sim.results['infections'] can technically
     # be greater than the total population size, for example if half the population got infected
     # with 2 genotypes simultaneously.
-    assert np.allclose(sim.results['infections'][:].sum(axis=0),sim.results['total_infections'][:]) # Check flows by genotype are equal to total flows
+    assert np.allclose(sim.results.genotype['infections_by_genotype'][:].sum(axis=0),sim.results['infections'][:]) # Check flows by genotype are equal to total flows
+    assert np.allclose(sim.results.age['infections_by_age'][:].sum(axis=0),sim.results['infections'][:]) # Check flows by genotype are equal to total flows
 
     # The test below was faulty, but leaving it here (commented out) is instructive.
     # Specifically, the total number of people infectious by genotype (sim.results['n_infectious'])
@@ -272,11 +270,12 @@ def test_result_consistency():
     # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
     # Check that CINs by grade sum up the the correct totals
-    assert np.allclose((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]),sim.results['total_cins'][:])
-    assert np.allclose((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]), sim.results['cins'][:])
+    assert np.allclose((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]),sim.results['cins'][:])
+    assert np.allclose((sim.results.genotype['cin1s_by_genotype'][:] + sim.results.genotype['cin2s_by_genotype'][:] + sim.results.genotype['cin3s_by_genotype'][:]), sim.results.genotype['cins_by_genotype'][:])
 
-    # Check that cancers by age sum to the correct totals
-    assert np.allclose(sim.results['cancers_by_age'][:].sum(axis=0),sim.results['total_cancers'][:])
+    # Check that results by age sum to the correct totals
+    assert np.allclose(sim.results.age['cancers_by_age'][:].sum(axis=0),sim.results['cancers'][:])
+    assert np.allclose(sim.results.age['infections_by_age'][:].sum(axis=0),sim.results['infections'][:])
 
     # Check demographics
     assert (sim['n_agents'] == n_agents)
@@ -342,7 +341,7 @@ def test_resuming():
     with pytest.raises(hpv.AlreadyRunError):
         s1.finalize() # Can't re-finalize a finalized sim
 
-    assert np.all(s0.results['total_infections'].values == s1.results['total_infections']) # Results should be identical
+    assert np.all(s0.results['infections'].values == s1.results['infections']) # Results should be identical
 
     return s1
 
@@ -354,7 +353,7 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim = test_sim(do_plot=do_plot, do_save=do_save)
     # sim2 = test_epi()
     # sim3 = test_states()
     # sim4 = test_flexible_inputs()

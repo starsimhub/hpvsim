@@ -148,8 +148,9 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
     analyzer_keys = [a.label for a in sim.get_analyzers()] # Defaults = whatever analyzer.plot() gives
     n_extra_plots = 0 # Keep track of the number of extra plots from analyzers
 
-    # If to_plot is a single key, turn it into a list
-    if to_plot in allkeys: to_plot = sc.tolist(to_plot)
+    # If to_plot is a single valid key, turn it into a list
+    if to_plot in valid_keys: to_plot = sc.tolist(to_plot)
+    if isinstance(to_plot, hpd.plot_args): to_plot = sc.tolist(to_plot)
 
     # If not specified or specified as another string, load defaults
     if to_plot is None or isinstance(to_plot, str):
@@ -175,9 +176,13 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
             if isinstance(reskey, str):
                 if reskey in valid_keys:
                     if names is not None: name = names[rn]
-                    else: name = sim.results[reskey].name
+                    else:
+                        if reskey in allkeys:
+                            name = sim.results[reskey.split('_')[0]].name
+                        elif reskey == 'type_dysp':
+                            name = 'HPV types by cytology'
                     if reskey in time_series_keys:
-                        to_plot += hpd.plot_args(reskey, name=name)
+                        to_plot += hpd.plot_args(reskey, name=name, plot_type='time_series')
                     elif reskey in age_dist_keys:
                         to_plot += hpd.plot_args(reskey, name=name, plot_type='age_dist', year=sim.results['year'][-1])
                     elif reskey in type_dysp_keys:
@@ -185,10 +190,15 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
                 else:
                     invalid += reskey
 
-            # If it's plot args, we validate the years and continue
+            # If it's plot args, we validate the years and set defaults
             elif isinstance(reskey, hpd.plot_args):
-                if reskey.years == 'last': reskey.year = sim.results['year'][-1]
-                to_plot += reskey # Just add it directly
+                if reskey.year == 'last': reskey.year = sim.results['year'][-1]
+                if reskey.plot_type is None: # Add sensible defaults if not supplied
+                    if reskey.keys[0] in age_dist_keys:
+                        reskey.plot_type = 'age_dist'
+                    elif reskey.keys[0] in type_dysp_keys:
+                        reskey.plot_type = 'type_dysp'
+                to_plot += reskey
 
             # If it's a list, we ned to choose a single plot type
             elif isinstance(reskey, list):
