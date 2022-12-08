@@ -412,10 +412,9 @@ def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
     scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
     scens.run(debug=debug_scens)
     to_plot = {
-        'HPV prevalence': ['total_hpv_prevalence'],
-        'Age standardized cancer incidence (per 100,000 women)': ['asr_cancer'],
+        'HPV prevalence': ['hpv_prevalence'],
+        'Age standardized cancer incidence (per 100,000 women)': ['asr_cancer_incidence'],
         'Cancer deaths per 100,000 women': ['cancer_mortality'],
-        'Number vaccinated': ['cum_vaccinated'],
     }
     scens.plot(to_plot=to_plot)
     return scens
@@ -488,7 +487,7 @@ def test_screening():
     sim.plot(to_plot=to_plot)
 
     fig, ax = plt.subplots(1, 2)
-    for i, result in enumerate(['total_cancers', 'total_cins']):
+    for i, result in enumerate(['cancers', 'cins']):
         ax[i].plot(sim0.results['year'], sim0.results[result].values, label='No Screening')
         ax[i].plot(sim.results['year'], sim.results[result].values, label='Screening')
         ax[i].set_ylabel(result)
