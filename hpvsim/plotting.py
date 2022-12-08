@@ -160,7 +160,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
     names = None
     if isinstance(to_plot, dict):
         to_plot_orig = to_plot # Hold onto original
-        names = to_plot.keys()
+        names = [k for k in to_plot.keys()]
         to_plot = [k for k in to_plot.values()]
 
     # Validate list
