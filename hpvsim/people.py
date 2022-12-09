@@ -757,26 +757,26 @@ class People(hpb.BasePeople):
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
             alive_inds = hpu.true(self.alive_level0)
-            ages = np.array([int(i) for i in self.age[alive_inds]])
-            count_ages = np.bincount(ages)
-            if len(count_ages) < len(age_dist_data['PopTotal'].values):
+            ages = np.array([int(i) for i in self.age[alive_inds]]) # Return ages for everyone level 0 and alive
+            count_ages = np.bincount(ages) # Bin and count them
+            if len(count_ages) < len(age_dist_data['PopTotal'].values): # Make sure we add zeros for old ages that arent represented here
                 diff = len(age_dist_data['PopTotal'].values) - len(count_ages)
                 count_ages = np.append(count_ages, [0]*diff)
-            expected = (age_dist_data['PopTotal'].values*scale)
-            difference = np.array([int(i) for i in (expected - count_ages)])
-            n_migrate = np.sum(difference)
+            expected = (age_dist_data['PopTotal'].values*scale) # Compute how many of each age we would expect in population
+            difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
+            n_migrate = np.sum(difference) # Compute total migrations (in and out)
 
-            ages_to_remove = hpu.true(difference<0)
-            n_to_remove = [int(i) for i in difference[ages_to_remove]]
-            ages_to_add = hpu.true(difference>0)
-            n_to_add = [int(i) for i in difference[ages_to_add]]
-            ages_to_add_list = sc.autolist()
+            ages_to_remove = hpu.true(difference<0) # Ages where we have too many, need to apply emigration
+            n_to_remove = [int(i) for i in difference[ages_to_remove]] # Determine number of agents to remove for each age
+            ages_to_add = hpu.true(difference>0) # Ages where we have too few, need to apply imigration
+            n_to_add = [int(i) for i in difference[ages_to_add]] # Determine number of agents to add for each age
+            ages_to_add_list = sc.autolist() # Construct list of ages to give to add_births
             for i, n_add in enumerate(n_to_add):
                 to_add = [ages_to_add[i]]*n_add
                 ages_to_add_list += to_add
             self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list))
 
-            for ind, diff in enumerate(n_to_remove):
+            for ind, diff in enumerate(n_to_remove): #TODO: is there a faster way to do this than in a for loop?
                 age = ages_to_remove[ind]
                 alive_inds = np.array([i for i, j in enumerate(ages) if j == age])
                 inds = hpu.choose(len(alive_inds), -diff)
