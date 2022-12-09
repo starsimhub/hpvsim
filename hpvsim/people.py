@@ -757,6 +757,9 @@ class People(hpb.BasePeople):
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
             alive_inds = hpu.true(self.alive_level0)
+            n_alive = len(alive_inds)
+            expected_old = np.interp(year, data_years, data_pop) * scale
+            n_migrate_old = int(expected_old - n_alive)
             ages = np.array([int(i) for i in self.age[alive_inds]]) # Return ages for everyone level 0 and alive
             count_ages = np.bincount(ages) # Bin and count them
             if len(count_ages) < len(age_dist_data['PopTotal'].values): # Make sure we add zeros for old ages that arent represented here
@@ -765,6 +768,7 @@ class People(hpb.BasePeople):
             expected = (age_dist_data['PopTotal'].values*scale) # Compute how many of each age we would expect in population
             difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
             n_migrate = np.sum(difference) # Compute total migrations (in and out)
+            print(f'old method has {n_migrate_old} migrations, new method has {n_migrate}')
 
             ages_to_remove = hpu.true(difference<0) # Ages where we have too many, need to apply emigration
             n_to_remove = [int(i) for i in difference[ages_to_remove]] # Determine number of agents to remove for each age
