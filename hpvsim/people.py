@@ -759,29 +759,29 @@ class People(hpb.BasePeople):
             alive_inds = hpu.true(self.alive_level0)
             ages = np.array([int(i) for i in self.age[alive_inds]])
             count_ages = np.bincount(ages)
-            expected = (age_dist_data['PopTotal'].values*scale)[0:len(count_ages)]
-            difference = expected - count_ages
+            if len(count_ages) < len(age_dist_data['PopTotal'].values):
+                diff = len(age_dist_data['PopTotal'].values) - len(count_ages)
+                count_ages = np.append(count_ages, [0]*diff)
+            expected = (age_dist_data['PopTotal'].values*scale)
+            difference = np.array([int(i) for i in (expected - count_ages)])
             n_migrate = np.sum(difference)
 
-            for age, diff in enumerate(difference):
+            ages_to_remove = hpu.true(difference<0)
+            n_to_remove = [int(i) for i in difference[ages_to_remove]]
+            ages_to_add = hpu.true(difference>0)
+            n_to_add = [int(i) for i in difference[ages_to_add]]
+            ages_to_add_list = sc.autolist()
+            for i, n_add in enumerate(n_to_add):
+                to_add = [ages_to_add[i]]*n_add
+                ages_to_add_list += to_add
+            self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list))
+
+            for ind, diff in enumerate(n_to_remove):
+                age = ages_to_remove[ind]
                 alive_inds = np.array([i for i, j in enumerate(ages) if j == age])
-                diff = int(diff)
-                if diff < 0: # need to remove people of this age
-                    inds = hpu.choose(len(alive_inds), -diff)
-                    migrate_inds = alive_inds[inds]
-                    self.remove_people(migrate_inds, cause='emigration')  # Remove people
-                elif diff > 0: # need to add people of this age
-                    if diff > len(alive_inds): # don't have enough people to sample from
-                        if len(alive_inds):
-                            immunity = self.imm[:, alive_inds]
-                            self.add_births(new_births=len(alive_inds), ages=age, immunity=immunity)
-                        diff -= len(alive_inds)
-                        immunity = None
-                    else:
-                        inds = hpu.choose(len(alive_inds), diff)
-                        migrate_inds = alive_inds[inds]  # Pull out indices of agents whose ages should be duplicated
-                        immunity = self.imm[:, migrate_inds]
-                    self.add_births(new_births=diff, ages=age, immunity=immunity)
+                inds = hpu.choose(len(alive_inds), -diff)
+                migrate_inds = alive_inds[inds]
+                self.remove_people(migrate_inds, cause='emigration')  # Remove people
 
         else:
             n_migrate = 0

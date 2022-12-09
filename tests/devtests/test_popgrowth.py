@@ -31,7 +31,6 @@ for label, mig in {'With migration': True}.items():
 
     sim = hpv.Sim(pars, label=label)
     sim.run()
-    sim.plot(to_plot=['migration'])
     factor=1e6
     years = sim.results['year']  # + 1 since update happens before analyzer
     pop = sim.results['n_alive'].values / factor
