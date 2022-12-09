@@ -46,7 +46,7 @@ class People(hpb.BasePeople):
     
     #%% Basic methods
 
-    def __init__(self, pars, strict=True, pop_trend=None, **kwargs):
+    def __init__(self, pars, strict=True, pop_trend=None, pop_age_trend=None, **kwargs):
 
         # Initialize the BasePeople, which also sets things up for filtering
         super().__init__(pars)
@@ -55,6 +55,7 @@ class People(hpb.BasePeople):
 
         # Other initialization
         self.pop_trend = pop_trend
+        self.pop_age_trend = pop_age_trend
         self.init_contacts() # Initialize the contacts
         self.infection_log = [] # Record of infections - keys for ['source','target','date','layer']
 
@@ -741,6 +742,8 @@ class People(hpb.BasePeople):
             data_pop = self.pop_trend.pop_size.values
             data_min = data_years[0]
             data_max = data_years[-1]
+            age_dist_data = self.pop_age_trend[self.pop_age_trend.year == int(year)]
+
 
             # No migration if outside the range of the data
             if year < data_min:
@@ -755,23 +758,23 @@ class People(hpb.BasePeople):
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
             alive_inds = hpu.true(self.alive_level0)
-            n_alive = len(alive_inds) # Actual number of alive agents
-            expected = np.interp(year, data_years, data_pop)*scale
-            n_migrate = int(expected - n_alive)
+            ages = np.array([int(i) for i in self.age[alive_inds]])
+            count_ages = np.bincount(ages)
+            expected = (age_dist_data['PopTotal'].values*scale)[0:len(count_ages)]
+            difference = expected - count_ages
 
-            # Apply emigration
-            if n_migrate < 0:
-                inds = hpu.choose(n_alive, -n_migrate)
-                migrate_inds = alive_inds[inds]
-                self.remove_people(migrate_inds, cause='emigration') # Remove people
+            for age, diff in difference:
+                alive_inds =  [i for i, j in enumerate(ages) if j == age]
+                if diff < 0:
+                    inds = hpu.choose(len(alive_inds), -diff)
+                    migrate_inds = alive_inds[inds]
+                    self.remove_people(migrate_inds, cause='emigration')  # Remove people
+                elif diff > 0:
+                    inds = hpu.choose(len(alive_inds), diff)  # Randomly sample existing people in the population
+                    migrate_inds = alive_inds[inds]  # Pull out indices of agents whose ages should be duplicated
+                    immunity = self.imm[:, migrate_inds]
+                    self.add_births(new_births=diff, ages=age, immunity=immunity)
 
-            # Apply immigration
-            elif n_migrate > 0:
-                inds = hpu.choose(n_alive, n_migrate) # Randomly sample existing people in the population
-                age_inds = alive_inds[inds] # Pull out indices of agents whose ages should be duplicated
-                ages = self.age[age_inds] # Pull out those ages
-                immunity = self.imm[:,age_inds]
-                self.add_births(new_births=n_migrate, ages=ages, immunity=immunity)
 
         else:
             n_migrate = 0
