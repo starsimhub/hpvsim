@@ -9,18 +9,18 @@ import hpvsim as hpv
 sc.options(dpi=150, font='monospace')
 
 
-loc = 'india'
+loc = 'nigeria'
 df = hpv.data.get_total_pop(loc)
 
 
 # for label,mig in {'No migration':False, 'With migration':True}.items():
 for label, mig in {'With migration': True}.items():
     pars = dict(
-        n_agents = round(df.pop_size[0]/10e3),
+        n_agents = round(df.pop_size[0]/1e3),
         start = df.year[0],
         end = 2030,
         location = loc,
-        pop_scale = 10e3,
+        pop_scale = 1e3,
         # genotypes = [],
         beta = 0.1,
         dt = 0.5,
@@ -31,6 +31,7 @@ for label, mig in {'With migration': True}.items():
 
     sim = hpv.Sim(pars, label=label)
     sim.run()
+    sim.plot(to_plot=['migration'])
     factor=1e6
     years = sim.results['year']  # + 1 since update happens before analyzer
     pop = sim.results['n_alive'].values / factor
