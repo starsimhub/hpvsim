@@ -768,7 +768,7 @@ class People(hpb.BasePeople):
             expected = (age_dist_data['PopTotal'].values*scale) # Compute how many of each age we would expect in population
             difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
             n_migrate = np.sum(difference) # Compute total migrations (in and out)
-            print(f'old method has {n_migrate_old} migrations, new method has {n_migrate}')
+            print(f'old method has {n_migrate_old} migrations, new method has {n_migrate} migrations, difference of {abs(n_migrate_old-n_migrate)}')
 
             ages_to_remove = hpu.true(difference<0) # Ages where we have too many, need to apply emigration
             n_to_remove = [int(i) for i in difference[ages_to_remove]] # Determine number of agents to remove for each age
