@@ -689,7 +689,7 @@ class People(hpb.BasePeople):
         return other_deaths, deaths_female, deaths_male
 
 
-    def add_births(self, year=None, new_births=None, ages=0):
+    def add_births(self, year=None, new_births=None, ages=0, immunity=None):
         '''
         Add more people to the population
 
@@ -718,6 +718,10 @@ class People(hpb.BasePeople):
             self.sex[new_inds]        = sexes
             self.debut[new_inds]      = debuts
             self.partners[:,new_inds] = partners
+
+            if immunity is not None:
+                self.imm[:,new_inds] = immunity
+
 
         return new_births*self.pars['pop_scale'] # These are not indices, so they scale differently
 
@@ -766,7 +770,8 @@ class People(hpb.BasePeople):
                 inds = hpu.choose(n_alive, n_migrate) # Randomly sample existing people in the population
                 age_inds = alive_inds[inds] # Pull out indices of agents whose ages should be duplicated
                 ages = self.age[age_inds] # Pull out those ages
-                self.add_births(new_births=n_migrate, ages=ages)
+                immunity = self.imm[:,age_inds]
+                self.add_births(new_births=n_migrate, ages=ages, immunity=immunity)
 
         else:
             n_migrate = 0
