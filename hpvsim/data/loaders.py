@@ -208,7 +208,7 @@ def get_age_distribution_over_time(location=None):
     # Extract the age distribution for the given location and year
     full_df = map_entries(df, location)[location]
     result = full_df.rename(columns={'Time':'year', 'AgeGrpStart': 'age'})
-    result['PopTotal'] *= 1e3
+    result['PopTotal'] *= 1e3 # reported as per 1,000
 
     return result
 
