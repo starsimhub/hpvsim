@@ -435,7 +435,8 @@ class Sim(hpb.BaseSim):
         for stock in hpd.PeopleMeta.stock_states:
             results[f'n_{stock.name}']              = init_res(stock.label, color=stock.color)
             results[f'n_{stock.name}_by_genotype']  = init_res(stock.label+' by genotype', n_rows=ng)
-            results[f'n_{stock.name}_by_age']       = init_res(stock.label+' by age', n_rows=na, color=stock.color)
+        # Only by-age stock result we will need is number infectious, for HPV prevalence calculations
+        results[f'n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
 
         # Create incidence and prevalence results
         for var,name,color in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
@@ -820,15 +821,16 @@ class Sim(hpb.BaseSim):
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == self.resfreq-1:
 
+            # Number infectious by age, for prevalence calculations
+            infinds = hpu.true(people['infectious'])
+            self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bins, weights=people.scale[infinds])[0]
+
             # Create total stocks
             for key in hpd.total_stock_keys:
 
                 # Stocks by genotype
                 for g in range(ng):
                     self.results[f'n_{key}_by_genotype'][g, idx] = people.count_by_genotype(key, g)
-                # Stocks by age
-                inds = hpu.true(people[key])
-                self.results[f'n_{key}_by_age'][:, idx] = np.histogram(people.age[inds], bins=people.age_bins, weights=people.scale[inds])[0]
 
                 # Total stocks
                 if key not in ['susceptible']:
