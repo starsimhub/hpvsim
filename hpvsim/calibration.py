@@ -707,7 +707,7 @@ class Calibration(sc.prettyobj):
                 values = []
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
-                ax.scatter(x, ydata, color=self.result_properties[resname].color[0], marker='s', label='Data')
+                ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
