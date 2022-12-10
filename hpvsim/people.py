@@ -782,9 +782,9 @@ class People(hpb.BasePeople):
 
             for ind, diff in enumerate(n_to_remove): #TODO: is there a faster way to do this than in a for loop?
                 age = ages_to_remove[ind]
-                alive_inds = np.array([i for i, j in enumerate(ages) if j == age])
-                inds = hpu.choose(len(alive_inds), -diff)
-                migrate_inds = alive_inds[inds]
+                alive_this_age_inds = np.array([i for i, j in enumerate(ages) if j == age])
+                inds = hpu.choose(len(alive_this_age_inds), -diff)
+                migrate_inds = alive_inds[alive_this_age_inds[inds]]
                 self.remove_people(migrate_inds, cause='emigration')  # Remove people
 
         else:
