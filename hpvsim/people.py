@@ -672,8 +672,8 @@ class People(hpb.BasePeople):
         death_probs = np.empty(len(self), dtype=hpd.default_float)
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
-        mx_f = death_pars[nearest_year]['f'][:,1]
-        mx_m = death_pars[nearest_year]['m'][:,1]
+        mx_f = death_pars[nearest_year]['f'][:,1]*self.pars['dt_demog']
+        mx_m = death_pars[nearest_year]['m'][:,1]*self.pars['dt_demog']
 
         death_probs[self.is_female] = mx_f[age_inds[self.is_female]]
         death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
@@ -704,7 +704,7 @@ class People(hpb.BasePeople):
         if new_births is None:
             years = self.pars['birth_rates'][0]
             rates = self.pars['birth_rates'][1]
-            this_birth_rate = self.pars['rel_birth']*np.interp(year, years, rates)/1e3
+            this_birth_rate = self.pars['rel_birth']*np.interp(year, years, rates)*self.pars['dt_demog']/1e3
             new_births = sc.randround(this_birth_rate*self.n_alive_level0) # Crude births per 1000
 
         if new_births>0:
@@ -765,7 +765,7 @@ class People(hpb.BasePeople):
             if len(count_ages) < len(age_dist_data['PopTotal'].values): # Make sure we add zeros for old ages that arent represented here
                 diff = len(age_dist_data['PopTotal'].values) - len(count_ages)
                 count_ages = np.append(count_ages, [0]*diff)
-            expected = (age_dist_data['PopTotal'].values*scale) # Compute how many of each age we would expect in population
+            expected = age_dist_data['PopTotal'].values*scale # Compute how many of each age we would expect in population
             difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
             n_migrate = np.sum(difference) # Compute total migrations (in and out)
             # print(f'old method has {n_migrate_old} migrations, new method has {n_migrate} migrations, difference of {abs(n_migrate_old-n_migrate)}')
