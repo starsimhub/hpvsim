@@ -382,6 +382,7 @@ class Calibration(sc.prettyobj):
         if self.extra_sim_results:
             for rkey in self.extra_sim_results_keys:
                 model_output = sim.results[rkey]
+                extra_sim_results[rkey] = model_output
 
         # Store results in temporary files (TODO: consider alternatives)
         if save:
