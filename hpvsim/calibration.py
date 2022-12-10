@@ -594,7 +594,7 @@ class Calibration(sc.prettyobj):
         if sc.isstring(plot_type) and plot_type.startswith('sns'):
             import seaborn as sns
             if plot_type.split('.')[1]=='boxplot':
-                extra_args=dict(boxprops=dict(alpha=.3))
+                extra_args=dict(boxprops=dict(alpha=.3), showfliers=False)
             else: extra_args = dict()
             plot_func = getattr(sns, plot_type.split('.')[1])
         else:
