@@ -763,10 +763,7 @@ class People(hpb.BasePeople):
             expected_old = np.interp(year, data_years, data_pop) * scale
             n_migrate_old = int(expected_old - n_alive)
             ages = self.age[alive_inds].astype(int) # Return ages for everyone level 0 and alive
-            count_ages = np.bincount(ages) # Bin and count them
-            if len(count_ages) < len(age_dist_data['PopTotal'].values): # Make sure we add zeros for old ages that arent represented here
-                diff = len(age_dist_data['PopTotal'].values) - len(count_ages)
-                count_ages = np.append(count_ages, [0]*diff)
+            count_ages = np.bincount(ages, minlength=age_dist_data.shape[0]) # Bin and count them
             expected = age_dist_data['PopTotal'].values*scale # Compute how many of each age we would expect in population
             difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
             n_migrate = np.sum(difference) # Compute total migrations (in and out)
@@ -776,10 +773,7 @@ class People(hpb.BasePeople):
             n_to_remove = [int(i) for i in difference[ages_to_remove]] # Determine number of agents to remove for each age
             ages_to_add = hpu.true(difference>0) # Ages where we have too few, need to apply imigration
             n_to_add = [int(i) for i in difference[ages_to_add]] # Determine number of agents to add for each age
-            ages_to_add_list = sc.autolist() # Construct list of ages to give to add_births
-            for i, n_add in enumerate(n_to_add):
-                to_add = [ages_to_add[i]]*n_add
-                ages_to_add_list += to_add
+            ages_to_add_list = np.repeat(ages_to_add, n_to_add)
             self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list))
 
             for ind, diff in enumerate(n_to_remove): #TODO: is there a faster way to do this than in a for loop?
