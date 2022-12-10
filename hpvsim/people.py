@@ -762,7 +762,7 @@ class People(hpb.BasePeople):
             n_alive = len(alive_inds)
             expected_old = np.interp(year, data_years, data_pop) * scale
             n_migrate_old = int(expected_old - n_alive)
-            ages = np.array([int(i) for i in self.age[alive_inds]]) # Return ages for everyone level 0 and alive
+            ages = self.age[alive_inds].astype(int) # Return ages for everyone level 0 and alive
             count_ages = np.bincount(ages) # Bin and count them
             if len(count_ages) < len(age_dist_data['PopTotal'].values): # Make sure we add zeros for old ages that arent represented here
                 diff = len(age_dist_data['PopTotal'].values) - len(count_ages)
