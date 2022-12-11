@@ -73,7 +73,7 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, genotypes=[16], network='random', beta=0.05, eff_condoms=0.6)
+    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, genotypes=[16], beta=0.05, verbose=0, eff_condoms=0.6)
     sim = hpv.Sim(pars=base_pars)
     sim.initialize()
 
@@ -98,12 +98,12 @@ def test_epi():
     for par_effect in par_effects:
     # for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
         if par_effect.par=='acts':
-            bp = sc.dcp(sim[par_effect.par]['a'])
-            lo = {'a':{**bp, 'par1': par_effect.range[0]}}
-            hi = {'a':{**bp, 'par1': par_effect.range[1]}}
+            bp = sc.dcp(sim[par_effect.par]['c'])
+            lo = {lk:{**bp, 'par1': par_effect.range[0]} for lk in ['m','c','o']}
+            hi = {lk:{**bp, 'par1': par_effect.range[1]} for lk in ['m','c','o']}
         elif par_effect.par=='condoms':
-            lo = {'a':par_effect.range[0]}
-            hi = {'a':par_effect.range[1]}
+            lo = {lk:par_effect.range[0] for lk in ['m','c','o']}
+            hi = {lk:par_effect.range[1] for lk in ['m','c','o']}
         elif par_effect.par=='debut':
             bp = sc.dcp(sim[par_effect.par]['f'])
             lo = {sk:{**bp, 'par1':par_effect.range[0]} for sk in ['f','m']}
@@ -130,7 +130,7 @@ def test_epi():
         # Check results
         v0 = s0.results[par_effect.variable][:].sum()
         v1 = s1.results[par_effect.variable][:].sum()
-        print(f'Checking {par_effect.variable:20s} ... ', end='')
+        print(f'Checking {par_effect.variable:10s} with varying {par_effect.par:10s} ... ', end='')
         assert v0 <= v1, f'Expected {par_effect.variable} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
         print(f'✓ ({v0} <= {v1})')
 
