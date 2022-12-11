@@ -9,9 +9,9 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
-Version 0.4.6 (2022-12-06)
+Version 0.4.6 (2022-12-12)
 --------------------------
-- Changes to several default parameters: use_multiscale is now True by default; default genotypes are now 16, 18, and other high-risk; and default hpv control prob is now 0.
+- Changes to several default parameters: default genotypes are now 16, 18, and other high-risk; and default hpv control prob is now 0.
  - Results now capture infections by age and type distributions.
 - Adds age of cancer to analyzer
 - Changes to default plotting styles
