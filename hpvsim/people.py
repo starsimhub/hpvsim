@@ -46,7 +46,7 @@ class People(hpb.BasePeople):
     
     #%% Basic methods
 
-    def __init__(self, pars, strict=True, pop_trend=None, **kwargs):
+    def __init__(self, pars, strict=True, pop_trend=None, pop_age_trend=None, **kwargs):
 
         # Initialize the BasePeople, which also sets things up for filtering
         super().__init__(pars)
@@ -55,6 +55,7 @@ class People(hpb.BasePeople):
 
         # Other initialization
         self.pop_trend = pop_trend
+        self.pop_age_trend = pop_age_trend
         self.init_contacts() # Initialize the contacts
         self.ng = self.pars['n_genotypes']
         self.na = len(self.pars['age_bins'])-1
@@ -680,6 +681,8 @@ class People(hpb.BasePeople):
         NB people are not actually removed to avoid issues with indices
         '''
 
+        if self.t == 0:
+            np.random.rand()
         death_pars = self.pars['death_rates']
         all_years = np.array(list(death_pars.keys()))
         base_year = all_years[0]
@@ -688,8 +691,8 @@ class People(hpb.BasePeople):
         death_probs = np.empty(len(self), dtype=hpd.default_float)
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
-        mx_f = death_pars[nearest_year]['f'][:,1]
-        mx_m = death_pars[nearest_year]['m'][:,1]
+        mx_f = death_pars[nearest_year]['f'][:,1]*self.pars['dt_demog']
+        mx_m = death_pars[nearest_year]['m'][:,1]*self.pars['dt_demog']
 
         death_probs[self.is_female] = mx_f[age_inds[self.is_female]]
         death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
@@ -706,7 +709,7 @@ class People(hpb.BasePeople):
         return other_deaths, deaths_female, deaths_male
 
 
-    def add_births(self, year=None, new_births=None, ages=0):
+    def add_births(self, year=None, new_births=None, ages=0, immunity=None):
         '''
         Add more people to the population
 
@@ -720,7 +723,7 @@ class People(hpb.BasePeople):
         if new_births is None:
             years = self.pars['birth_rates'][0]
             rates = self.pars['birth_rates'][1]
-            this_birth_rate = self.pars['rel_birth']*np.interp(year, years, rates)/1e3
+            this_birth_rate = self.pars['rel_birth']*np.interp(year, years, rates)*self.pars['dt_demog']/1e3
             new_births = sc.randround(this_birth_rate*self.n_alive_level0) # Crude births per 1000
 
         if new_births>0:
@@ -735,6 +738,10 @@ class People(hpb.BasePeople):
             self.sex[new_inds]        = sexes
             self.debut[new_inds]      = debuts
             self.partners[:,new_inds] = partners
+
+            if immunity is not None:
+                self.imm[:,new_inds] = immunity
+
 
         return new_births*self.pars['pop_scale'] # These are not indices, so they scale differently
 
@@ -754,6 +761,7 @@ class People(hpb.BasePeople):
             data_pop = self.pop_trend.pop_size.values
             data_min = data_years[0]
             data_max = data_years[-1]
+            age_dist_data = self.pop_age_trend[self.pop_age_trend.year == int(year)]
 
             # No migration if outside the range of the data
             if year < data_min:
@@ -768,22 +776,29 @@ class People(hpb.BasePeople):
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
             alive_inds = hpu.true(self.alive_level0)
-            n_alive = len(alive_inds) # Actual number of alive agents
-            expected = np.interp(year, data_years, data_pop)*scale
-            n_migrate = int(expected - n_alive)
+            n_alive = len(alive_inds)
+            expected_old = np.interp(year, data_years, data_pop) * scale
+            n_migrate_old = int(expected_old - n_alive)
+            ages = self.age[alive_inds].astype(int) # Return ages for everyone level 0 and alive
+            count_ages = np.bincount(ages, minlength=age_dist_data.shape[0]) # Bin and count them
+            expected = age_dist_data['PopTotal'].values*scale # Compute how many of each age we would expect in population
+            difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
+            n_migrate = np.sum(difference) # Compute total migrations (in and out)
+            # print(f'old method has {n_migrate_old} migrations, new method has {n_migrate} migrations, difference of {abs(n_migrate_old-n_migrate)}')
 
-            # Apply emigration
-            if n_migrate < 0:
-                inds = hpu.choose(n_alive, -n_migrate)
-                migrate_inds = alive_inds[inds]
-                self.remove_people(migrate_inds, cause='emigration') # Remove people
+            ages_to_remove = hpu.true(difference<0) # Ages where we have too many, need to apply emigration
+            n_to_remove = [int(i) for i in difference[ages_to_remove]] # Determine number of agents to remove for each age
+            ages_to_add = hpu.true(difference>0) # Ages where we have too few, need to apply imigration
+            n_to_add = [int(i) for i in difference[ages_to_add]] # Determine number of agents to add for each age
+            ages_to_add_list = np.repeat(ages_to_add, n_to_add)
+            self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list))
 
-            # Apply immigration
-            elif n_migrate > 0:
-                inds = hpu.choose(n_alive, n_migrate) # Randomly sample existing people in the population
-                age_inds = alive_inds[inds] # Pull out indices of agents whose ages should be duplicated
-                ages = self.age[age_inds] # Pull out those ages
-                self.add_births(new_births=n_migrate, ages=ages)
+            for ind, diff in enumerate(n_to_remove): #TODO: is there a faster way to do this than in a for loop?
+                age = ages_to_remove[ind]
+                alive_this_age_inds = np.where(ages==age)[0]
+                inds = hpu.choose(len(alive_this_age_inds), -diff)
+                migrate_inds = alive_inds[alive_this_age_inds[inds]]
+                self.remove_people(migrate_inds, cause='emigration')  # Remove people
 
         else:
             n_migrate = 0

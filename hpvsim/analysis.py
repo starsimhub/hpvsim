@@ -784,7 +784,7 @@ class age_results(Analyzer):
                         if 'incidence' in result:
                             # Need to divide by the right denominator
                             if 'hpv' in result:  # Denominator is susceptible population
-                                denom = bin_ages(inds=ppl.sus_pool, bins=bins)
+                                denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
                             else:  # Denominator is females at risk for cancer
                                 inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
                                 denom = bin_ages(inds, bins) / 1e5  # CIN and cancer are per 100,000 women
