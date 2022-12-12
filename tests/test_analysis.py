@@ -80,11 +80,11 @@ def test_age_results(do_plot=True):
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            hpv_incidence=sc.objdict(
+            infections=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
             ),
-            total_cancer_incidence=sc.objdict(
+            cancer_incidence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
             ),
@@ -96,27 +96,11 @@ def test_age_results(do_plot=True):
     )
 
     sim = hpv.Sim(pars, genotypes=[16, 18], analyzers=[az1])
-
     sim.run()
-    a = sim.get_analyzer(0)
-
-    to_plot = {
-        'HPV prevalence': [
-            'hpv_prevalence',
-        ],
-        'Cervical cancer incidence': [
-            'total_cancer_incidence',
-        ],
-        'Cervical cancer mortality': [
-            'cancer_mortality',
-        ],
-    }
+    a = sim.get_analyzer('age_results')
 
     # Check plot()
-    if do_plot:
-        sim.plot(to_plot=to_plot)
-        fig0 = sim.get_analyzer(0).plot()
-        # fig1 = sim.get_analyzer(1).plot()
+    if do_plot: a.plot()
 
     return sim, a
 
@@ -140,14 +124,12 @@ def test_reduce_analyzers():
 
         az = hpv.age_results(
             result_keys=sc.objdict(
-                total_cancer_incidence=sc.objdict(
+                cancer_incidence=sc.objdict(
                     timepoints=['2020'],
-                    # datafile=f'test_data/{location}_cancer_cases.csv',
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 ),
                 cancer_mortality=sc.objdict(
                     timepoints=['2020'],
-                    # datafile=f'test_data/{location}_cancer_deaths.csv',
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 )
             )
@@ -160,9 +142,9 @@ def test_reduce_analyzers():
 
         sim.run()
 
-        age_pyr = sim.get_analyzer(0)
+        age_pyr = sim.get_analyzer('age_pyramid')
         age_pyramids.append(age_pyr)
-        age_res = sim.get_analyzer(1)
+        age_res = sim.get_analyzer('age_results')
         age_results.append(age_res)
 
     # reduced_analyzer = hpv.age_pyramid.reduce(age_pyramids)
@@ -171,7 +153,7 @@ def test_reduce_analyzers():
     return sim, reduced_analyzer
 
 
-def test_age_causal_analyzer():
+def test_age_causal_analyzer(do_plot=True):
     sc.heading('Test age causal infection analyzer')
 
     pars = {
@@ -193,21 +175,21 @@ def test_age_causal_analyzer():
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
 
-    sim = hpv.Sim(pars=pars, analyzers=[hpv.age_causal_infection(start_year=2000)])
+    sim = hpv.Sim(pars=pars, analyzers=hpv.age_causal_infection(start_year=2000))
     sim.run()
-    a = sim.get_analyzer(hpv.age_causal_infection)
 
-    plt.figure()
-
+    a = sim.get_analyzer('age_causal_infection')
     count, bins_count = np.histogram(a.age_causal, bins=10)
     pdf = count / sum(count)
     cdf = np.cumsum(pdf)
-    plt.plot(bins_count[1:], cdf)
 
-    plt.title('Distribution of age of causal HPV infection')
-    plt.legend()
-    plt.xlabel('Age')
-    plt.show()
+    if do_plot:
+        plt.figure()
+        plt.plot(bins_count[1:], cdf)
+        plt.title('Distribution of age of causal HPV infection')
+        plt.legend()
+        plt.xlabel('Age')
+        plt.show()
 
     return sim, a
 
@@ -225,7 +207,7 @@ def test_detection():
         'dt': 1.,
     }
 
-    sim = hpv.Sim(pars=pars, analyzers=[hpv.cancer_detection()])
+    sim = hpv.Sim(pars=pars, analyzers='cancer_detection')
     sim.run()
     a = sim.get_analyzer(hpv.cancer_detection)
 

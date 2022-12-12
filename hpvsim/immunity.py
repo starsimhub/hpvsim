@@ -149,7 +149,8 @@ def check_immunity(people):
 
     '''
     immunity = people.pars['immunity'] # cross-immunity/own-immunity scalars to be applied to immunity level
-    people.sus_imm[:] = np.dot(immunity,people.imm) # Dot product gives immunity to all genotypes
+    sus_imm = np.dot(immunity,people.imm) # Dot product gives immunity to all genotypes
+    people.sus_imm[:] = np.minimum(sus_imm, np.ones_like(sus_imm)) # Don't let this be above 1
     return
 
 

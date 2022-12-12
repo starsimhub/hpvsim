@@ -191,6 +191,23 @@ class Result(object):
         return len(self.values)
 
 
+    def __sum__(self):
+        ''' To allow sum(result) instead of result.values.sum() '''
+        return self.values.sum()
+
+    # Numpy methods
+    def sum(self):
+        ''' To allow result.sum() instead of result.values.sum() '''
+        return self.values.sum()
+
+    def mean(self):
+        ''' To allow result.mean() instead of result.values.mean() '''
+        return self.values.mean()
+
+    def median(self):
+        ''' To allow result.median() instead of result.values.median() '''
+        return self.values.median()
+
     @property
     def npts(self):
         return len(self.values)
@@ -233,8 +250,8 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['total_infections']
-                cancers = self.summary['total_cancers']
+                infections = self.results['infections'].sum()
+                cancers = self.results['cancers'].sum()
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
@@ -401,21 +418,54 @@ class BaseSim(ParsObj):
 
         '''
         keys = []
-        choices = ['total', 'genotype', 'all', 'by_sex', 'by_age']
-        if which in ['all']:
-            keys = [k for k,res in self.results.items() if isinstance(res, Result)]
-        elif which in ['total']:
+        subchoices = ['total', 'genotype', 'sex', 'age', 'type_dist']
+        if which in ['total']:
             keys = [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
-        elif which in ['by_sex']:
+        elif which in ['sex']:
             keys = [k for k, res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
-        elif which in ['by_age']:
+        elif which in ['age']:
             keys = [k for k, res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
         elif which in ['genotype']:
-            keys = [k for k,res in self.results.items() if (res[:].ndim>1) and ('by_sex' not in k) and ('by_age' not in k) and isinstance(res, Result)]
+            keys = [k for k,res in self.results.items() if 'by_genotype' in k and isinstance(res, Result)]
+        elif which in ['type_dist']:
+            keys = [k for k, res in self.results.items() if 'genotype_shares' in k and isinstance(res, Result)]
+        elif which =='all':
+            keys = []
+            for subchoice in subchoices: # Recurse over options
+                keys += self.result_keys(subchoice)
         else:
-            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(choices)}'
+            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(subchoices+["all"])}'
             raise ValueError(errormsg)
         return keys
+
+
+    def result_types(self, reskeys):
+        '''
+        Figure out what kind of result it is, which determines what plotting style to use
+        '''
+
+        # If it's a single item, make it a list but remember to return a single item
+        return_list = True
+        if isinstance(reskeys, str):
+            return_list = False
+            reskeys = sc.tolist(reskeys)
+
+        # Construct list of result types
+        result_types = sc.autolist()
+        for rkey in reskeys:
+            for type_option in ['total', 'genotype', 'sex', 'age', 'type_dist']:
+                if rkey in self.result_keys(type_option):
+                    result_types += type_option
+
+        # Check that each result is of exactly one type
+        if len(result_types) != len(reskeys):
+            errormsg = f"Can't determine unique result types for result_keys {reskeys}."
+            raise ValueError(errormsg)
+
+        if return_list:
+            return result_types
+        else:
+            return result_types[0]
 
 
     def copy(self):
@@ -727,7 +777,7 @@ class BaseSim(ParsObj):
             errormsg = f'This method is only defined for interventions and analyzers, not "{which}"'
             raise ValueError(errormsg)
 
-        ia_list = sc.tolist(self.pars[which]) # List of interventions or analyzers
+        ia_list = sc.tolist(self.analyzers if which=='analyzers' else self.interventions) # List of interventions or analyzers
         n_ia = len(ia_list) # Number of interventions/analyzers
 
         if label == 'summary': # Print a summary of the interventions
@@ -1336,9 +1386,9 @@ class BasePeople(FlexPretty):
     def latent(self):
         '''
         Boolean array of everyone with latent infection. By definition, these
-        people have no dysplasia and inactive infection status.
+        people have no dysplasia, no cancer, and inactive infection status.
         '''
-        return (self.inactive * self.no_dysp).astype(bool)
+        return (self.inactive * self.no_dysp * ~self.cancerous.any(axis=0)).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''

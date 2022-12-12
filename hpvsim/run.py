@@ -262,7 +262,10 @@ class MultiSim(hpb.FlexPretty):
 
         totalkeys = reduced_sim.result_keys('total')
         genotypekeys = reduced_sim.result_keys('genotype')
-        sexkeys = reduced_sim.result_keys('by_sex')
+        sexkeys = reduced_sim.result_keys('sex')
+        agekeys = reduced_sim.result_keys('age')
+        type_dist_keys = reduced_sim.result_keys('type_dist')
+        n_age_bins = len(reduced_sim['age_bins'])-1
 
         for reskey in totalkeys:
             raw[reskey] = np.zeros((reduced_sim.res_npts, len(self.sims)))
@@ -279,8 +282,18 @@ class MultiSim(hpb.FlexPretty):
             for s,sim in enumerate(self.sims):
                 vals = sim.results[reskey].values
                 raw[reskey][:, :, s] = vals
+        for reskey in agekeys:
+            raw[reskey] = np.zeros((n_age_bins, reduced_sim.res_npts, len(self.sims)))
+            for s,sim in enumerate(self.sims):
+                vals = sim.results[reskey].values
+                raw[reskey][:, :, s] = vals
+        for reskey in type_dist_keys:
+            raw[reskey] = np.zeros((reduced_sim['n_genotypes'], reduced_sim.res_npts, len(self.sims)))
+            for s,sim in enumerate(self.sims):
+                vals = sim.results[reskey].values
+                raw[reskey][:, :, s] = vals
 
-        for reskey in totalkeys + genotypekeys + sexkeys:
+        for reskey in totalkeys + genotypekeys + sexkeys + agekeys + type_dist_keys:
             if reskey in totalkeys:
                 axis = 1
                 results = reduced_sim.results
@@ -297,7 +310,6 @@ class MultiSim(hpb.FlexPretty):
                 results[reskey].values[:] = np.quantile(raw[reskey], q=0.5, axis=axis)
                 results[reskey].low = np.quantile(raw[reskey], q=quantiles['low'], axis=axis)
                 results[reskey].high = np.quantile(raw[reskey], q=quantiles['high'], axis=axis)
-
 
         # Deal with analyzers
         reduced_analyzers = []
@@ -999,7 +1011,9 @@ class Scenarios(hpb.ParsObj):
 
         totalkeys   = self.result_keys('total')
         genotypekeys = self.result_keys('genotype')
-        sexkeys = self.result_keys('by_sex')
+        sexkeys = self.result_keys('sex')
+        agekeys = self.result_keys('age')
+        type_dist_keys = self.result_keys('type_dist')
 
         # Loop over scenarios
         for scenkey,scen in self.scenarios.items():
@@ -1047,17 +1061,22 @@ class Scenarios(hpb.ParsObj):
             # Process the simulations
             print_heading(f'Processing {scenkey}')
             ng = scen_sims[0]['n_genotypes'] # Get number of genotypes
+            na = len(scen_sims[0]['age_bins'])-1 # Get number of age bins
             scenraw = {}
             for reskey in totalkeys:
                 scenraw[reskey] = np.zeros((self.res_npts, len(scen_sims)))
                 for s,sim in enumerate(scen_sims):
                     scenraw[reskey][:,s] = sim.results[reskey].values
-            for reskey in genotypekeys:
+            for reskey in genotypekeys+type_dist_keys:
                 scenraw[reskey] = np.zeros((ng, self.res_npts, len(scen_sims)))
                 for s,sim in enumerate(scen_sims):
                     scenraw[reskey][:,:,s] = sim.results[reskey].values
             for reskey in sexkeys:
                 scenraw[reskey] = np.zeros((2, self.res_npts, len(scen_sims)))
+                for s,sim in enumerate(scen_sims):
+                    scenraw[reskey][:,:,s] = sim.results[reskey].values
+            for reskey in agekeys:
+                scenraw[reskey] = np.zeros((na, self.res_npts, len(scen_sims)))
                 for s,sim in enumerate(scen_sims):
                     scenraw[reskey][:,:,s] = sim.results[reskey].values
 
@@ -1115,7 +1134,7 @@ class Scenarios(hpb.ParsObj):
         # Compute dataframe
         x = defaultdict(dict)
         genotypekeys = self.result_keys('genotype')
-        sexkeys = self.result_keys('by_sex')
+        sexkeys = self.result_keys('sex')
         totalkeys = self.result_keys('total')
         for scenkey in self.scenarios.keys():
             for reskey in self.result_keys():

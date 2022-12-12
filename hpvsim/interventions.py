@@ -823,7 +823,6 @@ class BaseScreening(BaseTest):
             new_screen_inds = hpu.ifalsei(sim.people.screened, accept_inds)  # Figure out people who are getting screened for the first time
             n_new_people = sim.people.scale_flows(new_screen_inds)  # Scale
             n_new_screens = sim.people.scale_flows(accept_inds)  # Scale
-            n_new_screens = sim.people.scale_flows(accept_inds)  # Scale
             sim.results['new_screened'][idx] += n_new_people
             sim.results['new_screens'][idx] += n_new_screens
 
