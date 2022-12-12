@@ -457,7 +457,7 @@ class Sim(hpb.BaseSim):
         results['asr_cancer_mortality'] = init_res('ASR of cancer mortality', scale=False)
 
         # Type distributions by dysplasia
-        for var, name in zip(hpd.type_dysp_keys, hpd.type_dysp_names):
+        for var, name in zip(hpd.type_dist_keys, hpd.type_dist_names):
             results[var+'_genotype_shares'] = init_res(name, n_rows=ng)
 
         # Vaccination results
@@ -1027,7 +1027,7 @@ class Sim(hpb.BaseSim):
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution by cytology
-        for which in hpd.type_dysp_keys:
+        for which in hpd.type_dist_keys:
             totals = res[which][:]
             by_type = res[which+'_by_genotype'][:]
             inds_to_fill = totals>0

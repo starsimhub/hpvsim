@@ -264,7 +264,7 @@ class MultiSim(hpb.FlexPretty):
         genotypekeys = reduced_sim.result_keys('genotype')
         sexkeys = reduced_sim.result_keys('sex')
         agekeys = reduced_sim.result_keys('age')
-        type_dysp_keys = reduced_sim.result_keys('type_dysp')
+        type_dist_keys = reduced_sim.result_keys('type_dist')
         n_age_bins = len(reduced_sim['age_bins'])-1
 
         for reskey in totalkeys:
@@ -287,13 +287,13 @@ class MultiSim(hpb.FlexPretty):
             for s,sim in enumerate(self.sims):
                 vals = sim.results[reskey].values
                 raw[reskey][:, :, s] = vals
-        for reskey in type_dysp_keys:
+        for reskey in type_dist_keys:
             raw[reskey] = np.zeros((reduced_sim['n_genotypes'], reduced_sim.res_npts, len(self.sims)))
             for s,sim in enumerate(self.sims):
                 vals = sim.results[reskey].values
                 raw[reskey][:, :, s] = vals
 
-        for reskey in totalkeys + genotypekeys + sexkeys + agekeys + type_dysp_keys:
+        for reskey in totalkeys + genotypekeys + sexkeys + agekeys + type_dist_keys:
             if reskey in totalkeys:
                 axis = 1
                 results = reduced_sim.results
@@ -1013,7 +1013,7 @@ class Scenarios(hpb.ParsObj):
         genotypekeys = self.result_keys('genotype')
         sexkeys = self.result_keys('sex')
         agekeys = self.result_keys('age')
-        type_dysp_keys = self.result_keys('type_dysp')
+        type_dist_keys = self.result_keys('type_dist')
 
         # Loop over scenarios
         for scenkey,scen in self.scenarios.items():
@@ -1067,7 +1067,7 @@ class Scenarios(hpb.ParsObj):
                 scenraw[reskey] = np.zeros((self.res_npts, len(scen_sims)))
                 for s,sim in enumerate(scen_sims):
                     scenraw[reskey][:,s] = sim.results[reskey].values
-            for reskey in genotypekeys+type_dysp_keys:
+            for reskey in genotypekeys+type_dist_keys:
                 scenraw[reskey] = np.zeros((ng, self.res_npts, len(scen_sims)))
                 for s,sim in enumerate(scen_sims):
                     scenraw[reskey][:,:,s] = sim.results[reskey].values

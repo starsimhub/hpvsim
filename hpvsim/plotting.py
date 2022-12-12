@@ -134,14 +134,14 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
 
     # Define allowable choices for plotting - default plot type depends on result type
     allkeys = sim.result_keys('all')
-    time_series_keys = sim.result_keys('total')+sim.result_keys('genotype')+sim.result_keys('sex')+sim.result_keys('type_dysp')
+    time_series_keys = sim.result_keys('total')+sim.result_keys('genotype')+sim.result_keys('sex')+sim.result_keys('type_dist')
     age_dist_keys = sim.result_keys('age')
-    type_dysp_keys = ['type_dysp']
-    valid_keys = allkeys+type_dysp_keys
+    type_dist_keys = ['type_dist']
+    valid_keys = allkeys+type_dist_keys
     def check_plot_type(which):
         if which in time_series_keys: return 'time_series'
         elif which in age_dist_keys: return 'age_dist'
-        elif which in type_dysp_keys: return 'type_dysp'
+        elif which in type_dist_keys: return 'type_dist'
         else:
             raise ValueError(f'Plot type of {which} not understood.')
 
@@ -179,14 +179,14 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
                     else:
                         if reskey in allkeys:
                             name = sim.results[reskey].name
-                        elif reskey == 'type_dysp':
+                        elif reskey == 'type_dist':
                             name = 'HPV types by cytology'
                     if reskey in time_series_keys:
                         to_plot += hpd.plot_args(reskey, name=name, plot_type='time_series')
                     elif reskey in age_dist_keys:
                         to_plot += hpd.plot_args(reskey, name=name, plot_type='age_dist', year=sim.results['year'][-1])
-                    elif reskey in type_dysp_keys:
-                        to_plot += hpd.plot_args(reskey, name=name, plot_type='type_dysp', year=sim.results['year'][-1])
+                    elif reskey in type_dist_keys:
+                        to_plot += hpd.plot_args(reskey, name=name, plot_type='type_dist', year=sim.results['year'][-1])
                 else:
                     invalid += reskey
 
@@ -196,8 +196,8 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
                 if reskey.plot_type is None: # Add sensible defaults if not supplied
                     if reskey.keys[0] in age_dist_keys:
                         reskey.plot_type = 'age_dist'
-                    elif reskey.keys[0] in type_dysp_keys:
-                        reskey.plot_type = 'type_dysp'
+                    elif reskey.keys[0] in type_dist_keys:
+                        reskey.plot_type = 'type_dist'
                 to_plot += reskey
 
             # If it's a list, we ned to choose a single plot type
@@ -212,7 +212,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
                     plot_type = 'age_dist'
                     year = sim.results['year'][-1]
                 else:
-                    plot_type = 'type_dysp'
+                    plot_type = 'type_dist'
                     year = sim.results['year'][-1]
                 to_plot += hpd.plot_args(reskey, name=name, plot_type=plot_type, year=year)
 
@@ -465,7 +465,7 @@ def plot_type_bars(sim, ax, date, args):
     idx = sc.findinds(sim.res_yearvec, date)[0]
     labels = sc.autolist()
     resdict = sc.objdict()
-    for rkey in sim.result_keys('type_dysp'):
+    for rkey in sim.result_keys('type_dist'):
         labels += sim.results[rkey].name
         resdict[rkey] = sim.results[rkey][:,idx]
     g_labels = sim['genotypes']
@@ -544,7 +544,7 @@ def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=N
                         plot_data(sim, ax, reskey, args.scatter, color=color)  # Plot the data
                 title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show)
 
-            elif plot_type == 'type_dysp':
+            elif plot_type == 'type_dist':
                 ax = plot_type_bars(sim, ax, plot_arg.year, args)
                 title_grid_legend(ax, title, grid, commaticks, setylim, sc.mergedicts(args.legend,dict(title=int(plot_arg.year))), args.show)
 

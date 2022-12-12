@@ -418,7 +418,7 @@ class BaseSim(ParsObj):
 
         '''
         keys = []
-        subchoices = ['total', 'genotype', 'sex', 'age', 'type_dysp']
+        subchoices = ['total', 'genotype', 'sex', 'age', 'type_dist']
         if which in ['total']:
             keys = [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
         elif which in ['sex']:
@@ -427,7 +427,7 @@ class BaseSim(ParsObj):
             keys = [k for k, res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
         elif which in ['genotype']:
             keys = [k for k,res in self.results.items() if 'by_genotype' in k and isinstance(res, Result)]
-        elif which in ['type_dysp']:
+        elif which in ['type_dist']:
             keys = [k for k, res in self.results.items() if 'genotype_shares' in k and isinstance(res, Result)]
         elif which =='all':
             keys = []
@@ -453,7 +453,7 @@ class BaseSim(ParsObj):
         # Construct list of result types
         result_types = sc.autolist()
         for rkey in reskeys:
-            for type_option in ['total', 'genotype', 'sex', 'age', 'type_dysp']:
+            for type_option in ['total', 'genotype', 'sex', 'age', 'type_dist']:
                 if rkey in self.result_keys(type_option):
                     result_types += type_option
 

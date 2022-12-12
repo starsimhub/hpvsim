@@ -67,7 +67,6 @@ class People(hpb.BasePeople):
 
         # Store age bins
         self.age_bins = self.pars['age_bins'] # Age bins for age results
-        #self.asr_bins = self.pars['standard_pop'][0, :] # Age bins of the standard population
 
         if strict:
             self.lock() # If strict is true, stop further keys from being set (does not affect attributes)
