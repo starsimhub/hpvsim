@@ -261,8 +261,8 @@ def test_result_consistency():
     # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
 
     # Check that CINs by grade sum up the the correct totals
-    assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
-    assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
+    assert (((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]).sum() - sim.results['total_cins'][:].sum())<1e-3).all()
+    assert (((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]).sum(axis=0) - sim.results['cins'][:].sum(axis=0))<1e-3).all()
 
     # Check that cancers by age sum to the correct totals
     assert ((sim.results['cancers_by_age'][:].sum(axis=0)-sim.results['cancers'][:].sum(axis=0))<1e-3).all()
