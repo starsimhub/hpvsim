@@ -40,7 +40,6 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     n_agents = int(sim['n_agents']) # Shorten
     total_pop = None # Optionally created but always returned
     pop_trend = None # Populated later if location is specified
-    pop_age_trend = None
 
     if verbose is None:
         verbose = sim['verbose']
@@ -73,7 +72,6 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     age_data  = hpdata.get_age_distribution(location, year=sim['start'])
                     pop_trend = hpdata.get_total_pop(location)
                     total_pop = sum(age_data[:,2]) # Return the total population
-                    pop_age_trend = hpdata.get_age_distribution_over_time(location)
                 except ValueError as E:
                     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
                     hpm.warn(warnmsg)
@@ -125,7 +123,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
 
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
-    people = hpppl.People(sim.pars, pop_trend=pop_trend, pop_age_trend=pop_age_trend, **popdict) # List for storing the people
+    people = hpppl.People(sim.pars, pop_trend=pop_trend, **popdict) # List for storing the people
 
     sc.printv(f'Created {n_agents} agents, average age {ages.mean():0.2f} years', 2, verbose)
 

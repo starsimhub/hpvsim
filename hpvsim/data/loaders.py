@@ -10,7 +10,7 @@ import unicodedata
 import re
 from .. import misc as hpm
 
-__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_age_distribution_over_time', 'get_total_pop', 'get_death_rates',
+__all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_total_pop', 'get_death_rates',
            'get_birth_rates', 'get_life_expectancy']
 
 
@@ -182,33 +182,6 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
         dd = dd.rename("n_alive")
         dd = dd.rename_axis("year")
         dd.to_csv(total_pop_file)
-
-    return result
-
-
-def get_age_distribution_over_time(location=None):
-    '''
-    Load age distribution for a given country or countries over time.
-
-    Args:
-        location (str): name of the country to load the age distribution for
-
-    Returns:
-        age_data (dataframe): Pandas dataframe with age distribution over time
-    '''
-
-    # Load the raw data
-    try:
-        df = load_file(files.age_dist)
-    except Exception as E:
-        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
-        raise ValueError(errormsg) from E
-
-
-    # Extract the age distribution for the given location and year
-    full_df = map_entries(df, location)[location]
-    result = full_df.rename(columns={'Time':'year', 'AgeGrpStart': 'age'})
-    result['PopTotal'] *= 1e3 # reported as per 1,000
 
     return result
 
