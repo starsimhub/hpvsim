@@ -41,6 +41,7 @@ class Calibration(sc.prettyobj):
         sim          (Sim)  : the simulation to calibrate
         datafiles    (list) : list of datafile strings to calibrate to
         calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
+        extra_sim_results (list) : list of result strings to store
         fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
         par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_uniform
         n_trials     (int)  : the number of trials per worker
@@ -72,8 +73,8 @@ class Calibration(sc.prettyobj):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, par_samplers=None,
-                 n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, extra_sim_results=None,
+                 par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
 
         import multiprocessing as mp # Import here since it's also slow
@@ -93,6 +94,7 @@ class Calibration(sc.prettyobj):
         self.sim            = sim
         self.calib_pars     = calib_pars
         self.genotype_pars  = genotype_pars
+        self.extra_sim_results = extra_sim_results
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
         self.die            = die
@@ -105,7 +107,16 @@ class Calibration(sc.prettyobj):
             self.target_data.append(hpm.load_data(datafile))
 
         sim_results = sc.objdict()
+
         age_result_args = sc.objdict()
+        extra_sim_results = sc.objdict()
+
+        if self.extra_sim_results:
+            for extra_result in self.extra_sim_results:
+                extra_sim_results[extra_result] = sc.objdict()
+            self.extra_sim_results_keys = extra_sim_results.keys()
+        else:
+            self.extra_sim_results_keys = None
 
         # Go through each of the target keys and determine how we are going to get the results from sim
         for targ in self.target_data:
@@ -140,6 +151,11 @@ class Calibration(sc.prettyobj):
             self.result_args[rkey].name = self.sim.results[rkey].name
             self.result_args[rkey].color = self.sim.results[rkey].color
 
+        if self.extra_sim_results:
+            for rkey in self.extra_sim_results_keys:
+                self.result_properties[rkey] = sc.objdict()
+                self.result_properties[rkey].name = self.sim.results[rkey].name
+                self.result_properties[rkey].color = self.sim.results[rkey].color
         # Temporarily store a filename
         self.tmp_filename = 'tmp_calibration_%05i.obj'
 
@@ -263,7 +279,7 @@ class Calibration(sc.prettyobj):
             all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars)
             return all_pars
         else:
-            return pars, genotype_pars
+            return calib_pars, genotype_pars
 
 
     def sim_to_sample_pars(self):
@@ -363,9 +379,15 @@ class Calibration(sc.prettyobj):
             sim.fit += mismatch
             sim_results[rkey] = model_output
 
+        extra_sim_results = sc.objdict()
+        if self.extra_sim_results:
+            for rkey in self.extra_sim_results_keys:
+                model_output = sim.results[rkey]
+                extra_sim_results[rkey] = model_output
+
         # Store results in temporary files (TODO: consider alternatives)
         if save:
-            results = dict(sim=sim_results, analyzer=sim.get_analyzer().results)
+            results = dict(sim=sim_results, analyzer=sim.get_analyzer().results, extra_sim_results=extra_sim_results)
             filename = self.tmp_filename % trial.number
             sc.save(filename, results)
 
@@ -474,6 +496,7 @@ class Calibration(sc.prettyobj):
                     results = sc.load(filename)
                     self.sim_results.append(results['sim'])
                     self.analyzer_results.append(results['analyzer'])
+                    self.extra_sim_results.append(results['extra_sim_results'])
                     if tidyup:
                         try:
                             os.remove(filename)
@@ -572,7 +595,7 @@ class Calibration(sc.prettyobj):
         if sc.isstring(plot_type) and plot_type.startswith('sns'):
             import seaborn as sns
             if plot_type.split('.')[1]=='boxplot':
-                extra_args=dict(boxprops=dict(alpha=.3))
+                extra_args=dict(boxprops=dict(alpha=.3), showfliers=False)
             else: extra_args = dict()
             plot_func = getattr(sns, plot_type.split('.')[1])
         else:
@@ -685,7 +708,8 @@ class Calibration(sc.prettyobj):
                 values = []
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
-                ax.scatter(x, ydata, color=self.result_args[resname].color[0], marker='s', label='Data')
+                ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
+
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
