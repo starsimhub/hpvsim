@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.7 (2022-12-12)
+--------------------------
+- Migration is now modeled by finding mismatches between the modeled population size by age and data on population sizes by age (previously, this adjustment was done for the overall population rather than by age bucket).
+- *GitHub info*: PR `470 <https://github.com/amath-idm/hpvsim/pull/479>`__
+
+
 Version 0.4.6 (2022-12-12)
 --------------------------
 - Changes to several default parameters: default genotypes are now 16, 18, and other high-risk; and default hpv control prob is now 0.
@@ -16,44 +22,44 @@ Version 0.4.6 (2022-12-12)
 - Adds age of cancer to analyzer
 - Changes to default plotting styles
 - Various bugfixes: prevents immunity values from exceeding 1, ensures people with cancer aren't given second cancers
-- *GitHub info*: PRs `458 <https://github.com/amath-idm/hpvsim/pull/458>`__
+- *GitHub info*: PR `458 <https://github.com/amath-idm/hpvsim/pull/458>`__
 
 
 Version 0.4.5 (2022-12-06)
 --------------------------
 - Removes default screening products pending review
-- *GitHub info*: PRs `464 <https://github.com/amath-idm/hpvsim/pull/464>`__
+- *GitHub info*: PR `464 <https://github.com/amath-idm/hpvsim/pull/464>`__
 
 
 Version 0.4.4 (2022-12-05)
 --------------------------
 - Changes to progression to cancer -- no longer based on clinical cutoffs, now stochastically applied by genotype to CIN3 agents
-- *GitHub info*: PRs `430 <https://github.com/amath-idm/hpvsim/pull/430>`__
+- *GitHub info*: PR `430 <https://github.com/amath-idm/hpvsim/pull/430>`__
 
 
 Version 0.4.3 (2022-12-01)
 --------------------------
 - Fixes bug with population growth function
-- *GitHub info*: PRs `459 <https://github.com/amath-idm/hpvsim/pull/459>`__
+- *GitHub info*: PR `459 <https://github.com/amath-idm/hpvsim/pull/459>`__
 
 
 Version 0.4.2 (2022-11-21)
 --------------------------
 - Changes to parameterization of immunity
-- *GitHub info*: PRs `425 <https://github.com/amath-idm/hpvsim/pull/425>`__
+- *GitHub info*: PR `425 <https://github.com/amath-idm/hpvsim/pull/425>`__
 
 
 Version 0.4.1 (2022-11-21)
 --------------------------
 - Fixes age of migration
 - Adds scale parameter for vital dynamics
-- *GitHub info*: PRs `423 <https://github.com/amath-idm/hpvsim/pull/423>`__
+- *GitHub info*: PR `423 <https://github.com/amath-idm/hpvsim/pull/423>`__
 
 
 Version 0.4.0 (2022-11-16)
 --------------------------
 - Adds merge method for scenarios and fixes printing bugs
-- *GitHub info*: PRs `422 <https://github.com/amath-idm/hpvsim/pull/422>`__
+- *GitHub info*: PR `422 <https://github.com/amath-idm/hpvsim/pull/422>`__
 
 
 Version 0.3.9 (2022-11-15)
