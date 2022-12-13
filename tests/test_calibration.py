@@ -39,7 +39,7 @@ def test_calibration():
         )
     )
 
-    extra_sim_results = ['total_cancer_incidence', 'asr_cancer']
+    extra_sim_results = ['cancer_incidence', 'asr_cancer_incidence']
 
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             datafiles=[

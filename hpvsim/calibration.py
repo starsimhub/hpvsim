@@ -153,9 +153,9 @@ class Calibration(sc.prettyobj):
 
         if self.extra_sim_results:
             for rkey in self.extra_sim_results_keys:
-                self.result_properties[rkey] = sc.objdict()
-                self.result_properties[rkey].name = self.sim.results[rkey].name
-                self.result_properties[rkey].color = self.sim.results[rkey].color
+                self.result_args[rkey] = sc.objdict()
+                self.result_args[rkey].name = self.sim.results[rkey].name
+                self.result_args[rkey].color = self.sim.results[rkey].color
         # Temporarily store a filename
         self.tmp_filename = 'tmp_calibration_%05i.obj'
 
