@@ -1028,8 +1028,8 @@ class Sim(hpb.BaseSim):
 
         # Compute HPV type distribution by cytology
         for which in hpd.type_dist_keys:
-            totals = res[which][:]
-            by_type = res[which+'_by_genotype'][:]
+            totals = res[f'n_{which}'][:]
+            by_type = res[f'n_{which}_by_genotype'][:]
             inds_to_fill = totals>0
             res[which+'_genotype_shares'][:, inds_to_fill] = by_type[:, inds_to_fill] / totals[inds_to_fill]
 
