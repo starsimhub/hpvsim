@@ -9,10 +9,10 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
-Version 0.4.7 (2022-12-12)
+Version 0.4.7 (2022-12-13)
 --------------------------
 - Migration is now modeled by finding mismatches between the modeled population size by age and data on population sizes by age (previously, this adjustment was done for the overall population rather than by age bucket).
-- *GitHub info*: PR `470 <https://github.com/amath-idm/hpvsim/pull/479>`__
+- *GitHub info*: PR `479 <https://github.com/amath-idm/hpvsim/pull/479>`__
 
 
 Version 0.4.6 (2022-12-12)
