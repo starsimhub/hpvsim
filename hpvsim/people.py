@@ -680,8 +680,6 @@ class People(hpb.BasePeople):
         NB people are not actually removed to avoid issues with indices
         '''
 
-        if self.t == 0:
-            np.random.rand()
         death_pars = self.pars['death_rates']
         all_years = np.array(list(death_pars.keys()))
         base_year = all_years[0]
