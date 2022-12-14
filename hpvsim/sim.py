@@ -458,7 +458,7 @@ class Sim(hpb.BaseSim):
 
         # Type distributions by dysplasia
         for var, name in zip(hpd.type_dist_keys, hpd.type_dist_names):
-            results[var+'_genotype_shares'] = init_res(name, n_rows=ng)
+            results[var+'_genotype_dist'] = init_res(name, n_rows=ng)
 
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
@@ -1031,7 +1031,7 @@ class Sim(hpb.BaseSim):
             totals = res[f'n_{which}'][:]
             by_type = res[f'n_{which}_by_genotype'][:]
             inds_to_fill = totals>0
-            res[which+'_genotype_shares'][:, inds_to_fill] = by_type[:, inds_to_fill] / totals[inds_to_fill]
+            res[which+'_genotype_dist'][:, inds_to_fill] = by_type[:, inds_to_fill] / totals[inds_to_fill]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])
