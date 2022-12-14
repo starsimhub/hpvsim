@@ -39,12 +39,15 @@ def test_calibration():
         )
     )
 
+    extra_sim_results = ['cancer_incidence', 'asr_cancer_incidence']
+
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             datafiles=[
                                 'test_data/south_africa_hpv_data.csv',
                                 'test_data/south_africa_cancer_data_2020.csv',
-                                # 'test_data/south_africa_type_distribution_cancer.csv'
+                                'test_data/south_africa_type_distribution_cancer.csv'
                             ],
+                            extra_sim_results=extra_sim_results,
                             total_trials=3, n_workers=1)
     calib.calibrate(die=True)
     calib.plot(res_to_plot=4)
