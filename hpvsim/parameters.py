@@ -33,8 +33,8 @@ def make_pars(**kwargs):
     pars['n_agents']        = 20e3      # Number of agents
     pars['total_pop']       = None      # If defined, used for calculating the scale factor
     pars['pop_scale']       = None      # How much to scale the population
-    pars['use_multiscale']  = False     # Whether to use multiscale modeling
-    pars['ms_agent_ratio']  = 1         # Ratio of scale factor of cancer agents to normal agents -- must be an integer
+    pars['use_multiscale']  = True      # Whether to use multiscale modeling
+    pars['ms_agent_ratio']  = 10        # Ratio of scale factor of cancer agents to normal agents -- must be an integer
     pars['network']         = 'default' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
@@ -49,10 +49,10 @@ def make_pars(**kwargs):
     pars['rel_init_prev'] = 1.0 # Initial prevalence scale factor
 
     # Simulation parameters
-    pars['start']           = 2015.         # Start of the simulation
+    pars['start']           = 1995.         # Start of the simulation
     pars['end']             = None          # End of the simulation
-    pars['n_years']         = 15            # Number of years to run, if end isn't specified. Note that this includes burn-in
-    pars['burnin']          = 5             # Number of years of burnin. NB, this is doesn't affect the start and end dates of the simulation, but it is possible remove these years from plots
+    pars['n_years']         = 50            # Number of years to run, if end isn't specified. Note that this includes burn-in
+    pars['burnin']          = 25            # Number of years of burnin. NB, this is doesn't affect the start and end dates of the simulation, but it is possible remove these years from plots
     pars['dt']              = 0.2           # Timestep (in years)
     pars['dt_demog']        = 1.0           # Timestep for demographic updates (in years)
     pars['rand_seed']       = 1             # Random seed, if None, don't reset
@@ -74,7 +74,7 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']                = 0.25  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']                = 0.10  # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
     pars['rel_trans_cin1']      = 1     # Transmissibility of people with CIN1 compared to those without dysplasia
@@ -351,23 +351,23 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin   = dict(dist='lognormal', par1=mean16, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=4.5, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=10.2, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv16.dysp_rate    = 1.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate    = 0.06 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.cancer_prob  = 0.25 # Share of CIN3s that will go on to cancer
+    pars.hpv16.cancer_prob  = 0.09 # Share of CIN3s that will go on to cancer
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
     pars.hpv16.sero_prob    = 0.65 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin   = dict(dist='lognormal', par1=14.9/12, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3.16, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dysp_rate    = 1.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate_sd = 0.05 # Standard deviation of the progression rate
+    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3.52, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dysp_rate    = 1.64 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_rate    = 0.27 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_rate_sd = 0.09 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 0.72  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.cancer_prob  = 0.15  # Share of CIN3s that will go on to cancer
+    pars.hpv18.cancer_prob  = 0.03  # Share of CIN3s that will go on to cancer
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
     pars.hpv18.sero_prob    = 0.6 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -483,12 +483,12 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=4.0) # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=17.7, par2=4.0) # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.dysp_rate    = 0.1 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.prog_rate    = 0.5 # same value as for all oncogenic types
+    pars.hrhpv.prog_rate    = 0.06 # same value as for all oncogenic types
     pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
-    pars.hrhpv.rel_beta     = 0.94 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.cancer_prob  = 0.25  # Share of CIN3s that will go on to cancer
+    pars.hrhpv.rel_beta     = 1.16 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
     pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.sero_prob    = 0.5 # placeholder, currently assumed to be the same as for 31
 
