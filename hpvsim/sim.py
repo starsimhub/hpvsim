@@ -86,7 +86,7 @@ class Sim(hpb.BaseSim):
         self.init_immunity() # initialize information about immunity
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_analyzers()  # ...and the analyzers...
-        self.set_seed() # Reset the random seed again so the random number stream is consistent
+        self.set_seed(self['rand_seed']+1)  # Reset the random seed to the default run seed, so that if the simulation is run with reset_seed=False right after initialization, it will still produce the same output
         self.initialized   = True
         self.complete      = False
         self.results_ready = False
