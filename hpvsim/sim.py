@@ -86,11 +86,9 @@ class Sim(hpb.BaseSim):
         self.init_immunity() # initialize information about immunity
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_analyzers()  # ...and the analyzers...
-        self.set_seed() # Reset the random seed again so the random number stream is consistent
         self.initialized   = True
         self.complete      = False
         self.results_ready = False
-
 
         return self
 
@@ -890,9 +888,24 @@ class Sim(hpb.BaseSim):
             verbose = self['verbose']
 
         if reset_seed:
-            # Reset the RNG. If the simulation is newly created, then the RNG will be reset by sim.initialize() so the use case
-            # for resetting the seed here is if the simulation has been partially run, and changing the seed is required
-            self.set_seed()
+            # Reset the RNG. The primary use case (and why it defaults to True) is to ensure that
+            #
+            # >>> sim0.initialize()
+            # >>> sim0.run()
+            # >>> sim1.initialize()
+            # >>> sim1.run()
+            #
+            # produces the same output as
+            #
+            # >>> sim0.initialize()
+            # >>> sim1.initialize()
+            # >>> sim0.run()
+            # >>> sim1.run()
+            #
+            # The seed is offset by 1 to avoid drawing the same random numbers as those used for population generation, otherwise
+            # the first set of random numbers in the model (e.g., deaths) will be correlated with the first set of random numbers
+            # drawn in population generation (e.g., sex)
+            self.set_seed(self['rand_seed']+1)
 
         # Check for AlreadyRun errors
         errormsg = None
