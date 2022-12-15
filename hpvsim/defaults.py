@@ -265,11 +265,14 @@ dem_colors  = ['#fcba03',   '#000000',      '#000000']
 # Results by sex
 by_sex_keys    = ['infections_by_sex',    'other_deaths_by_sex']
 by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
-by_sex_colors  = ['#000000',                    '#000000']
+by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
+type_dist_stem   = 'HPV type distribution in women with'
 type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
-type_dist_names  = ['Normal', 'CIN1', 'Low-grade lesion', 'CIN2', 'CIN3', 'High-grade lesion', 'Cancer']
+type_dist_names  = [f'{type_dist_stem} HPV', f'{type_dist_stem} CIN1', f'{type_dist_stem} low-grade lesion',
+                    f'{type_dist_stem} CIN2', f'{type_dist_stem} CIN3', f'{type_dist_stem} high-grade lesion',
+                    f'{type_dist_stem} cancer']
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
