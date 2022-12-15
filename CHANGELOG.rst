@@ -11,6 +11,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 Version 0.4.8 (2022-12-15)
 --------------------------
 - Change the seed used for running simulations to avoid having random processes in the model run sometimes being correlated with population attributes
+- Removed `Intervention._store_args` and `Intervention.to_json`
 - *GitHub info*: PRs `485 <https://github.com/amath-idm/hpvsim/pull/485>`__
 
 

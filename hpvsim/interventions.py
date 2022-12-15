@@ -126,7 +126,6 @@ class Intervention:
     '''
     def __init__(self, label=None, show_label=False, do_plot=None, line_args=None, **kwargs):
         # super().__init__(**kwargs)
-        self._store_args() # Store the input arguments so the intervention can be recreated
         if label is None: label = self.__class__.__name__ # Use the class name if no label is supplied
         self.label = label # e.g. "Screen"
         self.show_label = show_label # Do not show the label by default
@@ -166,23 +165,6 @@ class Intervention:
     def disp(self):
         ''' Print a detailed representation of the intervention '''
         return sc.pr(self)
-
-
-    def _store_args(self):
-        ''' Store the user-supplied arguments for later use in to_json '''
-        f0 = inspect.currentframe() # This "frame", i.e. Intervention.__init__()
-        f1 = inspect.getouterframes(f0) # The list of outer frames
-        parent = f1[2].frame # The parent frame, e.g. change_beta.__init__()
-        _,_,_,values = inspect.getargvalues(parent) # Get the values of the arguments
-        if values:
-            self.input_args = {}
-            for key,value in values.items():
-                if key == 'kwargs': # Store additional kwargs directly
-                    for k2,v2 in value.items(): # pragma: no cover
-                        self.input_args[k2] = v2 # These are already a dict
-                elif key not in ['self', '__class__']: # Everything else, but skip these
-                    self.input_args[key] = value
-        return
 
 
     def initialize(self, sim=None):
@@ -279,27 +261,6 @@ class Intervention:
                         ax.axvline(date, label=label, **line_args)
         return
 
-
-    def to_json(self):
-        '''
-        Return JSON-compatible representation
-
-        Custom classes can't be directly represented in JSON. This method is a
-        one-way export to produce a JSON-compatible representation of the
-        intervention. In the first instance, the object dict will be returned.
-        However, if an intervention itself contains non-standard variables as
-        attributes, then its ``to_json`` method will need to handle those.
-
-        Note that simply printing an intervention will usually return a representation
-        that can be used to recreate it.
-
-        Returns:
-            JSON-serializable representation (typically a dict, but could be anything else)
-        '''
-        which = self.__class__.__name__
-        pars = sc.jsonify(self.input_args)
-        output = dict(which=which, pars=pars)
-        return output
 
 
 #%% Template classes for routine and campaign delivery
