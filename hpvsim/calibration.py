@@ -606,7 +606,8 @@ class Calibration(sc.prettyobj):
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
         axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
         d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
-        all_args = sc.mergedicts(fig_args, axis_args, d_args)
+        show_args = sc.objdict(show=dict(tight=True, maximize=False))
+        all_args = sc.objdict(sc.mergedicts(fig_args, axis_args, d_args, show_args))
 
         # Pull out results to use
         analyzer_results = sc.dcp(self.analyzer_results)
