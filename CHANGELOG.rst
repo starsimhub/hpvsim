@@ -14,6 +14,12 @@ Version 0.4.8 (2022-12-14)
 - *GitHub info*: PR `479 <https://github.com/amath-idm/hpvsim/pull/482>`__
 
 
+Version 0.4.8 (2022-12-14)
+--------------------------
+- Small bug fix to re-enable plots of cytology outcomes by genotype
+- *GitHub info*: PR `484 <https://github.com/amath-idm/hpvsim/pull/484>`__
+
+
 Version 0.4.7 (2022-12-13)
 --------------------------
 - Migration is now modeled by finding mismatches between the modeled population size by age and data on population sizes by age (previously, this adjustment was done for the overall population rather than by age bucket).
