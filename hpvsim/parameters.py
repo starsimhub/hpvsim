@@ -51,7 +51,7 @@ def make_pars(**kwargs):
     # Simulation parameters
     pars['start']           = 1995.         # Start of the simulation
     pars['end']             = None          # End of the simulation
-    pars['n_years']         = 50            # Number of years to run, if end isn't specified. Note that this includes burn-in
+    pars['n_years']         = 35            # Number of years to run, if end isn't specified. Note that this includes burn-in
     pars['burnin']          = 25            # Number of years of burnin. NB, this is doesn't affect the start and end dates of the simulation, but it is possible remove these years from plots
     pars['dt']              = 0.2           # Timestep (in years)
     pars['dt_demog']        = 1.0           # Timestep for demographic updates (in years)
