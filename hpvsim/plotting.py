@@ -546,12 +546,14 @@ def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=N
 
             elif plot_type == 'type_dist':
                 ax = plot_type_bars(sim, ax, plot_arg.year, args)
-                title_grid_legend(ax, title, grid, commaticks, setylim, sc.mergedicts(args.legend,dict(title=int(plot_arg.year))), args.show)
+                title = f'{title}, {int(plot_arg.year)}'
+                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show)
 
             elif plot_type == 'age_dist':
                 for resnum,reskey in enumerate(plot_arg.keys):
                     ax = plot_age_dist(sim, ax, reskey, plot_arg.year, args)
-                title_grid_legend(ax, title, grid, commaticks, setylim, sc.mergedicts(args.legend,dict(title=int(plot_arg.year))), args.show)
+                title = f'{title}, {int(plot_arg.year)}'
+                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show)
 
 
         output = tidy_up(fig, figs, do_save, fig_path, do_show, args)
