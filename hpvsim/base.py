@@ -306,19 +306,6 @@ class BaseSim(ParsObj):
         return
 
 
-    def set_seed(self, seed=-1):
-        '''
-        Set the seed for the random number stream from the stored or supplied value
-
-        Args:
-            seed (None or int): if no argument, use current seed; if None, randomize; otherwise, use and store supplied seed
-        '''
-        # Unless no seed is supplied, reset it
-        if seed != -1:
-            self['rand_seed'] = seed
-        hpu.set_seed(self['rand_seed'])
-        return
-
     @property
     def n(self):
         ''' Count the number of people -- if it fails, assume none '''

@@ -79,14 +79,14 @@ class Sim(hpb.BaseSim):
         '''
         self.t = 0  # The current time index
         self.validate_pars() # Ensure parameters have valid values
-        self.set_seed() # Reset the random seed before the population is created
+        hpu.set_seed(self['rand_seed']) # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
         self.init_results() # After initializing the genotypes and people, create the results structure
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
         self.init_immunity() # initialize information about immunity
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_analyzers()  # ...and the analyzers...
-        self.set_seed(self['rand_seed']+1)  # Reset the random seed to the default run seed, so that if the simulation is run with reset_seed=False right after initialization, it will still produce the same output
+        hpu.set_seed(self['rand_seed']+1)  # Reset the random seed to the default run seed, so that if the simulation is run with reset_seed=False right after initialization, it will still produce the same output
         self.initialized   = True
         self.complete      = False
         self.results_ready = False
@@ -906,7 +906,7 @@ class Sim(hpb.BaseSim):
             # The seed is offset by 1 to avoid drawing the same random numbers as those used for population generation, otherwise
             # the first set of random numbers in the model (e.g., deaths) will be correlated with the first set of random numbers
             # drawn in population generation (e.g., sex)
-            self.set_seed(self['rand_seed']+1)
+            hpu.set_seed(self['rand_seed']+1)
 
         # Check for AlreadyRun errors
         errormsg = None
