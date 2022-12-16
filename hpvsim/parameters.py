@@ -485,10 +485,10 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=17.7, par2=4.0) # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.dysp_rate    = 0.7 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.prog_rate    = 0.06 # same value as for all oncogenic types
+    pars.hrhpv.prog_rate    = 0.05 # same value as for all oncogenic types
     pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
     pars.hrhpv.rel_beta     = 1.16 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
+    pars.hrhpv.cancer_prob  = 0.01  # Share of CIN3s that will go on to cancer
     pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.sero_prob    = 0.5 # placeholder, currently assumed to be the same as for 31
 

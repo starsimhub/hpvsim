@@ -180,7 +180,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
                         if reskey in allkeys:
                             name = sim.results[reskey].name
                         elif reskey == 'type_dist':
-                            name = 'HPV types by cytology'
+                            name = 'HPV type distribution'
                     if reskey in time_series_keys:
                         to_plot += hpd.plot_args(reskey, name=name, plot_type='time_series')
                     elif reskey in age_dist_keys:

@@ -269,11 +269,15 @@ by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
 type_dist_stem   = 'HPV type distribution in'
-type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
-type_dist_names  = [f'{type_dist_stem} HPV', f'{type_dist_stem} CIN1', f'{type_dist_stem} low-grade lesion',
-                    f'{type_dist_stem} CIN2', f'{type_dist_stem} CIN3', f'{type_dist_stem} high-grade lesion',
-                    f'{type_dist_stem} cancer']
-lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
+# type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
+type_dist_keys   = ['low_grade','high_grade', 'cancerous']
+# type_dist_names  = [f'{type_dist_stem} HPV', f'{type_dist_stem} CIN1', f'{type_dist_stem} low-grade lesion',
+#                     f'{type_dist_stem} CIN2', f'{type_dist_stem} CIN3', f'{type_dist_stem} high-grade lesion',
+#                     f'{type_dist_stem} cancer']
+type_dist_names  = [f'Low-grade lesion',
+                    f'High-grade lesion',
+                    f'Cancer']
+lesion_grade_states = {'low_grade': ['precin', 'cin1'], 'high_grade': ['cin2', 'cin3']}
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
@@ -425,11 +429,11 @@ def get_default_plots(which='default', kind='sim', sim=None):
         if is_sim:
             plots = sc.objdict({
                 'HPV prevalence': 'hpv_prevalence',
+                'Infections by age': 'infections_by_age',
                 'CIN incidence (per 100,000 women)': 'cin_incidence',
                 'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
-                'Infections by age': 'infections_by_age',
                 'Cancers by age': 'cancers_by_age',
-                'HPV types by cytology': 'type_dist',
+                'HPV type distribution': 'type_dist',
             })
 
         else: # pragma: no cover
