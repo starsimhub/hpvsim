@@ -484,7 +484,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=4.0) # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.dysp_rate    = 0.1 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.dysp_rate    = 0.7 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.prog_rate    = 0.5 # same value as for all oncogenic types
     pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
     pars.hrhpv.rel_beta     = 0.94 # placeholder, currently assumed to be the same as for 31
