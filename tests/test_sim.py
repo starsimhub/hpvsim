@@ -317,7 +317,7 @@ def test_resuming():
     sc.heading('Test that resuming a run works')
 
     n_agents = 5e3
-    s0 = hpv.Sim(n_agents=n_agents, genotypes=[16], n_years=10, dt=0.5, label='test_resume')
+    s0 = hpv.Sim(n_agents=n_agents, genotypes=[16], dt=0.5, label='test_resume')
     s1 = s0.copy()
     s0.run()
 
