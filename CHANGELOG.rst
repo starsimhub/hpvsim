@@ -8,6 +8,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 0.4.9 (2022-12-16)
+--------------------------
+- Added in high- and low-grade lesions to type distribution results
+- Changes default duraton and rate of dysplasia for hr HPVs
+- *GitHub info*: PR `479 <https://github.com/amath-idm/hpvsim/pull/482>`__
+
 
 Version 0.4.8 (2022-12-14)
 --------------------------
