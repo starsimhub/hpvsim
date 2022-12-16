@@ -273,6 +273,7 @@ type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade',
 type_dist_names  = [f'{type_dist_stem} HPV', f'{type_dist_stem} CIN1', f'{type_dist_stem} low-grade lesion',
                     f'{type_dist_stem} CIN2', f'{type_dist_stem} CIN3', f'{type_dist_stem} high-grade lesion',
                     f'{type_dist_stem} cancer']
+lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)

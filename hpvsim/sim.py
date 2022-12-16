@@ -1027,13 +1027,11 @@ class Sim(hpb.BaseSim):
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution by cytology
-        grade_states = {'low_grade': ['cin1'],
-                        'high_grade': ['cin2', 'cin3']}
         for which in hpd.type_dist_keys:
             if which in ['low_grade', 'high_grade']:
                 totals = np.zeros(self.res_npts)
                 by_type = np.zeros((self['n_genotypes'], self.res_npts))
-                for state in grade_states[which]:
+                for state in hpd.lesion_grade_states[which]:
                     totals += res[f'n_{state}'][:]
                     by_type += res[f'n_{state}_by_genotype'][:]
             else:
