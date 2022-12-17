@@ -62,8 +62,8 @@ def make_pars(**kwargs):
     pars['model_hiv']       = False         # Whether or not to model HIV natural history
 
     # Network parameters, generally initialized after the population has been constructed
-    pars['debut']           = dict(f=dict(dist='normal', par1=18.6, par2=2.1), # Location-specific data should be used here if possible
-                                   m=dict(dist='normal', par1=19.6, par2=1.8))
+    pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
+                                   m=dict(dist='normal', par1=17.6, par2=1.8))
     pars['cross_layer']     = 0.05  # Proportion of females who have crosslayer relationships
     pars['partners']        = None  # The number of concurrent sexual partners for each partnership type
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
