@@ -277,7 +277,7 @@ type_dist_keys   = ['low_grade','high_grade', 'cancerous']
 type_dist_names  = [f'Low-grade lesion',
                     f'High-grade lesion',
                     f'Cancer']
-lesion_grade_states = {'low_grade': ['precin', 'cin1'], 'high_grade': ['cin2', 'cin3']}
+lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
 
 
 #%% Default data (age, death rates, birth dates, initial prevalence)
