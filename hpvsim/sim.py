@@ -1033,7 +1033,7 @@ class Sim(hpb.BaseSim):
                 by_type = np.zeros((self['n_genotypes'], self.res_npts))
                 for state in hpd.lesion_grade_states[which]:
                     by_type += res[f'n_{state}_by_genotype'][:]
-                    totals += by_type.sum(axis=0)
+                    totals += res[f'n_{state}_by_genotype'][:].sum(axis=0)
             else:
                 by_type = res[f'n_{which}_by_genotype'][:]
                 totals = by_type.sum(axis=0)
