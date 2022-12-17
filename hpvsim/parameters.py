@@ -352,7 +352,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin   = dict(dist='lognormal', par1=mean16, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=10.2, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dysp_rate    = 1.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.dysp_rate    = 1.3 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate    = 0.06 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
@@ -363,7 +363,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin   = dict(dist='lognormal', par1=14.9/12, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3.52, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dysp_rate    = 1.64 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.dysp_rate    = 1.3 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate    = 0.27 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.09 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 0.72  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
@@ -484,7 +484,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=17.7, par2=4.0) # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.dysp_rate    = 0.7 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.dysp_rate    = 1.3 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.prog_rate    = 0.05 # same value as for all oncogenic types
     pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
     pars.hrhpv.rel_beta     = 1.16 # placeholder, currently assumed to be the same as for 31
