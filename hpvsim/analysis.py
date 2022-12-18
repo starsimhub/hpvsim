@@ -714,7 +714,7 @@ class age_results(Analyzer):
             bins = result_dict.edges
             na = len(result_dict.bins)
             if 'genotype' in result: # Results by genotype
-                result_name = result[9:]
+                result_name = result[:-12]
                 size = (na, ng)
                 by_genotype = True
             else: # Total results
