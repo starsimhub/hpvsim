@@ -573,13 +573,19 @@ class BaseSim(ParsObj):
         d = {}
         for key in keys:
             if key == 'results':
-                resdict = self.export_results(for_json=True)
-                d['results'] = resdict
+                if self.results_ready:
+                    resdict = self.export_results(for_json=True)
+                    d['results'] = resdict
+                else:
+                    d['results'] = 'Results not available (Sim has not yet been run)'
             elif key in ['pars', 'parameters']:
                 pardict = self.export_pars()
                 d['parameters'] = pardict
             elif key == 'summary':
-                d['summary'] = dict(sc.dcp(self.summary))
+                if self.results_ready:
+                    d['summary'] = dict(sc.dcp(self.summary))
+                else:
+                    d['summary'] = 'Summary not available (Sim has not yet been run)'
             else: # pragma: no cover
                 try:
                     d[key] = sc.sanitizejson(getattr(self, key))
