@@ -40,7 +40,6 @@ setup(
     include_package_data=True,
     install_requires=[
         'numpy',
-        'numba',
         'scipy',
         'pandas>=1.4.0', 
         'sciris>=2.0.4',
