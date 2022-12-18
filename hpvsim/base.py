@@ -156,6 +156,8 @@ class Result(object):
         self.high = None
         return
 
+    def __eq__(self, other):
+        return self.npts == other.npts and np.all(self.values == other.values)  and self.scale == other.scale
 
     def __repr__(self):
         ''' Use pretty repr, like sc.prettyobj, but displaying full values '''
