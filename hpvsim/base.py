@@ -492,10 +492,7 @@ class BaseSim(ParsObj):
             resdict['timeseries_keys'] = self.result_keys()
         for key,res in self.results.items():
             if isinstance(res, Result):
-                if res.values.ndim == 1:
-                    resdict[key] = res.values
-                else:
-                    print(f'WARNING: skipping {key} from export since not 1D array')
+                resdict[key] = res.values
                 if res.low is not None:
                     resdict[key+'_low'] = res.low
                 if res.high is not None:
