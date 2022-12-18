@@ -777,7 +777,7 @@ class age_results(Analyzer):
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
                             inds = ((ppl[attr1][g, :] == sim.t) * (ppl[attr2][g, :])).nonzero()[-1]
-                            self.results[result][date][g, :] += bin_ages(inds, bins)  # Bin the people
+                            self.results[result][date][:, g] += bin_ages(inds, bins)  # Bin the people
 
                     # Figure out if this is the last timepoint in the year we're calculating results for
                     if sim.t == self.timepoint+self.resfreq-1:
