@@ -354,7 +354,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=10.2, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv16.dysp_rate    = 1.3 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate    = 0.06 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate_sd = 0.05 # Standard deviation of the progression rate
+    pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.cancer_prob  = 0.09 # Share of CIN3s that will go on to cancer
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
@@ -376,7 +376,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv31.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv31.dysp_rate    = 0.1 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv31.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_rate_sd = 0.05 # Standard deviation of the progression rate
+    pars.hpv31.prog_rate_sd = 0.02 # Standard deviation of the progression rate
     pars.hpv31.rel_beta     = 0.94 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv31.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
     pars.hpv31.imm_boost    = 1.0 # TODO: look for data
@@ -486,7 +486,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=17.7, par2=4.0) # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.dysp_rate    = 1.3 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.prog_rate    = 0.05 # same value as for all oncogenic types
-    pars.hrhpv.prog_rate_sd = 0.05 # same value as for all oncogenic types
+    pars.hrhpv.prog_rate_sd = 0.015 # same value as for all oncogenic types
     pars.hrhpv.rel_beta     = 1.16 # placeholder, currently assumed to be the same as for 31
     pars.hrhpv.cancer_prob  = 0.01  # Share of CIN3s that will go on to cancer
     pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
