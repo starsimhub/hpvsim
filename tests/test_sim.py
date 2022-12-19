@@ -58,8 +58,7 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
         }
     }
 
-    sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars)
-    sim.set_seed(seed)
+    sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars, rand_seed=seed)
     sim.run(verbose=verbose)
 
     # Optionally plot
