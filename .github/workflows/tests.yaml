@@ -1,5 +1,11 @@
-name: HPVsim CI workflow
-on: [pull_request]
+name: HPVsim CI tests
+on:
+  pull_request:
+
+  schedule:
+    - cron: "0 0 * * *"
+    branches:
+      - 'develop'
 
 jobs:
   install_and_test:

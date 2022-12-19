@@ -1,4 +1,4 @@
-name: HPVsim docs build workflow
+name: HPVsim documentation
 on: [pull_request]
 
 jobs:
