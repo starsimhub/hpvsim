@@ -872,7 +872,6 @@ class routine_screening(BaseScreening, RoutineDelivery):
         RoutineDelivery.initialize(self, sim) # Initialize this first, as it ensures that prob is interpolated properly
         BaseScreening.initialize(self, sim) # Initialize this next
 
-
 class campaign_screening(BaseScreening, CampaignDelivery):
     '''
     Campaign screening - an instance of base screening combined with campaign delivery.
@@ -1256,12 +1255,16 @@ class dx(Product):
     Testing products are used within screening and triage. Their fundamental proprty is that they classify people
     into exactly one result state. They do not change anything about the People.
     '''
-    def __init__(self, df, hierarchy):
+    def __init__(self, df, hierarchy=None):
         self.df = df
         self.states = df.state.unique()
         self.genotypes = df.genotype.unique()
         self.ng = len(self.genotypes)
-        self.hierarchy = hierarchy # or ['high', 'medium', 'low', 'not detected'], or other
+
+        if hierarchy is None:
+            self.hierarchy = df.result.unique() # Hierarchy is drawn from the order in which the outcomes are specified. The last unique item to be specified is the default
+        else:
+            self.hierarchy = hierarchy # or ['high', 'medium', 'low', 'not detected'], or other
 
     @property
     def default_value(self):
@@ -1421,10 +1424,9 @@ def default_dx(prod_name=None):
     Create default diagnostic products
     '''
     dfdx = pd.read_csv(datafiles.dx) # Read in dataframe with parameters
-    dxprods = dict(
-        # Diagnostics used to determine of subsequent care pathways
-        txvx_assigner   = dx(dfdx[dfdx.name == 'txvx_assigner'],    hierarchy=['triage', 'txvx', 'none']),
-    )
+    dxprods = dict()
+    for name in dfdx.name.unique():
+        dxprods[name] = dx(dfdx[dfdx.name==name])
     if prod_name is not None:   return dxprods[prod_name]
     else:                       return dxprods
 

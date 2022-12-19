@@ -214,6 +214,10 @@ class Result(object):
     def npts(self):
         return len(self.values)
 
+    @property
+    def shape(self):
+        return self.values.shape
+
 
 def set_metadata(obj, **kwargs):
     ''' Set standard metadata for an object '''
@@ -608,6 +612,7 @@ class BaseSim(ParsObj):
             date_index  (bool): if True, use the date as the index
         '''
         resdict = self.export_results(for_json=False)
+        resdict = {k:v for k,v in resdict.items() if v.ndim == 1}
         df = pd.DataFrame.from_dict(resdict)
         df['year'] = self.res_yearvec
         new_columns = ['t','year'] + df.columns[1:-1].tolist() # Get column order
