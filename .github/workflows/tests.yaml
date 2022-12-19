@@ -3,8 +3,6 @@ on:
   pull_request:
   schedule:
     - cron: "0 0 * * *"
-    - branches:
-      - 'develop'
 
 jobs:
   install_and_test:
