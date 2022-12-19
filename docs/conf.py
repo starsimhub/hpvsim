@@ -55,6 +55,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',  # Add a link to the Python source code for classes, functions etc.
     'nbsphinx',
+    'IPython.sphinxext.ipython_console_highlighting'  # Temporary fix for https://github.com/spatialaudio/nbsphinx/issues/687
 ]
 
 autodoc_default_options = {
