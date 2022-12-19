@@ -15,7 +15,7 @@ Version 0.4.10 (2022-12-19)
 - Added ``hpvsim.rootdir`` to provide a convenient absolute path to the
 - Added equality operator for `Result` objects
 - Exporting simulation results to JSON now includes 2D results (e.g., by genotype)
-- `age_pyramid` and `age_results` analyzer argument changed from `datafile` to `data` since this input supports both passing in a filename or a dataframe
+- ``age_pyramid`` and ``age_results`` analyzer argument changed from ``datafile`` to ``data`` since this input supports both passing in a filename or a dataframe
 - *GitHub info*: PRs `485 <https://github.com/amath-idm/hpvsim/pull/485>`__
 
 
