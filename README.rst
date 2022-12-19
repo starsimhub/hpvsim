@@ -1,6 +1,14 @@
 Human papillomavirus simulator (HPVsim)
 =======================================
 
+.. image:: https://github.com/amath-idm/hpvsim/actions/workflows/tests.yaml/badge.svg
+    :target: https://github.com/amath-idm/hpvsim/actions/workflows/tests.yaml
+    :alt: pipeline status
+
+.. image:: https://github.com/amath-idm/hpvsim/actions/workflows/docsbuild.yaml/badge.svg
+    :target: https://github.com/amath-idm/hpvsim/actions/workflows/docsbuild.yaml
+    :alt: pipeline status
+
 This repository contains the code for IDM's human papillomavirus simulator, HPVsim. 
 
 **HPVsim is currently under development**.
