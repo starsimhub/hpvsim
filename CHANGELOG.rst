@@ -11,7 +11,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
 Version 0.4.8 (2022-12-15)
 --------------------------
 - Change the seed used for running simulations to avoid having random processes in the model run sometimes being correlated with population attributes
-- Removed `Intervention._store_args` and `Intervention.to_json`
+- Deprecate ``Sim.set_seed()`` - use ``hpu.set_seed()`` instead
+- Added ``hpvsim.rootdir`` to provide a convenient absolute path to the
+- Added equality operator for `Result` objects
+- Exporting simulation results to JSON now includes 2D results (e.g., by genotype)
+- `age_pyramid` and `age_results` analyzer argument changed from `datafile` to `data` since this input supports both passing in a filename or a dataframe
 - *GitHub info*: PRs `485 <https://github.com/amath-idm/hpvsim/pull/485>`__
 
 
