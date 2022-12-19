@@ -356,7 +356,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.prog_rate    = 0.06 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.cancer_prob  = 0.09 # Share of CIN3s that will go on to cancer
+    pars.hpv16.cancer_prob  = 0.02 # Share of CIN3s that will go on to cancer
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
     pars.hpv16.sero_prob    = 0.65 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
