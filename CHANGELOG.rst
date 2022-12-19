@@ -8,7 +8,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 0.4.8 (2022-12-15)
+Version 0.4.10 (2022-12-19)
 --------------------------
 - Change the seed used for running simulations to avoid having random processes in the model run sometimes being correlated with population attributes
 - Deprecate ``Sim.set_seed()`` - use ``hpu.set_seed()`` instead
@@ -17,6 +17,19 @@ Version 0.4.8 (2022-12-15)
 - Exporting simulation results to JSON now includes 2D results (e.g., by genotype)
 - `age_pyramid` and `age_results` analyzer argument changed from `datafile` to `data` since this input supports both passing in a filename or a dataframe
 - *GitHub info*: PRs `485 <https://github.com/amath-idm/hpvsim/pull/485>`__
+
+
+Version 0.4.9 (2022-12-16)
+--------------------------
+- Added in high- and low-grade lesions to type distribution results
+- Changes default duraton and rate of dysplasia for hr HPVs
+- *GitHub info*: PR `479 <https://github.com/amath-idm/hpvsim/pull/482>`__
+
+
+Version 0.4.8 (2022-12-14)
+--------------------------
+- Small bug fix to re-enable plots of cytology outcomes by genotype
+- *GitHub info*: PR `484 <https://github.com/amath-idm/hpvsim/pull/484>`__
 
 
 Version 0.4.7 (2022-12-13)
