@@ -521,7 +521,9 @@ class age_results(Analyzer):
         kwargs      (dict): passed to :py:class:`Analyzer`
 
     **Example**::
-    # Construct your own result_args if you want different timepoints / age buckets for each one
+
+        # Construct your own result_args if you want different timepoints / age buckets for each one
+
         result_args=sc.objdict(
             hpv_prevalence=sc.objdict(
                 timepoints=[1990],
@@ -535,8 +537,10 @@ class age_results(Analyzer):
         sim.run()
         age_results = sim['analyzers'][0]
 
-    # Alternatively, use standard timepoints and age buckets across all results
+        # Alternatively, use standard timepoints and age buckets across all results
+
         sim = hpv.Sim(analyzers=hpv.age_results(result_keys=['cancers']))
+
     '''
 
     def __init__(self, result_keys=None, die=False, edges=None, timepoints=None, result_args=None, **kwargs):
@@ -703,7 +707,7 @@ class age_results(Analyzer):
         # Shorten variables that are used a lot
         ng = self.ng
         ppl = sim.people
-        
+
         def bin_ages(inds=None, bins=None):
             return np.histogram(ppl.age[inds], bins=bins, weights=ppl.scale[inds])[0] # Bin the people
 
@@ -965,7 +969,7 @@ class age_results(Analyzer):
 
         # Plot totals
         else:
-            ax.plot(x, resdict[date], color=resargs.color, **args.plot, label='Model')
+            ax.plot(x, resdict[date].T, color=resargs.color, **args.plot, label='Model')
             if ('data' in resargs.keys()) and (len(thisdatadf) > 0):
                 ydata = np.array(thisdatadf.value)
                 ax.scatter(x, ydata,  color=resargs.color, **args.scatter, label='Data')

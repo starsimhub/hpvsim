@@ -21,6 +21,7 @@ import hpvsim as hpv
 # Set environment
 os.environ['SPHINX_BUILD'] = 'True' # This is used so cv.options.set('jupyter') doesn't reset the Matplotlib renderer
 os.environ['HPVSIM_WARNINGS'] = 'error' # Don't let warnings pass in the tutorials
+os.environ['PYDEVD_DISABLE_FILE_VALIDATION'] = '1' # Suppress harmless warning in documentation build
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 
 if sys.platform in ["linux", "darwin"]:
@@ -54,6 +55,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',  # Add a link to the Python source code for classes, functions etc.
     'nbsphinx',
+    'IPython.sphinxext.ipython_console_highlighting'  # Temporary fix for https://github.com/spatialaudio/nbsphinx/issues/687
 ]
 
 autodoc_default_options = {

@@ -11,6 +11,7 @@ from . import defaults as hpd
 from . import misc as hpm
 from . import base as hpb
 from . import sim as hps
+from . import utils as hpu
 from . import plotting as hppl
 from . import interventions as hpi
 from .settings import options as hpo
@@ -1486,7 +1487,7 @@ def single_run(sim, ind=0, reseed=True, noise=0.0, noisepar=None, keep_people=Fa
 
     if reseed:
         sim['rand_seed'] += ind # Reset the seed, otherwise no point of parallel runs
-        sim.set_seed()
+        hpu.set_seed()
 
     # If the noise parameter is not found, guess what it should be
     if noisepar is None:

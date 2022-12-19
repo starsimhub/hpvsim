@@ -156,6 +156,8 @@ class Result(object):
         self.high = None
         return
 
+    def __eq__(self, other):
+        return self.npts == other.npts and np.all(self.values == other.values)  and self.scale == other.scale
 
     def __repr__(self):
         ''' Use pretty repr, like sc.prettyobj, but displaying full values '''
@@ -211,6 +213,10 @@ class Result(object):
     @property
     def npts(self):
         return len(self.values)
+
+    @property
+    def shape(self):
+        return self.values.shape
 
 
 def set_metadata(obj, **kwargs):
@@ -305,19 +311,6 @@ class BaseSim(ParsObj):
             self.simfile = 'hpvsim.sim'
         return
 
-
-    def set_seed(self, seed=-1):
-        '''
-        Set the seed for the random number stream from the stored or supplied value
-
-        Args:
-            seed (None or int): if no argument, use current seed; if None, randomize; otherwise, use and store supplied seed
-        '''
-        # Unless no seed is supplied, reset it
-        if seed != -1:
-            self['rand_seed'] = seed
-        hpu.set_seed(self['rand_seed'])
-        return
 
     @property
     def n(self):
@@ -503,10 +496,7 @@ class BaseSim(ParsObj):
             resdict['timeseries_keys'] = self.result_keys()
         for key,res in self.results.items():
             if isinstance(res, Result):
-                if res.values.ndim == 1:
-                    resdict[key] = res.values
-                else:
-                    print(f'WARNING: skipping {key} from export since not 1D array')
+                resdict[key] = res.values
                 if res.low is not None:
                     resdict[key+'_low'] = res.low
                 if res.high is not None:
@@ -586,13 +576,19 @@ class BaseSim(ParsObj):
         d = {}
         for key in keys:
             if key == 'results':
-                resdict = self.export_results(for_json=True)
-                d['results'] = resdict
+                if self.results_ready:
+                    resdict = self.export_results(for_json=True)
+                    d['results'] = resdict
+                else:
+                    d['results'] = 'Results not available (Sim has not yet been run)'
             elif key in ['pars', 'parameters']:
                 pardict = self.export_pars()
                 d['parameters'] = pardict
             elif key == 'summary':
-                d['summary'] = dict(sc.dcp(self.summary))
+                if self.results_ready:
+                    d['summary'] = dict(sc.dcp(self.summary))
+                else:
+                    d['summary'] = 'Summary not available (Sim has not yet been run)'
             else: # pragma: no cover
                 try:
                     d[key] = sc.sanitizejson(getattr(self, key))
@@ -616,6 +612,7 @@ class BaseSim(ParsObj):
             date_index  (bool): if True, use the date as the index
         '''
         resdict = self.export_results(for_json=False)
+        resdict = {k:v for k,v in resdict.items() if v.ndim == 1}
         df = pd.DataFrame.from_dict(resdict)
         df['year'] = self.res_yearvec
         new_columns = ['t','year'] + df.columns[1:-1].tolist() # Get column order

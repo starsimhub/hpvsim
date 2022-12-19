@@ -58,8 +58,7 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
         }
     }
 
-    sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars)
-    sim.set_seed(seed)
+    sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars, rand_seed=seed)
     sim.run(verbose=verbose)
 
     # Optionally plot
@@ -347,6 +346,16 @@ def test_resuming():
 
     return s1
 
+def test_initialize_order():
+
+    s0 = hpv.Sim(n_agents=5e3, genotypes=[16], n_years=10, dt=0.5)
+    s1 = hpv.Sim(n_agents=5e3, genotypes=[16], n_years=10, dt=0.5)
+    s0.initialize()
+    s1.initialize()
+    s0.run()
+    s1.run()
+    assert np.all(s0.results['infections'].values == s1.results['infections']) # Results should be identical
+    return s1
 
 #%% Run as a script
 if __name__ == '__main__':
@@ -362,6 +371,7 @@ if __name__ == '__main__':
     sim5 = test_result_consistency()
     sim6 = test_location_loading()
     sim7 = test_resuming()
+    sim8 = test_initialize_order()
 
     sc.toc(T)
     print('Done.')
