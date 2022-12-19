@@ -131,19 +131,25 @@ def check_immunity(people):
     '''
     Calculate people's immunity on this timestep from prior infections.
     As an example, suppose HPV16 and 18 are in the sim, and the cross-immunity matrix is:
+
         pars['immunity'] = np.array([[1., 0.5],
                                      [0.3, 1.]])
+
     This indicates that people who've had HPV18 have 50% protection against getting 16, and
     people who've had 16 have 30% protection against getting 18.
     Now suppose we have 3 people, whose immunity levels are
+
         people.imm = np.array([[0.9, 0.0, 0.0],
                                [0.0, 0.7, 0.0]])
+
     This indicates that person 1 has a prior HPV16 infection, person 2 has a prior HPV18
     infection, and person 3 has no history of infection.
 
     In this function, we take the dot product of pars['immunity'] and people.imm to get:
+
         people.sus_imm = np.array([[0.9 , 0.35, 0.  ],
                                    [0.27, 0.7 , 0.  ]])
+
     This indicates that the person 1 has high protection against reinfection with HPV16, and
     some (30% of 90%) protection against infection with HPV18, and so on.
 

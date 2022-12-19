@@ -8,6 +8,17 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 0.4.10 (2022-12-19)
+---------------------------
+- Change the seed used for running simulations to avoid having random processes in the model run sometimes being correlated with population attributes
+- Deprecate ``Sim.set_seed()`` - use ``hpu.set_seed()`` instead
+- Added ``hpvsim.rootdir`` to provide a convenient absolute path to the
+- Added equality operator for `Result` objects
+- Exporting simulation results to JSON now includes 2D results (e.g., by genotype)
+- ``age_pyramid`` and ``age_results`` analyzer argument changed from ``datafile`` to ``data`` since this input supports both passing in a filename or a dataframe
+- *GitHub info*: PRs `485 <https://github.com/amath-idm/hpvsim/pull/485>`__
+
+
 Version 0.4.9 (2022-12-16)
 --------------------------
 - Added in high- and low-grade lesions to type distribution results
@@ -30,7 +41,7 @@ Version 0.4.7 (2022-12-13)
 Version 0.4.6 (2022-12-12)
 --------------------------
 - Changes to several default parameters: default genotypes are now 16, 18, and other high-risk; and default hpv control prob is now 0.
- - Results now capture infections by age and type distributions.
+- Results now capture infections by age and type distributions.
 - Adds age of cancer to analyzer
 - Changes to default plotting styles
 - Various bugfixes: prevents immunity values from exceeding 1, ensures people with cancer aren't given second cancers

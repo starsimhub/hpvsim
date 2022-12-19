@@ -1,5 +1,8 @@
-name: HPVsim CI workflow
-on: [pull_request]
+name: HPVsim CI tests
+on:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
 
 jobs:
   install_and_test:
@@ -9,7 +12,7 @@ jobs:
       fail-fast: false
       max-parallel: 8
       matrix:
-        python-version: [ '3.9' ]
+        python-version: [ '3.11' ]
     name: Install and test
     steps:
       - name: Checkout sources
@@ -22,13 +25,12 @@ jobs:
         run:  pip install -e .
       - name: Install tests
         working-directory: ./tests
-        run: pip install -r requirements_test.txt
+        run: pip install -r requirements.txt
       - name: Run all tests
         working-directory: ./tests
         run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml # Run actual tests
-      - name: Upload test results
-        uses: actions/upload-artifact@v1
-        if: failure()
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v3
+        if: always() # always run even if the previous step fails
         with:
-          name: test_results
-          path: tests/test-results.xml
+          report_paths: './tests/test-results.xml'
