@@ -299,15 +299,18 @@ class People(hpb.BasePeople):
             is_cin3 = peak_dysp > ccut['cin2']
             dysp_time = dur_dysp[is_cin3]
             cancer_probs = np.zeros(len(inds))
-            cancer_probs[is_cin3] = 1-(1-cancer_prob)**dysp_time
+            cin3_time = dysp_time - sc.randround(hpu.invlogf1(ccut['cin2'], prog_rate[is_cin3]))
+            cancer_probs[is_cin3] = 1-(1-cancer_prob)**cin3_time
             is_cancer = hpu.binomial_arr(cancer_probs)
             cancer_inds = inds[is_cancer]  # Duplicated below, but avoids need to append extra arrays
             self.scale[cancer_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
             extra_peak_dysp = dysp_arrs.peak_dysp[:, 1:]
             extra_dysp_time = dysp_arrs.dur_dysp[:, 1:]
+            extra_prog_rate = dysp_arrs.prog_rate[:, 1:]
             extra_cin3_bools = extra_peak_dysp > ccut['cin2']
             extra_cancer_probs = np.zeros_like(extra_cin3_bools, dtype=hpd.default_float) # For storing probs that CIN3 agents will advance to cancer
-            extra_cancer_probs[extra_cin3_bools] = 1-(1-cancer_prob)**extra_dysp_time[extra_cin3_bools] # Prob of cancer is zero for agents without CIN3
+            extra_cin3_time = extra_dysp_time[extra_cin3_bools] - sc.randround(hpu.invlogf1(ccut['cin2'], extra_prog_rate[extra_cin3_bools]))
+            extra_cancer_probs[extra_cin3_bools] = 1-(1-cancer_prob)**extra_cin3_time # Prob of cancer is zero for agents without CIN3
             extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs)
             extra_cancer_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
             extra_cancer_counts = extra_cancer_bools.sum(axis=1)  # Find out how many new cancer cases we have
@@ -355,7 +358,8 @@ class People(hpb.BasePeople):
             cancer_probs[is_cancer] = 1 # Make sure inds that got assigned cancer above dont get stochastically missed
         else:
             dysp_time = dur_dysp[is_cin3]
-            cancer_probs[is_cin3] = 1 - (1 - cancer_prob) ** dysp_time
+            cin3_time = dysp_time - sc.randround(hpu.invlogf1(ccut['cin2'], prog_rate[is_cin3]))
+            cancer_probs[is_cin3] = 1 - (1 - cancer_prob) ** cin3_time
         is_cancer = hpu.binomial_arr(cancer_probs)
         cin2_inds = inds[is_cin2]  # Indices of those progress at least to CIN2
         cin3_inds = inds[is_cin3]  # Indices of those progress at least to CIN3
