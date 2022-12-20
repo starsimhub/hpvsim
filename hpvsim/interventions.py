@@ -380,12 +380,9 @@ class CampaignDelivery(Intervention):
     def initialize(self, sim):
         # Decide whether to apply the intervention at every timepoint throughout the year, or just once.
         if self.interpolate:
-            yearpoints = []
-            for yi, year in enumerate(self.years):
-                yearpoints += [year+(i*sim['dt']) for i in range(int(1 / sim['dt']))]
-            self.timepoints = np.array([sc.findinds(sim.yearvec,yp)[0] for yp in yearpoints])
+            self.timepoints = hpu.true(np.isin(np.floor(sim.yearvec), np.floor(self.years)))
         else:
-            self.timepoints = np.array([sc.findinds(sim.yearvec,year)[0] for year in self.years])
+            self.timepoints = hpu.true(np.isin(sim.yearvec, self.years))
 
         # Get the probability input into a format compatible with timepoints
         if len(self.prob) == len(self.years) and self.interpolate:
