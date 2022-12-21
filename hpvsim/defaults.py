@@ -428,11 +428,11 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         if is_sim:
             plots = sc.objdict({
-                'HPV prevalence': 'hpv_prevalence',
-                'Infections by age': 'infections_by_age',
-                'CIN incidence (per 100,000 women)': 'cin_incidence',
-                'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
+                'HPV/CIN prevalence': ['hpv_prevalence', 'cin1_prevalence', 'cin2_prevalence', 'cin3_prevalence'],
+                'HPV incidence by age': 'hpv_incidence_by_age',
+                'CIN by genotype': 'cin_prevalence_by_genotype',
                 'Cancers by age': 'cancers_by_age',
+                'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'HPV type distribution': 'type_dist',
             })
 

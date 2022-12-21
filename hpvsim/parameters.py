@@ -160,7 +160,7 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     layer_defaults['random'] = dict(
         partners    = dict(a=dict(dist='poisson', par1=0.01)), # Everyone in this layer has one partner; this captures *additional* partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 partner
         acts        = dict(a=dict(dist='neg_binomial', par1=100,par2=50)),  # Default number of sexual acts per year for people at sexual peak
-        age_act_pars = dict(a=dict(peak=35, retirement=65, debut_ratio=0.5, retirement_ratio=0.1)), # Parameters describing changes in coital frequency over agent lifespans
+        age_act_pars = dict(a=dict(peak=35, retirement=60, debut_ratio=0.5, retirement_ratio=0.1)), # Parameters describing changes in coital frequency over agent lifespans
         layer_probs = dict(a=1.0),  # Default proportion of the population in each layer
         dur_pship   = dict(a=dict(dist='normal_pos', par1=5,par2=3)),    # Default duration of partnerships
         condoms     = dict(a=0.25),  # Default proportion of acts in which condoms are used
@@ -175,8 +175,8 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts per year for people at sexual peak
                             c=dict(dist='neg_binomial', par1=10, par2=5), # Default number of acts per year for people at sexual peak
                             o=dict(dist='neg_binomial', par1=1,  par2=.01)),  # Default number of acts per year for people at sexual peak
-        age_act_pars = dict(m=dict(peak=35, retirement=65, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
-                            c=dict(peak=25, retirement=65, debut_ratio=0.5, retirement_ratio=0.1),
+        age_act_pars = dict(m=dict(peak=30, retirement=60, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
+                            c=dict(peak=25, retirement=60, debut_ratio=0.5, retirement_ratio=0.1),
                             o=dict(peak=25, retirement=50, debut_ratio=0.5, retirement_ratio=0.1)),
         dur_pship   = dict(m=dict(dist='normal_pos', par1=8, par2=3),
                            c=dict(dist='normal_pos', par1=1, par2=1),
@@ -805,19 +805,19 @@ def get_mixing(network=None):
             [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
             [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
             [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [15,    0,  0,  1,  1, 1,  1.0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [20,    0,  0, .5,  1,  1, 1,  1.0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [25,    0,  0,  0,  1,  1,  1, 1.0,  1.0,  0,  0,  0,  0,  0,  0,  0,  0],
-            [30,    0,  0,  0,  .5,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
-            [35,    0,  0,  0,  .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
-            [40,    0,  0,  0,  0,  .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
-            [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
-            [50,    0,  0,  0,  0,  0,  0.5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
-            [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
-            [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
-            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
-            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5],
-            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1],
+            [15,    0,  0,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .5,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0,  0,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  0, .5,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0,  0, .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0,  0, .1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0,  0, .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0, .1, .5, .5,  1,  1,  1, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0,  0, .1, .5, .5,  1,  1, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0,  0, .1, .1,  1,  1,  1, .5,  0,  0],
+            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0, .1,  1,  1,  1,  2, .5,  0],
+            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0, .1,  1,  1,  1,  1, .5],
+            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1],
         ]),
             o=np.array([
             #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
@@ -848,8 +848,8 @@ def get_mixing(network=None):
             ),
             c=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  0.10,   0.7,  0.8,  0.6,  0.6,  0.5,   0.2,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
-                [ 0,  0,  0.05,   0.7,  0.8,  0.6,  0.6,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
+                [ 0,  0,  0.10,   0.5,  0.8,  0.6,  0.6,  0.5,   0.2,  0.05,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having casual relationships
+                [ 0,  0,  0.05,   0.2,  0.8,  0.6,  0.6,  0.5,   0.5,   0.4,   0.3,  0.1, 0.05, 0.01, 0.01, 0.01]], # Share of males of each age having casual relationships
             ),
             o=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
