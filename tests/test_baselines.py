@@ -26,20 +26,13 @@ def make_sim(use_defaults=False, do_plot=False, **kwargs):
     plot the sim by default.
     '''
 
-    # Define some products
-    dfvia = hpv.dx(pd.read_csv(sc.path(sc.thisdir(), 'test_data/test_via.csv')), hierarchy=['positive', 'inadequate', 'negative'])
-    dfvia_triage = hpv.dx(pd.read_csv(sc.path(sc.thisdir(), 'test_data/test_via_triage.csv')),
-                          hierarchy=['positive', 'inadequate', 'negative'])
-    dftx_assigner = hpv.dx(pd.read_csv(sc.path(sc.thisdir(), 'test_data/test_tx_assigner.csv')),
-                           hierarchy=['radiation', 'excision', 'ablation', 'none'])
-
     # Define some interventions
     prob = 0.02
-    screen      = hpv.routine_screening(start_year=2040, prob=prob, product=dfvia, label='screen')
+    screen      = hpv.routine_screening(start_year=2040, prob=prob, product='hpv', label='screen')
     to_triage   = lambda sim: sim.get_intervention('screen').outcomes['positive']
-    triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product=dfvia_triage, label='triage')
+    triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product='via', label='triage')
     to_treat    = lambda sim: sim.get_intervention('triage').outcomes['positive']
-    assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product=dftx_assigner, label='assign_tx')
+    assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product='tx_assigner', label='assign_tx')
     to_ablate   = lambda sim: sim.get_intervention('assign_tx').outcomes['ablation']
     ablation    = hpv.treat_num(eligibility=to_ablate, prob=prob, product='ablation')
     to_excise   = lambda sim: sim.get_intervention('assign_tx').outcomes['excision']
