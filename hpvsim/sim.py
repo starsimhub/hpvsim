@@ -1118,6 +1118,14 @@ class Sim(hpb.BaseSim):
         self.results['cum_tx_vaccinated'][:] = np.cumsum(self.results['new_tx_vaccinated'][:], axis=0)
         self.results['cum_txvx_doses'][:] = np.cumsum(self.results['new_txvx_doses'][:])
 
+        # Screen & treat results
+        self.results['cum_screens'][:] = np.cumsum(self.results['new_screens'][:], axis=0)
+        self.results['cum_screened'][:] = np.cumsum(self.results['new_screened'][:], axis=0)
+        self.results['cum_cin_treatments'][:] = np.cumsum(self.results['new_cin_treatments'][:], axis=0)
+        self.results['cum_cin_treated'][:] = np.cumsum(self.results['new_cin_treated'][:], axis=0)
+        self.results['cum_cancer_treatments'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
+        self.results['cum_cancer_treated'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
+
         return
 
 
