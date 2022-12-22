@@ -1036,6 +1036,12 @@ class Sim(hpb.BaseSim):
         self.results['cin_incidence_by_genotype'][:]    = res['cins_by_genotype'][:] / demoninator
         self.results['cancer_incidence_by_genotype'][:] = res['cancers_by_genotype'][:] / demoninator
 
+        self.results['cin1_incidence_by_age'][:]        = sc.safedivide(res['cin1s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin2_incidence_by_age'][:]        = sc.safedivide(res['cin2s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin3_incidence_by_age'][:]        = sc.safedivide(res['cin3s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin_incidence_by_age'][:]         = sc.safedivide(res['cins'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cancer_incidence_by_age'][:]      = sc.safedivide(res['cancers'][:], res['n_alive_by_age'][:]/scale_factor)
+
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
