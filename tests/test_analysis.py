@@ -18,7 +18,7 @@ def test_snapshot():
 
     sc.heading('Testing snapshot analyzer')
 
-    pars = dict(n_years=10, dt=0.5)
+    pars = dict(n_years=10, dt=0.5, start=2015)
 
     sim = hpv.Sim(pars, analyzers=hpv.snapshot(['2016', '2019']))
     sim.run()
