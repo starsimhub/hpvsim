@@ -13,7 +13,7 @@ Version 0.4.11 (2022-12-21)
 ---------------------------
 - Adds colposcopy and cytology testing options, along with default values for screening sensitivity and specificity.
 - Removes use_multiscale parameter and sets ms_agent_ratio to 1 by default
-- *GitHub info*: PR `496 <https://github.com/amath-idm/hpvsim/pull/496>`__
+- *GitHub info*: PR `497 <https://github.com/amath-idm/hpvsim/pull/497>`__
 
 
 Version 0.4.10 (2022-12-19)
