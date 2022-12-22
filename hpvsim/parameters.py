@@ -33,7 +33,6 @@ def make_pars(**kwargs):
     pars['n_agents']        = 20e3      # Number of agents
     pars['total_pop']       = None      # If defined, used for calculating the scale factor
     pars['pop_scale']       = None      # How much to scale the population
-    pars['use_multiscale']  = False     # Whether to use multiscale modeling
     pars['ms_agent_ratio']  = 1         # Ratio of scale factor of cancer agents to normal agents -- must be an integer
     pars['network']         = 'default' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = None      # What location to load data from -- default Seattle
@@ -511,7 +510,6 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, default=False, g
     Get the cross immunity between each genotype in a sim
     '''
     pars = dict(
-        # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
         hpv16 = dict(
             hpv16  = 1.0, # Default for own-immunity
             hpv18 = cross_imm_high,

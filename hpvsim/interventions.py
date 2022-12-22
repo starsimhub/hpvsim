@@ -1310,8 +1310,9 @@ class tx(Product):
     Treatment products include anything used to treat cancer or precancer, as well as therapeutic vaccination.
     They change fundamental properties about People, including their prognoses and infectiousness.
     '''
-    def __init__(self, df, name=None, clears_all=False):
+    def __init__(self, df, clearance=0.8, name=None):
         self.df = df
+        self.clearance = clearance
         self.name = df.name.unique()[0]
         self.states = df.state.unique()
         self.genotypes = df.genotype.unique()
@@ -1354,9 +1355,14 @@ class tx(Product):
                         people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
                         people[f'date_{state}'][g, eff_treat_inds] = np.nan
 
-                        # Set date of clearance of infection on next timestep
-                        people['date_clearance'][g, eff_treat_inds] = people.t + 1
-                        people.dur_infection[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
+                        # Determine whether women also clear infection
+                        clearance_probs = np.full(len(eff_treat_inds), self.clearance, dtype=hpd.default_float)
+                        to_clear = hpu.binomial_arr(clearance_probs)  # Determine who will have effective treatment
+                        clear_inds = eff_treat_inds[to_clear]
+                        if len(clear_inds):
+                            # If so, set date of clearance of infection on next timestep
+                            people['date_clearance'][g, clear_inds] = people.t + 1
+                            people.dur_infection[g, clear_inds] = (people.t - people.date_infectious[g, clear_inds]) * people.pars['dt']
 
         tx_successful = np.array(list(set(tx_successful)))
         tx_unsuccessful = np.setdiff1d(inds, tx_successful)
@@ -1424,9 +1430,18 @@ def default_dx(prod_name=None):
     Create default diagnostic products
     '''
     dfdx = pd.read_csv(datafiles.dx) # Read in dataframe with parameters
-    dxprods = dict()
-    for name in dfdx.name.unique():
-        dxprods[name] = dx(dfdx[dfdx.name==name])
+    dxprods = dict(
+        # Default primary screening diagnostics
+        via             = dx(dfdx[dfdx.name == 'via'],              hierarchy=['positive', 'inadequate', 'negative']),
+        lbc             = dx(dfdx[dfdx.name == 'lbc'],              hierarchy=['abnormal', 'ascus', 'inadequate', 'normal']),
+        pap             = dx(dfdx[dfdx.name == 'pap'],              hierarchy=['abnormal', 'ascus', 'inadequate', 'normal']),
+        colposcopy      = dx(dfdx[dfdx.name == 'colposcopy'],       hierarchy=['cancer', 'hsil', 'lsil', 'ascus', 'normal']),
+        hpv             = dx(dfdx[dfdx.name == 'hpv'],              hierarchy=['positive', 'inadequate', 'negative']),
+        hpv1618         = dx(dfdx[dfdx.name == 'hpv1618'],          hierarchy=['positive', 'inadequate', 'negative']),
+        # Diagnostics used to determine of subsequent care pathways
+        txvx_assigner   = dx(dfdx[dfdx.name == 'txvx_assigner'],    hierarchy=['triage', 'txvx', 'none']),
+        tx_assigner     = dx(dfdx[dfdx.name == 'tx_assigner'],      hierarchy=['radiation', 'excision', 'ablation', 'none']),
+    )
     if prod_name is not None:   return dxprods[prod_name]
     else:                       return dxprods
 
