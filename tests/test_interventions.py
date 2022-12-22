@@ -580,11 +580,11 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_screen_prob()
-    # sim1 = test_all_interventions(do_plot=do_plot)
-    # sim2 = test_txvx_noscreen()
-    # sim3 = test_screening()
-    # scens0 = test_vx_effect()
+    sim0 = test_screen_prob()
+    sim1 = test_all_interventions(do_plot=do_plot)
+    sim2 = test_txvx_noscreen()
+    sim3 = test_screening()
+    scens0 = test_vx_effect()
     scens1 = test_cytology()
 
 

@@ -8,6 +8,14 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+
+Version 0.4.11 (2022-12-21)
+---------------------------
+- Adds colposcopy and cytology testing options, along with default values for screening sensitivity and specificity.
+- Removes use_multiscale parameter and sets ms_agent_ratio to 1 by default
+- *GitHub info*: PR `496 <https://github.com/amath-idm/hpvsim/pull/496>`__
+
+
 Version 0.4.10 (2022-12-19)
 ---------------------------
 - Change the seed used for running simulations to avoid having random processes in the model run sometimes being correlated with population attributes
@@ -16,7 +24,7 @@ Version 0.4.10 (2022-12-19)
 - Added equality operator for `Result` objects
 - Exporting simulation results to JSON now includes 2D results (e.g., by genotype)
 - ``age_pyramid`` and ``age_results`` analyzer argument changed from ``datafile`` to ``data`` since this input supports both passing in a filename or a dataframe
-- *GitHub info*: PRs `485 <https://github.com/amath-idm/hpvsim/pull/485>`__
+- *GitHub info*: PR `485 <https://github.com/amath-idm/hpvsim/pull/485>`__
 
 
 Version 0.4.9 (2022-12-16)
