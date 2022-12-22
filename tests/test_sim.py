@@ -305,9 +305,6 @@ def test_location_loading():
     sim2 = hpv.Sim(location='Zimbabwe') # Location should not be case sensitive
     assert not np.array_equal( sim0['birth_rates'][1],sim1['birth_rates'][1]) # Values for Zimbabwe should be different to default values
     assert np.array_equal(sim1['birth_rates'][1], sim2['birth_rates'][1]) # Values for Zimbabwe should be loaded regardless of capitalization
-    with pytest.warns(RuntimeWarning): # If the location doesn't exist, should use defaults
-        sim3 = hpv.Sim(location='penelope') # Make sure a warning message is raised
-    assert np.array_equal(sim0['birth_rates'][1], sim3['birth_rates'][1]) # Check that defaults have been used
 
     return sim1
 
