@@ -1427,8 +1427,9 @@ def default_dx(prod_name=None):
     dxprods = dict(
         # Default primary screening diagnostics
         via             = dx(dfdx[dfdx.name == 'via'],              hierarchy=['positive', 'inadequate', 'negative']),
-        lbc             = dx(dfdx[dfdx.name == 'lbc'],              hierarchy=['hsil', 'lsil', 'ascus', 'negative']),
-        pap             = dx(dfdx[dfdx.name == 'pap'],              hierarchy=['hsil', 'lsil', 'ascus', 'negative']),
+        lbc             = dx(dfdx[dfdx.name == 'lbc'],              hierarchy=['abnormal', 'ascus', 'inadequate', 'normal']),
+        pap             = dx(dfdx[dfdx.name == 'pap'],              hierarchy=['abnormal', 'ascus', 'inadequate', 'normal']),
+        colposcopy      = dx(dfdx[dfdx.name == 'colposcopy'],       hierarchy=['cancer', 'hsil', 'lsil', 'ascus', 'normal']),
         hpv             = dx(dfdx[dfdx.name == 'hpv'],              hierarchy=['positive', 'inadequate', 'negative']),
         hpv1618         = dx(dfdx[dfdx.name == 'hpv1618'],          hierarchy=['positive', 'inadequate', 'negative']),
         # Diagnostics used to determine of subsequent care pathways

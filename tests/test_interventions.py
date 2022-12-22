@@ -491,6 +491,88 @@ def test_screening():
     return sim
 
 
+def test_cytology():
+    sc.heading('Test cytology vs HPV')
+
+    # Algorithm 3 (https://www.ncbi.nlm.nih.gov/books/NBK572308/)
+
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened)# Single lifetime screen
+    cytology = hpv.routine_screening(
+        product='lbc',
+        prob=1.0,
+        eligibility=screen_eligible,
+        start_year=2020,
+        label='cytology',
+    )
+
+    # Triage ASCUS with HPV test
+    ascus = lambda sim: sim.get_intervention('cytology').outcomes['ascus']
+    hpv_triage = hpv.routine_triage(
+        product='hpv',
+        prob=.5,
+        annual_prob=False,
+        eligibility=ascus,
+        label='hpv triage'
+    )
+
+    # Send abnormal cytology results, plus ASCUS results that were HPV+, for colpo
+    to_colpo = lambda sim: list(set(sim.get_intervention('cytology').outcomes['abnormal'].tolist() + sim.get_intervention('hpv triage').outcomes['positive'].tolist()))
+    colpo = hpv.routine_triage(
+        product='colposcopy',
+        prob = 0.5,
+        annual_prob=False,
+        eligibility=to_colpo,
+        label = 'colposcopy'
+    )
+
+    # After colpo, treat HSILs with excision and LSILs with ablation
+    lsils = lambda sim: sim.get_intervention('colposcopy').outcomes['lsil']
+    ablation = hpv.treat_num(
+        prob = 0.5,
+        product = 'ablation',
+        eligibility = lsils,
+        label = 'ablation'
+    )
+
+    hsils = lambda sim: sim.get_intervention('colposcopy').outcomes['hsil']
+    excision = hpv.treat_num(
+        prob = 0.2,
+        product = 'excision',
+        eligibility = hsils,
+        label = 'excision'
+    )
+
+    interventions = [cytology, hpv_triage, colpo, ablation, excision]
+
+    for intv in interventions: intv.do_plot=False
+
+    base_sim = hpv.Sim(pars=base_pars)
+
+    scenarios = {
+        'baseline': {
+            'name': 'Baseline',
+            'pars': {
+            }
+        },
+        'algo3': {
+            'name': 'Algorithm 3',
+            'pars': {
+                'interventions': interventions
+            }
+        },
+    }
+
+    metapars = {'n_runs': 3}
+    scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
+    scens.run(debug=0)
+    to_plot = {
+        'HPV prevalence': ['hpv_prevalence'],
+        'Age standardized cancer incidence (per 100,000 women)': ['asr_cancer_incidence'],
+        'Cancer deaths per 100,000 women': ['cancer_mortality'],
+    }
+    scens.plot(to_plot=to_plot)
+    return scens
+
 
 #%% Run as a script
 if __name__ == '__main__':
@@ -498,11 +580,12 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_screen_prob()
-    sim1 = test_all_interventions(do_plot=do_plot)
-    sim2 = test_txvx_noscreen()
-    sim3 = test_screening()
-    scens0 = test_vx_effect()
+    # sim0 = test_screen_prob()
+    # sim1 = test_all_interventions(do_plot=do_plot)
+    # sim2 = test_txvx_noscreen()
+    # sim3 = test_screening()
+    # scens0 = test_vx_effect()
+    scens1 = test_cytology()
 
 
     sc.toc(T)
