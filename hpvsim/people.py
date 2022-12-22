@@ -241,7 +241,7 @@ class People(hpb.BasePeople):
         dysp_arrs = sc.objdict() # Store severity arrays
         
         # Evaluate duration of dysplasia prior to clearance/control/progression to cancer
-        n_cols = self.pars['ms_agent_ratio'] if self.pars['use_multiscale'] else 1
+        n_cols = self.pars['ms_agent_ratio']
         full_size = (len(inds), n_cols) # Main axis is indices, but include columns for multiscale agents
         dur_dysp = hpu.sample(**gpars['dur_dysp'], size=full_size)
         self.dur_infection[g, inds] += dur_dysp[:,0] # TODO: should this be mean(axis=1) instead?
@@ -295,7 +295,7 @@ class People(hpb.BasePeople):
         # Handle multiscale to create additional cancer agents
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
         cancer_scale = self.pars['pop_scale'] / n_extra
-        if self.pars['use_multiscale'] and n_extra  > 1:
+        if n_extra  > 1:
             is_cin3 = peak_dysp > ccut['cin2']
             dysp_time = dur_dysp[is_cin3]
             cancer_probs = np.zeros(len(inds))
@@ -354,7 +354,7 @@ class People(hpb.BasePeople):
         is_cin2 = peak_dysp > ccut['cin1']
         is_cin3 = peak_dysp > ccut['cin2']
         cancer_probs = np.zeros(len(inds))
-        if self.pars['use_multiscale'] and n_extra > 1:
+        if n_extra > 1:
             cancer_probs[is_cancer] = 1 # Make sure inds that got assigned cancer above dont get stochastically missed
         else:
             dysp_time = dur_dysp[is_cin3]
