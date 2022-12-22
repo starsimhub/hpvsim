@@ -12,6 +12,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 Version 0.4.11 (2022-12-21)
 ---------------------------
 - Adds colposcopy and cytology testing options, along with default values for screening sensitivity and specificity.
+- Adds a clearance probability for treatment to control the % of treated women who also clear their infection
 - Removes use_multiscale parameter and sets ms_agent_ratio to 1 by default
 - *GitHub info*: PR `497 <https://github.com/amath-idm/hpvsim/pull/497>`__
 
@@ -30,7 +31,7 @@ Version 0.4.10 (2022-12-19)
 Version 0.4.9 (2022-12-16)
 --------------------------
 - Added in high- and low-grade lesions to type distribution results
-- Changes default duraton and rate of dysplasia for hr HPVs
+- Changes default duration and rate of dysplasia for hr HPVs
 - *GitHub info*: PR `479 <https://github.com/amath-idm/hpvsim/pull/482>`__
 
 

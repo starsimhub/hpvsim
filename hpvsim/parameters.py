@@ -510,7 +510,6 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, default=False, g
     Get the cross immunity between each genotype in a sim
     '''
     pars = dict(
-        # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
         hpv16 = dict(
             hpv16  = 1.0, # Default for own-immunity
             hpv18 = cross_imm_high,
