@@ -33,9 +33,9 @@ def make_pars(**kwargs):
     pars['n_agents']        = 20e3      # Number of agents
     pars['total_pop']       = None      # If defined, used for calculating the scale factor
     pars['pop_scale']       = None      # How much to scale the population
-    pars['ms_agent_ratio']  = 1         # Ratio of scale factor of cancer agents to normal agents -- must be an integer
+    pars['ms_agent_ratio']  = 10         # Ratio of scale factor of cancer agents to normal agents -- must be an integer
     pars['network']         = 'default' # What type of sexual network to use -- 'random', 'basic', other options TBC
-    pars['location']        = None      # What location to load data from -- default Seattle
+    pars['location']        = 'nigeria' # What location to load data from -- default Nigeria
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
     pars['birth_rates']     = None      # Birth rates, loaded below
     pars['death_rates']     = None      # Death rates, loaded below
@@ -220,12 +220,12 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     return
 
 
-def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=None):
+def get_births_deaths(location, verbose=1, by_sex=True, overall=False, die=True):
     '''
     Get mortality and fertility data by location if provided, or use default
 
     Args:
-        location (str):  location; if none specified, use default value for XXX
+        location (str):  location
         verbose (bool):  whether to print progress
         by_sex   (bool): whether to get sex-specific death rates (default true)
         overall  (bool): whether to get overall values ie not disaggregated by sex (default false)
@@ -235,19 +235,16 @@ def get_births_deaths(location=None, verbose=1, by_sex=True, overall=False, die=
         birth_rates (arr): array of crude birth rates by year
     '''
 
-    birth_rates = hpd.default_birth_rates
-    death_rates = hpd.default_death_rates
-    if location is not None:
-        if verbose:
-            print(f'Loading location-specific demographic data for "{location}"')
-        try:
-            death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
-            birth_rates = hpdata.get_birth_rates(location=location)
-        except ValueError as E:
-            warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)}), using default'
-            hpm.warn(warnmsg, die=die)
+    if verbose:
+        print(f'Loading location-specific demographic data for "{location}"')
+    try:
+        death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+        birth_rates = hpdata.get_birth_rates(location=location)
+        return birth_rates, death_rates
+    except ValueError as E:
+        warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)})'
+        hpm.warn(warnmsg, die=die)
 
-    return birth_rates, death_rates
 
 #%% Genotype/immunity parameters and functions
 
