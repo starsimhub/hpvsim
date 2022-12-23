@@ -268,16 +268,10 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_stem   = 'HPV type distribution in'
-# type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
-type_dist_keys   = ['low_grade','high_grade', 'cancerous']
-# type_dist_names  = [f'{type_dist_stem} HPV', f'{type_dist_stem} CIN1', f'{type_dist_stem} low-grade lesion',
-#                     f'{type_dist_stem} CIN2', f'{type_dist_stem} CIN3', f'{type_dist_stem} high-grade lesion',
-#                     f'{type_dist_stem} cancer']
-type_dist_names  = [f'Low-grade lesion',
-                    f'High-grade lesion',
-                    f'Cancer']
+type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
+type_dist_names  = ['Normal', 'CIN1', 'Low-grade lesion', 'CIN2', 'CIN3', 'High-grade lesion', 'Cancer']
 lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
+cyto_states = ['precin', 'low_grade', 'high_grade', 'cancerous']
 
 
 #%% Default initial prevalence

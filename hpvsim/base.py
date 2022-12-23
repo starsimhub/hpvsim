@@ -421,7 +421,7 @@ class BaseSim(ParsObj):
         elif which in ['genotype']:
             keys = [k for k,res in self.results.items() if 'by_genotype' in k and isinstance(res, Result)]
         elif which in ['type_dist']:
-            keys = [k for k, res in self.results.items() if 'genotype_dist' in k and isinstance(res, Result)]
+            keys = [k for k, res in self.results.items() if 'genotype_dist' in k and isinstance(res, Result) and k.replace('_genotype_dist', '') in hpd.cyto_states]
         elif which =='all':
             keys = []
             for subchoice in subchoices: # Recurse over options
