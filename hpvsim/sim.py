@@ -1081,6 +1081,12 @@ class Sim(hpb.BaseSim):
         self.results['cin_incidence_by_genotype'][:]    = res['cins_by_genotype'][:] / demoninator
         self.results['cancer_incidence_by_genotype'][:] = res['cancers_by_genotype'][:] / demoninator
 
+        self.results['cin1_incidence_by_age'][:]        = sc.safedivide(res['cin1s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin2_incidence_by_age'][:]        = sc.safedivide(res['cin2s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin3_incidence_by_age'][:]        = sc.safedivide(res['cin3s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin_incidence_by_age'][:]         = sc.safedivide(res['cins'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cancer_incidence_by_age'][:]      = sc.safedivide(res['cancers'][:], res['n_alive_by_age'][:]/scale_factor)
+
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
@@ -1111,6 +1117,14 @@ class Sim(hpb.BaseSim):
         # Therapeutic vaccination results
         self.results['cum_tx_vaccinated'][:] = np.cumsum(self.results['new_tx_vaccinated'][:], axis=0)
         self.results['cum_txvx_doses'][:] = np.cumsum(self.results['new_txvx_doses'][:])
+
+        # Screen & treat results
+        self.results['cum_screens'][:] = np.cumsum(self.results['new_screens'][:], axis=0)
+        self.results['cum_screened'][:] = np.cumsum(self.results['new_screened'][:], axis=0)
+        self.results['cum_cin_treatments'][:] = np.cumsum(self.results['new_cin_treatments'][:], axis=0)
+        self.results['cum_cin_treated'][:] = np.cumsum(self.results['new_cin_treated'][:], axis=0)
+        self.results['cum_cancer_treatments'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
+        self.results['cum_cancer_treated'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
 
         return
 
