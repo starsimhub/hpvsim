@@ -269,7 +269,7 @@ by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
 type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
-type_dist_names  = ['Normal', 'CIN1', 'Low-grade lesion', 'CIN2', 'CIN3', 'High-grade lesion', 'Cancer']
+type_dist_names  = ['Normal', 'CIN1', 'Low-grade\nlesion', 'CIN2', 'CIN3', 'High-grade\nlesion', 'Cancer']
 lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
 cyto_states = ['precin', 'low_grade', 'high_grade', 'cancerous']
 
