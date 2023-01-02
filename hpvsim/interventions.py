@@ -1438,6 +1438,7 @@ def default_dx(prod_name=None):
         colposcopy      = dx(dfdx[dfdx.name == 'colposcopy'],       hierarchy=['cancer', 'hsil', 'lsil', 'ascus', 'normal']),
         hpv             = dx(dfdx[dfdx.name == 'hpv'],              hierarchy=['positive', 'inadequate', 'negative']),
         hpv1618         = dx(dfdx[dfdx.name == 'hpv1618'],          hierarchy=['positive', 'inadequate', 'negative']),
+        hpv_type        = dx(dfdx[dfdx.name == 'hpv_type'],         hierarchy=['positive_1618', 'positive_ohr', 'inadequate', 'negative']),
         # Diagnostics used to determine of subsequent care pathways
         txvx_assigner   = dx(dfdx[dfdx.name == 'txvx_assigner'],    hierarchy=['triage', 'txvx', 'none']),
         tx_assigner     = dx(dfdx[dfdx.name == 'tx_assigner'],      hierarchy=['radiation', 'excision', 'ablation', 'none']),
