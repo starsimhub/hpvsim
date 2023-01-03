@@ -63,20 +63,18 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         # Other demographic data like mortality and fertility are also available by
         # country, but these are loaded directly into the sim since they are not
         # stored as part of the people.
-        age_data = hpd.default_age_data
         location = sim['location']
-        if location is not None:
-            if sim['verbose']:
-                print(f'Loading location-specific data for "{location}"')
-            if use_age_data:
-                try:
-                    age_data  = hpdata.get_age_distribution(location, year=sim['start'])
-                    pop_trend = hpdata.get_total_pop(location)
-                    total_pop = sum(age_data[:,2]) # Return the total population
-                    pop_age_trend = hpdata.get_age_distribution_over_time(location)
-                except ValueError as E:
-                    warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}), using default'
-                    hpm.warn(warnmsg)
+        if sim['verbose']:
+            print(f'Loading location-specific data for "{location}"')
+        if use_age_data:
+            try:
+                age_data = hpdata.get_age_distribution(location, year=sim['start'])
+                pop_trend = hpdata.get_total_pop(location)
+                total_pop = sum(age_data[:, 2])  # Return the total population
+                pop_age_trend = hpdata.get_age_distribution_over_time(location)
+            except ValueError as E:
+                warnmsg = f'Could not load age data for requested location "{location}" ({str(E)})'
+                hpm.warn(warnmsg, die=True)
 
         uids, sexes, debuts, partners = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
 

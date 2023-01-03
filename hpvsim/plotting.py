@@ -30,7 +30,7 @@ def handle_args(fig_args=None, plot_args=None, scatter_args=None, axis_args=None
     defaults.bar        = sc.objdict(width=0.15)
     defaults.legend     = sc.objdict(loc='best', frameon=False)
     defaults.date       = sc.objdict(as_dates=True, dateformat=None, rotation=None, start=None, end=None)
-    defaults.show       = sc.objdict(data=True, ticks=True, interventions=True, legend=True, outer=False, tight=False, maximize=False)
+    defaults.show       = sc.objdict(data=True, ticks=True, interventions=True, legend=True, outer=False, tight=True, maximize=False)
     defaults.style      = sc.objdict(style=None, dpi=None, font=None, fontsize=None, grid=None, facecolor=None) # Use HPVsim global defaults
 
     # Handle directly supplied kwargs
@@ -180,7 +180,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
                         if reskey in allkeys:
                             name = sim.results[reskey].name
                         elif reskey == 'type_dist':
-                            name = 'HPV types by cytology'
+                            name = 'HPV type distribution'
                     if reskey in time_series_keys:
                         to_plot += hpd.plot_args(reskey, name=name, plot_type='time_series')
                     elif reskey in age_dist_keys:
@@ -408,6 +408,8 @@ def plot_time_series(ax, sim, reskey, resnum, args, colors=None, labels=None, pl
     genotype_keys = sim.result_keys('genotype')
     res_t = sim.results['year'][bi:]
     res = sim.results[reskey]
+    ax.set_xlabel('Year')
+    ax.set_ylabel('Value')
 
     # The exact plotting call depends on what kind of core result key we're dealing with
     # Simplest case: it's a total result, i.e. not disagreggated by genotype or sex
@@ -488,7 +490,9 @@ def plot_type_bars(sim, ax, date, args):
 
     # Add xticks on the middle of the group bars
     ax.set_xticks([r + width for r in range(len(x))], labels)
-
+    ax.set_xlabel('Health state')
+    ax.set_ylabel('Value')
+    
     return ax
 
 
@@ -501,6 +505,8 @@ def plot_age_dist(sim, ax, reskey, date, args):
     res = sim.results[reskey]
     x = sim['age_bins'][:-1]
     ax.plot(x, res.values[:,idx], color=res.color, **args.plot, label=res.name)
+    ax.set_xlabel('Age')
+    ax.set_ylabel('Value')
     return ax
 
 
@@ -546,12 +552,14 @@ def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=N
 
             elif plot_type == 'type_dist':
                 ax = plot_type_bars(sim, ax, plot_arg.year, args)
-                title_grid_legend(ax, title, grid, commaticks, setylim, sc.mergedicts(args.legend,dict(title=int(plot_arg.year))), args.show)
+                title = f'{title}, {int(plot_arg.year)}'
+                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show)
 
             elif plot_type == 'age_dist':
                 for resnum,reskey in enumerate(plot_arg.keys):
                     ax = plot_age_dist(sim, ax, reskey, plot_arg.year, args)
-                title_grid_legend(ax, title, grid, commaticks, setylim, sc.mergedicts(args.legend,dict(title=int(plot_arg.year))), args.show)
+                title = f'{title}, {int(plot_arg.year)}'
+                title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show)
 
 
         output = tidy_up(fig, figs, do_save, fig_path, do_show, args)

@@ -268,104 +268,13 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_stem   = 'HPV type distribution in'
 type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
-type_dist_names  = [f'{type_dist_stem} HPV', f'{type_dist_stem} CIN1', f'{type_dist_stem} low-grade lesion',
-                    f'{type_dist_stem} CIN2', f'{type_dist_stem} CIN3', f'{type_dist_stem} high-grade lesion',
-                    f'{type_dist_stem} cancer']
+type_dist_names  = ['Normal', 'CIN1', 'Low-grade\nlesion', 'CIN2', 'CIN3', 'High-grade\nlesion', 'Cancer']
 lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
+cyto_states = ['precin', 'low_grade', 'high_grade', 'cancerous']
 
 
-#%% Default data (age, death rates, birth dates, initial prevalence)
-
-# Default age data, based on population distribution of Kenya in 1990 -- used in population.py
-default_age_data = np.array([
-    [ 0,  4.9, 0.1900],
-    [ 5,  9.9, 0.1645],
-    [10, 14.9, 0.1366],
-    [15, 19.9, 0.1114],
-    [20, 24.9, 0.0886],
-    [25, 29.9, 0.0714],
-    [30, 34.9, 0.0575],
-    [35, 39.9, 0.0459],
-    [40, 44.9, 0.0333],
-    [45, 49.9, 0.0230],
-    [50, 54.9, 0.0205],
-    [55, 59.9, 0.0184],
-    [60, 64.9, 0.0142],
-    [65, 69.9, 0.0104],
-    [70, 74.9, 0.0072],
-    [75, 79.9, 0.0044],
-    [80, 84.9, 0.0021],
-    [85, 89.9, 0.0006],
-    [90, 99.9, 0.0001],
-])
-
-
-default_death_rates = {1990:{
-    'm': np.array([
-        [0, 7.2104400e-02],
-        [1, 1.0654040e-02],
-        [5, 2.8295600e-03],
-        [10, 1.9216100e-03],
-        [15, 2.7335400e-03],
-        [20, 4.0810100e-03],
-        [25, 4.8902400e-03],
-        [30, 5.9253300e-03],
-        [35, 7.4720500e-03],
-        [40, 9.3652300e-03],
-        [45, 1.1931680e-02],
-        [50, 1.5847690e-02],
-        [55, 2.0939170e-02],
-        [60, 3.0100500e-02],
-        [65, 4.2748730e-02],
-        [70, 6.1530140e-02],
-        [75, 8.9883930e-02],
-        [80, 1.3384614e-01],
-        [85, 1.9983915e-01],
-        [90, 2.8229192e-01],
-        [95, 3.8419482e-01],
-        [100, 4.9952545e-01]]),
-     'f': np.array([
-         [0, 6.5018870e-02],
-         [1, 9.0851100e-03],
-         [5, 2.4186200e-03],
-         [10, 1.7122100e-03],
-         [15, 2.3409200e-03],
-         [20, 3.2310800e-03],
-         [25, 4.0792700e-03],
-         [30, 4.9329000e-03],
-         [35, 6.0179400e-03],
-         [40, 7.2600100e-03],
-         [45, 8.8378400e-03],
-         [50, 1.1686220e-02],
-         [55, 1.5708330e-02],
-         [60, 2.3382130e-02],
-         [65, 3.4809540e-02],
-         [70, 5.2215630e-02],
-         [75, 7.7168190e-02],
-         [80, 1.1523265e-01],
-         [85, 1.7457906e-01],
-         [90, 2.5035197e-01],
-         [95, 3.4646801e-01],
-         [100, 4.6195778e-01]
-     ])}
-}
-
-default_birth_rates = np.array([[
-    1960., 1961., 1962., 1963., 1964., 1965., 1966., 1967., 1968., 1969.,
-    1970., 1971., 1972., 1973., 1974., 1975., 1976., 1977., 1978., 1979.,
-    1980., 1981., 1982., 1983., 1984., 1985., 1986., 1987., 1988., 1989.,
-    1990., 1991., 1992., 1993., 1994., 1995., 1996., 1997., 1998., 1999.,
-    2000., 2001., 2002., 2003., 2004., 2005., 2006., 2007., 2008., 2009.,
-    2010., 2011., 2012., 2013., 2014., 2015., 2016., 2017., 2018., 2019.],
-    [51.156, 51.068, 50.976, 50.887, 50.807, 50.748, 50.723, 50.731, 50.768, 50.825,
-     50.887, 50.938, 50.958, 50.935, 50.859, 50.732, 50.560, 50.356, 50.125, 49.863,
-     49.564, 49.219, 48.817, 48.349, 47.808, 47.171, 46.409, 45.529, 44.560, 43.544,
-     42.560, 41.698, 41.015, 40.542, 40.280, 40.196, 40.226, 40.282, 40.289, 40.212,
-     40.037, 39.777, 39.468, 39.135, 38.773, 38.366, 37.890, 37.330, 36.678, 35.942,
-     35.128, 34.249, 33.333, 32.415, 31.522, 30.688, 29.943, 29.296, 28.748, 28.298]
-])
+#%% Default initial prevalence
 
 default_init_prev = {
     'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
@@ -424,12 +333,12 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         if is_sim:
             plots = sc.objdict({
-                'HPV prevalence': 'hpv_prevalence',
-                'CIN incidence (per 100,000 women)': 'cin_incidence',
+                'HPV incidence by age': 'hpv_incidence_by_age',
+                'HPV/CIN prevalence': ['hpv_prevalence', 'cin1_prevalence', 'cin2_prevalence', 'cin3_prevalence'],
+                'CIN prevalence by age': ['cin1_prevalence_by_age', 'cin2_prevalence_by_age', 'cin3_prevalence_by_age'],
                 'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
-                'Infections by age': 'infections_by_age',
                 'Cancers by age': 'cancers_by_age',
-                'HPV types by cytology': 'type_dist',
+                'HPV type distribution': 'type_dist',
             })
 
         else: # pragma: no cover

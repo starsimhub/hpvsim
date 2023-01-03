@@ -434,8 +434,14 @@ class Sim(hpb.BaseSim):
         for stock in hpd.PeopleMeta.stock_states:
             results[f'n_{stock.name}']              = init_res(stock.label, color=stock.color)
             results[f'n_{stock.name}_by_genotype']  = init_res(stock.label+' by genotype', n_rows=ng)
-        # Only by-age stock result we will need is number infectious, for HPV prevalence calculations
+
+        # Only by-age stock result we will need is number infectious, susceptible, and with cin, for HPV and CIN prevalence/incidence calculations
         results[f'n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
+        results[f'n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
+        results[f'n_cin_by_age']                    = init_res('Number CIN by age', n_rows=na, color=stock.color)
+        results[f'n_cin1_by_age']                   = init_res('Number CIN1 by age', n_rows=na, color=stock.color)
+        results[f'n_cin2_by_age']                   = init_res('Number CIN2 by age', n_rows=na, color=stock.color)
+        results[f'n_cin3_by_age']                   = init_res('Number CIN3 by age', n_rows=na, color=stock.color)
 
         # Create incidence and prevalence results
         for var,name,color in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
@@ -495,6 +501,7 @@ class Sim(hpb.BaseSim):
         results['n_alive'] = init_res('Number alive')
         results['n_alive_by_sex'] = init_res('Number alive by sex', n_rows=2)
         results['n_alive_by_age'] = init_res('Number alive by age', n_rows=na)
+        results['n_females_alive_by_age'] = init_res('Number females alive by age', n_rows=na)
         results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
         results['hiv_incidence'] = init_res('HIV incidence')
@@ -502,6 +509,18 @@ class Sim(hpb.BaseSim):
         results['hpv_prevalence'] = init_res('HPV prevalence', color=hpd.stock_colors[0])
         results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0])
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
+        results['cin_prevalence'] = init_res('CIN prevalence', color=hpd.stock_colors[0])
+        results['cin_prevalence_by_genotype'] = init_res('CIN prevalence by genotype', n_rows=ng, color=hpd.stock_colors[0])
+        results['cin_prevalence_by_age'] = init_res('CIN prevalence by age', n_rows=na, color=hpd.stock_colors[0])
+        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=hpd.stock_colors[1])
+        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
+        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[1])
+        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=hpd.stock_colors[2])
+        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[2])
+        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[3])
+        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=hpd.stock_colors[3])
+        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=hpd.stock_colors[3])
+        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=hpd.stock_colors[3])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -820,9 +839,19 @@ class Sim(hpb.BaseSim):
         # Make stock updates every nth step, where n is the frequency of result output
         if t % self.resfreq == self.resfreq-1:
 
-            # Number infectious by age, for prevalence calculations
+            # Number infectious/susceptible by age, for prevalence calculations
             infinds = hpu.true(people['infectious'])
             self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bins, weights=people.scale[infinds])[0]
+            susinds = hpu.true(people['susceptible'])
+            self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bins, weights=people.scale[susinds])[0]
+            cininds = hpu.true(people['cin'])
+            self.results[f'n_cin_by_age'][:, idx] = np.histogram(people.age[cininds], bins=people.age_bins, weights=people.scale[cininds])[0]
+            cin1inds = hpu.true(people['cin1'])
+            self.results[f'n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bins, weights=people.scale[cin1inds])[0]
+            cin2inds = hpu.true(people['cin2'])
+            self.results[f'n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bins, weights=people.scale[cin2inds])[0]
+            cin3inds = hpu.true(people['cin3'])
+            self.results[f'n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bins, weights=people.scale[cin3inds])[0]
 
             # Create total stocks
             for key in hpd.total_stock_keys:
@@ -859,10 +888,12 @@ class Sim(hpb.BaseSim):
 
             # Save number alive
             alive_inds = hpu.true(people.alive)
+            alive_female_inds = hpu.true(people.alive*people.is_female)
             self.results['n_alive'][idx] = people.scale_flows(alive_inds)
             self.results['n_alive_by_sex'][0,idx] = people.scale_flows((people.alive*people.is_female).nonzero()[0])
             self.results['n_alive_by_sex'][1,idx] = people.scale_flows((people.alive*people.is_male).nonzero()[0])
             self.results['n_alive_by_age'][:,idx] = np.histogram(people.age[alive_inds], bins=people.age_bins, weights=people.scale[alive_inds])[0]
+            self.results['n_females_alive_by_age'][:,idx] = np.histogram(people.age[alive_female_inds], bins=people.age_bins, weights=people.scale[alive_female_inds])[0]
 
         # Apply analyzers
         for i,analyzer in enumerate(self.analyzers):
@@ -1011,6 +1042,7 @@ class Sim(hpb.BaseSim):
 
         self.results['hpv_incidence'][:]                = sc.safedivide(res['infections'][:], res['n_susceptible'][:])
         self.results['hpv_incidence_by_genotype'][:]    = safedivide(res['infections_by_genotype'][:], res['n_susceptible_by_genotype'][:])
+        self.results['hpv_incidence_by_age'][:]    = safedivide(res['infections_by_age'][:], res['n_susceptible_by_age'][:])
         self.results['hpv_prevalence'][:]               = sc.safedivide(res['n_infectious'][:], res['n_alive'][:])
         self.results['hpv_prevalence_by_genotype'][:]   = safedivide(res['n_infectious_by_genotype'][:], res['n_alive'][:])
         self.results['hpv_prevalence_by_age'][:]        = safedivide(res['n_infectious_by_age'][:], res['n_alive_by_age'][:])
@@ -1019,6 +1051,19 @@ class Sim(hpb.BaseSim):
 
         # Compute CIN and cancer prevalence
         alive_females = res['n_alive_by_sex'][0,:]
+
+        self.results['cin_prevalence'][:] = sc.safedivide(res['n_cin'][:], alive_females)
+        self.results['cin_prevalence_by_genotype'][:] = safedivide(res['n_cin_by_genotype'][:], alive_females)
+        self.results['cin_prevalence_by_age'][:] = safedivide(res['n_cin_by_age'][:], res['n_females_alive_by_age'][:])
+        self.results['cin1_prevalence'][:] = sc.safedivide(res['n_cin1'][:], alive_females)
+        self.results['cin1_prevalence_by_genotype'][:] = safedivide(res['n_cin1_by_genotype'][:], alive_females)
+        self.results['cin1_prevalence_by_age'][:] = safedivide(res['n_cin1_by_age'][:], res['n_females_alive_by_age'][:])
+        self.results['cin2_prevalence'][:] = sc.safedivide(res['n_cin2'][:], alive_females)
+        self.results['cin2_prevalence_by_genotype'][:] = safedivide(res['n_cin2_by_genotype'][:], alive_females)
+        self.results['cin2_prevalence_by_age'][:] = safedivide(res['n_cin2_by_age'][:], res['n_females_alive_by_age'][:])
+        self.results['cin3_prevalence'][:] = sc.safedivide(res['n_cin3'][:], alive_females)
+        self.results['cin3_prevalence_by_genotype'][:] = safedivide(res['n_cin3_by_genotype'][:], alive_females)
+        self.results['cin3_prevalence_by_age'][:] = safedivide(res['n_cin3_by_age'][:], res['n_females_alive_by_age'][:])
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
@@ -1036,6 +1081,12 @@ class Sim(hpb.BaseSim):
         self.results['cin_incidence_by_genotype'][:]    = res['cins_by_genotype'][:] / demoninator
         self.results['cancer_incidence_by_genotype'][:] = res['cancers_by_genotype'][:] / demoninator
 
+        self.results['cin1_incidence_by_age'][:]        = sc.safedivide(res['cin1s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin2_incidence_by_age'][:]        = sc.safedivide(res['cin2s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin3_incidence_by_age'][:]        = sc.safedivide(res['cin3s'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cin_incidence_by_age'][:]         = sc.safedivide(res['cins'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cancer_incidence_by_age'][:]      = sc.safedivide(res['cancers'][:], res['n_alive_by_age'][:]/scale_factor)
+
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
@@ -1046,11 +1097,11 @@ class Sim(hpb.BaseSim):
                 totals = np.zeros(self.res_npts)
                 by_type = np.zeros((self['n_genotypes'], self.res_npts))
                 for state in hpd.lesion_grade_states[which]:
-                    totals += res[f'n_{state}'][:]
                     by_type += res[f'n_{state}_by_genotype'][:]
+                    totals += res[f'n_{state}_by_genotype'][:].sum(axis=0)
             else:
-                totals = res[f'n_{which}'][:]
                 by_type = res[f'n_{which}_by_genotype'][:]
+                totals = by_type.sum(axis=0)
             inds_to_fill = totals>0
             res[which+'_genotype_dist'][:, inds_to_fill] = by_type[:, inds_to_fill] / totals[inds_to_fill]
 
@@ -1066,6 +1117,14 @@ class Sim(hpb.BaseSim):
         # Therapeutic vaccination results
         self.results['cum_tx_vaccinated'][:] = np.cumsum(self.results['new_tx_vaccinated'][:], axis=0)
         self.results['cum_txvx_doses'][:] = np.cumsum(self.results['new_txvx_doses'][:])
+
+        # Screen & treat results
+        self.results['cum_screens'][:] = np.cumsum(self.results['new_screens'][:], axis=0)
+        self.results['cum_screened'][:] = np.cumsum(self.results['new_screened'][:], axis=0)
+        self.results['cum_cin_treatments'][:] = np.cumsum(self.results['new_cin_treatments'][:], axis=0)
+        self.results['cum_cin_treated'][:] = np.cumsum(self.results['new_cin_treated'][:], axis=0)
+        self.results['cum_cancer_treatments'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
+        self.results['cum_cancer_treated'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
 
         return
 
