@@ -1363,12 +1363,6 @@ class BasePeople(FlexPretty):
         '''
         return (self.infectious + self.inactive).astype(bool)
 
-    @property
-    def cin(self):
-        '''
-        Boolean array of everyone with dysplasia. Union of CIN1, CIN2, CIN3
-        '''
-        return (self.cin1 + self.cin2 + self.cin3).astype(bool)
 
     @property
     def precin(self):

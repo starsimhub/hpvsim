@@ -185,7 +185,7 @@ class People(hpb.BasePeople):
                 self.genotype_flows[key][g] = cases # Store flows by genotype
                 self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
             self.check_clearance(g)
-            self.update_dysp(g)
+            # self.update_dysp(g)
 
         # Perform updates that are not genotype specific
         self.flows['cancer_deaths'] = self.check_cancer_deaths()
@@ -474,9 +474,10 @@ class People(hpb.BasePeople):
 
     def check_progress(self, what, genotype):
         ''' Wrapper function for all the new progression checks '''
-        if what=='dysps':       cases_by_age, cases = self.check_dysplasia(genotype)
-        else:                   cases_by_age, cases = self.check_cancer(genotype)
+        if what=='dysplasias':      cases_by_age, cases = self.check_dysplasia(genotype)
+        else:                       cases_by_age, cases = self.check_cancer(genotype)
         return cases_by_age, cases
+
 
     def check_dysplasia(self, genotype):
         ''' Check for new progressions to dysplasia '''
@@ -716,16 +717,11 @@ class People(hpb.BasePeople):
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
             alive_inds = hpu.true(self.alive_level0)
-            n_alive = len(alive_inds)
-            expected_old = np.interp(year, data_years, data_pop) * scale
-            n_migrate_old = int(expected_old - n_alive)
             ages = self.age[alive_inds].astype(int) # Return ages for everyone level 0 and alive
             count_ages = np.bincount(ages, minlength=age_dist_data.shape[0]) # Bin and count them
             expected = age_dist_data['PopTotal'].values*scale # Compute how many of each age we would expect in population
             difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
             n_migrate = np.sum(difference) # Compute total migrations (in and out)
-            # print(f'old method has {n_migrate_old} migrations, new method has {n_migrate} migrations, difference of {abs(n_migrate_old-n_migrate)}')
-
             ages_to_remove = hpu.true(difference<0) # Ages where we have too many, need to apply emigration
             n_to_remove = [int(i) for i in difference[ages_to_remove]] # Determine number of agents to remove for each age
             ages_to_add = hpu.true(difference>0) # Ages where we have too few, need to apply imigration
