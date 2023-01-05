@@ -233,6 +233,9 @@ class Flow():
 flows = [
     Flow('infections',              color='#c78f65',    label='Infections'),
     Flow('dysplasias',              color='#c1ad71',    label='Dysplasias'),
+    Flow('cin1s',                   color='#c1ad71',    label='CIN1s'),
+    Flow('cin2s',                   color='#c1981d',    label='CIN2s'),
+    Flow('cin3s',                   color='#b86113',    label='CIN3s'),
     Flow('cancers',                 color='#5f5cd2',    label='Cancers'),
     Flow('detected_cancers',        color='#5f5cd2',    label='Cancer detections', by_genotype=False),
     Flow('cancer_deaths',           color='#000000',    label='Cancer deaths', by_genotype=False),
@@ -254,9 +257,9 @@ other_stock_keys = [state.name for state in PeopleMeta.intv_states+PeopleMeta.hi
 
 # Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
-inci_keys   = ['hpv',       'dysplasia',      'cancer']
-inci_names  = ['HPV',       'Dysplasia',      'Cancer']
-inci_colors = ['#c78f65',   '#c1ad71',        '#5f5cd2']
+inci_keys   = ['hpv',       'cin1',     'cin2',     'cin3',     'dysplasia',      'cancer']
+inci_names  = ['HPV',       'CIN1',     'CIN2',     'CIN3',     'Dysplasia',      'Cancer']
+inci_colors = ['#c78f65',   '#c1ad71',  '#c1981d',  '#b86113',  '#c1ad71',  '#5f5cd2']
 
 # Demographics
 dem_keys    = ['births',    'other_deaths', 'migration']
@@ -269,8 +272,10 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_keys   = ['precin', 'dysp', 'cancerous']
-type_dist_names  = ['Normal', 'Dysplasia', 'Cancer']
+type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
+type_dist_names  = ['Normal', 'CIN1', 'Low-grade\nlesion', 'CIN2', 'CIN3', 'High-grade\nlesion', 'Cancer']
+lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
+cyto_states = ['precin', 'low_grade', 'high_grade', 'cancerous']
 
 #%% Default initial prevalence
 
@@ -332,7 +337,8 @@ def get_default_plots(which='default', kind='sim', sim=None):
         if is_sim:
             plots = sc.objdict({
                 'HPV incidence by age': 'hpv_incidence_by_age',
-                'HPV/Dysplasia prevalence': ['hpv_prevalence', 'dysplasia_prevalence'],
+                'HPV/CIN prevalence': ['hpv_prevalence', 'cin1_prevalence', 'cin2_prevalence', 'cin3_prevalence'],
+                'CIN prevalence by age': ['cin1_prevalence_by_age', 'cin2_prevalence_by_age', 'cin3_prevalence_by_age'],
                 'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'Cancers by age': 'cancers_by_age',
                 'HPV type distribution': 'type_dist',
