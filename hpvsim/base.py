@@ -1393,14 +1393,14 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with dysplasia <33%.
         '''
-        return (self.infectious * self.dysp * (self.current_dysp>0.33) * (self.current_dysp<0.67)).astype(bool)
+        return (self.infectious * self.dysp * (self.current_dysp>=0.33) * (self.current_dysp<0.67)).astype(bool)
 
     @property
     def cin3(self):
         '''
         Boolean array of everyone with dysplasia <33%.
         '''
-        return (self.infectious * self.dysp * (self.current_dysp>0.67)).astype(bool)
+        return (self.infectious * self.dysp * (self.current_dysp>=0.67)).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''

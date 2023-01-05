@@ -511,8 +511,9 @@ class People(hpb.BasePeople):
 
             # Next, set the dysplasia properties
             self.cancerous[genotype, inds] = True
-            self.dysp[genotype, inds] = False # No longer counted as dysplastic
-            self.current_dysp[genotype, inds] = 0
+            self.dysp[:, inds] = False # No longer counted as dysplastic
+            self.no_dysp[:, inds] = True # No longer counted as dysplastic
+            self.current_dysp[:, inds] = 0
 
             # Age results
             cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
