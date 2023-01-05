@@ -76,10 +76,7 @@ def make_pars(**kwargs):
     pars['beta']                = 0.10  # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
-    pars['rel_trans_cin1']      = 1     # Transmissibility of people with CIN1 compared to those without dysplasia
-    pars['rel_trans_cin2']      = 1     # Transmissibility of people with CIN2 compared to those without dysplasia
-    pars['rel_trans_cin3']      = 1     # Transmissibility of people with CIN3 compared to those without dysplasia
-    pars['rel_trans_cancerous'] = 0.0   # Transmissibility of people with cancer compared to those without dysplasia
+    pars['rel_trans_cancerous'] = 0.0   # Transmissibility of people with cancer compared to those without
     pars['eff_condoms']         = 0.7   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
 
     # Parameters for disease progression
@@ -341,7 +338,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.prog_rate    = 0.17 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.cancer_prob  = 0.022 # Share of CIN3s that will go on to cancer
+    pars.hpv16.cancer_prob  = 0.0082 # Share of CIN3s that will go on to cancer
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
     pars.hpv16.sero_prob    = 0.983 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -352,7 +349,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.prog_rate    = 0.506 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.09 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 1.22  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.cancer_prob  = 0.13  # Share of CIN3s that will go on to cancer
+    pars.hpv18.cancer_prob  = 0.03  # Share of CIN3s that will go on to cancer
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
     pars.hpv18.sero_prob    = 0.87 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
@@ -378,20 +375,20 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, default=False, g
     pars = dict(
         # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
         hpv16 = dict(
-            hpv16  = 1.0, # Default for own-immunity
-            hpv18 = cross_imm_high,
-            hrhpv = 0.1,
+            hpv16=1.0, # Default for own-immunity
+            hpv18=cross_imm_high,
+            hrhpv=cross_imm_med,
         ),
 
         hpv18 = dict(
             hpv16=cross_imm_high,
             hpv18=1.0,  # Default for own-immunity
-            hrhpv = 0.1,
+            hrhpv=cross_imm_med,
         ),
 
         hrhpv=dict(
-            hpv16=0.1,
-            hpv18=0.1,
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
             hrhpv=cross_imm_med,
         ),
 

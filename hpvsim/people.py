@@ -185,7 +185,7 @@ class People(hpb.BasePeople):
                 self.genotype_flows[key][g] = cases # Store flows by genotype
                 self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
             self.check_clearance(g)
-            # self.update_dysp(g)
+            self.update_dysp(g)
 
         # Perform updates that are not genotype specific
         self.flows['cancer_deaths'] = self.check_cancer_deaths()
@@ -512,6 +512,7 @@ class People(hpb.BasePeople):
             # Next, set the dysplasia properties
             self.cancerous[genotype, inds] = True
             self.dysp[genotype, inds] = False # No longer counted as dysplastic
+            self.current_dysp[genotype, inds] = 0
 
             # Age results
             cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
@@ -565,7 +566,7 @@ class People(hpb.BasePeople):
         # Whether infection is controlled on not, people have no dysplasia, so we clear all this info
         self.no_dysp[genotype, inds] = True
         self.dysp[genotype, inds] = False
-        self.current_dysp[genotype, inds] = np.nan
+        self.current_dysp[genotype, inds] = 0
         self.dysp_rate[genotype, inds] = np.nan
         self.prog_rate[genotype, inds] = np.nan
 

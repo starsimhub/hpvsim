@@ -505,6 +505,8 @@ class Sim(hpb.BaseSim):
         results['hpv_prevalence'] = init_res('HPV prevalence', color=hpd.stock_colors[0])
         results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0])
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
+        results['dysplasia_prevalence'] = init_res('Dysplasia prevalence', color=hpd.stock_colors[1])
+        results['dysplasia_prevalence_by_genotype'] = init_res('Dysplasia prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -738,9 +740,7 @@ class Sim(hpb.BaseSim):
 
         # Calculate relative transmissibility by stage of infection
         rel_trans = people.infectious[:].astype(hpd.default_float)
-        # rel_trans[people.cin1] *= self['rel_trans_cin1']
-        # rel_trans[people.cin2] *= self['rel_trans_cin2']
-        # rel_trans[people.cin3] *= self['rel_trans_cin3']
+        rel_trans *= 1-people.current_dysp[:]
         rel_trans[people.cancerous] *= self['rel_trans_cancerous']
 
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
@@ -834,7 +834,7 @@ class Sim(hpb.BaseSim):
 
                 # Total stocks
                 if key not in ['susceptible']:
-                    # For n_infectious, n_cin1, etc, we get the total number where this state is true for at least one genotype
+                    # For n_infectious, n_dysp, etc, we get the total number where this state is true for at least one genotype
                     self.results[f'n_{key}'][idx] = people.count_any(key)
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size
@@ -1023,6 +1023,9 @@ class Sim(hpb.BaseSim):
 
         alive_females = res['n_alive_by_sex'][0,:]
 
+        self.results['dysplasia_prevalence'][:] = sc.safedivide(res['n_dysp'][:], alive_females)
+        self.results['dysplasia_prevalence_by_genotype'][:] = safedivide(res['n_dysp_by_genotype'][:], alive_females)
+
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
         at_risk_females = alive_females - res['n_cancerous'][:]
@@ -1030,25 +1033,18 @@ class Sim(hpb.BaseSim):
         demoninator = at_risk_females / scale_factor
         self.results['cancer_incidence'][:]             = res['cancers'][:] / demoninator
         self.results['cancer_incidence_by_genotype'][:] = res['cancers_by_genotype'][:] / demoninator
-        self.results['cancer_incidence_by_age'][:]      = sc.safedivide(res['cancers'][:], res['n_alive_by_age'][:]/scale_factor)
+        self.results['cancer_incidence_by_age'][:]      = sc.safedivide(res['cancers'][:], res['n_females_alive_by_age'][:]/scale_factor)
 
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor
         self.results['cancer_mortality'][:]         = res['cancer_deaths'][:]/denominator
 
         # Compute HPV type distribution by cytology
-        # for which in hpd.type_dist_keys:
-        #     if which in ['low_grade', 'high_grade']:
-        #         totals = np.zeros(self.res_npts)
-        #         by_type = np.zeros((self['n_genotypes'], self.res_npts))
-        #         for state in hpd.lesion_grade_states[which]:
-        #             by_type += res[f'n_{state}_by_genotype'][:]
-        #             totals += res[f'n_{state}_by_genotype'][:].sum(axis=0)
-        #     else:
-        #         by_type = res[f'n_{which}_by_genotype'][:]
-        #         totals = by_type.sum(axis=0)
-        #     inds_to_fill = totals>0
-        #     res[which+'_genotype_dist'][:, inds_to_fill] = by_type[:, inds_to_fill] / totals[inds_to_fill]
+        for which in hpd.type_dist_keys:
+            by_type = res[f'n_{which}_by_genotype'][:]
+            totals = by_type.sum(axis=0)
+            inds_to_fill = totals>0
+            res[which+'_genotype_dist'][:, inds_to_fill] = by_type[:, inds_to_fill] / totals[inds_to_fill]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])

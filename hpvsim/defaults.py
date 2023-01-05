@@ -179,7 +179,7 @@ class PeopleMeta(sc.prettyobj):
 
     # Markers of disease severity
     sev = [
-        State('current_dysp', default_float, np.nan, shape='n_genotypes'), # Current level of dyplasia
+        State('current_dysp', default_float, 0, shape='n_genotypes'), # Current level of dyplasia
         State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
         State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
         State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration to dysplasia over time
@@ -266,11 +266,8 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_keys   = ['precin', 'cin1', 'low_grade', 'cin2', 'cin3', 'high_grade', 'cancerous']
-type_dist_names  = ['Normal', 'CIN1', 'Low-grade\nlesion', 'CIN2', 'CIN3', 'High-grade\nlesion', 'Cancer']
-lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
-cyto_states = ['precin', 'low_grade', 'high_grade', 'cancerous']
-
+type_dist_keys   = ['precin', 'dysp', 'cancerous']
+type_dist_names  = ['Normal', 'Dysplasia', 'Cancer']
 
 #%% Default initial prevalence
 
@@ -332,8 +329,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
         if is_sim:
             plots = sc.objdict({
                 'HPV incidence by age': 'hpv_incidence_by_age',
-                'HPV/CIN prevalence': ['hpv_prevalence'],#, 'cin1_prevalence', 'cin2_prevalence', 'cin3_prevalence'],
-                # 'CIN prevalence by age': ['cin1_prevalence_by_age', 'cin2_prevalence_by_age', 'cin3_prevalence_by_age'],
+                'HPV/Dysplasia prevalence': ['hpv_prevalence', 'dysplasia_prevalence'],
                 'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'Cancers by age': 'cancers_by_age',
                 'HPV type distribution': 'type_dist',
