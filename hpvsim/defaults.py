@@ -121,6 +121,9 @@ class PeopleMeta(sc.prettyobj):
         State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
         State('precin',     bool, False, 'n_genotypes', label='Number with active infection and no dysplasia', color='#9e1149'), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
         State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#9e1149'), # intersection of no_dysp and inactive.
+        State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'),
+        State('cin2',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'),
+        State('cin3',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'),
     ]
 
     hiv_states = [

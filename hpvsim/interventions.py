@@ -1249,7 +1249,7 @@ class Product(hpb.FlexPretty):
 
 class dx(Product):
     '''
-    Testing products are used within screening and triage. Their fundamental proprty is that they classify people
+    Testing products are used within screening and triage. Their fundamental property is that they classify people
     into exactly one result state. They do not change anything about the People.
     '''
     def __init__(self, df, hierarchy=None):
