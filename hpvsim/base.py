@@ -1386,21 +1386,21 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with dysplasia <33%.
         '''
-        return (self.infectious * self.dysp * (self.current_dysp<self['clinical_cutoffs']['cin1'])).astype(bool)
+        return (self.infectious * self.dysp * (self.current_dysp<self.pars['clinical_cutoffs']['cin1'])).astype(bool)
 
     @property
     def cin2(self):
         '''
         Boolean array of everyone with dysplasia 33-67%.
         '''
-        return (self.infectious * self.dysp * (self.current_dysp>=self['clinical_cutoffs']['cin1']) * (self.current_dysp<self['clinical_cutoffs']['cin2'])).astype(bool)
+        return (self.infectious * self.dysp * (self.current_dysp>=self.pars['clinical_cutoffs']['cin1']) * (self.current_dysp<self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     @property
     def cin3(self):
         '''
         Boolean array of everyone with dysplasia <67%.
         '''
-        return (self.infectious * self.dysp * (self.current_dysp>=self['clinical_cutoffs']['cin2'])).astype(bool)
+        return (self.infectious * self.dysp * (self.current_dysp>=self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
