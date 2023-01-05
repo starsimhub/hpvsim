@@ -293,7 +293,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     sim.plot(to_plot=to_plot)
 
     fig, ax = plt.subplots(1, 2)
-    for i, result in enumerate(['cancers', 'cins']):
+    for i, result in enumerate(['cancers', 'dysplasias']):
         ax[i].plot(sim0.results['year'], sim0.results[result].values, label='No Screening')
         ax[i].plot(sim.results['year'], sim.results[result].values, label='Screening')
         ax[i].set_ylabel(result)
@@ -474,13 +474,13 @@ def test_screening():
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
     to_plot = {
-        'CINs': ['cins'],
+        'Dysplasias': ['dysplasias'],
         # 'Screens': ['screens'],
     }
     sim.plot(to_plot=to_plot)
 
     fig, ax = plt.subplots(1, 2)
-    for i, result in enumerate(['cancers', 'cins']):
+    for i, result in enumerate(['cancers', 'dysplasias']):
         ax[i].plot(sim0.results['year'], sim0.results[result].values, label='No Screening')
         ax[i].plot(sim.results['year'], sim.results[result].values, label='Screening')
         ax[i].set_ylabel(result)
