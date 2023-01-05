@@ -59,7 +59,7 @@ class People(hpb.BasePeople):
         self.init_contacts() # Initialize the contacts
         self.ng = self.pars['n_genotypes']
         self.na = len(self.pars['age_bins'])-1
-        self.dysp_keys = ['cin1s', 'cin2s', 'cin3s', 'dysplasias', 'cancers']
+        self.dysp_keys = ['dysplasias', 'cancers']
 
         self.lag_bins = np.linspace(0,50,51)
         self.rship_lags = dict()

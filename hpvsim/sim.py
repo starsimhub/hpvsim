@@ -1087,6 +1087,8 @@ class Sim(hpb.BaseSim):
             else:
                 by_type = res[f'n_{which}_by_genotype'][:]
                 totals = by_type.sum(axis=0)
+            inds_to_fill = totals > 0
+            res[which + '_genotype_dist'][:, inds_to_fill] = by_type[:, inds_to_fill] / totals[inds_to_fill]
 
         # Demographic results
         self.results['cdr'][:]  = self.results['other_deaths'][:] / (self.results['n_alive'][:])
