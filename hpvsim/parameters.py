@@ -33,7 +33,7 @@ def make_pars(**kwargs):
     pars['n_agents']        = 20e3      # Number of agents
     pars['total_pop']       = None      # If defined, used for calculating the scale factor
     pars['pop_scale']       = None      # How much to scale the population
-    pars['ms_agent_ratio']  = 10         # Ratio of scale factor of cancer agents to normal agents -- must be an integer
+    pars['ms_agent_ratio']  = 10        # Ratio of scale factor of cancer agents to normal agents -- must be an integer
     pars['network']         = 'default' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = 'nigeria' # What location to load data from -- default Nigeria
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
