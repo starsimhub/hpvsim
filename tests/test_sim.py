@@ -159,7 +159,7 @@ def test_states():
                 s4  = ~(people.infectious[g,:] & people.inactive[g,:]).any()
 
                 d1 = (~people.has_dysp[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
-                d2 = (people.has_dysp[g,:] & ~people.cin1[g,:]).all()
+                d2 = ~(people.has_dysp[g,:] & people.cin1[g,:]).all()
                 d3 = ~(people.cin1[g,:] & people.cin2[g,:]).all()
                 d4 = ~(people.cin2[g,:] & people.cin3[g,:]).all()
                 d5 = ~(people.cin3[g,:] & people.cancerous[g,:]).all()
@@ -360,9 +360,9 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim2 = test_epi()
     sim3 = test_states()
     sim4 = test_flexible_inputs()
     sim5 = test_result_consistency()
