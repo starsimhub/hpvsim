@@ -370,7 +370,7 @@ class People(hpb.BasePeople):
         inds = self.true_by_genotype('dysp', genotype)
         prog_rate = self.prog_rate[genotype, inds]
         dur_dysp = self.t - self.date_dysp[genotype, inds]
-        self.current_dysp[genotype, inds] = hpu.logf1(dur_dysp, prog_rate)
+        self.dysp[genotype, inds] = hpu.logf1(dur_dysp, prog_rate)
 
         return
 
@@ -484,9 +484,8 @@ class People(hpb.BasePeople):
         # Only include infectious females who haven't already cleared dysplasia/infection
         filters = self.infectious[genotype,:]*self.is_female*~(self.date_clearance[genotype,:]<=self.t)
         filter_inds = filters.nonzero()[0]
-        inds = self.check_inds(self.dysp[genotype,:], self.date_dysp[genotype,:], filter_inds=filter_inds)
-        self.dysp[genotype, inds] = True
-        self.no_dysp[genotype, inds] = False
+        inds = self.check_inds(self.has_dysp[genotype,:], self.date_dysp[genotype,:], filter_inds=filter_inds)
+        self.has_dysp[genotype, inds] = True
         # Age calculations
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
 
@@ -511,9 +510,8 @@ class People(hpb.BasePeople):
 
             # Next, set the dysplasia properties
             self.cancerous[genotype, inds] = True
-            self.dysp[:, inds] = False # No longer counted as dysplastic
-            self.no_dysp[:, inds] = True # No longer counted as dysplastic
-            self.current_dysp[:, inds] = 0
+            self.has_dysp[:, inds] = False # No longer counted as dysplastic
+            self.dysp[:, inds] = 0
 
             # Age results
             cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
@@ -565,9 +563,8 @@ class People(hpb.BasePeople):
             self.date_clearance[genotype, latent_inds] = np.nan
 
         # Whether infection is controlled on not, people have no dysplasia, so we clear all this info
-        self.no_dysp[genotype, inds] = True
-        self.dysp[genotype, inds] = False
-        self.current_dysp[genotype, inds] = 0
+        self.has_dysp[genotype, inds] = False
+        self.dysp[genotype, inds] = 0
         self.dysp_rate[genotype, inds] = np.nan
         self.prog_rate[genotype, inds] = np.nan
 

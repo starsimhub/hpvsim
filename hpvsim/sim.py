@@ -686,7 +686,7 @@ class Sim(hpb.BaseSim):
 
         # Check for dysplasias
         dysp_filters = (self.people.date_dysp<0)
-        self.people.dysp[dysp_filters.nonzero()] = True
+        self.people.has_dysp[dysp_filters.nonzero()] = True
         # Check for CINs
         cin1_filters = (self.people.date_cin1 < 0) * (self.people.date_cin2 > 0)
         self.people.cin1[cin1_filters.nonzero()] = True
@@ -759,7 +759,7 @@ class Sim(hpb.BaseSim):
 
         # Calculate relative transmissibility by stage of infection
         rel_trans = people.infectious[:].astype(hpd.default_float)
-        rel_trans *= 1-people.current_dysp[:]
+        rel_trans *= 1-people.dysp[:]
         rel_trans[people.cancerous] *= self['rel_trans_cancerous']
 
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep

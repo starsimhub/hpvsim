@@ -112,8 +112,7 @@ class PeopleMeta(sc.prettyobj):
         #       1. 'cin' (union of cin1, cin2, cin3)
         #       2. 'precin' (intersection of infectious and no_dysp agents - agents with infection but not dysplasia)
         #       3. 'latent' (intersection of inactive and no_dysp - agents with latent infection)
-        State('no_dysp',        bool, True,  'n_genotypes', label='Number without dyplasia', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
-        State('dysp',           bool, False, 'n_genotypes', label='Number with dysplasia', color='#c1ad71'),
+        State('has_dysp',       bool, False, 'n_genotypes', label='Number with dyplasia', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
         State('cancerous',      bool, False, 'n_genotypes', label='Number with cancer', color='#5f5cd2'),      # Allowable viral states: inactive
     ]
 
@@ -182,7 +181,7 @@ class PeopleMeta(sc.prettyobj):
 
     # Markers of disease severity
     sev = [
-        State('current_dysp', default_float, 0, shape='n_genotypes'), # Current level of dyplasia
+        State('dysp', default_float, 0, shape='n_genotypes'), # Current level of dyplasia
         State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
         State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
         State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration to dysplasia over time
