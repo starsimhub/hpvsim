@@ -226,9 +226,9 @@ class People(hpb.BasePeople):
         self.date_clearance[g, nodysp_inds] = self.date_infectious[g, nodysp_inds]+ np.ceil(self.dur_infection[g, nodysp_inds] / dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         # Infection progresses to dysplasia, set dates for this
-        excl_inds = hpu.true(self.date_dysp[g, dysp_inds] < self.t)  # Don't count dysplasias that were acquired before now
-        self.date_dysp[g, dysp_inds[excl_inds]] = np.nan
-        self.date_dysp[g, dysp_inds] = np.fmin(self.date_dysp[g, dysp_inds],
+        excl_inds = hpu.true(self.date_has_dysp[g, dysp_inds] < self.t)  # Don't count dysplasias that were acquired before now
+        self.date_has_dysp[g, dysp_inds[excl_inds]] = np.nan
+        self.date_has_dysp[g, dysp_inds] = np.fmin(self.date_has_dysp[g, dysp_inds],
                                                self.date_infectious[g, dysp_inds] +
                                                sc.randround(self.dur_precin[g, dysp_inds] / dt))  # Date they develop dysplasia - minimum of the date from their new infection and any previous date
 
@@ -349,12 +349,12 @@ class People(hpb.BasePeople):
         no_cancer_inds = inds[~is_cancer]  # Indices of those who eventually heal lesion/clear infection
         time_to_clear = dur_dysp[~is_cancer]
         self.date_clearance[g, no_cancer_inds] = np.fmax(self.date_clearance[g, no_cancer_inds],
-                                                        self.date_dysp[g, no_cancer_inds] +
+                                                        self.date_has_dysp[g, no_cancer_inds] +
                                                         sc.randround(time_to_clear / dt))
 
         time_to_cancer = dur_dysp[is_cancer]
         self.date_cancerous[g, cancer_inds] = np.fmax(self.t,
-                                                      self.date_dysp[g, cancer_inds] +
+                                                      self.date_has_dysp[g, cancer_inds] +
                                                       sc.randround(time_to_cancer / dt))
 
         # Record eventual deaths from cancer (assuming no survival without treatment)
@@ -369,7 +369,7 @@ class People(hpb.BasePeople):
         ''' Update dysplasia for women with active dysplasia'''
         inds = self.true_by_genotype('dysp', genotype)
         prog_rate = self.prog_rate[genotype, inds]
-        dur_dysp = self.t - self.date_dysp[genotype, inds]
+        dur_dysp = self.t - self.date_has_dysp[genotype, inds]
         self.dysp[genotype, inds] = hpu.logf1(dur_dysp, prog_rate)
 
         return
@@ -484,7 +484,7 @@ class People(hpb.BasePeople):
         # Only include infectious females who haven't already cleared dysplasia/infection
         filters = self.infectious[genotype,:]*self.is_female*~(self.date_clearance[genotype,:]<=self.t)
         filter_inds = filters.nonzero()[0]
-        inds = self.check_inds(self.has_dysp[genotype,:], self.date_dysp[genotype,:], filter_inds=filter_inds)
+        inds = self.check_inds(self.has_dysp[genotype,:], self.date_has_dysp[genotype,:], filter_inds=filter_inds)
         self.has_dysp[genotype, inds] = True
         # Age calculations
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
@@ -604,12 +604,12 @@ class People(hpb.BasePeople):
 
             for g in range(self.pars['n_genotypes']):
                 gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-                nodysp_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_dysp[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
+                nodysp_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_has_dysp[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
                 if len(nodysp_inds): # Reevaluate whether these women will develop dysplasia
                     self.set_dysp_rates(nodysp_inds, g, gpars, hiv_dysp_rate=self.pars['hiv_pars']['dysp_rate'])
                     self.set_dysp_status(nodysp_inds, g, dt)
 
-                dysp_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_dysp[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
+                dysp_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_has_dysp[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
                 if len(dysp_inds): # Reevaluate disease severity and progression speed for these women
                     dysp_arrs = self.set_severity(dysp_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
                     self.set_health_outcomes(dysp_inds, g, dt, dysp_arrs=dysp_arrs)
@@ -811,7 +811,7 @@ class People(hpb.BasePeople):
         # Count reinfections and remove any previous dates
         self.genotype_flows['reinfections'][g]  += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         self.flows['reinfections']              += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
-        for key in ['date_clearance', 'date_dysp']:
+        for key in ['date_clearance', 'date_has_dysp']:
             self[key][g, inds] = np.nan
 
         # Count reactivations and adjust latency status

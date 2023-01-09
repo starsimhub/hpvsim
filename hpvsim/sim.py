@@ -685,7 +685,7 @@ class Sim(hpb.BaseSim):
             self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
         # Check for dysplasias
-        dysp_filters = (self.people.date_dysp<0)
+        dysp_filters = (self.people.date_has_dysp<0)
         self.people.has_dysp[dysp_filters.nonzero()] = True
         # Check for CINs
         cin1_filters = (self.people.date_cin1 < 0) * (self.people.date_cin2 > 0)
