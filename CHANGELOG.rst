@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.12 (2023-01-02)
+---------------------------
+- Adds documentation and examples for screening algorithms.
+- *GitHub info*: PR `505 <https://github.com/amath-idm/hpvsim/pull/505>`__
+
+
 Version 0.4.11 (2022-12-21)
 ---------------------------
 - Adds colposcopy and cytology testing options, along with default values for screening sensitivity and specificity.
