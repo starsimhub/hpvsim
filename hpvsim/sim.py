@@ -1051,8 +1051,8 @@ class Sim(hpb.BaseSim):
 
         alive_females = res['n_alive_by_sex'][0,:]
 
-        self.results['dysplasia_prevalence'][:] = sc.safedivide(res['n_dysp'][:], alive_females)
-        self.results['dysplasia_prevalence_by_genotype'][:] = safedivide(res['n_dysp_by_genotype'][:], alive_females)
+        self.results['dysplasia_prevalence'][:] = sc.safedivide(res['n_has_dysp'][:], alive_females)
+        self.results['dysplasia_prevalence_by_genotype'][:] = safedivide(res['n_has_dysp_by_genotype'][:], alive_females)
         self.results['cin1_prevalence'][:] = sc.safedivide(res['n_cin1'][:], alive_females)
         self.results['cin1_prevalence_by_genotype'][:] = safedivide(res['n_cin1_by_genotype'][:], alive_females)
         self.results['cin1_prevalence_by_age'][:] = safedivide(res['n_cin1_by_age'][:], res['n_females_alive_by_age'][:])
