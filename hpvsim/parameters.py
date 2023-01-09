@@ -86,7 +86,7 @@ def make_pars(**kwargs):
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
 
     # Parameters used to calculate immunity
-    pars['imm_init']        = dict(dist='beta_mean', par1=0.625, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance
+    pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
     pars['imm_decay']       = dict(form=None)  # decay rate, with half life in years
     pars['imm_boost']       = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity']        = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
@@ -338,9 +338,9 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.prog_rate    = 0.17 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.cancer_prob  = 0.04 # Share of CIN3s that will go on to cancer
+    pars.hpv16.cancer_prob  = 0.04 # Annual probability of cancer during dysplasia
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv16.sero_prob    = 0.983 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
+    pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin   = dict(dist='lognormal', par1=14.9/12, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
@@ -349,20 +349,20 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.prog_rate    = 0.506 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.09 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 1.5  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.cancer_prob  = 0.08  # Share of CIN3s that will go on to cancer
+    pars.hpv18.cancer_prob  = 0.08  # Annual probability of cancer during dysplasia
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv18.sero_prob    = 0.87 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
+    pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
-    pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=12, par2=5.0) # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.dysp_rate    = 1.3 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.prog_rate    = 0.071 # same value as for all oncogenic types
-    pars.hrhpv.prog_rate_sd = 0.015 # same value as for all oncogenic types
-    pars.hrhpv.rel_beta     = 0.5 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.cancer_prob  = 0.001  # Share of CIN3s that will go on to cancer
-    pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.sero_prob    = 0.98 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder
+    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=12, par2=5.0) # placeholder
+    pars.hrhpv.dysp_rate    = 1.3 # placeholder
+    pars.hrhpv.prog_rate    = 0.071 # placeholder
+    pars.hrhpv.prog_rate_sd = 0.015 # placeholder
+    pars.hrhpv.rel_beta     = 0.5 # placeholder
+    pars.hrhpv.cancer_prob  = 0.001  # Annual probability of cancer during dysplasia
+    pars.hrhpv.imm_boost    = 1.0 # placeholder
+    pars.hrhpv.sero_prob    = 0.60 # placeholder
 
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
