@@ -367,7 +367,7 @@ class People(hpb.BasePeople):
 
     def update_dysp(self, genotype):
         ''' Update dysplasia for women with active dysplasia'''
-        inds = self.true_by_genotype('dysp', genotype)
+        inds = self.true_by_genotype('has_dysp', genotype)
         prog_rate = self.prog_rate[genotype, inds]
         dur_dysp = self.t - self.date_has_dysp[genotype, inds]
         self.dysp[genotype, inds] = hpu.logf1(dur_dysp, prog_rate)
@@ -493,7 +493,7 @@ class People(hpb.BasePeople):
 
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
-        filter_inds = self.true_by_genotype('dysp', genotype)
+        filter_inds = self.true_by_genotype('has_dysp', genotype)
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
         cases_by_age = 0
 
