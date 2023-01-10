@@ -359,7 +359,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.dysp_rate    = 0.2 # placeholder
     pars.hrhpv.prog_rate    = 0.071 # placeholder
     pars.hrhpv.prog_rate_sd = 0.015 # placeholder
-    pars.hrhpv.rel_beta     = 0.5 # placeholder
+    pars.hrhpv.rel_beta     = 0.75 # placeholder
     pars.hrhpv.cancer_prob  = 0.0035  # Annual probability of cancer during dysplasia
     pars.hrhpv.imm_boost    = 1.0 # placeholder
     pars.hrhpv.sero_prob    = 0.60 # placeholder
