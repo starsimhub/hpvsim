@@ -1398,7 +1398,7 @@ class BasePeople(FlexPretty):
     @property
     def cin3(self):
         '''
-        Boolean array of everyone with dysplasia <67%.
+        Boolean array of everyone with dysplasia >67%.
         '''
         return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
