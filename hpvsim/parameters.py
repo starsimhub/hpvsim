@@ -355,12 +355,12 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=1) # placeholder
-    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=15, par2=5.0) # placeholder
+    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=17, par2=8.0) # placeholder
     pars.hrhpv.dysp_rate    = 0.2 # placeholder
     pars.hrhpv.prog_rate    = 0.071 # placeholder
     pars.hrhpv.prog_rate_sd = 0.015 # placeholder
     pars.hrhpv.rel_beta     = 0.5 # placeholder
-    pars.hrhpv.cancer_prob  = 0.0025  # Annual probability of cancer during dysplasia
+    pars.hrhpv.cancer_prob  = 0.0035  # Annual probability of cancer during dysplasia
     pars.hrhpv.imm_boost    = 1.0 # placeholder
     pars.hrhpv.sero_prob    = 0.60 # placeholder
 
