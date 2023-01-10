@@ -112,18 +112,17 @@ class PeopleMeta(sc.prettyobj):
         #       1. 'cin' (union of cin1, cin2, cin3)
         #       2. 'precin' (intersection of infectious and no_dysp agents - agents with infection but not dysplasia)
         #       3. 'latent' (intersection of inactive and no_dysp - agents with latent infection)
-        State('no_dysp',        bool, True,  'n_genotypes', label='Number without dyplasia', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
-        State('cin1',           bool, False, 'n_genotypes', label='Number with CIN1', color='#c1ad71'),        # Allowable viral states: infectious
-        State('cin2',           bool, False, 'n_genotypes', label='Number with CIN2', color='#c1981d'),        # Allowable viral states: infectious
-        State('cin3',           bool, False, 'n_genotypes', label='Number with CIN3', color='#b86113'),        # Allowable viral states: infectious
+        State('has_dysp',       bool, False, 'n_genotypes', label='Number with dyplasia', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
         State('cancerous',      bool, False, 'n_genotypes', label='Number with cancer', color='#5f5cd2'),      # Allowable viral states: inactive
     ]
 
     derived_states = [
         State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
-        State('cin',        bool, False, 'n_genotypes', label='Number with dysplasia', color='#c1ad71'), # union of cin1, cin2, cin3
         State('precin',     bool, False, 'n_genotypes', label='Number with active infection and no dysplasia', color='#9e1149'), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
         State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#9e1149'), # intersection of no_dysp and inactive.
+        State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'),
+        State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'),
+        State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#9e1149'),
     ]
 
     hiv_states = [
@@ -176,12 +175,15 @@ class PeopleMeta(sc.prettyobj):
     durs = [
         State('dur_infection', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present
         State('dur_precin', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
+        State('dur_dysp', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has with dysplasia
         State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
     ]
 
     # Markers of disease severity
     sev = [
+        State('dysp', default_float, 0, shape='n_genotypes'), # Level of dyplasia
         State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
+        State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration to dysplasia over time
     ]
 
 
@@ -228,10 +230,10 @@ class Flow():
 
 flows = [
     Flow('infections',              color='#c78f65',    label='Infections'),
+    Flow('dysplasias',              color='#c1ad71',    label='Dysplasias'),
     Flow('cin1s',                   color='#c1ad71',    label='CIN1s'),
     Flow('cin2s',                   color='#c1981d',    label='CIN2s'),
     Flow('cin3s',                   color='#b86113',    label='CIN3s'),
-    Flow('cins',                    color='#c1ad71',    label='CINs'),
     Flow('cancers',                 color='#5f5cd2',    label='Cancers'),
     Flow('detected_cancers',        color='#5f5cd2',    label='Cancer detections', by_genotype=False),
     Flow('cancer_deaths',           color='#000000',    label='Cancer deaths', by_genotype=False),
@@ -253,8 +255,8 @@ other_stock_keys = [state.name for state in PeopleMeta.intv_states+PeopleMeta.hi
 
 # Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
-inci_keys   = ['hpv',       'cin1',     'cin2',     'cin3',     'cin',      'cancer']
-inci_names  = ['HPV',       'CIN1',     'CIN2',     'CIN3',     'CIN',      'Cancer']
+inci_keys   = ['hpv',       'cin1',     'cin2',     'cin3',     'dysplasia',      'cancer']
+inci_names  = ['HPV',       'CIN1',     'CIN2',     'CIN3',     'Dysplasia',      'Cancer']
 inci_colors = ['#c78f65',   '#c1ad71',  '#c1981d',  '#b86113',  '#c1ad71',  '#5f5cd2']
 
 # Demographics
@@ -273,7 +275,6 @@ type_dist_names  = ['Normal', 'CIN1', 'Low-grade\nlesion', 'CIN2', 'CIN3', 'High
 lesion_grade_states = {'low_grade': ['cin1'], 'high_grade': ['cin2', 'cin3']}
 cyto_states = ['precin', 'low_grade', 'high_grade', 'cancerous']
 
-
 #%% Default initial prevalence
 
 default_init_prev = {
@@ -288,7 +289,7 @@ default_init_prev = {
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
     'infections',
-    'cins',
+    'dysplasias',
     'cancers',
 ]
 

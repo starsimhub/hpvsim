@@ -1363,12 +1363,6 @@ class BasePeople(FlexPretty):
         '''
         return (self.infectious + self.inactive).astype(bool)
 
-    @property
-    def cin(self):
-        '''
-        Boolean array of everyone with dysplasia. Union of CIN1, CIN2, CIN3
-        '''
-        return (self.cin1 + self.cin2 + self.cin3).astype(bool)
 
     @property
     def precin(self):
@@ -1377,7 +1371,7 @@ class BasePeople(FlexPretty):
         with transient infections that will clear on their own plus those where
         dysplasia isn't established yet
         '''
-        return (self.infectious * self.no_dysp).astype(bool)
+        return (self.infectious * ~self.has_dysp).astype(bool)
 
     @property
     def latent(self):
@@ -1385,7 +1379,28 @@ class BasePeople(FlexPretty):
         Boolean array of everyone with latent infection. By definition, these
         people have no dysplasia, no cancer, and inactive infection status.
         '''
-        return (self.inactive * self.no_dysp * ~self.cancerous.any(axis=0)).astype(bool)
+        return (self.inactive * ~self.has_dysp * ~self.cancerous.any(axis=0)).astype(bool)
+
+    @property
+    def cin1(self):
+        '''
+        Boolean array of everyone with dysplasia <33%.
+        '''
+        return (self.infectious * self.has_dysp * (self.dysp<self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+
+    @property
+    def cin2(self):
+        '''
+        Boolean array of everyone with dysplasia 33-67%.
+        '''
+        return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin1']) * (self.dysp<self.pars['clinical_cutoffs']['cin2'])).astype(bool)
+
+    @property
+    def cin3(self):
+        '''
+        Boolean array of everyone with dysplasia >67%.
+        '''
+        return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''

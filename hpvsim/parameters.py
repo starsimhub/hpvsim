@@ -33,7 +33,7 @@ def make_pars(**kwargs):
     pars['n_agents']        = 20e3      # Number of agents
     pars['total_pop']       = None      # If defined, used for calculating the scale factor
     pars['pop_scale']       = None      # How much to scale the population
-    pars['ms_agent_ratio']  = 10         # Ratio of scale factor of cancer agents to normal agents -- must be an integer
+    pars['ms_agent_ratio']  = 10        # Ratio of scale factor of cancer agents to normal agents -- must be an integer
     pars['network']         = 'default' # What type of sexual network to use -- 'random', 'basic', other options TBC
     pars['location']        = 'nigeria' # What location to load data from -- default Nigeria
     pars['lx']              = None      # Proportion of people alive at the beginning of age interval x
@@ -76,10 +76,7 @@ def make_pars(**kwargs):
     pars['beta']                = 0.10  # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
-    pars['rel_trans_cin1']      = 1     # Transmissibility of people with CIN1 compared to those without dysplasia
-    pars['rel_trans_cin2']      = 1     # Transmissibility of people with CIN2 compared to those without dysplasia
-    pars['rel_trans_cin3']      = 1     # Transmissibility of people with CIN3 compared to those without dysplasia
-    pars['rel_trans_cancerous'] = 0.0   # Transmissibility of people with cancer compared to those without dysplasia
+    pars['rel_trans_cancerous'] = 0.0   # Transmissibility of people with cancer compared to those without
     pars['eff_condoms']         = 0.7   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
 
     # Parameters for disease progression
@@ -89,7 +86,7 @@ def make_pars(**kwargs):
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
 
     # Parameters used to calculate immunity
-    pars['imm_init']        = dict(dist='beta_mean', par1=0.625, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance
+    pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
     pars['imm_decay']       = dict(form=None)  # decay rate, with half life in years
     pars['imm_boost']       = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity']        = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
@@ -256,18 +253,7 @@ def get_genotype_choices():
     choices = {
         'hpv16':  ['hpv16', '16'],
         'hpv18': ['hpv18', '18'],
-        'hpv6':  ['hpv6', '6'],
-        'hpv11': ['hpv11', '11'],
-        'hpv31': ['hpv31', '31'],
-        'hpv33': ['hpv33', '33'],
-        'hpv35': ['hpv35', '35'],
-        'hpv45': ['hpv45', '45'],
-        'hpv51': ['hpv51', '51'],
-        'hpv52': ['hpv52', '52'],
-        'hpv56': ['hpv56', '56'],
-        'hpv58': ['hpv58', '58'],
         'hrhpv': ['hrhpv', 'ohrhpv', 'hr', 'ohr'],
-        'lrhpv': ['lrhpv', 'lr'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -346,158 +332,38 @@ def get_genotype_pars(default=False, genotype=None):
     mean16 = 13.9/12 # Defined here since used repeatedly below. This is the duration of HPV16 infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_precin   = dict(dist='lognormal', par1=mean16, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv16.dur_precin   = dict(dist='lognormal', par1=mean16, par2=1) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=7.25, par2=3.8) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dysp_rate    = 1.3 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.dysp_rate    = 0.7 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate    = 0.17 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.cancer_prob  = 0.022 # Share of CIN3s that will go on to cancer
+    pars.hpv16.cancer_prob  = 0.02 # Annual probability of cancer during dysplasia
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv16.sero_prob    = 0.983 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
+    pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_precin   = dict(dist='lognormal', par1=14.9/12, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3.246, par2=0.75) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dysp_rate    = 1.3 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate    = 0.506 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate_sd = 0.09 # Standard deviation of the progression rate
-    pars.hpv18.rel_beta     = 1.22  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.cancer_prob  = 0.13  # Share of CIN3s that will go on to cancer
+    pars.hpv18.dur_precin   = dict(dist='lognormal', par1=14.9/12, par2=1) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=5, par2=3) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dysp_rate    = 0.9 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_rate    = 0.25 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.prog_rate_sd = 0.05 # Standard deviation of the progression rate
+    pars.hpv18.rel_beta     = 1.0  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv18.cancer_prob  = 0.01  # Annual probability of cancer during dysplasia
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv18.sero_prob    = 0.87 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv31 = sc.objdict()
-    pars.hpv31.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
-    pars.hpv31.dur_dysp     = dict(dist='lognormal', par1=1.35, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv31.dysp_rate    = 0.1 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv31.prog_rate_sd = 0.02 # Standard deviation of the progression rate
-    pars.hpv31.rel_beta     = 0.94 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv31.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
-    pars.hpv31.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv31.sero_prob    = 0.53 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv33 = sc.objdict()
-    pars.hpv33.dur_precin   = dict(dist='lognormal', par1=12.5/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
-    pars.hpv33.dur_dysp     = dict(dist='lognormal', par1=14.12, par2=3.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv33.dysp_rate    = 0.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv33.prog_rate_sd = 0.05 # Standard deviation of the progression rate
-    pars.hpv33.rel_beta     = 0.26 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv33.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
-    pars.hpv33.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv33.sero_prob    = 0.6  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv35 = sc.objdict()
-    pars.hpv35.dur_precin   = dict(dist='lognormal', par1=6.0/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
-    pars.hpv35.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv35.dysp_rate    = 0.3 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv35.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv35.prog_rate_sd = 0.05 # Standard deviation of the progression rate
-    pars.hpv35.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv35.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
-    pars.hpv35.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv35.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv45 = sc.objdict()
-    pars.hpv45.dur_precin   = dict(dist='lognormal', par1=8.0/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
-    pars.hpv45.dur_dysp     = dict(dist='lognormal', par1=3.776, par2=4.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv45.dysp_rate    = 1.2 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv45.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv45.prog_rate_sd = 0.05 # Standard deviation of the progression rate
-    pars.hpv45.rel_beta     = 0.77 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv45.cancer_prob  = 0.15  # Share of CIN3s that will go on to cancer
-    pars.hpv45.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv45.sero_prob    = 0.25  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv51 = sc.objdict()
-    pars.hpv51.dur_precin   = dict(dist='lognormal', par1=7.4/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
-    pars.hpv51.dur_dysp     = dict(dist='lognormal', par1=1.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv51.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv51.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv51.prog_rate_sd = 0.05 # Standard deviation of the progression rate
-    pars.hpv51.rel_beta     = 0.5 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv51.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
-    pars.hpv51.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv51.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv52 = sc.objdict()
-    pars.hpv52.dur_precin   = dict(dist='lognormal', par1=11.7/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
-    pars.hpv52.dur_dysp     = dict(dist='lognormal', par1=1.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv52.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv52.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv52.prog_rate_sd = 0.05 # Standard deviation of the progression rate
-    pars.hpv52.rel_beta     = 0.623 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv52.cancer_prob  = 0.05  # Share of CIN3s that will go on to cancer
-    pars.hpv52.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv52.sero_prob    = 0.5  # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv56 = sc.objdict()
-    pars.hpv56.dur_precin   = dict(dist='lognormal', par1=11.2/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
-    pars.hpv56.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv56.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv56.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv56.prog_rate_sd = 0.05 # Standard deviation of the progression rate
-    pars.hpv56.rel_beta     = 0.6 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv56.cancer_prob  = 0.15  # Share of CIN3s that will go on to cancer
-    pars.hpv56.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv56.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv58 = sc.objdict()
-    pars.hpv58.dur_precin   = dict(dist='lognormal', par1=9.7/12.4*mean16, par2=0.4) # Multiply the mean duration of HPV16 infection truncated at the time of CIN detection (https://pubmed.ncbi.nlm.nih.gov/17416761/) by a scale factor derived from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3707974/figure/F1/
-    pars.hpv58.dur_dysp     = dict(dist='lognormal', par1=3.0, par2=2.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv58.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv58.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv58.prog_rate_sd = 0.05 # Standard deviation of the progression rate
-    pars.hpv58.rel_beta     = 0.6 # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv58.cancer_prob  = 0.15  # Share of CIN3s that will go on to cancer
-    pars.hpv58.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv58.sero_prob    = 0.65  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv6 = sc.objdict()
-    pars.hpv6.dur_precin    = dict(dist='lognormal', par1=8.4/12, par2=0.4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv6.dur_dysp      = dict(dist='lognormal', par1=0.5, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv6.dysp_rate     = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.prog_rate     = 0.05 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv6.prog_rate_sd  = 0.005 # Standard deviation of the progression rate
-    pars.hpv6.rel_beta      = 0.8 # Relative transmissibility, generally calibrated to match available type distributions
-    pars.hpv6.cancer_prob   = 0.0 # Share of CIN3s that will go on to cancer
-    pars.hpv6.imm_boost     = 1.0 # TODO: look for data
-    pars.hpv6.sero_prob     = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
-
-    pars.hpv11 = sc.objdict()
-    pars.hpv11.dur_precin   = dict(dist='lognormal', par1=8.1/12, par2=0.4)  # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv11.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=1.0) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv11.dysp_rate    = 0.01 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv11.prog_rate    = 0.05 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv11.prog_rate_sd = 0.005 # Standard deviation of the progression rate
-    pars.hpv11.rel_beta     = 0.5 # Relative transmissibility, generally calibrated to match available type distributions
-    pars.hpv11.cancer_prob  = 0.0  # Share of CIN3s that will go on to cancer
-    pars.hpv11.imm_boost    = 1.0 # TODO: look for data
-    pars.hpv11.sero_prob    = 0.6  # Assumption, not provided in https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
+    pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
-    pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=0.4) # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=23.69, par2=8.0) # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.dysp_rate    = 1.3 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.prog_rate    = 0.071 # same value as for all oncogenic types
-    pars.hrhpv.prog_rate_sd = 0.015 # same value as for all oncogenic types
-    pars.hrhpv.rel_beta     = 0.75 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.cancer_prob  = 0.0026  # Share of CIN3s that will go on to cancer
-    pars.hrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 31
-    pars.hrhpv.sero_prob    = 0.98 # placeholder, currently assumed to be the same as for 31
+    pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=1) # placeholder
+    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=12, par2=5.0) # placeholder
+    pars.hrhpv.dysp_rate    = 0.5 # placeholder
+    pars.hrhpv.prog_rate    = 0.071 # placeholder
+    pars.hrhpv.prog_rate_sd = 0.015 # placeholder
+    pars.hrhpv.rel_beta     = 0.5 # placeholder
+    pars.hrhpv.cancer_prob  = 0.005  # Annual probability of cancer during dysplasia
+    pars.hrhpv.imm_boost    = 1.0 # placeholder
+    pars.hrhpv.sero_prob    = 0.60 # placeholder
 
-    pars.lrhpv = sc.objdict()
-    pars.lrhpv.dur_precin   = dict(dist='lognormal', par1=8.1/12, par2=0.4)  # placeholder, currently assumed to be the same as for 6
-    pars.lrhpv.dur_dysp     = dict(dist='lognormal', par1=4.0, par2=1.0) # placeholder, currently assumed to be the same as for 6
-    pars.lrhpv.dysp_rate    = 0.01 # placeholder, currently assumed to be the same as for 6
-    pars.lrhpv.prog_rate    = 0.05 # placeholder, currently assumed to be the same as for 6
-    pars.lrhpv.prog_rate_sd = 0.005 # placeholder, currently assumed to be the same as for 6
-    pars.lrhpv.rel_beta     = 0.5 # placeholder, currently assumed to be the same as for 6
-    pars.lrhpv.cancer_prob  = 0.0  # Share of CIN3s that will go on to cancer
-    pars.lrhpv.imm_boost    = 1.0 # placeholder, currently assumed to be the same as for 6
-    pars.lrhpv.sero_prob    = 0.6  # placeholder, currently assumed to be the same as for 6
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
@@ -509,241 +375,23 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, default=False, g
     pars = dict(
         # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
         hpv16 = dict(
-            hpv16  = 1.0, # Default for own-immunity
-            hpv18 = cross_imm_high,
-            hpv31  = cross_imm_high,
-            hpv33 = cross_imm_high,
-            hpv35 = cross_imm_high,
-            hpv45 = cross_imm_high,
-            hpv51 = cross_imm_med,
-            hpv52 = cross_imm_med,
-            hpv56 = cross_imm_med,
-            hpv58 = cross_imm_med,
-            hpv6 = cross_imm_med,
-            hpv11 = cross_imm_med,
-            hrhpv = 0.1,
-            lrhpv = cross_imm_med
+            hpv16=1.0, # Default for own-immunity
+            hpv18=cross_imm_high,
+            hrhpv=cross_imm_med,
         ),
 
         hpv18 = dict(
             hpv16=cross_imm_high,
             hpv18=1.0,  # Default for own-immunity
-            hpv31=cross_imm_high,
-            hpv33=cross_imm_high,
-            hpv35=cross_imm_high,
-            hpv45=cross_imm_high,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv = 0.1,
-            lrhpv = cross_imm_med
-        ),
-
-        hpv31=dict(
-            hpv16=cross_imm_high,
-            hpv18=cross_imm_high,
-            hpv31=1.0,  # Default for own-immunity
-            hpv33=cross_imm_high,
-            hpv35=cross_imm_high,
-            hpv45=cross_imm_high,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_high,
-            lrhpv=cross_imm_med
-        ),
-
-        hpv33=dict(
-            hpv16=cross_imm_high,
-            hpv18=cross_imm_high,
-            hpv31=cross_imm_high,
-            hpv33=1.0,  # Default for own-immunity
-            hpv35=cross_imm_high,
-            hpv45=cross_imm_high,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_high,
-            lrhpv=cross_imm_med
-        ),
-
-        hpv35=dict(
-            hpv16=cross_imm_high,
-            hpv18=cross_imm_high,
-            hpv31=cross_imm_high,
-            hpv33=cross_imm_high,
-            hpv35=1.0,  # Default for own-immunity
-            hpv45=cross_imm_high,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_high,
-            lrhpv=cross_imm_med
-        ),
-
-        hpv45=dict(
-            hpv16=cross_imm_high,
-            hpv18=cross_imm_high,
-            hpv31=cross_imm_high,
-            hpv33=cross_imm_high,
-            hpv35=cross_imm_high,
-            hpv45=1.0,  # Default for own-immunity
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_high,
-            lrhpv=cross_imm_med
-        ),
-
-        hpv51=dict(
-            hpv16=cross_imm_med,
-            hpv18=cross_imm_med,
-            hpv31=cross_imm_med,
-            hpv33=cross_imm_med,
-            hpv35=cross_imm_med,
-            hpv45=cross_imm_med,
-            hpv51=1.0,  # Default for own-immunity
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_high,
-            lrhpv=cross_imm_med
-        ),
-
-        hpv52=dict(
-            hpv16=cross_imm_med,
-            hpv18=cross_imm_med,
-            hpv31=cross_imm_med,
-            hpv33=cross_imm_med,
-            hpv35=cross_imm_med,
-            hpv45=cross_imm_med,
-            hpv51=cross_imm_med,
-            hpv52=1.0,  # Default for own-immunity
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_high,
-            lrhpv=cross_imm_med
-        ),
-
-        hpv56=dict(
-            hpv16=cross_imm_med,
-            hpv18=cross_imm_med,
-            hpv31=cross_imm_med,
-            hpv33=cross_imm_med,
-            hpv35=cross_imm_med,
-            hpv45=cross_imm_med,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=1.0,  # Default for own-immunity
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_high,
-            lrhpv=cross_imm_med
-        ),
-
-        hpv58=dict(
-            hpv16=cross_imm_med,
-            hpv18=cross_imm_med,
-            hpv31=cross_imm_med,
-            hpv33=cross_imm_med,
-            hpv35=cross_imm_med,
-            hpv45=cross_imm_med,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=1.0,  # Default for own-immunity
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_high,
-            lrhpv=cross_imm_med
-        ),
-
-        hpv6=dict(
-            hpv16=cross_imm_med,
-            hpv18=cross_imm_med,
-            hpv31=cross_imm_med,
-            hpv33=cross_imm_med,
-            hpv35=cross_imm_med,
-            hpv45=cross_imm_med,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=1.0,  # Default for own-immunity
-            hpv11=cross_imm_med,
             hrhpv=cross_imm_med,
-            lrhpv=cross_imm_high
         ),
 
-        hpv11=dict(
-            hpv16=cross_imm_med,
-            hpv18=cross_imm_med,
-            hpv31=cross_imm_med,
-            hpv33=cross_imm_med,
-            hpv35=cross_imm_med,
-            hpv45=cross_imm_med,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=1.0,  # Default for own-immunity
-            hrhpv=cross_imm_med,
-            lrhpv=cross_imm_high
-        ),
         hrhpv=dict(
-            hpv16=0.1,
-            hpv18=0.1,
-            hpv31=cross_imm_med,
-            hpv33=cross_imm_med,
-            hpv35=cross_imm_med,
-            hpv45=cross_imm_med,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
-            hrhpv=cross_imm_med,
-            lrhpv=cross_imm_med
-        ),
-
-        lrhpv=dict(
             hpv16=cross_imm_med,
             hpv18=cross_imm_med,
-            hpv31=cross_imm_med,
-            hpv33=cross_imm_med,
-            hpv35=cross_imm_med,
-            hpv45=cross_imm_med,
-            hpv51=cross_imm_med,
-            hpv52=cross_imm_med,
-            hpv56=cross_imm_med,
-            hpv58=cross_imm_med,
-            hpv6=cross_imm_med,
-            hpv11=cross_imm_med,
             hrhpv=cross_imm_med,
-            lrhpv=1.0# Default for own-immunity
         ),
+
     )
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
