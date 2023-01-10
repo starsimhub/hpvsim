@@ -759,7 +759,6 @@ class Sim(hpb.BaseSim):
 
         # Calculate relative transmissibility by stage of infection
         rel_trans = people.infectious[:].astype(hpd.default_float)
-        rel_trans *= 1-people.dysp[:]
         rel_trans[people.cancerous] *= self['rel_trans_cancerous']
 
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
