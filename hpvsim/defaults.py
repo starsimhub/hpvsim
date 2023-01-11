@@ -185,7 +185,6 @@ class PeopleMeta(sc.prettyobj):
         State('dysp', default_float, 0, shape='n_genotypes'), # Level of dyplasia
         State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
         State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration to dysplasia over time
-        State('cancer_growth_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in logistic function that maps to cancer probability over time
     ]
 
 

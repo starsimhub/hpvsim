@@ -339,7 +339,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.cancer_prob_growth = 0.3
-    pars.hpv16.cancer_prob_growth_sd = 0.05
     pars.hpv16.cancer_prob_growth_infl = 18
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
     pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
@@ -352,7 +351,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 1.0  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.cancer_prob_growth = 0.3
-    pars.hpv18.cancer_prob_growth_sd = 0.05
     pars.hpv18.cancer_prob_growth_infl = 15
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
     pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
@@ -365,7 +363,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.prog_rate_sd = 0.015 # placeholder
     pars.hrhpv.rel_beta     = 0.75 # placeholder
     pars.hrhpv.cancer_prob_growth = 0.4
-    pars.hrhpv.cancer_prob_growth_sd = 0.05
     pars.hrhpv.cancer_prob_growth_infl = 20
     pars.hrhpv.imm_boost    = 1.0 # placeholder
     pars.hrhpv.sero_prob    = 0.60 # placeholder

@@ -266,10 +266,6 @@ class People(hpb.BasePeople):
 
         self.prog_rate[g, inds] = prog_rate[:,0]
 
-        # Calculate cancer growth rates
-        cancer_growth_rate = hpu.sample(dist='normal_pos', par1=gpars['cancer_prob_growth'], par2=gpars['cancer_prob_growth_sd'], size=full_size)
-        dysp_arrs.cancer_growth_rate = cancer_growth_rate
-        self.cancer_growth_rate[g, inds] = cancer_growth_rate[:,0]
         return dysp_arrs
 
 
@@ -294,7 +290,7 @@ class People(hpb.BasePeople):
 
         dur_dysp  = dysp_arrs.dur_dysp[:,0]
         gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-        cancer_growth = dysp_arrs.cancer_growth_rate[:,0]
+        cancer_growth = gpars['cancer_prob_growth']
         cancer_infl = gpars['cancer_prob_growth_infl']
 
         # Handle multiscale to create additional cancer agents
@@ -306,8 +302,7 @@ class People(hpb.BasePeople):
             cancer_inds = inds[is_cancer]  # Duplicated below, but avoids need to append extra arrays
             self.scale[cancer_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
             extra_dysp_time = dysp_arrs.dur_dysp[:, 1:]
-            aextra_cancer_growth = dysp_arrs.cancer_growth_rate[:, 1:]
-            extra_cancer_probs = hpu.logf2(extra_dysp_time, cancer_infl, aextra_cancer_growth)
+            extra_cancer_probs = hpu.logf2(extra_dysp_time, cancer_infl, cancer_growth)
             extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs)
             extra_cancer_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
             extra_cancer_counts = extra_cancer_bools.sum(axis=1)  # Find out how many new cancer cases we have
