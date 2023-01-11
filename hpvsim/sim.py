@@ -515,7 +515,7 @@ class Sim(hpb.BaseSim):
         results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[1])
         results['cin2_prevalence'] = init_res('CIN2 prevalence', color=hpd.stock_colors[2])
         results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[2])
-        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[3])
+        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[2])
         results['cin3_prevalence'] = init_res('CIN3 prevalence', color=hpd.stock_colors[3])
         results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=hpd.stock_colors[3])
         results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=hpd.stock_colors[3])
