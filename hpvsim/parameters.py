@@ -52,7 +52,7 @@ def make_pars(**kwargs):
     pars['end']             = None          # End of the simulation
     pars['n_years']         = 35            # Number of years to run, if end isn't specified. Note that this includes burn-in
     pars['burnin']          = 25            # Number of years of burnin. NB, this is doesn't affect the start and end dates of the simulation, but it is possible remove these years from plots
-    pars['dt']              = 0.5           # Timestep (in years)
+    pars['dt']              = 0.25           # Timestep (in years)
     pars['dt_demog']        = 1.0           # Timestep for demographic updates (in years)
     pars['rand_seed']       = 1             # Random seed, if None, don't reset
     pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
@@ -73,7 +73,7 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']                = 0.50  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']                = 0.10  # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
     pars['rel_trans_cancerous'] = 0.0   # Transmissibility of people with cancer compared to those without
@@ -332,34 +332,34 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin   = dict(dist='lognormal', par1=0.9, par2=1) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=15, par2=8) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv16.dysp_rate    = 0.9 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate    = 0.17 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.dur_dysp     = dict(dist='lognormal', par1=10, par2=8) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv16.dysp_rate    = 0.8 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate    = 0.1 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.cancer_prob  = 0.0035 # Annual probability of cancer during dysplasia
+    pars.hpv16.cancer_prob  = 0.0042 # Annual probability of cancer during dysplasia
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
     pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin   = dict(dist='lognormal', par1=1, par2=1) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=5, par2=3) # PLACEHOLDERS; INSERT SOURCE
-    pars.hpv18.dysp_rate    = 0.7 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3, par2=3) # PLACEHOLDERS; INSERT SOURCE
+    pars.hpv18.dysp_rate    = 0.9 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate    = 0.25 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.05 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 1.0  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.cancer_prob  = 0.0096  # Annual probability of cancer during dysplasia
+    pars.hpv18.cancer_prob  = 0.007  # Annual probability of cancer during dysplasia
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
     pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=0.8, par2=1) # placeholder
-    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=20, par2=10) # placeholder
-    pars.hrhpv.dysp_rate    = 0.8 # placeholder
+    pars.hrhpv.dur_dysp     = dict(dist='lognormal', par1=15, par2=10) # placeholder
+    pars.hrhpv.dysp_rate    = 0.7 # placeholder
     pars.hrhpv.prog_rate    = 0.071 # placeholder
     pars.hrhpv.prog_rate_sd = 0.015 # placeholder
     pars.hrhpv.rel_beta     = 0.75 # placeholder
-    pars.hrhpv.cancer_prob  = 0.0038  # Annual probability of cancer during dysplasia
+    pars.hrhpv.cancer_prob  = 0.008  # Annual probability of cancer during dysplasia
     pars.hrhpv.imm_boost    = 1.0 # placeholder
     pars.hrhpv.sero_prob    = 0.60 # placeholder
 
