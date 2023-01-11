@@ -155,6 +155,7 @@ class PeopleMeta(sc.prettyobj):
         State('peak_imm',       default_float,  0,'n_imm_sources'),  # Float, peak level of immunity
         State('imm',            default_float,  0,'n_imm_sources'),  # Float, current immunity level
         State('t_imm_event',    default_int,    0,'n_imm_sources'),  # Int, time since immunity event
+        State('cell_imm',       default_float,  0,'n_imm_sources'),
     ]
 
     # Relationship states

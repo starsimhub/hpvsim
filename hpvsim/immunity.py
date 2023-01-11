@@ -106,7 +106,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
 
         if len(no_prior_imm_inds):
             people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
-
+            people.cell_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['cell_imm_init'], size=len(no_prior_imm_inds))
     else:
         # Vaccination by dose
         dose1_inds = inds[people.doses[inds]==1] # First doses

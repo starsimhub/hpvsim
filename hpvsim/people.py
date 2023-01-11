@@ -218,6 +218,8 @@ class People(hpb.BasePeople):
         dur_precin  = self.dur_precin[g, inds]  # Array of durations of infection prior to dysplasia/clearance/control
         dysp_rate   = self.dysp_rate[g, inds]  # Array of dysplasia rates
         dysp_probs  = hpu.logf1(dur_precin, dysp_rate)  # Probability of developing dysplasia
+        cell_imm    = self.cell_imm[g, inds]
+        dysp_probs  *= 1-cell_imm
         has_dysp    = hpu.binomial_arr(dysp_probs)  # Boolean array of those who have dysplasia
         nodysp_inds = inds[~has_dysp]  # Indices of those without dysplasia
         dysp_inds   = inds[has_dysp]  # Indices of those with dysplasia
