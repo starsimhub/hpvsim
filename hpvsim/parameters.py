@@ -346,7 +346,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.dur_dysp     = dict(dist='lognormal', par1=3, par2=3) # PLACEHOLDERS; INSERT SOURCE
     pars.hpv18.dysp_rate    = 0.9 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate    = 0.25 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.prog_rate_sd = 0.05 # Standard deviation of the progression rate
+    pars.hpv18.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv18.rel_beta     = 1.0  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.cancer_prob  = 0.007  # Annual probability of cancer during dysplasia
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data

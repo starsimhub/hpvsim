@@ -80,7 +80,7 @@ def invlogf1(y, k):
 def logf2(x, x_infl, k):
     '''
     Logistic function, constrained to pass through 0,0 and with upper asymptote
-    at 1. Accepts 2 parameters: growth rate and point of inflexion.
+    at 1. Accepts 2 parameters: growth rate and point of inflection.
     '''
     l_asymp = -1/(1+np.exp(k*x_infl))
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
