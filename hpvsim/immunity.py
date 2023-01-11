@@ -101,8 +101,11 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
         prior_imm_inds = inds[has_imm]
 
         if len(prior_imm_inds):
-            boost = genotype_pars['imm_boost']
-            people.peak_imm[imm_source, prior_imm_inds] *= is_seroconvert[has_imm] * boost
+            new_peak = hpu.sample(**imm_pars['imm_init'], size=len(prior_imm_inds))
+            people.peak_imm[imm_source, prior_imm_inds] = is_seroconvert[has_imm] * np.max(new_peak, people.peak_imm[imm_source, prior_imm_inds])
+
+            new_cell_imm = hpu.sample(**imm_pars['cell_imm_init'], size=len(prior_imm_inds))
+            people.cell_imm[imm_source, prior_imm_inds] = is_seroconvert[has_imm] * np.max(new_cell_imm, people.cell_imm[imm_source, prior_imm_inds])
 
         if len(no_prior_imm_inds):
             people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
