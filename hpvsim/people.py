@@ -290,7 +290,7 @@ class People(hpb.BasePeople):
 
         dur_dysp  = dysp_arrs.dur_dysp[:,0]
         gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-        cancer_growth = gpars['cancer_prob_growth']
+        cancer_growth = gpars['cancer_prob_growth_rate']
         cancer_infl = gpars['cancer_prob_growth_infl']
 
         # Handle multiscale to create additional cancer agents
