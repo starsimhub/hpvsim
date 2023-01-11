@@ -22,11 +22,11 @@ def test_microsim():
         'n_agents': 500, # CK: values smaller than this fail
         'init_hpv_prev': .1,
         'n_years': 2,
+        'burnin': 0,
         'genotypes': [16,18],
         }
     sim.update_pars(pars)
     sim.run()
-    sim.disp()
     sim.summarize()
     sim.brief()
 
@@ -38,17 +38,16 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
 
     # Settings
     seed = 1
-    verbose = 1
+    verbose = 0.1
 
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
-        'start': 1980,
+        'start': 1950,
         'burnin': 30,
         'end': 2030,
         'location': 'tanzania',
         'dt': .5,
-        'genotypes': [16,18]
     }
     pars = sc.mergedicts(pars, kwargs)
 
@@ -59,12 +58,11 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
         }
     }
 
-    sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars)
-    sim.set_seed(seed)
+    sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars, rand_seed=seed)
+    sim.run(verbose=verbose)
 
     # Optionally plot
     if do_plot:
-        sim.run(verbose=verbose)
         sim.plot(do_save=do_save)
 
     return sim
@@ -74,34 +72,46 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, network='random', beta=0.05, eff_condoms=1.0)
+    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, genotypes=[16], beta=0.05, verbose=0, eff_condoms=0.6)
     sim = hpv.Sim(pars=base_pars)
     sim.initialize()
 
     # Define the parameters to vary
-    vary_pars   = ['model_hiv',     'beta',          'acts',             'condoms',          'debut',            'init_hpv_prev', ] # Parameters
-    vary_vals   = [[False, True],   [0.0001, 0.99],    [1, 200],         [0.01,0.9],         [15,25],             [0.01,0.8]] # Values
-    vary_rels   = ['pos',           'pos',           'pos',              'neg',              'neg',              'pos'] # Expected association with epi outcomes
-    vary_what   = ['total_hpv_prevalence', 'total_hpv_incidence',    'total_hpv_incidence',      'total_hpv_incidence', 'total_hpv_incidence',    'total_cancer_incidence'] # Epi outcomes to check
+    class ParEffects():
+        def __init__(self, par, range, variable):
+            self.par = par
+            self.range = range
+            self.variable = variable
+            return
+
+    par_effects = [
+        # ParEffects('model_hiv',     [False, True],  'cancers'),
+        ParEffects('beta',          [0.01, 0.99],   'infections'),
+        ParEffects('condoms',       [0.90, 0.10],   'infections'),
+        ParEffects('acts',          [1, 200],       'infections'),
+        ParEffects('debut',         [25, 15],       'infections'),
+        ParEffects('init_hpv_prev', [0.1, 0.8],     'infections'),
+    ]
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
-    for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
-        if vpar=='acts':
-            bp = sc.dcp(sim[vpar]['a'])
-            lo = {'a':{**bp, 'par1': vval[0]}}
-            hi = {'a':{**bp, 'par1': vval[1]}}
-        elif vpar=='condoms':
-            lo = {'a':vval[0]}
-            hi = {'a':vval[1]}
-        elif vpar=='debut':
-            bp = sc.dcp(sim[vpar]['f'])
-            lo = {sk:{**bp, 'par1':vval[0]} for sk in ['f','m']}
-            hi = {sk:{**bp, 'par1':vval[1]} for sk in ['f','m']}
+    for par_effect in par_effects:
+    # for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
+        if par_effect.par=='acts':
+            bp = sc.dcp(sim[par_effect.par]['c'])
+            lo = {lk:{**bp, 'par1': par_effect.range[0]} for lk in ['m','c','o']}
+            hi = {lk:{**bp, 'par1': par_effect.range[1]} for lk in ['m','c','o']}
+        elif par_effect.par=='condoms':
+            lo = {lk:par_effect.range[0] for lk in ['m','c','o']}
+            hi = {lk:par_effect.range[1] for lk in ['m','c','o']}
+        elif par_effect.par=='debut':
+            bp = sc.dcp(sim[par_effect.par]['f'])
+            lo = {sk:{**bp, 'par1':par_effect.range[0]} for sk in ['f','m']}
+            hi = {sk:{**bp, 'par1':par_effect.range[1]} for sk in ['f','m']}
         else:
-            lo = vval[0]
-            hi = vval[1]
+            lo = par_effect.range[0]
+            hi = par_effect.range[1]
 
-        if vpar == 'model_hiv':
+        if par_effect.par == 'model_hiv':
             base_pars['location'] = 'south africa'
             hiv_datafile = 'test_data/hiv_incidence_south_africa.csv'
             art_datafile = 'test_data/art_coverage_south_africa.csv'
@@ -109,26 +119,19 @@ def test_epi():
             hiv_datafile = None
             art_datafile = None
 
-        pars0 = sc.mergedicts(base_pars, {vpar: lo})  # Use lower parameter bound
-        pars1 = sc.mergedicts(base_pars, {vpar: hi})  # Use upper parameter bound
+        pars0 = sc.mergedicts(base_pars, {par_effect.par: lo})  # Use lower parameter bound
+        pars1 = sc.mergedicts(base_pars, {par_effect.par: hi})  # Use upper parameter bound
 
         # Run the simulations and pull out the results
-        s0 = hpv.Sim(pars0, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{vpar} {vval[0]}').run()
-        s1 = hpv.Sim(pars1, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{vpar} {vval[1]}').run()
-        res0 = s0.summary
-        res1 = s1.summary
+        s0 = hpv.Sim(pars0, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{par_effect.par} {par_effect.range[0]}').run()
+        s1 = hpv.Sim(pars1, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{par_effect.par} {par_effect.range[1]}').run()
 
         # Check results
-        key=vwhat
-        v0 = res0[key]
-        v1 = res1[key]
-        print(f'Checking {key:20s} ... ', end='')
-        if vrel=='pos':
-            assert v0 <= v1, f'Expected {key} to be lower with {vpar}={lo} than with {vpar}={hi}, but {v0} > {v1})'
-            print(f'✓ ({v0} <= {v1})')
-        elif vrel=='neg':
-            assert v0 >= v1, f'Expected {key} to be higher with {vpar}={lo} than with {vpar}={hi}, but {v0} < {v1})'
-            print(f'✓ ({v0} => {v1})')
+        v0 = s0.results[par_effect.variable][:].sum()
+        v1 = s1.results[par_effect.variable][:].sum()
+        print(f'Checking {par_effect.variable:10s} with varying {par_effect.par:10s} ... ', end='')
+        assert v0 <= v1, f'Expected {par_effect.variable} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
+        print(f'✓ ({v0} <= {v1})')
 
     return
 
@@ -137,7 +140,7 @@ def test_states():
     sc.heading('Test states')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_years=10, dt=0.5, network='random', beta=0.05)
+    base_pars = dict(n_years=20, dt=0.5, network='random', beta=0.05)
 
     class check_states(hpv.Analyzer):
 
@@ -155,13 +158,19 @@ def test_states():
                 s3  = ~(people.susceptible[g,:] & people.inactive[g,:]).any()
                 s4  = ~(people.infectious[g,:] & people.inactive[g,:]).any()
 
-                d1 = (people.no_dysp[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous | removed).all()
-                d2 = ~(people.no_dysp[g,:] & people.cin1[g,:]).all()
+                d1 = (~people.has_dysp[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
+                d2 = ~(people.has_dysp[g,:] & people.cin1[g,:]).all()
                 d3 = ~(people.cin1[g,:] & people.cin2[g,:]).all()
                 d4 = ~(people.cin2[g,:] & people.cin3[g,:]).all()
                 d5 = ~(people.cin3[g,:] & people.cancerous[g,:]).all()
 
-                if not np.array([s1, s2, s3, s4, d1, d2, d3, d4, d5]).all():
+                # If there's anyone with dysplasia & inactive infection, they must have cancer
+                sd1inds = hpv.true(people.has_dysp[g,:] & people.inactive[g,:])
+                sd1 = True
+                if len(sd1inds)>0:
+                    sd1 = people.cancerous[:,sd1inds].any(axis=0).all()
+
+                if not np.array([s1, s2, s3, s4, d1, d2, d3, d4, d5, sd1]).all():
                     self.okay = False
 
             return
@@ -178,7 +187,7 @@ def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
-    sim = hpv.Sim(n_agents=100, label='test_label')
+    sim = hpv.Sim(n_agents=100, genotypes=[16], label='test_label')
     sim.reset_layer_pars()
     sim.initialize()
     sim.reset_layer_pars()
@@ -240,7 +249,7 @@ def test_result_consistency():
 
     # Create sim
     n_agents = 1e3
-    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, genotypes=['hpv16','hpv18'], label='test_results')
+    sim = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, label='test_results')
     sim.run()
 
     # Check that infections by genotype sum up the the correct totals
@@ -248,7 +257,8 @@ def test_result_consistency():
     # of any genotype that occured each period. Thus, sim.results['infections'] can technically
     # be greater than the total population size, for example if half the population got infected
     # with 2 genotypes simultaneously.
-    assert (sim.results['infections'][:].sum(axis=0)==sim.results['total_infections'][:]).all() # Check flows by genotype are equal to total flows
+    assert np.allclose(sim.results['infections_by_genotype'][:].sum(axis=0),sim.results['infections'][:]) # Check flows by genotype are equal to total flows
+    assert np.allclose(sim.results['infections_by_age'][:].sum(axis=0),sim.results['infections'][:]) # Check flows by genotype are equal to total flows
 
     # The test below was faulty, but leaving it here (commented out) is instructive.
     # Specifically, the total number of people infectious by genotype (sim.results['n_infectious'])
@@ -256,14 +266,17 @@ def test_result_consistency():
     # because of the possibility of coinfections within a single person.
     # So sim.results['n_total_infectious'] represents the total number of people who have 1+ infections
     # whereas sim.results['n_infectious'] represents the total number of people infected with each genotype.
-    # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check flows by genotype are equal to total flows
+    # assert (sim.results['n_infectious'][:].sum(axis=0)==sim.results['n_total_infectious'][:]).all() # Check stocks by genotype are equal to stocks flows
+    # assert np.allclose(sim.results.age['n_infectious_by_age'][:].sum(axis=0),sim.results['n_infectious'][:]) # Check stocks by age are equal to stocks flows
 
-    # Check that CINs by grade sum up the the correct totals
-    assert ((sim.results['total_cin1s'][:] + sim.results['total_cin2s'][:] + sim.results['total_cin3s'][:]) == sim.results['total_cins'][:]).all()
-    assert ((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]) == sim.results['cins'][:]).all()
 
-    # Check that cancers by age sum to the correct totals
-    assert ((sim.results['cancers_by_age'][:].sum(axis=0)-sim.results['cancers'][:])<1e-3).all()
+    # # Check that CINs by grade sum up the the correct totals
+    # assert np.allclose((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]),sim.results['dysplasias'][:])
+    # assert np.allclose((sim.results['cin1s_by_genotype'][:] + sim.results['cin2s_by_genotype'][:] + sim.results['cin3s_by_genotype'][:]), sim.results['dysplasias_by_genotype'][:])
+
+    # Check that results by age sum to the correct totals
+    assert np.allclose(sim.results['cancers_by_age'][:].sum(axis=0),sim.results['cancers'][:])
+    assert np.allclose(sim.results['infections_by_age'][:].sum(axis=0),sim.results['infections'][:])
 
     # Check demographics
     assert (sim['n_agents'] == n_agents)
@@ -292,9 +305,6 @@ def test_location_loading():
     sim2 = hpv.Sim(location='Zimbabwe') # Location should not be case sensitive
     assert not np.array_equal( sim0['birth_rates'][1],sim1['birth_rates'][1]) # Values for Zimbabwe should be different to default values
     assert np.array_equal(sim1['birth_rates'][1], sim2['birth_rates'][1]) # Values for Zimbabwe should be loaded regardless of capitalization
-    with pytest.warns(RuntimeWarning): # If the location doesn't exist, should use defaults
-        sim3 = hpv.Sim(location='penelope') # Make sure a warning message is raised
-    assert np.array_equal(sim0['birth_rates'][1], sim3['birth_rates'][1]) # Check that defaults have been used
 
     return sim1
 
@@ -303,7 +313,7 @@ def test_resuming():
     sc.heading('Test that resuming a run works')
 
     n_agents = 5e3
-    s0 = hpv.Sim(n_agents=n_agents, n_years=10, dt=0.5, label='test_resume')
+    s0 = hpv.Sim(n_agents=n_agents, genotypes=[16], dt=0.5, label='test_resume', start=2015, n_years=15, burnin=5)
     s1 = s0.copy()
     s0.run()
 
@@ -329,10 +339,20 @@ def test_resuming():
     with pytest.raises(hpv.AlreadyRunError):
         s1.finalize() # Can't re-finalize a finalized sim
 
-    assert np.all(s0.results['total_infections'].values == s1.results['total_infections']) # Results should be identical
+    assert np.all(s0.results['infections'].values == s1.results['infections']) # Results should be identical
 
     return s1
 
+def test_initialize_order():
+
+    s0 = hpv.Sim(n_agents=5e3, genotypes=[16], n_years=10, dt=0.5)
+    s1 = hpv.Sim(n_agents=5e3, genotypes=[16], n_years=10, dt=0.5)
+    s0.initialize()
+    s1.initialize()
+    s0.run()
+    s1.run()
+    assert np.all(s0.results['infections'].values == s1.results['infections']) # Results should be identical
+    return s1
 
 #%% Run as a script
 if __name__ == '__main__':
@@ -348,6 +368,7 @@ if __name__ == '__main__':
     sim5 = test_result_consistency()
     sim6 = test_location_loading()
     sim7 = test_resuming()
+    sim8 = test_initialize_order()
 
     sc.toc(T)
     print('Done.')

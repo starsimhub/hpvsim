@@ -6,6 +6,7 @@ the baseline results.
 import numpy as np
 import sciris as sc
 import hpvsim as hpv
+import pandas as pd
 
 do_plot = 1
 do_save = 0
@@ -14,19 +15,22 @@ benchmark_filename = sc.thisdir(__file__, 'benchmark.json')
 parameters_filename = sc.thisdir(hpv.__file__, 'regression', f'pars_v{hpv.__version__}.json')
 hpv.options.set(interactive=False) # Assume not running interactively
 
+testdir = sc.thisdir(aspath=True)
+tempdir = testdir/'temp'
+tempdir.mkdir(exist_ok=True)
 
 def make_sim(use_defaults=False, do_plot=False, **kwargs):
     '''
-    Define a default simulation for testing the baseline -- use hybrid and include
+    Define a default simulation for testing the baseline, including
     interventions to increase coverage. If run directly (not via pytest), also
     plot the sim by default.
     '''
 
     # Define some interventions
     prob = 0.02
-    screen      = hpv.routine_screening(start_year=2040, prob=prob, product='via', label='screen')
+    screen      = hpv.routine_screening(start_year=2040, prob=prob, product='hpv', label='screen')
     to_triage   = lambda sim: sim.get_intervention('screen').outcomes['positive']
-    triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product='via_triage', label='triage')
+    triage      = hpv.routine_triage(eligibility=to_triage, prob=prob, product='via', label='triage')
     to_treat    = lambda sim: sim.get_intervention('triage').outcomes['positive']
     assign_tx   = hpv.routine_triage(eligibility=to_treat, prob=prob, product='tx_assigner', label='assign_tx')
     to_ablate   = lambda sim: sim.get_intervention('assign_tx').outcomes['ablation']
@@ -90,7 +94,9 @@ def test_baseline():
 
     # Calculate new baseline
     new = make_sim()
+    new.to_json(tempdir/'baseline_pre_run.json')  # Check that exporting works before results have been generated
     new.run()
+    new.to_json(tempdir/'baseline_post_run.json')  # Check that exporting works before results have been generated
 
     # Compute the comparison
     hpv.diff_sims(old, new, die=True)

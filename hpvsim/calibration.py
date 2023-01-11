@@ -41,6 +41,7 @@ class Calibration(sc.prettyobj):
         sim          (Sim)  : the simulation to calibrate
         datafiles    (list) : list of datafile strings to calibrate to
         calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
+        extra_sim_results (list) : list of result strings to store
         fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
         par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_uniform
         n_trials     (int)  : the number of trials per worker
@@ -72,8 +73,8 @@ class Calibration(sc.prettyobj):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, par_samplers=None,
-                 n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, extra_sim_results=None,
+                 par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
 
         import multiprocessing as mp # Import here since it's also slow
@@ -93,6 +94,7 @@ class Calibration(sc.prettyobj):
         self.sim            = sim
         self.calib_pars     = calib_pars
         self.genotype_pars  = genotype_pars
+        self.extra_sim_results = extra_sim_results
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
         self.die            = die
@@ -105,7 +107,16 @@ class Calibration(sc.prettyobj):
             self.target_data.append(hpm.load_data(datafile))
 
         sim_results = sc.objdict()
-        age_result_keys = sc.objdict()
+
+        age_result_args = sc.objdict()
+        extra_sim_results = sc.objdict()
+
+        if self.extra_sim_results:
+            for extra_result in self.extra_sim_results:
+                extra_sim_results[extra_result] = sc.objdict()
+            self.extra_sim_results_keys = extra_sim_results.keys()
+        else:
+            self.extra_sim_results_keys = None
 
         # Go through each of the target keys and determine how we are going to get the results from sim
         for targ in self.target_data:
@@ -114,7 +125,7 @@ class Calibration(sc.prettyobj):
                 errormsg = f'Only support one set of targets per datafile, {len(targ_keys)} provided'
                 raise ValueError(errormsg)
             if 'age' in targ.columns:
-                age_result_keys[targ_keys[0]] = sc.objdict(
+                age_result_args[targ_keys[0]] = sc.objdict(
                     datafile=sc.dcp(targ),
                     compute_fit=True,
                 )
@@ -123,23 +134,28 @@ class Calibration(sc.prettyobj):
                     data=sc.dcp(targ)
                 )
 
-        ar = hpa.age_results(result_keys=age_result_keys)
+        ar = hpa.age_results(result_args=age_result_args)
         self.sim['analyzers'] += [ar]
         self.sim.initialize()
         for rkey in sim_results.keys():
             sim_results[rkey].timepoints = sim.get_t(sim_results[rkey].data.year.unique()[0], return_date_format='str')[0]//sim.resfreq
             if 'weights' not in sim_results[rkey].data.columns:
                 sim_results[rkey].weights = np.ones(len(sim_results[rkey].data))
-        self.age_results_keys = age_result_keys.keys()
+        self.age_results_keys = age_result_args.keys()
         self.sim_results = sim_results
         self.sim_results_keys = sim_results.keys()
 
-        self.result_properties = sc.objdict()
+        self.result_args = sc.objdict()
         for rkey in self.age_results_keys + self.sim_results_keys:
-            self.result_properties[rkey] = sc.objdict()
-            self.result_properties[rkey].name = self.sim.results[rkey].name
-            self.result_properties[rkey].color = self.sim.results[rkey].color
+            self.result_args[rkey] = sc.objdict()
+            self.result_args[rkey].name = self.sim.results[rkey].name
+            self.result_args[rkey].color = self.sim.results[rkey].color
 
+        if self.extra_sim_results:
+            for rkey in self.extra_sim_results_keys:
+                self.result_args[rkey] = sc.objdict()
+                self.result_args[rkey].name = self.sim.results[rkey].name
+                self.result_args[rkey].color = self.sim.results[rkey].color
         # Temporarily store a filename
         self.tmp_filename = 'tmp_calibration_%05i.obj'
 
@@ -263,7 +279,7 @@ class Calibration(sc.prettyobj):
             all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars)
             return all_pars
         else:
-            return pars, genotype_pars
+            return calib_pars, genotype_pars
 
 
     def sim_to_sample_pars(self):
@@ -363,9 +379,15 @@ class Calibration(sc.prettyobj):
             sim.fit += mismatch
             sim_results[rkey] = model_output
 
+        extra_sim_results = sc.objdict()
+        if self.extra_sim_results:
+            for rkey in self.extra_sim_results_keys:
+                model_output = sim.results[rkey]
+                extra_sim_results[rkey] = model_output
+
         # Store results in temporary files (TODO: consider alternatives)
         if save:
-            results = dict(sim=sim_results, analyzer=sim.get_analyzer().results)
+            results = dict(sim=sim_results, analyzer=sim.get_analyzer().results, extra_sim_results=extra_sim_results)
             filename = self.tmp_filename % trial.number
             sc.save(filename, results)
 
@@ -474,6 +496,7 @@ class Calibration(sc.prettyobj):
                     results = sc.load(filename)
                     self.sim_results.append(results['sim'])
                     self.analyzer_results.append(results['analyzer'])
+                    self.extra_sim_results.append(results['extra_sim_results'])
                     if tidyup:
                         try:
                             os.remove(filename)
@@ -552,7 +575,7 @@ class Calibration(sc.prettyobj):
             return json
 
 
-    def plot(self, res_to_plot=None, fig_args=None, axis_args=None, data_args=None, do_save=None,
+    def plot(self, res_to_plot=None, fig_args=None, axis_args=None, data_args=None, show_args=None, do_save=None,
              fig_path=None, do_show=True, plot_type='sns.boxplot', **kwargs):
         '''
         Plot the calibration results
@@ -572,7 +595,7 @@ class Calibration(sc.prettyobj):
         if sc.isstring(plot_type) and plot_type.startswith('sns'):
             import seaborn as sns
             if plot_type.split('.')[1]=='boxplot':
-                extra_args=dict(boxprops=dict(alpha=.3))
+                extra_args=dict(boxprops=dict(alpha=.3), showfliers=False)
             else: extra_args = dict()
             plot_func = getattr(sns, plot_type.split('.')[1])
         else:
@@ -583,7 +606,8 @@ class Calibration(sc.prettyobj):
         fig_args = sc.mergedicts(dict(figsize=(12,8)), fig_args)
         axis_args = sc.mergedicts(dict(left=0.08, right=0.92, bottom=0.08, top=0.92), axis_args)
         d_args = sc.objdict(sc.mergedicts(dict(width=0.3, color='#000000', offset=0), data_args))
-        all_args = sc.mergedicts(fig_args, axis_args, d_args)
+        show_args = sc.objdict(sc.mergedicts(dict(show=dict(tight=True, maximize=False)), show_args))
+        all_args = sc.objdict(sc.mergedicts(fig_args, axis_args, d_args, show_args))
 
         # Pull out results to use
         analyzer_results = sc.dcp(self.analyzer_results)
@@ -639,13 +663,13 @@ class Calibration(sc.prettyobj):
                     unique_genotypes = thisdatadf.genotype.unique()
 
                     # Start making plot
-                    if 'total' not in resname and 'cancer' not in resname:
+                    if 'genotype' in resname:
                         for g in range(self.ng):
                             glabel = self.glabels[g].upper()
                             # Plot data
                             if glabel in unique_genotypes:
                                 ydata = np.array(thisdatadf[thisdatadf.genotype == glabel].value)
-                                ax.scatter(x, ydata, color=self.result_properties[resname].color[g], marker='s', label=f'Data - {glabel}')
+                                ax.scatter(x, ydata, color=self.result_args[resname].color[g], marker='s', label=f'Data - {glabel}')
 
                             # Construct a dataframe with things in the most logical order for plotting
                             for run_num, run in enumerate(analyzer_results):
@@ -660,7 +684,7 @@ class Calibration(sc.prettyobj):
                     else:
                         # Plot data
                         ydata = np.array(thisdatadf.value)
-                        ax.scatter(x, ydata, color=self.result_properties[resname].color, marker='s', label='Data')
+                        ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data')
 
                         # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(analyzer_results):
@@ -669,11 +693,11 @@ class Calibration(sc.prettyobj):
 
                         # Plot model
                         modeldf = pd.DataFrame({'bins':bins, 'values':values})
-                        ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, color=self.result_properties[resname].color, **extra_args)
+                        ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, color=self.result_args[resname].color, **extra_args)
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_properties[resname].name+', '+ date.replace('.0', ''))
+                    ax.set_title(self.result_args[resname].name+', '+ date.replace('.0', ''))
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
@@ -685,7 +709,8 @@ class Calibration(sc.prettyobj):
                 values = []
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
-                ax.scatter(x, ydata, color=self.result_properties[resname].color[0], marker='s', label='Data')
+                ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
+
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
@@ -698,7 +723,7 @@ class Calibration(sc.prettyobj):
                 # Set title and labels
                 date = thisdatadf.year[0]
                 ax.set_xlabel('Genotype')
-                ax.set_title(self.result_properties[resname].name + ', ' + str(date))
+                ax.set_title(self.result_args[resname].name + ', ' + str(date))
                 ax.legend()
                 ax.set_xticks(x, self.glabels)
                 plot_count += 1

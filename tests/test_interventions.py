@@ -6,6 +6,7 @@ Tests for single simulations
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
+import pandas as pd
 import matplotlib.pyplot as plt
 
 do_plot = 0
@@ -38,7 +39,7 @@ def test_screen_prob():
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) # Only model a single lifetime screen
 
     screen = hpv.routine_screening(
-        product='via',  # pass in string or product
+        product='via',
         prob=model_annual_prob,  # This looks like it means that we screen 50% of the population each year
         eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
         age_range=age_range,
@@ -48,7 +49,7 @@ def test_screen_prob():
 
     to_triage = lambda sim: sim.get_intervention('screen').outcomes['positive']
     triage = hpv.routine_triage(
-        product='via_triage',  # pass in string or product
+        product='via',  # pass in string or product
         prob=target_triage,
         annual_prob=False,
         eligibility=to_triage,  # pass in valid state of People OR indices OR callable that gets indices
@@ -57,7 +58,7 @@ def test_screen_prob():
 
     to_treat = lambda sim: sim.get_intervention('triage').outcomes['positive']
     assign_tx = hpv.routine_triage(
-        product='tx_assigner',  # pass in string or product
+        product='tx_assigner',
         prob=target_triage,
         annual_prob=False,
         eligibility=to_treat,
@@ -147,7 +148,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     # Screen, triage, assign treatment, treat
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine_screen = hpv.routine_screening(
-        product='via',  # pass in string or product
+        product='hpv',
         prob=0.1,
         eligibility=screen_eligible,
         age_range=[30, 50],
@@ -156,7 +157,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     )
 
     campaign_screen = hpv.campaign_screening(
-        product='via',
+        product='hpv',
         prob=0.3,
         age_range=[30, 70],
         years=2030,
@@ -169,7 +170,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
         years = [2020,2029],
         prob = 0.9, # acceptance rate
         annual_prob=False, # This probability is per timestep, not annual
-        product = 'via_triage',
+        product = 'via',
         eligibility = to_triage,
         label = 'VIA triage (pre-txvx)'
     )
@@ -190,7 +191,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     new_triage = hpv.routine_triage(
         start_year = 2030,
         prob = 1.0,
-        product = 'via_triage',
+        product = 'via',
         eligibility = to_triage_new,
         label = 'VIA triage (post-txvx)'
     )
@@ -292,7 +293,7 @@ def test_all_interventions(do_plot=False, do_save=False, fig_path=None):
     sim.plot(to_plot=to_plot)
 
     fig, ax = plt.subplots(1, 2)
-    for i, result in enumerate(['total_cancers', 'total_cins']):
+    for i, result in enumerate(['cancers', 'dysplasias']):
         ax[i].plot(sim0.results['year'], sim0.results[result].values, label='No Screening')
         ax[i].plot(sim.results['year'], sim.results[result].values, label='Screening')
         ax[i].set_ylabel(result)
@@ -351,8 +352,6 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
     to_plot = {
-        # 'Therapeutic vaccine': ['resources_campaign txvx', 'resources_campaign txvx 2nd dose',
-        #                         'resources_routine txvx', 'resources_routine txvx 2nd dose'],
         'Number vaccinated': ['new_tx_vaccinated', 'cum_tx_vaccinated'],
     }
     sim.plot(to_plot=to_plot)
@@ -364,7 +363,7 @@ def test_txvx_noscreen(do_plot=False, do_save=False, fig_path=None):
 def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
     sc.heading('Testing effect of prophylactic vaccination')
 
-    debug_scens = 0
+    debug_scens = 1
 
     ### Create interventions
     routine_vx_dose1 = hpv.routine_vx(
@@ -407,10 +406,9 @@ def test_vx_effect(do_plot=False, do_save=False, fig_path=None):
     scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
     scens.run(debug=debug_scens)
     to_plot = {
-        'HPV prevalence': ['total_hpv_prevalence'],
-        'Age standardized cancer incidence (per 100,000 women)': ['asr_cancer'],
+        'HPV prevalence': ['hpv_prevalence'],
+        'Age standardized cancer incidence (per 100,000 women)': ['asr_cancer_incidence'],
         'Cancer deaths per 100,000 women': ['cancer_mortality'],
-        'Number vaccinated': ['cum_vaccinated'],
     }
     scens.plot(to_plot=to_plot)
     return scens
@@ -423,14 +421,13 @@ def test_screening():
     # Screen, triage, assign treatment, treat
     screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
     routine_screen = hpv.routine_screening(
-        product='hpv',  # pass in string or product
-        prob=1.0,  # 3% annual screening probability/year over 30-50 implies ~60% of people will get a screen
-        eligibility=screen_eligible,  # pass in valid state of People OR indices OR callable that gets indices
+        product='via',
+        prob=1.0,
+        eligibility=screen_eligible,
         age_range=[0, 100],
         start_year=2020,
         label='routine screening',
     )
-
 
     # New and old protocol: for those who've been confirmed positive in their secondary diagnostic, determine what kind of treatment to offer them
     screen_positive = lambda sim: sim.get_intervention('routine screening').outcomes['positive']
@@ -477,14 +474,13 @@ def test_screening():
     sim = hpv.Sim(pars=base_pars, interventions=interventions)
     sim.run()
     to_plot = {
-        'CINs': ['total_cins'],
+        'Dysplasias': ['dysplasias'],
         # 'Screens': ['screens'],
-        # 'Treatments': ['resources_ablation', 'resources_excision', 'resources_radiation'],
     }
     sim.plot(to_plot=to_plot)
 
     fig, ax = plt.subplots(1, 2)
-    for i, result in enumerate(['total_cancers', 'total_cins']):
+    for i, result in enumerate(['cancers', 'dysplasias']):
         ax[i].plot(sim0.results['year'], sim0.results[result].values, label='No Screening')
         ax[i].plot(sim.results['year'], sim.results[result].values, label='Screening')
         ax[i].set_ylabel(result)
@@ -494,6 +490,88 @@ def test_screening():
 
     return sim
 
+
+def test_cytology():
+    sc.heading('Test cytology vs HPV')
+
+    # Algorithm 3 (https://www.ncbi.nlm.nih.gov/books/NBK572308/)
+
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened)# Single lifetime screen
+    cytology = hpv.routine_screening(
+        product='lbc',
+        prob=1.0,
+        eligibility=screen_eligible,
+        start_year=2020,
+        label='cytology',
+    )
+
+    # Triage ASCUS with HPV test
+    ascus = lambda sim: sim.get_intervention('cytology').outcomes['ascus']
+    hpv_triage = hpv.routine_triage(
+        product='hpv',
+        prob=.5,
+        annual_prob=False,
+        eligibility=ascus,
+        label='hpv triage'
+    )
+
+    # Send abnormal cytology results, plus ASCUS results that were HPV+, for colpo
+    to_colpo = lambda sim: list(set(sim.get_intervention('cytology').outcomes['abnormal'].tolist() + sim.get_intervention('hpv triage').outcomes['positive'].tolist()))
+    colpo = hpv.routine_triage(
+        product='colposcopy',
+        prob = 0.5,
+        annual_prob=False,
+        eligibility=to_colpo,
+        label = 'colposcopy'
+    )
+
+    # After colpo, treat HSILs with excision and LSILs with ablation
+    lsils = lambda sim: sim.get_intervention('colposcopy').outcomes['lsil']
+    ablation = hpv.treat_num(
+        prob = 0.5,
+        product = 'ablation',
+        eligibility = lsils,
+        label = 'ablation'
+    )
+
+    hsils = lambda sim: sim.get_intervention('colposcopy').outcomes['hsil']
+    excision = hpv.treat_num(
+        prob = 0.2,
+        product = 'excision',
+        eligibility = hsils,
+        label = 'excision'
+    )
+
+    interventions = [cytology, hpv_triage, colpo, ablation, excision]
+
+    for intv in interventions: intv.do_plot=False
+
+    base_sim = hpv.Sim(pars=base_pars)
+
+    scenarios = {
+        'baseline': {
+            'name': 'Baseline',
+            'pars': {
+            }
+        },
+        'algo3': {
+            'name': 'Algorithm 3',
+            'pars': {
+                'interventions': interventions
+            }
+        },
+    }
+
+    metapars = {'n_runs': 3}
+    scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
+    scens.run(debug=0)
+    to_plot = {
+        'HPV prevalence': ['hpv_prevalence'],
+        'Age standardized cancer incidence (per 100,000 women)': ['asr_cancer_incidence'],
+        'Cancer deaths per 100,000 women': ['cancer_mortality'],
+    }
+    scens.plot(to_plot=to_plot)
+    return scens
 
 
 #%% Run as a script
@@ -507,6 +585,7 @@ if __name__ == '__main__':
     sim2 = test_txvx_noscreen()
     sim3 = test_screening()
     scens0 = test_vx_effect()
+    scens1 = test_cytology()
 
 
     sc.toc(T)

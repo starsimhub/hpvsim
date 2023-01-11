@@ -28,3 +28,7 @@ if not data.check_downloaded():
         import sciris as sc
         errormsg = f"Warning: couldn't download data:\n\n{sc.traceback()}\nProceeding anyway..."
         print(errormsg)
+
+# Set the root directory for the codebase
+import pathlib
+rootdir = pathlib.Path(__file__).parent

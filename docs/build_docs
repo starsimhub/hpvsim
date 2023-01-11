@@ -8,6 +8,7 @@
 #
 # Otherwise, Jupyter notebooks will be rebuilt in parallel.
 
+set -e  # Pass errors upwards
 
 echo 'Building docs...'
 start=$SECONDS

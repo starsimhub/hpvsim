@@ -172,7 +172,10 @@ class Intervention:
         ''' Store the user-supplied arguments for later use in to_json '''
         f0 = inspect.currentframe() # This "frame", i.e. Intervention.__init__()
         f1 = inspect.getouterframes(f0) # The list of outer frames
-        parent = f1[2].frame # The parent frame, e.g. change_beta.__init__()
+        if self.__class__.__init__ is Intervention.__init__:
+            parent = f1[1].frame  # parent = f1[2].frame # The parent frame, e.g. change_beta.__init__()
+        else:
+            parent = f1[2].frame  # parent = f1[2].frame # The parent frame, e.g. change_beta.__init__()
         _,_,_,values = inspect.getargvalues(parent) # Get the values of the arguments
         if values:
             self.input_args = {}
@@ -303,7 +306,7 @@ class Intervention:
 
 
 #%% Template classes for routine and campaign delivery
-__all__ = ['RoutineDelivery', 'CampaignDelivery']
+__all__ += ['RoutineDelivery', 'CampaignDelivery']
 
 class RoutineDelivery(Intervention):
     '''
@@ -377,12 +380,9 @@ class CampaignDelivery(Intervention):
     def initialize(self, sim):
         # Decide whether to apply the intervention at every timepoint throughout the year, or just once.
         if self.interpolate:
-            yearpoints = []
-            for yi, year in enumerate(self.years):
-                yearpoints += [year+(i*sim['dt']) for i in range(int(1 / sim['dt']))]
-            self.timepoints = np.array([sc.findinds(sim.yearvec,yp)[0] for yp in yearpoints])
+            self.timepoints = hpu.true(np.isin(np.floor(sim.yearvec), np.floor(self.years)))
         else:
-            self.timepoints = np.array([sc.findinds(sim.yearvec,year)[0] for year in self.years])
+            self.timepoints = hpu.true(np.isin(sim.yearvec, self.years))
 
         # Get the probability input into a format compatible with timepoints
         if len(self.prob) == len(self.years) and self.interpolate:
@@ -823,7 +823,6 @@ class BaseScreening(BaseTest):
             new_screen_inds = hpu.ifalsei(sim.people.screened, accept_inds)  # Figure out people who are getting screened for the first time
             n_new_people = sim.people.scale_flows(new_screen_inds)  # Scale
             n_new_screens = sim.people.scale_flows(accept_inds)  # Scale
-            n_new_screens = sim.people.scale_flows(accept_inds)  # Scale
             sim.results['new_screened'][idx] += n_new_people
             sim.results['new_screens'][idx] += n_new_screens
 
@@ -869,7 +868,6 @@ class routine_screening(BaseScreening, RoutineDelivery):
     def initialize(self, sim):
         RoutineDelivery.initialize(self, sim) # Initialize this first, as it ensures that prob is interpolated properly
         BaseScreening.initialize(self, sim) # Initialize this next
-
 
 class campaign_screening(BaseScreening, CampaignDelivery):
     '''
@@ -1251,15 +1249,19 @@ class Product(hpb.FlexPretty):
 
 class dx(Product):
     '''
-    Testing products are used within screening and triage. Their fundamental proprty is that they classify people
+    Testing products are used within screening and triage. Their fundamental property is that they classify people
     into exactly one result state. They do not change anything about the People.
     '''
-    def __init__(self, df, hierarchy):
+    def __init__(self, df, hierarchy=None):
         self.df = df
         self.states = df.state.unique()
         self.genotypes = df.genotype.unique()
         self.ng = len(self.genotypes)
-        self.hierarchy = hierarchy # or ['high', 'medium', 'low', 'not detected'], or other
+
+        if hierarchy is None:
+            self.hierarchy = df.result.unique() # Hierarchy is drawn from the order in which the outcomes are specified. The last unique item to be specified is the default
+        else:
+            self.hierarchy = hierarchy # or ['high', 'medium', 'low', 'not detected'], or other
 
     @property
     def default_value(self):
@@ -1305,8 +1307,9 @@ class tx(Product):
     Treatment products include anything used to treat cancer or precancer, as well as therapeutic vaccination.
     They change fundamental properties about People, including their prognoses and infectiousness.
     '''
-    def __init__(self, df, name=None, clears_all=False):
+    def __init__(self, df, clearance=0.8, name=None):
         self.df = df
+        self.clearance = clearance
         self.name = df.name.unique()[0]
         self.states = df.state.unique()
         self.genotypes = df.genotype.unique()
@@ -1349,9 +1352,14 @@ class tx(Product):
                         people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
                         people[f'date_{state}'][g, eff_treat_inds] = np.nan
 
-                        # Set date of clearance of infection on next timestep
-                        people['date_clearance'][g, eff_treat_inds] = people.t + 1
-                        people.dur_infection[g, eff_treat_inds] = (people.t - people.date_infectious[g, eff_treat_inds]) * people.pars['dt']
+                        # Determine whether women also clear infection
+                        clearance_probs = np.full(len(eff_treat_inds), self.clearance, dtype=hpd.default_float)
+                        to_clear = hpu.binomial_arr(clearance_probs)  # Determine who will have effective treatment
+                        clear_inds = eff_treat_inds[to_clear]
+                        if len(clear_inds):
+                            # If so, set date of clearance of infection on next timestep
+                            people['date_clearance'][g, clear_inds] = people.t + 1
+                            people.dur_infection[g, clear_inds] = (people.t - people.date_infectious[g, clear_inds]) * people.pars['dt']
 
         tx_successful = np.array(list(set(tx_successful)))
         tx_unsuccessful = np.setdiff1d(inds, tx_successful)
@@ -1422,10 +1430,12 @@ def default_dx(prod_name=None):
     dxprods = dict(
         # Default primary screening diagnostics
         via             = dx(dfdx[dfdx.name == 'via'],              hierarchy=['positive', 'inadequate', 'negative']),
+        lbc             = dx(dfdx[dfdx.name == 'lbc'],              hierarchy=['abnormal', 'ascus', 'inadequate', 'normal']),
+        pap             = dx(dfdx[dfdx.name == 'pap'],              hierarchy=['abnormal', 'ascus', 'inadequate', 'normal']),
+        colposcopy      = dx(dfdx[dfdx.name == 'colposcopy'],       hierarchy=['cancer', 'hsil', 'lsil', 'ascus', 'normal']),
         hpv             = dx(dfdx[dfdx.name == 'hpv'],              hierarchy=['positive', 'inadequate', 'negative']),
         hpv1618         = dx(dfdx[dfdx.name == 'hpv1618'],          hierarchy=['positive', 'inadequate', 'negative']),
-        # Diagnostics used for confimatory testing
-        via_triage      = dx(dfdx[dfdx.name == 'via_triage'],       hierarchy=['positive', 'inadequate', 'negative']),
+        hpv_type        = dx(dfdx[dfdx.name == 'hpv_type'],         hierarchy=['positive_1618', 'positive_ohr', 'inadequate', 'negative']),
         # Diagnostics used to determine of subsequent care pathways
         txvx_assigner   = dx(dfdx[dfdx.name == 'txvx_assigner'],    hierarchy=['triage', 'txvx', 'none']),
         tx_assigner     = dx(dfdx[dfdx.name == 'tx_assigner'],      hierarchy=['radiation', 'excision', 'ablation', 'none']),

@@ -156,6 +156,8 @@ class Result(object):
         self.high = None
         return
 
+    def __eq__(self, other):
+        return self.npts == other.npts and np.all(self.values == other.values)  and self.scale == other.scale
 
     def __repr__(self):
         ''' Use pretty repr, like sc.prettyobj, but displaying full values '''
@@ -191,9 +193,30 @@ class Result(object):
         return len(self.values)
 
 
+    def __sum__(self):
+        ''' To allow sum(result) instead of result.values.sum() '''
+        return self.values.sum()
+
+    # Numpy methods
+    def sum(self):
+        ''' To allow result.sum() instead of result.values.sum() '''
+        return self.values.sum()
+
+    def mean(self):
+        ''' To allow result.mean() instead of result.values.mean() '''
+        return self.values.mean()
+
+    def median(self):
+        ''' To allow result.median() instead of result.values.median() '''
+        return self.values.median()
+
     @property
     def npts(self):
         return len(self.values)
+
+    @property
+    def shape(self):
+        return self.values.shape
 
 
 def set_metadata(obj, **kwargs):
@@ -233,8 +256,8 @@ class BaseSim(ParsObj):
         # Try to get a detailed description of the sim...
         try:
             if self.results_ready:
-                infections = self.summary['total_infections']
-                cancers = self.summary['total_cancers']
+                infections = self.results['infections'].sum()
+                cancers = self.results['cancers'].sum()
                 results = f'{infections:n}⚙, {cancers:n}♋︎'
             else:
                 results = 'not run'
@@ -270,7 +293,7 @@ class BaseSim(ParsObj):
             # Handle other special parameters
             if pars.get('network'):
                 hppar.reset_layer_pars(pars, force=False)
-            location = None
+            location = 'nigeria'
             if pars.get('location'):
                 location = pars['location']
             pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
@@ -288,19 +311,6 @@ class BaseSim(ParsObj):
             self.simfile = 'hpvsim.sim'
         return
 
-
-    def set_seed(self, seed=-1):
-        '''
-        Set the seed for the random number stream from the stored or supplied value
-
-        Args:
-            seed (None or int): if no argument, use current seed; if None, randomize; otherwise, use and store supplied seed
-        '''
-        # Unless no seed is supplied, reset it
-        if seed != -1:
-            self['rand_seed'] = seed
-        hpu.set_seed(self['rand_seed'])
-        return
 
     @property
     def n(self):
@@ -401,21 +411,54 @@ class BaseSim(ParsObj):
 
         '''
         keys = []
-        choices = ['total', 'genotype', 'all', 'by_sex', 'by_age']
-        if which in ['all']:
-            keys = [k for k,res in self.results.items() if isinstance(res, Result)]
-        elif which in ['total']:
+        subchoices = ['total', 'genotype', 'sex', 'age', 'type_dist']
+        if which in ['total']:
             keys = [k for k,res in self.results.items() if (res[:].ndim==1) and isinstance(res, Result)]
-        elif which in ['by_sex']:
+        elif which in ['sex']:
             keys = [k for k, res in self.results.items() if 'by_sex' in k and isinstance(res, Result)]
-        elif which in ['by_age']:
+        elif which in ['age']:
             keys = [k for k, res in self.results.items() if 'by_age' in k and isinstance(res, Result)]
         elif which in ['genotype']:
-            keys = [k for k,res in self.results.items() if (res[:].ndim>1) and ('by_sex' not in k) and ('by_age' not in k) and isinstance(res, Result)]
+            keys = [k for k,res in self.results.items() if 'by_genotype' in k and isinstance(res, Result)]
+        elif which in ['type_dist']:
+            keys = [k for k, res in self.results.items() if 'genotype_dist' in k and isinstance(res, Result) and k.replace('_genotype_dist', '') in hpd.cyto_states]
+        elif which =='all':
+            keys = []
+            for subchoice in subchoices: # Recurse over options
+                keys += self.result_keys(subchoice)
         else:
-            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(choices)}'
+            errormsg = f'Choice "{which}" not available; choices are: {sc.strjoin(subchoices+["all"])}'
             raise ValueError(errormsg)
         return keys
+
+
+    def result_types(self, reskeys):
+        '''
+        Figure out what kind of result it is, which determines what plotting style to use
+        '''
+
+        # If it's a single item, make it a list but remember to return a single item
+        return_list = True
+        if isinstance(reskeys, str):
+            return_list = False
+            reskeys = sc.tolist(reskeys)
+
+        # Construct list of result types
+        result_types = sc.autolist()
+        for rkey in reskeys:
+            for type_option in ['total', 'genotype', 'sex', 'age', 'type_dist']:
+                if rkey in self.result_keys(type_option):
+                    result_types += type_option
+
+        # Check that each result is of exactly one type
+        if len(result_types) != len(reskeys):
+            errormsg = f"Can't determine unique result types for result_keys {reskeys}."
+            raise ValueError(errormsg)
+
+        if return_list:
+            return result_types
+        else:
+            return result_types[0]
 
 
     def copy(self):
@@ -453,10 +496,7 @@ class BaseSim(ParsObj):
             resdict['timeseries_keys'] = self.result_keys()
         for key,res in self.results.items():
             if isinstance(res, Result):
-                if res.values.ndim == 1:
-                    resdict[key] = res.values
-                else:
-                    print(f'WARNING: skipping {key} from export since not 1D array')
+                resdict[key] = res.values
                 if res.low is not None:
                     resdict[key+'_low'] = res.low
                 if res.high is not None:
@@ -536,13 +576,19 @@ class BaseSim(ParsObj):
         d = {}
         for key in keys:
             if key == 'results':
-                resdict = self.export_results(for_json=True)
-                d['results'] = resdict
+                if self.results_ready:
+                    resdict = self.export_results(for_json=True)
+                    d['results'] = resdict
+                else:
+                    d['results'] = 'Results not available (Sim has not yet been run)'
             elif key in ['pars', 'parameters']:
                 pardict = self.export_pars()
                 d['parameters'] = pardict
             elif key == 'summary':
-                d['summary'] = dict(sc.dcp(self.summary))
+                if self.results_ready:
+                    d['summary'] = dict(sc.dcp(self.summary))
+                else:
+                    d['summary'] = 'Summary not available (Sim has not yet been run)'
             else: # pragma: no cover
                 try:
                     d[key] = sc.sanitizejson(getattr(self, key))
@@ -566,6 +612,7 @@ class BaseSim(ParsObj):
             date_index  (bool): if True, use the date as the index
         '''
         resdict = self.export_results(for_json=False)
+        resdict = {k:v for k,v in resdict.items() if v.ndim == 1}
         df = pd.DataFrame.from_dict(resdict)
         df['year'] = self.res_yearvec
         new_columns = ['t','year'] + df.columns[1:-1].tolist() # Get column order
@@ -727,7 +774,7 @@ class BaseSim(ParsObj):
             errormsg = f'This method is only defined for interventions and analyzers, not "{which}"'
             raise ValueError(errormsg)
 
-        ia_list = sc.tolist(self.pars[which]) # List of interventions or analyzers
+        ia_list = sc.tolist(self.analyzers if which=='analyzers' else self.interventions) # List of interventions or analyzers
         n_ia = len(ia_list) # Number of interventions/analyzers
 
         if label == 'summary': # Print a summary of the interventions
@@ -1008,8 +1055,9 @@ class BasePeople(FlexPretty):
             n (int): Number of new agents to add
         """
         orig_n = self._n
-        if (orig_n + n) > self._s:
-            n_new = int(self._s / 2)  # 50% growth
+        new_total = orig_n + n
+        if new_total > self._s:
+            n_new = max(n, int(self._s / 2))  # Minimum 50% growth
             for state in self.meta.all_states:
                 self._data[state.name] = np.concatenate([self._data[state.name], state.new(self.pars, n_new)], axis=self._data[state.name].ndim-1)
             self._s += n_new
@@ -1315,12 +1363,6 @@ class BasePeople(FlexPretty):
         '''
         return (self.infectious + self.inactive).astype(bool)
 
-    @property
-    def cin(self):
-        '''
-        Boolean array of everyone with dysplasia. Union of CIN1, CIN2, CIN3
-        '''
-        return (self.cin1 + self.cin2 + self.cin3).astype(bool)
 
     @property
     def precin(self):
@@ -1329,15 +1371,36 @@ class BasePeople(FlexPretty):
         with transient infections that will clear on their own plus those where
         dysplasia isn't established yet
         '''
-        return (self.infectious * self.no_dysp).astype(bool)
+        return (self.infectious * ~self.has_dysp).astype(bool)
 
     @property
     def latent(self):
         '''
         Boolean array of everyone with latent infection. By definition, these
-        people have no dysplasia and inactive infection status.
+        people have no dysplasia, no cancer, and inactive infection status.
         '''
-        return (self.inactive * self.no_dysp).astype(bool)
+        return (self.inactive * ~self.has_dysp * ~self.cancerous.any(axis=0)).astype(bool)
+
+    @property
+    def cin1(self):
+        '''
+        Boolean array of everyone with dysplasia <33%.
+        '''
+        return (self.infectious * self.has_dysp * (self.dysp<self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+
+    @property
+    def cin2(self):
+        '''
+        Boolean array of everyone with dysplasia 33-67%.
+        '''
+        return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin1']) * (self.dysp<self.pars['clinical_cutoffs']['cin2'])).astype(bool)
+
+    @property
+    def cin3(self):
+        '''
+        Boolean array of everyone with dysplasia >67%.
+        '''
+        return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
