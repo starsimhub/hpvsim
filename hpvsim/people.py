@@ -248,7 +248,7 @@ class People(hpb.BasePeople):
         self.dur_dysp[g, inds] = dur_dysp[:,0] # TODO: should this be mean(axis=1) instead?
 
         # Evaluate progression rates
-        prog_rate = hpu.sample(dist='normal', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=full_size)
+        prog_rate = hpu.sample(dist='normal_pos', par1=gpars['prog_rate'], par2=gpars['prog_rate_sd'], size=full_size)
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
@@ -264,6 +264,10 @@ class People(hpb.BasePeople):
 
         self.prog_rate[g, inds] = prog_rate[:,0]
 
+        # Calculate cancer growth rates
+        cancer_growth_rate = hpu.sample(dist='normal_pos', par1=gpars['cancer_prob_growth'], par2=gpars['cancer_prob_growth_sd'], size=full_size)
+        dysp_arrs.cancer_growth_rate = cancer_growth_rate
+        self.cancer_growth_rate[g, inds] = cancer_growth_rate[:,0]
         return dysp_arrs
 
 
@@ -288,18 +292,20 @@ class People(hpb.BasePeople):
 
         dur_dysp  = dysp_arrs.dur_dysp[:,0]
         gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-        cancer_prob = gpars['cancer_prob']
+        cancer_growth = dysp_arrs.cancer_growth_rate[:,0]
+        cancer_infl = gpars['cancer_prob_growth_infl']
 
         # Handle multiscale to create additional cancer agents
         n_extra = self.pars['ms_agent_ratio'] # Number of extra cancer agents per regular agent
         cancer_scale = self.pars['pop_scale'] / n_extra
         if n_extra  > 1:
-            cancer_probs = 1-(1-cancer_prob)**dur_dysp
+            cancer_probs = hpu.logf2(dur_dysp, cancer_infl, cancer_growth)
             is_cancer = hpu.binomial_arr(cancer_probs)
             cancer_inds = inds[is_cancer]  # Duplicated below, but avoids need to append extra arrays
             self.scale[cancer_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
             extra_dysp_time = dysp_arrs.dur_dysp[:, 1:]
-            extra_cancer_probs = 1-(1-cancer_prob)**extra_dysp_time
+            aextra_cancer_growth = dysp_arrs.cancer_growth_rate[:, 1:]
+            extra_cancer_probs = hpu.logf2(extra_dysp_time, cancer_infl, aextra_cancer_growth)
             extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs)
             extra_cancer_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
             extra_cancer_counts = extra_cancer_bools.sum(axis=1)  # Find out how many new cancer cases we have
@@ -343,7 +349,7 @@ class People(hpb.BasePeople):
         if n_extra > 1:
             cancer_probs[is_cancer] = 1 # Make sure inds that got assigned cancer above dont get stochastically missed
         else:
-            cancer_probs = 1 - (1 - cancer_prob) ** dur_dysp
+            cancer_probs = hpu.logf2(dur_dysp, cancer_infl, cancer_growth)
         is_cancer = hpu.binomial_arr(cancer_probs)
         cancer_inds = inds[is_cancer]  # Indices of those progress to cancer
         no_cancer_inds = inds[~is_cancer]  # Indices of those who eventually heal lesion/clear infection
