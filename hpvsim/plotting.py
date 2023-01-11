@@ -754,8 +754,8 @@ def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, sc
     return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
 
 
-def plot_heatmap(sweep, xx, yy, to_plot=None, x=None, y=None, yi=None, xi=None, zscale=1, xpar=None, ypar=None,
-                 add_contours=True, contour_args=None, cmap='plasma',
+def plot_heatmap(sweep, xx, yy, x=None, y=None, xi=None, yi=None, to_plot=None, xpar=None, ypar=None,
+                 zscale=1, add_contours=True, contour_args=None, cmap='plasma',
                  fig_args=None, plot_args=None, axis_args=None, legend_args=None, show_args=None, style_args=None,
                  fig=None, ax=None, do_save=None, do_show=None, fig_path=None):
     '''

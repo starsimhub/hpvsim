@@ -1596,7 +1596,6 @@ class Sweep(MultiSim):
     def compare(self, **kwargs):
         raise NotImplementedError
 
-
     def plot_heatmap(self, to_plot=None, xpar=None, ypar=None, zscale=1, npts=100, **kwargs):
 
         # Handle plotting inputs
