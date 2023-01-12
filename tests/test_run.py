@@ -237,7 +237,7 @@ def test_sweeps(do_plot=do_plot):
                       n_draws=4)
     sweep.run(reduce=True, from_year=2020)
     if do_plot:
-        sweep.plot_heatmap(to_plot='infections')
+        sweep.plot_heatmap(zscales=[1,1e6])
 
     return sweep
 
@@ -249,13 +249,13 @@ if __name__ == '__main__':
     hpv.options.set(interactive=do_plot)
     T = sc.tic()
 
-    sim1   = test_singlerun()
-    sims2  = test_multirun(do_plot=do_plot)
-    msim1  = test_multisim_reduce(do_plot=do_plot)
-    msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
-    m1,m2  = test_multisim_advanced()
-    scens1 = test_simple_scenarios(do_plot=do_plot)
-    scens2 = test_complex_scenarios(do_plot=do_plot)
+    # sim1   = test_singlerun()
+    # sims2  = test_multirun(do_plot=do_plot)
+    # msim1  = test_multisim_reduce(do_plot=do_plot)
+    # msim2  = test_multisim_combine(do_plot=do_plot) #CURRENTLY PARTIALLY BROKEN
+    # m1,m2  = test_multisim_advanced()
+    # scens1 = test_simple_scenarios(do_plot=do_plot)
+    # scens2 = test_complex_scenarios(do_plot=do_plot)
     sweep = test_sweeps(do_plot=True)
 
     sc.toc(T)

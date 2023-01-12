@@ -1474,10 +1474,13 @@ class Sweep(MultiSim):
         self.sweep_pars = sweep_pars
         self.sweep_par_keys = list(sweep_pars.keys())
         self.sweep_vars = sweep_vars
+        self.res_labels = None # Populated after sims are run
         self.n_draws    = n_draws
+        self.from_year  = None # Populated within reduce()
+        self.to_year    = None # Populated within reduce()
         self.label      = base_sim.label if (label is None) else label
         self.run_args   = sc.mergedicts(kwargs)
-        self.resdf    = None
+        self.resdf      = None
         hpb.set_metadata(self) # Set version, date, and git info
 
         # Create parameter draws
@@ -1554,9 +1557,12 @@ class Sweep(MultiSim):
             except:
                 errormsg = f'Cannot sum from {from_year}, summing from simulation start year instead'
                 print(errormsg)
+                from_year = self.sims[0].res_yearvec[0]
                 i0 = None
+            self.from_year = from_year
         else:
             i0 = None
+            self.from_year = self.sims[0].res_yearvec[0]
 
         if to_year is not None:
             try:
@@ -1564,9 +1570,17 @@ class Sweep(MultiSim):
             except:
                 errormsg = f'Cannot sum to {to_year}, summing to simulation end year instead'
                 print(errormsg)
+                to_year = self.sims[0].res_yearvec[-1]
                 i1 = None
         else:
             i1 = None
+            self.to_year = self.sims[0].res_yearvec[-1]
+
+        # Store result labels
+        self.res_labels = {}
+        ref_sim = self.sims[0]
+        for svar in self.sweep_vars:
+            self.res_labels[svar] = ref_sim.results[svar].name
 
         # Start creating result dataframe
         dfts = sc.autolist()
@@ -1596,7 +1610,7 @@ class Sweep(MultiSim):
     def compare(self, **kwargs):
         raise NotImplementedError
 
-    def plot_heatmap(self, to_plot=None, xpar=None, ypar=None, zscale=1, npts=100, **kwargs):
+    def plot_heatmap(self, to_plot=None, xpar=None, ypar=None, zscales=1, npts=100, **kwargs):
 
         # Handle plotting inputs
         if to_plot is None: to_plot = self.sweep_vars
@@ -1635,7 +1649,7 @@ class Sweep(MultiSim):
         xx, yy = np.meshgrid(xi, yi)
 
         # Call plotting code to create and return figures
-        return hppl.plot_heatmap(self, xx, yy, x=x, y=y, xi=xi, yi=yi, to_plot=to_plot, xpar=xpar, ypar=ypar, **kwargs)
+        return hppl.plot_heatmap(self, xx, yy, x=x, y=y, xi=xi, yi=yi, to_plot=to_plot, xpar=xpar, ypar=ypar, zscales=zscales, npts=npts, **kwargs)
 
 
 def single_run(sim, ind=0, reseed=True, noise=0.0, noisepar=None, keep_people=False, run_args=None, sim_args=None, verbose=None, do_run=True, **kwargs):
