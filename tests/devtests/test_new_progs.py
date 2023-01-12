@@ -432,7 +432,7 @@ if __name__ == '__main__':
     T = sc.tic()
 
     make_precinfig()
-    # make_cinfig()
+    make_cinfig()
     # make_outcomefig()
     # make_fig1()
 

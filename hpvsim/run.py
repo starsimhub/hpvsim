@@ -18,7 +18,7 @@ from .settings import options as hpo
 
 
 # Specify all externally visible functions this file defines
-__all__ = ['make_metapars', 'MultiSim', 'Scenarios', 'single_run', 'multi_run', 'parallel']
+__all__ = ['make_metapars', 'MultiSim', 'Scenarios', 'Sweep', 'single_run', 'multi_run', 'parallel']
 
 
 
@@ -1446,6 +1446,210 @@ class Scenarios(hpb.ParsObj):
 
         return scens
 
+
+class Sweep(MultiSim):
+    '''
+    Class for running parameter sweeps.
+
+    Args:
+        base_sim  (Sim)      : the sim used for shared properties
+        label      (str)     : the name of the multisim
+        kwargs    (dict)     : stored in run_args and passed to run()
+
+    Returns:
+        sweep: a Sweep object
+
+    **Examples**:
+        sim = hpv.Sim() # Create the sim
+        sweep = hpv.Sweep(sim, sweep_pars={'beta':[0.4, 0.8]}, n_runs=5) # Create the sweep
+        sweep.run() # Run the sims in parallel
+        sweep.plot() # Plot results
+    '''
+
+    def __init__(self, base_sim=None, sweep_pars=None, sweep_vars=None, n_draws=4, initialize=False, label=None,
+                 **kwargs):
+
+        # Set properties
+        self.base_sim   = base_sim
+        self.sweep_pars = sweep_pars
+        self.sweep_par_keys = list(sweep_pars.keys())
+        self.sweep_vars = sweep_vars
+        self.res_labels = None # Populated after sims are run
+        self.n_draws    = n_draws
+        self.from_year  = None # Populated within reduce()
+        self.to_year    = None # Populated within reduce()
+        self.label      = base_sim.label if (label is None) else label
+        self.run_args   = sc.mergedicts(kwargs)
+        self.resdf      = None
+        hpb.set_metadata(self) # Set version, date, and git info
+
+        # Create parameter draws
+        self.sweep_draws = sc.objdict()
+        for pname, prange in self.sweep_pars.items():
+            self.sweep_draws[pname] = np.random.uniform(prange[0], prange[1], self.n_draws)
+
+        # Create sims and optionally initialize
+        self.create_sims(initialize=initialize)
+
+        return
+
+    def create_sims(self, initialize=False):
+        self.sims = sc.autolist()
+        for ipd in range(self.n_draws):
+            sim = sc.dcp(self.base_sim)
+            for pname,pdraws in self.sweep_draws.items():
+                sim.pars[pname] = pdraws[ipd]
+            self.sims += sim
+
+        # Optionally initialize the sims
+        if initialize:
+            kwargs = sc.mergedicts(self.run_args, kwargs, {'do_run':False})
+            self.sims = multi_run(sims, **kwargs)
+
+
+    def run(self, shrink=True, reduce=True, sum_totals=True, from_year=None, to_year=None, **kwargs):
+        '''
+        Run the sims
+        Args:
+            shrink  (bool): whether or not to shrink after running
+            kwargs  (dict): passed to multi_run(); use run_args to pass arguments to sim.run()
+
+        Returns:
+            None (modifies MultiSim object in place)
+
+        **Examples**::
+            sweep.run()
+        '''
+
+        # Handle which sims to use
+        if self.sims is None:
+            sims = self.base_sim
+        else:
+            sims = self.sims
+
+            # Handle missing labels
+            for s,sim in enumerate(sims):
+                if sim.label is None:
+                    sim.label = f'Sim {s}'
+
+        # Run
+        kwargs = sc.mergedicts(self.run_args, kwargs)
+        self.sims = multi_run(sims, **kwargs)
+
+        # Shrink
+        if shrink:
+            self.shrink()
+
+        # Create results
+        if reduce:
+            self.reduce(sum_totals=sum_totals, from_year=from_year, to_year=to_year)
+
+        return self
+
+
+    def reduce(self, sum_totals=True, from_year=None, to_year=None):
+        ''' Create a dataframe holding reduced results '''
+
+        # Handle from and to years
+        if from_year is not None:
+            try:
+                i0 = sc.findinds(self.sims[0].res_yearvec, from_year)[0]
+            except:
+                errormsg = f'Cannot sum from {from_year}, summing from simulation start year instead'
+                print(errormsg)
+                from_year = self.sims[0].res_yearvec[0]
+                i0 = None
+            self.from_year = from_year
+        else:
+            i0 = None
+            self.from_year = self.sims[0].res_yearvec[0]
+
+        if to_year is not None:
+            try:
+                i1 = sc.findinds(self.sims[0].res_yearvec, to_year)[0]
+            except:
+                errormsg = f'Cannot sum to {to_year}, summing to simulation end year instead'
+                print(errormsg)
+                to_year = self.sims[0].res_yearvec[-1]
+                i1 = None
+        else:
+            i1 = None
+            self.to_year = self.sims[0].res_yearvec[-1]
+
+        # Store result labels
+        self.res_labels = {}
+        ref_sim = self.sims[0]
+        for svar in self.sweep_vars:
+            self.res_labels[svar] = ref_sim.results[svar].name
+
+        # Start creating result dataframe
+        dfts = sc.autolist()
+        for sim in self.sims:
+            dft = pd.DataFrame()
+            for spar in self.sweep_pars:
+                dft[spar] = [sim[spar]]
+            for svar in self.sweep_vars:
+                if sum_totals:
+                    dft[svar] = [sim.results[svar][i0:i1].sum()]
+                else:
+                    dft[svar] = sim.results[svar][i0:i1]
+            dfts += dft
+        self.resdf = pd.concat(dfts, ignore_index=True)
+
+        return
+
+    def combine(self, **kwargs):
+        raise NotImplementedError
+
+    def mean(self, **kwargs):
+        raise NotImplementedError
+
+    def median(self, **kwargs):
+        raise NotImplementedError
+
+    def compare(self, **kwargs):
+        raise NotImplementedError
+
+    def plot_heatmap(self, to_plot=None, xpar=None, ypar=None, zscales=1, npts=100, **kwargs):
+
+        # Handle plotting inputs
+        if to_plot is None: to_plot = self.sweep_vars
+        if type(to_plot)==str: to_plot = [to_plot]
+        if type(to_plot)==list:
+            for res_to_plot in to_plot:
+                if res_to_plot not in self.sweep_vars:
+                    errormsg = f'Cannot plot result {res_to_plot} as it does not appear in the stored results: {self.sweep_vars}.'
+                    raise ValueError(errormsg)
+
+        # Handle x and y parameters
+        if len(self.sweep_par_keys)<2:
+            raise ValueError(f'Cannot plot a heatmap without 2 or more sweep parameters: sweep_pars={self.sweep_par_keys}.')
+        else:
+            if xpar is None: xpar = self.sweep_par_keys[0]
+            else:
+                if xpar not in self.sweep_par_keys:
+                    errormsg = f'Cannot plot results for parameter {xpar} as it was not one of the sweep parameters: {self.sweep_par_keys}.'
+                    raise ValueError(errormsg)
+
+            if ypar is None: ypar = self.sweep_par_keys[1]
+            else:
+                if ypar not in self.sweep_par_keys:
+                    errormsg = f'Cannot plot results for parameter {ypar} as it was not one of the sweep parameters: {self.sweep_par_keys}.'
+                    raise ValueError(errormsg)
+
+        # Other validation
+        if self.resdf is None:
+            raise ValueError('Sweeps not run yet.')
+
+        # Create xy grid
+        x = np.array(self.resdf[xpar])
+        y = np.array(self.resdf[ypar])
+        xi = np.linspace(self.sweep_pars[xpar][0], self.sweep_pars[xpar][1], npts)
+        yi = np.linspace(self.sweep_pars[ypar][0], self.sweep_pars[ypar][1], npts)
+        xx, yy = np.meshgrid(xi, yi)
+
+        # Call plotting code to create and return figures
+        return hppl.plot_heatmap(self, xx, yy, x=x, y=y, xi=xi, yi=yi, to_plot=to_plot, xpar=xpar, ypar=ypar, zscales=zscales, npts=npts, **kwargs)
 
 
 def single_run(sim, ind=0, reseed=True, noise=0.0, noisepar=None, keep_people=False, run_args=None, sim_args=None, verbose=None, do_run=True, **kwargs):
