@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.14 (2023-01-11)
+---------------------------
+- Add Sweep class
+- *GitHub info*: PRs `431 <https://github.com/amath-idm/hpvsim/pull/431>`__
+
+
 Version 0.4.13 (2023-01-09)
 ---------------------------
 - Dysplasia percentages are now tracked throughout agent lifetimes, and CIN grades are defined as properties based on these percentages
