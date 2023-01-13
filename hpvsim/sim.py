@@ -632,9 +632,9 @@ class Sim(hpb.BaseSim):
                     if isinstance(az, str): az = convert_analyzer(az) # It might still be a string
                     self.analyzers += az() # Unpack list
             else:
-                if isinstance(analyzer, type) and issubclass(analyzer, hpi.Analyzer):
+                if isinstance(analyzer, type) and issubclass(analyzer, hpa.Analyzer):
                     analyzer = analyzer() # Convert from a class to an instance of a class
-                if not (isinstance(analyzer, hpi.Analyzer) or callable(analyzer)):
+                if not (isinstance(analyzer, hpa.Analyzer) or callable(analyzer)):
                     errormsg = f'Analyzer {analyzer} does not seem to be a valid analyzer: must be a function or hpv.Analyzer subclass'
                     raise TypeError(errormsg)
                 self.analyzers += analyzer # Add it in
