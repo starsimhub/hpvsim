@@ -17,7 +17,7 @@ from .settings import options as hpo # For setting global options
 
 
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection',
-           'dwelltime', 'cancer_detection', 'analyzer_map']
+           'dwelltime', 'cancer_detection', 'daly_computation', 'analyzer_map']
 
 
 class Analyzer(sc.prettyobj):
@@ -575,7 +575,7 @@ class age_results(Analyzer):
         elif sc.checktype(self.result_args, dict): # Ensure it's an object dict
             self.result_args = sc.objdict(self.result_args)
         else: # Raise an error
-            errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(result_args)}.'
+            errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(self.result_args)}.'
             raise TypeError(errormsg)
 
         # Handle dt - if we're storing annual results we'll need to aggregate them over several consecutive timesteps
@@ -1203,6 +1203,54 @@ class cancer_detection(Analyzer):
 
         return new_detections, new_treatments
 
+class daly_computation(Analyzer):
+    '''
+    Analyzer for computing DALYs.
+
+    Produces a dataframe by year storing:
+
+        - Cases/deaths: number of new cancer cases and cancer deaths
+        - Average age of new cases, average age of deaths, average age of noncancer death
+    '''
+
+    def __init__(self, start, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.start = start
+        return
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        columns = ['new_cancers', 'new_cancer_deaths', 'new_other_deaths',
+                   'av_age_cancers', 'av_age_cancer_deaths', 'av_age_other_deaths']
+        self.si = sc.findinds(sim.res_yearvec, self.start)[0]
+        self.df = pd.DataFrame(0.0, index=pd.Index(sim.res_yearvec[self.si:], name='year'), columns=columns)
+        return
+
+    def apply(self, sim):
+        if sim.yearvec[sim.t] >= self.start:
+            ppl = sim.people
+
+            def av_age(arr):
+                if len(hpu.true(arr)):
+                    return np.mean(sim.people.age[hpu.true(arr)])
+                else:
+                    return np.nan
+
+            li = np.floor(sim.yearvec[sim.t])
+            lt = (sim.t - 1)
+
+            self.df.loc[li].av_age_other_deaths = av_age(ppl.date_dead_other == lt)
+            self.df.loc[li].av_age_cancer_deaths = av_age(ppl.date_dead_cancer == lt)
+            self.df.loc[li].av_age_cancers = av_age(ppl.date_cancerous == lt)
+        return
+
+    def finalize(self, sim):
+        # Add in results that are already generated (NB, these have all been scaled already)
+        self.df['new_cancers'] = sim.results['total_cancers'][self.si:]
+        self.df['new_cancer_deaths'] = sim.results['total_cancer_deaths'][self.si:]
+        self.df['new_other_deaths'] = sim.results['other_deaths'][self.si:]
+        return
+
 
 #%% Additional utilities
 analyzer_map = {
@@ -1211,5 +1259,6 @@ analyzer_map = {
     'age_results': age_results,
     'age_causal_infection': age_causal_infection,
     'cancer_detection': cancer_detection,
+    'daly_computation': daly_computation,
 }
 
