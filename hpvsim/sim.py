@@ -895,9 +895,8 @@ class Sim(hpb.BaseSim):
             self.results['n_females_alive_by_age'][:,idx] = np.histogram(people.age[alive_female_inds], bins=people.age_bins, weights=people.scale[alive_female_inds])[0]
 
         # Apply analyzers
-        for analyzer in self.analyzers:
-            if isinstance(analyzer, hpa.Analyzer):
-                analyzer.apply(self)
+        for i,analyzer in enumerate(self.analyzers):
+            analyzer(self)
 
         # Tidy up
         self.t += 1
