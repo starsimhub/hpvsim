@@ -896,7 +896,7 @@ class Sim(hpb.BaseSim):
 
         # Apply analyzers
         for i,analyzer in enumerate(self.analyzers):
-            analyzer(self)
+            analyzer.apply(self)
 
         # Tidy up
         self.t += 1
