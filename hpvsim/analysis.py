@@ -1213,8 +1213,8 @@ class daly_computation(Analyzer):
         - Average age of new cases, average age of deaths, average age of noncancer death
     '''
 
-    def __init__(self, start, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, start, **kwargs):
+        super().__init__(**kwargs)
         self.start = start
         return
 
@@ -1246,8 +1246,8 @@ class daly_computation(Analyzer):
 
     def finalize(self, sim):
         # Add in results that are already generated (NB, these have all been scaled already)
-        self.df['new_cancers'] = sim.results['total_cancers'][self.si:]
-        self.df['new_cancer_deaths'] = sim.results['total_cancer_deaths'][self.si:]
+        self.df['new_cancers'] = sim.results['cancers'][self.si:]
+        self.df['new_cancer_deaths'] = sim.results['cancer_deaths'][self.si:]
         self.df['new_other_deaths'] = sim.results['other_deaths'][self.si:]
         return
 
