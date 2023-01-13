@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 0.4.15 (2023-01-13)
+---------------------------
+- Fixed bug in intervention and analyzer initialization
+- *GitHub info*: PRs `511 <https://github.com/amath-idm/hpvsim/pull/511>`__
+
+
 Version 0.4.14 (2023-01-11)
 ---------------------------
 - Add Sweep class
