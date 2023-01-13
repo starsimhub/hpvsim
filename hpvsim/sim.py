@@ -595,9 +595,16 @@ class Sim(hpb.BaseSim):
 
         # Translate the intervention specs into actual interventions
         for i,intervention in enumerate(self['interventions']):
+            if isinstance(intervention, type) and issubclass(intervention, hpi.Intervention):
+                intervention = intervention() # Convert from a class to an instance of a class
             if isinstance(intervention, hpi.Intervention):
                 intervention.initialize(self)
                 self.interventions += intervention
+            elif callable(intervention):
+                self.interventions += intervention
+            else:
+                errormsg = f'Intervention {intervention} does not seem to be a valid intervention: must be a function or hpv.Intervention subclass'
+                raise TypeError(errormsg)
 
         return
 
@@ -625,11 +632,17 @@ class Sim(hpb.BaseSim):
                     if isinstance(az, str): az = convert_analyzer(az) # It might still be a string
                     self.analyzers += az() # Unpack list
             else:
-                self.analyzers += analyzer # Just add it in
+                if isinstance(analyzer, type) and issubclass(analyzer, hpi.Analyzer):
+                    analyzer = analyzer() # Convert from a class to an instance of a class
+                if not (isinstance(analyzer, hpi.Analyzer) or callable(analyzer)):
+                    errormsg = f'Analyzer {analyzer} does not seem to be a valid analyzer: must be a function or hpv.Analyzer subclass'
+                    raise TypeError(errormsg)
+                self.analyzers += analyzer # Add it in
 
         for analyzer in self.analyzers:
             if isinstance(analyzer, hpa.Analyzer):
                 analyzer.initialize(self)
+                
         return
 
 
