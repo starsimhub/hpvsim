@@ -505,8 +505,9 @@ def plot_age_dist(sim, ax, reskey, date, args):
     '''
     idx = sc.findinds(sim.res_yearvec, date)[0]
     res = sim.results[reskey]
+    label = res.name.replace('by age', '')
     x = sim['age_bins'][:-1]
-    ax.plot(x, res.values[:,idx], color=res.color, **args.plot, label=res.name)
+    ax.plot(x, res.values[:,idx], color=res.color, **args.plot, label=label)
     ax.set_xlabel('Age')
     ax.set_ylabel('Value')
     return ax
