@@ -80,7 +80,7 @@ def run_calcs():
     genotype_pars['hpv18']['dysp_infl'] = 10
     genotype_pars['hrhpv']['dysp_infl'] = 10
 
-    genotype_pars['hpv16']['prog_infl'] = 10
+    genotype_pars['hpv16']['prog_infl'] = 8
     genotype_pars['hpv18']['prog_infl'] = 6
     genotype_pars['hrhpv']['prog_infl'] = 12
 
@@ -148,7 +148,7 @@ def run_calcs():
         ax[axn].grid()
 
     ax['A'].set_ylabel("Density")
-    ax['C'].set_ylabel("Probability of transformation")
+    ax['C'].set_ylabel("Probability of transformation\n(cumulative)")
     ax['A'].set_xlabel("Duration of productive infection prior to\nclearance or transformation (years)")
 
     ax['A'].legend(fontsize=20, frameon=True)
@@ -164,20 +164,19 @@ def run_calcs():
 
     def cancer_prob(cp,dysp): return 1-np.power(1-cp, dysp*100)
 
-    def clearance_prob(cp,dysp): return 1-(1 - np.power(1 - cp, dysp * 100))
+    def clearance_prob(cp,dysp): return 0.2*(1-(1 - np.power(1 - cp, dysp * 100)))
 
-    twind = ax['D'].twinx()
     # Durations and severity of dysplasia
     for gi, gtype in enumerate(genotypes):
         ax['B'].plot(thisx, logf2(thisx, prog_infl[gi], prog_rate[gi]), color=colors[gi], lw=3, label=gtype.upper())
         for smpl in range(n_samples):
-            pr = hpu.sample(dist='normal', par1=prog_rate[gi], par2=prog_rate_sd[gi])
+            pr = hpu.sample(dist='normal_pos', par1=prog_rate[gi], par2=prog_rate_sd[gi])
             ax['B'].plot(thisx, logf2(thisx, prog_infl[gi], pr), color=colors[gi], lw=1, alpha=0.5, label=gtype.upper())
 
         cp = cancer_prob(cancer_probs[gi], logf2(thisx, prog_infl[gi], prog_rate[gi]))
         clear_p = clearance_prob(clearance_probs[gi], logf2(thisx, prog_infl[gi], prog_rate[gi]))
         ax['D'].plot(thisx, cp, color=colors[gi], label=gtype.upper())
-        twind.plot(thisx, clear_p, color=colors[gi], ls='--', label=gtype.upper())
+        ax['D'].plot(thisx, clear_p, color=colors[gi], ls='--', label=gtype.upper())
 
     ax['B'].set_ylabel("")
     ax['B'].grid()
@@ -185,22 +184,59 @@ def run_calcs():
     ax['B'].set_xlabel("Duration of transforming infection (years)")
     ax['B'].set_ylabel("% of cells transformed")
 
-    ax['D'].set_ylabel("Probability of cervical cancer invasion")
-    twind.set_ylabel("Probability of HPV clearance")
-    twind.set_ylim([0,1])
+    ax['D'].set_ylabel("Probability of invasion or clearance")
+    ax['D'].set_xlabel("Duration of transforming infection (years)")
     ax['D'].set_ylim([0, 1])
     ax['D'].grid()
     h, l = ax['D'].get_legend_handles_labels()
-    h1, l1 = twind.get_legend_handles_labels()
 
-    ax['D'].legend([h[0], h1[0]], ['Cervical cancer invasion', 'HPV clearance'], loc='upper left')
+    ax['D'].legend([h[0], h[1]], ['Cervical cancer invasion', 'HPV clearance'], loc='upper right')
 
     ####################
     # Panel F
     ####################
 
+    # Now determine outcomes for those with transformation
+
+    longx = np.linspace(1, 40, 40)
+    n_samples = 1000
+    cancers = dict()
+    cinshares, cancershares = [], []
+    for gi, gtype in enumerate(genotypes):
+        cancers[gtype] = 0
+        pr = hpu.sample(dist='normal_pos', par1=prog_rate[gi], par2=prog_rate_sd[gi], size=n_samples)
+        for x in longx:
+            cp = cancer_prob(cancer_probs[gi], logf2(x, prog_infl[gi], pr))
+            has_cancer = hpu.n_binomial(cp, len(cp))
+            cancer_inds = hpu.true(has_cancer)
+            cancers[gtype] += len(cancer_inds)
+            pr = pr[~has_cancer]
+            cp = clearance_prob(clearance_probs[gi], logf2(x, prog_infl[gi], pr))
+            clears_hpv = hpu.n_binomial(cp, len(cp))
+            pr = pr[~clears_hpv]
+
+        cancer_share = cancers[gtype]/n_samples
+        cin_share = 1 - cancer_share
+        cinshares.append(cin_share)
+        cancershares.append(cancer_share)
+
     # This section calculates the overall share of outcomes for people infected with each genotype
-    ax['F'].set_axis_off()
+    bottom = np.zeros(ng)
+    all_shares = [cinshares,
+                  cancershares
+                  ]
+
+    for gn, grade in enumerate(['CIN2/3', 'Cervical cancer']):
+        ydata = np.array(all_shares[gn])
+        color = cmap[gn + 1, :]
+        ax['F'].bar(np.arange(1, ng + 1), ydata, color=color, bottom=bottom, label=grade)
+        bottom = bottom + ydata
+
+    ax['F'].set_xticks(np.arange(1, ng + 1))
+    ax['F'].set_xticklabels(glabels)
+    ax['F'].set_ylabel("")
+    ax['F'].set_ylabel("Distribution of transformation outcomes")
+    ax['F'].legend(fontsize=20, frameon=True, loc='lower right')
     fig.tight_layout()
     plt.savefig(f"AA_cells.png", dpi=100)
 
