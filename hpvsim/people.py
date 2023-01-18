@@ -420,8 +420,7 @@ class People(hpb.BasePeople):
         cancer_inds = dysp_inds[is_cancer]
 
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))
-        self.date_dead_cancer[cancer_inds] = self.date_cancerous[genotype, cancer_inds] + sc.randround(
-            dur_cancer / dt)
+        self.date_dead_cancer[cancer_inds] = self.date_cancerous[genotype, cancer_inds] + sc.randround(dur_cancer / dt)
         self.dur_cancer[genotype, cancer_inds] = dur_cancer
 
         if len(cancer_inds):

@@ -338,7 +338,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.prog_infl    = 10
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.cancer_prob  = 0.002 # Annual rate of transformed cell invading
+    pars.hpv16.cancer_prob  = 0.003 # Annual rate of transformed cell invading
     pars.hpv16.clearance_prob = 0.009 # Annual rate of transformed cell healing
     pars.hpv16.clearance_prob_adj = 0.2 # Annual rate of transformed cell healing
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
@@ -352,7 +352,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv18.prog_infl    = 6
     pars.hpv18.rel_beta     = 1.0  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.cancer_prob  = 0.0005
+    pars.hpv18.cancer_prob  = 0.001
     pars.hpv18.clearance_prob = 0.01  # Annual rate of transformed cell healing
     pars.hpv18.clearance_prob_adj = 0.3 # Annual rate of transformed cell healing
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
@@ -366,9 +366,9 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.prog_rate_sd = 0.015 # placeholder
     pars.hrhpv.prog_infl    = 12
     pars.hrhpv.rel_beta     = 1.05 # placeholder
-    pars.hrhpv.cancer_prob  = 0.0008
+    pars.hrhpv.cancer_prob  = 0.002
     pars.hrhpv.clearance_prob = 0.03  # Annual rate of transformed cell healing
-    pars.hrhpv.clearance_prob_adj = 0.4 # Annual rate of transformed cell healing
+    pars.hrhpv.clearance_prob_adj = 0.2 # Annual rate of transformed cell healing
     pars.hrhpv.imm_boost    = 1.0 # placeholder
     pars.hrhpv.sero_prob    = 0.60 # placeholder
 
