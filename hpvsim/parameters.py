@@ -73,14 +73,13 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']                = 0.13  # Per-act transmission probability; absolute value, calibrated
+    pars['beta']                = 0.1   # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
     pars['rel_trans_cancerous'] = 0.0   # Transmissibility of people with cancer compared to those without
     pars['eff_condoms']         = 0.7   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
 
     # Parameters for disease progression
-    pars['clinical_cutoffs']    = {'cin1': 0.33, 'cin2':0.67} # Parameters the control the clinical cliassification of dysplasia
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation']    = 0.025 # Placeholder
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
@@ -332,38 +331,41 @@ def get_genotype_pars(default=False, genotype=None):
     pars = sc.objdict()
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_precin   = dict(dist='lognormal', par1=2, par2=2) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv16.dysp_rate    = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.dysp_infl    = 6  # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate    = 0.2 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.dur_precin   = dict(dist='lognormal', par1=4, par2=4) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv16.dysp_rate    = 0.6 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.dysp_infl    = 10  # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate    = 0.3 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
+    pars.hpv16.prog_infl    = 10
     pars.hpv16.rel_beta     = 1  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.cancer_prob  = 0.001 # Annual rate of transformed cell invading
-    pars.hpv16.clearance_prob = 0.01 # Annual rate of transformed cell healing
+    pars.hpv16.cancer_prob  = 0.002 # Annual rate of transformed cell invading
+    pars.hpv16.clearance_prob = 0.009 # Annual rate of transformed cell healing
     pars.hpv16.imm_boost    = 1.0 # TODO: look for data
     pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_precin   = dict(dist='lognormal', par1=1.5, par2=1.5) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv18.dysp_rate    = 0.4 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.dysp_infl    = 6
-    pars.hpv18.prog_rate    = 0.3 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.dur_precin   = dict(dist='lognormal', par1=3, par2=3) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv18.dysp_rate    = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.dysp_infl    = 10
+    pars.hpv18.prog_rate    = 0.4 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.015 # Standard deviation of the progression rate
+    pars.hpv18.prog_infl    = 6
     pars.hpv18.rel_beta     = 1.0  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.cancer_prob  = 0.001
+    pars.hpv18.cancer_prob  = 0.0005
     pars.hpv18.clearance_prob = 0.01  # Annual rate of transformed cell healing
     pars.hpv18.imm_boost    = 1.0 # TODO: look for data
     pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
-    pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=2.5, par2=3) # placeholder
-    pars.hrhpv.dysp_rate    = 0.1 # placeholder
-    pars.hrhpv.dysp_infl    = 6
-    pars.hrhpv.prog_rate    = 0.071 # placeholder
+    pars.hrhpv.dur_precin   = dict(dist='lognormal', par1=5, par2=5) # placeholder
+    pars.hrhpv.dysp_rate    = 0.4 # placeholder
+    pars.hrhpv.dysp_infl    = 10
+    pars.hrhpv.prog_rate    = 0.02 # placeholder
     pars.hrhpv.prog_rate_sd = 0.015 # placeholder
+    pars.hrhpv.prog_infl    = 12
     pars.hrhpv.rel_beta     = 1.05 # placeholder
-    pars.hrhpv.cancer_prob  = 0.0005
-    pars.hrhpv.clearance_prob = 0.01  # Annual rate of transformed cell healing
+    pars.hrhpv.cancer_prob  = 0.0008
+    pars.hrhpv.clearance_prob = 0.03  # Annual rate of transformed cell healing
     pars.hrhpv.imm_boost    = 1.0 # placeholder
     pars.hrhpv.sero_prob    = 0.60 # placeholder
 

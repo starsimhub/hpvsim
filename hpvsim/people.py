@@ -277,10 +277,13 @@ class People(hpb.BasePeople):
 
     def update_dysp(self, genotype):
         ''' Update dysplasia for women with active dysplasia'''
+        gpars = self.pars['genotype_pars']
+        gmap = self.pars['genotype_map']
         inds = self.true_by_genotype('has_dysp', genotype)
         prog_rate = self.prog_rate[genotype, inds]
+        prog_infl = gpars[gmap[genotype]]['prog_infl']
         dur_dysp = self.t - self.date_has_dysp[genotype, inds]
-        self.dysp[genotype, inds] = hpu.logf1(dur_dysp, prog_rate)
+        self.dysp[genotype, inds] = hpu.logf2(dur_dysp, prog_infl, prog_rate)
 
         return
 

@@ -266,7 +266,7 @@ by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
 type_dist_keys   = ['precin', 'high_grade', 'cancerous']
-type_dist_names  = ['Normal', 'High-grade\nlesion', 'Cancer']
+type_dist_names  = ['Normal/LSIL', 'High-grade\nlesion', 'Cancer']
 lesion_grade_states = {'high_grade': ['has_dysp']}
 cyto_states = ['precin', 'high_grade', 'cancerous']
 
@@ -330,7 +330,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
         if is_sim:
             plots = sc.objdict({
                 'HPV incidence by age': 'hpv_incidence_by_age',
-                'HPV prevalence': ['hpv_prevalence'],
+                'HPV prevalence': ['hpv_prevalence_by_genotype'],
                 'HPV prevalence by age': ['hpv_prevalence_by_age'],
                 'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'Cancers by age': 'cancers_by_age',
