@@ -265,10 +265,8 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_keys   = ['precin', 'high_grade', 'cancerous']
-type_dist_names  = ['Normal/LSIL', 'High-grade\nlesion', 'Cancer']
-lesion_grade_states = {'high_grade': ['has_dysp']}
-cyto_states = ['precin', 'high_grade', 'cancerous']
+type_dist_keys   = ['precin', 'has_dysp', 'cancerous']
+type_dist_names  = ['Productive infection', 'Transforming infection', 'Cervical cancer']
 
 #%% Default initial prevalence
 

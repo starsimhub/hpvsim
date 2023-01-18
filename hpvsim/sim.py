@@ -1039,8 +1039,7 @@ class Sim(hpb.BaseSim):
         self.results['dysplasia_prevalence'][:] = sc.safedivide(res['n_has_dysp'][:], alive_females)
         self.results['dysplasia_prevalence_by_genotype'][:] = safedivide(res['n_has_dysp_by_genotype'][:], alive_females)
 
-        # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
-        # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)
+        # Compute CIN and cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
@@ -1054,15 +1053,8 @@ class Sim(hpb.BaseSim):
 
         # Compute HPV type distribution by cytology
         for which in hpd.type_dist_keys:
-            if which in ['low_grade', 'high_grade']:
-                totals = np.zeros(self.res_npts)
-                by_type = np.zeros((self['n_genotypes'], self.res_npts))
-                for state in hpd.lesion_grade_states[which]:
-                    by_type += res[f'n_{state}_by_genotype'][:]
-                    totals += res[f'n_{state}_by_genotype'][:].sum(axis=0)
-            else:
-                by_type = res[f'n_{which}_by_genotype'][:]
-                totals = by_type.sum(axis=0)
+            by_type = res[f'n_{which}_by_genotype'][:]
+            totals = by_type.sum(axis=0)
             inds_to_fill = totals > 0
             res[which + '_genotype_dist'][:, inds_to_fill] = by_type[:, inds_to_fill] / totals[inds_to_fill]
 
