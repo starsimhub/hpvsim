@@ -438,9 +438,6 @@ class Sim(hpb.BaseSim):
         # Only by-age stock result we will need is number infectious, susceptible, and with cin, for HPV and CIN prevalence/incidence calculations
         results[f'n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
         results[f'n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
-        results[f'n_cin1_by_age']                   = init_res('Number CIN1 by age', n_rows=na, color=stock.color)
-        results[f'n_cin2_by_age']                   = init_res('Number CIN2 by age', n_rows=na, color=stock.color)
-        results[f'n_cin3_by_age']                   = init_res('Number CIN3 by age', n_rows=na, color=stock.color)
 
         # Create incidence and prevalence results
         for var,name,color in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
@@ -510,15 +507,6 @@ class Sim(hpb.BaseSim):
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
         results['dysplasia_prevalence'] = init_res('Dysplasia prevalence', color=hpd.stock_colors[1])
         results['dysplasia_prevalence_by_genotype'] = init_res('Dysplasia prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
-        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=hpd.stock_colors[1])
-        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
-        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[1])
-        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=hpd.stock_colors[2])
-        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[2])
-        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[2])
-        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=hpd.stock_colors[4])
-        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=hpd.stock_colors[4])
-        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=hpd.stock_colors[4])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -700,13 +688,6 @@ class Sim(hpb.BaseSim):
         # Check for dysplasias
         dysp_filters = (self.people.date_has_dysp<0)
         self.people.has_dysp[dysp_filters.nonzero()] = True
-        # Check for CINs
-        cin1_filters = (self.people.date_cin1 < 0) * (self.people.date_cin2 > 0)
-        self.people.cin1[cin1_filters.nonzero()] = True
-        cin2_filters = (self.people.date_cin2 < 0) * (self.people.date_cin3 > 0)
-        self.people.cin2[cin2_filters.nonzero()] = True
-        cin3_filters = (self.people.date_cin3 < 0) * (self.people.date_cancerous > 0)
-        self.people.cin3[cin3_filters.nonzero()] = True
 
         return
 
@@ -754,10 +735,10 @@ class Sim(hpb.BaseSim):
                 ss = people.t_imm_event[:, inds].shape
                 t_since_boost = (t - people.t_imm_event[:,inds]).ravel()
                 current_imm = imm_kin_pars[t_since_boost].reshape(ss) # Get people's current level of immunity
-                people.imm[:,inds] = current_imm*people.peak_imm[:,inds] # Set immunity relative to peak
+                people.nab_imm[:,inds] = current_imm*people.peak_imm[:,inds] # Set immunity relative to peak
                     # return imm
         else:
-            people.imm[:] = people.peak_imm
+            people.nab_imm[:] = people.peak_imm
         hpimm.check_immunity(people)
 
         # Shorten more variables
@@ -855,15 +836,6 @@ class Sim(hpb.BaseSim):
             self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bins, weights=people.scale[infinds])[0]
             susinds = hpu.true(people['susceptible'])
             self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bins, weights=people.scale[susinds])[0]
-            cin1inds = hpu.true(people['cin1'])
-            self.results[f'n_cin1_by_age'][:, idx] = \
-            np.histogram(people.age[cin1inds], bins=people.age_bins, weights=people.scale[cin1inds])[0]
-            cin2inds = hpu.true(people['cin2'])
-            self.results[f'n_cin2_by_age'][:, idx] = \
-            np.histogram(people.age[cin2inds], bins=people.age_bins, weights=people.scale[cin2inds])[0]
-            cin3inds = hpu.true(people['cin3'])
-            self.results[f'n_cin3_by_age'][:, idx] = \
-            np.histogram(people.age[cin3inds], bins=people.age_bins, weights=people.scale[cin3inds])[0]
 
             # Create total stocks
             for key in hpd.total_stock_keys:
@@ -1065,15 +1037,6 @@ class Sim(hpb.BaseSim):
 
         self.results['dysplasia_prevalence'][:] = sc.safedivide(res['n_has_dysp'][:], alive_females)
         self.results['dysplasia_prevalence_by_genotype'][:] = safedivide(res['n_has_dysp_by_genotype'][:], alive_females)
-        self.results['cin1_prevalence'][:] = sc.safedivide(res['n_cin1'][:], alive_females)
-        self.results['cin1_prevalence_by_genotype'][:] = safedivide(res['n_cin1_by_genotype'][:], alive_females)
-        self.results['cin1_prevalence_by_age'][:] = safedivide(res['n_cin1_by_age'][:], res['n_females_alive_by_age'][:])
-        self.results['cin2_prevalence'][:] = sc.safedivide(res['n_cin2'][:], alive_females)
-        self.results['cin2_prevalence_by_genotype'][:] = safedivide(res['n_cin2_by_genotype'][:], alive_females)
-        self.results['cin2_prevalence_by_age'][:] = safedivide(res['n_cin2_by_age'][:], res['n_females_alive_by_age'][:])
-        self.results['cin3_prevalence'][:] = sc.safedivide(res['n_cin3'][:], alive_females)
-        self.results['cin3_prevalence_by_genotype'][:] = safedivide(res['n_cin3_by_genotype'][:], alive_females)
-        self.results['cin3_prevalence_by_age'][:] = safedivide(res['n_cin3_by_age'][:], res['n_females_alive_by_age'][:])
 
         # Compute CIN and cancer incidence. Technically the denominator should be number susceptible
         # to CIN/cancer, not number alive, but should be small enough that it won't matter (?)

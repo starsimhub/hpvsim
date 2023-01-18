@@ -1381,27 +1381,6 @@ class BasePeople(FlexPretty):
         '''
         return (self.inactive * ~self.has_dysp * ~self.cancerous.any(axis=0)).astype(bool)
 
-    @property
-    def cin1(self):
-        '''
-        Boolean array of everyone with dysplasia <33%.
-        '''
-        return (self.infectious * self.has_dysp * (self.dysp<self.pars['clinical_cutoffs']['cin1'])).astype(bool)
-
-    @property
-    def cin2(self):
-        '''
-        Boolean array of everyone with dysplasia 33-67%.
-        '''
-        return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin1']) * (self.dysp<self.pars['clinical_cutoffs']['cin2'])).astype(bool)
-
-    @property
-    def cin3(self):
-        '''
-        Boolean array of everyone with dysplasia >67%.
-        '''
-        return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin2'])).astype(bool)
-
     def true(self, key):
         ''' Return indices matching the condition '''
         return self[key].nonzero()[-1]

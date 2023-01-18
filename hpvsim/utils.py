@@ -95,6 +95,22 @@ def invlogf2(y, x_infl, k):
     return (-1/k)*np.log((1/(y - l_asymp)) - 1) + x_infl
 
 
+def cancer_prob(cp,dysp):
+    '''
+    Returns cancer probability given % of transformed cells
+    '''
+
+    return 1-np.power(1-cp, dysp*100)
+
+
+def clearance_prob(cp, dysp):
+    '''
+    Returns clearance probability given % of transformed cells
+    '''
+
+    return 1-(1 - np.power(1 - cp, dysp * 100))
+
+
 #%% Sampling and seed methods
 
 __all__ += ['sample', 'get_pdf', 'set_seed']
