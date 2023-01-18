@@ -103,12 +103,12 @@ def cancer_prob(cp,dysp):
     return 1-np.power(1-cp, dysp*100)
 
 
-def clearance_prob(cp, dysp):
+def clearance_prob(cp_adjust, cp, dysp):
     '''
     Returns clearance probability given % of transformed cells
     '''
 
-    return 1-(1 - np.power(1 - cp, dysp * 100))
+    return cp_adjust*(1-(1 - np.power(1 - cp, dysp * 100)))
 
 
 #%% Sampling and seed methods

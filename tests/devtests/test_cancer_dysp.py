@@ -76,8 +76,8 @@ def run_calcs():
     genotype_pars['hpv18']['dysp_rate'] = 0.5
     genotype_pars['hrhpv']['dysp_rate'] = 0.4
 
-    genotype_pars['hpv16']['dysp_infl'] = 10
-    genotype_pars['hpv18']['dysp_infl'] = 10
+    genotype_pars['hpv16']['dysp_infl'] = 8
+    genotype_pars['hpv18']['dysp_infl'] = 7
     genotype_pars['hrhpv']['dysp_infl'] = 10
 
     genotype_pars['hpv16']['prog_infl'] = 8
@@ -96,6 +96,7 @@ def run_calcs():
     genotype_pars['hpv18']['clearance_prob'] = .01
     genotype_pars['hrhpv']['clearance_prob'] = .03
 
+
     # Shorten duration names
     dur_prod = [genotype_pars[genotype_map[g]]['dur_precin'] for g in range(ng)]
     trans_rate = [genotype_pars[genotype_map[g]]['dysp_rate'] for g in range(ng)]
@@ -105,6 +106,7 @@ def run_calcs():
     prog_infl = [genotype_pars[genotype_map[g]]['prog_infl'] for g in range(ng)]
     cancer_probs = [genotype_pars[genotype_map[g]]['cancer_prob'] for g in range(ng)]
     clearance_probs = [genotype_pars[genotype_map[g]]['clearance_prob'] for g in range(ng)]
+    clearance_prob_adj = [genotype_pars[genotype_map[g]]['clearance_prob_adj'] for g in range(ng)]
 
     set_font(size=20)
     colors = sc.gridcolors(ng)
@@ -115,7 +117,7 @@ def run_calcs():
     # Panel A and C
     ####################
 
-    x = np.linspace(0.01, 10, 200)  # Make an array of durations 0-3 years
+    x = np.linspace(0.01, 16, 200)  # Make an array of durations 0-15 years
     glabels = ['HPV16', 'HPV18', 'HRHPV']
     dysp_shares = []
     gtypes = []
@@ -142,14 +144,14 @@ def run_calcs():
     ax['E'].set_ylabel("Distribution of infection outcomes")
 
     # Axis labeling and other settings
-    ax['C'].set_xlabel("Duration of productive infection (years)")
+    ax['C'].set_xlabel("Total duration of productive infection (years)")
     for axn in ['A', 'C']:
         ax[axn].set_ylabel("")
         ax[axn].grid()
 
     ax['A'].set_ylabel("Density")
-    ax['C'].set_ylabel("Probability of transformation\n(cumulative)")
-    ax['A'].set_xlabel("Duration of productive infection prior to\nclearance or transformation (years)")
+    ax['C'].set_ylabel("Cumulative probability of transformation")
+    ax['A'].set_xlabel("Total duration of productive infection (years)")
 
     ax['A'].legend(fontsize=20, frameon=True)
     ax['E'].legend(fontsize=20, frameon=True, loc='lower right')
@@ -164,7 +166,7 @@ def run_calcs():
 
     def cancer_prob(cp,dysp): return 1-np.power(1-cp, dysp*100)
 
-    def clearance_prob(cp,dysp): return 0.2*(1-(1 - np.power(1 - cp, dysp * 100)))
+    def clearance_prob(cp_adj, cp,dysp): return cp_adj*(1-(1 - np.power(1 - cp, dysp * 100)))
 
     # Durations and severity of dysplasia
     for gi, gtype in enumerate(genotypes):
@@ -174,19 +176,18 @@ def run_calcs():
             ax['B'].plot(thisx, logf2(thisx, prog_infl[gi], pr), color=colors[gi], lw=1, alpha=0.5, label=gtype.upper())
 
         cp = cancer_prob(cancer_probs[gi], logf2(thisx, prog_infl[gi], prog_rate[gi]))
-        clear_p = clearance_prob(clearance_probs[gi], logf2(thisx, prog_infl[gi], prog_rate[gi]))
+        clear_p = clearance_prob(clearance_prob_adj[gi], clearance_probs[gi], logf2(thisx, prog_infl[gi], prog_rate[gi]))
         ax['D'].plot(thisx, cp, color=colors[gi], label=gtype.upper())
         ax['D'].plot(thisx, clear_p, color=colors[gi], ls='--', label=gtype.upper())
 
     ax['B'].set_ylabel("")
     ax['B'].grid()
     ax['B'].set_ylim([0, 1])
-    ax['B'].set_xlabel("Duration of transforming infection (years)")
+    ax['B'].set_xlabel("Years with transforming infection")
     ax['B'].set_ylabel("% of cells transformed")
 
     ax['D'].set_ylabel("Probability of invasion or clearance")
-    ax['D'].set_xlabel("Duration of transforming infection (years)")
-    ax['D'].set_ylim([0, 1])
+    ax['D'].set_xlabel("Years with transforming infection")
     ax['D'].grid()
     h, l = ax['D'].get_legend_handles_labels()
 
@@ -211,7 +212,7 @@ def run_calcs():
             cancer_inds = hpu.true(has_cancer)
             cancers[gtype] += len(cancer_inds)
             pr = pr[~has_cancer]
-            cp = clearance_prob(clearance_probs[gi], logf2(x, prog_infl[gi], pr))
+            cp = clearance_prob(clearance_prob_adj[gi], clearance_probs[gi], logf2(x, prog_infl[gi], pr))
             clears_hpv = hpu.n_binomial(cp, len(cp))
             pr = pr[~clears_hpv]
 
