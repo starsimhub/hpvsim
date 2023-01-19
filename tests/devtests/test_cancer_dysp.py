@@ -88,9 +88,9 @@ def run_calcs():
     genotype_pars['hpv18']['prog_rate'] = 0.5
     genotype_pars['hrhpv']['prog_rate'] = 0.2
     #
-    genotype_pars['hpv16']['cancer_prob'] = .0025
-    genotype_pars['hpv18']['cancer_prob'] = .0015
-    genotype_pars['hrhpv']['cancer_prob'] = .001
+    genotype_pars['hpv16']['cancer_prob'] = .002
+    genotype_pars['hpv18']['cancer_prob'] = .001
+    genotype_pars['hrhpv']['cancer_prob'] = .0008
     #
     genotype_pars['hpv16']['clearance_prob_adj'] = .18
     genotype_pars['hpv18']['clearance_prob_adj'] = .18

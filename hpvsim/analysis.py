@@ -1043,7 +1043,7 @@ class age_causal_infection(Analyzer):
         self.age_causal = []
         self.age_cancer = []
         self.dwelltime = dict()
-        for state in ['hpv', 'cin1', 'cin2', 'cin3', 'total']:
+        for state in ['precin', 'dysp', 'total']:
             self.dwelltime[state] = []
 
     def apply(self, sim):
@@ -1052,20 +1052,14 @@ class age_causal_infection(Analyzer):
             if len(cancer_inds):
                 current_age = sim.people.age[cancer_inds]
                 date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
-                date_cin1 = sim.people.date_cin1[cancer_genotypes, cancer_inds]
-                date_cin2 = sim.people.date_cin2[cancer_genotypes, cancer_inds]
-                date_cin3 = sim.people.date_cin3[cancer_genotypes, cancer_inds]
-                hpv_time = (date_cin1 - date_exposed) * sim['dt']
-                cin1_time = (date_cin2 - date_cin1) * sim['dt']
-                cin2_time = (date_cin3 - date_cin2) * sim['dt']
-                cin3_time = (sim.t - date_cin3) * sim['dt']
+                date_dysp = sim.people.date_has_dysp[cancer_genotypes, cancer_inds]
+                hpv_time = (date_dysp - date_exposed) * sim['dt']
+                dysp_time = (sim.t - date_dysp) * sim['dt']
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()
-                self.dwelltime['hpv'] += hpv_time.tolist()
-                self.dwelltime['cin1'] += cin1_time.tolist()
-                self.dwelltime['cin2'] += cin2_time.tolist()
-                self.dwelltime['cin3'] += cin3_time.tolist()
+                self.dwelltime['precin'] += hpv_time.tolist()
+                self.dwelltime['dysp'] += dysp_time.tolist()
                 self.dwelltime['total'] += total_time.tolist()
         return
 
@@ -1093,7 +1087,7 @@ class dwelltime(Analyzer):
         self.dwelltime = dict()
         for _, genotype in self.genotype_map.items():
             self.dwelltime[genotype] = dict()
-            for state in ['hpv', 'cin1', 'cin2', 'cin3', 'total']:
+            for state in ['precin', 'dysp', 'total']:
                 self.dwelltime[genotype][state] = []
 
     def apply(self, sim):
@@ -1103,52 +1097,25 @@ class dwelltime(Analyzer):
                 for gtype in np.unique(cancer_genotypes):
                     cancer_inds_gtype = cancer_inds[hpu.true(cancer_genotypes == gtype)]
                     date_exposed = sim.people.date_exposed[gtype, cancer_inds_gtype]
-                    date_cin1 = sim.people.date_cin1[gtype, cancer_inds_gtype]
-                    date_cin2 = sim.people.date_cin2[gtype, cancer_inds_gtype]
-                    date_cin3 = sim.people.date_cin3[gtype, cancer_inds_gtype]
-                    hpv_time = (date_cin1 - date_exposed) * sim['dt']
-                    cin1_time = (date_cin2 - date_cin1) * sim['dt']
-                    cin2_time = (date_cin3 - date_cin2) * sim['dt']
-                    cin3_time = (sim.t - date_cin3) * sim['dt']
+                    date_dysp = sim.people.date_has_dysp[gtype, cancer_inds_gtype]
+                    hpv_time = (date_dysp - date_exposed) * sim['dt']
+                    dysp_time = (sim.t - date_dysp) * sim['dt']
                     total_time = (sim.t - date_exposed) * sim['dt']
-                    self.dwelltime[self.genotype_map[gtype]]['hpv'] += hpv_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['cin1'] += cin1_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['cin2'] += cin2_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['cin3'] += cin3_time.tolist()
+                    self.dwelltime[self.genotype_map[gtype]]['precin'] += hpv_time.tolist()
+                    self.dwelltime[self.genotype_map[gtype]]['dysp'] += dysp_time.tolist()
                     self.dwelltime[self.genotype_map[gtype]]['total'] += total_time.tolist()
             genotypes, inds = (sim.people.date_clearance == sim.t).nonzero()
             if len(inds):
                 for gtype in np.unique(genotypes):
                     inds_gtype = inds[hpu.true(genotypes == gtype)]
                     date_exposed = sim.people.date_exposed[gtype, inds_gtype]
-                    cin1_inds = hpu.true(~np.isnan(sim.people.date_cin1[gtype, inds_gtype]))
-                    cin2_inds = hpu.true(~np.isnan(sim.people.date_cin2[gtype, inds_gtype]))
-                    cin3_inds = hpu.true(~np.isnan(sim.people.date_cin3[gtype, inds_gtype]))
-                    hpv_time = ((sim.people.date_cin1[gtype, inds_gtype[cin1_inds]] - date_exposed[
-                        cin1_inds]) * sim['dt']).tolist() + \
-                               ((sim.people.date_cin1[gtype, inds_gtype[cin2_inds]] - date_exposed[
-                                   cin2_inds]) * sim['dt']).tolist() + \
-                               ((sim.people.date_cin1[gtype, inds_gtype[cin3_inds]] - date_exposed[
-                                   cin3_inds]) * sim['dt']).tolist()
-
-                    cin1_time = ((sim.t - sim.people.date_cin1[gtype, inds_gtype[cin1_inds]]) * sim[
-                        'dt']).tolist() + \
-                                ((sim.people.date_cin2[gtype, inds_gtype[cin2_inds]] - sim.people.date_cin1[
-                                    gtype, inds_gtype[cin2_inds]]) * sim['dt']).tolist() + \
-                                ((sim.people.date_cin2[gtype, inds_gtype[cin3_inds]] - date_exposed[
-                                    cin3_inds]) * sim['dt']).tolist()
-
-                    cin2_time = ((sim.t - sim.people.date_cin2[gtype, inds_gtype[cin2_inds]]) * sim[
-                        'dt']).tolist() + \
-                                ((sim.people.date_cin3[gtype, inds_gtype[cin3_inds]] - sim.people.date_cin2[
-                                    gtype, inds_gtype[cin3_inds]]) * sim['dt']).tolist()
-                    cin3_time = ((sim.t - sim.people.date_cin3[gtype, inds_gtype[cin3_inds]]) * sim[
-                        'dt']).tolist()
+                    dysp_inds = hpu.true(~np.isnan(sim.people.date_has_dysp[gtype, inds_gtype]))
+                    hpv_time = ((sim.people.date_has_dysp[gtype, inds_gtype[dysp_inds]] - date_exposed[
+                        dysp_inds]) * sim['dt']).tolist()
+                    dysp_time = ((sim.t - sim.people.date_has_dysp[gtype, inds_gtype[dysp_inds]]) * sim['dt']).tolist()
                     total_time = ((sim.t - date_exposed) * sim['dt']).tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['hpv'] += hpv_time
-                    self.dwelltime[self.genotype_map[gtype]]['cin1'] += cin1_time
-                    self.dwelltime[self.genotype_map[gtype]]['cin2'] += cin2_time
-                    self.dwelltime[self.genotype_map[gtype]]['cin3'] += cin3_time
+                    self.dwelltime[self.genotype_map[gtype]]['precin'] += hpv_time
+                    self.dwelltime[self.genotype_map[gtype]]['dysp'] += dysp_time
                     self.dwelltime[self.genotype_map[gtype]]['total'] += total_time
         return
 

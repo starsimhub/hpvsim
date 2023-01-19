@@ -470,6 +470,7 @@ class People(hpb.BasePeople):
             is_cancer = hpu.binomial_arr(cancer_probs)
             cancer_inds = dysp_inds[is_cancer]
 
+            self.date_cancerous[genotype, cancer_inds] = self.t
             dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))
             self.date_dead_cancer[cancer_inds] = self.date_cancerous[genotype, cancer_inds] + sc.randround(dur_cancer / dt)
             self.dur_cancer[genotype, cancer_inds] = dur_cancer
@@ -484,8 +485,7 @@ class People(hpb.BasePeople):
                     if g != genotype:
                         self.date_cancerous[
                             g, cancer_inds] = np.nan  # Remove their date of cancer for all genotypes but the one currently causing cancer
-                self.inactive[:,
-                cancer_inds] = True  # If this person has any other infections from any other genotypes, set them to inactive
+                self.inactive[:, cancer_inds] = True  # If this person has any other infections from any other genotypes, set them to inactive
 
                 # Next, set the dysplasia properties
                 self.cancerous[genotype, cancer_inds] = True
