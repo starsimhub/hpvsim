@@ -266,7 +266,7 @@ by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
 type_dist_keys   = ['precin', 'has_dysp', 'cancerous']
-type_dist_names  = ['Productive infection', 'Transforming infection', 'Cervical cancer']
+type_dist_names  = ['Productive\ninfection', 'Transforming\ninfection', 'Cervical cancer']
 
 #%% Default initial prevalence
 

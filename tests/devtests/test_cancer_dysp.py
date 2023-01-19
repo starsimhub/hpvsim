@@ -72,29 +72,33 @@ def run_calcs():
     # genotype_pars['hpv18']['dur_precin']['par2'] = 3
     # genotype_pars['hrhpv']['dur_precin']['par2'] = 5
     #
-    # genotype_pars['hpv16']['dysp_rate'] = 0.6
-    # genotype_pars['hpv18']['dysp_rate'] = 0.5
-    # genotype_pars['hrhpv']['dysp_rate'] = 0.4
+    genotype_pars['hpv16']['dysp_rate'] = 0.5
+    genotype_pars['hpv18']['dysp_rate'] = 0.5
+    genotype_pars['hrhpv']['dysp_rate'] = 0.4
+    # #
+    # genotype_pars['hpv16']['dysp_infl'] = 12
+    # genotype_pars['hpv18']['dysp_infl'] = 10
+    # genotype_pars['hrhpv']['dysp_infl'] = 13
     #
-    # genotype_pars['hpv16']['dysp_infl'] = 8
-    # genotype_pars['hpv18']['dysp_infl'] = 7
-    # genotype_pars['hrhpv']['dysp_infl'] = 10
+    genotype_pars['hpv16']['prog_infl'] = 17
+    genotype_pars['hpv18']['prog_infl'] = 15
+    genotype_pars['hrhpv']['prog_infl'] = 20
+
+    genotype_pars['hpv16']['prog_rate'] = 0.3
+    genotype_pars['hpv18']['prog_rate'] = 0.5
+    genotype_pars['hrhpv']['prog_rate'] = 0.2
     #
-    # genotype_pars['hpv16']['prog_infl'] = 8
-    # genotype_pars['hpv18']['prog_infl'] = 6
-    # genotype_pars['hrhpv']['prog_infl'] = 12
+    genotype_pars['hpv16']['cancer_prob'] = .0025
+    genotype_pars['hpv18']['cancer_prob'] = .0015
+    genotype_pars['hrhpv']['cancer_prob'] = .001
     #
-    # genotype_pars['hpv16']['prog_rate'] = 0.3
-    # genotype_pars['hpv18']['prog_rate'] = 0.4
-    # genotype_pars['hrhpv']['prog_rate'] = 0.2
-    #
-    # genotype_pars['hpv16']['cancer_prob'] = .003
-    # genotype_pars['hpv18']['cancer_prob'] = .002
-    # genotype_pars['hrhpv']['cancer_prob'] = .002
-    #
-    # genotype_pars['hpv16']['clearance_prob'] = .009
-    # genotype_pars['hpv18']['clearance_prob'] = .01
-    # genotype_pars['hrhpv']['clearance_prob'] = .03
+    genotype_pars['hpv16']['clearance_prob_adj'] = .18
+    genotype_pars['hpv18']['clearance_prob_adj'] = .18
+    genotype_pars['hrhpv']['clearance_prob_adj'] = .18
+
+    genotype_pars['hpv16']['clearance_prob'] = .15
+    genotype_pars['hpv18']['clearance_prob'] = .15
+    genotype_pars['hrhpv']['clearance_prob'] = .15
 
 
     # Shorten duration names
