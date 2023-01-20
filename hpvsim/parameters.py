@@ -339,8 +339,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.prog_infl    = 17
     pars.hpv16.rel_beta     = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.cancer_prob  = 0.002 # Annual rate of transformed cell invading
-    pars.hpv16.clearance_prob = 0.15 # Annual rate of transformed cell healing
-    pars.hpv16.clearance_prob_adj = 0.18 # Annual rate of transformed cell healing
+    pars.hpv16.init_clearance_prob = 0.18
+    pars.hpv16.clearance_decay = 0.15 # Rate of decay in clearance
     pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
@@ -352,8 +352,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.prog_infl    = 15
     pars.hpv18.rel_beta     = 1.0  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.cancer_prob  = 0.001
-    pars.hpv18.clearance_prob = 0.15 # Annual rate of transformed cell healing
-    pars.hpv18.clearance_prob_adj = 0.18 # Annual rate of transformed cell healing
+    pars.hpv18.init_clearance_prob = 0.18
+    pars.hpv18.clearance_decay = 0.15 # Rate of decay in clearance
     pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
@@ -365,8 +365,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.prog_infl    = 20
     pars.hrhpv.rel_beta     = 1.05 # placeholder
     pars.hrhpv.cancer_prob  = 0.0008
-    pars.hrhpv.clearance_prob = 0.15  # Annual rate of transformed cell healing
-    pars.hrhpv.clearance_prob_adj = 0.18 # Annual rate of transformed cell healing
+    pars.hrhpv.init_clearance_prob = 0.18
+    pars.hrhpv.clearance_decay = 0.15 # Rate of decay in clearance
     pars.hrhpv.sero_prob    = 0.60 # placeholder
 
 

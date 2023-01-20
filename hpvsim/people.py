@@ -404,8 +404,8 @@ class People(hpb.BasePeople):
         gpars = self.pars['genotype_pars'][self.pars['genotype_map'][genotype]]
         dt = self.pars['dt']
         cancer_prob = gpars['cancer_prob'] * dt
-        clearance_prob = gpars['clearance_prob'] * dt
-        clearance_prob_adjust = gpars['clearance_prob_adj']
+        init_clearance_prob = gpars['init_clearance_prob']
+        clearance_decay = gpars['clearance_decay'] * dt
 
         n_extra = self.pars['ms_agent_ratio']
         cancer_scale = self.pars['pop_scale'] / n_extra
@@ -497,7 +497,7 @@ class People(hpb.BasePeople):
 
             # Next, check if any transformations heal today
             no_cancer_inds = dysp_inds[~is_cancer]
-            clear_probs = hpu.clearance_prob(clearance_prob_adjust, clearance_prob, self.dysp[genotype, no_cancer_inds])
+            clear_probs = hpu.clearance_prob(init_clearance_prob, clearance_decay, self.dysp[genotype, no_cancer_inds])
             is_cleared = hpu.binomial_arr(clear_probs)
             clear_inds = no_cancer_inds[is_cleared]
             self.date_clearance[genotype, clear_inds] = self.t + 1

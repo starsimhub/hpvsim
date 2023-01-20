@@ -109,8 +109,8 @@ def run_calcs():
     prog_rate_sd = [genotype_pars[genotype_map[g]]['prog_rate_sd'] for g in range(ng)]
     prog_infl = [genotype_pars[genotype_map[g]]['prog_infl'] for g in range(ng)]
     cancer_probs = [genotype_pars[genotype_map[g]]['cancer_prob'] for g in range(ng)]
-    clearance_probs = [genotype_pars[genotype_map[g]]['clearance_prob'] for g in range(ng)]
-    clearance_prob_adj = [genotype_pars[genotype_map[g]]['clearance_prob_adj'] for g in range(ng)]
+    clearance_decay = [genotype_pars[genotype_map[g]]['clearance_decay'] for g in range(ng)]
+    init_clearance_prob = [genotype_pars[genotype_map[g]]['init_clearance_prob'] for g in range(ng)]
 
     set_font(size=20)
     colors = sc.gridcolors(ng)
@@ -180,7 +180,7 @@ def run_calcs():
             ax['B'].plot(thisx, logf2(thisx, prog_infl[gi], pr), color=colors[gi], lw=1, alpha=0.5, label=gtype.upper())
 
         cp = cancer_prob(cancer_probs[gi], logf2(thisx, prog_infl[gi], prog_rate[gi]))
-        clear_p = clearance_prob(clearance_prob_adj[gi], clearance_probs[gi], logf2(thisx, prog_infl[gi], prog_rate[gi]))
+        clear_p = clearance_prob(init_clearance_prob[gi], clearance_decay[gi], logf2(thisx, prog_infl[gi], prog_rate[gi]))
         ax['D'].plot(thisx, cp, color=colors[gi], label=gtype.upper())
         ax['D'].plot(thisx, clear_p, color=colors[gi], ls='--', label=gtype.upper())
 
@@ -216,7 +216,7 @@ def run_calcs():
             cancer_inds = hpu.true(has_cancer)
             cancers[gtype] += len(cancer_inds)
             pr = pr[~has_cancer]
-            cp = clearance_prob(clearance_prob_adj[gi], clearance_probs[gi], logf2(x, prog_infl[gi], pr))
+            cp = clearance_prob(init_clearance_prob[gi], clearance_decay[gi], logf2(x, prog_infl[gi], pr))
             clears_hpv = hpu.n_binomial(cp, len(cp))
             pr = pr[~clears_hpv]
 
