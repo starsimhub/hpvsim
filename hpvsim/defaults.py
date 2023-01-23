@@ -119,11 +119,11 @@ class PeopleMeta(sc.prettyobj):
     derived_states = [
         State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
         State('episomal',   bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
-        State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#9e1149'), # intersection of no_dysp and inactive.
+        State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#5f5cd2'), # intersection of no_dysp and inactive.
         State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'),
         State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'),
-        State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#9e1149'),
-        State('carcinoma_insitu', bool, False, 'n_genotypes', label='Number with carcinoma in situ', color='#9e1149'),
+        State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'),
+        State('carcinoma_insitu', bool, False, 'n_genotypes', label='Number with carcinoma in situ', color='#5f5cd2'),
     ]
 
     hiv_states = [
@@ -336,8 +336,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
             plots = sc.objdict({
                 'HPV incidence by age': 'hpv_incidence_by_age',
                 'HPV prevalence': ['hpv_prevalence_by_genotype'],
-                'Pre-cancer prevalence by age': ['dysplasia_prevalence_by_age', 'cin1_prevalence_by_age',
-                                                 'cin2_prevalence_by_age', 'cin3_prevalence_by_age'],
+                'Pre-cancer prevalence by age': ['cin1_prevalence_by_age', 'cin2_prevalence_by_age', 'cin3_prevalence_by_age'],
                 'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'Cancers by age': 'cancers_by_age',
                 'HPV type distribution': 'type_dist',

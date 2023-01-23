@@ -509,20 +509,18 @@ class Sim(hpb.BaseSim):
         results['hpv_prevalence'] = init_res('HPV prevalence', color=hpd.stock_colors[0])
         results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0])
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
-        results['dysplasia_prevalence'] = init_res('Dysplasia prevalence', color=hpd.stock_colors[1])
-        results['dysplasia_prevalence_by_genotype'] = init_res('Dysplasia prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
-        results['dysplasia_prevalence_by_age'] = init_res('Dysplasia prevalence by age', n_rows=na, color=hpd.stock_colors[1])
-        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=hpd.stock_colors[1])
-        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng,
-                                                          color=hpd.stock_colors[1])
-        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[1])
-        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=hpd.stock_colors[2])
-        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng,
-                                                          color=hpd.stock_colors[2])
-        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[2])
-        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=hpd.stock_colors[3])
-        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=hpd.stock_colors[3])
-        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=hpd.stock_colors[3])
+        results['dysplasia_prevalence'] = init_res('Dysplasia prevalence', color=hpd.stock_colors[0])
+        results['dysplasia_prevalence_by_genotype'] = init_res('Dysplasia prevalence by genotype', n_rows=ng, color=hpd.stock_colors[0])
+        results['dysplasia_prevalence_by_age'] = init_res('Dysplasia prevalence by age', n_rows=na, color=hpd.stock_colors[0])
+        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=hpd.stock_colors[0])
+        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[0])
+        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[0])
+        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=hpd.stock_colors[1])
+        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
+        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[1])
+        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=hpd.stock_colors[2])
+        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=hpd.stock_colors[2])
+        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=hpd.stock_colors[2])
 
         # Time vector
         results['year'] = self.res_yearvec
