@@ -73,7 +73,7 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']                = 0.1   # Per-act transmission probability; absolute value, calibrated
+    pars['beta']                = 0.25   # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
     pars['rel_trans_cancerous'] = 0.0   # Transmissibility of people with cancer compared to those without
@@ -333,7 +333,7 @@ def get_genotype_pars(default=False, genotype=None):
     mean16 = 13.9 / 12  # Defined here since used repeatedly below. This is the duration of HPV16 infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_episomal = dict(dist='lognormal', par1=mean16, par2=2) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv16.dur_episomal = dict(dist='lognormal', par1=mean16, par2=1) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv16.trans_rate    = 1.1 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.trans_infl    = 2  # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate    = 0.15 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
@@ -346,20 +346,20 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_episomal   = dict(dist='lognormal', par1=14.9/12, par2=2) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
+    pars.hpv18.dur_episomal   = dict(dist='lognormal', par1=14.9/12, par2=1) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
     pars.hpv18.trans_rate    = 1 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.trans_infl    = 3
     pars.hpv18.prog_rate    = 0.1 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv18.prog_infl    = 22
-    pars.hpv18.rel_beta     = 0.8  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv18.rel_beta     = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.cancer_prob  = 0.001
     pars.hpv18.init_clearance_prob = 0.18
     pars.hpv18.clearance_decay = 0.15 # Rate of decay in clearance
     pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
-    pars.hrhpv.dur_episomal   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=2) # placeholder
+    pars.hrhpv.dur_episomal   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=1) # placeholder
     pars.hrhpv.trans_rate    = 0.9 # placeholder
     pars.hrhpv.trans_infl    = 4
     pars.hrhpv.prog_rate    = 0.17 # placeholder

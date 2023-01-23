@@ -63,40 +63,7 @@ def run_calcs():
 
     # Get parameters
     genotype_pars = sim['genotype_pars']
-
-    # genotype_pars['hpv16']['trans_rate'] = 1.1
-    # genotype_pars['hpv18']['trans_rate'] = 1
-    # genotype_pars['hrhpv']['trans_rate'] = 0.9
-    #
-    # genotype_pars['hpv16']['trans_infl'] = 2
-    # genotype_pars['hpv18']['trans_infl'] = 3
-    # genotype_pars['hrhpv']['trans_infl'] = 4
-    #
-    # genotype_pars['hpv16']['prog_infl'] = 25
-    # genotype_pars['hpv18']['prog_infl'] = 22
-    # genotype_pars['hrhpv']['prog_infl'] = 23
-    #
-    # genotype_pars['hpv16']['prog_rate'] = 0.12
-    # genotype_pars['hpv18']['prog_rate'] = 0.15
-    # genotype_pars['hrhpv']['prog_rate'] = 0.2
-    # # #
-    # #
-    # genotype_pars['hpv16']['prog_infl'] = 17
-    # genotype_pars['hpv18']['prog_infl'] = 15
-    # genotype_pars['hrhpv']['prog_infl'] = 20
-    #
-    # genotype_pars['hpv16']['prog_rate'] = 0.3
-    # genotype_pars['hpv18']['prog_rate'] = 0.5
-    # genotype_pars['hrhpv']['prog_rate'] = 0.2
-    #
-    # genotype_pars['hpv16']['cancer_prob'] = .0005
-    # genotype_pars['hpv18']['cancer_prob'] = .0005
-    # genotype_pars['hrhpv']['cancer_prob'] = .0005
-    #
-    # genotype_pars['hpv16']['clearance_prob_adj'] = .18
-    # genotype_pars['hpv18']['clearance_prob_adj'] = .18
-    # genotype_pars['hrhpv']['clearance_prob_adj'] = .18
-    #
+    mean16 = 13.9 / 12
     genotype_pars['hpv16']['clearance_decay'] = .2
     genotype_pars['hpv18']['clearance_decay'] = .2
     genotype_pars['hrhpv']['clearance_decay'] = .2

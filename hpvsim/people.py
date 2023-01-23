@@ -540,7 +540,8 @@ class People(hpb.BasePeople):
             self.susceptible[genotype, cleared_inds] = True
             self.infectious[genotype, cleared_inds] = False
             self.inactive[genotype, cleared_inds] = False # should already be false
-            hpimm.update_peak_immunity(self, cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
+            female_cleared_inds = np.intersect1d(cleared_inds, self.f_inds) # Only give natural immunity to females
+            hpimm.update_peak_immunity(self, female_cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
 
         if len(latent_inds):
             self.susceptible[genotype, latent_inds] = False # should already be false
