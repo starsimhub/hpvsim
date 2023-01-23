@@ -63,18 +63,7 @@ def run_calcs():
 
     # Get parameters
     genotype_pars = sim['genotype_pars']
-    genotype_pars['hpv16']['clearance_decay'] = .25
-    genotype_pars['hpv18']['clearance_decay'] = .25
-    genotype_pars['hrhpv']['clearance_decay'] = .25
-
-    genotype_pars['hpv16']['cancer_prob'] = .0013
-    genotype_pars['hpv18']['cancer_prob'] = .0003
-    genotype_pars['hrhpv']['cancer_prob'] = 0.00035
-
-    genotype_pars['hpv16']['prog_infl'] = 25
-    genotype_pars['hpv18']['prog_infl'] = 24
-    genotype_pars['hrhpv']['prog_infl'] = 27
-
+    genotype_pars['hpv16']['cancer_prob'] = 0.0005
 
     # Shorten duration names
     dur_episomal = [genotype_pars[genotype_map[g]]['dur_episomal'] for g in range(ng)]
@@ -206,7 +195,7 @@ def run_calcs():
                   cancershares
                   ]
 
-    for gn, grade in enumerate(['CIN2/3', 'Cervical cancer']):
+    for gn, grade in enumerate(['Pre-cancer', 'Cervical cancer']):
         ydata = np.array(all_shares[gn])
         color = cmap[gn + 1, :]
         ax['F'].bar(np.arange(1, ng + 1), ydata, color=color, bottom=bottom, label=grade)
