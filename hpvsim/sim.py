@@ -438,6 +438,7 @@ class Sim(hpb.BaseSim):
         # Only by-age stock result we will need is number infectious, susceptible, and with cin, for HPV and CIN prevalence/incidence calculations
         results[f'n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
         results[f'n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
+        results[f'n_transformed_by_age']            = init_res('Number transformed by age', n_rows=na, color=stock.color)
 
         # Create incidence and prevalence results
         for var,name,color in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
@@ -507,6 +508,7 @@ class Sim(hpb.BaseSim):
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
         results['dysplasia_prevalence'] = init_res('Dysplasia prevalence', color=hpd.stock_colors[1])
         results['dysplasia_prevalence_by_genotype'] = init_res('Dysplasia prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
+        results['dysplasia_prevalence_by_age'] = init_res('Dysplasia prevalence by age', n_rows=na, color=hpd.stock_colors[1])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -680,14 +682,14 @@ class Sim(hpb.BaseSim):
         genotype_map = self.pars['genotype_map']
 
         for g in range(ng):
-            dur_precin = genotype_pars[genotype_map[g]]['dur_precin']
-            dur_hpv = hpu.sample(**dur_precin, size=len(hpv_inds))
+            dur_episomal = genotype_pars[genotype_map[g]]['dur_episomal']
+            dur_hpv = hpu.sample(**dur_episomal, size=len(hpv_inds))
             t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
             self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
 
         # Check for dysplasias
-        dysp_filters = (self.people.date_has_dysp<0)
-        self.people.has_dysp[dysp_filters.nonzero()] = True
+        dysp_filters = (self.people.date_transformed<0)
+        self.people.transformed[dysp_filters.nonzero()] = True
 
         return
 
@@ -837,6 +839,8 @@ class Sim(hpb.BaseSim):
             self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bins, weights=people.scale[infinds])[0]
             susinds = hpu.true(people['susceptible'])
             self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bins, weights=people.scale[susinds])[0]
+            transformedinds = hpu.true(people['transformed'])
+            self.results[f'n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bins, weights=people.scale[transformedinds])[0]
 
             # Create total stocks
             for key in hpd.total_stock_keys:
@@ -1036,8 +1040,9 @@ class Sim(hpb.BaseSim):
 
         alive_females = res['n_alive_by_sex'][0,:]
 
-        self.results['dysplasia_prevalence'][:] = sc.safedivide(res['n_has_dysp'][:], alive_females)
-        self.results['dysplasia_prevalence_by_genotype'][:] = safedivide(res['n_has_dysp_by_genotype'][:], alive_females)
+        self.results['dysplasia_prevalence'][:] = sc.safedivide(res['n_transformed'][:], alive_females)
+        self.results['dysplasia_prevalence_by_genotype'][:] = safedivide(res['n_transformed_by_genotype'][:], alive_females)
+        self.results['dysplasia_prevalence_by_age'][:] = safedivide(res['n_transformed_by_age'][:], res['n_females_alive_by_age'][:])
 
         # Compute CIN and cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]

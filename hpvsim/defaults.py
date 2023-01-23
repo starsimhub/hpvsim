@@ -112,13 +112,13 @@ class PeopleMeta(sc.prettyobj):
         #       1. 'cin' (union of cin1, cin2, cin3)
         #       2. 'precin' (intersection of infectious and no_dysp agents - agents with infection but not dysplasia)
         #       3. 'latent' (intersection of inactive and no_dysp - agents with latent infection)
-        State('has_dysp',       bool, False, 'n_genotypes', label='Number with dyplasia', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
+        State('transformed',    bool, False, 'n_genotypes', label='Number with transformation', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
         State('cancerous',      bool, False, 'n_genotypes', label='Number with cancer', color='#5f5cd2'),      # Allowable viral states: inactive
     ]
 
     derived_states = [
         State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
-        State('precin',     bool, False, 'n_genotypes', label='Number with active infection and no dysplasia', color='#9e1149'), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
+        State('episomal',   bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
         State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#9e1149'), # intersection of no_dysp and inactive.
     ]
 
@@ -172,16 +172,16 @@ class PeopleMeta(sc.prettyobj):
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
         State('dur_infection', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present
-        State('dur_precin', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV without dysplasia
-        State('dur_dysp', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has with dysplasia
+        State('dur_episomal', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
+        State('dur_transformed', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
         State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
     ]
 
     # Markers of disease severity
     sev = [
-        State('dysp', default_float, 0, shape='n_genotypes'), # Level of dyplasia
-        State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of developing dysplasia
-        State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration to dysplasia over time
+        State('trans', default_float, 0, shape='n_genotypes'), # Level of transformation
+        State('trans_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of transformation
+        State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration to transformation over time
     ]
 
 
@@ -265,8 +265,8 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_keys   = ['precin', 'has_dysp', 'cancerous']
-type_dist_names  = ['Productive\ninfection', 'Transforming\ninfection', 'Cervical cancer']
+type_dist_keys   = ['episomal', 'transformed', 'cancerous']
+type_dist_names  = ['Episomal\ninfection', 'Transforming\ninfection', 'Cervical cancer']
 
 #%% Default initial prevalence
 
@@ -329,7 +329,7 @@ def get_default_plots(which='default', kind='sim', sim=None):
             plots = sc.objdict({
                 'HPV incidence by age': 'hpv_incidence_by_age',
                 'HPV prevalence': ['hpv_prevalence_by_genotype'],
-                'HPV prevalence by age': ['hpv_prevalence_by_age'],
+                'Pre-cancer prevalence by age': ['dysplasia_prevalence_by_age'],
                 'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'Cancers by age': 'cancers_by_age',
                 'HPV type distribution': 'type_dist',

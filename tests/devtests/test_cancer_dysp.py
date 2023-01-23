@@ -72,39 +72,36 @@ def run_calcs():
     # genotype_pars['hpv18']['dur_precin']['par2'] = 3
     # genotype_pars['hrhpv']['dur_precin']['par2'] = 5
     #
-    genotype_pars['hpv16']['dysp_rate'] = 0.5
-    genotype_pars['hpv18']['dysp_rate'] = 0.5
-    genotype_pars['hrhpv']['dysp_rate'] = 0.4
+    # genotype_pars['hpv16']['dysp_rate'] = 0.5
+    # genotype_pars['hpv18']['dysp_rate'] = 0.5
+    # genotype_pars['hrhpv']['dysp_rate'] = 0.4
+    # # #
     # #
-    # genotype_pars['hpv16']['dysp_infl'] = 12
-    # genotype_pars['hpv18']['dysp_infl'] = 10
-    # genotype_pars['hrhpv']['dysp_infl'] = 13
+    # genotype_pars['hpv16']['prog_infl'] = 17
+    # genotype_pars['hpv18']['prog_infl'] = 15
+    # genotype_pars['hrhpv']['prog_infl'] = 20
     #
-    genotype_pars['hpv16']['prog_infl'] = 17
-    genotype_pars['hpv18']['prog_infl'] = 15
-    genotype_pars['hrhpv']['prog_infl'] = 20
-
-    genotype_pars['hpv16']['prog_rate'] = 0.3
-    genotype_pars['hpv18']['prog_rate'] = 0.5
-    genotype_pars['hrhpv']['prog_rate'] = 0.2
+    # genotype_pars['hpv16']['prog_rate'] = 0.3
+    # genotype_pars['hpv18']['prog_rate'] = 0.5
+    # genotype_pars['hrhpv']['prog_rate'] = 0.2
     #
-    genotype_pars['hpv16']['cancer_prob'] = .002
-    genotype_pars['hpv18']['cancer_prob'] = .001
-    genotype_pars['hrhpv']['cancer_prob'] = .0008
+    genotype_pars['hpv16']['cancer_prob'] = .0005
+    genotype_pars['hpv18']['cancer_prob'] = .0005
+    genotype_pars['hrhpv']['cancer_prob'] = .0005
     #
-    genotype_pars['hpv16']['clearance_prob_adj'] = .18
-    genotype_pars['hpv18']['clearance_prob_adj'] = .18
-    genotype_pars['hrhpv']['clearance_prob_adj'] = .18
-
-    genotype_pars['hpv16']['clearance_prob'] = .15
-    genotype_pars['hpv18']['clearance_prob'] = .15
-    genotype_pars['hrhpv']['clearance_prob'] = .15
+    # genotype_pars['hpv16']['clearance_prob_adj'] = .18
+    # genotype_pars['hpv18']['clearance_prob_adj'] = .18
+    # genotype_pars['hrhpv']['clearance_prob_adj'] = .18
+    #
+    # genotype_pars['hpv16']['clearance_prob'] = .15
+    # genotype_pars['hpv18']['clearance_prob'] = .15
+    # genotype_pars['hrhpv']['clearance_prob'] = .15
 
 
     # Shorten duration names
-    dur_prod = [genotype_pars[genotype_map[g]]['dur_precin'] for g in range(ng)]
-    trans_rate = [genotype_pars[genotype_map[g]]['dysp_rate'] for g in range(ng)]
-    trans_infl = [genotype_pars[genotype_map[g]]['dysp_infl'] for g in range(ng)]
+    dur_episomal = [genotype_pars[genotype_map[g]]['dur_episomal'] for g in range(ng)]
+    trans_rate = [genotype_pars[genotype_map[g]]['trans_rate'] for g in range(ng)]
+    trans_infl = [genotype_pars[genotype_map[g]]['trans_infl'] for g in range(ng)]
     prog_rate = [genotype_pars[genotype_map[g]]['prog_rate'] for g in range(ng)]
     prog_rate_sd = [genotype_pars[genotype_map[g]]['prog_rate_sd'] for g in range(ng)]
     prog_infl = [genotype_pars[genotype_map[g]]['prog_infl'] for g in range(ng)]
@@ -121,7 +118,7 @@ def run_calcs():
     # Panel A and C
     ####################
 
-    x = np.linspace(0.01, 16, 200)  # Make an array of durations 0-15 years
+    x = np.linspace(0.01, 10, 200)  # Make an array of durations 0-15 years
     glabels = ['HPV16', 'HPV18', 'HRHPV']
     dysp_shares = []
     gtypes = []
@@ -130,7 +127,7 @@ def run_calcs():
 
     # Loop over genotypes, plot each one
     for gi, gtype in enumerate(genotypes):
-        sigma, scale = lognorm_params(dur_prod[gi]['par1'], dur_prod[gi]['par2'])
+        sigma, scale = lognorm_params(dur_episomal[gi]['par1'], dur_episomal[gi]['par2'])
         rv = lognorm(sigma, 0, scale)
         aa = np.diff(rv.cdf(longx))  # Calculate the probability that a woman will have a pre-dysplasia duration in any of the subintervals of time spanning 0-25 years
         bb = logf2(longx, trans_infl[gi], trans_rate[gi])[1:]  # Calculate the probablity of her developing dysplasia for a given duration
@@ -140,7 +137,7 @@ def run_calcs():
         ax['C'].plot(x, logf2(x, trans_infl[gi], trans_rate[gi]), color=colors[gi], lw=2, label=gtype.upper())
 
     bottom = np.zeros(ng)
-    ax['E'].bar(np.arange(1, ng + 1), 1-np.array(dysp_shares), color='grey', bottom=bottom, label='Productive')
+    ax['E'].bar(np.arange(1, ng + 1), 1-np.array(dysp_shares), color='grey', bottom=bottom, label='Episomal')
     ax['E'].bar(np.arange(1, ng + 1), np.array(dysp_shares), color=cmap[0], bottom=1-np.array(dysp_shares), label='Transforming')
     ax['E'].set_xticks(np.arange(1, ng + 1))
     ax['E'].set_xticklabels(glabels)
@@ -148,14 +145,14 @@ def run_calcs():
     ax['E'].set_ylabel("Distribution of infection outcomes")
 
     # Axis labeling and other settings
-    ax['C'].set_xlabel("Total duration of productive infection (years)")
+    ax['C'].set_xlabel("Total duration of episomal infection (years)")
     for axn in ['A', 'C']:
         ax[axn].set_ylabel("")
         ax[axn].grid()
 
     ax['A'].set_ylabel("Density")
     ax['C'].set_ylabel("Cumulative probability of transformation")
-    ax['A'].set_xlabel("Total duration of productive infection (years)")
+    ax['A'].set_xlabel("Total duration of episomal infection (years)")
 
     ax['A'].legend(fontsize=20, frameon=True)
     ax['E'].legend(fontsize=20, frameon=True, loc='lower right')

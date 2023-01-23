@@ -1365,13 +1365,13 @@ class BasePeople(FlexPretty):
 
 
     @property
-    def precin(self):
+    def episomal(self):
         '''
-        Boolean array of everyone infectious with no dysplasia. Includes people
+        Boolean array of everyone infectious with no transformation. Includes people
         with transient infections that will clear on their own plus those where
         dysplasia isn't established yet
         '''
-        return (self.infectious * ~self.has_dysp).astype(bool)
+        return (self.infectious * ~self.transformed).astype(bool)
 
     @property
     def latent(self):
@@ -1379,7 +1379,7 @@ class BasePeople(FlexPretty):
         Boolean array of everyone with latent infection. By definition, these
         people have no dysplasia, no cancer, and inactive infection status.
         '''
-        return (self.inactive * ~self.has_dysp * ~self.cancerous.any(axis=0)).astype(bool)
+        return (self.inactive * ~self.transformed * ~self.cancerous.any(axis=0)).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
