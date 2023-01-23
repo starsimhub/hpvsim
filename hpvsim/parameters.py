@@ -83,6 +83,7 @@ def make_pars(**kwargs):
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation']    = 0.025 # Placeholder
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
+    pars['clinical_cutoffs']    = dict(cin1=0.33, cin2=0.67, cin3=0.99)
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
@@ -333,11 +334,11 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_episomal = dict(dist='lognormal', par1=mean16, par2=2) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv16.trans_rate    = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.trans_infl    = 4  # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.prog_rate    = 0.3 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.trans_rate    = 1.1 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.trans_infl    = 2  # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv16.prog_rate    = 0.15 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.prog_rate_sd = 0.015 # Standard deviation of the progression rate
-    pars.hpv16.prog_infl    = 17
+    pars.hpv16.prog_infl    = 25
     pars.hpv16.rel_beta     = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.cancer_prob  = 0.002 # Annual rate of transformed cell invading
     pars.hpv16.init_clearance_prob = 0.18
@@ -346,12 +347,12 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_episomal   = dict(dist='lognormal', par1=14.9/12, par2=2) # Duration of HPV infections truncated at the time of CIN detection: https://pubmed.ncbi.nlm.nih.gov/17416761/
-    pars.hpv18.trans_rate    = 0.5 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.trans_infl    = 5
-    pars.hpv18.prog_rate    = 0.5 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.trans_rate    = 1 # Rate of progression to dysplasia. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
+    pars.hpv18.trans_infl    = 3
+    pars.hpv18.prog_rate    = 0.1 # Rate of progression of dysplasia once it is established. This parameter is used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.prog_rate_sd = 0.015 # Standard deviation of the progression rate
-    pars.hpv18.prog_infl    = 15
-    pars.hpv18.rel_beta     = 1.0  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv18.prog_infl    = 22
+    pars.hpv18.rel_beta     = 0.8  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.cancer_prob  = 0.001
     pars.hpv18.init_clearance_prob = 0.18
     pars.hpv18.clearance_decay = 0.15 # Rate of decay in clearance
@@ -359,12 +360,12 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_episomal   = dict(dist='lognormal', par1=14.4/12.4*mean16, par2=2) # placeholder
-    pars.hrhpv.trans_rate    = 0.4 # placeholder
-    pars.hrhpv.trans_infl    = 6
-    pars.hrhpv.prog_rate    = 0.2 # placeholder
+    pars.hrhpv.trans_rate    = 0.9 # placeholder
+    pars.hrhpv.trans_infl    = 4
+    pars.hrhpv.prog_rate    = 0.17 # placeholder
     pars.hrhpv.prog_rate_sd = 0.015 # placeholder
-    pars.hrhpv.prog_infl    = 20
-    pars.hrhpv.rel_beta     = 1.05 # placeholder
+    pars.hrhpv.prog_infl    = 23
+    pars.hrhpv.rel_beta     = 0.9 # placeholder
     pars.hrhpv.cancer_prob  = 0.0008
     pars.hrhpv.init_clearance_prob = 0.18
     pars.hrhpv.clearance_decay = 0.15 # Rate of decay in clearance

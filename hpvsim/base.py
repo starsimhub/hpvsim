@@ -1381,6 +1381,37 @@ class BasePeople(FlexPretty):
         '''
         return (self.inactive * ~self.transformed * ~self.cancerous.any(axis=0)).astype(bool)
 
+
+    @property
+    def cin1(self):
+        '''
+        Boolean array of everyone with cin1. By definition, these
+        people have dysplasia < 33%, no cancer.
+        '''
+        return (self.transformed * self.trans < self.pars['clinical_cutoffs']['cin1']).astype(bool)
+
+
+    def cin2(self):
+        '''
+        Boolean array of everyone with cin2. By definition, these
+        people have dysplasia > 33% and < 67%, no cancer.
+        '''
+        return (self.transformed * self.trans >= self.pars['clinical_cutoffs']['cin1'] * self.trans < self.pars['clinical_cutoffs']['cin2']).astype(bool)
+
+    def cin3(self):
+        '''
+        Boolean array of everyone with cin3. By definition, these
+        people have dysplasia > 67% and < 99%, no cancer.
+        '''
+        return (self.transformed * self.trans >= self.pars['clinical_cutoffs']['cin2'] * self.trans < self.pars['clinical_cutoffs']['cin3']).astype(bool)
+
+    def carcinoma_insitu(self):
+        '''
+        Boolean array of everyone with carcinoma in situ. By definition, these
+        people have dysplasia > 33% and < 67%, no cancer.
+        '''
+        return (self.transformed * self.trans >= self.pars['clinical_cutoffs']['cin3']).astype(bool)
+
     def true(self, key):
         ''' Return indices matching the condition '''
         return self[key].nonzero()[-1]
