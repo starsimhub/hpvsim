@@ -1043,7 +1043,7 @@ class age_causal_infection(Analyzer):
         self.age_causal = []
         self.age_cancer = []
         self.dwelltime = dict()
-        for state in ['transformed', 'dysp', 'total']:
+        for state in ['episomal', 'dysp', 'total']:
             self.dwelltime[state] = []
 
     def apply(self, sim):
@@ -1058,7 +1058,7 @@ class age_causal_infection(Analyzer):
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()
-                self.dwelltime['transformed'] += hpv_time.tolist()
+                self.dwelltime['episomal'] += hpv_time.tolist()
                 self.dwelltime['dysp'] += dysp_time.tolist()
                 self.dwelltime['total'] += total_time.tolist()
         return
@@ -1087,7 +1087,7 @@ class dwelltime(Analyzer):
         self.dwelltime = dict()
         for _, genotype in self.genotype_map.items():
             self.dwelltime[genotype] = dict()
-            for state in ['transformed', 'dysp', 'total']:
+            for state in ['episomal', 'dysp', 'total']:
                 self.dwelltime[genotype][state] = []
 
     def apply(self, sim):
@@ -1101,7 +1101,7 @@ class dwelltime(Analyzer):
                     hpv_time = (date_dysp - date_exposed) * sim['dt']
                     dysp_time = (sim.t - date_dysp) * sim['dt']
                     total_time = (sim.t - date_exposed) * sim['dt']
-                    self.dwelltime[self.genotype_map[gtype]]['transformed'] += hpv_time.tolist()
+                    self.dwelltime[self.genotype_map[gtype]]['episomal'] += hpv_time.tolist()
                     self.dwelltime[self.genotype_map[gtype]]['dysp'] += dysp_time.tolist()
                     self.dwelltime[self.genotype_map[gtype]]['total'] += total_time.tolist()
             genotypes, inds = (sim.people.date_clearance == sim.t).nonzero()
@@ -1114,7 +1114,7 @@ class dwelltime(Analyzer):
                         dysp_inds]) * sim['dt']).tolist()
                     dysp_time = ((sim.t - sim.people.date_transformed[gtype, inds_gtype[dysp_inds]]) * sim['dt']).tolist()
                     total_time = ((sim.t - date_exposed) * sim['dt']).tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['transformed'] += hpv_time
+                    self.dwelltime[self.genotype_map[gtype]]['episomal'] += hpv_time
                     self.dwelltime[self.genotype_map[gtype]]['dysp'] += dysp_time
                     self.dwelltime[self.genotype_map[gtype]]['total'] += total_time
         return
