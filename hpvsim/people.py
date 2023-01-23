@@ -185,7 +185,7 @@ class People(hpb.BasePeople):
                 self.genotype_flows[key][g] = cases # Store flows by genotype
                 self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
             self.check_clearance(g)
-            self.update_dysp(g)
+            self.update_trans(g)
 
         # Perform updates that are not genotype specific
         self.flows['cancer_deaths'] = self.check_cancer_deaths()
