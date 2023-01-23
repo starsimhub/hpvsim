@@ -336,7 +336,8 @@ def get_default_plots(which='default', kind='sim', sim=None):
             plots = sc.objdict({
                 'HPV incidence by age': 'hpv_incidence_by_age',
                 'HPV prevalence': ['hpv_prevalence_by_genotype'],
-                'Pre-cancer prevalence by age': ['dysplasia_prevalence_by_age'],
+                'Pre-cancer prevalence by age': ['dysplasia_prevalence_by_age', 'cin1_prevalence_by_age',
+                                                 'cin2_prevalence_by_age', 'cin3_prevalence_by_age'],
                 'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'Cancers by age': 'cancers_by_age',
                 'HPV type distribution': 'type_dist',

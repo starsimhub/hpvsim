@@ -94,7 +94,7 @@ def make_pars(**kwargs):
     pars['cross_imm_med']   = 0.3
     pars['cross_imm_high']  = 0.5
 
-    # Genotype parametres
+    # Genotype parameters
     pars['genotypes']       = [16, 18, 'hrhpv']  # Genotypes to model
     pars['genotype_pars']   = sc.objdict()  # Can be directly modified by passing in arguments listed in get_genotype_pars
 
