@@ -1087,7 +1087,7 @@ class dwelltime(Analyzer):
         self.dwelltime = dict()
         for _, genotype in self.genotype_map.items():
             self.dwelltime[genotype] = dict()
-            for state in ['precin', 'dysp', 'total']:
+            for state in ['transformed', 'dysp', 'total']:
                 self.dwelltime[genotype][state] = []
 
     def apply(self, sim):
@@ -1097,7 +1097,7 @@ class dwelltime(Analyzer):
                 for gtype in np.unique(cancer_genotypes):
                     cancer_inds_gtype = cancer_inds[hpu.true(cancer_genotypes == gtype)]
                     date_exposed = sim.people.date_exposed[gtype, cancer_inds_gtype]
-                    date_dysp = sim.people.date_has_dysp[gtype, cancer_inds_gtype]
+                    date_dysp = sim.people.date_transformed[gtype, cancer_inds_gtype]
                     hpv_time = (date_dysp - date_exposed) * sim['dt']
                     dysp_time = (sim.t - date_dysp) * sim['dt']
                     total_time = (sim.t - date_exposed) * sim['dt']
@@ -1110,9 +1110,9 @@ class dwelltime(Analyzer):
                     inds_gtype = inds[hpu.true(genotypes == gtype)]
                     date_exposed = sim.people.date_exposed[gtype, inds_gtype]
                     dysp_inds = hpu.true(~np.isnan(sim.people.date_has_dysp[gtype, inds_gtype]))
-                    hpv_time = ((sim.people.date_has_dysp[gtype, inds_gtype[dysp_inds]] - date_exposed[
+                    hpv_time = ((sim.people.date_transformed[gtype, inds_gtype[dysp_inds]] - date_exposed[
                         dysp_inds]) * sim['dt']).tolist()
-                    dysp_time = ((sim.t - sim.people.date_has_dysp[gtype, inds_gtype[dysp_inds]]) * sim['dt']).tolist()
+                    dysp_time = ((sim.t - sim.people.date_transformed[gtype, inds_gtype[dysp_inds]]) * sim['dt']).tolist()
                     total_time = ((sim.t - date_exposed) * sim['dt']).tolist()
                     self.dwelltime[self.genotype_map[gtype]]['precin'] += hpv_time
                     self.dwelltime[self.genotype_map[gtype]]['dysp'] += dysp_time
