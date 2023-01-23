@@ -63,10 +63,17 @@ def run_calcs():
 
     # Get parameters
     genotype_pars = sim['genotype_pars']
-    mean16 = 13.9 / 12
-    genotype_pars['hpv16']['clearance_decay'] = .2
-    genotype_pars['hpv18']['clearance_decay'] = .2
-    genotype_pars['hrhpv']['clearance_decay'] = .2
+    genotype_pars['hpv16']['clearance_decay'] = .25
+    genotype_pars['hpv18']['clearance_decay'] = .25
+    genotype_pars['hrhpv']['clearance_decay'] = .25
+
+    genotype_pars['hpv16']['cancer_prob'] = .0013
+    genotype_pars['hpv18']['cancer_prob'] = .0003
+    genotype_pars['hrhpv']['cancer_prob'] = 0.00035
+
+    genotype_pars['hpv16']['prog_infl'] = 25
+    genotype_pars['hpv18']['prog_infl'] = 24
+    genotype_pars['hrhpv']['prog_infl'] = 27
 
 
     # Shorten duration names
