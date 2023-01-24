@@ -458,8 +458,8 @@ class Sim(hpb.BaseSim):
             results[var] = init_res(name, color=color, n_rows=2)
 
         # Create ASR results using standard populations
-        results['asr_cancer_incidence'] = init_res('ASR of cancer incidence', scale=False)
-        results['asr_cancer_mortality'] = init_res('ASR of cancer mortality', scale=False)
+        results['asr_cancer_incidence'] = init_res('Age-adjusted cervical cancer incidence', scale=False)
+        results['asr_cancer_mortality'] = init_res('Age-adjusted cervical cancer mortality', scale=False)
 
         # Type distributions by dysplasia
         for var, name in zip(hpd.type_dist_keys, hpd.type_dist_names):
@@ -1039,30 +1039,30 @@ class Sim(hpb.BaseSim):
             else:
                 answer[:, fill_inds] = num[:, fill_inds] / denom[fill_inds]
             return answer
-
-        self.results['hpv_incidence'][:]                = sc.safedivide(res['infections'][:], res['n_susceptible'][:])
+        ng = self.pars['n_genotypes']
+        self.results['hpv_incidence'][:]                = sc.safedivide(res['infections'][:], ng*res['n_susceptible'][:])
         self.results['hpv_incidence_by_genotype'][:]    = safedivide(res['infections_by_genotype'][:], res['n_susceptible_by_genotype'][:])
-        self.results['hpv_incidence_by_age'][:]    = safedivide(res['infections_by_age'][:], res['n_susceptible_by_age'][:])
-        self.results['hpv_prevalence'][:]               = sc.safedivide(res['n_infectious'][:], res['n_alive'][:])
+        self.results['hpv_incidence_by_age'][:]    = safedivide(res['infections_by_age'][:], ng*res['n_susceptible_by_age'][:])
+        self.results['hpv_prevalence'][:]               = sc.safedivide(res['n_infectious'][:], ng*res['n_alive'][:])
         self.results['hpv_prevalence_by_genotype'][:]   = safedivide(res['n_infectious_by_genotype'][:], res['n_alive'][:])
-        self.results['hpv_prevalence_by_age'][:]        = safedivide(res['n_infectious_by_age'][:], res['n_alive_by_age'][:])
+        self.results['hpv_prevalence_by_age'][:]        = safedivide(res['n_infectious_by_age'][:], ng*res['n_alive_by_age'][:])
         self.results['hiv_incidence'][:]                = sc.safedivide(res['hiv_infections'][:], (res['n_alive'][:]-res['n_hiv'][:]))
         self.results['hiv_prevalence'][:]               = sc.safedivide(res['n_hiv'][:], res['n_alive'][:])
 
         alive_females = res['n_alive_by_sex'][0,:]
 
-        self.results['cin1_prevalence'][:] = sc.safedivide(res['n_cin1'][:], alive_females)
+        self.results['cin1_prevalence'][:] = sc.safedivide(res['n_cin1'][:], ng*alive_females)
         self.results['cin1_prevalence_by_genotype'][:] = safedivide(res['n_cin1_by_genotype'][:], alive_females)
         self.results['cin1_prevalence_by_age'][:] = safedivide(res['n_cin1_by_age'][:],
-                                                               res['n_females_alive_by_age'][:])
-        self.results['cin2_prevalence'][:] = sc.safedivide(res['n_cin2'][:], alive_females)
+                                                               ng*res['n_females_alive_by_age'][:])
+        self.results['cin2_prevalence'][:] = sc.safedivide(res['n_cin2'][:], ng*alive_females)
         self.results['cin2_prevalence_by_genotype'][:] = safedivide(res['n_cin2_by_genotype'][:], alive_females)
         self.results['cin2_prevalence_by_age'][:] = safedivide(res['n_cin2_by_age'][:],
-                                                               res['n_females_alive_by_age'][:])
-        self.results['cin3_prevalence'][:] = sc.safedivide(res['n_cin3'][:], alive_females)
+                                                               ng*res['n_females_alive_by_age'][:])
+        self.results['cin3_prevalence'][:] = sc.safedivide(res['n_cin3'][:], ng*alive_females)
         self.results['cin3_prevalence_by_genotype'][:] = safedivide(res['n_cin3_by_genotype'][:], alive_females)
         self.results['cin3_prevalence_by_age'][:] = safedivide(res['n_cin3_by_age'][:],
-                                                               res['n_females_alive_by_age'][:])
+                                                               ng*res['n_females_alive_by_age'][:])
         # Compute CIN and cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]
         scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
