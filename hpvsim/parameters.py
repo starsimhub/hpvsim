@@ -338,7 +338,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.dysp_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv16.dysp_infl    = 15
     pars.hpv16.rel_beta     = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.transform_prob  = 0.0012 # Annual rate of transformed cell invading
+    pars.hpv16.transform_prob  = 0.0002 # Annual rate of transformed cell invading
     pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
@@ -347,7 +347,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.dysp_rate_sd = 0.015 # Standard deviation of the progression rate
     pars.hpv18.dysp_infl    = 16
     pars.hpv18.rel_beta     = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.transform_prob  = 0.0002
+    pars.hpv18.transform_prob  = 0.0001
     pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
@@ -356,7 +356,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.dysp_rate_sd = 0.015 # placeholder
     pars.hrhpv.dysp_infl    = 17
     pars.hrhpv.rel_beta     = 0.9 # placeholder
-    pars.hrhpv.transform_prob  = 0.00032
+    pars.hrhpv.transform_prob  = 0.0001
     pars.hrhpv.sero_prob    = 0.60 # placeholder
 
 
