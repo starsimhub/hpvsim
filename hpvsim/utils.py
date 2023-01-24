@@ -95,12 +95,12 @@ def invlogf2(y, x_infl, k):
     return (-1/k)*np.log((1/(y - l_asymp)) - 1) + x_infl
 
 
-def cancer_prob(cp,dysp):
+def transform_prob(tp,dysp):
     '''
-    Returns cancer probability given % of transformed cells
+    Returns transformation probability given % of dysplastic cells
     '''
 
-    return 1-np.power(1-cp, dysp*100)
+    return 1-np.power(1-tp, dysp*100)
 
 
 def clearance_prob(init_clearance_prob, clearance_decay, dysp):

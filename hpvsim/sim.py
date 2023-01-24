@@ -509,9 +509,6 @@ class Sim(hpb.BaseSim):
         results['hpv_prevalence'] = init_res('HPV prevalence', color=hpd.stock_colors[0])
         results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0])
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
-        results['dysplasia_prevalence'] = init_res('Dysplasia prevalence', color=hpd.stock_colors[0])
-        results['dysplasia_prevalence_by_genotype'] = init_res('Dysplasia prevalence by genotype', n_rows=ng, color=hpd.stock_colors[0])
-        results['dysplasia_prevalence_by_age'] = init_res('Dysplasia prevalence by age', n_rows=na, color=hpd.stock_colors[0])
         results['cin1_prevalence'] = init_res('CIN1 prevalence', color=hpd.stock_colors[0])
         results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[0])
         results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[0])
@@ -689,15 +686,8 @@ class Sim(hpb.BaseSim):
             type_dist = np.array(list(self['init_hpv_dist'].values()))
             genotypes = hpu.choose_w(type_dist, len(hpv_inds), unique=False)
 
-        # Figure of duration of infection and infect people
-        genotype_pars = self.pars['genotype_pars']
-        genotype_map = self.pars['genotype_map']
-
         for g in range(ng):
-            dur_episomal = genotype_pars[genotype_map[g]]['dur_episomal']
-            dur_hpv = hpu.sample(**dur_episomal, size=len(hpv_inds))
-            t_imm_event = np.floor(np.random.uniform(-dur_hpv, 0) / self['dt'])
-            self.people.infect(inds=hpv_inds[genotypes==g], g=g, offset=t_imm_event[genotypes==g], dur=dur_hpv[genotypes==g], layer='seed_infection')
+            self.people.infect(inds=hpv_inds[genotypes==g], g=g, layer='seed_infection')
 
         # Check for dysplasias
         dysp_filters = (self.people.date_transformed<0)
@@ -774,7 +764,7 @@ class Sim(hpb.BaseSim):
         # Calculate relative transmissibility by stage of infection
         rel_trans = people.infectious[:].astype(hpd.default_float)
         rel_trans[people.cancerous] *= self['rel_trans_cancerous']
-        rel_trans *= 1-people.trans[:]
+        # rel_trans *= 1-people.dysp[:]
 
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
 
@@ -1066,9 +1056,6 @@ class Sim(hpb.BaseSim):
 
         alive_females = res['n_alive_by_sex'][0,:]
 
-        self.results['dysplasia_prevalence'][:] = sc.safedivide(res['n_transformed'][:], alive_females)
-        self.results['dysplasia_prevalence_by_genotype'][:] = safedivide(res['n_transformed_by_genotype'][:], alive_females)
-        self.results['dysplasia_prevalence_by_age'][:] = safedivide(res['n_transformed_by_age'][:], res['n_females_alive_by_age'][:])
         self.results['cin1_prevalence'][:] = sc.safedivide(res['n_cin1'][:], alive_females)
         self.results['cin1_prevalence_by_genotype'][:] = safedivide(res['n_cin1_by_genotype'][:], alive_females)
         self.results['cin1_prevalence_by_age'][:] = safedivide(res['n_cin1_by_age'][:],

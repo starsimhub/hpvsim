@@ -183,9 +183,8 @@ class PeopleMeta(sc.prettyobj):
 
     # Markers of disease severity
     sev = [
-        State('trans', default_float, 0, shape='n_genotypes'), # Level of transformation
-        State('trans_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of transformation
-        State('prog_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration to transformation over time
+        State('dysp', default_float, 0, shape='n_genotypes'), # Level of transformation
+        State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of transformation
     ]
 
 
@@ -273,7 +272,7 @@ by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
 type_dist_keys   = ['episomal', 'transformed', 'cancerous']
-type_dist_names  = ['Episomal\ninfection', 'Transforming\ninfection', 'Cervical cancer']
+type_dist_names  = ['Episomal\ninfection', 'Transformed\ninfection', 'Cervical cancer']
 
 #%% Default initial prevalence
 
