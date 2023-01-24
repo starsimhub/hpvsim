@@ -761,11 +761,6 @@ class Sim(hpb.BaseSim):
         mod[mod < 1] = 1
         hiv_rel_sus[hiv_inds] *= mod
 
-        # Calculate relative transmissibility by stage of infection
-        rel_trans = people.infectious[:].astype(hpd.default_float)
-        rel_trans[people.cancerous] *= self['rel_trans_cancerous']
-        # rel_trans *= 1-people.dysp[:]
-
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
 
         # Loop over layers
@@ -796,7 +791,7 @@ class Sim(hpb.BaseSim):
 
                 # Compute transmissibility for each partnership
                 for pship_inds, sources, targets, this_foi in discordant_pairs:
-                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * hiv_rel_sus[targets] * rel_trans[g,sources] # Pull out the transmissibility associated with this partnership
+                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * hiv_rel_sus[targets] # Pull out the transmissibility associated with this partnership
                     transmissions = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
                     target_inds   = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them

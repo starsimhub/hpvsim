@@ -437,6 +437,7 @@ class People(hpb.BasePeople):
 
         # Next, set the dysplasia properties
         self.cancerous[genotype, inds] = True
+        self.infectious[:, inds] = False
         self.episomal[:, inds] = False  # No longer counted as dysplastic
         self.dysp[:, inds] = 0
 
