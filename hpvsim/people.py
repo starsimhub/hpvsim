@@ -179,7 +179,7 @@ class People(hpb.BasePeople):
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
         for g in range(ng):
-            self.check_dysplasia(g) # check for new transformations, persistence, or clearance
+            self.check_transformation(g) # check for new transformations, persistence, or clearance
             cases_by_age, cases = self.check_cancer(g)
             self.check_clearance(g)
             self.update_dysp(g)
@@ -197,11 +197,20 @@ class People(hpb.BasePeople):
 
     
     #%% Disease progression methods
+    def set_prognoses(self, inds, g, gpars, dt, hiv_dysp_rate=None):
+        '''
+        Assigns prognoses for all infected women on day of infection.
+        '''
+        self.set_dysp_rates(inds, g, gpars, hiv_dysp_rate=hiv_dysp_rate)
+        self.set_dysp_outcomes(inds, g, gpars, dt)
+        return
+
     def set_dysp_rates(self, inds, g, gpars, hiv_dysp_rate=None):
         '''
         Set dysplasia rates
         '''
         self.dysp_rate[g, inds] = gpars['dysp_rate']
+        self.dur_episomal[g, inds] = hpu.sample(**gpars['dur_dysp'], size=len(inds))
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
@@ -210,6 +219,90 @@ class People(hpb.BasePeople):
             self.dysp_rate[g, inds] = self.dysp_rate[g, inds] * modified_dysp_rate  # Store transformation rates
         return
 
+    def set_dysp_outcomes(self, inds, g, gpars, dt):
+        dysp_infl = gpars['dysp_infl']
+        dur_episomal = self.dur_episomal[g, inds] # Array of durations of episomal infection
+        dysp_rate = self.dysp_rate[g, inds] # Array of dysplasia rates
+        transform_prob = gpars['transform_prob']
+        n_extra = self.pars['ms_agent_ratio']
+        cancer_scale = self.pars['pop_scale'] / n_extra
+        dysps = hpu.logf2(dur_episomal, dysp_infl, dysp_rate)
+        if n_extra > 1:
+            transform_probs = hpu.transform_prob(transform_prob, dysps)
+            cell_imm = self.cell_imm[g, inds]
+            transform_probs *= 1 - cell_imm
+            is_transform = hpu.binomial_arr(transform_probs)
+            transform_inds = inds[is_transform]
+
+            self.scale[transform_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
+
+            # Create extra progression rates
+            full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
+            extra_dysp_rate = hpu.sample(dist='normal_pos', par1=gpars['dysp_rate'], par2=gpars['dysp_rate_sd'], size=full_size)
+            extra_dur_dysp = hpu.sample(**gpars['dur_dysp'], size=full_size)
+            dysp_infl = gpars['dysp_infl']
+            extra_dysp = hpu.logf2(extra_dur_dysp, dysp_infl, extra_dysp_rate)
+            extra_transform_probs = hpu.transform_prob(transform_prob, extra_dysp[:, 1:])
+            extra_transform_bools = hpu.binomial_arr(extra_transform_probs)
+            extra_transform_bools *= self.level0[
+                inds, None]  # Don't allow existing cancer agents to make more cancer agents
+            extra_transform_counts = extra_transform_bools.sum(axis=1)  # Find out how many new cancer cases we have
+            n_new_agents = extra_transform_counts.sum()  # Total number of new agents
+            if n_new_agents:  # If we have more than 0, proceed
+                extra_source_lists = []
+                for i, count in enumerate(extra_transform_counts):
+                    ii = inds[i]
+                    if count:  # At least 1 new cancer agent, plus person is not already a cancer agent
+                        extra_source_lists.append([ii] * int(count))  # Duplicate the curret index count times
+                extra_source_inds = np.concatenate(
+                    extra_source_lists).flatten()  # Assemble the sources for these new agents
+                n_new_agents = len(
+                    extra_source_inds)  # The same as above, *unless* a cancer agent tried to spawn more cancer agents
+
+                # Create the new agents and assign them the same properties as the existing agents
+                new_inds = self._grow(n_new_agents)
+                for state in self.meta.all_states:
+                    if state.ndim == 1:
+                        self[state.name][new_inds] = self[state.name][extra_source_inds]
+                    elif state.ndim == 2:
+                        self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
+
+                # Reset the states for the new agents
+                self.level0[new_inds] = False
+                self.level1[new_inds] = True
+                self.scale[new_inds] = cancer_scale
+
+                # Sneakily add the new indices onto the existing vectors
+                inds = np.append(inds, new_inds)
+                is_transform = np.append(is_transform, np.full(len(new_inds), fill_value=True))
+                new_dysp_rate = extra_dysp_rate[:,1:][extra_transform_bools]
+                new_dur_dysp = extra_dur_dysp[:,1:][extra_transform_bools]
+                self.dysp_rate[g, new_inds] = new_dysp_rate
+                self.dur_episomal[g, new_inds] = new_dur_dysp
+                dur_episomal = np.append(dur_episomal, new_dur_dysp)
+        # First check indices, including new cancer agents
+        transform_probs = np.zeros(len(inds))
+        if n_extra > 1:
+            transform_probs[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
+        else:
+            transform_probs = hpu.transform_prob(transform_prob, hpu.logf2(self.dur_episomal[g,inds], dysp_infl, self.dysp_rate[g,inds]))
+
+        is_transform = hpu.binomial_arr(transform_probs)
+        transform_inds = inds[is_transform]
+        no_cancer_inds = inds[~is_transform]  # Indices of those who eventually heal lesion/clear infection
+        time_to_clear = dur_episomal[~is_transform]
+        self.date_clearance[g, no_cancer_inds] = np.fmax(self.date_clearance[g, no_cancer_inds],
+                                                         self.date_exposed[g, no_cancer_inds] +
+                                                         sc.randround(time_to_clear / dt))
+
+        self.date_transformed[g, transform_inds] = self.t
+        dur_transform_to_cancer = hpu.sample(**self.pars['dur_transform_to_cancer'], size=len(transform_inds))
+        self.date_cancerous[g, transform_inds] = self.t + sc.randround(dur_transform_to_cancer / dt)
+        dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
+        self.date_dead_cancer[transform_inds] = self.date_cancerous[g, transform_inds] + sc.randround(
+            dur_cancer / dt)
+        self.dur_cancer[g, transform_inds] = dur_cancer
+        return
 
     def update_dysp(self, genotype):
         ''' Update dysplasia for women with infection'''
@@ -319,101 +412,13 @@ class People(hpb.BasePeople):
         inds     = hpu.itrue(self.t >= date[has_date], has_date)
         return inds
 
-    def check_dysplasia(self, genotype):
+    def check_transformation(self, genotype):
         ''' Check for new transformations, clearance or persistence '''
         # Only include infectious, episomal females who haven't already cleared infection
-        dysp_inds = self.true_by_genotype('episomal', genotype)
-        gpars = self.pars['genotype_pars'][self.pars['genotype_map'][genotype]]
-        dt = self.pars['dt']
-        transform_prob = gpars['transform_prob'] * dt
-        init_clearance_prob = gpars['init_clearance_prob']
-        clearance_decay = gpars['clearance_decay'] * dt
-        n_extra = self.pars['ms_agent_ratio']
-        cancer_scale = self.pars['pop_scale'] / n_extra
-
-        if len(dysp_inds):
-            if n_extra > 1:
-                # First check if any transformations occur today
-                transform_probs = hpu.transform_prob(transform_prob, self.dysp[genotype, dysp_inds])
-                cell_imm = self.cell_imm[genotype, dysp_inds]
-                transform_probs *= 1 - cell_imm
-                is_transform = hpu.binomial_arr(transform_probs)
-                transform_inds = dysp_inds[is_transform]
-
-                self.scale[transform_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
-
-                # Create extra progression rates
-                full_size = (len(dysp_inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
-                extra_dysp_rate = hpu.sample(dist='normal_pos', par1=gpars['dysp_rate'], par2=gpars['dysp_rate_sd'], size=full_size)
-                extra_dur_dysp = np.empty(full_size)
-                dur_dysp = self.t - self.date_exposed[genotype, dysp_inds]
-                for i, di in enumerate(dur_dysp):
-                    extra_dur_dysp[i, :] = di
-                dysp_infl = gpars['dysp_infl']
-                extra_dysp = hpu.logf2(extra_dur_dysp, dysp_infl, extra_dysp_rate)
-                extra_transform_probs = hpu.transform_prob(transform_prob, extra_dysp[:, 1:])
-                extra_transform_bools = hpu.binomial_arr(extra_transform_probs)
-                extra_transform_bools *= self.level0[dysp_inds, None]  # Don't allow existing cancer agents to make more cancer agents
-                extra_transform_counts = extra_transform_bools.sum(axis=1)  # Find out how many new cancer cases we have
-                n_new_agents = extra_transform_counts.sum()  # Total number of new agents
-                if n_new_agents:  # If we have more than 0, proceed
-                    extra_source_lists = []
-                    for i, count in enumerate(extra_transform_counts):
-                        ii = dysp_inds[i]
-                        if count:  # At least 1 new cancer agent, plus person is not already a cancer agent
-                            extra_source_lists.append([ii] * int(count))  # Duplicate the curret index count times
-                    extra_source_inds = np.concatenate(
-                        extra_source_lists).flatten()  # Assemble the sources for these new agents
-                    n_new_agents = len(
-                        extra_source_inds)  # The same as above, *unless* a cancer agent tried to spawn more cancer agents
-
-                    # Create the new agents and assign them the same properties as the existing agents
-                    new_inds = self._grow(n_new_agents)
-                    for state in self.meta.all_states:
-                        if state.ndim == 1:
-                            self[state.name][new_inds] = self[state.name][extra_source_inds]
-                        elif state.ndim == 2:
-                            self[state.name][:, new_inds] = self[state.name][:, extra_source_inds]
-
-                    # Reset the states for the new agents
-                    self.level0[new_inds] = False
-                    self.level1[new_inds] = True
-                    self.scale[new_inds] = cancer_scale
-
-                    # Sneakily add the new indices onto the existing vectors
-                    dysp_inds = np.append(dysp_inds, new_inds)
-                    is_transform = np.append(is_transform, np.full(len(new_inds), fill_value=True))
-
-        # First check indices, including new cancer agents
-        transform_probs = np.zeros(len(dysp_inds))
-        if n_extra > 1:
-            transform_probs[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
-        else:
-            transform_probs = hpu.transform_prob(transform_prob, self.dysp[genotype, dysp_inds])
-
-        is_transform = hpu.binomial_arr(transform_probs)
-        transform_inds = dysp_inds[is_transform]
-
-        if len(transform_inds):
-            self.date_transformed[genotype, transform_inds] = self.t
-            dur_transform_to_cancer = hpu.sample(**self.pars['dur_transform_to_cancer'], size=len(transform_inds))
-            self.date_cancerous[genotype, transform_inds] = self.t + sc.randround(dur_transform_to_cancer / dt)
-            dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
-            self.date_dead_cancer[transform_inds] = self.date_cancerous[genotype, transform_inds] + sc.randround(dur_cancer / dt)
-            self.dur_cancer[genotype, transform_inds] = dur_cancer
-
-            # First, set the SIR properties. Once a person has cancer, their are designated
-            # as inactive for all genotypes they may be infected with
-            self.transformed[:, transform_inds] = True  # Now transformed, cannot clear
-            self.date_clearance[:, transform_inds] = np.nan  # Remove their clearance dates for all genotypes
-
-        # Next, check if any dysplasias heal today
-        no_transform_inds = dysp_inds[~is_transform]
-        clear_probs = hpu.clearance_prob(init_clearance_prob, clearance_decay, self.dysp[genotype, no_transform_inds])
-        is_cleared = hpu.binomial_arr(clear_probs)
-        clear_inds = no_transform_inds[is_cleared]
-        self.date_clearance[genotype, clear_inds] = self.t + 1
-
+        filter_inds = self.true_by_genotype('episomal', genotype)
+        inds = self.check_inds(self.transformed[genotype,:], self.date_transformed[genotype,:], filter_inds=filter_inds)
+        self.transformed[genotype, inds] = True  # Now transformed, cannot clear
+        self.date_clearance[genotype, inds] = np.nan  # Remove their clearance dates
         return
 
 
@@ -763,7 +768,7 @@ class People(hpb.BasePeople):
         # Compute disease progression for females
         if len(f_inds)>0:
             gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-            self.set_dysp_rates(inds, g, gpars, hiv_dysp_rate=self.pars['hiv_pars']['dysp_rate'])
+            self.set_prognoses(f_inds, g, gpars, dt, hiv_dysp_rate=self.pars['hiv_pars']['dysp_rate'])
 
         # Compute infection clearance for males
         if len(m_inds)>0:
