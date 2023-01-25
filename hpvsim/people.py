@@ -211,7 +211,7 @@ class People(hpb.BasePeople):
         '''
         self.dysp_rate[g, inds] = gpars['dysp_rate']
         cell_imm = self.cell_imm[g, inds]
-        self.dur_episomal[g, inds] = hpu.sample(**gpars['dur_dysp'], size=len(inds))*cell_imm
+        self.dur_episomal[g, inds] = hpu.sample(**gpars['dur_dysp'], size=len(inds))*(1-cell_imm)
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
@@ -230,8 +230,6 @@ class People(hpb.BasePeople):
         dysps = hpu.logf2(dur_episomal, dysp_infl, dysp_rate)
         if n_extra > 1:
             transform_probs = hpu.transform_prob(transform_prob, dysps)
-            cell_imm = self.cell_imm[g, inds]
-            transform_probs *= 1 - cell_imm
             is_transform = hpu.binomial_arr(transform_probs)
             transform_inds = inds[is_transform]
 

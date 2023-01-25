@@ -89,7 +89,7 @@ def make_pars(**kwargs):
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
     pars['imm_decay']       = dict(form=None)  # decay rate, with half life in years
-    pars['cell_imm_init']   = dict(dist='beta_mean', par1=0.5, par2=0.025) # beta distribution for level of immunity against persistence/progression of infection following infection clearance and seroconversion
+    pars['cell_imm_init']   = dict(dist='beta_mean', par1=0.25, par2=0.025) # beta distribution for level of immunity against persistence/progression of infection following infection clearance and seroconversion
     pars['imm_boost']       = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['immunity']        = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
     pars['cross_imm_med']   = 0.3
