@@ -286,6 +286,11 @@ class People(hpb.BasePeople):
         else:
             transform_probs = hpu.transform_prob(transform_prob, hpu.logf2(self.dur_episomal[g,inds], dysp_infl, self.dysp_rate[g,inds]))
 
+        # Set dates of cin1, 2, 3 for all women who get infected
+        self.date_cin1[g, inds] = self.t
+        self.date_cin2[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin1'], dysp_infl, self.dysp_rate[g, inds])/dt)
+        self.date_cin3[g, inds] = self.date_cin2[g, inds] + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin2'], dysp_infl, self.dysp_rate[g, inds])/dt)
+
         is_transform = hpu.binomial_arr(transform_probs)
         transform_inds = inds[is_transform]
         no_cancer_inds = inds[~is_transform]  # Indices of those who eventually heal lesion/clear infection
@@ -494,7 +499,9 @@ class People(hpb.BasePeople):
         self.episomal[genotype, inds] = False
         self.dysp[genotype, inds] = 0
         self.dysp_rate[genotype, inds] = np.nan
-
+        self.date_cin1[genotype, inds] = np.nan
+        self.date_cin2[genotype, inds] = np.nan
+        self.date_cin3[genotype, inds] = np.nan
         return
 
 
