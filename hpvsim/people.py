@@ -285,7 +285,9 @@ class People(hpb.BasePeople):
         if n_extra > 1:
             transform_probs[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
         else:
+            cell_imm = self.cell_imm[g, inds]
             transform_probs = hpu.transform_prob(transform_prob, hpu.logf2(self.dur_episomal[g,inds], dysp_infl, self.dysp_rate[g,inds]))
+            transform_probs *= 1 - cell_imm
 
         is_transform = hpu.binomial_arr(transform_probs)
         transform_inds = inds[is_transform]

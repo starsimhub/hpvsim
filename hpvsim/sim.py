@@ -463,7 +463,7 @@ class Sim(hpb.BaseSim):
 
         # Type distributions by dysplasia
         for var, name in zip(hpd.type_dist_keys, hpd.type_dist_names):
-            results[var+'_genotype_dist'] = init_res(name, n_rows=ng)
+            results[var+'_genotype_dist'] = init_res(name, n_rows=ng, color=hpd.stock_colors[0])
 
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
