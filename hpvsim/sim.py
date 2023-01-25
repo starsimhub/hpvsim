@@ -689,16 +689,6 @@ class Sim(hpb.BaseSim):
         for g in range(ng):
             self.people.infect(inds=hpv_inds[genotypes==g], g=g, layer='seed_infection')
 
-        # Check for dysplasias
-        dysp_filters = (self.people.date_transformed<0)
-        self.people.transformed[dysp_filters.nonzero()] = True
-        cin1_filters = (self.people.date_cin1 < 0) * (self.people.date_cin2 > 0)
-        self.people.cin1[cin1_filters.nonzero()] = True
-        cin2_filters = (self.people.date_cin2 < 0) * (self.people.date_cin3 > 0)
-        self.people.cin2[cin2_filters.nonzero()] = True
-        cin3_filters = (self.people.date_cin3 < 0) * (self.people.date_cancerous > 0)
-        self.people.cin3[cin3_filters.nonzero()] = True
-
         return
 
 

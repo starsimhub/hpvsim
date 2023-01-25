@@ -294,12 +294,11 @@ class People(hpb.BasePeople):
                                                          self.date_exposed[g, no_cancer_inds] +
                                                          sc.randround(time_to_clear / dt))
 
-        self.date_transformed[g, transform_inds] = self.t
+        self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal[is_transform] / dt)
         dur_transform_to_cancer = hpu.sample(**self.pars['dur_transform_to_cancer'], size=len(transform_inds))
-        self.date_cancerous[g, transform_inds] = self.t + sc.randround(dur_transform_to_cancer / dt)
+        self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + sc.randround(dur_transform_to_cancer / dt)
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
-        self.date_dead_cancer[transform_inds] = self.date_cancerous[g, transform_inds] + sc.randround(
-            dur_cancer / dt)
+        self.date_dead_cancer[transform_inds] = self.date_cancerous[g, transform_inds] + sc.randround(dur_cancer / dt)
         self.dur_cancer[g, transform_inds] = dur_cancer
         return
 

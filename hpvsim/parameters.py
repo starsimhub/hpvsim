@@ -82,7 +82,7 @@ def make_pars(**kwargs):
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation']    = 0.025 # Placeholder
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
-    pars['dur_transform_to_cancer'] = dict(dist='lognormal', par1=20.0, par2=10.0)  # Duration of untreated invasive cerival cancer before death (years)
+    pars['dur_transform_to_cancer'] = dict(dist='lognormal', par1=10.0, par2=10.0)  # Duration of untreated invasive cerival cancer before death (years)
     pars['dur_infection'] = dict(dist='lognormal', par1=1, par2=1)
     pars['clinical_cutoffs']    = dict(cin1=0.33, cin2=0.67, cin3=0.99)
 

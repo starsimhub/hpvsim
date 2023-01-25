@@ -1363,7 +1363,6 @@ class BasePeople(FlexPretty):
         '''
         return (self.infectious + self.inactive).astype(bool)
 
-
     @property
     def episomal(self):
         '''
@@ -1380,7 +1379,6 @@ class BasePeople(FlexPretty):
         people have no dysplasia, no cancer, and inactive infection status.
         '''
         return (self.inactive * ~self.transformed * ~self.cancerous.any(axis=0)).astype(bool)
-
 
     @property
     def cin1(self):
