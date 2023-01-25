@@ -271,8 +271,8 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_keys   = ['episomal', 'transformed', 'cancerous']
-type_dist_names  = ['Episomal\ninfection', 'Transformed\ninfection', 'Cervical cancer']
+type_dist_keys   = ['cin1', 'cin2', 'cin3', 'cancerous']
+type_dist_names  = ['HPV/CIN1', 'CIN2', 'CIN3', 'Cancer']
 
 #%% Default initial prevalence
 
