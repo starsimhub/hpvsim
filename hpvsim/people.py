@@ -210,7 +210,8 @@ class People(hpb.BasePeople):
         Set dysplasia rates
         '''
         self.dysp_rate[g, inds] = gpars['dysp_rate']
-        self.dur_episomal[g, inds] = hpu.sample(**gpars['dur_dysp'], size=len(inds))
+        cell_imm = self.cell_imm[g, inds]
+        self.dur_episomal[g, inds] = hpu.sample(**gpars['dur_dysp'], size=len(inds))*cell_imm
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
@@ -285,9 +286,7 @@ class People(hpb.BasePeople):
         if n_extra > 1:
             transform_probs[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
         else:
-            cell_imm = self.cell_imm[g, inds]
             transform_probs = hpu.transform_prob(transform_prob, hpu.logf2(self.dur_episomal[g,inds], dysp_infl, self.dysp_rate[g,inds]))
-            transform_probs *= 1 - cell_imm
 
         is_transform = hpu.binomial_arr(transform_probs)
         transform_inds = inds[is_transform]
