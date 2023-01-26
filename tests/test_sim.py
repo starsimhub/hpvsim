@@ -158,14 +158,14 @@ def test_states():
                 s3  = ~(people.susceptible[g,:] & people.inactive[g,:]).any()
                 s4  = ~(people.infectious[g,:] & people.inactive[g,:]).any()
 
-                d1 = (~people.has_dysp[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
-                d2 = ~(people.has_dysp[g,:] & people.cin1[g,:]).all()
+                d1 = (people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
+                d2 = ~(people.cin1[g,:]).all()
                 d3 = ~(people.cin1[g,:] & people.cin2[g,:]).all()
                 d4 = ~(people.cin2[g,:] & people.cin3[g,:]).all()
                 d5 = ~(people.cin3[g,:] & people.cancerous[g,:]).all()
 
                 # If there's anyone with dysplasia & inactive infection, they must have cancer
-                sd1inds = hpv.true(people.has_dysp[g,:] & people.inactive[g,:])
+                sd1inds = hpv.true(people.transformed[g,:] & people.inactive[g,:])
                 sd1 = True
                 if len(sd1inds)>0:
                     sd1 = people.cancerous[:,sd1inds].any(axis=0).all()
