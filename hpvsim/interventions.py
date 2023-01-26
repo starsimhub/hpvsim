@@ -1356,15 +1356,15 @@ class tx(Product):
                         people[f'date_transformed'][g, eff_treat_inds] = np.nan
                         people[f'date_cancerous'][g, eff_treat_inds] = np.nan
                         people[f'dysp'][g, eff_treat_inds] = np.nan
-
+                        people['date_clearance'][g, eff_treat_inds] = people.t + 1
                         # Determine whether women also clear infection
-                        clearance_probs = np.full(len(eff_treat_inds), self.clearance, dtype=hpd.default_float)
-                        to_clear = hpu.binomial_arr(clearance_probs)  # Determine who will have effective treatment
-                        clear_inds = eff_treat_inds[to_clear]
-                        if len(clear_inds):
-                            # If so, set date of clearance of infection on next timestep
-                            people['date_clearance'][g, clear_inds] = people.t + 1
-                            people.dur_infection[g, clear_inds] = (people.t - people.date_infectious[g, clear_inds]) * people.pars['dt']
+                        # clearance_probs = np.full(len(eff_treat_inds), self.clearance, dtype=hpd.default_float)
+                        # to_clear = hpu.binomial_arr(clearance_probs)  # Determine who will have effective treatment
+                        # clear_inds = eff_treat_inds[to_clear]
+                        # if len(clear_inds):
+                        #     # If so, set date of clearance of infection on next timestep
+                        #
+                        #     people.dur_infection[g, clear_inds] = (people.t - people.date_infectious[g, clear_inds]) * people.pars['dt']
 
         tx_successful = np.array(list(set(tx_successful)))
         tx_unsuccessful = np.setdiff1d(inds, tx_successful)
