@@ -243,8 +243,7 @@ class People(hpb.BasePeople):
             extra_dysp = hpu.logf2(extra_dur_dysp, dysp_infl, extra_dysp_rate)
             extra_transform_probs = hpu.transform_prob(transform_prob, extra_dysp[:, 1:])
             extra_transform_bools = hpu.binomial_arr(extra_transform_probs)
-            extra_transform_bools *= self.level0[
-                inds, None]  # Don't allow existing cancer agents to make more cancer agents
+            extra_transform_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
             extra_transform_counts = extra_transform_bools.sum(axis=1)  # Find out how many new cancer cases we have
             n_new_agents = extra_transform_counts.sum()  # Total number of new agents
             if n_new_agents:  # If we have more than 0, proceed
@@ -252,11 +251,9 @@ class People(hpb.BasePeople):
                 for i, count in enumerate(extra_transform_counts):
                     ii = inds[i]
                     if count:  # At least 1 new cancer agent, plus person is not already a cancer agent
-                        extra_source_lists.append([ii] * int(count))  # Duplicate the curret index count times
-                extra_source_inds = np.concatenate(
-                    extra_source_lists).flatten()  # Assemble the sources for these new agents
-                n_new_agents = len(
-                    extra_source_inds)  # The same as above, *unless* a cancer agent tried to spawn more cancer agents
+                        extra_source_lists.append([ii] * int(count))  # Duplicate the current index count times
+                extra_source_inds = np.concatenate(extra_source_lists).flatten()  # Assemble the sources for these new agents
+                n_new_agents = len(extra_source_inds)  # The same as above, *unless* a cancer agent tried to spawn more cancer agents
 
                 # Create the new agents and assign them the same properties as the existing agents
                 new_inds = self._grow(n_new_agents)
@@ -434,8 +431,19 @@ class People(hpb.BasePeople):
         self.date_clearance[:, inds] = np.nan  # Remove their clearance dates for all genotypes
         for g in range(self.ng):
             if g != genotype:
-                self.date_cancerous[
-                    g, inds] = np.nan  # Remove their date of cancer for all genotypes but the one currently causing cancer
+                self.date_cancerous[g, inds] = np.nan  # Remove their date of cancer for all genotypes but the one currently causing cancer
+                self.date_cin1[g, inds] = np.nan
+                self.date_cin2[g, inds] = np.nan
+                self.date_cin3[g, inds] = np.nan
+            else:
+                date_cin2 = self.date_cin2[g,inds]
+                change_inds = hpu.true(date_cin2 > self.t)
+                self.date_cin2[g,inds[change_inds]] = np.nan
+
+                date_cin3 = self.date_cin3[g,inds]
+                change_inds = hpu.true(date_cin3 > self.t)
+                self.date_cin3[g,inds[change_inds]] = np.nan
+
         self.inactive[:,inds] = True  # If this person has any other infections from any other genotypes, set them to inactive
 
         # Next, set the dysplasia properties
