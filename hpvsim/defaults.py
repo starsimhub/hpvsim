@@ -120,10 +120,10 @@ class PeopleMeta(sc.prettyobj):
         State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
         State('episomal',   bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
         State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#5f5cd2'), # intersection of no_dysp and inactive.
+        State('precin',     bool, False, 'n_genotypes', label='Number with precin', color='#9e1149'),
         State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'),
         State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'),
         State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'),
-        State('carcinoma_insitu', bool, False, 'n_genotypes', label='Number with carcinoma in situ', color='#5f5cd2'),
     ]
 
     hiv_states = [
@@ -232,6 +232,7 @@ class Flow():
 flows = [
     Flow('infections',              color='#c78f65',    label='Infections'),
     Flow('dysplasias',              color='#c1ad71',    label='Dysplasias'),
+    Flow('precins',                 color='#c1ad71',    label='Pre-CINs'),
     Flow('cin1s',                   color='#c1ad71',    label='CIN1s'),
     Flow('cin2s',                   color='#c1981d',    label='CIN2s'),
     Flow('cin3s',                   color='#b86113',    label='CIN3s'),
@@ -271,8 +272,8 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_keys   = ['cin1', 'cin2', 'cin3', 'cancerous']
-type_dist_names  = ['HPV/CIN1', 'CIN2', 'CIN3', 'Cancer']
+type_dist_keys   = ['precin', 'cin1', 'cin2', 'cin3', 'cancerous']
+type_dist_names  = ['Pre-CIN', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
 
 #%% Default initial prevalence
 

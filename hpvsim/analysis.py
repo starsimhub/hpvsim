@@ -1043,7 +1043,7 @@ class age_causal_infection(Analyzer):
         self.age_causal = []
         self.age_cancer = []
         self.dwelltime = dict()
-        for state in ['cin1', 'cin2', 'cin3', 'total']:
+        for state in ['precin', 'cin1', 'cin2', 'cin3', 'total']:
             self.dwelltime[state] = []
 
     def apply(self, sim):
@@ -1052,14 +1052,17 @@ class age_causal_infection(Analyzer):
             if len(cancer_inds):
                 current_age = sim.people.age[cancer_inds]
                 date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
+                date_cin1 = sim.people.date_cin1[cancer_genotypes, cancer_inds]
                 date_cin2 = sim.people.date_cin2[cancer_genotypes, cancer_inds]
                 date_cin3 = sim.people.date_cin3[cancer_genotypes, cancer_inds]
-                cin1_time = (date_cin2 - date_exposed) * sim['dt']
+                hpv_time = (date_cin1 - date_exposed) * sim['dt']
+                cin1_time = (date_cin2 - date_cin1) * sim['dt']
                 cin2_time = (date_cin3 - date_cin2) * sim['dt']
                 cin3_time = (sim.t - date_cin3) * sim['dt']
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()
+                self.dwelltime['precin'] += hpv_time.tolist()
                 self.dwelltime['cin1'] += cin1_time.tolist()
                 self.dwelltime['cin2'] += cin2_time.tolist()
                 self.dwelltime['cin3'] += cin3_time.tolist()

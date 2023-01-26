@@ -1381,17 +1381,26 @@ class BasePeople(FlexPretty):
         return (self.inactive * ~self.transformed * ~self.cancerous.any(axis=0)).astype(bool)
 
     @property
+    def precin(self):
+        '''
+        Boolean array of everyone with precin. By definition, these
+        people have dysplasia < 10%, no cancer.
+        '''
+        return (self.infectious * (self.dysp >= self.pars['clinical_cutoffs']['precin']) * (
+                    self.dysp < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+
+    @property
     def cin1(self):
         '''
         Boolean array of everyone with cin1. By definition, these
-        people have dysplasia < 33%, no cancer.
+        people have dysplasia 10-40%, no cancer.
         '''
         return (self.infectious * (self.dysp<self.pars['clinical_cutoffs']['cin1'])).astype(bool)
 
     @property
     def cin2(self):
         '''
-        Boolean array of everyone with dysplasia 33-67%.
+        Boolean array of everyone with dysplasia 40-70%.
         '''
         return (self.infectious * (self.dysp >= self.pars['clinical_cutoffs']['cin1']) * (
                     self.dysp < self.pars['clinical_cutoffs']['cin2'])).astype(bool)
@@ -1399,17 +1408,9 @@ class BasePeople(FlexPretty):
     @property
     def cin3(self):
         '''
-        Boolean array of everyone with dysplasia >67%.
+        Boolean array of everyone with dysplasia >70%.
         '''
-        return (self.infectious * (self.dysp >= self.pars['clinical_cutoffs']['cin2']) * (self.dysp < self.pars['clinical_cutoffs']['cin3'])).astype(bool)
-
-    @property
-    def carcinoma_insitu(self):
-        '''
-        Boolean array of everyone with carcinoma in situ. By definition, these
-        people have dysplasia > 99%, no cancer.
-        '''
-        return (self.infectious * (self.dysp >= self.pars['clinical_cutoffs']['cin3'])).astype(bool)
+        return (self.infectious * (self.dysp >= self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''

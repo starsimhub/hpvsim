@@ -84,7 +84,7 @@ def make_pars(**kwargs):
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
     pars['dur_transform_to_cancer'] = dict(dist='normal_pos', par1=5.77, par2=5)  # Duration of untreated invasive cerival cancer before death (years)
     pars['dur_infection'] = dict(dist='lognormal', par1=1, par2=1)
-    pars['clinical_cutoffs']    = dict(cin1=0.33, cin2=0.67, cin3=0.99)
+    pars['clinical_cutoffs']    = dict(precin=0.10, cin1=0.4, cin2=0.7)
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
