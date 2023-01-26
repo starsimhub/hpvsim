@@ -1350,7 +1350,10 @@ class tx(Product):
                     if len(eff_treat_inds):
                         tx_successful += list(eff_treat_inds)
                         people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
+                        people['episomal'][g, eff_treat_inds] = False  # People who get treated have their CINs removed
+                        people['transformed'][g, eff_treat_inds] = False  # People who get treated have their CINs removed
                         people[f'date_{state}'][g, eff_treat_inds] = np.nan
+                        people[f'date_transformed'][g, eff_treat_inds] = np.nan
 
                         # Determine whether women also clear infection
                         clearance_probs = np.full(len(eff_treat_inds), self.clearance, dtype=hpd.default_float)

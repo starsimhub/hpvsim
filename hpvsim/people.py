@@ -546,10 +546,10 @@ class People(hpb.BasePeople):
 
             for g in range(self.pars['n_genotypes']):
                 gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-                nodysp_inds = hpu.itruei((self.is_female & self.precin[g, :] & np.isnan(self.date_transformed[g, :])), hiv_inds) # Women with HIV who are scheduled to clear without dysplasia
-                if len(nodysp_inds): # Reevaluate whether these women will develop dysplasia
-                    self.set_trans_rates(nodysp_inds, g, gpars, hiv_trans_rate=self.pars['hiv_pars']['dysp_rate'])
-                    self.set_trans_status(nodysp_inds, g, dt)
+                hpv_inds = hpu.itruei((self.is_female & self.episomal[g, :]), hiv_inds) # Women with HIV who have HPV
+                if len(hpv_inds): # Reevaluate whether these women will develop dysplasia
+                    self.set_trans_rates(hpv_inds, g, gpars, hiv_trans_rate=self.pars['hiv_pars']['dysp_rate'])
+                    self.set_trans_status(hpv_inds, g, dt)
 
                 dysp_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_transformed[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
                 if len(dysp_inds): # Reevaluate disease severity and progression speed for these women
