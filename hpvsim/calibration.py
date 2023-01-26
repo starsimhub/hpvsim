@@ -282,8 +282,14 @@ class Calibration(sc.prettyobj):
             genotype_pars[gname] = this_genotype_pars
 
         # Handle regular sim parameters
-        for pname in self.calib_pars.keys():
-            calib_pars[pname] = trial_pars[pname]
+        for name, par in self.calib_pars.items():
+            if isinstance(par, dict):
+                simpar = self.sim.pars[name]
+                for parkey in par.keys():
+                    simpar[parkey] = trial_pars[f'{name}_{parkey}']
+                calib_pars[name] = simpar
+            else:
+                calib_pars[name] = trial_pars[name]
 
         # Return
         if return_full:
