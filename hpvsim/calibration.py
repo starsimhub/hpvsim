@@ -194,7 +194,18 @@ class Calibration(sc.prettyobj):
 
         # Prepare the parameters
         if calib_pars is not None:
-            new_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
+            new_pars = {}
+            for name, par in calib_pars.items():
+                if isinstance(par, dict):
+                    simpar = sim.pars[name]
+                    for parkey, parval in par.items():
+                        simpar[parkey] = parval
+                    new_pars[name] = simpar
+                else:
+                    if name in sim.pars:
+                        new_pars[name] = par
+
+            # new_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
             if len(new_pars) != len(calib_pars):
                 extra = set(calib_pars.keys()) - set(new_pars.keys())
                 errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'

@@ -17,7 +17,7 @@ from .settings import options as hpo # For setting global options
 
 
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection',
-           'dwelltime', 'cancer_detection', 'daly_computation', 'analyzer_map']
+           'cancer_detection', 'daly_computation', 'analyzer_map']
 
 
 class Analyzer(sc.prettyobj):
@@ -1069,61 +1069,6 @@ class age_causal_infection(Analyzer):
     def finalize(self, sim=None):
         ''' Convert things to arrays '''
 
-
-class dwelltime(Analyzer):
-    '''
-    Determine the distribution of time spend in health states.
-    '''
-
-    def __init__(self, start_year=None, **kwargs):
-        super().__init__(**kwargs)
-        self.start_year = start_year
-        self.years = None
-
-    def initialize(self, sim):
-        super().initialize(sim)
-        self.years = sim.yearvec
-        if self.start_year is None:
-            self.start_year = sim['start']
-        self.ng = sim['n_genotypes']
-        self.genotype_map = sim['genotype_map']
-        self.dwelltime = dict()
-        for _, genotype in self.genotype_map.items():
-            self.dwelltime[genotype] = dict()
-            for state in ['episomal', 'dysp', 'total']:
-                self.dwelltime[genotype][state] = []
-
-    def apply(self, sim):
-        if sim.yearvec[sim.t] >= self.start_year:
-            cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
-            if len(cancer_inds):
-                for gtype in np.unique(cancer_genotypes):
-                    cancer_inds_gtype = cancer_inds[hpu.true(cancer_genotypes == gtype)]
-                    date_exposed = sim.people.date_exposed[gtype, cancer_inds_gtype]
-                    date_dysp = sim.people.date_transformed[gtype, cancer_inds_gtype]
-                    hpv_time = (date_dysp - date_exposed) * sim['dt']
-                    dysp_time = (sim.t - date_dysp) * sim['dt']
-                    total_time = (sim.t - date_exposed) * sim['dt']
-                    self.dwelltime[self.genotype_map[gtype]]['episomal'] += hpv_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['dysp'] += dysp_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['total'] += total_time.tolist()
-            genotypes, inds = (sim.people.date_clearance == sim.t).nonzero()
-            if len(inds):
-                for gtype in np.unique(genotypes):
-                    inds_gtype = inds[hpu.true(genotypes == gtype)]
-                    date_exposed = sim.people.date_exposed[gtype, inds_gtype]
-                    dysp_inds = hpu.true(~np.isnan(sim.people.date_has_dysp[gtype, inds_gtype]))
-                    hpv_time = ((sim.people.date_transformed[gtype, inds_gtype[dysp_inds]] - date_exposed[
-                        dysp_inds]) * sim['dt']).tolist()
-                    dysp_time = ((sim.t - sim.people.date_transformed[gtype, inds_gtype[dysp_inds]]) * sim['dt']).tolist()
-                    total_time = ((sim.t - date_exposed) * sim['dt']).tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['episomal'] += hpv_time
-                    self.dwelltime[self.genotype_map[gtype]]['dysp'] += dysp_time
-                    self.dwelltime[self.genotype_map[gtype]]['total'] += total_time
-        return
-
-    def finalize(self, sim=None):
-        ''' Convert things to arrays '''
 
 class cancer_detection(Analyzer):
     '''
