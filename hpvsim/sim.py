@@ -462,9 +462,11 @@ class Sim(hpb.BaseSim):
         results['asr_cancer_incidence'] = init_res('Age-adjusted cervical cancer incidence', scale=False)
         results['asr_cancer_mortality'] = init_res('Age-adjusted cervical cancer mortality', scale=False)
 
+        stock_colors = [i for i in set(hpd.stock_colors) if i is not None]
+
         # Type distributions by dysplasia
         for var, name in zip(hpd.type_dist_keys, hpd.type_dist_names):
-            results[var+'_genotype_dist'] = init_res(name, n_rows=ng, color=hpd.stock_colors[0])
+            results[var+'_genotype_dist'] = init_res(name, n_rows=ng, color=stock_colors[0])
 
         # Vaccination results
         results['new_vaccinated'] = init_res('Newly vaccinated by genotype', n_rows=ng)
@@ -507,21 +509,21 @@ class Sim(hpb.BaseSim):
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
         results['hiv_incidence'] = init_res('HIV incidence')
         results['hiv_prevalence'] = init_res('HIV prevalence')
-        results['hpv_prevalence'] = init_res('HPV prevalence', color=hpd.stock_colors[0])
-        results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0])
-        results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
-        results['precin_prevalence'] = init_res('Pre-CIN prevalence', color=hpd.stock_colors[0])
-        results['precin_prevalence_by_genotype'] = init_res('Pre-CIN prevalence by genotype', n_rows=ng, color=hpd.stock_colors[0])
-        results['precin_prevalence_by_age'] = init_res('Pre-CIN prevalence by age', n_rows=na, color=hpd.stock_colors[0])
-        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=hpd.stock_colors[1])
-        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
-        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[1])
-        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=hpd.stock_colors[2])
-        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[2])
-        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[2])
-        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=hpd.stock_colors[3])
-        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=hpd.stock_colors[3])
-        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=hpd.stock_colors[3])
+        results['hpv_prevalence'] = init_res('HPV prevalence', color=stock_colors[0])
+        results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=stock_colors[0])
+        results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=stock_colors[0])
+        results['precin_prevalence'] = init_res('Pre-CIN prevalence', color=stock_colors[0])
+        results['precin_prevalence_by_genotype'] = init_res('Pre-CIN prevalence by genotype', n_rows=ng, color=stock_colors[0])
+        results['precin_prevalence_by_age'] = init_res('Pre-CIN prevalence by age', n_rows=na, color=stock_colors[0])
+        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=stock_colors[1])
+        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=stock_colors[1])
+        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=stock_colors[1])
+        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=stock_colors[2])
+        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=stock_colors[2])
+        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=stock_colors[2])
+        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=stock_colors[3])
+        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=stock_colors[3])
+        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=stock_colors[3])
 
         # Time vector
         results['year'] = self.res_yearvec
