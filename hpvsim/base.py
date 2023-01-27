@@ -1386,8 +1386,7 @@ class BasePeople(FlexPretty):
         Boolean array of everyone with precin. By definition, these
         people have dysplasia < 10%, no cancer.
         '''
-        return (self.infectious * (self.dysp >= self.pars['clinical_cutoffs']['precin']) * (
-                    self.dysp < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+        return (self.infectious * (self.dysp < self.pars['clinical_cutoffs']['precin'])).astype(bool)
 
     @property
     def cin1(self):
@@ -1395,7 +1394,8 @@ class BasePeople(FlexPretty):
         Boolean array of everyone with cin1. By definition, these
         people have dysplasia 10-40%, no cancer.
         '''
-        return (self.infectious * (self.dysp<self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+        return (self.infectious * (self.dysp >= self.pars['clinical_cutoffs']['precin']) * (
+                    self.dysp < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
 
     @property
     def cin2(self):
