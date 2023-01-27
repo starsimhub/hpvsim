@@ -197,11 +197,11 @@ class People(hpb.BasePeople):
 
     
     #%% Disease progression methods
-    def set_prognoses(self, inds, g, gpars, dt, hiv_dysp_rate=None):
+    def set_prognoses(self, inds, g, gpars, dt, rel_hiv_dysp_infl=None):
         '''
         Assigns prognoses for all infected women on day of infection.
         '''
-        self.set_dysp_rates(inds, g, gpars, hiv_dysp_rate=hiv_dysp_rate)
+        self.set_dysp_rates(inds, g, gpars, rel_hiv_dysp_infl=rel_hiv_dysp_infl)
         self.set_dysp_outcomes(inds, g, gpars, dt)
         return
 
@@ -778,7 +778,7 @@ class People(hpb.BasePeople):
         # Compute disease progression for females
         if len(f_inds)>0:
             gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-            self.set_prognoses(f_inds, g, gpars, dt, hiv_dysp_rate=self.pars['hiv_pars']['dysp_rate'])
+            self.set_prognoses(f_inds, g, gpars, dt, rel_hiv_dysp_infl=self.pars['hiv_pars']['rel_hiv_dysp_infl'])
 
         # Compute infection clearance for males
         if len(m_inds)>0:
