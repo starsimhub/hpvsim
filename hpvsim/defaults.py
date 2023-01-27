@@ -184,7 +184,8 @@ class PeopleMeta(sc.prettyobj):
     # Markers of disease severity
     sev = [
         State('dysp', default_float, 0, shape='n_genotypes'), # Level of transformation
-        State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of initial infection to the probability of transformation
+        State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of infection to the probability of transformation
+        State('rel_dysp_infl', default_float, 1.0) # Parameter that adjusts the inflection point in the logistic function of infection growth
     ]
 
 

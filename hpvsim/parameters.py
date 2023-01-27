@@ -101,9 +101,8 @@ def make_pars(**kwargs):
 
     # HIV parameters
     pars['hiv_pars'] = {
-        'rel_sus': 2.2,
-        'dysp_rate': 2,
-        'prog_rate': 2,
+        'rel_sus': 2.2, # Increased risk of acquiring HPV
+        'rel_hiv_dysp_infl': 0.5, # Speed up time to dysplastic growth
         'reactivation_prob': 3,
     }
 

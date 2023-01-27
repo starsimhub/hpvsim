@@ -205,7 +205,7 @@ class People(hpb.BasePeople):
         self.set_dysp_outcomes(inds, g, gpars, dt)
         return
 
-    def set_dysp_rates(self, inds, g, gpars, hiv_dysp_rate=None):
+    def set_dysp_rates(self, inds, g, gpars, rel_hiv_dysp_infl=None):
         '''
         Set dysplasia rates
         '''
@@ -215,13 +215,13 @@ class People(hpb.BasePeople):
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
-            modified_dysp_rate = immune_compromise * hiv_dysp_rate  # Calculate the modification to make to the transformation rate
-            modified_dysp_rate[modified_dysp_rate < 1] = 1
-            self.dysp_rate[g, inds] = self.dysp_rate[g, inds] * modified_dysp_rate  # Store transformation rates
+            modified_dysp_rate = immune_compromise * rel_hiv_dysp_infl  # Calculate the modification to make to the transformation rate
+            self.rel_dysp_infl[g, inds] *= modified_dysp_rate  # Store transformation rates
         return
 
     def set_dysp_outcomes(self, inds, g, gpars, dt):
-        dysp_infl = gpars['dysp_infl']
+        rel_dysp_infl = self.rel_dysp_infl[inds]
+        dysp_infl = gpars['dysp_infl']*rel_dysp_infl
         dur_episomal = self.dur_episomal[g, inds] # Array of durations of episomal infection
         dysp_rate = self.dysp_rate[g, inds] # Array of dysplasia rates
         transform_prob = gpars['transform_prob']
@@ -546,14 +546,10 @@ class People(hpb.BasePeople):
 
             for g in range(self.pars['n_genotypes']):
                 gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-                hpv_inds = hpu.itruei((self.is_female & self.episomal[g, :]), hiv_inds) # Women with HIV who have HPV
+                hpv_inds = hpu.itruei((self.is_female & self.episomal[g, :]), hiv_inds) # Women with HIV who have episomal HPV
                 if len(hpv_inds): # Reevaluate whether these women will develop dysplasia
-                    self.set_trans_rates(hpv_inds, g, gpars, hiv_trans_rate=self.pars['hiv_pars']['dysp_rate'])
-                    self.set_trans_status(hpv_inds, g, dt)
-
-                dysp_inds = hpu.itruei((self.is_female & self.infectious[g, :] & ~np.isnan(self.date_transformed[g, :])), hiv_inds) # Women with HIV who are scheduled to have dysplasia
-                if len(dysp_inds): # Reevaluate disease severity and progression speed for these women
-                    dysp_arrs = self.set_severity(dysp_inds, g, gpars, hiv_prog_rate=self.pars['hiv_pars']['prog_rate'])
+                    self.set_dysp_rates(hpv_inds, g, gpars, rel_hiv_dysp_infl=self.pars['hiv_pars']['rel_hiv_dysp_infl'])
+                    self.set_dysp_outcomes(hpv_inds, g, dt)
 
         return self.scale_flows(hiv_inds)
 
