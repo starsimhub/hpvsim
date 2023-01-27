@@ -439,6 +439,7 @@ class Sim(hpb.BaseSim):
         results[f'n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
         results[f'n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
         results[f'n_transformed_by_age']            = init_res('Number transformed by age', n_rows=na, color=stock.color)
+        results[f'n_precin_by_age']                 = init_res('Number Pre-CIN by age', n_rows=na, color=stock.color)
         results[f'n_cin1_by_age']                   = init_res('Number CIN1 by age', n_rows=na, color=stock.color)
         results[f'n_cin2_by_age']                   = init_res('Number CIN2 by age', n_rows=na, color=stock.color)
         results[f'n_cin3_by_age']                   = init_res('Number CIN3 by age', n_rows=na, color=stock.color)
@@ -509,15 +510,18 @@ class Sim(hpb.BaseSim):
         results['hpv_prevalence'] = init_res('HPV prevalence', color=hpd.stock_colors[0])
         results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=hpd.stock_colors[0])
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=hpd.stock_colors[0])
-        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=hpd.stock_colors[0])
-        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[0])
-        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[0])
-        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=hpd.stock_colors[1])
-        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
-        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[1])
-        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=hpd.stock_colors[2])
-        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=hpd.stock_colors[2])
-        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=hpd.stock_colors[2])
+        results['precin_prevalence'] = init_res('Pre-CIN prevalence', color=hpd.stock_colors[0])
+        results['precin_prevalence_by_genotype'] = init_res('Pre-CIN prevalence by genotype', n_rows=ng, color=hpd.stock_colors[0])
+        results['precin_prevalence_by_age'] = init_res('Pre-CIN prevalence by age', n_rows=na, color=hpd.stock_colors[0])
+        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=hpd.stock_colors[1])
+        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[1])
+        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=hpd.stock_colors[1])
+        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=hpd.stock_colors[2])
+        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=hpd.stock_colors[2])
+        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=hpd.stock_colors[2])
+        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=hpd.stock_colors[3])
+        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=hpd.stock_colors[3])
+        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=hpd.stock_colors[3])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -834,15 +838,14 @@ class Sim(hpb.BaseSim):
             self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bins, weights=people.scale[susinds])[0]
             transformedinds = hpu.true(people['transformed'])
             self.results[f'n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bins, weights=people.scale[transformedinds])[0]
+            precininds = hpu.true(people['precin'])
+            self.results[f'n_precin_by_age'][:, idx] = np.histogram(people.age[precininds], bins=people.age_bins, weights=people.scale[precininds])[0]
             cin1inds = hpu.true(people['cin1'])
-            self.results[f'n_cin1_by_age'][:, idx] = \
-                np.histogram(people.age[cin1inds], bins=people.age_bins, weights=people.scale[cin1inds])[0]
+            self.results[f'n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bins, weights=people.scale[cin1inds])[0]
             cin2inds = hpu.true(people['cin2'])
-            self.results[f'n_cin2_by_age'][:, idx] = \
-                np.histogram(people.age[cin2inds], bins=people.age_bins, weights=people.scale[cin2inds])[0]
+            self.results[f'n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bins, weights=people.scale[cin2inds])[0]
             cin3inds = hpu.true(people['cin3'])
-            self.results[f'n_cin3_by_age'][:, idx] = \
-                np.histogram(people.age[cin3inds], bins=people.age_bins, weights=people.scale[cin3inds])[0]
+            self.results[f'n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bins, weights=people.scale[cin3inds])[0]
             # Create total stocks
             for key in hpd.total_stock_keys:
 
@@ -1041,6 +1044,10 @@ class Sim(hpb.BaseSim):
 
         alive_females = res['n_alive_by_sex'][0,:]
 
+        self.results['precin_prevalence'][:] = sc.safedivide(res['n_precin'][:], ng * alive_females)
+        self.results['precin_prevalence_by_genotype'][:] = safedivide(res['n_precin_by_genotype'][:], alive_females)
+        self.results['precin_prevalence_by_age'][:] = safedivide(res['n_precin_by_age'][:],
+                                                               ng * res['n_females_alive_by_age'][:])
         self.results['cin1_prevalence'][:] = sc.safedivide(res['n_cin1'][:], ng*alive_females)
         self.results['cin1_prevalence_by_genotype'][:] = safedivide(res['n_cin1_by_genotype'][:], alive_females)
         self.results['cin1_prevalence_by_age'][:] = safedivide(res['n_cin1_by_age'][:],
