@@ -275,6 +275,8 @@ class People(hpb.BasePeople):
                 new_dur_dysp = extra_dur_dysp[:,1:][extra_transform_bools]
                 self.dysp_rate[g, new_inds] = new_dysp_rate
                 self.dur_episomal[g, new_inds] = new_dur_dysp
+                self.date_infectious[g, new_inds] = self.t
+                self.date_exposed[g, new_inds] = self.t
                 dur_episomal = np.append(dur_episomal, new_dur_dysp)
         # First check indices, including new cancer agents
         transform_probs = np.zeros(len(inds))
@@ -448,9 +450,8 @@ class People(hpb.BasePeople):
 
         # Next, set the dysplasia properties
         self.cancerous[genotype, inds] = True
-        self.infectious[:, inds] = False
         self.episomal[:, inds] = False  # No longer counted as dysplastic
-        self.dysp[:, inds] = 0
+        self.dysp[:, inds] = np.nan
 
         # Age results
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
