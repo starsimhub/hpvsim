@@ -228,6 +228,7 @@ class People(hpb.BasePeople):
             self.sev_infl[g, inds] *= modified_sev_infl  # Store transformation rates
         return
 
+
     def set_severity(self, inds, g, gpars, dt):
         '''
         Set severity levels for individual women
