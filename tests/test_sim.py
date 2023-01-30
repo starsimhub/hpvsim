@@ -230,6 +230,10 @@ def test_states():
                 # Severity markers
                 v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.infectious[g,:] & people.is_female)))
                 if v1>0:
+                    import traceback;
+                    traceback.print_exc();
+                    import pdb;
+                    pdb.set_trace()
                     raise ValueError('All women with active infection should have a severity marker.')
                 v2 = len(hpv.true((~np.isnan(people.sev[g,:]) & ~people.infectious[g,:] & people.is_female)))
                 if not v2:

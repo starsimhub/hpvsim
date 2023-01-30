@@ -315,6 +315,9 @@ class People(hpb.BasePeople):
         sev_rate = self.sev_rate[genotype, inds]
         sev_infl = gpars[gmap[genotype]]['sev_infl']
         dur_episomal = self.t - self.date_exposed[genotype, inds]
+        if (dur_episomal<0).any():
+            errormsg = 'Durations cannot be less than zero.'
+            raise ValueError(errormsg)
         self.sev[genotype, inds] = hpu.logf2(dur_episomal, sev_infl, sev_rate)
         return
 
@@ -763,7 +766,7 @@ class People(hpb.BasePeople):
         # Update states, genotype info, and flows
         self.susceptible[g, inds]   = False # no longer susceptible
         self.infectious[g, inds]    = True  # now infectious
-        self.episomal[g, inds] = True  # now episomal
+        self.episomal[g, inds]      = True  # now episomal
         self.inactive[g, inds]      = False  # no longer inactive
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
