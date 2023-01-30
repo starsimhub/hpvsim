@@ -59,7 +59,7 @@ class People(hpb.BasePeople):
         self.init_contacts() # Initialize the contacts
         self.ng = self.pars['n_genotypes']
         self.na = len(self.pars['age_bins'])-1
-        self.dysp_keys = ['dysplasias', 'cancers']
+        # self.dysp_keys = ['dysplasias', 'cancers']
 
         self.lag_bins = np.linspace(0,50,51)
         self.rship_lags = dict()
@@ -182,7 +182,7 @@ class People(hpb.BasePeople):
             self.check_transformation(g) # check for new transformations, persistence, or clearance
             cases_by_age, cases = self.check_cancer(g)
             self.check_clearance(g)
-            self.update_dysp(g)
+            self.update_sev(g)
             self.flows['cancers'] += cases  # Increment flows (summed over all genotypes)
             self.genotype_flows['cancers'][g] = cases  # Store flows by genotype
             self.age_flows['cancers'] += cases_by_age  # Increment flows by age (summed over all genotypes)
@@ -197,39 +197,39 @@ class People(hpb.BasePeople):
 
     
     #%% Disease progression methods
-    def set_prognoses(self, inds, g, gpars, dt, rel_hiv_dysp_infl=None):
+    def set_prognoses(self, inds, g, gpars, dt, rel_hiv_sev_infl=None):
         '''
         Assigns prognoses for all infected women on day of infection.
         '''
-        self.set_dysp_rates(inds, g, gpars, rel_hiv_dysp_infl=rel_hiv_dysp_infl)
-        self.set_dysp_outcomes(inds, g, gpars, dt)
+        self.set_sev_rates(inds, g, gpars, rel_hiv_sev_infl=rel_hiv_sev_infl)
+        self.set_sev_outcomes(inds, g, gpars, dt)
         return
 
-    def set_dysp_rates(self, inds, g, gpars, rel_hiv_dysp_infl=None):
+    def set_sev_rates(self, inds, g, gpars, rel_hiv_sev_infl=None):
         '''
-        Set dysplasia rates
+        Set disease severity rates
         '''
-        self.dysp_rate[g, inds] = gpars['dysp_rate']
+        self.sev_rate[g, inds] = gpars['sev_rate']
         cell_imm = self.cell_imm[g, inds]
-        self.dur_episomal[g, inds] = hpu.sample(**gpars['dur_dysp'], size=len(inds))*(1-cell_imm)
+        self.dur_episomal[g, inds] = hpu.sample(**gpars['dur_inf'], size=len(inds))*(1-cell_imm)
         has_hiv = self.hiv[inds]
         if has_hiv.any():  # Figure out if any of these women have HIV
             immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
-            modified_dysp_rate = immune_compromise * rel_hiv_dysp_infl  # Calculate the modification to make to the transformation rate
-            self.rel_dysp_infl[g, inds] *= modified_dysp_rate  # Store transformation rates
+            modified_sev_rate = immune_compromise * rel_hiv_sev_infl  # Calculate the modification to make to the transformation rate
+            self.rel_sev_infl[g, inds] *= modified_sev_rate  # Store transformation rates
         return
 
-    def set_dysp_outcomes(self, inds, g, gpars, dt):
-        rel_dysp_infl = self.rel_dysp_infl[inds]
-        dysp_infl = gpars['dysp_infl']*rel_dysp_infl
+    def set_sev_outcomes(self, inds, g, gpars, dt):
+        # rel_sev_infl = self.rel_sev_infl[inds]
+        sev_infl = gpars['sev_infl'] #*rel_sev_infl
         dur_episomal = self.dur_episomal[g, inds] # Array of durations of episomal infection
-        dysp_rate = self.dysp_rate[g, inds] # Array of dysplasia rates
+        sev_rate = self.sev_rate[g, inds] # Array of severity rates
         transform_prob = gpars['transform_prob']
         n_extra = self.pars['ms_agent_ratio']
         cancer_scale = self.pars['pop_scale'] / n_extra
-        dysps = hpu.logf2(dur_episomal, dysp_infl, dysp_rate)
+        sevs = hpu.logf2(dur_episomal, sev_infl, sev_rate)
         if n_extra > 1:
-            transform_probs = hpu.transform_prob(transform_prob, dysps)
+            transform_probs = hpu.transform_prob(transform_prob, sevs)
             is_transform = hpu.binomial_arr(transform_probs)
             transform_inds = inds[is_transform]
 
@@ -237,11 +237,11 @@ class People(hpb.BasePeople):
 
             # Create extra progression rates
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
-            extra_dysp_rate = hpu.sample(dist='normal_pos', par1=gpars['dysp_rate'], par2=gpars['dysp_rate_sd'], size=full_size)
-            extra_dur_dysp = hpu.sample(**gpars['dur_dysp'], size=full_size)
-            dysp_infl = gpars['dysp_infl']
-            extra_dysp = hpu.logf2(extra_dur_dysp, dysp_infl, extra_dysp_rate)
-            extra_transform_probs = hpu.transform_prob(transform_prob, extra_dysp[:, 1:])
+            extra_sev_rate = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=full_size)
+            extra_dur_inf = hpu.sample(**gpars['dur_inf'], size=full_size)
+            sev_infl = gpars['sev_infl']
+            extra_sev = hpu.logf2(extra_dur_inf, sev_infl, extra_sev_rate)
+            extra_transform_probs = hpu.transform_prob(transform_prob, extra_sev[:, 1:])
             extra_transform_bools = hpu.binomial_arr(extra_transform_probs)
             extra_transform_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
             extra_transform_counts = extra_transform_bools.sum(axis=1)  # Find out how many new cancer cases we have
@@ -271,24 +271,25 @@ class People(hpb.BasePeople):
                 # Sneakily add the new indices onto the existing vectors
                 inds = np.append(inds, new_inds)
                 is_transform = np.append(is_transform, np.full(len(new_inds), fill_value=True))
-                new_dysp_rate = extra_dysp_rate[:,1:][extra_transform_bools]
-                new_dur_dysp = extra_dur_dysp[:,1:][extra_transform_bools]
-                self.dysp_rate[g, new_inds] = new_dysp_rate
-                self.dur_episomal[g, new_inds] = new_dur_dysp
+                new_sev_rate = extra_sev_rate[:,1:][extra_transform_bools]
+                new_dur_episomal = extra_dur_inf[:,1:][extra_transform_bools]
+                self.sev_rate[g, new_inds] = new_sev_rate
+                self.dur_episomal[g, new_inds] = new_dur_episomal
                 self.date_infectious[g, new_inds] = self.t
                 self.date_exposed[g, new_inds] = self.t
-                dur_episomal = np.append(dur_episomal, new_dur_dysp)
+                dur_episomal = np.append(dur_episomal, new_dur_episomal)
         # First check indices, including new cancer agents
         transform_probs = np.zeros(len(inds))
         if n_extra > 1:
             transform_probs[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
         else:
-            transform_probs = hpu.transform_prob(transform_prob, hpu.logf2(self.dur_episomal[g,inds], dysp_infl, self.dysp_rate[g,inds]))
+            transform_probs = hpu.transform_prob(transform_prob, hpu.logf2(self.dur_episomal[g,inds], sev_infl, self.sev_rate[g,inds]))
 
         # Set dates of cin1, 2, 3 for all women who get infected
-        self.date_cin1[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['precin'], dysp_infl, self.dysp_rate[g, inds])/dt)
-        self.date_cin2[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin1'], dysp_infl, self.dysp_rate[g, inds])/dt)
-        self.date_cin3[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin2'], dysp_infl, self.dysp_rate[g, inds])/dt)
+        self.date_cin1[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['precin'], sev_infl, self.sev_rate[g, inds])/dt)
+        self.date_cin2[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin1'], sev_infl, self.sev_rate[g, inds])/dt)
+        self.date_cin3[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin2'], sev_infl, self.sev_rate[g, inds])/dt)
+        self.date_carcinoma[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin3'], sev_infl, self.sev_rate[g, inds])/dt)
 
         is_transform = hpu.binomial_arr(transform_probs)
         transform_inds = inds[is_transform]
@@ -306,15 +307,15 @@ class People(hpb.BasePeople):
         self.dur_cancer[g, transform_inds] = dur_cancer
         return
 
-    def update_dysp(self, genotype):
-        ''' Update dysplasia for women with infection'''
+    def update_sev(self, genotype):
+        ''' Update disease severity for women with infection'''
         gpars = self.pars['genotype_pars']
         gmap = self.pars['genotype_map']
         inds = self.true_by_genotype('infectious', genotype)
-        dysp_rate = self.dysp_rate[genotype, inds]
-        dysp_infl = gpars[gmap[genotype]]['dysp_infl']
-        dur_dysp = self.t - self.date_exposed[genotype, inds]
-        self.dysp[genotype, inds] = hpu.logf2(dur_dysp, dysp_infl, dysp_rate)
+        sev_rate = self.sev_rate[genotype, inds]
+        sev_infl = gpars[gmap[genotype]]['sev_infl']
+        dur_episomal = self.t - self.date_exposed[genotype, inds]
+        self.sev[genotype, inds] = hpu.logf2(dur_episomal, sev_infl, sev_rate)
         return
 
     def set_hiv_prognoses(self, inds, year=None):
@@ -428,9 +429,15 @@ class People(hpb.BasePeople):
         ''' Check for new progressions to cancer '''
         filter_inds = self.true('transformed')
         inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
+
+        # Set infectious states
         self.susceptible[:, inds] = False  # No longer susceptible to any genotype
         self.infectious[:, inds] = False  # No longer counted as infectious with any genotype
+        self.inactive[:,inds] = True  # If this person has any other infections from any other genotypes, set them to inactive
+
         self.date_clearance[:, inds] = np.nan  # Remove their clearance dates for all genotypes
+
+        # Deal with dysplasia states and dates
         for g in range(self.ng):
             if g != genotype:
                 self.date_cancerous[g, inds] = np.nan  # Remove their date of cancer for all genotypes but the one currently causing cancer
@@ -446,16 +453,14 @@ class People(hpb.BasePeople):
                 change_inds = hpu.true(date_cin3 > self.t)
                 self.date_cin3[g,inds[change_inds]] = np.nan
 
-        self.inactive[:,inds] = True  # If this person has any other infections from any other genotypes, set them to inactive
-
-        # Next, set the dysplasia properties
+        # Set the properties related to cell changes and disease severity markers
         self.cancerous[genotype, inds] = True
-        self.episomal[:, inds] = False  # No longer counted as dysplastic
-        self.dysp[:, inds] = np.nan
+        self.episomal[:, inds] = False  # No longer counted as episomal with any genotype
+        self.transformed[:, inds] = False  # No longer counted as transformed with any genotype
+        self.sev[:, inds] = np.nan # NOTE: setting this to nan means this people no longer counts as CIN1/2/3, since those categories are based on this value
 
         # Age results
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
-
 
         return cases_by_age, self.scale_flows(inds)
 
@@ -504,13 +509,16 @@ class People(hpb.BasePeople):
             self.inactive[genotype, latent_inds] = True
             self.date_clearance[genotype, latent_inds] = np.nan
 
-        # Whether infection is controlled on not, people have no dysplasia, so we clear all this info
+        # Whether infection is controlled on not, clear all cell changes and severity markeres
         self.episomal[genotype, inds] = False
-        self.dysp[genotype, inds] = 0
-        self.dysp_rate[genotype, inds] = np.nan
+        self.transformed[genotype, inds] = False
+        self.sev[genotype, inds] = 0
+        self.sev_rate[genotype, inds] = np.nan
         self.date_cin1[genotype, inds] = np.nan
         self.date_cin2[genotype, inds] = np.nan
         self.date_cin3[genotype, inds] = np.nan
+        self.date_carcinoma[genotype, inds] = np.nan
+
         return
 
 
@@ -548,9 +556,9 @@ class People(hpb.BasePeople):
             for g in range(self.pars['n_genotypes']):
                 gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
                 hpv_inds = hpu.itruei((self.is_female & self.episomal[g, :]), hiv_inds) # Women with HIV who have episomal HPV
-                if len(hpv_inds): # Reevaluate whether these women will develop dysplasia
-                    self.set_dysp_rates(hpv_inds, g, gpars, rel_hiv_dysp_infl=self.pars['hiv_pars']['rel_hiv_dysp_infl'])
-                    self.set_dysp_outcomes(hpv_inds, g, dt)
+                if len(hpv_inds): # Reevaluate these women's severity markers and determine whether they will develop cellular changes
+                    self.set_sev_rates(hpv_inds, g, gpars, rel_hiv_sev_infl=self.pars['hiv_pars']['rel_hiv_sev_infl'])
+                    self.set_sev_outcomes(hpv_inds, g, dt)
 
         return self.scale_flows(hiv_inds)
 
@@ -779,7 +787,7 @@ class People(hpb.BasePeople):
         # Compute disease progression for females
         if len(f_inds)>0:
             gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-            self.set_prognoses(f_inds, g, gpars, dt, rel_hiv_dysp_infl=self.pars['hiv_pars']['rel_hiv_dysp_infl'])
+            self.set_prognoses(f_inds, g, gpars, dt, rel_hiv_sev_infl=self.pars['hiv_pars']['rel_hiv_sev_infl'])
 
         # Compute infection clearance for males
         if len(m_inds)>0:
