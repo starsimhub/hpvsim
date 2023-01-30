@@ -221,6 +221,10 @@ class People(hpb.BasePeople):
 
     def set_sev_outcomes(self, inds, g, gpars, dt):
         # rel_sev_infl = self.rel_sev_infl[inds]
+        import traceback;
+        traceback.print_exc();
+        import pdb;
+        pdb.set_trace()
         sev_infl = gpars['sev_infl'] #*rel_sev_infl
         dur_episomal = self.dur_episomal[g, inds] # Array of durations of episomal infection
         sev_rate = self.sev_rate[g, inds] # Array of severity rates
@@ -319,6 +323,14 @@ class People(hpb.BasePeople):
             errormsg = 'Durations cannot be less than zero.'
             raise ValueError(errormsg)
         self.sev[genotype, inds] = hpu.logf2(dur_episomal, sev_infl, sev_rate)
+        if (np.isnan(self.sev[genotype, inds])).any():
+            import traceback;
+            traceback.print_exc();
+            import pdb;
+            pdb.set_trace()
+            errormsg = 'Invalid severity values.'
+            raise ValueError(errormsg)
+
         return
 
     def set_hiv_prognoses(self, inds, year=None):
