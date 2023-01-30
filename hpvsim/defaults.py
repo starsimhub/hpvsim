@@ -99,31 +99,37 @@ class PeopleMeta(sc.prettyobj):
 
     viral_states = [
         # States related to whether virus is present
-        # From these, we calculate the following additional derived states:
-        #       1. 'infected' (union of infectious and inactive)
         State('susceptible',    bool, True,     'n_genotypes', label='Number susceptible', color='#4d771e'),               # Allowable dysp states: no_dysp
         State('infectious',     bool, False,    'n_genotypes', label='Number infectious',  color='#c78f65'),               # Allowable dysp states: no_dysp, cin1, cin2, cin3
         State('inactive',       bool, False,    'n_genotypes', label='Number with inactive infection', color='#9e1149'),   # Allowable dysp states: no_dysp, cancer in at least one genotype
     ]
 
-    dysp_states = [
-        # States related to whether or not cervical dysplasia is present.
-        # From these and the viral_states, we derive the following additional states:
-        #       1. 'cin' (union of cin1, cin2, cin3)
-        #       2. 'precin' (intersection of infectious and no_dysp agents - agents with infection but not dysplasia)
-        #       3. 'latent' (intersection of inactive and no_dysp - agents with latent infection)
+    cell_states = [
+        # States related to the cellular changes present in the cervix.
+        State('normal',         bool, True, 'n_genotypes', label='Number with no cellular changes', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
+        State('episomal',       bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
         State('transformed',    bool, False, 'n_genotypes', label='Number with transformation', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
         State('cancerous',      bool, False, 'n_genotypes', label='Number with cancer', color='#5f5cd2'),      # Allowable viral states: inactive
     ]
 
+    sev = [
+        # Markers of disease severity.
+        State('sev', default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
+        State('sev_rate', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
+        State('sev_infl', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
+    ]
+
     derived_states = [
-        State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
-        State('episomal',   bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # intersection of no_dysp and infectious. Includes people with transient infections that will clear on their own plus those where dysplasia isn't established yet
-        State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#5f5cd2'), # intersection of no_dysp and inactive.
-        State('precin',     bool, False, 'n_genotypes', label='Number with precin', color='#9e1149'),
-        State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'),
-        State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'),
-        State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'),
+        # From the viral states, cell states, and severity markers, we derive the following additional states:
+        State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # Union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
+        State('abnormal',   bool, False, 'n_genotypes', label='Number with abnormal cells', color='#9e1149'),  # Union of episomal, transformed, and cancerous. Allowable viral states: infectious
+        State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#5f5cd2'), # Intersection of normal and inactive.
+        State('precin',     bool, False, 'n_genotypes', label='Number with precin', color='#9e1149'), # Defined as those with sev < clinical_cuttoff[0]
+        State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'), # Defined as those with clinical_cuttoff[0] < sev < clinical_cuttoff[1]
+        State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'), # Defined as those with clinical_cuttoff[1] < sev < clinical_cuttoff[2]
+        State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'), # Defined as those with clinical_cuttoff[2] < sev < clinical_cuttoff[3]
+        State('carcinoma',  bool, False, 'n_genotypes', label='Number with carcinoma in situ', color='#5f5cd2'), # Defined as those with clinical_cuttoff[3] < sev < clinical_cuttoff[4]
+        State('cin',        bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#5f5cd2'), # Union of CIN1, CIN3, CIN3, and carcinoma in situ
     ]
 
     hiv_states = [
@@ -141,10 +147,10 @@ class PeopleMeta(sc.prettyobj):
     ]
 
     # Collection of mutually exclusive + collectively exhaustive states
-    mece_states = alive_states + viral_states + dysp_states
+    mece_states = alive_states + viral_states + cell_states
 
     # Collection of states that we store as stock results
-    stock_states = viral_states + dysp_states + derived_states + intv_states + hiv_states
+    stock_states = viral_states + cell_states + derived_states + intv_states + hiv_states
 
     # Set dates
     # Convert each MECE state and derived state into a date except for susceptible, alive, and no_dysp (which are True by default)
@@ -175,19 +181,11 @@ class PeopleMeta(sc.prettyobj):
 
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
-        State('dur_infection', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present
-        State('dur_episomal', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
-        State('dur_transformed', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
-        State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
+        State('dur_infection',      default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present. Defined for males and females. For females, dur_infection = dur_episomal + dur_transformed. For males, it's taken from a separate distribution
+        State('dur_episomal',       default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
+        State('dur_transformed',    default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
+        State('dur_cancer',         default_float, np.nan, shape='n_genotypes'), # Duration of cancer
     ]
-
-    # Markers of disease severity
-    sev = [
-        State('dysp', default_float, 0, shape='n_genotypes'), # Level of transformation
-        State('dysp_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of infection to the probability of transformation
-        State('rel_dysp_infl', default_float, 1.0) # Parameter that adjusts the inflection point in the logistic function of infection growth
-    ]
-
 
     all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev
 

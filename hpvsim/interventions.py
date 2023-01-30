@@ -1355,7 +1355,7 @@ class tx(Product):
                         people[f'date_{state}'][g, eff_treat_inds] = np.nan
                         people[f'date_transformed'][g, eff_treat_inds] = np.nan
                         people[f'date_cancerous'][g, eff_treat_inds] = np.nan
-                        people[f'dysp'][g, eff_treat_inds] = np.nan
+                        people[f'sev'][g, eff_treat_inds] = np.nan
                         people['date_clearance'][g, eff_treat_inds] = people.t + 1
                         # Determine whether women also clear infection
                         # clearance_probs = np.full(len(eff_treat_inds), self.clearance, dtype=hpd.default_float)

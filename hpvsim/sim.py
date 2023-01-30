@@ -464,7 +464,7 @@ class Sim(hpb.BaseSim):
 
         stock_colors = [i for i in set(hpd.stock_colors) if i is not None]
 
-        # Type distributions by dysplasia
+        # Type distributions by cytology
         for var, name in zip(hpd.type_dist_keys, hpd.type_dist_names):
             results[var+'_genotype_dist'] = init_res(name, n_rows=ng, color=stock_colors[0])
 
@@ -857,7 +857,7 @@ class Sim(hpb.BaseSim):
 
                 # Total stocks
                 if key not in ['susceptible']:
-                    # For n_infectious, n_dysp, etc, we get the total number where this state is true for at least one genotype
+                    # For n_infectious etc, we get the total number where this state is true for at least one genotype
                     self.results[f'n_{key}'][idx] = people.count_any(key)
                 elif key == 'susceptible':
                     # For n_total_susceptible, we get the total number of infections that could theoretically happen in the population, which can be greater than the population size

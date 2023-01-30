@@ -20,14 +20,14 @@ def test_calibration():
     sim = hpv.Sim(pars)
     calib_pars = dict(
         beta=[0.05, 0.010, 0.20],
-        dur_transform_to_cancer=dict(par1=[5, 3, 10]),
+        dur_transformed=dict(par1=[5, 3, 10]),
     )
     genotype_pars = dict(
         hpv16=dict(
-            dysp_rate=[0.5, 0.2, 1.0],
+            sev_rate=[0.5, 0.2, 1.0],
         ),
         hpv18=dict(
-            dysp_rate=[0.5, 0.2, 1.0],
+            sev_rate=[0.5, 0.2, 1.0],
         )
     )
 
