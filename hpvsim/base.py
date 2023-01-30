@@ -1085,13 +1085,7 @@ class BasePeople(FlexPretty):
             if arr.ndim == 1:
                 obj_set(self, k, arr[row_inds])
             elif arr.ndim == 2:
-                try:
-                    obj_set(self, k, arr[:, row_inds])
-                except:
-                    import traceback;
-                    traceback.print_exc();
-                    import pdb;
-                    pdb.set_trace()
+                obj_set(self, k, arr[:, row_inds])
             else:
                 errormsg = 'Can only operate on 1D or 2D arrays'
                 raise TypeError(errormsg)
@@ -1390,45 +1384,45 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with whose disease severity level does not meet the threshold for detectable cell changes
         '''
-        return (self.infectious * (self.sev < self.pars['clinical_cutoffs']['precin'])).astype(bool)
+        return (self.sev < self.pars['clinical_cutoffs']['precin']).astype(bool)
 
     @property
     def cin1(self):
         '''
         Boolean array of everyone with whose disease severity level lies within the thresholds for CIN1-level cell changes
         '''
-        return (self.infectious * (self.sev >= self.pars['clinical_cutoffs']['precin']) * (
-                    self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+        return ((self.sev >= self.pars['clinical_cutoffs']['precin']) * (
+                 self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
 
     @property
     def cin2(self):
         '''
         Boolean array of everyone with whose disease severity level lies within the thresholds for CIN2-level cell changes
         '''
-        return (self.infectious * (self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
-                    self.sev < self.pars['clinical_cutoffs']['cin2'])).astype(bool)
+        return ((self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
+                 self.sev < self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     @property
     def cin3(self):
         '''
         Boolean array of everyone with whose disease severity level lies within the thresholds for CIN3-level cell changes
         '''
-        return (self.infectious * (self.sev >= self.pars['clinical_cutoffs']['cin2']) * (
-                    self.sev < self.pars['clinical_cutoffs']['cin3'])).astype(bool)
+        return ((self.sev >= self.pars['clinical_cutoffs']['cin2']) * (
+                 self.sev < self.pars['clinical_cutoffs']['cin3'])).astype(bool)
 
     @property
     def carcinoma(self):
         '''
         Boolean array of everyone with whose disease severity level lies within the thresholds for carcinoma in situ
         '''
-        return (self.infectious * (self.sev >= self.pars['clinical_cutoffs']['cin3'])).astype(bool)
+        return (self.sev >= self.pars['clinical_cutoffs']['cin3']).astype(bool)
 
     @property
     def cin(self):
         '''
         Boolean array of everyone with whose disease severity level meets the threshold for detectable cell changes
         '''
-        return (self.infectious * (self.sev >= self.pars['clinical_cutoffs']['precin'])).astype(bool)
+        return (self.sev >= self.pars['clinical_cutoffs']['precin']).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
