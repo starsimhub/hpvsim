@@ -182,7 +182,7 @@ class People(hpb.BasePeople):
             self.check_transformation(g) # check for new transformations, persistence, or clearance
             cases_by_age, cases = self.check_cancer(g)
             self.check_clearance(g)
-            self.update_sev(g)
+            self.update_severity(g)
             self.flows['cancers'] += cases  # Increment flows (summed over all genotypes)
             self.genotype_flows['cancers'][g] = cases  # Store flows by genotype
             self.age_flows['cancers'] += cases_by_age  # Increment flows by age (summed over all genotypes)
@@ -822,7 +822,7 @@ class People(hpb.BasePeople):
 
         # Compute infection clearance for males
         if len(m_inds)>0:
-            dur_infection = hpu.sample(**self.pars['dur_infection'], size=len(m_inds))
+            dur_infection = hpu.sample(**self.pars['dur_infection_male'], size=len(m_inds))
             self.date_clearance[g, m_inds] = self.date_infectious[g, m_inds] + np.ceil(dur_infection/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return self.scale_flows(inds) # For incrementing counters

@@ -341,7 +341,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_inf = dict(dist='lognormal', par1=5.57, par2=9) # Duration of infection prior to cancer
+    pars.hpv18.dur_episomal = dict(dist='lognormal', par1=5.57, par2=9) # Duration of infection prior to cancer
     pars.hpv18.sev_rate    = 0.238 # Rate of disease severity progression. Used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv18.sev_rate_sd = 0.015 # Standard deviation of the disease severity progression rate
     pars.hpv18.sev_infl    = 14 # Point of inflection for severity growth
@@ -350,7 +350,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
-    pars.hrhpv.dur_inf = dict(dist='lognormal', par1=7.05, par2=10) # Duration of infection prior to cancer
+    pars.hrhpv.dur_episomal = dict(dist='lognormal', par1=7.05, par2=10) # Duration of infection prior to cancer
     pars.hrhpv.sev_rate    = 0.35 # Rate of disease severity progression. Used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hrhpv.sev_rate_sd = 0.015 # Standard deviation of the disease severity progression rate
     pars.hrhpv.sev_infl    = 15 # Point of inflection for severity growth
