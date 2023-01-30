@@ -43,7 +43,7 @@ class Calibration(sc.prettyobj):
         calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
         extra_sim_results (list) : list of result strings to store
         fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
-        par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_uniform
+        par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_float
         n_trials     (int)  : the number of trials per worker
         n_workers    (int)  : the number of parallel workers (default: maximum
         total_trials (int)  : if n_trials is not supplied, calculate by dividing this number by n_workers)
@@ -349,7 +349,7 @@ class Calibration(sc.prettyobj):
                         errormsg = 'The requested sampler function is not found: ensure it is a valid attribute of an Optuna Trial object'
                         raise AttributeError(errormsg) from E
                 else:
-                    sampler_fn = trial.suggest_uniform
+                    sampler_fn = trial.suggest_float
                 if gname is not None:
                     sampler_key = gname + '_' + key
                 else:
@@ -357,7 +357,7 @@ class Calibration(sc.prettyobj):
                 pars[key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
 
             elif isinstance(val, dict):
-                sampler_fn = trial.suggest_uniform
+                sampler_fn = trial.suggest_float
                 pars[key] = dict()
                 for parkey, par_highlowlist in val.items():
                     if gname is not None:
