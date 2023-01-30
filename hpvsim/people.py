@@ -209,7 +209,7 @@ class People(hpb.BasePeople):
         '''
         Set disease severity rates
         '''
-        self.sev_rate[g, inds] = gpars['sev_rate']
+        self.sev_rate[g, inds] = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=len(inds))
         cell_imm = self.cell_imm[g, inds]
         self.dur_episomal[g, inds] = hpu.sample(**gpars['dur_inf'], size=len(inds))*(1-cell_imm)
         has_hiv = self.hiv[inds]
