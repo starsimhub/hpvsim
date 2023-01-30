@@ -233,7 +233,7 @@ def get_total_pop(location=None):
 
     # Extract the age distribution for the given location and year
     full_df = map_entries(df, location)[location]
-    dd = full_df.groupby("Time").sum()["PopTotal"]
+    dd = full_df.groupby("Time").sum(numeric_only=True)["PopTotal"]
     dd = dd * 1e3
     df = sc.dataframe(dd).reset_index().rename(columns={'Time':'year', 'PopTotal':'pop_size'})
     return df
