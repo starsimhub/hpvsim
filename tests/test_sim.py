@@ -228,14 +228,10 @@ def test_states():
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
                 # Severity markers
-                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.infectious[g,:] & people.is_female)))
-                if v1>0:
-                    import traceback;
-                    traceback.print_exc();
-                    import pdb;
-                    pdb.set_trace()
+                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.infectious[g,:] & people.is_female & ~removed))) == 0
+                if not v1:
                     raise ValueError('All women with active infection should have a severity marker.')
-                v2 = len(hpv.true((~np.isnan(people.sev[g,:]) & ~people.infectious[g,:] & people.is_female)))
+                v2 = len(hpv.true((~np.isnan(people.sev[g,:]) & ~people.infectious[g,:] & people.is_female & ~removed))) == 0
                 if not v2:
                     raise ValueError('No women without active infection should have severity markers.')
 
@@ -243,7 +239,6 @@ def test_states():
                     s1, s2, s3, s4,
                     d0, d1, d2, d3, d4, d5, d6,
                     c1, c2, c3, c4,
-                    v1, v2,
                     sc1, sc2, sd1
                 ])
                 if not checkall.all():
@@ -426,14 +421,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
-    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    # sim2 = test_epi()
+    sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim2 = test_epi()
     sim3 = test_states()
-    # sim4 = test_flexible_inputs()
-    # sim5 = test_result_consistency()
-    # sim6 = test_location_loading()
-    # sim7 = test_resuming()
+    sim4 = test_flexible_inputs()
+    sim5 = test_result_consistency()
+    sim6 = test_location_loading()
+    sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')

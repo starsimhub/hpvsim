@@ -181,8 +181,8 @@ class People(hpb.BasePeople):
         for g in range(ng):
             self.check_transformation(g) # check for new transformations, persistence, or clearance
             cases_by_age, cases = self.check_cancer(g)
-            self.check_clearance(g)
             self.update_severity(g)
+            self.check_clearance(g)
             self.flows['cancers'] += cases  # Increment flows (summed over all genotypes)
             self.genotype_flows['cancers'][g] = cases  # Store flows by genotype
             self.age_flows['cancers'] += cases_by_age  # Increment flows by age (summed over all genotypes)
@@ -239,6 +239,7 @@ class People(hpb.BasePeople):
         sev_infl = self.sev_infl[g, inds]
         sev_rate = self.sev_rate[g, inds]
         sevs = hpu.logf2(dur_episomal, sev_infl, sev_rate)
+        self.sev[g, inds] = sevs # Set severity
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob = gpars['transform_prob']
@@ -250,12 +251,14 @@ class People(hpb.BasePeople):
             transform_inds = inds[is_transform]
             self.scale[transform_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
 
-            # Create extra progression rates
+            # Create extra disease severity values
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
             extra_sev_rate = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=full_size)
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
-            sev_infl = gpars['sev_infl']
+            sev_infl = gpars['sev_infl'] # This assumes none of the extra agents have HIV...
             extra_sev = hpu.logf2(extra_dur_episomal, sev_infl, extra_sev_rate)
+
+            # Based on the severity values, determine transformation probabilities
             extra_transform_probs = hpu.transform_prob(transform_prob, extra_sev[:, 1:])
             extra_transform_bools = hpu.binomial_arr(extra_transform_probs)
             extra_transform_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
@@ -283,7 +286,7 @@ class People(hpb.BasePeople):
                 self.level1[new_inds] = True
                 self.scale[new_inds] = cancer_scale
 
-                # Sneakily add the new indices onto the existing vectors
+                # Add the new indices onto the existing vectors
                 inds = np.append(inds, new_inds)
                 is_transform = np.append(is_transform, np.full(len(new_inds), fill_value=True))
                 new_sev_rate = extra_sev_rate[:,1:][extra_transform_bools]
@@ -306,7 +309,7 @@ class People(hpb.BasePeople):
         self.date_cin1[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['precin'], sev_infl, self.sev_rate[g, inds])/dt)
         self.date_cin2[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin1'], sev_infl, self.sev_rate[g, inds])/dt)
         self.date_cin3[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin2'], sev_infl, self.sev_rate[g, inds])/dt)
-        self.date_carcinoma[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin3'], sev_infl, self.sev_rate[g, inds])/dt)
+        # self.date_carcinoma[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin3'], sev_infl, self.sev_rate[g, inds])/dt)
 
         # Now handle women who transform - need to adjust their length of infection and set more dates
         is_transform = hpu.binomial_arr(transform_probs)
@@ -332,15 +335,16 @@ class People(hpb.BasePeople):
         ''' Update disease severity for women with infection'''
         gpars = self.pars['genotype_pars']
         gmap = self.pars['genotype_map']
-        inds = self.true_by_genotype('infectious', genotype)
-        sev_rate = self.sev_rate[genotype, inds]
-        sev_infl = self.sev_infl[genotype, inds]
-        dur_episomal = self.t - self.date_exposed[genotype, inds]
+        fg_inds = hpu.true(self.is_female & self.infectious[genotype,:])
+        sev_rate = self.sev_rate[genotype, fg_inds]
+        sev_infl = self.sev_infl[genotype, fg_inds]
+        dur_episomal = self.t - self.date_exposed[genotype, fg_inds]
         if (dur_episomal<0).any():
             errormsg = 'Durations cannot be less than zero.'
             raise ValueError(errormsg)
-        self.sev[genotype, inds] = hpu.logf2(dur_episomal, sev_infl, sev_rate)
-        if (np.isnan(self.sev[genotype, inds])).any():
+
+        self.sev[genotype, fg_inds] = hpu.logf2(dur_episomal, sev_infl, sev_rate)
+        if (np.isnan(self.sev[genotype, fg_inds])).any():
             import traceback;
             traceback.print_exc();
             import pdb;

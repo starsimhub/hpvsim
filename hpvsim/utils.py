@@ -92,7 +92,10 @@ def invlogf2(y, x_infl, k):
     at 1. Accepts 2 parameters: growth rate and point of inflection.
     '''
     l_asymp = -1/(1+np.exp(k*x_infl))
-    return (-1/k)*np.log((1/(y - l_asymp)) - 1) + x_infl
+    if ((1/(y - l_asymp)) - 1 < 0).any():
+        raise ValueError
+    result = (-1/k)*np.log((1/(y - l_asymp)) - 1) + x_infl
+    return result
 
 
 def transform_prob(tp,dysp):
