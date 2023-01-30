@@ -345,10 +345,6 @@ class People(hpb.BasePeople):
 
         self.sev[genotype, fg_inds] = hpu.logf2(dur_episomal, sev_infl, sev_rate)
         if (np.isnan(self.sev[genotype, fg_inds])).any():
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
             errormsg = 'Invalid severity values.'
             raise ValueError(errormsg)
 
