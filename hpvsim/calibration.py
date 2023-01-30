@@ -43,7 +43,7 @@ class Calibration(sc.prettyobj):
         calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
         extra_sim_results (list) : list of result strings to store
         fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
-        par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_uniform
+        par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_float
         n_trials     (int)  : the number of trials per worker
         n_workers    (int)  : the number of parallel workers (default: maximum
         total_trials (int)  : if n_trials is not supplied, calculate by dividing this number by n_workers)
@@ -194,7 +194,18 @@ class Calibration(sc.prettyobj):
 
         # Prepare the parameters
         if calib_pars is not None:
-            new_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
+            new_pars = {}
+            for name, par in calib_pars.items():
+                if isinstance(par, dict):
+                    simpar = sim.pars[name]
+                    for parkey, parval in par.items():
+                        simpar[parkey] = parval
+                    new_pars[name] = simpar
+                else:
+                    if name in sim.pars:
+                        new_pars[name] = par
+
+            # new_pars = {k:v for k,v in calib_pars.items() if k in sim.pars}
             if len(new_pars) != len(calib_pars):
                 extra = set(calib_pars.keys()) - set(new_pars.keys())
                 errormsg = f'The following parameters are not part of the sim, nor is a custom function specified to use them: {sc.strjoin(extra)}'
@@ -271,8 +282,14 @@ class Calibration(sc.prettyobj):
             genotype_pars[gname] = this_genotype_pars
 
         # Handle regular sim parameters
-        for pname in self.calib_pars.keys():
-            calib_pars[pname] = trial_pars[pname]
+        for name, par in self.calib_pars.items():
+            if isinstance(par, dict):
+                simpar = self.sim.pars[name]
+                for parkey in par.keys():
+                    simpar[parkey] = trial_pars[f'{name}_{parkey}']
+                calib_pars[name] = simpar
+            else:
+                calib_pars[name] = trial_pars[name]
 
         # Return
         if return_full:
@@ -332,7 +349,7 @@ class Calibration(sc.prettyobj):
                         errormsg = 'The requested sampler function is not found: ensure it is a valid attribute of an Optuna Trial object'
                         raise AttributeError(errormsg) from E
                 else:
-                    sampler_fn = trial.suggest_uniform
+                    sampler_fn = trial.suggest_float
                 if gname is not None:
                     sampler_key = gname + '_' + key
                 else:
@@ -340,7 +357,7 @@ class Calibration(sc.prettyobj):
                 pars[key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
 
             elif isinstance(val, dict):
-                sampler_fn = trial.suggest_uniform
+                sampler_fn = trial.suggest_float
                 pars[key] = dict()
                 for parkey, par_highlowlist in val.items():
                     if gname is not None:

@@ -8,6 +8,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 0.4.16 (2023-01-26)
+---------------------------
+- Change to natural history, including computation of transformation based upon time with dysplasia
+- Addition of cellular immunity to moderate progression in a secondary infection
+- Default parameter changes and some small typo/bug fixes
+- *GitHub info*: PRs `511 <https://github.com/amath-idm/hpvsim/pull/513>`__
+
 
 Version 0.4.15 (2023-01-13)
 ---------------------------

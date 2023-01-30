@@ -16,26 +16,18 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(n_agents=n_agents, start=1980, end=2020, dt=0.5, location='south africa',
-                init_hpv_dist=dict(
-                    hpv16=0.9,
-                    hpv18=0.1
-                ))
-    sim = hpv.Sim(pars, genotypes=[16,18])
+    pars = dict(n_agents=n_agents, start=1980, end=2020, dt=0.25, location='south africa')
+    sim = hpv.Sim(pars)
     calib_pars = dict(
         beta=[0.05, 0.010, 0.20],
-        hpv_control_prob=[.9, 0.1, 1],
+        dur_transformed=dict(par1=[5, 3, 10]),
     )
     genotype_pars = dict(
         hpv16=dict(
-            dysp_rate=[0.5, 0.2, 1.0],
-            prog_rate=[0.5, 0.2, 1.0],
-            dur_precin = dict(par1=[1.0, 0.5, 2.5])
+            sev_rate=[0.5, 0.2, 1.0],
         ),
         hpv18=dict(
-            dysp_rate=[0.5, 0.2, 1.0],
-            prog_rate=[0.5, 0.2, 1.0],
-            dur_precin=dict(par1=[1.0, 0.5, 2.5])
+            sev_rate=[0.5, 0.2, 1.0],
         )
     )
 
@@ -45,8 +37,6 @@ def test_calibration():
                             datafiles=[
                                 'test_data/south_africa_hpv_data.csv',
                                 'test_data/south_africa_cancer_data_2020.csv',
-                                'test_data/south_africa_type_distribution_cancer.csv',
-                                'test_data/south_africa_type_distribution_high_grade_lesion.csv'
                             ],
                             extra_sim_results=extra_sim_results,
                             total_trials=3, n_workers=1)

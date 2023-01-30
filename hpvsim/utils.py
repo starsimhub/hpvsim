@@ -80,7 +80,7 @@ def invlogf1(y, k):
 def logf2(x, x_infl, k):
     '''
     Logistic function, constrained to pass through 0,0 and with upper asymptote
-    at 1. Accepts 2 parameters: growth rate and point of inflexion.
+    at 1. Accepts 2 parameters: growth rate and point of inflection.
     '''
     l_asymp = -1/(1+np.exp(k*x_infl))
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
@@ -89,10 +89,29 @@ def logf2(x, x_infl, k):
 def invlogf2(y, x_infl, k):
     '''
     Inverse logistic function, constrained to pass through 0,0 and with upper asymptote
-    at 1. Accepts 2 parameters: growth rate and point of inflexion.
+    at 1. Accepts 2 parameters: growth rate and point of inflection.
     '''
     l_asymp = -1/(1+np.exp(k*x_infl))
-    return (-1/k)*np.log((1/(y - l_asymp)) - 1) + x_infl
+    if ((1/(y - l_asymp)) - 1 < 0).any():
+        raise ValueError
+    result = (-1/k)*np.log((1/(y - l_asymp)) - 1) + x_infl
+    return result
+
+
+def transform_prob(tp,dysp):
+    '''
+    Returns transformation probability given % of dysplastic cells
+    '''
+
+    return 1-np.power(1-tp, dysp*100)
+
+
+def clearance_prob(init_clearance_prob, clearance_decay, dysp):
+    '''
+    Returns clearance probability given % of transformed cells
+    '''
+
+    return init_clearance_prob*(1-(1 - np.power(1 - clearance_decay, dysp * 100)))
 
 
 #%% Sampling and seed methods

@@ -147,7 +147,7 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
         else:
             raise ValueError(f'Plot type of {which} not understood.')
 
-    analyzer_keys = [a.label for a in sim.get_analyzers()] # Defaults = whatever analyzer.plot() gives
+    # analyzer_keys = [a.label for a in sim.get_analyzers()] # Defaults = whatever analyzer.plot() gives
     n_extra_plots = 0 # Keep track of the number of extra plots from analyzers
 
     # If to_plot is a single valid key, turn it into a list
@@ -505,8 +505,9 @@ def plot_age_dist(sim, ax, reskey, date, args):
     '''
     idx = sc.findinds(sim.res_yearvec, date)[0]
     res = sim.results[reskey]
+    label = res.name.replace('by age', '')
     x = sim['age_bins'][:-1]
-    ax.plot(x, res.values[:,idx], color=res.color, **args.plot, label=res.name)
+    ax.plot(x, res.values[:,idx], color=res.color, **args.plot, label=label)
     ax.set_xlabel('Age')
     ax.set_ylabel('Value')
     return ax

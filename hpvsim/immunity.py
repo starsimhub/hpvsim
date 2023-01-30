@@ -96,17 +96,20 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
         is_seroconvert = hpu.binomial_arr(seroconvert_probs)
 
         # Extract parameters and indices
-        has_imm = people.imm[imm_source, inds] > 0
+        has_imm = people.nab_imm[imm_source, inds] > 0
         no_prior_imm_inds = inds[~has_imm]
         prior_imm_inds = inds[has_imm]
 
         if len(prior_imm_inds):
-            boost = genotype_pars['imm_boost']
-            people.peak_imm[imm_source, prior_imm_inds] *= is_seroconvert[has_imm] * boost
+            new_peak = hpu.sample(**imm_pars['imm_init'], size=len(prior_imm_inds))
+            people.peak_imm[imm_source, prior_imm_inds] = np.maximum(new_peak, people.peak_imm[imm_source, prior_imm_inds])
+
+            new_cell_imm = hpu.sample(**imm_pars['cell_imm_init'], size=len(prior_imm_inds))
+            people.cell_imm[imm_source, prior_imm_inds] = np.maximum(new_cell_imm, people.cell_imm[imm_source, prior_imm_inds])
 
         if len(no_prior_imm_inds):
             people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
-
+            people.cell_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['cell_imm_init'], size=len(no_prior_imm_inds))
     else:
         # Vaccination by dose
         dose1_inds = inds[people.doses[inds]==1] # First doses
@@ -139,13 +142,13 @@ def check_immunity(people):
     people who've had 16 have 30% protection against getting 18.
     Now suppose we have 3 people, whose immunity levels are
 
-        people.imm = np.array([[0.9, 0.0, 0.0],
+        people.nab_imm = np.array([[0.9, 0.0, 0.0],
                                [0.0, 0.7, 0.0]])
 
     This indicates that person 1 has a prior HPV16 infection, person 2 has a prior HPV18
     infection, and person 3 has no history of infection.
 
-    In this function, we take the dot product of pars['immunity'] and people.imm to get:
+    In this function, we take the dot product of pars['immunity'] and people.nab_imm to get:
 
         people.sus_imm = np.array([[0.9 , 0.35, 0.  ],
                                    [0.27, 0.7 , 0.  ]])
@@ -155,7 +158,7 @@ def check_immunity(people):
 
     '''
     immunity = people.pars['immunity'] # cross-immunity/own-immunity scalars to be applied to immunity level
-    sus_imm = np.dot(immunity,people.imm) # Dot product gives immunity to all genotypes
+    sus_imm = np.dot(immunity,people.nab_imm) # Dot product gives immunity to all genotypes
     people.sus_imm[:] = np.minimum(sus_imm, np.ones_like(sus_imm)) # Don't let this be above 1
     return
 

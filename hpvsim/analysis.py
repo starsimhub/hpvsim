@@ -17,7 +17,7 @@ from .settings import options as hpo # For setting global options
 
 
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection',
-           'dwelltime', 'cancer_detection', 'analyzer_map']
+           'cancer_detection', 'daly_computation', 'analyzer_map']
 
 
 class Analyzer(sc.prettyobj):
@@ -575,7 +575,7 @@ class age_results(Analyzer):
         elif sc.checktype(self.result_args, dict): # Ensure it's an object dict
             self.result_args = sc.objdict(self.result_args)
         else: # Raise an error
-            errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(result_args)}.'
+            errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(self.result_args)}.'
             raise TypeError(errormsg)
 
         # Handle dt - if we're storing annual results we'll need to aggregate them over several consecutive timesteps
@@ -1043,7 +1043,7 @@ class age_causal_infection(Analyzer):
         self.age_causal = []
         self.age_cancer = []
         self.dwelltime = dict()
-        for state in ['hpv', 'cin1', 'cin2', 'cin3', 'total']:
+        for state in ['precin', 'cin1', 'cin2', 'cin3', 'total']:
             self.dwelltime[state] = []
 
     def apply(self, sim):
@@ -1062,7 +1062,7 @@ class age_causal_infection(Analyzer):
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()
-                self.dwelltime['hpv'] += hpv_time.tolist()
+                self.dwelltime['precin'] += hpv_time.tolist()
                 self.dwelltime['cin1'] += cin1_time.tolist()
                 self.dwelltime['cin2'] += cin2_time.tolist()
                 self.dwelltime['cin3'] += cin3_time.tolist()
@@ -1072,88 +1072,6 @@ class age_causal_infection(Analyzer):
     def finalize(self, sim=None):
         ''' Convert things to arrays '''
 
-
-class dwelltime(Analyzer):
-    '''
-    Determine the distribution of time spend in health states.
-    '''
-
-    def __init__(self, start_year=None, **kwargs):
-        super().__init__(**kwargs)
-        self.start_year = start_year
-        self.years = None
-
-    def initialize(self, sim):
-        super().initialize(sim)
-        self.years = sim.yearvec
-        if self.start_year is None:
-            self.start_year = sim['start']
-        self.ng = sim['n_genotypes']
-        self.genotype_map = sim['genotype_map']
-        self.dwelltime = dict()
-        for _, genotype in self.genotype_map.items():
-            self.dwelltime[genotype] = dict()
-            for state in ['hpv', 'cin1', 'cin2', 'cin3', 'total']:
-                self.dwelltime[genotype][state] = []
-
-    def apply(self, sim):
-        if sim.yearvec[sim.t] >= self.start_year:
-            cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
-            if len(cancer_inds):
-                for gtype in np.unique(cancer_genotypes):
-                    cancer_inds_gtype = cancer_inds[hpu.true(cancer_genotypes == gtype)]
-                    date_exposed = sim.people.date_exposed[gtype, cancer_inds_gtype]
-                    date_cin1 = sim.people.date_cin1[gtype, cancer_inds_gtype]
-                    date_cin2 = sim.people.date_cin2[gtype, cancer_inds_gtype]
-                    date_cin3 = sim.people.date_cin3[gtype, cancer_inds_gtype]
-                    hpv_time = (date_cin1 - date_exposed) * sim['dt']
-                    cin1_time = (date_cin2 - date_cin1) * sim['dt']
-                    cin2_time = (date_cin3 - date_cin2) * sim['dt']
-                    cin3_time = (sim.t - date_cin3) * sim['dt']
-                    total_time = (sim.t - date_exposed) * sim['dt']
-                    self.dwelltime[self.genotype_map[gtype]]['hpv'] += hpv_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['cin1'] += cin1_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['cin2'] += cin2_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['cin3'] += cin3_time.tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['total'] += total_time.tolist()
-            genotypes, inds = (sim.people.date_clearance == sim.t).nonzero()
-            if len(inds):
-                for gtype in np.unique(genotypes):
-                    inds_gtype = inds[hpu.true(genotypes == gtype)]
-                    date_exposed = sim.people.date_exposed[gtype, inds_gtype]
-                    cin1_inds = hpu.true(~np.isnan(sim.people.date_cin1[gtype, inds_gtype]))
-                    cin2_inds = hpu.true(~np.isnan(sim.people.date_cin2[gtype, inds_gtype]))
-                    cin3_inds = hpu.true(~np.isnan(sim.people.date_cin3[gtype, inds_gtype]))
-                    hpv_time = ((sim.people.date_cin1[gtype, inds_gtype[cin1_inds]] - date_exposed[
-                        cin1_inds]) * sim['dt']).tolist() + \
-                               ((sim.people.date_cin1[gtype, inds_gtype[cin2_inds]] - date_exposed[
-                                   cin2_inds]) * sim['dt']).tolist() + \
-                               ((sim.people.date_cin1[gtype, inds_gtype[cin3_inds]] - date_exposed[
-                                   cin3_inds]) * sim['dt']).tolist()
-
-                    cin1_time = ((sim.t - sim.people.date_cin1[gtype, inds_gtype[cin1_inds]]) * sim[
-                        'dt']).tolist() + \
-                                ((sim.people.date_cin2[gtype, inds_gtype[cin2_inds]] - sim.people.date_cin1[
-                                    gtype, inds_gtype[cin2_inds]]) * sim['dt']).tolist() + \
-                                ((sim.people.date_cin2[gtype, inds_gtype[cin3_inds]] - date_exposed[
-                                    cin3_inds]) * sim['dt']).tolist()
-
-                    cin2_time = ((sim.t - sim.people.date_cin2[gtype, inds_gtype[cin2_inds]]) * sim[
-                        'dt']).tolist() + \
-                                ((sim.people.date_cin3[gtype, inds_gtype[cin3_inds]] - sim.people.date_cin2[
-                                    gtype, inds_gtype[cin3_inds]]) * sim['dt']).tolist()
-                    cin3_time = ((sim.t - sim.people.date_cin3[gtype, inds_gtype[cin3_inds]]) * sim[
-                        'dt']).tolist()
-                    total_time = ((sim.t - date_exposed) * sim['dt']).tolist()
-                    self.dwelltime[self.genotype_map[gtype]]['hpv'] += hpv_time
-                    self.dwelltime[self.genotype_map[gtype]]['cin1'] += cin1_time
-                    self.dwelltime[self.genotype_map[gtype]]['cin2'] += cin2_time
-                    self.dwelltime[self.genotype_map[gtype]]['cin3'] += cin3_time
-                    self.dwelltime[self.genotype_map[gtype]]['total'] += total_time
-        return
-
-    def finalize(self, sim=None):
-        ''' Convert things to arrays '''
 
 class cancer_detection(Analyzer):
     '''
@@ -1203,6 +1121,54 @@ class cancer_detection(Analyzer):
 
         return new_detections, new_treatments
 
+class daly_computation(Analyzer):
+    '''
+    Analyzer for computing DALYs.
+
+    Produces a dataframe by year storing:
+
+        - Cases/deaths: number of new cancer cases and cancer deaths
+        - Average age of new cases, average age of deaths, average age of noncancer death
+    '''
+
+    def __init__(self, start, **kwargs):
+        super().__init__(**kwargs)
+        self.start = start
+        return
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        columns = ['new_cancers', 'new_cancer_deaths', 'new_other_deaths',
+                   'av_age_cancers', 'av_age_cancer_deaths', 'av_age_other_deaths']
+        self.si = sc.findinds(sim.res_yearvec, self.start)[0]
+        self.df = pd.DataFrame(0.0, index=pd.Index(sim.res_yearvec[self.si:], name='year'), columns=columns)
+        return
+
+    def apply(self, sim):
+        if sim.yearvec[sim.t] >= self.start:
+            ppl = sim.people
+
+            def av_age(arr):
+                if len(hpu.true(arr)):
+                    return np.mean(sim.people.age[hpu.true(arr)])
+                else:
+                    return np.nan
+
+            li = np.floor(sim.yearvec[sim.t])
+            lt = (sim.t - 1)
+
+            self.df.loc[li].av_age_other_deaths = av_age(ppl.date_dead_other == lt)
+            self.df.loc[li].av_age_cancer_deaths = av_age(ppl.date_dead_cancer == lt)
+            self.df.loc[li].av_age_cancers = av_age(ppl.date_cancerous == lt)
+        return
+
+    def finalize(self, sim):
+        # Add in results that are already generated (NB, these have all been scaled already)
+        self.df['new_cancers'] = sim.results['cancers'][self.si:]
+        self.df['new_cancer_deaths'] = sim.results['cancer_deaths'][self.si:]
+        self.df['new_other_deaths'] = sim.results['other_deaths'][self.si:]
+        return
+
 
 #%% Additional utilities
 analyzer_map = {
@@ -1211,5 +1177,6 @@ analyzer_map = {
     'age_results': age_results,
     'age_causal_infection': age_causal_infection,
     'cancer_detection': cancer_detection,
+    'daly_computation': daly_computation,
 }
 

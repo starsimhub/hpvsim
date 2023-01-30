@@ -18,7 +18,7 @@ from .version import __version__
 __all__ = ['ParsObj', 'Result', 'BaseSim', 'BasePeople', 'Person', 'FlexDict', 'Contacts', 'Layer']
 
 # Default object getter/setter
-obj_set = object.__setattr__ 
+obj_set = object.__setattr__
 base_key = 'uid' # Define the key used by default for getting length, etc.
 
 #%% Define simulation classes
@@ -421,7 +421,7 @@ class BaseSim(ParsObj):
         elif which in ['genotype']:
             keys = [k for k,res in self.results.items() if 'by_genotype' in k and isinstance(res, Result)]
         elif which in ['type_dist']:
-            keys = [k for k, res in self.results.items() if 'genotype_dist' in k and isinstance(res, Result) and k.replace('_genotype_dist', '') in hpd.cyto_states]
+            keys = [k for k, res in self.results.items() if 'genotype_dist' in k and isinstance(res, Result)]
         elif which =='all':
             keys = []
             for subchoice in subchoices: # Recurse over options
@@ -1354,7 +1354,8 @@ class BasePeople(FlexPretty):
     def n_alive_level0(self):
         ''' Number of people alive '''
         return len(self.alive_level0_inds)
-    
+
+    # Derived states
     @property
     def infected(self):
         '''
@@ -1363,44 +1364,65 @@ class BasePeople(FlexPretty):
         '''
         return (self.infectious + self.inactive).astype(bool)
 
-
     @property
-    def precin(self):
+    def abnormal(self):
         '''
-        Boolean array of everyone infectious with no dysplasia. Includes people
-        with transient infections that will clear on their own plus those where
-        dysplasia isn't established yet
+        Boolean array of everyone with abnormal cells. Union of episomal, transformed, and cancerous
         '''
-        return (self.infectious * ~self.has_dysp).astype(bool)
+        return (self.episomal + self.transformed + self.cancerous).astype(bool)
 
     @property
     def latent(self):
         '''
         Boolean array of everyone with latent infection. By definition, these
-        people have no dysplasia, no cancer, and inactive infection status.
+        people have inactive infection and no cancer.
         '''
-        return (self.inactive * ~self.has_dysp * ~self.cancerous.any(axis=0)).astype(bool)
+        return (self.inactive * ~self.cancerous.any(axis=0)).astype(bool)
+
+    @property
+    def precin(self):
+        '''
+        Boolean array of everyone with whose disease severity level does not meet the threshold for detectable cell changes
+        '''
+        return (self.sev < self.pars['clinical_cutoffs']['precin']).astype(bool)
 
     @property
     def cin1(self):
         '''
-        Boolean array of everyone with dysplasia <33%.
+        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN1-level cell changes
         '''
-        return (self.infectious * self.has_dysp * (self.dysp<self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+        return ((self.sev >= self.pars['clinical_cutoffs']['precin']) * (
+                 self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
 
     @property
     def cin2(self):
         '''
-        Boolean array of everyone with dysplasia 33-67%.
+        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN2-level cell changes
         '''
-        return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin1']) * (self.dysp<self.pars['clinical_cutoffs']['cin2'])).astype(bool)
+        return ((self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
+                 self.sev < self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     @property
     def cin3(self):
         '''
-        Boolean array of everyone with dysplasia >67%.
+        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN3-level cell changes
         '''
-        return (self.infectious * self.has_dysp * (self.dysp>=self.pars['clinical_cutoffs']['cin2'])).astype(bool)
+        return ((self.sev >= self.pars['clinical_cutoffs']['cin2']) * (
+                 self.sev < self.pars['clinical_cutoffs']['cin3'])).astype(bool)
+
+    @property
+    def carcinoma(self):
+        '''
+        Boolean array of everyone with whose disease severity level lies within the thresholds for carcinoma in situ
+        '''
+        return (self.sev >= self.pars['clinical_cutoffs']['cin3']).astype(bool)
+
+    @property
+    def cin(self):
+        '''
+        Boolean array of everyone with whose disease severity level meets the threshold for detectable cell changes
+        '''
+        return (self.sev >= self.pars['clinical_cutoffs']['precin']).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
