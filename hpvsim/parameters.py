@@ -80,11 +80,11 @@ def make_pars(**kwargs):
 
     # Parameters for disease progression
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
-    pars['hpv_reactivation']    = 0.025 # Placeholder
+    pars['hpv_reactivation']    = 0.025 # Placeholder; unused unless hpv_control_prob>0
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
-    pars['dur_transform_to_cancer'] = dict(dist='normal_pos', par1=5.77, par2=5)  # Duration of untreated invasive cerival cancer before death (years)
-    pars['dur_infection'] = dict(dist='lognormal', par1=1, par2=1)
-    pars['clinical_cutoffs']    = dict(precin=0.10, cin1=0.4, cin2=0.7, cin3=0.99)
+    pars['dur_transformed']     = dict(dist='normal_pos', par1=5.77, par2=5)  # Duration of transformed infection prior to onset of invasive cervical cancer (years)
+    pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
+    pars['clinical_cutoffs']    = dict(precin=0.10, cin1=0.4, cin2=0.7, cin3=0.99) # Parameters used to map disease severity onto cytological grades
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
@@ -332,7 +332,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars = sc.objdict()
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_inf = dict(dist='lognormal', par1=6.619, par2=9) # Duration of infection prior to cancer
+    pars.hpv16.dur_episomal = dict(dist='lognormal', par1=6.619, par2=9) # Duration of episomal infection prior to cancer
     pars.hpv16.sev_rate    = 0.537 # Rate of disease severity progression. Used as the growth rate within a logistic function that maps durations to progression probabilities
     pars.hpv16.sev_rate_sd = 0.015 # Standard deviation of the disease severity progression rate
     pars.hpv16.sev_infl    = 13 # Point of inflection for severity growth

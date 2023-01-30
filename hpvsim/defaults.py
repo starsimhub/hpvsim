@@ -115,7 +115,8 @@ class PeopleMeta(sc.prettyobj):
     sev = [
         # Markers of disease severity.
         State('sev', default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
-        State('sev_rate', default_float, np.nan, shape='n_genotypes'), # Parameter in a logistic function that maps duration of infection to severity
+        State('sev_rate', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
+        State('sev_infl', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
     ]
 
     derived_states = [
@@ -180,10 +181,10 @@ class PeopleMeta(sc.prettyobj):
 
     # Duration of different states: these are floats per person -- used in people.py
     durs = [
-        State('dur_infection', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present
-        State('dur_episomal', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
-        State('dur_transformed', default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
-        State('dur_cancer', default_float, np.nan, shape='n_genotypes'),  # Duration of cancer
+        State('dur_infection',      default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present. Defined for males and females. For females, dur_infection = dur_episomal + dur_transformed. For males, it's taken from a separate distribution
+        State('dur_episomal',       default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
+        State('dur_transformed',    default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
+        State('dur_cancer',         default_float, np.nan, shape='n_genotypes'), # Duration of cancer
     ]
 
     all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev
