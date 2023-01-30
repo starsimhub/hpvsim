@@ -1375,9 +1375,9 @@ class BasePeople(FlexPretty):
     def latent(self):
         '''
         Boolean array of everyone with latent infection. By definition, these
-        people have no detectablecell changes, no cancer, and inactive infection status.
+        people have inactive infection and no cancer.
         '''
-        return (self.inactive * ~self.transformed * ~self.cancerous.any(axis=0)).astype(bool)
+        return (self.inactive * ~self.cancerous.any(axis=0)).astype(bool)
 
     @property
     def precin(self):

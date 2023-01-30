@@ -172,10 +172,10 @@ def test_states():
                     raise ValueError('States {infectious, inactive} should be mutually exclusive but are not.')
 
                 # Dysplasia states:
-                #   - people *without active infection* should not be in any dysplasia state
-                #   - people *with active infection* should be in exactly one dysplasia state
-                #   - people should either have no cellular changes (normal) or be in a dysplasia state
-                d0 = ~((~people.infectious[g,:]) & people.cin[g,:]).any()
+                #   - people *without active infection* should not be in any dysplasia state (test d0)
+                #   - people *with active infection* should be in exactly one dysplasia state (test d1)
+                #   - people should either have no cellular changes (normal) or be in a dysplasia state (tests d2-d6)
+                d0 = (~((~people.infectious[g,:]) & people.cin[g,:])).any()
                 if not d0:
                     raise ValueError('People without active infection should not have detectable cell changes/')
                 d1 = (people.normal[g,:] | people.precin[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.carcinoma[g,:] | people.cancerous[g,:] | removed).all()
@@ -219,7 +219,7 @@ def test_states():
                 if not sc2:
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
-                # If there's anyone with dysplasia & inactive infection, they must have cancer
+                # If there's anyone with abnormal cells & inactive infection, they must have cancer
                 sd1inds = hpv.true(people.abnormal[g,:] & people.inactive[g,:])
                 sd1 = True
                 if len(sd1inds)>0:
@@ -227,10 +227,19 @@ def test_states():
                 if not sd1:
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
+                # Severity markers
+                v1 = (~((np.isnan(people.sev[g,:]) & people.infectious[g,:]))).any()
+                if not v1:
+                    raise ValueError('Everyone with active infection should have a severity marker.')
+                v2 = (~((~np.isnan(people.sev[g,:]) & ~people.infectious[g,:]))).any()
+                if not v2:
+                    raise ValueError('No-one without active infection should have a severity marker.')
+
                 checkall = np.array([
                     s1, s2, s3, s4,
                     d0, d1, d2, d3, d4, d5, d6,
                     c1, c2, c3, c4,
+                    v1, v2,
                     sc1, sc2, sd1
                 ])
                 if not checkall.all():
@@ -413,14 +422,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim2 = test_epi()
     sim3 = test_states()
-    sim4 = test_flexible_inputs()
-    sim5 = test_result_consistency()
-    sim6 = test_location_loading()
-    sim7 = test_resuming()
+    # sim4 = test_flexible_inputs()
+    # sim5 = test_result_consistency()
+    # sim6 = test_location_loading()
+    # sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')

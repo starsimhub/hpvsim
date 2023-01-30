@@ -512,7 +512,7 @@ class People(hpb.BasePeople):
         # Whether infection is controlled on not, clear all cell changes and severity markeres
         self.episomal[genotype, inds] = False
         self.transformed[genotype, inds] = False
-        self.sev[genotype, inds] = 0
+        self.sev[genotype, inds] = np.nan
         self.sev_rate[genotype, inds] = np.nan
         self.date_cin1[genotype, inds] = np.nan
         self.date_cin2[genotype, inds] = np.nan
