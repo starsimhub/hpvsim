@@ -23,20 +23,18 @@ The easiest way to install is simply via pip: ``pip install hpvsim``. Alternativ
 Usage and documentation
 -----------------------
 
-Documentation is available at https://docs.idmod.org/projects/hpvsim/en/latest/. Additional usage examples are available in the ``tests`` folder.
+Documentation is available at https://docs.hpvsim.org. Additional usage examples are available in the ``tests`` folder.
 
 
 Contributing
 ------------
 
-**Style guide**
-
-If you wish to contribute, please follow the Starsim style guide at: https://github.com/amath-idm/styleguide
+If you wish to contribute, please follow the Starsim style guide at: https://github.com/amath-idm/styleguide. See the code of conduct readme for more information.
 
 
 Disclaimer
 ----------
 
-The code in this repository was developed by IDM, the Burnet Institute, and other collaborators to support our joint research on HPV. We've made it publicly available under the MIT License to provide others with a better understanding of our research and an opportunity to build upon it for their own work. Note that HPVsim depends on a number of user-installed Python packages that can be installed automatically via ``pip install``. We make no representations that the code works as intended or that we will provide support, address issues that are found, or accept pull requests. You are welcome to create your own fork and modify the code to suit your own modeling needs as contemplated under the MIT License. See the code of conduct readme for more information.
+The code in this repository was developed by IDM, the Burnet Institute, and other collaborators to support our joint research on HPV. We've made it publicly available under the MIT License to provide others with a better understanding of our research and an opportunity to build upon it for their own work. Note that HPVsim depends on a number of user-installed Python packages that can be installed automatically via ``pip install``. We make no representations that the code works as intended or that we will provide support, address issues that are found, or accept pull requests. You are welcome to create your own fork and modify the code to suit your own modeling needs as contemplated under the MIT License. 
 
 
