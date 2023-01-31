@@ -9,3 +9,4 @@
     tutorials/tut_people.ipynb
     tutorials/tut_interventions.ipynb
     tutorials/tut_analyzers.ipynb
+    tutorials/tut_calibration.ipynb

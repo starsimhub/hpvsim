@@ -8,24 +8,31 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 0.4.17 (2023-01-31)
+---------------------------
+- Adds a tutorial on calibration
+- Small changes to parameter values
+- *GitHub info*: PR `520 <https://github.com/amath-idm/hpvsim/pull/520>`__
+
+
 Version 0.4.16 (2023-01-30)
 ---------------------------
 - Change to natural history, including computation of transformation based upon time with dysplasia
 - Addition of cellular immunity to moderate progression in a secondary infection
 - Default parameter changes and some small typo/bug fixes
-- *GitHub info*: PRs `513 <https://github.com/amath-idm/hpvsim/pull/513>`__
+- *GitHub info*: PR `513 <https://github.com/amath-idm/hpvsim/pull/513>`__
 
 
 Version 0.4.15 (2023-01-13)
 ---------------------------
 - Fixed bug in intervention and analyzer initialization
-- *GitHub info*: PRs `511 <https://github.com/amath-idm/hpvsim/pull/511>`__
+- *GitHub info*: PR `511 <https://github.com/amath-idm/hpvsim/pull/511>`__
 
 
 Version 0.4.14 (2023-01-11)
 ---------------------------
 - Add Sweep class
-- *GitHub info*: PRs `431 <https://github.com/amath-idm/hpvsim/pull/431>`__
+- *GitHub info*: PR `431 <https://github.com/amath-idm/hpvsim/pull/431>`__
 
 
 Version 0.4.13 (2023-01-09)
