@@ -12,7 +12,6 @@ from . import base as hpb
 from . import population as hppop
 from . import plotting as hpplt
 from . import immunity as hpimm
-from . import hiv as hphiv
 
 
 __all__ = ['People']
