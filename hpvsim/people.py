@@ -220,7 +220,7 @@ class People(hpb.BasePeople):
         Set disease severity properties
         '''
         self.sev_rate[g, inds] = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=len(inds)) # Sample
-        self.sev_infl[g, inds] = gpars['sev_infl'] * self.rel_sev_infl[g,inds] # Store points of inflection
+        self.sev_infl[g, inds] = gpars['sev_infl'] * self.rel_sev_infl[inds] # Store points of inflection
 
         return
 

@@ -71,7 +71,7 @@ def apply_hiv_rates(people, year=None):
             gpars = people.pars['genotype_pars'][people.pars['genotype_map'][g]]
             hpv_inds = hpu.itruei((people.is_female & people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
             if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
-                people.set_sev_rates(hpv_inds, g, gpars)
-                people.set_sev_outcomes(hpv_inds, g, dt)
+                people.set_severity_pars(hpv_inds, g, gpars)
+                people.set_severity(hpv_inds, g, gpars, dt)
 
     return people.scale_flows(hiv_inds)
