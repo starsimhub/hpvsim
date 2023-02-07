@@ -157,7 +157,7 @@ class People(hpb.BasePeople):
 
         # Check for HIV acquisitions
         if self.pars['model_hiv']:
-            self.flows['hiv_infections'] = hphiv.apply_hiv_rates(self, year=year)
+            self.flows['hiv_infections'] = self.hiv_pars.apply_hiv_rates(self, year=year)
 
         # Perform updates that are not genotype-specific
         update_freq = max(1, int(self.pars['dt_demog'] / self.pars['dt'])) # Ensure it's an integer not smaller than 1

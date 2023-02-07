@@ -583,7 +583,8 @@ class Sim(hpb.BaseSim):
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
         
         # Finish initialization
-        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_data) # Fully initialize the people
+        self.hiv = hphiv.HIVPars(self.hiv_data)
+        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])

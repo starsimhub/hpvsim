@@ -8,73 +8,125 @@ import pandas as pd
 from collections.abc import Iterable
 from . import utils as hpu
 from . import defaults as hpd
+from . import base as hpb
 from .data import loaders as hpdata
 
 
-# %% HIV methods
 
-def set_hiv_prognoses(people, inds, year=None):
-    ''' Set HIV outcomes (for now only ART) '''
-
-    art_cov = people.hiv_pars.art_adherence  # Shorten
-
-    # Extract index of current year
-    all_years = np.array(list(art_cov.keys()))
-    year_ind = sc.findnearest(all_years, year)
-    nearest_year = all_years[year_ind]
-
-    # Figure out which age bin people belong to
-    age_bins = art_cov[nearest_year][0, :]
-    age_inds = np.digitize(people.age[inds], age_bins)
-
-    # Apply ART coverage by age to people
-    art_covs = art_cov[nearest_year][1, :]
-    art_adherence = art_covs[age_inds]
-    people.art_adherence[inds] = art_adherence
-    people.rel_sev_infl[inds] = (1-art_adherence)*people.pars['hiv_pars']['rel_hiv_sev_infl']
-    people.rel_sus[inds] = (1-art_adherence)*people.pars['hiv_pars']['rel_sus']
-
-    return
-
-def apply_hiv_rates(people, year=None):
+class HIVPars(hpb.FlexPretty):
     '''
-    Apply HIV infection rates to population
-    '''
-    hiv_pars = people.hiv_pars.infection_rates
-    all_years = np.array(list(hiv_pars.keys()))
-    year_ind = sc.findnearest(all_years, year)
-    nearest_year = all_years[year_ind]
-    hiv_year = hiv_pars[nearest_year]
-    dt = people.pars['dt']
+        A class based around performing operations on a self.pars dict.
+        '''
 
-    hiv_probs = np.zeros(len(people), dtype=hpd.default_float)
-    for sk in ['f', 'm']:
-        hiv_year_sex = hiv_year[sk]
-        age_bins = hiv_year_sex[:, 0]
-        hiv_rates = hiv_year_sex[:, 1] * dt
-        mf_inds = people.is_female if sk == 'f' else people.is_male
-        mf_inds *= people.alive  # Only include people alive
-        age_inds = np.digitize(people.age[mf_inds], age_bins)
-        hiv_probs[mf_inds] = hiv_rates[age_inds]
-    hiv_probs[people.hiv] = 0  # not at risk if already infected
+    def __init__(self, pars):
+        self.update_pars(pars, create=True)
+        return
 
-    # Get indices of people who acquire HIV
-    hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
-    people.hiv[hiv_inds] = True
+    def __getitem__(self, key):
+        ''' Allow sim['par_name'] instead of sim.pars['par_name'] '''
+        try:
+            return self.pars[key]
+        except:
+            all_keys = '\n'.join(list(self.pars.keys()))
+            errormsg = f'Key "{key}" not found; available keys:\n{all_keys}'
+            raise sc.KeyNotFoundError(errormsg)
 
-    # Update prognoses for those with HIV
-    if len(hiv_inds):
+    def __setitem__(self, key, value):
+        ''' Ditto '''
+        if key in self.pars:
+            self.pars[key] = value
+        else:
+            all_keys = '\n'.join(list(self.pars.keys()))
+            errormsg = f'Key "{key}" not found; available keys:\n{all_keys}'
+            raise sc.KeyNotFoundError(errormsg)
+        return
 
-        set_hiv_prognoses(people, hiv_inds, year=year)  # Set ART adherence for those with HIV
+    def update_pars(self, pars=None, create=False):
+        '''
+        Update internal dict with new pars.
 
-        for g in range(people.pars['n_genotypes']):
-            gpars = people.pars['genotype_pars'][people.pars['genotype_map'][g]]
-            hpv_inds = hpu.itruei((people.is_female & people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
-            if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
-                people.set_severity_pars(hpv_inds, g, gpars)
-                people.set_severity(hpv_inds, g, gpars, dt)
+        Args:
+            pars (dict): the parameters to update (if None, do nothing)
+            create (bool): if create is False, then raise a KeyNotFoundError if the key does not already exist
+        '''
+        if pars is not None:
+            if not isinstance(pars, dict):
+                raise TypeError(f'The pars object must be a dict; you supplied a {type(pars)}')
+            if not hasattr(self, 'pars'):
+                self.pars = pars
+            if not create:
+                available_keys = list(self.pars.keys())
+                mismatches = [key for key in pars.keys() if key not in available_keys]
+                if len(mismatches):
+                    errormsg = f'Key(s) {mismatches} not found; available keys are {available_keys}'
+                    raise sc.KeyNotFoundError(errormsg)
+            self.pars.update(pars)
+        return
 
-    return people.scale_flows(hiv_inds)
+    # %% HIV methods
+
+    def set_hiv_prognoses(self, people, inds, year=None):
+        ''' Set HIV outcomes (for now only ART) '''
+
+        art_cov = self['art_adherence']  # Shorten
+
+        # Extract index of current year
+        all_years = np.array(list(art_cov.keys()))
+        year_ind = sc.findnearest(all_years, year)
+        nearest_year = all_years[year_ind]
+
+        # Figure out which age bin people belong to
+        age_bins = art_cov[nearest_year][0, :]
+        age_inds = np.digitize(people.age[inds], age_bins)
+
+        # Apply ART coverage by age to people
+        art_covs = art_cov[nearest_year][1, :]
+        art_adherence = art_covs[age_inds]
+        people.art_adherence[inds] = art_adherence
+        people.rel_sev_infl[inds] = (1-art_adherence)*people.pars['hiv_pars']['rel_hiv_sev_infl']
+        people.rel_sus[inds] = (1-art_adherence)*people.pars['hiv_pars']['rel_sus']
+
+        return
+
+    def apply_hiv_rates(self, people, year=None):
+        '''
+        Apply HIV infection rates to population
+        '''
+        hiv_pars = self['infection_rates']
+        all_years = np.array(list(hiv_pars.keys()))
+        year_ind = sc.findnearest(all_years, year)
+        nearest_year = all_years[year_ind]
+        hiv_year = hiv_pars[nearest_year]
+        dt = people.pars['dt']
+
+        hiv_probs = np.zeros(len(people), dtype=hpd.default_float)
+        for sk in ['f', 'm']:
+            hiv_year_sex = hiv_year[sk]
+            age_bins = hiv_year_sex[:, 0]
+            hiv_rates = hiv_year_sex[:, 1] * dt
+            mf_inds = people.is_female if sk == 'f' else people.is_male
+            mf_inds *= people.alive  # Only include people alive
+            age_inds = np.digitize(people.age[mf_inds], age_bins)
+            hiv_probs[mf_inds] = hiv_rates[age_inds]
+        hiv_probs[people.hiv] = 0  # not at risk if already infected
+
+        # Get indices of people who acquire HIV
+        hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
+        people.hiv[hiv_inds] = True
+
+        # Update prognoses for those with HIV
+        if len(hiv_inds):
+
+            self.set_hiv_prognoses(people, hiv_inds, year=year)  # Set ART adherence for those with HIV
+
+            for g in range(people.pars['n_genotypes']):
+                gpars = people.pars['genotype_pars'][people.pars['genotype_map'][g]]
+                hpv_inds = hpu.itruei((people.is_female & people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
+                if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
+                    people.set_severity_pars(hpv_inds, g, gpars)
+                    people.set_severity(hpv_inds, g, gpars, dt)
+
+        return people.scale_flows(hiv_inds)
 
 
 def get_hiv_data(location=None, hiv_datafile=None, art_datafile=None, verbose=False):
