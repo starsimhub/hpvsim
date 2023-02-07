@@ -12,6 +12,7 @@ from . import defaults as hpd
 from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
+from . import hiv as hphiv
 from . import analysis as hpa
 from . import plotting as hpplt
 from . import immunity as hpimm
@@ -69,7 +70,7 @@ class Sim(hpb.BaseSim):
     def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
         ''' Load any data files that are used to create additional parameters, if provided '''
         self.hiv_data = sc.objdict()
-        self.hiv_data.infection_rates, self.hiv_data.art_adherence = hppar.get_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        self.hiv_data.infection_rates, self.hiv_data.art_adherence = hphiv.get_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return
 
 
