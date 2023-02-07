@@ -117,7 +117,11 @@ class PeopleMeta(sc.prettyobj):
         State('sev', default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
         State('sev_rate', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
         State('sev_infl', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
-        State('rel_sev_infl', default_float, 1.0), # Individual relative risk for rate severe disease growth
+    ]
+
+    rel_states = [
+        State('rel_sev_infl', default_float, 1.0),  # Individual relative risk for rate severe disease growth (does not vary by genotype)
+        State('rel_sus', default_float, 1.0)        # Individual relative risk for acquiring infection (does not vary by genotype)
     ]
 
     derived_states = [
@@ -161,7 +165,7 @@ class PeopleMeta(sc.prettyobj):
     imm_states = [
         State('sus_imm',        default_float,  0,'n_imm_sources'),  # Float, by genotype
         State('peak_imm',       default_float,  0,'n_imm_sources'),  # Float, peak level of immunity
-        State('nab_imm',            default_float,  0,'n_imm_sources'),  # Float, current immunity level
+        State('nab_imm',        default_float,  0,'n_imm_sources'),  # Float, current immunity level
         State('t_imm_event',    default_int,    0,'n_imm_sources'),  # Int, time since immunity event
         State('cell_imm',       default_float,  0,'n_imm_sources'),
     ]
@@ -188,7 +192,7 @@ class PeopleMeta(sc.prettyobj):
         State('dur_cancer',         default_float, np.nan, shape='n_genotypes'), # Duration of cancer
     ]
 
-    all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev
+    all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev + rel_states
 
     @classmethod
     def validate(cls):

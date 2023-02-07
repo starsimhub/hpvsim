@@ -32,6 +32,7 @@ def set_hiv_prognoses(people, inds, year=None):
     art_adherence = art_covs[age_inds]
     people.art_adherence[inds] = art_adherence
     people.rel_sev_infl[inds] = (1-art_adherence)*people.pars['hiv_pars']['rel_hiv_sev_infl']
+    people.rel_sus[inds] = (1-art_adherence)*people.pars['hiv_pars']['rel_sus']
 
     return
 
