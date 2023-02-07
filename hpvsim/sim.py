@@ -52,7 +52,6 @@ class Sim(hpb.BaseSim):
         # Load data, including datafile that are used to create additional optional parameters
         location = pars.get('location') if pars else None
         self.load_data(datafile) # Load the data, if provided
-        self.load_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
 
         # Update parameters
         self.update_pars(pars, **kwargs)   # Update the parameters
@@ -64,13 +63,6 @@ class Sim(hpb.BaseSim):
         ''' Load the data to calibrate against, if provided '''
         if datafile is not None: # If a data file is provided, load it
             self.data = hpm.load_data(datafile=datafile, check_date=True, **kwargs)
-        return
-
-
-    def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
-        ''' Load any data files that are used to create additional parameters, if provided '''
-        self.hiv_data = sc.objdict()
-        self.hiv_data.infection_rates, self.hiv_data.art_adherence = hphiv.get_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return
 
 
@@ -228,12 +220,6 @@ class Sim(hpb.BaseSim):
         if not sc.isnumber(self['verbose']): # pragma: no cover
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
-
-        # Handle HIV
-        if self['model_hiv']:
-            if self.hiv_data['infection_rates'] is None or self.hiv_data['art_adherence'] is None:
-                errormsg = 'Data on HIV infection rates and ART adherence must be provided if model_hiv is True.'
-                raise ValueError(errormsg)
 
         return
 
@@ -583,7 +569,7 @@ class Sim(hpb.BaseSim):
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
         
         # Finish initialization
-        self.hiv = hphiv.HIVPars(self.hiv_data)
+        self.hiv = hphiv.HIVPars(location=self['location'], hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile)
         self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:

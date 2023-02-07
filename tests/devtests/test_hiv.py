@@ -20,19 +20,14 @@ def test_hiv(model_hiv=True):
 
     pars = {
         'n_agents': n_agents,
-        'start': 1990,
-        'burnin': 30,
-        'end': 2020,
-        'genotypes': [16, 18],
         'location': 'south africa',
-        'dt': .5,
         'model_hiv': model_hiv
     }
 
     sim = hpv.Sim(
         pars=pars,
-        hiv_datafile='test_data/hiv_incidence_south_africa.csv',
-        art_datafile='test_data/art_coverage_south_africa.csv'
+        hiv_datafile='hiv_incidence_south_africa.csv',
+        art_datafile='art_coverage_south_africa.csv'
     )
     sim.run()
     sim.plot(to_plot=['hiv_prevalence'])
@@ -44,18 +39,13 @@ def test_impact_on_cancer():
 
     pars = {
         'n_agents': n_agents,
-        'start': 1990,
-        'burnin': 30,
-        'end': 2020,
-        'genotypes': [16, 18],
         'location': 'south africa',
-        'dt': .5,
     }
 
     base_sim = hpv.Sim(
         pars=pars,
-        hiv_datafile='test_data/hiv_incidence_south_africa.csv',
-        art_datafile='test_data/art_coverage_south_africa.csv'
+        hiv_datafile='hiv_incidence_south_africa.csv',
+        art_datafile='art_coverage_south_africa.csv'
     )
 
     scenarios = {
@@ -77,10 +67,7 @@ def test_impact_on_cancer():
                 'model_hiv': True,
                 'hiv_pars': {
                     'rel_sus': 3,
-                    'dysp_rate': 5,
-                    'prog_rate': 5,
-                    'prog_time': 1/5,
-                    'reactivation_prob': 3
+                    'rel_hiv_sev_infl': .25,
                 }
             }
         }
@@ -94,14 +81,11 @@ def test_impact_on_cancer():
             'hiv_prevalence',
         ],
         'HPV prevalence': [
-            'total_hpv_prevalence',
+            'hpv_prevalence',
         ],
         'Age standardized cancer incidence (per 100,000 women)': [
-            'asr_cancer',
-        ],
-        'Cancer deaths per 100,000 women': [
-            'cancer_mortality',
-        ],
+            'asr_cancer_incidence',
+        ]
     }
     scens.plot(to_plot=to_plot)
     return scens
