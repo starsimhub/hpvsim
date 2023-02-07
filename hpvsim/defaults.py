@@ -117,6 +117,7 @@ class PeopleMeta(sc.prettyobj):
         State('sev', default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
         State('sev_rate', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
         State('sev_infl', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
+        State('rel_sev_infl', default_float, 1.0), # Individual relative risk for rate severe disease growth
     ]
 
     derived_states = [
