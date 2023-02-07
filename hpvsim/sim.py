@@ -742,7 +742,6 @@ class Sim(hpb.BaseSim):
                 t_since_boost = (t - people.t_imm_event[:,inds]).ravel()
                 current_imm = imm_kin_pars[t_since_boost].reshape(ss) # Get people's current level of immunity
                 people.nab_imm[:,inds] = current_imm*people.peak_imm[:,inds] # Set immunity relative to peak
-                    # return imm
         else:
             people.nab_imm[:] = people.peak_imm
         hpimm.check_immunity(people)
