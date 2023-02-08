@@ -19,10 +19,11 @@ class HIVPars(hpb.ParsObj):
     def __init__(self, location, art_datafile, hiv_datafile, hiv_pars=None):
         pars = self.load_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
 
+        # Define default parameters, can be overwritten by hiv_pars
         pars['hiv_pars'] = {
             'rel_sus': 2.2,  # Increased risk of acquiring HPV
             'rel_hiv_sev_infl': 0.5,  # Speed up growth of disease severity
-            'reactivation_prob': 3,
+            'reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
         }
 
         if hiv_pars is not None:
