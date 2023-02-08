@@ -53,7 +53,6 @@ class HIVsim(hpb.ParsObj):
         people.art_adherence[inds] = art_adherence
         people.rel_sev_infl[inds] = (1 - art_adherence) * self['hiv_pars']['rel_hiv_sev_infl']
         people.rel_sus[inds] = (1 - art_adherence) * self['hiv_pars']['rel_sus']
-
         return
 
     def apply(self, people, year=None):
@@ -61,13 +60,14 @@ class HIVsim(hpb.ParsObj):
         Wrapper method that checks for new HIV infections, updates prognoses, etc.
         '''
 
-        new_infections = self.apply_hiv_rates(people, year)
+        new_infection_inds = self.new_hiv_infections(people, year) # Newly acquired HIV infections
+        self.set_hiv_prognoses(people, new_infection_inds, year=year)  # Set ART adherence for those with HIV
+        self.update_hpv_progs(people, new_infection_inds) # Update any HPV prognoses
+        new_infections = people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections
 
-    def apply_hiv_rates(self, people, year=None):
-        '''
-        Apply HIV infection rates to population
-        '''
+    def new_hiv_infections(self, people, year=None):
+        '''Apply HIV infection rates to population'''
         hiv_pars = self['infection_rates']
         all_years = np.array(list(hiv_pars.keys()))
         year_ind = sc.findnearest(all_years, year)
@@ -89,22 +89,17 @@ class HIVsim(hpb.ParsObj):
         # Get indices of people who acquire HIV
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
         people.hiv[hiv_inds] = True
+        return hiv_inds
 
-        # Update prognoses for those with HIV
-        if len(hiv_inds):
-
-            self.set_hiv_prognoses(people, hiv_inds, year=year)  # Set ART adherence for those with HIV
-
-            for g in range(people.pars['n_genotypes']):
-                gpars = people.pars['genotype_pars'][people.pars['genotype_map'][g]]
-                hpv_inds = hpu.itruei((people.is_female & people.episomal[g, :]),
-                                      hiv_inds)  # Women with HIV who have episomal HPV
-                if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
-                    people.set_severity_pars(hpv_inds, g, gpars)
-                    people.set_severity(hpv_inds, g, gpars, dt)
-
-        return people.scale_flows(hiv_inds)
-
+    def update_hpv_progs(self, people, hiv_inds):
+        dt = people.pars['dt']
+        for g in range(people.pars['n_genotypes']):
+            gpars = people.pars['genotype_pars'][people.pars['genotype_map'][g]]
+            hpv_inds = hpu.itruei((people.is_female & people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
+            if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
+                people.set_severity_pars(hpv_inds, g, gpars)
+                people.set_severity(hpv_inds, g, gpars, dt)
+        return
 
     def get_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, verbose=False):
         '''

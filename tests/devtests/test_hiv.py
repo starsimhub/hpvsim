@@ -29,11 +29,18 @@ def test_hiv(model_hiv=True):
                 'rel_hiv_sev_infl': .25,
             }
 
+    if model_hiv:
+        hiv_datafile='hiv_incidence_south_africa.csv'
+        art_datafile = 'art_coverage_south_africa.csv'
+    else:
+        hiv_datafile=None
+        art_datafile=None
+
     sim = hpv.Sim(
         pars=pars,
         hiv_pars=hiv_pars,
-        hiv_datafile='hiv_incidence_south_africa.csv',
-        art_datafile='art_coverage_south_africa.csv'
+        hiv_datafile=hiv_datafile,
+        art_datafile=art_datafile
     )
     sim.run()
     sim.plot(to_plot=['hiv_prevalence'])
@@ -101,7 +108,7 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    # sim0 = test_hiv(model_hiv=True)
+    # sim0 = test_hiv(model_hiv=False)
     sim1 = test_impact_on_cancer()
     sc.toc(T)
     print('Done.')

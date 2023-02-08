@@ -234,7 +234,7 @@ class People(hpb.BasePeople):
         sev_infl = self.sev_infl[g, inds]
         sev_rate = self.sev_rate[g, inds]
         sevs = hpu.logf2(dur_episomal, sev_infl, sev_rate)
-        self.sev[g, inds] = sevs # Set severity
+        self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob = gpars['transform_prob']
