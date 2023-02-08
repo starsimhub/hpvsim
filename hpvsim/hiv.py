@@ -56,6 +56,13 @@ class HIVPars(hpb.ParsObj):
 
         return
 
+    def apply(self, people, year=None):
+        '''
+        Wrapper method that checks for new HIV infections, updates prognoses, etc.
+        '''
+
+        self.apply_hiv_rates(people, year)
+
     def apply_hiv_rates(self, people, year=None):
         '''
         Apply HIV infection rates to population
