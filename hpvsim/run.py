@@ -1054,8 +1054,8 @@ class Scenarios(hpb.ParsObj):
             scen_sim.initialize(reset=reset_people, init_states=reset_init_states)
 
             if 'hiv_pars' in scen.keys():
-                hiv_scenpars = {'hiv_pars': sc.mergedicts(scen_sim.hiv.pars['hiv_pars'], scen['hiv_pars'])}
-                scen_sim.hiv.update_pars(hiv_scenpars)
+                hiv_scenpars = {'hiv_pars': sc.mergedicts(scen_sim.hivsim.pars['hiv_pars'], scen['hiv_pars'])}
+                scen_sim.hivsim.update_pars(hiv_scenpars)
 
             run_args = dict(n_runs=self['n_runs'], noise=self['noise'], noisepar=self['noisepar'], keep_people=keep_people, verbose=verbose)
             if debug:

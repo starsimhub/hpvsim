@@ -11,7 +11,7 @@ from . import base as hpb
 from .data import loaders as hpdata
 
 
-class HIVPars(hpb.ParsObj):
+class HIVsim(hpb.ParsObj):
     '''
         A class based around performing operations on a self.pars dict.
         '''
@@ -61,7 +61,8 @@ class HIVPars(hpb.ParsObj):
         Wrapper method that checks for new HIV infections, updates prognoses, etc.
         '''
 
-        self.apply_hiv_rates(people, year)
+        new_infections = self.apply_hiv_rates(people, year)
+        return new_infections
 
     def apply_hiv_rates(self, people, year=None):
         '''
