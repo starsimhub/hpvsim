@@ -24,8 +24,14 @@ def test_hiv(model_hiv=True):
         'model_hiv': model_hiv
     }
 
+    hiv_pars = {
+                'rel_sus': 3,
+                'rel_hiv_sev_infl': .25,
+            }
+
     sim = hpv.Sim(
         pars=pars,
+        hiv_pars=hiv_pars,
         hiv_datafile='hiv_incidence_south_africa.csv',
         art_datafile='art_coverage_south_africa.csv'
     )
@@ -65,10 +71,10 @@ def test_impact_on_cancer():
             'name': 'HIV, elevated risk',
             'pars': {
                 'model_hiv': True,
-                'hiv_pars': {
-                    'rel_sus': 3,
-                    'rel_hiv_sev_infl': .25,
-                }
+            },
+            'hiv_pars': {
+                'rel_sus': 3,
+                'rel_hiv_sev_infl': .25,
             }
         }
     }
@@ -95,7 +101,7 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv(model_hiv=True)
+    # sim0 = test_hiv(model_hiv=True)
     sim1 = test_impact_on_cancer()
     sc.toc(T)
     print('Done.')

@@ -99,13 +99,6 @@ def make_pars(**kwargs):
     pars['genotypes']       = [16, 18, 'hrhpv']  # Genotypes to model
     pars['genotype_pars']   = sc.objdict()  # Can be directly modified by passing in arguments listed in get_genotype_pars
 
-    # HIV parameters
-    pars['hiv_pars'] = {
-        'rel_sus': 2.2, # Increased risk of acquiring HPV
-        'rel_hiv_sev_infl': 0.5, # Speed up growth of disease severity
-        'reactivation_prob': 3,
-    }
-
     # Events and interventions
     pars['interventions']   = sc.autolist() # The interventions present in this simulation; populated by the user
     pars['analyzers']       = sc.autolist() # The functions present in this simulation; populated by the user

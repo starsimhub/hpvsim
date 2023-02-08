@@ -1020,6 +1020,8 @@ class Scenarios(hpb.ParsObj):
         for scenkey,scen in self.scenarios.items():
             scenname = scen['name']
             scenpars = scen['pars']
+
+
             allpars = sc.mergedicts(scenpars, {'location': self.base_sim['location']})
 
             # This is necessary for plotting, and since self.npts is defined prior to run
@@ -1050,6 +1052,10 @@ class Scenarios(hpb.ParsObj):
 
             # Initialize the sim, including potentially the people and initial states
             scen_sim.initialize(reset=reset_people, init_states=reset_init_states)
+
+            if 'hiv_pars' in scen.keys():
+                hiv_scenpars = {'hiv_pars': sc.mergedicts(scen_sim.hiv.pars['hiv_pars'], scen['hiv_pars'])}
+                scen_sim.hiv.update_pars(hiv_scenpars)
 
             run_args = dict(n_runs=self['n_runs'], noise=self['noise'], noisepar=self['noisepar'], keep_people=keep_people, verbose=verbose)
             if debug:

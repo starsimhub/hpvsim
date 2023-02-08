@@ -16,8 +16,17 @@ class HIVPars(hpb.ParsObj):
         A class based around performing operations on a self.pars dict.
         '''
 
-    def __init__(self, location, art_datafile, hiv_datafile):
+    def __init__(self, location, art_datafile, hiv_datafile, hiv_pars=None):
         pars = self.load_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+
+        pars['hiv_pars'] = {
+            'rel_sus': 2.2,  # Increased risk of acquiring HPV
+            'rel_hiv_sev_infl': 0.5,  # Speed up growth of disease severity
+            'reactivation_prob': 3,
+        }
+
+        if hiv_pars is not None:
+            pars = sc.mergedicts(pars, hiv_pars)
         self.update_pars(pars, create=True)
         return
 
@@ -41,8 +50,8 @@ class HIVPars(hpb.ParsObj):
         art_covs = art_cov[nearest_year][1, :]
         art_adherence = art_covs[age_inds]
         people.art_adherence[inds] = art_adherence
-        people.rel_sev_infl[inds] = (1 - art_adherence) * people.pars['hiv_pars']['rel_hiv_sev_infl']
-        people.rel_sus[inds] = (1 - art_adherence) * people.pars['hiv_pars']['rel_sus']
+        people.rel_sev_infl[inds] = (1 - art_adherence) * self['hiv_pars']['rel_hiv_sev_infl']
+        people.rel_sus[inds] = (1 - art_adherence) * self['hiv_pars']['rel_sus']
 
         return
 
