@@ -8,6 +8,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.0.1 (2023-02-07)
+---------------------------
+- Moves all HIV functionality into hiv.py
+- Establishes new class HIVsim, which is defined by a set of parameters and methods for updating a people object
+- Bug fix for setting people.sev wrong on day of infection
+- *Github info* PR `526 <https://github.com/amath-idm/hpvsim/pull/526>`__
 
 Version 1.0.0 (2023-01-31)
 ---------------------------
