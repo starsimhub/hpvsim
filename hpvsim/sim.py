@@ -570,7 +570,7 @@ class Sim(hpb.BaseSim):
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
         
         # Finish initialization
-        self.hivsim = hphiv.HIVsim(location=self['location'], hiv_datafile=self.hiv_datafile,
+        self.hivsim = hphiv.HIVsim(self, location=self['location'], hiv_datafile=self.hiv_datafile,
                                  art_datafile=self.art_datafile, hiv_pars=self.hiv_pars)
         self.people.initialize(sim_pars=self.pars, hivsim=self.hivsim) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
@@ -975,7 +975,10 @@ class Sim(hpb.BaseSim):
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
-        # self.finalize_interventions()
+        # self.finalize_interventions() #TODO: why is this commented out?
+
+        if self['model_hiv']:
+            self.hivsim.finalize(self)
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results

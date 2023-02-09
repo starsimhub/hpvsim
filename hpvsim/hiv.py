@@ -16,7 +16,7 @@ class HIVsim(hpb.ParsObj):
         A class based around performing operations on a self.pars dict.
         '''
 
-    def __init__(self, location, art_datafile, hiv_datafile, hiv_pars=None):
+    def __init__(self, sim, location, art_datafile, hiv_datafile, hiv_pars=None):
         pars = self.load_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
 
         # Define default parameters, can be overwritten by hiv_pars
@@ -29,6 +29,33 @@ class HIVsim(hpb.ParsObj):
         if hiv_pars is not None:
             pars = sc.mergedicts(pars, hiv_pars)
         self.update_pars(pars, create=True)
+        self.init_results(sim)
+
+        return
+
+
+    def init_results(self, sim):
+
+        def init_res(*args, **kwargs):
+            ''' Initialize a single result object '''
+            output = hpb.Result(*args, **kwargs, npts=sim.res_npts)
+            return output
+
+        self.resfreq = sim.resfreq
+        # Initialize storage
+        results = sc.objdict()
+
+        na = len(sim['age_bins']) - 1  # Number of age bins
+
+        results['hiv_infections'] = init_res('Number HIV infections')
+        results['hiv_infections_by_age'] = init_res('Number HIV infections by age', n_rows=na)
+        results['n_hiv'] = init_res('Number living with HIV')
+        results['n_hiv_by_age'] = init_res('Number living with HIV by age', n_rows=na)
+        results['hiv_prevalence'] = init_res('HIV prevalence')
+        results['hiv_prevalence_by_age'] = init_res('HIV prevalence by age', n_rows=na)
+        results['hiv_incidence'] = init_res('HIV incidence')
+        results['hiv_incidence_by_age'] = init_res('HIV incidence by age', n_rows=na)
+        self.results = results
         return
 
     # %% HIV methods
@@ -89,6 +116,16 @@ class HIVsim(hpb.ParsObj):
         # Get indices of people who acquire HIV
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
         people.hiv[hiv_inds] = True
+
+        if people.t % self.resfreq == self.resfreq - 1:
+            # Update stock and flows
+            idx = int(people.t / self.resfreq)
+            self.results['hiv_infections'][idx] = people.scale_flows(hiv_inds)
+            self.results[f'hiv_infections_by_age'][:, idx] = np.histogram(people.age[hiv_inds], bins=people.age_bins, weights=people.scale[hiv_inds])[0]
+            self.results['n_hiv'][idx] = people.count('hiv')
+            hivinds = hpu.true(people['hiv'])
+            self.results[f'n_hiv_by_age'][:, idx] = np.histogram(people.age[hivinds], bins=people.age_bins, weights=people.scale[hivinds])[0]
+
         return hiv_inds
 
     def update_hpv_progs(self, people, hiv_inds):
@@ -205,3 +242,27 @@ class HIVsim(hpb.ParsObj):
                 raise NotImplementedError(errormsg)
         else:
             raise NotImplementedError('Cannot load HIV data without a specified location')
+
+    def finalize(self, sim):
+        '''
+        Compute prevalence, incidence.
+        '''
+        res = self.results
+        simres = sim.results
+
+        # Compute HIV incidence and prevalence
+        def safedivide(num, denom):
+            ''' Define a variation on sc.safedivide that respects shape of numerator '''
+            answer = np.zeros_like(num)
+            fill_inds = (denom != 0).nonzero()
+            if len(num.shape) == len(denom.shape):
+                answer[fill_inds] = num[fill_inds] / denom[fill_inds]
+            else:
+                answer[:, fill_inds] = num[:, fill_inds] / denom[fill_inds]
+            return answer
+
+        self.results['hiv_prevalence_by_age'][:] = safedivide(res['n_hiv_by_age'][:], simres['n_alive_by_age'][:])
+        self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], (simres['n_alive'][:] - res['n_hiv'][:]))
+        self.results['hiv_incidence_by_age'][:] = sc.safedivide(res['hiv_infections_by_age'][:], (simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]))
+        self.results['hiv_prevalence'][:] = sc.safedivide(res['n_hiv'][:], simres['n_alive'][:])
+        return
