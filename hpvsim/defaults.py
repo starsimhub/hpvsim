@@ -182,6 +182,7 @@ class PeopleMeta(sc.prettyobj):
     dates += [
         State('date_clearance',     default_float, np.nan, shape='n_genotypes'),
         State('date_exposed',       default_float, np.nan, shape='n_genotypes'),
+        State('date_hiv',           default_float, np.nan),
     ]
 
     # Duration of different states: these are floats per person -- used in people.py
