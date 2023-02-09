@@ -26,7 +26,9 @@ class HIVsim(hpb.ParsObj):
             'rel_hiv_sev_infl': 0.5,  # Speed up growth of disease severity
             'reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
             'time_to_hiv_death_shape': 2, # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
-            'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
+            'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
+            'cd4_start': 594,
+            'cd4_trajectory': lambda f: (24.363 - 16.672*f)**2 # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
         }
 
         self.init_states()
@@ -40,11 +42,11 @@ class HIVsim(hpb.ParsObj):
 
     def init_states(self):
         hiv_states = [
-            hpd.State('cd4', hpd.default_int, -1),
-            hpd.State('vl', hpd.default_float, np.nan),
+            hpd.State('cd4', hpd.default_float, np.nan),
             hpd.State('art', bool, False),
             hpd.State('date_dead_hiv', hpd.default_float, np.nan),
             hpd.State('dead_hiv', bool, False),
+            hpd.State('dur_hiv', hpd.default_float, np.nan)
         ]
         self.people.meta.all_states += hiv_states
 
@@ -95,11 +97,13 @@ class HIVsim(hpb.ParsObj):
         self.people.art_adherence[inds] = art_adherence
         self.people.rel_sev_infl[inds] = (1 - art_adherence) * self['hiv_pars']['rel_hiv_sev_infl']
         self.people.rel_sus[inds] = (1 - art_adherence) * self['hiv_pars']['rel_sus']
+        self.people.cd4[inds] = self['hiv_pars']['cd4_start']
 
         # Draw time to HIV mortality
         shape = self['hiv_pars']['time_to_hiv_death_shape']
         scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[inds])
-        time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(inds))
+        time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(inds))/(1-art_adherence)
+        self.people.dur_hiv[inds] = time_to_hiv_death
         self.people.date_dead_hiv[inds] = self.people.t + sc.randround(time_to_hiv_death / self.people.dt)
 
         return
@@ -113,6 +117,16 @@ class HIVsim(hpb.ParsObj):
         self.people.remove_people(inds, cause='hiv')
         return
 
+    def check_cd4(self):
+        '''
+        Check for current cd4
+        '''
+        filter_inds = self.people.true('hiv')
+        frac_prognosis = (self.people.t - self.people.date_hiv[filter_inds])/self.people.dur_hiv[filter_inds]
+        cd4 = self['hiv_pars']['cd4_trajectory'](frac_prognosis)
+        self.people.cd4[filter_inds] = cd4
+        return
+
     def apply(self, year=None):
         '''
         Wrapper method that checks for new HIV infections, updates prognoses, etc.
@@ -123,6 +137,7 @@ class HIVsim(hpb.ParsObj):
             self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
             self.update_hpv_progs(new_infection_inds) # Update any HPV prognoses
         self.check_hiv_mortality()
+        self.check_cd4()
         new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections
 
