@@ -772,6 +772,8 @@ class People(hpb.BasePeople):
             self.dead_cancer[inds] = True
         elif cause == 'emigration':
             self.emigrated[inds] = True
+        elif cause == 'hiv':
+            pass # handled by hivsim
         else:
             errormsg = f'Cause of death must be one of "other", "cancer", or "emigration", not {cause}.'
             raise ValueError(errormsg)

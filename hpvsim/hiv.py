@@ -9,6 +9,7 @@ from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
 from .data import loaders as hpdata
+from scipy.stats import weibull_min
 
 
 class HIVsim(hpb.ParsObj):
@@ -24,6 +25,8 @@ class HIVsim(hpb.ParsObj):
             'rel_sus': 2.2,  # Increased risk of acquiring HPV
             'rel_hiv_sev_infl': 0.5,  # Speed up growth of disease severity
             'reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
+            'time_to_hiv_death_shape': 2, # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
+            'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
         }
 
         self.init_states()
@@ -39,7 +42,9 @@ class HIVsim(hpb.ParsObj):
         hiv_states = [
             hpd.State('cd4', hpd.default_int, -1),
             hpd.State('vl', hpd.default_float, np.nan),
-            hpd.State('art', bool, False)
+            hpd.State('art', bool, False),
+            hpd.State('date_dead_hiv', hpd.default_float, np.nan),
+            hpd.State('dead_hiv', bool, False),
         ]
         self.people.meta.all_states += hiv_states
 
@@ -90,6 +95,22 @@ class HIVsim(hpb.ParsObj):
         self.people.art_adherence[inds] = art_adherence
         self.people.rel_sev_infl[inds] = (1 - art_adherence) * self['hiv_pars']['rel_hiv_sev_infl']
         self.people.rel_sus[inds] = (1 - art_adherence) * self['hiv_pars']['rel_sus']
+
+        # Draw time to HIV mortality
+        shape = self['hiv_pars']['time_to_hiv_death_shape']
+        scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[inds])
+        time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(inds))
+        self.people.date_dead_hiv[inds] = self.people.t + sc.randround(time_to_hiv_death / self.people.dt)
+
+        return
+
+    def check_hiv_mortality(self):
+        '''
+        Check for new deaths from HIV
+        '''
+        filter_inds = self.people.true('hiv')
+        inds = self.people.check_inds(self.people.dead_hiv, self.people.date_dead_hiv, filter_inds=filter_inds)
+        self.people.remove_people(inds, cause='hiv')
         return
 
     def apply(self, year=None):
@@ -98,9 +119,10 @@ class HIVsim(hpb.ParsObj):
         '''
 
         new_infection_inds = self.new_hiv_infections(year) # Newly acquired HIV infections
-        self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
-        self.update_hpv_progs(new_infection_inds) # Update any HPV prognoses
-        # self.check_hiv_mortality(people, year)
+        if len(new_infection_inds):
+            self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
+            self.update_hpv_progs(new_infection_inds) # Update any HPV prognoses
+        self.check_hiv_mortality()
         new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections
 
@@ -221,8 +243,7 @@ class HIVsim(hpb.ParsObj):
                     idx = np.where(life_exp[year]['f'][:, 0] == age)[0]  # Finding life expectancy for this age group/year
                     this_life_exp = life_exp[year]['f'][idx, 1]  # Pull out value
                     last_year = int(year + this_life_exp)  # Figure out the year in which this age cohort is expected to die
-                    year_ind = sc.findnearest(years,
-                                              last_year)  # Get as close to the above year as possible within the data
+                    year_ind = sc.findnearest(years, last_year)  # Get as close to the above year as possible within the data
                     if year_ind > i:  # Either take the mean of ART coverage from now up until the year of death
                         cov[j] = np.mean(df_art[i:year_ind]['ART Coverage'].values)
                     else:  # Or, just use ART overage in this year
