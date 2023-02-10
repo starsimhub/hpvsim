@@ -570,8 +570,8 @@ class Sim(hpb.BaseSim):
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
         
         # Finish initialization
-        self.hivsim = hphiv.HIVsim(self, location=self['location'], hiv_datafile=self.hiv_datafile,
-                                 art_datafile=self.art_datafile, hiv_pars=self.hiv_pars)
+        self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
+                                   hiv_pars=self.hiv_pars)
         self.people.initialize(sim_pars=self.pars, hivsim=self.hivsim) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
