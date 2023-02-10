@@ -338,7 +338,7 @@ class People(hpb.BasePeople):
         fg_inds = hpu.true(self.is_female & self.infectious[genotype,:])
         sev_rate = self.sev_rate[genotype, fg_inds]
         sev_infl = self.sev_infl[genotype, fg_inds]
-        dur_episomal = self.t - self.date_exposed[genotype, fg_inds]
+        dur_episomal = (self.t - self.date_exposed[genotype, fg_inds]) * self.dt
         if (dur_episomal<0).any():
             errormsg = 'Durations cannot be less than zero.'
             raise ValueError(errormsg)
