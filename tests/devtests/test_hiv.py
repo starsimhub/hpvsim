@@ -26,7 +26,7 @@ def test_hiv(model_hiv=True):
 
     hiv_pars = {
                 'rel_sus': 3,
-                'rel_hiv_sev_infl': .25,
+                'rel_hiv_sev_infl': {'cd4_200': 0.36, 'cd4_200_500': 0.76},
             }
 
     if model_hiv:
@@ -81,7 +81,7 @@ def test_impact_on_cancer():
             },
             'hiv_pars': {
                 'rel_sus': 3,
-                'rel_hiv_sev_infl': .25,
+                'rel_hiv_sev_infl': {'cd4_200': 0.36, 'cd4_200_500': 0.76},
             }
         }
     }

@@ -23,11 +23,11 @@ class HIVsim(hpb.ParsObj):
         # Define default parameters, can be overwritten by hiv_pars
         pars['hiv_pars'] = {
             'rel_sus': 2.2,  # Increased risk of acquiring HPV
-            'rel_hiv_sev_infl': 0.5,  # Speed up growth of disease severity
+            'rel_hiv_sev_infl': {'cd4_200': 0.36, 'cd4_200_500': 0.76},  # Speed up growth of disease severity
             'reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
             'time_to_hiv_death_shape': 2, # shape parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
             'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # scale parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
-            'cd4_start': 594,
+            'cd4_start': dict(dist='normal', par1=594, par2=20),
             'cd4_trajectory': lambda f: (24.363 - 16.672*f)**2, # based on https://docs.idmod.org/projects/emod-hiv/en/latest/hiv-model-healthcare-systems.html?highlight=art#art-s-impact-on-cd4-count
             'cd4_reconstitution': lambda m: 15.584*m - 0.2113*m**2 # growth in CD4 count following ART initiation
         }
@@ -108,9 +108,7 @@ class HIVsim(hpb.ParsObj):
 
         self.people.art[art_inds] = True
         self.people.date_art[art_inds] = self.people.t
-        self.people.rel_sev_infl[art_inds] = self['hiv_pars']['rel_hiv_sev_infl']
-        self.people.rel_sus[art_inds] = self['hiv_pars']['rel_sus']
-        self.people.cd4[inds] = self['hiv_pars']['cd4_start']
+        self.people.cd4[inds] = hpu.sample(**self['hiv_pars']['cd4_start'], size=len(inds))
 
         # Draw time to HIV mortality
         shape = self['hiv_pars']['time_to_hiv_death_shape']
@@ -148,6 +146,18 @@ class HIVsim(hpb.ParsObj):
             months_on_ART = (self.people.t - self.people.date_art[art_inds])*12
             cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
             self.people.cd4[art_inds] += cd4_change
+
+            cd4_200_inds = sc.findinds(self.people.cd4 < 200)
+            cd4_200_500_inds = sc.findinds((self.people.cd4 > 200) & (self.people.cd4 < 500))
+
+            if len(cd4_200_inds):
+                self.people.rel_sev_infl[cd4_200_inds] = self['hiv_pars']['rel_hiv_sev_infl']['cd4_200']
+                self.people.rel_sus[cd4_200_inds] = self['hiv_pars']['rel_sus']
+
+            if len(cd4_200_500_inds):
+                self.people.rel_sev_infl[cd4_200_500_inds] = self['hiv_pars']['rel_hiv_sev_infl']['cd4_200_500']
+                self.people.rel_sus[cd4_200_500_inds] = self['hiv_pars']['rel_sus']
+
         return
 
     def apply(self, year=None):
