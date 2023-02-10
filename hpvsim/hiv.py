@@ -25,17 +25,22 @@ class HIVsim(hpb.ParsObj):
             'rel_sus': 2.2,  # Increased risk of acquiring HPV
             'rel_hiv_sev_infl': 0.5,  # Speed up growth of disease severity
             'reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
-            'time_to_hiv_death_shape': 2, # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
-            'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
+            'time_to_hiv_death_shape': 2, # shape parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
+            'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # scale parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
             'cd4_start': 594,
-            'cd4_trajectory': lambda f: (24.363 - 16.672*f)**2 # based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
+            'cd4_trajectory': lambda f: (24.363 - 16.672*f)**2, # based on https://docs.idmod.org/projects/emod-hiv/en/latest/hiv-model-healthcare-systems.html?highlight=art#art-s-impact-on-cd4-count
+            'cd4_reconstitution': lambda m: 15.584*m - 0.2113*m**2 # growth in CD4 count following ART initiation
         }
 
         self.init_states()
         if hiv_pars is not None:
-            pars = sc.mergedicts(pars, hiv_pars)
+            pars['hiv_pars'] = sc.mergedicts(pars['hiv_pars'], hiv_pars)
         self.update_pars(pars, create=True)
         self.init_results(sim)
+
+        y = np.linspace(0,1,101)
+        cd4_decline = self['hiv_pars']['cd4_trajectory'](y)
+        self.cd4_decline_diff = np.diff(cd4_decline)
 
         return
 
@@ -44,9 +49,10 @@ class HIVsim(hpb.ParsObj):
         hiv_states = [
             hpd.State('cd4', hpd.default_float, np.nan),
             hpd.State('art', bool, False),
+            hpd.State('date_art', hpd.default_float, np.nan),
             hpd.State('date_dead_hiv', hpd.default_float, np.nan),
             hpd.State('dead_hiv', bool, False),
-            hpd.State('dur_hiv', hpd.default_float, np.nan)
+            hpd.State('dur_hiv', hpd.default_float, np.nan),
         ]
         self.people.meta.all_states += hiv_states
 
@@ -88,21 +94,28 @@ class HIVsim(hpb.ParsObj):
         nearest_year = all_years[year_ind]
 
         # Figure out which age bin people belong to
-        age_bins = art_cov[nearest_year][0, :]
-        age_inds = np.digitize(self.people.age[inds], age_bins)
+        # age_bins = art_cov[nearest_year][0, :]
+        # age_inds = np.digitize(self.people.age[inds], age_bins)
 
         # Apply ART coverage by age to people
-        art_covs = art_cov[nearest_year][1, :]
-        art_adherence = art_covs[age_inds]
-        self.people.art_adherence[inds] = art_adherence
-        self.people.rel_sev_infl[inds] = (1 - art_adherence) * self['hiv_pars']['rel_hiv_sev_infl']
-        self.people.rel_sus[inds] = (1 - art_adherence) * self['hiv_pars']['rel_sus']
+        art_covs = art_cov[nearest_year]#[1, :]
+
+        art_probs = np.zeros(len(self.people), dtype=hpd.default_float)
+        art_probs[inds] = art_covs
+
+        # Get indices of people who acquire HIV
+        art_inds = hpu.true(hpu.binomial_arr(art_probs))
+
+        self.people.art[art_inds] = True
+        self.people.date_art[art_inds] = self.people.t
+        self.people.rel_sev_infl[art_inds] = self['hiv_pars']['rel_hiv_sev_infl']
+        self.people.rel_sus[art_inds] = self['hiv_pars']['rel_sus']
         self.people.cd4[inds] = self['hiv_pars']['cd4_start']
 
         # Draw time to HIV mortality
         shape = self['hiv_pars']['time_to_hiv_death_shape']
         scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[inds])
-        time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(inds))/(1-art_adherence)
+        time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(inds))
         self.people.dur_hiv[inds] = time_to_hiv_death
         self.people.date_dead_hiv[inds] = self.people.t + sc.randround(time_to_hiv_death / self.people.dt)
 
@@ -122,9 +135,19 @@ class HIVsim(hpb.ParsObj):
         Check for current cd4
         '''
         filter_inds = self.people.true('hiv')
-        frac_prognosis = (self.people.t - self.people.date_hiv[filter_inds])/self.people.dur_hiv[filter_inds]
-        cd4 = self['hiv_pars']['cd4_trajectory'](frac_prognosis)
-        self.people.cd4[filter_inds] = cd4
+        if len(filter_inds):
+            art_inds = filter_inds[hpu.true(self.people.art[filter_inds])]
+            not_art_inds = filter_inds[hpu.false(self.people.art[filter_inds])]
+
+            # First take care of people not on ART
+            frac_prognosis = 100*(self.people.t - self.people.date_hiv[not_art_inds])* self.people.dt/self.people.dur_hiv[not_art_inds]
+            cd4_change = [self.cd4_decline_diff[int(i)] for i in frac_prognosis]
+            self.people.cd4[not_art_inds] += cd4_change
+
+            # Now take care of people on ART
+            months_on_ART = (self.people.t - self.people.date_art[art_inds])*12
+            cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
+            self.people.cd4[art_inds] += cd4_change
         return
 
     def apply(self, year=None):
@@ -164,6 +187,7 @@ class HIVsim(hpb.ParsObj):
         # Get indices of people who acquire HIV
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
         self.people.hiv[hiv_inds] = True
+        self.people.hiv[hiv_inds] = self['hiv_pars']['cd4_start']
         self.people.date_hiv[hiv_inds] = self.people.t
 
         if self.people.t % self.resfreq == self.resfreq - 1:
@@ -246,25 +270,26 @@ class HIVsim(hpb.ParsObj):
             art_adherence = dict()
             years = df_art['Year'].values
             for i, year in enumerate(years):
+                art_adherence[year] = df_art.iloc[i]['ART Coverage']
 
-                # Use the incidence file to determine which age groups we want to calculate ART coverage for
-                ages_inc = hiv_incidence_rates[year]['m'][:, 0]  # Read in the age groups we have HIV incidence data for
-                ages_ex = life_exp[year]['m'][:, 0]  # Age groups available in life expectancy file
-                ages = np.intersect1d(ages_inc, ages_ex)  # Age groups we want to calculate ART coverage for
-
-                # Initialize age-specific ART coverage dict and start filling it in
-                cov = np.zeros(len(ages), dtype=hpd.default_float)
-                for j, age in enumerate(ages):
-                    idx = np.where(life_exp[year]['f'][:, 0] == age)[0]  # Finding life expectancy for this age group/year
-                    this_life_exp = life_exp[year]['f'][idx, 1]  # Pull out value
-                    last_year = int(year + this_life_exp)  # Figure out the year in which this age cohort is expected to die
-                    year_ind = sc.findnearest(years, last_year)  # Get as close to the above year as possible within the data
-                    if year_ind > i:  # Either take the mean of ART coverage from now up until the year of death
-                        cov[j] = np.mean(df_art[i:year_ind]['ART Coverage'].values)
-                    else:  # Or, just use ART overage in this year
-                        cov[j] = df_art.iloc[year_ind]['ART Coverage']
-
-                art_adherence[year] = np.array([ages, cov])
+                # # Use the incidence file to determine which age groups we want to calculate ART coverage for
+                # ages_inc = hiv_incidence_rates[year]['m'][:, 0]  # Read in the age groups we have HIV incidence data for
+                # ages_ex = life_exp[year]['m'][:, 0]  # Age groups available in life expectancy file
+                # ages = np.intersect1d(ages_inc, ages_ex)  # Age groups we want to calculate ART coverage for
+                #
+                # # Initialize age-specific ART coverage dict and start filling it in
+                # cov = np.zeros(len(ages), dtype=hpd.default_float)
+                # for j, age in enumerate(ages):
+                #     idx = np.where(life_exp[year]['f'][:, 0] == age)[0]  # Finding life expectancy for this age group/year
+                #     this_life_exp = life_exp[year]['f'][idx, 1]  # Pull out value
+                #     last_year = int(year + this_life_exp)  # Figure out the year in which this age cohort is expected to die
+                #     year_ind = sc.findnearest(years, last_year)  # Get as close to the above year as possible within the data
+                #     if year_ind > i:  # Either take the mean of ART coverage from now up until the year of death
+                #         cov[j] = np.mean(df_art[i:year_ind]['ART Coverage'].values)
+                #     else:  # Or, just use ART overage in this year
+                #         cov[j] = df_art.iloc[year_ind]['ART Coverage']
+                #
+                # art_adherence[year] = np.array([ages, cov])
 
         return hiv_incidence_rates, art_adherence
 
