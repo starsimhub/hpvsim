@@ -1,14 +1,14 @@
 '''
-Defines classes and methods for hiv natural history
+Defines classes and methods for HIV natural history
 '''
 
 import numpy as np
 import sciris as sc
 import pandas as pd
+from scipy.stats import weibull_min
 from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
-from scipy.stats import weibull_min
 
 
 class HIVsim(hpb.ParsObj):
@@ -80,6 +80,7 @@ class HIVsim(hpb.ParsObj):
         self.results = results
         return
 
+
     # %% HIV methods
 
     def set_hiv_prognoses(self, inds, year=None):
@@ -118,6 +119,7 @@ class HIVsim(hpb.ParsObj):
 
         return
 
+
     def check_hiv_mortality(self):
         '''
         Check for new deaths from HIV
@@ -126,6 +128,7 @@ class HIVsim(hpb.ParsObj):
         inds = self.people.check_inds(self.people.dead_hiv, self.people.date_dead_hiv, filter_inds=filter_inds)
         self.people.remove_people(inds, cause='hiv')
         return
+
 
     def check_cd4(self):
         '''
@@ -159,7 +162,8 @@ class HIVsim(hpb.ParsObj):
 
         return
 
-    def apply(self, year=None):
+
+    def step(self, year=None):
         '''
         Wrapper method that checks for new HIV infections, updates prognoses, etc.
         '''
@@ -172,6 +176,7 @@ class HIVsim(hpb.ParsObj):
         self.check_cd4()
         new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections
+
 
     def new_hiv_infections(self, year=None):
         '''Apply HIV infection rates to population'''
@@ -203,12 +208,13 @@ class HIVsim(hpb.ParsObj):
             # Update stock and flows
             idx = int(self.people.t / self.resfreq)
             self.results['hiv_infections'][idx] = self.people.scale_flows(hiv_inds)
-            self.results[f'hiv_infections_by_age'][:, idx] = np.histogram(self.people.age[hiv_inds], bins=self.people.age_bins, weights=self.people.scale[hiv_inds])[0]
+            self.results['hiv_infections_by_age'][:, idx] = np.histogram(self.people.age[hiv_inds], bins=self.people.age_bins, weights=self.people.scale[hiv_inds])[0]
             self.results['n_hiv'][idx] = self.people.count('hiv')
             hivinds = hpu.true(self.people['hiv'])
-            self.results[f'n_hiv_by_age'][:, idx] = np.histogram(self.people.age[hivinds], bins=self.people.age_bins, weights=self.people.scale[hivinds])[0]
+            self.results['n_hiv_by_age'][:, idx] = np.histogram(self.people.age[hivinds], bins=self.people.age_bins, weights=self.people.scale[hivinds])[0]
 
         return hiv_inds
+
 
     def update_hpv_progs(self, hiv_inds):
         dt = self.people.pars['dt']
@@ -219,6 +225,7 @@ class HIVsim(hpb.ParsObj):
                 self.people.set_severity_pars(hpv_inds, g, gpars)
                 self.people.set_severity(hpv_inds, g, gpars, dt)
         return
+
 
     def get_hiv_data(self, hiv_datafile=None, art_datafile=None):
         '''
@@ -273,11 +280,13 @@ class HIVsim(hpb.ParsObj):
 
         return hiv_incidence_rates, art_adherence
 
+
     def load_data(self, hiv_datafile=None, art_datafile=None):
         ''' Load any data files that are used to create additional parameters, if provided '''
         hiv_data = sc.objdict()
         hiv_data.infection_rates, hiv_data.art_adherence = self.get_hiv_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return hiv_data
+
 
     def finalize(self, sim):
         '''
