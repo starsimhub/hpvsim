@@ -8,12 +8,19 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 1.0.1 (2023-02-07)
+Version 1.1.0 (2023-02-16)
 ---------------------------
 - Moves all HIV functionality into hiv.py
 - Establishes new class HIVsim, which is defined by a set of parameters and methods for updating a people object
 - Bug fix for setting people.sev wrong on day of infection
 - *Github info* PR `526 <https://github.com/amath-idm/hpvsim/pull/526>`__
+
+
+Version 1.0.1 (2023-02-09)
+---------------------------
+- Fixes computation of dur_episomal by adjusting for dt
+- *GitHub info*: PR `527 <https://github.com/amath-idm/hpvsim/pull/527>`__
+
 
 Version 1.0.0 (2023-01-31)
 ---------------------------
