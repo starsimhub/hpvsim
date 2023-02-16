@@ -24,11 +24,6 @@ def test_hiv(model_hiv=True):
         'model_hiv': model_hiv
     }
 
-    hiv_pars = {
-                'rel_sus': 3,
-                'rel_hiv_sev_infl': {'cd4_200': 0.36, 'cd4_200_500': 0.76},
-            }
-
     if model_hiv:
         hiv_datafile='hiv_incidence_south_africa.csv'
         art_datafile = 'art_coverage_south_africa.csv'
@@ -38,7 +33,6 @@ def test_hiv(model_hiv=True):
 
     sim = hpv.Sim(
         pars=pars,
-        hiv_pars=hiv_pars,
         hiv_datafile=hiv_datafile,
         art_datafile=art_datafile
     )

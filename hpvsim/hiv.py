@@ -113,6 +113,7 @@ class HIVsim(hpb.ParsObj):
         # Draw time to HIV mortality
         shape = self['hiv_pars']['time_to_hiv_death_shape']
         scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[inds])
+        scale = np.maximum(scale, 0)
         time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(inds))
         self.people.dur_hiv[inds] = time_to_hiv_death
         self.people.date_dead_hiv[inds] = self.people.t + sc.randround(time_to_hiv_death / self.people.dt)
