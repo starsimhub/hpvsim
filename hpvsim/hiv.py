@@ -8,7 +8,6 @@ import pandas as pd
 from . import utils as hpu
 from . import defaults as hpd
 from . import base as hpb
-from .data import loaders as hpdata
 from scipy.stats import weibull_min
 
 
@@ -139,7 +138,7 @@ class HIVsim(hpb.ParsObj):
 
             # First take care of people not on ART
             frac_prognosis = 100*(self.people.t - self.people.date_hiv[not_art_inds])* self.people.dt/self.people.dur_hiv[not_art_inds]
-            cd4_change = [self.cd4_decline_diff[int(i)] for i in frac_prognosis]
+            cd4_change = self.cd4_decline_diff[frac_prognosis.astype(np.int64)]
             self.people.cd4[not_art_inds] += cd4_change
 
             # Now take care of people on ART
