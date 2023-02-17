@@ -109,7 +109,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def initialize(self, sim_pars=None, hiv_pars=None):
+    def initialize(self, sim_pars=None, hivsim=None):
         ''' Perform initializations '''
         super().initialize() # Initialize states
         
@@ -138,7 +138,7 @@ class People(hpb.BasePeople):
         
         # Additional validation
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
-        self.set_pars(pars=sim_pars, hiv_pars=hiv_pars) # Replace the saved parameters with this simulation's
+        self.set_pars(pars=sim_pars, hivsim=hivsim) # Replace the saved parameters with this simulation's
         self.initialized = True
         return
 
@@ -156,7 +156,7 @@ class People(hpb.BasePeople):
 
         # Check for HIV acquisitions
         if self.pars['model_hiv']:
-            self.flows['hiv_infections'] = self.apply_hiv_rates(year=year)
+            self.flows['hiv_infections'] = self.hivsim.step(year=year)
 
         # Perform updates that are not genotype-specific
         update_freq = max(1, int(self.pars['dt_demog'] / self.pars['dt'])) # Ensure it's an integer not smaller than 1
@@ -197,7 +197,7 @@ class People(hpb.BasePeople):
 
     
     #%% Disease progression methods
-    def set_prognoses(self, inds, g, gpars, dt, rel_hiv_sev_infl=None):
+    def set_prognoses(self, inds, g, gpars, dt):
         '''
         Assigns prognoses for all infected women on day of infection.
         '''
@@ -208,24 +208,19 @@ class People(hpb.BasePeople):
         self.dur_infection[g, inds] = self.dur_episomal[g, inds] # For women who transform, the length of time that they have transformed infection is added to this later
 
         # Set infection severity and outcomes
-        self.set_severity_pars(inds, g, gpars, rel_hiv_sev_infl=rel_hiv_sev_infl)
+        self.set_severity_pars(inds, g, gpars)
         self.set_severity(inds, g, gpars, dt)
 
         return
 
 
-    def set_severity_pars(self, inds, g, gpars, rel_hiv_sev_infl=None):
+    def set_severity_pars(self, inds, g, gpars):
         '''
         Set disease severity properties
         '''
         self.sev_rate[g, inds] = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=len(inds)) # Sample
-        self.sev_infl[g, inds] = gpars['sev_infl']  # Store points of inflection - currently the same for everyone unless HIV is being modeled, in which case they are modified below
+        self.sev_infl[g, inds] = gpars['sev_infl'] * self.rel_sev_infl[inds] # Store points of inflection
 
-        has_hiv = self.hiv[inds]
-        if has_hiv.any():  # Figure out if any of these women have HIV
-            immune_compromise = 1 - self.art_adherence[inds]  # Get the degree of immunocompromise
-            modified_sev_infl = immune_compromise * rel_hiv_sev_infl  # Calculate the modification to make to the transformation rate
-            self.sev_infl[g, inds] *= modified_sev_infl  # Store transformation rates
         return
 
 
@@ -239,7 +234,7 @@ class People(hpb.BasePeople):
         sev_infl = self.sev_infl[g, inds]
         sev_rate = self.sev_rate[g, inds]
         sevs = hpu.logf2(dur_episomal, sev_infl, sev_rate)
-        self.sev[g, inds] = sevs # Set severity
+        self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob = gpars['transform_prob']
@@ -348,27 +343,6 @@ class People(hpb.BasePeople):
             errormsg = 'Invalid severity values.'
             raise ValueError(errormsg)
 
-        return
-
-    def set_hiv_prognoses(self, inds, year=None):
-        ''' Set HIV outcomes (for now only ART) '''
-    
-        art_cov = self.hiv_pars.art_adherence # Shorten
-    
-        # Extract index of current year
-        all_years = np.array(list(art_cov.keys()))
-        year_ind = sc.findnearest(all_years, year)
-        nearest_year = all_years[year_ind]
-    
-        # Figure out which age bin people belong to
-        age_bins = art_cov[nearest_year][0, :]
-        age_inds = np.digitize(self.age[inds], age_bins)
-    
-        # Apply ART coverage by age to people
-        art_covs = art_cov[nearest_year][1,:]
-        art_adherence = art_covs[age_inds]
-        self.art_adherence[inds] = art_adherence
-    
         return
 
 
@@ -552,47 +526,6 @@ class People(hpb.BasePeople):
         self.date_carcinoma[genotype, inds] = np.nan
 
         return
-
-
-    def apply_hiv_rates(self, year=None):
-        '''
-        Apply HIV infection rates to population
-        '''
-        hiv_pars = self.hiv_pars.infection_rates
-        all_years = np.array(list(hiv_pars.keys()))
-        year_ind = sc.findnearest(all_years, year)
-        nearest_year = all_years[year_ind]
-        hiv_year = hiv_pars[nearest_year]
-        dt = self.pars['dt']
-
-        hiv_probs = np.zeros(len(self), dtype=hpd.default_float)
-        for sk in ['f','m']:
-            hiv_year_sex = hiv_year[sk]
-            age_bins = hiv_year_sex[:,0]
-            hiv_rates = hiv_year_sex[:,1]*dt
-            mf_inds = self.is_female if sk == 'f' else self.is_male
-            mf_inds *= self.alive # Only include people alive
-            age_inds = np.digitize(self.age[mf_inds], age_bins)
-            hiv_probs[mf_inds]  = hiv_rates[age_inds]
-        hiv_probs[self.hiv] = 0 # not at risk if already infected
-
-        # Get indices of people who acquire HIV
-        hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
-        self.hiv[hiv_inds] = True
-
-        # Update prognoses for those with HIV
-        if len(hiv_inds):
-            
-            self.set_hiv_prognoses(hiv_inds, year=year) # Set ART adherence for those with HIV
-
-            for g in range(self.pars['n_genotypes']):
-                gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-                hpv_inds = hpu.itruei((self.is_female & self.episomal[g, :]), hiv_inds) # Women with HIV who have episomal HPV
-                if len(hpv_inds): # Reevaluate these women's severity markers and determine whether they will develop cellular changes
-                    self.set_sev_rates(hpv_inds, g, gpars, rel_hiv_sev_infl=self.pars['hiv_pars']['rel_hiv_sev_infl'])
-                    self.set_sev_outcomes(hpv_inds, g, dt)
-
-        return self.scale_flows(hiv_inds)
 
 
     def apply_death_rates(self, year=None):
@@ -819,7 +752,7 @@ class People(hpb.BasePeople):
         # Compute disease progression for females
         if len(f_inds)>0:
             gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
-            self.set_prognoses(f_inds, g, gpars, dt, rel_hiv_sev_infl=self.pars['hiv_pars']['rel_hiv_sev_infl'])
+            self.set_prognoses(f_inds, g, gpars, dt)
 
         # Compute infection clearance for males
         if len(m_inds)>0:
@@ -839,6 +772,8 @@ class People(hpb.BasePeople):
             self.dead_cancer[inds] = True
         elif cause == 'emigration':
             self.emigrated[inds] = True
+        elif cause == 'hiv':
+            pass # handled by hivsim
         else:
             errormsg = f'Cause of death must be one of "other", "cancer", or "emigration", not {cause}.'
             raise ValueError(errormsg)

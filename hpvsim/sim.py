@@ -12,6 +12,7 @@ from . import defaults as hpd
 from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
+from . import hiv as hphiv
 from . import analysis as hpa
 from . import plotting as hpplt
 from . import immunity as hpimm
@@ -23,7 +24,8 @@ from .settings import options as hpo
 class Sim(hpb.BaseSim):
 
     def __init__(self, pars=None, datafile=None, label=None,
-                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None, **kwargs):
+                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
+                 hiv_pars=None, **kwargs):
 
         # Set attributes
         self.label         = label    # The label/name of the simulation
@@ -31,6 +33,7 @@ class Sim(hpb.BaseSim):
         self.datafile      = datafile # The name of the data file
         self.art_datafile  = art_datafile # The name of the ART data file
         self.hiv_datafile  = hiv_datafile # The name of the HIV data file
+        self.hiv_pars      = hiv_pars
         self.popfile       = popfile  # The population file
         self.data          = None     # The data
         self.popdict       = people   # The population dictionary
@@ -49,9 +52,7 @@ class Sim(hpb.BaseSim):
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
         # Load data, including datafile that are used to create additional optional parameters
-        location = pars.get('location') if pars else None
         self.load_data(datafile) # Load the data, if provided
-        self.load_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
 
         # Update parameters
         self.update_pars(pars, **kwargs)   # Update the parameters
@@ -63,13 +64,6 @@ class Sim(hpb.BaseSim):
         ''' Load the data to calibrate against, if provided '''
         if datafile is not None: # If a data file is provided, load it
             self.data = hpm.load_data(datafile=datafile, check_date=True, **kwargs)
-        return
-
-
-    def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
-        ''' Load any data files that are used to create additional parameters, if provided '''
-        self.hiv_data = sc.objdict()
-        self.hiv_data.infection_rates, self.hiv_data.art_adherence = hppar.get_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return
 
 
@@ -227,12 +221,6 @@ class Sim(hpb.BaseSim):
         if not sc.isnumber(self['verbose']): # pragma: no cover
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
-
-        # Handle HIV
-        if self['model_hiv']:
-            if self.hiv_data['infection_rates'] is None or self.hiv_data['art_adherence'] is None:
-                errormsg = 'Data on HIV infection rates and ART adherence must be provided if model_hiv is True.'
-                raise ValueError(errormsg)
 
         return
 
@@ -582,7 +570,9 @@ class Sim(hpb.BaseSim):
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
         
         # Finish initialization
-        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_data) # Fully initialize the people
+        self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
+                                   hiv_pars=self.hiv_pars)
+        self.people.initialize(sim_pars=self.pars, hivsim=self.hivsim) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])
@@ -742,7 +732,6 @@ class Sim(hpb.BaseSim):
                 t_since_boost = (t - people.t_imm_event[:,inds]).ravel()
                 current_imm = imm_kin_pars[t_since_boost].reshape(ss) # Get people's current level of immunity
                 people.nab_imm[:,inds] = current_imm*people.peak_imm[:,inds] # Set immunity relative to peak
-                    # return imm
         else:
             people.nab_imm[:] = people.peak_imm
         hpimm.check_immunity(people)
@@ -750,12 +739,7 @@ class Sim(hpb.BaseSim):
         # Shorten more variables
         gen_betas = np.array([g['rel_beta'] * beta for g in gen_pars.values()], dtype=hpd.default_float)
         sus_imm = people.sus_imm
-        hiv_rel_sus = np.ones(len(people), dtype=hpd.default_float)
-        hiv_inds = hpu.true(people.hiv)
-        immune_compromise = 1 - people.art_adherence[hiv_inds]
-        mod = immune_compromise * self['hiv_pars']['rel_sus']
-        mod[mod < 1] = 1
-        hiv_rel_sus[hiv_inds] *= mod
+        rel_sus = people.rel_sus
 
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
 
@@ -787,7 +771,7 @@ class Sim(hpb.BaseSim):
 
                 # Compute transmissibility for each partnership
                 for pship_inds, sources, targets, this_foi in discordant_pairs:
-                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * hiv_rel_sus[targets] # Pull out the transmissibility associated with this partnership
+                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * rel_sus[targets] # Pull out the transmissibility associated with this partnership
                     transmissions = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
                     target_inds   = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
@@ -799,14 +783,14 @@ class Sim(hpb.BaseSim):
             if len(latent_inds):
                 reactivation_probs = np.full_like(latent_inds, self['hpv_reactivation'] * dt, dtype=hpd.default_float)
 
-                if self['model_hiv']:
-                    # determine if any of these inds have HIV and adjust their probs
-                    hiv_latent_inds = latent_inds[hpu.true(people.hiv[latent_inds])]
-                    if len(hiv_latent_inds):
-                        immune_compromise = 1 - people.art_adherence[hiv_latent_inds]
-                        mod = immune_compromise * self['hiv_pars']['reactivation_prob']
-                        mod[mod < 1] = 1
-                        reactivation_probs[hpu.true(people.hiv[latent_inds])] *= mod
+                # if self['model_hiv']:
+                #     # determine if any of these inds have HIV and adjust their probs
+                #     hiv_latent_inds = latent_inds[hpu.true(people.hiv[latent_inds])]
+                #     if len(hiv_latent_inds):
+                #         immune_compromise = 1 - people.art_adherence[hiv_latent_inds]
+                #         mod = immune_compromise * self['hiv_pars']['reactivation_prob']
+                #         mod[mod < 1] = 1
+                #         reactivation_probs[hpu.true(people.hiv[latent_inds])] *= mod
                 is_reactivated = hpu.binomial_arr(reactivation_probs)
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
@@ -991,7 +975,10 @@ class Sim(hpb.BaseSim):
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
-        # self.finalize_interventions()
+        # self.finalize_interventions() #TODO: why is this commented out?
+
+        if self['model_hiv']:
+            self.hivsim.finalize(self)
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results

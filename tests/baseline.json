@@ -23,12 +23,12 @@
     "n_infected": 74559824.0,
     "n_abnormal": 74547696.0,
     "n_latent": 0.0,
-    "n_precin": 29594792.0,
-    "n_cin1": 19109136.0,
-    "n_cin2": 3209103.0,
-    "n_cin3": 3342462.0,
+    "n_precin": 30687124.0,
+    "n_cin1": 18089546.0,
+    "n_cin2": 3110902.25,
+    "n_cin3": 3172732.5,
     "n_carcinoma": 0.0,
-    "n_cin": 25052100.0,
+    "n_cin": 23777914.0,
     "n_detected_cancer": 0.0,
     "n_screened": 591629.125,
     "n_cin_treated": 0.0,
@@ -75,9 +75,9 @@
     "hiv_incidence": 0.0,
     "hiv_prevalence": 0.0,
     "hpv_prevalence": 0.11695111747249973,
-    "precin_prevalence": 0.09274695942022648,
-    "cin1_prevalence": 0.05988601849770017,
-    "cin2_prevalence": 0.010056990625794128,
-    "cin3_prevalence": 0.01047492367838399
+    "precin_prevalence": 0.09617021279796317,
+    "cin1_prevalence": 0.0566907308823904,
+    "cin2_prevalence": 0.009749239823717675,
+    "cin3_prevalence": 0.009943009311527978
   }
 }
