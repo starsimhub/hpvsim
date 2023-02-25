@@ -21,7 +21,7 @@ class HIVsim(hpb.ParsObj):
         self.people = sim.people
         # Define default parameters, can be overwritten by hiv_pars
         pars['hiv_pars'] = {
-            'rel_sus': {
+            'rel_sus': { # Increased risk of acquiring HPV
                 'cat1': {
                     'cd4_lower': 0,
                     'cd4_upper': 200,
@@ -32,8 +32,8 @@ class HIVsim(hpb.ParsObj):
                     'cd4_upper': 500,
                     'value': 2.2
                 }
-            },  # Increased risk of acquiring HPV
-            'rel_sev_infl': {
+            },
+            'rel_sev_infl': { # Speed up growth of disease severity
                 'cat1':{
                     'cd4_lower': 0,
                     'cd4_upper': 200,
@@ -44,8 +44,8 @@ class HIVsim(hpb.ParsObj):
                     'cd4_upper': 500,
                     'value': 0.76
                 }
-            },  # Speed up growth of disease severity
-            'rel_imm': {
+            },
+            'rel_imm': { # Reduction in immunity acquired after infection/vaccination
                 'cat1': {
                     'cd4_lower': 0,
                     'cd4_upper': 200,
@@ -56,8 +56,7 @@ class HIVsim(hpb.ParsObj):
                     'cd4_upper': 500,
                     'value': 0.76
                 }
-
-            },  # Reduction in immunity acquired after infection/vaccination
+            },
             'rel_reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
             'time_to_hiv_death_shape': 2, # shape parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
             'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # scale parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
@@ -116,6 +115,11 @@ class HIVsim(hpb.ParsObj):
         results['hiv_prevalence_by_age'] = init_res('HIV prevalence by age', n_rows=na)
         results['hiv_incidence'] = init_res('HIV incidence')
         results['hiv_incidence_by_age'] = init_res('HIV incidence by age', n_rows=na)
+        results['n_hpv_by_age_with_hiv'] = init_res('Number HPV infections by age among HIV+', n_rows=na)
+        results['n_hpv_by_age_no_hiv'] = init_res('Number HPV infections by age among HIV-', n_rows=na)
+        results['hpv_prevalence_by_age_with_hiv'] = init_res('HPV prevalence by age among HIV+', n_rows=na)
+        results['hpv_prevalence_by_age_no_hiv'] = init_res('HPV prevalence by age among HIV-', n_rows=na)
+
         self.results = results
         return
 
@@ -293,6 +297,13 @@ class HIVsim(hpb.ParsObj):
             hivinds = hpu.true(self.people['hiv'])
             self.results['n_hiv_by_age'][:, idx] = np.histogram(self.people.age[hivinds], bins=self.people.age_bins, weights=self.people.scale[hivinds])[0]
 
+            # Pull out those with HPV and HIV+
+            hpvhivinds = hpu.true((self.people['hiv']) & self.people['infectious'])
+            self.results['n_hpv_by_age_with_hiv'][:, idx] = np.histogram(self.people.age[hpvhivinds], bins=self.people.age_bins, weights=self.people.scale[hpvhivinds])[0]
+
+            # Pull out those with HPV and HIV-
+            hpvnohivinds = hpu.true(~(self.people['hiv']) & self.people['infectious'])
+            self.results['n_hpv_by_age_no_hiv'][:, idx] = np.histogram(self.people.age[hpvnohivinds], bins=self.people.age_bins, weights=self.people.scale[hpvnohivinds])[0]
 
     def get_hiv_data(self, hiv_datafile=None, art_datafile=None):
         '''
@@ -373,9 +384,13 @@ class HIVsim(hpb.ParsObj):
                 answer[:, fill_inds] = num[:, fill_inds] / denom[fill_inds]
             return answer
 
+        ng = sim.pars['n_genotypes']
+        no_hiv_by_age = simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]
         self.results['hiv_prevalence_by_age'][:] = safedivide(res['n_hiv_by_age'][:], simres['n_alive_by_age'][:])
         self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], (simres['n_alive'][:] - res['n_hiv'][:]))
         self.results['hiv_incidence_by_age'][:] = sc.safedivide(res['hiv_infections_by_age'][:], (simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]))
         self.results['hiv_prevalence'][:] = sc.safedivide(res['n_hiv'][:], simres['n_alive'][:])
+        self.results['hpv_prevalence_by_age_with_hiv'][:] = safedivide(res['n_hpv_by_age_with_hiv'][:], ng*res['n_hiv_by_age'][:])
+        self.results['hpv_prevalence_by_age_no_hiv'][:] = safedivide(res['n_hpv_by_age_no_hiv'][:], ng*no_hiv_by_age)
         sim.results = sc.mergedicts(simres, self.results)
         return

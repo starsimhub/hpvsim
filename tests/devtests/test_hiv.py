@@ -40,7 +40,7 @@ def test_hiv(model_hiv=True):
         art_datafile=art_datafile
     )
     sim.run()
-    sim.plot(to_plot=['hiv_prevalence_by_age'])
+    sim.plot(to_plot=['hiv_prevalence_by_age', 'hpv_prevalence_by_age_with_hiv', 'hpv_prevalence_by_age_no_hiv'])
     return sim
 
 
