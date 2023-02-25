@@ -107,6 +107,8 @@ class HIVsim(hpb.ParsObj):
         art_inds = hpu.true(art_bools)
         self.people.art[art_inds] = True
         self.people.date_art[art_inds] = self.people.t
+        self.people.date_dead_hiv[art_inds] = np.nan
+        self.people.dur_hiv[art_inds] = np.nan
 
         if incident:
             # Assign starting CD4

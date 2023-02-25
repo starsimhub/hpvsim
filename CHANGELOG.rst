@@ -8,6 +8,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.1.1 (2023-02-24)
+---------------------------
+- Sets time to and date of HIV death for those not on ART and who fail on ART
+- *Github info* PR `526 <https://github.com/amath-idm/hpvsim/pull/526>`__
+
 Version 1.1.0 (2023-02-16)
 ---------------------------
 - Moves all HIV functionality into hiv.py
