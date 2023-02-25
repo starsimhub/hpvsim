@@ -144,6 +144,7 @@ class HIVsim(hpb.ParsObj):
         filter_inds = self.people.true('hiv')
         inds = self.people.check_inds(self.people.dead_hiv, self.people.date_dead_hiv, filter_inds=filter_inds)
         self.people.remove_people(inds, cause='hiv')
+        self.people['hiv'][inds] = False
         return
 
 
