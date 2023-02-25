@@ -23,6 +23,7 @@ class HIVsim(hpb.ParsObj):
         pars['hiv_pars'] = {
             'rel_sus': 2.2,  # Increased risk of acquiring HPV
             'rel_hiv_sev_infl': {'cd4_200': 0.36, 'cd4_200_500': 0.76},  # Speed up growth of disease severity
+            'rel_hiv_imm': {'cd4_200': 0.36, 'cd4_200_500': 0.76},  # Reduction in immunity acquired after infection/vaccination
             'reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
             'time_to_hiv_death_shape': 2, # shape parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
             'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # scale parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
@@ -111,9 +112,6 @@ class HIVsim(hpb.ParsObj):
         self.people.dur_hiv[art_inds] = np.nan
 
         if incident:
-            # Assign starting CD4
-            self.people.cd4[inds] = hpu.sample(**self['hiv_pars']['cd4_start'], size=len(inds))
-
             # Filter those who are not on ART and assign time to HIV death
             no_art_inds = np.setdiff1d(inds, art_inds)
             scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[no_art_inds])
@@ -172,10 +170,14 @@ class HIVsim(hpb.ParsObj):
             if len(cd4_200_inds):
                 self.people.rel_sev_infl[cd4_200_inds] = self['hiv_pars']['rel_hiv_sev_infl']['cd4_200']
                 self.people.rel_sus[cd4_200_inds] = self['hiv_pars']['rel_sus']
+                self.people.rel_imm[cd4_200_inds] = self['hiv_pars']['rel_hiv_imm']['cd4_200']
+                self.update_hpv_progs(cd4_200_inds)  # Update any HPV prognoses
 
             if len(cd4_200_500_inds):
                 self.people.rel_sev_infl[cd4_200_500_inds] = self['hiv_pars']['rel_hiv_sev_infl']['cd4_200_500']
                 self.people.rel_sus[cd4_200_500_inds] = self['hiv_pars']['rel_sus']
+                self.people.rel_imm[cd4_200_500_inds] = self['hiv_pars']['rel_hiv_imm']['cd4_200']
+                self.update_hpv_progs(cd4_200_500_inds)  # Update any HPV prognoses
 
         return
 
@@ -197,10 +199,10 @@ class HIVsim(hpb.ParsObj):
         new_infection_inds = self.new_hiv_infections(year) # Newly acquired HIV infections
         if len(new_infection_inds):
             self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
-            self.update_hpv_progs(new_infection_inds) # Update any HPV prognoses
 
         self.check_hiv_mortality()
         self.check_cd4()
+        self.update_hiv_results(new_infection_inds)
         new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections
 
@@ -228,17 +230,8 @@ class HIVsim(hpb.ParsObj):
         # Get indices of people who acquire HIV
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
         self.people.hiv[hiv_inds] = True
-        self.people.hiv[hiv_inds] = self['hiv_pars']['cd4_start']
+        self.people.cd4[hiv_inds] = hpu.sample(**self['hiv_pars']['cd4_start'], size=len(hiv_inds))
         self.people.date_hiv[hiv_inds] = self.people.t
-
-        if self.people.t % self.resfreq == self.resfreq - 1:
-            # Update stock and flows
-            idx = int(self.people.t / self.resfreq)
-            self.results['hiv_infections'][idx] = self.people.scale_flows(hiv_inds)
-            self.results['hiv_infections_by_age'][:, idx] = np.histogram(self.people.age[hiv_inds], bins=self.people.age_bins, weights=self.people.scale[hiv_inds])[0]
-            self.results['n_hiv'][idx] = self.people.count('hiv')
-            hivinds = hpu.true(self.people['hiv'])
-            self.results['n_hiv_by_age'][:, idx] = np.histogram(self.people.age[hivinds], bins=self.people.age_bins, weights=self.people.scale[hivinds])[0]
 
         return hiv_inds
 
@@ -250,8 +243,18 @@ class HIVsim(hpb.ParsObj):
             hpv_inds = hpu.itruei((self.people.is_female & self.people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
             if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
                 self.people.set_severity_pars(hpv_inds, g, gpars)
-                self.people.set_severity(hpv_inds, g, gpars, dt)
+                self.people.set_severity(hpv_inds, g, gpars, dt, set_sev=False)
         return
+
+    def update_hiv_results(self, hiv_inds):
+        if self.people.t % self.resfreq == self.resfreq - 1:
+            # Update stock and flows
+            idx = int(self.people.t / self.resfreq)
+            self.results['hiv_infections'][idx] = self.people.scale_flows(hiv_inds)
+            self.results['hiv_infections_by_age'][:, idx] = np.histogram(self.people.age[hiv_inds], bins=self.people.age_bins, weights=self.people.scale[hiv_inds])[0]
+            self.results['n_hiv'][idx] = self.people.count('hiv')
+            hivinds = hpu.true(self.people['hiv'])
+            self.results['n_hiv_by_age'][:, idx] = np.histogram(self.people.age[hivinds], bins=self.people.age_bins, weights=self.people.scale[hivinds])[0]
 
 
     def get_hiv_data(self, hiv_datafile=None, art_datafile=None):

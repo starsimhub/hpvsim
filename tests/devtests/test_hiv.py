@@ -8,9 +8,10 @@ import hpvsim as hpv
 
 do_plot = 0
 do_save = 0
-debug = 1
+debug = 0
 
 n_agents = [50e3,500][debug] # Swap between sizes
+start = [1970,1990][debug]
 
 
 #%% Define the tests
@@ -21,7 +22,9 @@ def test_hiv(model_hiv=True):
     pars = {
         'n_agents': n_agents,
         'location': 'south africa',
-        'model_hiv': model_hiv
+        'model_hiv': model_hiv,
+        'start': start,
+        'end': 2030
     }
 
     if model_hiv:
@@ -47,6 +50,8 @@ def test_impact_on_cancer():
     pars = {
         'n_agents': n_agents,
         'location': 'south africa',
+        'start': start,
+        'end': 2030
     }
 
     base_sim = hpv.Sim(
@@ -76,6 +81,7 @@ def test_impact_on_cancer():
             'hiv_pars': {
                 'rel_sus': 3,
                 'rel_hiv_sev_infl': {'cd4_200': 0.36, 'cd4_200_500': 0.76},
+                'rel_hiv_imm': {'cd4_200': 0.1, 'cd4_200_500': 0.5},
             }
         }
     }

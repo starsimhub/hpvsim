@@ -224,7 +224,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def set_severity(self, inds, g, gpars, dt):
+    def set_severity(self, inds, g, gpars, dt, set_sev=True):
         '''
         Set severity levels for individual women
         '''
@@ -234,7 +234,8 @@ class People(hpb.BasePeople):
         sev_infl = self.sev_infl[g, inds]
         sev_rate = self.sev_rate[g, inds]
         sevs = hpu.logf2(dur_episomal, sev_infl, sev_rate)
-        self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
+        if set_sev:
+            self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob = gpars['transform_prob']
@@ -250,8 +251,9 @@ class People(hpb.BasePeople):
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
             extra_sev_rate = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=full_size)
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
-            sev_infl = gpars['sev_infl'] # This assumes none of the extra agents have HIV...
-            extra_sev = hpu.logf2(extra_dur_episomal, sev_infl, extra_sev_rate)
+            extra_sev_infl = gpars['sev_infl'] * self.rel_sev_infl[inds]# This assumes none of the extra agents have HIV...
+            extra_sev_infl = extra_sev_infl[:, None] * np.full(fill_value=1, shape=full_size)
+            extra_sev = hpu.logf2(extra_dur_episomal, extra_sev_infl, extra_sev_rate)
 
             # Based on the severity values, determine transformation probabilities
             extra_transform_probs = hpu.transform_prob(transform_prob, extra_sev[:, 1:])
@@ -286,6 +288,8 @@ class People(hpb.BasePeople):
                 is_transform = np.append(is_transform, np.full(len(new_inds), fill_value=True))
                 new_sev_rate = extra_sev_rate[:,1:][extra_transform_bools]
                 new_dur_episomal = extra_dur_episomal[:,1:][extra_transform_bools]
+                new_sev_infl = extra_sev_infl[:,1:][extra_transform_bools]
+                self.sev_infl[g, new_inds] = new_sev_infl
                 self.sev_rate[g, new_inds] = new_sev_rate
                 self.dur_episomal[g, new_inds] = new_dur_episomal
                 self.dur_infection[g, new_inds] = new_dur_episomal
@@ -301,9 +305,9 @@ class People(hpb.BasePeople):
             transform_probs = hpu.transform_prob(transform_prob, hpu.logf2(self.dur_episomal[g,inds], sev_infl, self.sev_rate[g,inds]))
 
         # Set dates of cin1, 2, 3 for all women who get infected
-        self.date_cin1[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['precin'], sev_infl, self.sev_rate[g, inds])/dt)
-        self.date_cin2[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin1'], sev_infl, self.sev_rate[g, inds])/dt)
-        self.date_cin3[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin2'], sev_infl, self.sev_rate[g, inds])/dt)
+        self.date_cin1[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['precin'], self.sev_infl[g, inds], self.sev_rate[g, inds])/dt)
+        self.date_cin2[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin1'], self.sev_infl[g, inds], self.sev_rate[g, inds])/dt)
+        self.date_cin3[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin2'], self.sev_infl[g, inds], self.sev_rate[g, inds])/dt)
         # self.date_carcinoma[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin3'], sev_infl, self.sev_rate[g, inds])/dt)
 
         # Now handle women who transform - need to adjust their length of infection and set more dates

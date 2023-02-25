@@ -121,7 +121,8 @@ class PeopleMeta(sc.prettyobj):
 
     rel_states = [
         State('rel_sev_infl', default_float, 1.0),  # Individual relative risk for rate severe disease growth (does not vary by genotype)
-        State('rel_sus', default_float, 1.0)        # Individual relative risk for acquiring infection (does not vary by genotype)
+        State('rel_sus', default_float, 1.0),       # Individual relative risk for acquiring infection (does not vary by genotype)
+        State('rel_imm', default_float, 1.0)        # Individual relative level of immunity acquired from infection clearance/vaccination
     ]
 
     derived_states = [
