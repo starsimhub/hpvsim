@@ -89,6 +89,7 @@ class HIVsim(hpb.ParsObj):
         ''' Set HIV outcomes '''
 
         art_cov = self['art_adherence']  # Shorten
+        shape = self['hiv_pars']['time_to_hiv_death_shape']
 
         # Extract index of current year
         all_years = np.array(list(art_cov.keys()))
@@ -111,11 +112,7 @@ class HIVsim(hpb.ParsObj):
             # Assign starting CD4
             self.people.cd4[inds] = hpu.sample(**self['hiv_pars']['cd4_start'], size=len(inds))
 
-        # Draw time to HIV mortality
-        shape = self['hiv_pars']['time_to_hiv_death_shape']
-
-        # Filter those who are not on ART and assign time to HIV death
-        if incident:
+            # Filter those who are not on ART and assign time to HIV death
             no_art_inds = np.setdiff1d(inds, art_inds)
             scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[no_art_inds])
             scale = np.maximum(scale, 0)
