@@ -37,12 +37,12 @@ class HIVsim(hpb.ParsObj):
                 'cat1':{
                     'cd4_lower': 0,
                     'cd4_upper': 200,
-                    'value': 0.36
+                    'value': 0.25
                 },
                 'cat2': {
                     'cd4_lower': 200,
                     'cd4_upper': 500,
-                    'value': 0.76
+                    'value': 0.5
                 }
             },
             'rel_imm': { # Reduction in immunity acquired after infection/vaccination
