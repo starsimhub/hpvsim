@@ -68,20 +68,9 @@ def test_impact_on_cancer():
             }
         },
         'hiv_baseline': {
-            'name': 'HIV, baseline',
+            'name': 'HIV',
             'pars': {
                 'model_hiv': True
-            }
-        },
-        'hiv_elevated_risk': {
-            'name': 'HIV, elevated risk',
-            'pars': {
-                'model_hiv': True,
-            },
-            'hiv_pars': {
-                'rel_sus': 3,
-                'rel_hiv_sev_infl': {'cd4_200': 0.36, 'cd4_200_500': 0.76},
-                'rel_hiv_imm': {'cd4_200': 0.1, 'cd4_200_500': 0.5},
             }
         }
     }
