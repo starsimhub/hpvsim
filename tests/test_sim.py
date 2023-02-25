@@ -113,6 +113,8 @@ def test_epi():
 
         if par_effect.par == 'model_hiv':
             base_pars['location'] = 'south africa'
+            base_pars['n_years'] = 30
+            base_pars['dt'] = 0.25
             hiv_datafile = 'test_data/hiv_incidence_south_africa.csv'
             art_datafile = 'test_data/art_coverage_south_africa.csv'
         else:
