@@ -50,7 +50,9 @@ class HIVsim(hpb.ParsObj):
     def init_states(self):
         hiv_states = [
             hpd.State('cd4', hpd.default_float, np.nan),
+            hpd.State('hiv', bool, False),
             hpd.State('art', bool, False),
+            hpd.State('date_hiv', hpd.default_float, np.nan),
             hpd.State('date_art', hpd.default_float, np.nan),
             hpd.State('date_dead_hiv', hpd.default_float, np.nan),
             hpd.State('dead_hiv', bool, False),
@@ -155,12 +157,13 @@ class HIVsim(hpb.ParsObj):
             not_art_inds = filter_inds[hpu.false(self.people.art[filter_inds])]
 
             # First take care of people not on ART
-            frac_prognosis = 100*(self.people.t - self.people.date_hiv[not_art_inds])* self.people.dt/self.people.dur_hiv[not_art_inds]
+            frac_prognosis = 100 * (self.people.t - self.people.date_hiv[not_art_inds]) * self.people.dt / \
+                             self.people.dur_hiv[not_art_inds]
             cd4_change = self.cd4_decline_diff[frac_prognosis.astype(np.int64)]
             self.people.cd4[not_art_inds] += cd4_change
 
             # Now take care of people on ART
-            months_on_ART = (self.people.t - self.people.date_art[art_inds])*12
+            months_on_ART = (self.people.t - self.people.date_art[art_inds]) * 12
             cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
             self.people.cd4[art_inds] += cd4_change
 
@@ -178,6 +181,7 @@ class HIVsim(hpb.ParsObj):
                 self.people.rel_sus[cd4_200_500_inds] = self['hiv_pars']['rel_sus']
                 self.people.rel_imm[cd4_200_500_inds] = self['hiv_pars']['rel_hiv_imm']['cd4_200']
                 self.update_hpv_progs(cd4_200_500_inds)  # Update any HPV prognoses
+
 
         return
 
@@ -201,7 +205,8 @@ class HIVsim(hpb.ParsObj):
             self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
 
         self.check_hiv_mortality()
-        self.check_cd4()
+        if t % update_freq == 0:
+            self.check_cd4()
         self.update_hiv_results(new_infection_inds)
         new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections

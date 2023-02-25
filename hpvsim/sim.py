@@ -495,8 +495,6 @@ class Sim(hpb.BaseSim):
         results['n_females_alive_by_age'] = init_res('Number females alive by age', n_rows=na)
         results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
-        results['hiv_incidence'] = init_res('HIV incidence')
-        results['hiv_prevalence'] = init_res('HIV prevalence')
         results['hpv_prevalence'] = init_res('HPV prevalence', color=stock_colors[0])
         results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=stock_colors[0])
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=stock_colors[0])
@@ -851,9 +849,6 @@ class Sim(hpb.BaseSim):
             for key in [state.name for state in hpd.PeopleMeta.intv_states]:
                 self.results[f'n_{key}'][idx] = people.count(key)
 
-            # Count total hiv infections
-            self.results['n_hiv'][idx] = people.count('hiv')
-
             # Update cancers and cancers by age
             cases_by_age = self.results['cancers_by_age'][:, idx]
             inds = people.alive * (self.people.sex==0) * ~people.cancerous.any(axis=0)
@@ -1028,8 +1023,6 @@ class Sim(hpb.BaseSim):
         self.results['hpv_prevalence'][:]               = sc.safedivide(res['n_infectious'][:], ng*res['n_alive'][:])
         self.results['hpv_prevalence_by_genotype'][:]   = safedivide(res['n_infectious_by_genotype'][:], res['n_alive'][:])
         self.results['hpv_prevalence_by_age'][:]        = safedivide(res['n_infectious_by_age'][:], ng*res['n_alive_by_age'][:])
-        self.results['hiv_incidence'][:]                = sc.safedivide(res['hiv_infections'][:], (res['n_alive'][:]-res['n_hiv'][:]))
-        self.results['hiv_prevalence'][:]               = sc.safedivide(res['n_hiv'][:], res['n_alive'][:])
 
         alive_females = res['n_alive_by_sex'][0,:]
 
