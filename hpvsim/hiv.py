@@ -29,7 +29,8 @@ class HIVsim(hpb.ParsObj):
             'cd4_start': dict(dist='normal', par1=594, par2=20),
             'cd4_trajectory': lambda f: (24.363 - 16.672*f)**2, # based on https://docs.idmod.org/projects/emod-hiv/en/latest/hiv-model-healthcare-systems.html?highlight=art#art-s-impact-on-cd4-count
             'cd4_reconstitution': lambda m: 15.584*m - 0.2113*m**2, # growth in CD4 count following ART initiation
-            'art_failure_prob': 0.1 # Percentage of people on ART who will not suppress virus successfully
+            'art_failure_prob': 0.1, # Percentage of people on ART who will not suppress virus successfully
+            'dt_art': 1.0 # Timestep (annually) at which ART updates are made
         }
 
         self.init_states()
@@ -84,8 +85,8 @@ class HIVsim(hpb.ParsObj):
 
     # %% HIV methods
 
-    def set_hiv_prognoses(self, inds, year=None):
-        ''' Set HIV outcomes (for now only ART) '''
+    def set_hiv_prognoses(self, inds, year=None, incident=True):
+        ''' Set HIV outcomes '''
 
         art_cov = self['art_adherence']  # Shorten
 
@@ -106,20 +107,21 @@ class HIVsim(hpb.ParsObj):
         self.people.art[art_inds] = True
         self.people.date_art[art_inds] = self.people.t
 
-        # Assign starting CD4
-        self.people.cd4[inds] = hpu.sample(**self['hiv_pars']['cd4_start'], size=len(inds))
+        if incident:
+            # Assign starting CD4
+            self.people.cd4[inds] = hpu.sample(**self['hiv_pars']['cd4_start'], size=len(inds))
 
         # Draw time to HIV mortality
         shape = self['hiv_pars']['time_to_hiv_death_shape']
 
-
         # Filter those who are not on ART and assign time to HIV death
-        no_art_inds = np.setdiff1d(inds, art_inds)
-        scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[no_art_inds])
-        scale = np.maximum(scale, 0)
-        time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(no_art_inds))
-        self.people.dur_hiv[no_art_inds] = time_to_hiv_death
-        self.people.date_dead_hiv[no_art_inds] = self.people.t + sc.randround(time_to_hiv_death / self.people.dt)
+        if incident:
+            no_art_inds = np.setdiff1d(inds, art_inds)
+            scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[no_art_inds])
+            scale = np.maximum(scale, 0)
+            time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(no_art_inds))
+            self.people.dur_hiv[no_art_inds] = time_to_hiv_death
+            self.people.date_dead_hiv[no_art_inds] = self.people.t + sc.randround(time_to_hiv_death / self.people.dt)
 
         # Find those on ART who will not be virologically suppressed and assign time to HIV death
         art_failure_prob = self['hiv_pars']['art_failure_prob']
@@ -183,11 +185,21 @@ class HIVsim(hpb.ParsObj):
         '''
         Wrapper method that checks for new HIV infections, updates prognoses, etc.
         '''
+        # Pull out anyone with prevalent infection who is not on ART, check if they get on today
+        t = self.people.t
+        dt = self.people.dt
+
+        update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt)) # Ensure it's an integer not smaller than 1
+        if t % update_freq == 0:
+            hiv_inds = self.people.true('hiv')
+            if len(hiv_inds):
+                self.set_hiv_prognoses(hiv_inds, year=year, incident=False)
 
         new_infection_inds = self.new_hiv_infections(year) # Newly acquired HIV infections
         if len(new_infection_inds):
             self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
             self.update_hpv_progs(new_infection_inds) # Update any HPV prognoses
+
         self.check_hiv_mortality()
         self.check_cd4()
         new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
