@@ -139,6 +139,8 @@ class Calibration(sc.prettyobj):
 
         ar = hpa.age_results(result_args=age_result_args)
         self.sim['analyzers'] += [ar]
+        if hiv_pars is not None:
+            self.sim['model_hiv'] = True # if calibrating HIV parameters, make sure model is running HIV
         self.sim.initialize()
         for rkey in sim_results.keys():
             sim_results[rkey].timepoints = sim.get_t(sim_results[rkey].data.year.unique()[0], return_date_format='str')[0]//sim.resfreq
@@ -242,11 +244,9 @@ class Calibration(sc.prettyobj):
                 else:
                     if name in sim.hivsim.pars['hiv_pars']:
                         hiv_pars[name] = par
+            new_pars['hiv_pars'] = hiv_pars
 
-        else:
-            hiv_pars = {}
-
-        return new_pars, hiv_pars
+        return new_pars
 
 
     def trial_pars_to_sim_pars(self, trial_pars=None, which_pars=None, return_full=True):
@@ -275,6 +275,7 @@ class Calibration(sc.prettyobj):
         # Initialize
         calib_pars = {}
         genotype_pars = sc.objdict()
+        hiv_pars = sc.objdict()
 
         # Deal with trial parameters
         if trial_pars is None:
@@ -299,6 +300,16 @@ class Calibration(sc.prettyobj):
                     this_genotype_pars[gpar] = trial_pars[f'{gname}_{gpar}']
             genotype_pars[gname] = this_genotype_pars
 
+        # Handle hiv sim parameters
+        for name, par in self.hiv_pars.items():
+            if isinstance(par, dict):
+                hivsimpar = self.sim.hivsim.pars['hiv_pars'][name]
+                for parkey in par.keys():
+                    hivsimpar[parkey] = trial_pars[f'{name}_{parkey}']
+                hiv_pars[name] = hivsimpar
+            else:
+                hiv_pars[name] = trial_pars[name]
+
         # Handle regular sim parameters
         for name, par in self.calib_pars.items():
             if isinstance(par, dict):
@@ -311,10 +322,10 @@ class Calibration(sc.prettyobj):
 
         # Return
         if return_full:
-            all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars)
+            all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
             return all_pars
         else:
-            return calib_pars, genotype_pars
+            return calib_pars, genotype_pars, hiv_pars
 
 
     def sim_to_sample_pars(self):
@@ -348,6 +359,18 @@ class Calibration(sc.prettyobj):
                             sampler_key = gname + '_' + key + '_' + parkey
                             initial_pars[sampler_key] = par_highlowlist[0]
                             par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
+
+        # Convert hiv pars
+        if self.hiv_pars is not None:
+            for key, val in self.hiv_pars.items():
+                if isinstance(val, list):
+                    initial_pars[key] = val[0]
+                    par_bounds[key] = np.array([val[1], val[2]])
+                elif isinstance(val, dict):
+                    for parkey, par_highlowlist in val.items():
+                        sampler_key = key + '_' + parkey + '_'
+                        initial_pars[sampler_key] = par_highlowlist[0]
+                        par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
 
         return initial_pars, par_bounds
 
@@ -396,12 +419,16 @@ class Calibration(sc.prettyobj):
                 genotype_pars[gname] = self.trial_to_sim_pars(pardict, trial, gname=gname)
         else:
             genotype_pars = None
+        if self.hiv_pars is not None:
+            hiv_pars = self.trial_to_sim_pars(self.hiv_pars, trial)
+        else:
+            hiv_pars = None
         if self.calib_pars is not None:
             calib_pars = self.trial_to_sim_pars(self.calib_pars, trial)
         else:
             calib_pars = None
 
-        sim = self.run_sim(calib_pars, genotype_pars, return_sim=True)
+        sim = self.run_sim(calib_pars, genotype_pars, hiv_pars, return_sim=True)
 
         # Compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
@@ -484,7 +511,7 @@ class Calibration(sc.prettyobj):
         return output
 
 
-    def calibrate(self, calib_pars=None, genotype_pars=None, verbose=True, load=True, tidyup=True, **kwargs):
+    def calibrate(self, calib_pars=None, genotype_pars=None, hiv_pars=None, verbose=True, load=True, tidyup=True, **kwargs):
         '''
         Actually perform calibration.
 
@@ -500,7 +527,9 @@ class Calibration(sc.prettyobj):
             self.calib_pars = calib_pars
         if genotype_pars is not None:
             self.genotype_pars = genotype_pars
-        if (self.calib_pars is None) and (self.genotype_pars is None):
+        if hiv_pars is not None:
+            self.hiv_pars = hiv_pars
+        if (self.calib_pars is None) and (self.genotype_pars is None) and (self.hiv_pars is None):
             errormsg = 'You must supply calibration parameters (calib_pars or genotype_pars) either when creating the calibration object or when calling calibrate().'
             raise ValueError(errormsg)
         self.run_args.update(kwargs) # Update optuna settings

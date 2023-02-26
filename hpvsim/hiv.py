@@ -16,7 +16,7 @@ class HIVsim(hpb.ParsObj):
         A class based around performing operations on a self.pars dict.
         '''
 
-    def __init__(self, sim, art_datafile, hiv_datafile, hiv_pars=None):
+    def __init__(self, sim, art_datafile, hiv_datafile, hiv_pars):
         pars = self.load_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         self.people = sim.people
         # Define default parameters, can be overwritten by hiv_pars
@@ -78,7 +78,7 @@ class HIVsim(hpb.ParsObj):
         return
 
     def update_pars(self, old_pars=None, new_pars=None, create=True):
-        if new_pars is not None:
+        if len(new_pars):
             for parkey, parval in new_pars.items():
                 if isinstance(parval, dict):
                     for parvalkey, parvalval in parval.items():

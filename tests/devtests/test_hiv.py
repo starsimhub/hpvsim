@@ -25,12 +25,13 @@ def test_hiv(model_hiv=True):
         'model_hiv': model_hiv,
         'start': start,
         'end': 2030,
-    }
-    hiv_pars = {
-        'rel_sus' : dict(
+        'hiv_pars': {
+        'rel_sus': dict(
             cat1=dict(value=3)
         )
+        }
     }
+
 
     if model_hiv:
         hiv_datafile='hiv_incidence_south_africa.csv'
@@ -41,7 +42,7 @@ def test_hiv(model_hiv=True):
 
     sim = hpv.Sim(
         pars=pars,
-        hiv_pars=hiv_pars,
+        # hiv_pars=hiv_pars,
         hiv_datafile=hiv_datafile,
         art_datafile=art_datafile
     )
