@@ -11,6 +11,9 @@ All notable changes to the codebase are documented in this file. Changes that ma
 Version 1.1.1 (2023-02-24)
 ---------------------------
 - Sets time to and date of HIV death for those not on ART and who fail on ART
+- Moves all HIV attributes, parameters, and results into hivsim class instance
+- Merges HIV results with sim.results at conclusion of simulation
+- Other cleanup and small bug fixes
 - *Github info* PR `533 <https://github.com/amath-idm/hpvsim/pull/533>`__
 
 Version 1.1.0 (2023-02-16)
