@@ -41,6 +41,8 @@ class Calibration(sc.prettyobj):
         sim          (Sim)  : the simulation to calibrate
         datafiles    (list) : list of datafile strings to calibrate to
         calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
+        genotype_pars(dict) : a dictionary of the genotype-specific parameters to calibrate of the format dict(genotype=dict(key1=[best, low, high]))
+        hiv_pars     (dict) : a dictionary of the hiv-specific parameters to calibrate of the format dict(key1=[best, low, high])
         extra_sim_results (list) : list of result strings to store
         fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
         par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_float
@@ -73,7 +75,7 @@ class Calibration(sc.prettyobj):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, extra_sim_results=None,
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_results=None,
                  par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
 
@@ -94,6 +96,7 @@ class Calibration(sc.prettyobj):
         self.sim            = sim
         self.calib_pars     = calib_pars
         self.genotype_pars  = genotype_pars
+        self.hiv_pars       = hiv_pars
         self.extra_sim_results = extra_sim_results
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
@@ -162,12 +165,12 @@ class Calibration(sc.prettyobj):
         return
 
 
-    def run_sim(self, calib_pars=None, genotype_pars=None, label=None, return_sim=False):
+    def run_sim(self, calib_pars=None, genotype_pars=None, hiv_pars=None, label=None, return_sim=False):
         ''' Create and run a simulation '''
         sim = self.sim.copy()
         if label: sim.label = label
 
-        new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars)
+        new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
         sim.update_pars(new_pars)
 
         # Run the sim
@@ -189,8 +192,8 @@ class Calibration(sc.prettyobj):
 
 
     @staticmethod
-    def get_full_pars(sim=None, calib_pars=None, genotype_pars=None):
-        ''' Make a full pardict from the subset of regular sim parameters and genotype parameters used in calibration'''
+    def get_full_pars(sim=None, calib_pars=None, genotype_pars=None, hiv_pars=None):
+        ''' Make a full pardict from the subset of regular sim parameters, genotype parameters, and hiv parameters used in calibration'''
 
         # Prepare the parameters
         if calib_pars is not None:
@@ -228,7 +231,22 @@ class Calibration(sc.prettyobj):
             all_genotype_pars.update(new_genotype_pars)
             new_pars['genotype_pars'] = all_genotype_pars
 
-        return new_pars
+        if hiv_pars is not None:
+            hiv_pars = {}
+            for name, par in hiv_pars.items():
+                if isinstance(par, dict):
+                    hivsimpar = sim.hivsim.pars['hiv_pars'][name]
+                    for parkey, parval in par.items():
+                        hivsimpar[parkey] = parval
+                    hiv_pars[name] = hivsimpar
+                else:
+                    if name in sim.hivsim.pars['hiv_pars']:
+                        hiv_pars[name] = par
+
+        else:
+            hiv_pars = {}
+
+        return new_pars, hiv_pars
 
 
     def trial_pars_to_sim_pars(self, trial_pars=None, which_pars=None, return_full=True):
