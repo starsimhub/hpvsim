@@ -94,7 +94,7 @@ def invlogf2(y, x_infl, k):
     l_asymp = -1/(1+np.exp(k*x_infl))
     val = (1/(y - l_asymp)) - 1
     if (val < 0).any():
-        val[true(val < 0)] = 0
+        val[true(val < 0)] = 0.001
         # raise ValueError
     result = (-1/k)*np.log(val) + x_infl
     return result
