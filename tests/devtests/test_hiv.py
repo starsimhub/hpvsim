@@ -79,9 +79,6 @@ def test_impact_on_cancer():
     scens = hpv.Scenarios(sim=base_sim, metapars=metapars, scenarios=scenarios)
     scens.run(debug=debug)
     to_plot = {
-        'HIV prevalence': [
-            'hiv_prevalence',
-        ],
         'HPV prevalence': [
             'hpv_prevalence',
         ],
@@ -97,7 +94,7 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv(model_hiv=True)
-    # sim1 = test_impact_on_cancer()
+    # sim0 = test_hiv(model_hiv=True)
+    sim1 = test_impact_on_cancer()
     sc.toc(T)
     print('Done.')

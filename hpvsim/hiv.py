@@ -37,12 +37,12 @@ class HIVsim(hpb.ParsObj):
                 'cat1':{
                     'cd4_lower': 0,
                     'cd4_upper': 200,
-                    'value': 0.36
+                    'value': 0.25
                 },
                 'cat2': {
                     'cd4_lower': 200,
                     'cd4_upper': 500,
-                    'value': 0.76
+                    'value': 0.5
                 }
             },
             'rel_imm': { # Reduction in immunity acquired after infection/vaccination
@@ -241,8 +241,7 @@ class HIVsim(hpb.ParsObj):
             self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
 
         self.check_hiv_mortality()
-        if t % update_freq == 0:
-            self.check_cd4()
+        self.check_cd4()
         self.update_hiv_results(new_infection_inds)
         new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections
