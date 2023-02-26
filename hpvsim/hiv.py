@@ -108,17 +108,23 @@ class HIVsim(hpb.ParsObj):
         na = len(sim['age_bins']) - 1  # Number of age bins
 
         results['hiv_infections'] = init_res('Number HIV infections')
-        results['hiv_infections_by_age'] = init_res('Number HIV infections by age', n_rows=na)
-        results['n_hiv'] = init_res('Number living with HIV')
-        results['n_hiv_by_age'] = init_res('Number living with HIV by age', n_rows=na)
-        results['hiv_prevalence'] = init_res('HIV prevalence')
-        results['hiv_prevalence_by_age'] = init_res('HIV prevalence by age', n_rows=na)
-        results['hiv_incidence'] = init_res('HIV incidence')
-        results['hiv_incidence_by_age'] = init_res('HIV incidence by age', n_rows=na)
-        results['n_hpv_by_age_with_hiv'] = init_res('Number HPV infections by age among HIV+', n_rows=na)
-        results['n_hpv_by_age_no_hiv'] = init_res('Number HPV infections by age among HIV-', n_rows=na)
-        results['hpv_prevalence_by_age_with_hiv'] = init_res('HPV prevalence by age among HIV+', n_rows=na)
-        results['hpv_prevalence_by_age_no_hiv'] = init_res('HPV prevalence by age among HIV-', n_rows=na)
+        results['hiv_infections_by_age'] = init_res('Number HIV infections by age', n_rows=na, color=hpd.inci_colors[0])
+        results['n_hiv'] = init_res('Number living with HIV', color=hpd.inci_colors[0])
+        results['n_hiv_by_age'] = init_res('Number living with HIV by age', n_rows=na, color=hpd.inci_colors[0])
+        results['hiv_prevalence'] = init_res('HIV prevalence', color=hpd.inci_colors[0])
+        results['hiv_prevalence_by_age'] = init_res('HIV prevalence by age', n_rows=na, color=hpd.inci_colors[0])
+        results['hiv_incidence'] = init_res('HIV incidence', color=hpd.inci_colors[0])
+        results['hiv_incidence_by_age'] = init_res('HIV incidence by age', n_rows=na, color=hpd.inci_colors[0])
+        results['n_hpv_by_age_with_hiv'] = init_res('Number HPV infections by age among HIV+', n_rows=na, color=hpd.inci_colors[0])
+        results['n_hpv_by_age_no_hiv'] = init_res('Number HPV infections by age among HIV-', n_rows=na, color=hpd.inci_colors[0])
+        results['hpv_prevalence_by_age_with_hiv'] = init_res('HPV prevalence by age among HIV+', n_rows=na, color=hpd.inci_colors[0])
+        results['hpv_prevalence_by_age_no_hiv'] = init_res('HPV prevalence by age among HIV-', n_rows=na, color=hpd.inci_colors[0])
+        results['cancers_by_age_with_hiv'] = init_res('Cancers by age among HIV+', n_rows=na, color=hpd.inci_colors[0])
+        results['cancers_by_age_no_hiv'] = init_res('Cancers by age among HIV-', n_rows=na, color=hpd.inci_colors[0])
+        results['cancers_with_hiv'] = init_res('Cancers among HIV+', color=hpd.inci_colors[0])
+        results['cancers_no_hiv'] = init_res('Cancers among HIV-', color=hpd.inci_colors[0])
+        results['cancer_incidence_with_hiv'] = init_res('Cancer incidence among HIV+', color=hpd.inci_colors[0])
+        results['cancer_incidence_no_hiv'] = init_res('Cancer incidence among HIV-', color=hpd.inci_colors[0])
 
         self.results = results
         return
@@ -304,6 +310,19 @@ class HIVsim(hpb.ParsObj):
             hpvnohivinds = hpu.true(~(self.people['hiv']) & self.people['infectious'])
             self.results['n_hpv_by_age_no_hiv'][:, idx] = np.histogram(self.people.age[hpvnohivinds], bins=self.people.age_bins, weights=self.people.scale[hpvnohivinds])[0]
 
+            # Pull out those with cancer and HIV+
+            cancer_today_inds = hpu.true(self.people.date_cancerous == self.people.t)
+            if len(cancer_today_inds):
+                hiv_bools = self.people.hiv[cancer_today_inds]
+                cancer_today_hiv_pos_inds = cancer_today_inds[hiv_bools]
+                cancer_today_hiv_neg_inds = cancer_today_inds[~hiv_bools]
+                self.results['cancers_with_hiv'][idx] = self.people.scale_flows(cancer_today_hiv_pos_inds)
+                self.results['cancers_no_hiv'][idx] = self.people.scale_flows(cancer_today_hiv_neg_inds)
+                self.results['cancers_by_age_with_hiv'][:, idx] = np.histogram(self.people.age[cancer_today_hiv_pos_inds], bins=self.people.age_bins, weights=self.people.scale[cancer_today_hiv_pos_inds])[0]
+                self.results['cancers_by_age_no_hiv'][:, idx] = np.histogram(self.people.age[cancer_today_hiv_neg_inds], bins=self.people.age_bins, weights=self.people.scale[cancer_today_hiv_neg_inds])[0]
+
+
+
     def get_hiv_data(self, hiv_datafile=None, art_datafile=None):
         '''
         Load HIV incidence and art coverage data, if provided
@@ -372,6 +391,7 @@ class HIVsim(hpb.ParsObj):
         res = self.results
         simres = sim.results
 
+
         # Compute HIV incidence and prevalence
         def safedivide(num, denom):
             ''' Define a variation on sc.safedivide that respects shape of numerator '''
@@ -391,5 +411,12 @@ class HIVsim(hpb.ParsObj):
         self.results['hiv_prevalence'][:] = sc.safedivide(res['n_hiv'][:], simres['n_alive'][:])
         self.results['hpv_prevalence_by_age_with_hiv'][:] = safedivide(res['n_hpv_by_age_with_hiv'][:], ng*res['n_hiv_by_age'][:])
         self.results['hpv_prevalence_by_age_no_hiv'][:] = safedivide(res['n_hpv_by_age_no_hiv'][:], ng*no_hiv_by_age)
+
+        # Compute cancer incidence
+        # alive_females = res['n_alive_by_sex'][0, :]
+        # at_risk_females = alive_females - res['n_cancerous'][:]
+        # scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
+        # demoninator = at_risk_females / scale_factor
+
         sim.results = sc.mergedicts(simres, self.results)
         return

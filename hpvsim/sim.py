@@ -1042,13 +1042,13 @@ class Sim(hpb.BaseSim):
         self.results['cin3_prevalence_by_genotype'][:] = safedivide(res['n_cin3_by_genotype'][:], alive_females)
         self.results['cin3_prevalence_by_age'][:] = safedivide(res['n_cin3_by_age'][:],
                                                                ng*res['n_females_alive_by_age'][:])
-        # Compute CIN and cancer incidence.
+        # Compute cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]
-        scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
+        scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
         self.results['cancer_incidence'][:]             = res['cancers'][:] / demoninator
         self.results['cancer_incidence_by_genotype'][:] = res['cancers_by_genotype'][:] / demoninator
-        self.results['cancer_incidence_by_age'][:]      = sc.safedivide(res['cancers'][:], res['n_females_alive_by_age'][:]/scale_factor)
+        self.results['cancer_incidence_by_age'][:]      = sc.safedivide(res['cancers_by_age'][:], res['n_females_alive_by_age'][:]/scale_factor)
 
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor
