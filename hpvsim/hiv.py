@@ -68,9 +68,7 @@ class HIVsim(hpb.ParsObj):
         }
 
         self.init_states()
-        if hiv_pars is not None:
-            pars['hiv_pars'] = sc.mergedicts(pars['hiv_pars'], hiv_pars)
-        self.update_pars(pars, create=True)
+        self.update_pars(old_pars=pars, new_pars=hiv_pars, create=True)
         self.init_results(sim)
 
         y = np.linspace(0,1,101)
@@ -78,6 +76,22 @@ class HIVsim(hpb.ParsObj):
         self.cd4_decline_diff = np.diff(cd4_decline)
 
         return
+
+    def update_pars(self, old_pars=None, new_pars=None, create=True):
+        if new_pars is not None:
+            for parkey, parval in new_pars.items():
+                if isinstance(parval, dict):
+                    for parvalkey, parvalval in parval.items():
+                        if isinstance(parvalval, dict):
+                            for parvalkeyval, parvalvalval in parvalval.items():
+                                old_pars['hiv_pars'][parkey][parvalkey][parvalkeyval] = parvalvalval
+                        else:
+                            old_pars['hiv_pars'][parkey][parvalkey] = parvalval
+                else:
+                    old_pars['hiv_pars'][parkey] = parval
+
+        # Call update_pars() for ParsObj
+        super().update_pars(pars=old_pars, create=create)
 
 
     def init_states(self):
