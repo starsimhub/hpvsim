@@ -241,8 +241,7 @@ class HIVsim(hpb.ParsObj):
             self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
 
         self.check_hiv_mortality()
-        if t % update_freq == 0:
-            self.check_cd4()
+        self.check_cd4()
         self.update_hiv_results(new_infection_inds)
         new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections
