@@ -47,6 +47,8 @@ def test_hiv(model_hiv=True):
         ],
         'Age standardized cancer incidence (per 100,000 women)': [
             'asr_cancer_incidence',
+            'cancer_incidence_with_hiv',
+            'cancer_incidence_no_hiv',
         ],
         'Cancers by age and HIV status': [
             'cancers_by_age_with_hiv',

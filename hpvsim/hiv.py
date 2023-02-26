@@ -107,24 +107,31 @@ class HIVsim(hpb.ParsObj):
 
         na = len(sim['age_bins']) - 1  # Number of age bins
 
+        stock_colors = [i for i in set(hpd.stock_colors) if i is not None]
+
         results['hiv_infections'] = init_res('Number HIV infections')
-        results['hiv_infections_by_age'] = init_res('Number HIV infections by age', n_rows=na, color=hpd.inci_colors[0])
-        results['n_hiv'] = init_res('Number living with HIV', color=hpd.inci_colors[0])
-        results['n_hiv_by_age'] = init_res('Number living with HIV by age', n_rows=na, color=hpd.inci_colors[0])
-        results['hiv_prevalence'] = init_res('HIV prevalence', color=hpd.inci_colors[0])
-        results['hiv_prevalence_by_age'] = init_res('HIV prevalence by age', n_rows=na, color=hpd.inci_colors[0])
-        results['hiv_incidence'] = init_res('HIV incidence', color=hpd.inci_colors[0])
-        results['hiv_incidence_by_age'] = init_res('HIV incidence by age', n_rows=na, color=hpd.inci_colors[0])
-        results['n_hpv_by_age_with_hiv'] = init_res('Number HPV infections by age among HIV+', n_rows=na, color=hpd.inci_colors[0])
-        results['n_hpv_by_age_no_hiv'] = init_res('Number HPV infections by age among HIV-', n_rows=na, color=hpd.inci_colors[0])
-        results['hpv_prevalence_by_age_with_hiv'] = init_res('HPV prevalence by age among HIV+', n_rows=na, color=hpd.inci_colors[0])
-        results['hpv_prevalence_by_age_no_hiv'] = init_res('HPV prevalence by age among HIV-', n_rows=na, color=hpd.inci_colors[0])
-        results['cancers_by_age_with_hiv'] = init_res('Cancers by age among HIV+', n_rows=na, color=hpd.inci_colors[0])
-        results['cancers_by_age_no_hiv'] = init_res('Cancers by age among HIV-', n_rows=na, color=hpd.inci_colors[0])
-        results['cancers_with_hiv'] = init_res('Cancers among HIV+', color=hpd.inci_colors[0])
-        results['cancers_no_hiv'] = init_res('Cancers among HIV-', color=hpd.inci_colors[0])
-        results['cancer_incidence_with_hiv'] = init_res('Cancer incidence among HIV+', color=hpd.inci_colors[0])
-        results['cancer_incidence_no_hiv'] = init_res('Cancer incidence among HIV-', color=hpd.inci_colors[0])
+        results['hiv_infections_by_age'] = init_res('Number HIV infections by age', n_rows=na, color=stock_colors[0])
+        results['n_hiv'] = init_res('Number living with HIV', color=stock_colors[0])
+        results['n_hiv_by_age'] = init_res('Number living with HIV by age', n_rows=na, color=stock_colors[0])
+        results['hiv_prevalence'] = init_res('HIV prevalence', color=stock_colors[0])
+        results['hiv_prevalence_by_age'] = init_res('HIV prevalence by age', n_rows=na, color=stock_colors[0])
+        results['hiv_incidence'] = init_res('HIV incidence', color=stock_colors[0])
+        results['hiv_incidence_by_age'] = init_res('HIV incidence by age', n_rows=na, color=stock_colors[0])
+        results['n_hpv_by_age_with_hiv'] = init_res('Number HPV infections by age among HIV+', n_rows=na, color=stock_colors[0])
+        results['n_hpv_by_age_no_hiv'] = init_res('Number HPV infections by age among HIV-', n_rows=na, color=stock_colors[0])
+        results['hpv_prevalence_by_age_with_hiv'] = init_res('HPV prevalence by age among HIV+', n_rows=na, color=stock_colors[0])
+        results['hpv_prevalence_by_age_no_hiv'] = init_res('HPV prevalence by age among HIV-', n_rows=na, color=stock_colors[1])
+        results['cancers_by_age_with_hiv'] = init_res('Cancers by age among HIV+', n_rows=na, color=stock_colors[0])
+        results['cancers_by_age_no_hiv'] = init_res('Cancers by age among HIV-', n_rows=na, color=stock_colors[1])
+        results['cancers_with_hiv'] = init_res('Cancers among HIV+', color=stock_colors[0])
+        results['cancers_no_hiv'] = init_res('Cancers among HIV-', color=stock_colors[1])
+        results['cancer_incidence_with_hiv'] = init_res('Cancer incidence among HIV+', color=stock_colors[0])
+        results['cancer_incidence_no_hiv'] = init_res('Cancer incidence among HIV-', color=stock_colors[1])
+        results['n_females_with_hiv_alive_by_age'] = init_res('Number females with HIV alive by age', n_rows=na)
+        results['n_females_no_hiv_alive_by_age'] = init_res('Number females without HIV alive by age', n_rows=na)
+        results['n_females_with_hiv_alive'] = init_res('Number females with HIV alive')
+        results['n_females_no_hiv_alive'] = init_res('Number females without HIV alive')
+
 
         self.results = results
         return
@@ -321,7 +328,14 @@ class HIVsim(hpb.ParsObj):
                 self.results['cancers_by_age_with_hiv'][:, idx] = np.histogram(self.people.age[cancer_today_hiv_pos_inds], bins=self.people.age_bins, weights=self.people.scale[cancer_today_hiv_pos_inds])[0]
                 self.results['cancers_by_age_no_hiv'][:, idx] = np.histogram(self.people.age[cancer_today_hiv_neg_inds], bins=self.people.age_bins, weights=self.people.scale[cancer_today_hiv_neg_inds])[0]
 
-
+            alive_female_hiv_inds = hpu.true(self.people.alive*self.people.is_female*self.people.hiv)
+            self.results['n_females_with_hiv_alive'][idx] = self.people.scale_flows(alive_female_hiv_inds)
+            self.results['n_females_with_hiv_alive_by_age'][:, idx] = np.histogram(self.people.age[alive_female_hiv_inds], bins=self.people.age_bins,
+                 weights=self.people.scale[alive_female_hiv_inds])[0]
+            alive_female_no_hiv_inds = hpu.true(self.people.alive * self.people.is_female * ~self.people.hiv)
+            self.results['n_females_no_hiv_alive'][idx] = self.people.scale_flows(alive_female_no_hiv_inds)
+            self.results['n_females_no_hiv_alive_by_age'][:, idx] = np.histogram(self.people.age[alive_female_no_hiv_inds], bins=self.people.age_bins,
+                 weights=self.people.scale[alive_female_no_hiv_inds])[0]
 
     def get_hiv_data(self, hiv_datafile=None, art_datafile=None):
         '''
@@ -413,10 +427,9 @@ class HIVsim(hpb.ParsObj):
         self.results['hpv_prevalence_by_age_no_hiv'][:] = safedivide(res['n_hpv_by_age_no_hiv'][:], ng*no_hiv_by_age)
 
         # Compute cancer incidence
-        # alive_females = res['n_alive_by_sex'][0, :]
-        # at_risk_females = alive_females - res['n_cancerous'][:]
-        # scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
-        # demoninator = at_risk_females / scale_factor
+        scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
+        self.results['cancer_incidence_with_hiv'][:] = res['cancers_with_hiv'][:]/ res['n_females_with_hiv_alive'][:]*scale_factor
+        self.results['cancer_incidence_no_hiv'][:] = res['cancers_no_hiv'][:]/ res['n_females_no_hiv_alive'][:]*scale_factor
 
         sim.results = sc.mergedicts(simres, self.results)
         return
