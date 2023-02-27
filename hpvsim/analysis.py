@@ -747,10 +747,23 @@ class age_results(Analyzer):
                 # Both annual stocks and prevalence require us to calculate the current stocks.
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
                 if result_name[0] == 'n' or 'prevalence' in result_name:
+                    by_hiv = False
+                    if '_with_hiv' in result_name:
+                        result_name = result_name.replace('_with_hiv', '')  # remove "_with_hiv" from result name
+                        by_hiv = True
+                        attr2 = ppl['hiv']
+                    elif '_no_hiv' in result_name:
+                        result_name = result_name.replace('_no_hiv', '')  # remove "_no_hiv" from result name
+                        by_hiv = True
+                        attr2 = ~ppl['hiv']
+
                     attr = self.convert_rname_stocks(result_name) # Convert to a people attribute
                     if attr in ppl.keys():
                         if not by_genotype:
-                            inds = ppl[attr].any(axis=0).nonzero()[-1]  # Pull out people for which this state is true
+                            if by_hiv:
+                                inds = (ppl[attr].any(axis=0) * attr2).nonzero()[-1]  # Pull out people for which this state is true
+                            else:
+                                inds = ppl[attr].any(axis=0).nonzero()[-1]  # Pull out people for which this state is true
                             self.results[result][date] = bin_ages(inds, bins)
                         else:
                             for g in range(ng):
@@ -760,7 +773,11 @@ class age_results(Analyzer):
                         if 'prevalence' in result:
                             # Need to divide by the right denominator
                             if 'hpv' in result:  # Denominator is whole population
-                                denom = bin_ages(inds=None, bins=bins)
+                                if by_hiv:
+                                    inds = sc.findinds(attr2)
+                                    denom = bin_ages(inds=inds, bins=bins)
+                                else:
+                                    denom = bin_ages(inds=None, bins=bins)
                             else:  # Denominator is females
                                 denom = bin_ages(inds=ppl.f_inds, bins=bins)
                             if by_genotype: denom = denom[None, :]
