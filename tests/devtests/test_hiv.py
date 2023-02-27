@@ -27,7 +27,7 @@ def test_calibration_hiv():
     }
 
     hiv_datafile='hiv_incidence_south_africa.csv'
-    art_datafile = 'art_coverage_south_africa.csv'
+    art_datafile='art_coverage_south_africa.csv'
 
     sim = hpv.Sim(
         pars=pars,
@@ -75,7 +75,7 @@ def test_hiv(model_hiv=True):
         'location': 'south africa',
         'model_hiv': model_hiv,
         'start': start,
-        'end': 2030,
+        'end': 2020,
         'hiv_pars': {
         'rel_sus': dict(
             cat1=dict(value=3)
@@ -99,6 +99,9 @@ def test_hiv(model_hiv=True):
     )
     sim.run()
     to_plot = {
+        'ART Coverage': [
+            'art_coverage',
+        ],
         'HPV prevalence by HIV status': [
             'hpv_prevalence_by_age_with_hiv',
             'hpv_prevalence_by_age_no_hiv'
@@ -168,8 +171,8 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    # sim0 = test_hiv(model_hiv=True)
-    sim1 = test_impact_on_cancer()
+    sim0 = test_hiv(model_hiv=True)
+    # sim1 = test_impact_on_cancer()
     # sim, calib = test_calibration_hiv()
     sc.toc(T)
     print('Done.')

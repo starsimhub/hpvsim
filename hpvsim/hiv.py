@@ -64,7 +64,7 @@ class HIVsim(hpb.ParsObj):
             'cd4_trajectory': lambda f: (24.363 - 16.672*f)**2, # based on https://docs.idmod.org/projects/emod-hiv/en/latest/hiv-model-healthcare-systems.html?highlight=art#art-s-impact-on-cd4-count
             'cd4_reconstitution': lambda m: 15.584*m - 0.2113*m**2, # growth in CD4 count following ART initiation
             'art_failure_prob': 0.1, # Percentage of people on ART who will not suppress virus successfully
-            'dt_art': 1.0 # Timestep (annually) at which ART and CD4 updates are made
+            'dt_art': 5.0 # Timestep at which people originally not on ART can initiate care
         }
 
         self.init_states()
@@ -145,6 +145,8 @@ class HIVsim(hpb.ParsObj):
         results['n_females_no_hiv_alive_by_age'] = init_res('Number females without HIV alive by age', n_rows=na)
         results['n_females_with_hiv_alive'] = init_res('Number females with HIV alive')
         results['n_females_no_hiv_alive'] = init_res('Number females without HIV alive')
+        results['n_art'] = init_res('Number on ART')
+        results['art_coverage'] = init_res('ART coverage')
 
 
         self.results = results
@@ -259,9 +261,9 @@ class HIVsim(hpb.ParsObj):
 
         update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt)) # Ensure it's an integer not smaller than 1
         if t % update_freq == 0:
-            hiv_inds = self.people.true('hiv')
-            if len(hiv_inds):
-                self.set_hiv_prognoses(hiv_inds, year=year, incident=False)
+            no_art_inds = hpu.true(self.people.hiv * ~self.people.art)
+            if len(no_art_inds):
+                self.set_hiv_prognoses(no_art_inds, year=year, incident=False)
 
         new_infection_inds = self.new_hiv_infections(year) # Newly acquired HIV infections
         if len(new_infection_inds):
@@ -322,6 +324,9 @@ class HIVsim(hpb.ParsObj):
             self.results['n_hiv'][idx] = self.people.count('hiv')
             hivinds = hpu.true(self.people['hiv'])
             self.results['n_hiv_by_age'][:, idx] = np.histogram(self.people.age[hivinds], bins=self.people.age_bins, weights=self.people.scale[hivinds])[0]
+
+            # Pull out those on ART:
+            self.results['n_art'][idx] = self.people.count('art')
 
             # Pull out those with HPV and HIV+
             hpvhivinds = hpu.true((self.people['hiv']) & self.people['infectious'])
@@ -436,9 +441,10 @@ class HIVsim(hpb.ParsObj):
         self.results['hiv_prevalence_by_age'][:] = safedivide(res['n_hiv_by_age'][:], simres['n_alive_by_age'][:])
         self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], (simres['n_alive'][:] - res['n_hiv'][:]))
         self.results['hiv_incidence_by_age'][:] = sc.safedivide(res['hiv_infections_by_age'][:], (simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]))
-        self.results['hiv_prevalence'][:] = sc.safedivide(res['n_hiv'][:], simres['n_alive'][:])
+        self.results['hiv_prevalence'][:] = res['n_hiv'][:]/ simres['n_alive'][:]
         self.results['hpv_prevalence_by_age_with_hiv'][:] = safedivide(res['n_hpv_by_age_with_hiv'][:], ng*res['n_hiv_by_age'][:])
         self.results['hpv_prevalence_by_age_no_hiv'][:] = safedivide(res['n_hpv_by_age_no_hiv'][:], ng*no_hiv_by_age)
+        self.results['art_coverage'][:] = res['n_art'][:]/res['n_hiv'][:]
 
         # Compute cancer incidence
         scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
