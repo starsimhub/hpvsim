@@ -590,8 +590,12 @@ class age_results(Analyzer):
 
         # Store colors
         for rkey in self.result_args.keys():
-            self.result_args[rkey].color = sim.results[rkey].color
-            self.result_args[rkey].name = sim.results[rkey].name
+            if 'hiv' in rkey:
+                self.result_args[rkey].color = sim.hivsim.results[rkey].color
+                self.result_args[rkey].name = sim.hivsim.results[rkey].name
+            else:
+                self.result_args[rkey].color = sim.results[rkey].color
+                self.result_args[rkey].name = sim.results[rkey].name
 
         self.initialized = True
 
@@ -600,6 +604,8 @@ class age_results(Analyzer):
 
     def validate_results(self, sim):
         choices = sim.result_keys('total')+[k for k in sim.result_keys('genotype')]
+        if sim['model_hiv']:
+            choices += list(sim.hivsim.results.keys())
         for rk, rdict in self.result_args.items():
             if rk not in choices:
                 strm = '\n'.join(choices)
@@ -766,17 +772,29 @@ class age_results(Analyzer):
             # Both annual new cases and incidence require us to calculate the new cases over all
             # the timepoints that belong to the requested year.
             if sim.t in result_dict.calcpoints:
-
+                by_hiv = False
+                if '_with_hiv' in result_name:
+                    result_name = result_name.replace('_with_hiv','') # remove "_with_hiv" from result name
+                    by_hiv = True
+                    attr3 = ppl['hiv']
+                elif '_no_hiv' in result_name:
+                    result_name = result_name.replace('_no_hiv', '')  # remove "_no_hiv" from result name
+                    by_hiv = True
+                    attr3 = ~ppl['hiv']
                 # Figure out if it's a flow or incidence
                 if result_name in hpd.flow_keys or 'incidence' in result_name or 'mortality' in result_name:
 
                     date = self.date  # Stored just above for use here
                     attr1, attr2 = self.convert_rname_flows(result_name)
+
                     if not by_genotype:  # Results across all genotypes
                         if result_name == 'detected_cancer_deaths':
                             inds = ((ppl[attr1] == sim.t) * (ppl[attr2]) * (ppl['detected_cancer'])).nonzero()[-1]
                         else:
-                            inds = ((ppl[attr1] == sim.t) * (ppl[attr2])).nonzero()[-1]
+                            if by_hiv:
+                                inds = ((ppl[attr1] == sim.t) * (ppl[attr2]) * (attr3)).nonzero()[-1]
+                            else:
+                                inds = ((ppl[attr1] == sim.t) * (ppl[attr2])).nonzero()[-1]
                         self.results[result][date] += bin_ages(inds, bins)  # Bin the people
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
@@ -790,7 +808,10 @@ class age_results(Analyzer):
                             if 'hpv' in result:  # Denominator is susceptible population
                                 denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
                             else:  # Denominator is females at risk for cancer
-                                inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
+                                if by_hiv:
+                                    inds = sc.findinds(ppl.is_female_alive & attr3 * ~ppl.cancerous.any(axis=0))
+                                else:
+                                    inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
                                 denom = bin_ages(inds, bins) / 1e5  # CIN and cancer are per 100,000 women
                             if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
                             self.results[result][date] = self.results[result][date] / denom

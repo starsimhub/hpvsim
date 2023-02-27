@@ -153,8 +153,12 @@ class Calibration(sc.prettyobj):
         self.result_args = sc.objdict()
         for rkey in self.age_results_keys + self.sim_results_keys:
             self.result_args[rkey] = sc.objdict()
-            self.result_args[rkey].name = self.sim.results[rkey].name
-            self.result_args[rkey].color = self.sim.results[rkey].color
+            if 'hiv' in rkey:
+                self.result_args[rkey].name = self.sim.hivsim.results[rkey].name
+                self.result_args[rkey].color = self.sim.hivsim.results[rkey].color
+            else:
+                self.result_args[rkey].name = self.sim.results[rkey].name
+                self.result_args[rkey].color = self.sim.results[rkey].color
 
         if self.extra_sim_results:
             for rkey in self.extra_sim_results_keys:
@@ -239,7 +243,11 @@ class Calibration(sc.prettyobj):
                 if isinstance(par, dict):
                     hivsimpar = sim.hivsim.pars['hiv_pars'][name]
                     for parkey, parval in par.items():
-                        hivsimpar[parkey] = parval
+                        if isinstance(parval, dict):
+                            for parvalkey, parvalval in parval.items():
+                                hivsimpar[parkey][parvalkey] = parvalval
+                        else:
+                            hivsimpar[parkey] = parval
                     hiv_pars[name] = hivsimpar
                 else:
                     if name in sim.hivsim.pars['hiv_pars']:
@@ -369,6 +377,8 @@ class Calibration(sc.prettyobj):
                 elif isinstance(val, dict):
                     for parkey, par_highlowlist in val.items():
                         sampler_key = key + '_' + parkey + '_'
+                        if isinstance(par_highlowlist, dict):
+                            par_highlowlist = par_highlowlist['value']
                         initial_pars[sampler_key] = par_highlowlist[0]
                         par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
 
@@ -405,6 +415,8 @@ class Calibration(sc.prettyobj):
                         sampler_key = gname + '_' + key + '_' + parkey
                     else:
                         sampler_key = key + '_' + parkey
+                    if isinstance(par_highlowlist, dict):
+                        par_highlowlist = par_highlowlist['value']
                     pars[key][parkey] = sampler_fn(sampler_key, par_highlowlist[1], par_highlowlist[2])
 
         return pars
