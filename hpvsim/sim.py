@@ -25,7 +25,7 @@ class Sim(hpb.BaseSim):
 
     def __init__(self, pars=None, datafile=None, label=None,
                  popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
-                 hiv_pars=None, **kwargs):
+                 **kwargs):
 
         # Set attributes
         self.label         = label    # The label/name of the simulation
@@ -33,7 +33,6 @@ class Sim(hpb.BaseSim):
         self.datafile      = datafile # The name of the data file
         self.art_datafile  = art_datafile # The name of the ART data file
         self.hiv_datafile  = hiv_datafile # The name of the HIV data file
-        self.hiv_pars      = hiv_pars
         self.popfile       = popfile  # The population file
         self.data          = None     # The data
         self.popdict       = people   # The population dictionary
@@ -569,7 +568,7 @@ class Sim(hpb.BaseSim):
         
         # Finish initialization
         self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
-                                   hiv_pars=self.hiv_pars)
+                                   hiv_pars=self['hiv_pars'])
         self.people.initialize(sim_pars=self.pars, hivsim=self.hivsim) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:

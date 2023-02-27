@@ -16,6 +16,57 @@ start = [1970,1990][debug]
 
 #%% Define the tests
 
+def test_calibration_hiv():
+    sc.heading('Testing calibration with hiv pars')
+    pars = {
+        'n_agents': n_agents,
+        'location': 'south africa',
+        'model_hiv': True,
+        'start': start,
+        'end': 2020,
+    }
+
+    hiv_datafile='hiv_incidence_south_africa.csv'
+    art_datafile = 'art_coverage_south_africa.csv'
+
+    sim = hpv.Sim(
+        pars=pars,
+        hiv_datafile=hiv_datafile,
+        art_datafile=art_datafile
+    )
+
+    calib_pars = dict(
+        beta=[0.05, 0.010, 0.20],
+        dur_transformed=dict(par1=[5, 3, 10]),
+    )
+    genotype_pars = dict(
+        hpv16=dict(
+            sev_rate=[0.5, 0.2, 1.0],
+        ),
+        hpv18=dict(
+            sev_rate=[0.5, 0.2, 1.0],
+        )
+    )
+
+    hiv_pars = dict(
+        rel_sus= dict(
+            cat1=dict(value=[3, 2,4])
+        )
+    )
+
+
+    calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars,
+                            datafiles=[
+                                'south_africa_hpv_data.csv',
+                                'south_africa_cancer_data_2020.csv',
+                                'south_africa_cancer_data_hiv_2020.csv',
+                            ],
+                            total_trials=3, n_workers=1)
+    calib.calibrate(die=True)
+    calib.plot(res_to_plot=4)
+    return sim, calib
+
+
 def test_hiv(model_hiv=True):
     sc.heading('Testing hiv')
 
@@ -25,12 +76,13 @@ def test_hiv(model_hiv=True):
         'model_hiv': model_hiv,
         'start': start,
         'end': 2030,
-    }
-    hiv_pars = {
-        'rel_sus' : dict(
+        'hiv_pars': {
+        'rel_sus': dict(
             cat1=dict(value=3)
         )
+        }
     }
+
 
     if model_hiv:
         hiv_datafile='hiv_incidence_south_africa.csv'
@@ -41,7 +93,7 @@ def test_hiv(model_hiv=True):
 
     sim = hpv.Sim(
         pars=pars,
-        hiv_pars=hiv_pars,
+        # hiv_pars=hiv_pars,
         hiv_datafile=hiv_datafile,
         art_datafile=art_datafile
     )
@@ -116,7 +168,8 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv(model_hiv=True)
+    # sim0 = test_hiv(model_hiv=True)
     # sim1 = test_impact_on_cancer()
+    sim, calib = test_calibration_hiv()
     sc.toc(T)
     print('Done.')
