@@ -59,7 +59,6 @@ class People(hpb.BasePeople):
         self.init_contacts() # Initialize the contacts
         self.ng = self.pars['n_genotypes']
         self.na = len(self.pars['age_bins'])-1
-        # self.dysp_keys = ['dysplasias', 'cancers']
 
         self.lag_bins = np.linspace(0,50,51)
         self.rship_lags = dict()
@@ -135,10 +134,11 @@ class People(hpb.BasePeople):
         
         # Set the scale factor
         self.scale[:] = sim_pars['pop_scale']
-        
+
         # Additional validation
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
         self.set_pars(pars=sim_pars, hivsim=hivsim) # Replace the saved parameters with this simulation's
+
         self.initialized = True
         return
 
@@ -204,8 +204,9 @@ class People(hpb.BasePeople):
 
         # Set length of infection, which is moderated by any prior cell-level immunity
         cell_imm = self.cell_imm[g, inds]
-        self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-cell_imm)
-        self.dur_infection[g, inds] = self.dur_episomal[g, inds] # For women who transform, the length of time that they have transformed infection is added to this later
+        self.dur_infection[g, inds]  = hpu.sample(**gpars['dur_infection'], size=len(inds))*(1-cell_imm)
+        # self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-cell_imm)
+        # self.dur_infection[g, inds] = self.dur_episomal[g, inds] # For women who transform, the length of time that they have transformed infection is added to this later
 
         # Set infection severity and outcomes
         self.set_severity_pars(inds, g, gpars)
@@ -218,8 +219,10 @@ class People(hpb.BasePeople):
         '''
         Set disease severity properties
         '''
-        self.sev_rate[g, inds] = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=len(inds)) # Sample
-        self.sev_infl[g, inds] = gpars['sev_infl'] * self.rel_sev_infl[inds] # Store points of inflection
+        # self.sev_rate[g, inds] = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=len(inds)) # Sample
+        # self.sev_infl[g, inds] = gpars['sev_infl'] * self.rel_sev_infl[inds] # Store points of inflection
+        self.sev_rate[g, inds] = gpars['sev_rate']
+        self.sev_infl[g, inds] = gpars['sev_infl']
 
         return
 
@@ -230,10 +233,10 @@ class People(hpb.BasePeople):
         '''
 
         # Firstly, calculate the overall maximal severity that each woman will have
-        dur_episomal = self.dur_episomal[g, inds]
+        dur_infection = self.dur_infection[g, inds]
         sev_infl = self.sev_infl[g, inds]
         sev_rate = self.sev_rate[g, inds]
-        sevs = hpu.logf2(dur_episomal, sev_infl, sev_rate)
+        sevs = hpu.logf2(dur_infection, sev_infl, sev_rate)
         self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
@@ -579,16 +582,17 @@ class People(hpb.BasePeople):
 
         if new_births>0:
             # Generate other characteristics of the new people
-            uids, sexes, debuts, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
+            uids, sexes, debuts, rel_sev, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
             
             # Grow the arrays
             new_inds = self._grow(new_births)
-            self.uid[new_inds]        = uids
-            self.age[new_inds]        = ages
-            self.scale[new_inds]      = self.pars['pop_scale']
-            self.sex[new_inds]        = sexes
-            self.debut[new_inds]      = debuts
-            self.partners[:,new_inds] = partners
+            self.uid[new_inds]          = uids
+            self.age[new_inds]          = ages
+            self.scale[new_inds]        = self.pars['pop_scale']
+            self.sex[new_inds]          = sexes
+            self.debut[new_inds]        = debuts
+            self.rel_sev[new_inds]      = rel_sev
+            self.partners[:,new_inds]   = partners
 
             if immunity is not None:
                 self.nab_imm[:,new_inds] = immunity

@@ -78,6 +78,7 @@ class PeopleMeta(sc.prettyobj):
         State('age',            default_float,  np.nan), # Float
         State('sex',            default_float,  np.nan), # Float
         State('debut',          default_float,  np.nan), # Float
+        State('rel_sev',        default_float,  np.nan), # Float
         State('doses',          default_int,    0),  # Number of doses of the prophylactic vaccine given per person
         State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
         State('vaccine_source', default_int,    -1), # Index of the prophylactic vaccine that individual received
