@@ -309,14 +309,15 @@ class Calibration(sc.prettyobj):
             genotype_pars[gname] = this_genotype_pars
 
         # Handle hiv sim parameters
-        for name, par in self.hiv_pars.items():
-            if isinstance(par, dict):
-                hivsimpar = self.sim.hivsim.pars['hiv_pars'][name]
-                for parkey in par.keys():
-                    hivsimpar[parkey] = trial_pars[f'{name}_{parkey}']
-                hiv_pars[name] = hivsimpar
-            else:
-                hiv_pars[name] = trial_pars[name]
+        if self.hiv_pars is not None:
+            for name, par in self.hiv_pars.items():
+                if isinstance(par, dict):
+                    hivsimpar = self.sim.hivsim.pars['hiv_pars'][name]
+                    for parkey in par.keys():
+                        hivsimpar[parkey] = trial_pars[f'{name}_{parkey}']
+                    hiv_pars[name] = hivsimpar
+                else:
+                    hiv_pars[name] = trial_pars[name]
 
         # Handle regular sim parameters
         for name, par in self.calib_pars.items():

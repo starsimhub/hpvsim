@@ -45,7 +45,7 @@ class HIVsim(hpb.ParsObj):
                     'value': 0.5
                 }
             },
-            'rel_imm': { # Reduction in immunity acquired after infection/vaccination
+            'rel_imm': { # Reduction in neutralizing/t-cell immunity acquired after infection/vaccination
                 'cat1': {
                     'cd4_lower': 0,
                     'cd4_upper': 200,
