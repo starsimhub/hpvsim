@@ -5,13 +5,15 @@ Tests for single simulations
 #%% Imports and settings
 import sciris as sc
 import hpvsim as hpv
+import numpy as np
 
 do_plot = 0
 do_save = 0
 debug = 0
 
 n_agents = [50e3,500][debug] # Swap between sizes
-start = [1970,1990][debug]
+start = [1950,1990][debug]
+ms_agent_ratio = [100,10][debug]
 
 
 #%% Define the tests
@@ -67,33 +69,35 @@ def test_calibration_hiv():
     return sim, calib
 
 
-def test_hiv(model_hiv=True):
+def test_hiv():
     sc.heading('Testing hiv')
+
+    partners = dict(m=dict(dist='poisson', par1=0.1),
+                    c=dict(dist='poisson', par1=0.5),
+                    o=dict(dist='poisson', par1=0.0),
+                    )
 
     pars = {
         'n_agents': n_agents,
         'location': 'south africa',
-        'model_hiv': model_hiv,
+        'model_hiv': True,
         'start': start,
         'end': 2020,
-        'hiv_pars': {
-        'rel_sus': dict(
-            cat1=dict(value=3)
-        )
-        }
+        'ms_agent_ratio': ms_agent_ratio,
+        'partners': partners,
+        'cross_layer': 0.1  # Proportion of females who have crosslayer relationships
+        # 'hiv_pars': {
+        # 'rel_sus': dict(
+        #     cat1=dict(value=3)
+        # )
+        # }
     }
 
-
-    if model_hiv:
-        hiv_datafile='hiv_incidence_south_africa.csv'
-        art_datafile = 'art_coverage_south_africa.csv'
-    else:
-        hiv_datafile=None
-        art_datafile=None
+    hiv_datafile = 'hiv_incidence_south_africa.csv'
+    art_datafile = 'art_coverage_south_africa.csv'
 
     sim = hpv.Sim(
         pars=pars,
-        # hiv_pars=hiv_pars,
         hiv_datafile=hiv_datafile,
         art_datafile=art_datafile
     )
@@ -116,6 +120,7 @@ def test_hiv(model_hiv=True):
             'cancers_by_age_no_hiv'
         ]
     }
+    sim.plot()
     sim.plot(to_plot=to_plot)
     return sim
 
@@ -171,7 +176,7 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv(model_hiv=True)
+    sim0 = test_hiv()
     # sim1 = test_impact_on_cancer()
     # sim, calib = test_calibration_hiv()
     sc.toc(T)
