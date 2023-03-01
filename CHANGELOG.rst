@@ -8,23 +8,16 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-<<<<<<< HEAD
 
-Version 1.1.1 (2023-02-28)
----------------------------
-- Allows for flexible severity growth functions
-- *Github info* PR `526 <https://github.com/amath-idm/hpvsim/pull/526>`__
-
-=======
-Version 1.1.1 (2023-02-26)
+Version 1.1.1 (2023-03-01)
 ---------------------------
 - Sets time to and date of HIV death for those not on ART and who fail on ART
 - Moves all HIV attributes, parameters, and results into hivsim class instance
 - Merges HIV results with sim.results at conclusion of simulation
 - Adds HIV pars as an argument to calibration as well as HIV-specific results to age-results analyzer
-- Other cleanup and small bug fixes
+- Allows for flexible severity growth functions
 - *Github info* PR `533 <https://github.com/amath-idm/hpvsim/pull/533>`__
->>>>>>> hiv-updates
+
 
 Version 1.1.0 (2023-02-16)
 ---------------------------
