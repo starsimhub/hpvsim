@@ -213,37 +213,15 @@ class People(hpb.BasePeople):
         return
 
 
-<<<<<<< HEAD
-    def set_severity(self, inds, g, gpars, dt):
-=======
-    def set_severity_pars(self, inds, g, gpars):
-        '''
-        Set disease severity properties
-        '''
-        self.sev_rate[g, inds] = hpu.sample(dist='normal_pos', par1=gpars['sev_rate'], par2=gpars['sev_rate_sd'], size=len(inds)) # Sample
-        self.sev_infl[g, inds] = gpars['sev_infl'] * self.rel_sev_infl[inds] # Store points of inflection
-
-        return
-
-
     def set_severity(self, inds, g, gpars, dt, set_sev=True):
->>>>>>> hiv-updates
         '''
         Set severity levels for individual women
         '''
 
         # Firstly, calculate the overall maximal severity that each woman will have
         dur_episomal = self.dur_episomal[g, inds]
-<<<<<<< HEAD
-        self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
+        if set_sev: self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
         sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate maximal severity
-=======
-        sev_infl = self.sev_infl[g, inds]
-        sev_rate = self.sev_rate[g, inds]
-        sevs = hpu.logf2(dur_episomal, sev_infl, sev_rate)
-        if set_sev:
-            self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
->>>>>>> hiv-updates
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob_par = gpars['transform_prob'] # Pull out the genotype-specific parameter governing the probability of transformation
@@ -266,14 +244,8 @@ class People(hpb.BasePeople):
             # Create extra disease severity values for the extra agents
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
-<<<<<<< HEAD
             extra_rel_sevs = hpu.sample(**self.pars['sev_dist'], size=full_size)
             extra_sev = hppar.compute_severity(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate maximal severity
-=======
-            extra_sev_infl = gpars['sev_infl'] * self.rel_sev_infl[inds]# This assumes none of the extra agents have HIV...
-            extra_sev_infl = extra_sev_infl[:, None] * np.full(fill_value=1, shape=full_size)
-            extra_sev = hpu.logf2(extra_dur_episomal, extra_sev_infl, extra_sev_rate)
->>>>>>> hiv-updates
 
             # Based on the extra severity values, determine additional transformation probabilities
             extra_transform_probs = hpu.transform_prob(transform_prob_par, extra_sev[:, 1:])
@@ -307,12 +279,6 @@ class People(hpb.BasePeople):
                 inds = np.append(inds, new_inds)
                 is_transform = np.append(is_transform, np.full(len(new_inds), fill_value=True))
                 new_dur_episomal = extra_dur_episomal[:,1:][extra_transform_bools]
-<<<<<<< HEAD
-=======
-                new_sev_infl = extra_sev_infl[:,1:][extra_transform_bools]
-                self.sev_infl[g, new_inds] = new_sev_infl
-                self.sev_rate[g, new_inds] = new_sev_rate
->>>>>>> hiv-updates
                 self.dur_episomal[g, new_inds] = new_dur_episomal
                 self.dur_infection[g, new_inds] = new_dur_episomal
                 self.date_infectious[g, new_inds] = self.t
@@ -325,19 +291,12 @@ class People(hpb.BasePeople):
             transform_prob_arr[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
 
         # Set dates of cin1, 2, 3 for all women who get infected
-<<<<<<< HEAD
         ccdict = self.pars['clinical_cutoffs']
         rel_sev_vals = self.rel_sev[inds]
         self.date_cin1[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['precin'],    rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
         self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
         self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
         self.date_carcinoma[g, inds]    = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin3'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
-=======
-        self.date_cin1[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['precin'], self.sev_infl[g, inds], self.sev_rate[g, inds])/dt)
-        self.date_cin2[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin1'], self.sev_infl[g, inds], self.sev_rate[g, inds])/dt)
-        self.date_cin3[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin2'], self.sev_infl[g, inds], self.sev_rate[g, inds])/dt)
-        # self.date_carcinoma[g, inds] = self.t + sc.randround(hpu.invlogf2(self.pars['clinical_cutoffs']['cin3'], sev_infl, self.sev_rate[g, inds])/dt)
->>>>>>> hiv-updates
 
         # Now handle women who transform - need to adjust their length of infection and set more dates
         is_transform = hpu.binomial_arr(transform_prob_arr)

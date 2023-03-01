@@ -1,48 +1,11 @@
 {
   "summary": {
-<<<<<<< HEAD
     "infections": 55637385.6875,
-=======
-    "infections": 54549904.625,
->>>>>>> hiv-updates
     "dysplasias": 0.0,
     "precins": 0.0,
     "cin1s": 0.0,
     "cin2s": 0.0,
     "cin3s": 0.0,
-<<<<<<< HEAD
-    "cancers": 14548.258178710938,
-    "detected_cancers": 0.0,
-    "cancer_deaths": 7274.1290283203125,
-    "detected_cancer_deaths": 0.0,
-    "reinfections": 46857512.625,
-    "reactivations": 0.0,
-    "hiv_infections": 0.0,
-    "n_susceptible": 550154496.0,
-    "n_infectious": 75892200.0,
-    "n_inactive": 118810.7578125,
-    "n_normal": 318324352.0,
-    "n_episomal": 75878864.0,
-    "n_transformed": 121235.4609375,
-    "n_cancerous": 118810.7578125,
-    "n_infected": 76011008.0,
-    "n_abnormal": 75997672.0,
-    "n_latent": 0.0,
-    "n_precin": 31675194.0,
-    "n_cin1": 17729476.0,
-    "n_cin2": 3203041.5,
-    "n_cin3": 2365304.0,
-    "n_carcinoma": 874107.8125,
-    "n_cin": 23543930.0,
-    "n_detected_cancer": 0.0,
-    "n_screened": 686192.9375,
-    "n_cin_treated": 0.0,
-    "n_cancer_treated": 0.0,
-    "n_vaccinated": 1224478.125,
-    "n_tx_vaccinated": 12221748.0,
-    "n_hiv": 0.0,
-    "hpv_incidence": 0.050565237666893484,
-=======
     "cancers": 16972.9677734375,
     "detected_cancers": 0.0,
     "cancer_deaths": 9698.8388671875,
@@ -72,28 +35,10 @@
     "n_vaccinated": 1346926.25,
     "n_tx_vaccinated": 12494528.0,
     "hpv_incidence": 0.04956707056712344,
->>>>>>> hiv-updates
     "cin1_incidence": 0.0,
     "cin2_incidence": 0.0,
     "cin3_incidence": 0.0,
     "dysplasia_incidence": 0.0,
-<<<<<<< HEAD
-    "cancer_incidence": 9.174382793277266,
-    "births": 11577988.8175,
-    "other_deaths": 2599288.5,
-    "migration": -2982392.9310000003,
-    "asr_cancer_incidence": 11.121606186290991,
-    "asr_cancer_mortality": 0.0,
-    "new_total_vaccinated": 0.0,
-    "cum_total_vaccinated": 0.0,
-    "new_doses": 48494.197265625,
-    "cum_doses": 1272972.640625,
-    "new_txvx_doses": 12586667.25,
-    "new_tx_vaccinated": 12221748.75,
-    "cum_txvx_doses": 12586667.25,
-    "cum_tx_vaccinated": 12221748.75,
-    "new_screens": 686192.875,
-=======
     "cancer_incidence": 10.5779326072179,
     "births": 11565865.269000001,
     "other_deaths": 3149697.75,
@@ -109,36 +54,13 @@
     "cum_txvx_doses": 12893392.75,
     "cum_tx_vaccinated": 12493316.0,
     "new_screens": 723775.859375,
->>>>>>> hiv-updates
-    "new_screened": 0.0,
-    "new_cin_treatments": 0.0,
-    "new_cin_treated": 0.0,
-    "new_cancer_treatments": 0.0,
-    "new_cancer_treated": 0.0,
-<<<<<<< HEAD
     "cum_screens": 686192.875,
-=======
-    "cum_screens": 723775.859375,
->>>>>>> hiv-updates
     "cum_screened": 0.0,
     "cum_cin_treatments": 0.0,
     "cum_cin_treated": 0.0,
     "cum_cancer_treatments": 0.0,
     "cum_cancer_treated": 0.0,
     "detected_cancer_incidence": 0.0,
-<<<<<<< HEAD
-    "cancer_mortality": 4.583757018758358,
-    "n_alive": 318324352.0,
-    "cdr": 0.008165534567710358,
-    "cbr": 0.036371671676253034,
-    "hiv_incidence": 0.0,
-    "hiv_prevalence": 0.0,
-    "hpv_prevalence": 0.11920577160241891,
-    "precin_prevalence": 0.09979984700076122,
-    "cin1_prevalence": 0.055860715239934064,
-    "cin2_prevalence": 0.010091905092580924,
-    "cin3_prevalence": 0.007452424042305424
-=======
     "cancer_mortality": 6.0373712374504125,
     "n_alive": 318228576.0,
     "cdr": 0.00989759558865009,
@@ -148,6 +70,5 @@
     "cin1_prevalence": 0.06030956000844586,
     "cin2_prevalence": 0.00932773790837435,
     "cin3_prevalence": 0.011538925288981936
->>>>>>> hiv-updates
   }
 }

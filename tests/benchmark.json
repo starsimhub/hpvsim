@@ -1,11 +1,7 @@
 {
   "time": {
     "initialize": 0.013,
-<<<<<<< HEAD
     "run": 2.921
-=======
-    "run": 2.031
->>>>>>> hiv-updates
   },
   "parameters": {
     "n_agents": 10000,
@@ -14,9 +10,5 @@
     "n_interventions": 7,
     "n_analyzers": 0
   },
-<<<<<<< HEAD
-  "cpu_performance": 0.26741819002775546
-=======
   "cpu_performance": 0.5987731750909937
->>>>>>> hiv-updates
 }
