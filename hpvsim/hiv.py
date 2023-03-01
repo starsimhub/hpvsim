@@ -21,11 +21,6 @@ class HIVsim(hpb.ParsObj):
         self.people = sim.people
         # Define default parameters, can be overwritten by hiv_pars
         pars['hiv_pars'] = {
-<<<<<<< HEAD
-            'rel_sus': 2.2,  # Increased risk of acquiring HPV
-            'rel_hiv_sev': {'cd4_200': 1.2, 'cd4_200_500': 1.1},  # Relative severity for HIV
-            'reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
-=======
             'rel_sus': { # Increased risk of acquiring HPV
                 'cat1': {
                     'cd4_lower': 0,
@@ -38,16 +33,16 @@ class HIVsim(hpb.ParsObj):
                     'value': 2.2
                 }
             },
-            'rel_sev_infl': { # Speed up growth of disease severity
+            'rel_sev': { # Speed up growth of disease severity
                 'cat1':{
                     'cd4_lower': 0,
                     'cd4_upper': 200,
-                    'value': 0.25
+                    'value': 1.2
                 },
                 'cat2': {
                     'cd4_lower': 200,
                     'cd4_upper': 500,
-                    'value': 0.5
+                    'value': 1.1
                 }
             },
             'rel_imm': { # Reduction in neutralizing/t-cell immunity acquired after infection/vaccination
@@ -63,7 +58,6 @@ class HIVsim(hpb.ParsObj):
                 }
             },
             'rel_reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
->>>>>>> hiv-updates
             'time_to_hiv_death_shape': 2, # shape parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
             'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # scale parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
             'cd4_start': dict(dist='normal', par1=594, par2=20),
@@ -178,15 +172,9 @@ class HIVsim(hpb.ParsObj):
         art_probs = np.zeros(len(self.people), dtype=hpd.default_float)
         art_probs[inds] = art_covs
 
-<<<<<<< HEAD
-        # Get indices of people on ART
-        art_inds = hpu.true(hpu.binomial_arr(art_probs))
-
-=======
         # Get indices of people who are on ART
         art_bools = hpu.binomial_arr(art_probs)
         art_inds = hpu.true(art_bools)
->>>>>>> hiv-updates
         self.people.art[art_inds] = True
         self.people.date_art[art_inds] = self.people.t
         self.people.date_dead_hiv[art_inds] = np.nan
@@ -248,20 +236,8 @@ class HIVsim(hpb.ParsObj):
             cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
             self.people.cd4[art_inds] += cd4_change
 
-<<<<<<< HEAD
-            cd4_200_inds = sc.findinds(self.people.cd4 < 200)
-            cd4_200_500_inds = sc.findinds((self.people.cd4 > 200) & (self.people.cd4 < 500))
-
-            if len(cd4_200_inds):
-                self.people.rel_sev[cd4_200_inds] = self['hiv_pars']['rel_hiv_sev']['cd4_200']
-                self.people.rel_sus[cd4_200_inds] = self['hiv_pars']['rel_sus']
-
-            if len(cd4_200_500_inds):
-                self.people.rel_sev[cd4_200_500_inds] = self['hiv_pars']['rel_hiv_sev']['cd4_200_500']
-                self.people.rel_sus[cd4_200_500_inds] = self['hiv_pars']['rel_sus']
-=======
             inds_to_update = sc.autolist()
-            for ir, rel_par in enumerate(['rel_sus', 'rel_sev_infl', 'rel_imm']):
+            for ir, rel_par in enumerate(['rel_sus', 'rel_sev', 'rel_imm']):
                 for cat, catvals in self['hiv_pars'][rel_par].items():
                     inds = sc.findinds((self.people.cd4 >= catvals['cd4_lower']) & (self.people.cd4 < catvals['cd4_upper']))
                     if len(inds):
@@ -271,7 +247,6 @@ class HIVsim(hpb.ParsObj):
             if len(inds_to_update):
                 inds_to_update = np.array(list(set(inds_to_update)))
                 self.update_hpv_progs(inds_to_update)
->>>>>>> hiv-updates
 
         return
 
@@ -336,12 +311,7 @@ class HIVsim(hpb.ParsObj):
             gpars = self.people.pars['genotype_pars'][self.people.pars['genotype_map'][g]]
             hpv_inds = hpu.itruei((self.people.is_female & self.people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
             if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
-<<<<<<< HEAD
-                self.people.set_severity(hpv_inds, g, gpars, dt)
-=======
-                self.people.set_severity_pars(hpv_inds, g, gpars)
                 self.people.set_severity(hpv_inds, g, gpars, dt, set_sev=False)
->>>>>>> hiv-updates
         return
 
     def update_hiv_results(self, hiv_inds):
