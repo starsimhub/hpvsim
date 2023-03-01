@@ -60,6 +60,7 @@ def make_pars(**kwargs):
     pars['use_waning']      = False         # Whether or not to use waning immunity. If set to False, immunity from infection and vaccination is assumed to stay at the same level permanently
     pars['use_migration']   = True          # Whether to estimate migration rates to correct the total population size
     pars['model_hiv']       = False         # Whether or not to model HIV natural history
+    pars['hiv_pars']        = sc.objdict()  # Can be directly modified by passing in arguments listed in hiv_pars
 
     # Network parameters, generally initialized after the population has been constructed
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible

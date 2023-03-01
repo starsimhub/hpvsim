@@ -85,7 +85,7 @@ def test_epi():
             return
 
     par_effects = [
-        ParEffects('model_hiv',     [False, True],  'cancers'),
+        ParEffects('model_hiv',     [False, True],  'infections'),
         ParEffects('beta',          [0.01, 0.99],   'infections'),
         ParEffects('condoms',       [0.90, 0.10],   'infections'),
         ParEffects('acts',          [1, 200],       'infections'),
@@ -113,6 +113,8 @@ def test_epi():
 
         if par_effect.par == 'model_hiv':
             base_pars['location'] = 'south africa'
+            base_pars['n_years'] = 30
+            base_pars['dt'] = 0.25
             hiv_datafile = 'test_data/hiv_incidence_south_africa.csv'
             art_datafile = 'test_data/art_coverage_south_africa.csv'
         else:

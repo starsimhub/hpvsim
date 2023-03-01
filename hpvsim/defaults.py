@@ -122,7 +122,8 @@ class PeopleMeta(sc.prettyobj):
 
     rel_states = [
         State('rel_sev_infl', default_float, 1.0),  # Individual relative risk for rate severe disease growth (does not vary by genotype)
-        State('rel_sus', default_float, 1.0)        # Individual relative risk for acquiring infection (does not vary by genotype)
+        State('rel_sus', default_float, 1.0),       # Individual relative risk for acquiring infection (does not vary by genotype)
+        State('rel_imm', default_float, 1.0)        # Individual relative level of immunity acquired from infection clearance/vaccination
     ]
 
     derived_states = [
@@ -136,10 +137,6 @@ class PeopleMeta(sc.prettyobj):
         State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'), # Defined as those with clinical_cuttoff[2] < sev < clinical_cuttoff[3]
         State('carcinoma',  bool, False, 'n_genotypes', label='Number with carcinoma in situ', color='#5f5cd2'), # Defined as those with clinical_cuttoff[3] < sev < clinical_cuttoff[4]
         State('cin',        bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#5f5cd2'), # Union of CIN1, CIN3, CIN3, and carcinoma in situ
-    ]
-
-    hiv_states = [
-        State('hiv',        bool, False, label='Number infected with HIV', color='#5c399c'),
     ]
 
     # Additional intervention states
@@ -156,7 +153,7 @@ class PeopleMeta(sc.prettyobj):
     mece_states = alive_states + viral_states + cell_states
 
     # Collection of states that we store as stock results
-    stock_states = viral_states + cell_states + derived_states + intv_states + hiv_states
+    stock_states = viral_states + cell_states + derived_states + intv_states
 
     # Set dates
     # Convert each MECE state and derived state into a date except for susceptible, alive, and no_dysp (which are True by default)
@@ -183,7 +180,6 @@ class PeopleMeta(sc.prettyobj):
     dates += [
         State('date_clearance',     default_float, np.nan, shape='n_genotypes'),
         State('date_exposed',       default_float, np.nan, shape='n_genotypes'),
-        State('date_hiv',           default_float, np.nan),
     ]
 
     # Duration of different states: these are floats per person -- used in people.py
@@ -194,7 +190,7 @@ class PeopleMeta(sc.prettyobj):
         State('dur_cancer',         default_float, np.nan, shape='n_genotypes'), # Duration of cancer
     ]
 
-    all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev + rel_states
+    all_states = person + mece_states + imm_states + intv_states + dates + durs + rship_states + sev + rel_states
 
     @classmethod
     def validate(cls):
@@ -212,7 +208,7 @@ class PeopleMeta(sc.prettyobj):
 
         """
         # Validate
-        state_types = ['person', 'mece_states', 'imm_states', 'hiv_states', 'intv_states', 'dates', 'durs', 'sev', 'all_states']
+        state_types = ['person', 'mece_states', 'imm_states', 'intv_states', 'dates', 'durs', 'sev', 'all_states']
         for state_type in state_types:
             states = getattr(cls, state_type)
             n_states        = len(states)
@@ -248,7 +244,6 @@ flows = [
     Flow('detected_cancer_deaths',  color='#000000',    label='Detected cancer deaths', by_genotype=False),
     Flow('reinfections',            color='#732e26',    label='Reinfections'),
     Flow('reactivations',           color='#732e26',    label='Reactivations'),
-    Flow('hiv_infections',          color='#5c399c',    label='HIV infections', by_genotype=False)
 ]
 flow_keys           = [flow.name for flow in flows]
 genotype_flow_keys  = [flow.name for flow in flows if flow.by_genotype]
@@ -259,7 +254,7 @@ stock_keys   = [state.name for state in PeopleMeta.stock_states]
 stock_names  = [state.label for state in PeopleMeta.stock_states]
 stock_colors = [state.color for state in PeopleMeta.stock_states]
 total_stock_keys = [state.name for state in PeopleMeta.stock_states if state.shape=='n_genotypes']
-other_stock_keys = [state.name for state in PeopleMeta.intv_states+PeopleMeta.hiv_states]
+other_stock_keys = [state.name for state in PeopleMeta.intv_states]
 
 # Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -285,8 +280,8 @@ type_dist_names  = ['Pre-CIN', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
 
 default_init_prev = {
     'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
-    'm'             : np.array([ 0.0, 0.05, 0.07, 0.05, 0.02, 0.01, 0.0005, 0]),
-    'f'             : np.array([ 0.0, 0.05, 0.07, 0.05, 0.02, 0.01, 0.0005, 0]),
+    'm'             : np.array([ 0.0, 0.25, 0.6, 0.25, 0.05, 0.01, 0.0005, 0]),
+    'f'             : np.array([ 0.0, 0.35, 0.7, 0.25, 0.05, 0.01, 0.0005, 0]),
 }
 
 
