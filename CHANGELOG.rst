@@ -8,6 +8,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+
+Version 1.1.1 (2023-02-28)
+---------------------------
+- Allows for flexible severity growth functions
+- *Github info* PR `526 <https://github.com/amath-idm/hpvsim/pull/526>`__
+
+
 Version 1.1.0 (2023-02-16)
 ---------------------------
 - Moves all HIV functionality into hiv.py
