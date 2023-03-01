@@ -16,7 +16,7 @@ Version 1.1.1 (2023-03-01)
 - Merges HIV results with sim.results at conclusion of simulation
 - Adds HIV pars as an argument to calibration as well as HIV-specific results to age-results analyzer
 - Allows for flexible severity growth functions
-- *Github info* PR `533 <https://github.com/amath-idm/hpvsim/pull/533>`__
+- *Github info* PR `537 <https://github.com/amath-idm/hpvsim/pull/537>`__
 
 
 Version 1.1.0 (2023-02-16)
