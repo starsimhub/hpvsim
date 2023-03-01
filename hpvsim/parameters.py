@@ -86,8 +86,7 @@ def make_pars(**kwargs):
     pars['dur_transformed']     = dict(dist='normal_pos', par1=5.77, par2=5)  # Duration of transformed infection prior to onset of invasive cervical cancer (years)
     pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
     pars['clinical_cutoffs']    = dict(precin=0.03, cin1=0.353, cin2=0.676, cin3=0.99) # Parameters used to map disease severity onto cytological grades
-    pars['sev_dist']            = dict(dist='lognormal', par1=1.0, par2=1.0) # Distribution to draw individual level severity scale factors
-    pars['rel_sev']             = 1 # Scale factor applied to all genotype severity
+    pars['sev_dist']            = dict(dist='normal_po', par1=1.0, par2=0.05) # Distribution to draw individual level severity scale factors
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
