@@ -93,17 +93,13 @@ class HIVsim(hpb.ParsObj):
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
 
-        # Figure out which age bin people belong to
-        # age_bins = art_cov[nearest_year][0, :]
-        # age_inds = np.digitize(self.people.age[inds], age_bins)
-
         # Apply ART coverage by age to people
         art_covs = art_cov[nearest_year]#[1, :]
 
         art_probs = np.zeros(len(self.people), dtype=hpd.default_float)
         art_probs[inds] = art_covs
 
-        # Get indices of people who acquire HIV
+        # Get indices of people on ART
         art_inds = hpu.true(hpu.binomial_arr(art_probs))
 
         self.people.art[art_inds] = True
@@ -223,7 +219,6 @@ class HIVsim(hpb.ParsObj):
             gpars = self.people.pars['genotype_pars'][self.people.pars['genotype_map'][g]]
             hpv_inds = hpu.itruei((self.people.is_female & self.people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
             if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
-                self.people.set_severity_pars(hpv_inds, g, gpars)
                 self.people.set_severity(hpv_inds, g, gpars, dt)
         return
 
