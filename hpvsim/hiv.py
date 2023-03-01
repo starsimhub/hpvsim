@@ -22,7 +22,7 @@ class HIVsim(hpb.ParsObj):
         # Define default parameters, can be overwritten by hiv_pars
         pars['hiv_pars'] = {
             'rel_sus': 2.2,  # Increased risk of acquiring HPV
-            'rel_hiv_sev_infl': {'cd4_200': 0.36, 'cd4_200_500': 0.76},  # Speed up growth of disease severity
+            'rel_hiv_sev': {'cd4_200': 1.2, 'cd4_200_500': 1.1},  # Relative severity for HIV
             'reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
             'time_to_hiv_death_shape': 2, # shape parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
             'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # scale parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
@@ -150,11 +150,11 @@ class HIVsim(hpb.ParsObj):
             cd4_200_500_inds = sc.findinds((self.people.cd4 > 200) & (self.people.cd4 < 500))
 
             if len(cd4_200_inds):
-                self.people.rel_sev_infl[cd4_200_inds] = self['hiv_pars']['rel_hiv_sev_infl']['cd4_200']
+                self.people.rel_sev[cd4_200_inds] = self['hiv_pars']['rel_hiv_sev']['cd4_200']
                 self.people.rel_sus[cd4_200_inds] = self['hiv_pars']['rel_sus']
 
             if len(cd4_200_500_inds):
-                self.people.rel_sev_infl[cd4_200_500_inds] = self['hiv_pars']['rel_hiv_sev_infl']['cd4_200_500']
+                self.people.rel_sev[cd4_200_500_inds] = self['hiv_pars']['rel_hiv_sev']['cd4_200_500']
                 self.people.rel_sus[cd4_200_500_inds] = self['hiv_pars']['rel_sus']
 
         return

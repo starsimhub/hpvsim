@@ -25,8 +25,8 @@ def test_hiv(model_hiv=True):
     }
 
     if model_hiv:
-        hiv_datafile='hiv_incidence_south_africa.csv'
-        art_datafile = 'art_coverage_south_africa.csv'
+        hiv_datafile='./test_data/hiv_incidence_south_africa.csv'
+        art_datafile = './test_data/art_coverage_south_africa.csv'
     else:
         hiv_datafile=None
         art_datafile=None
@@ -51,8 +51,8 @@ def test_impact_on_cancer():
 
     base_sim = hpv.Sim(
         pars=pars,
-        hiv_datafile='hiv_incidence_south_africa.csv',
-        art_datafile='art_coverage_south_africa.csv'
+        hiv_datafile='./test_data/hiv_incidence_south_africa.csv',
+        art_datafile='./test_data/art_coverage_south_africa.csv'
     )
 
     scenarios = {
