@@ -554,7 +554,6 @@ class People(hpb.BasePeople):
         self.episomal[genotype, inds] = False
         self.transformed[genotype, inds] = False
         self.sev[genotype, inds] = np.nan
-        self.sev_rate[genotype, inds] = np.nan
         self.date_cin1[genotype, inds] = np.nan
         self.date_cin2[genotype, inds] = np.nan
         self.date_cin3[genotype, inds] = np.nan

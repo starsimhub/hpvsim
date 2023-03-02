@@ -28,8 +28,8 @@ def test_calibration_hiv():
         'end': 2020,
     }
 
-    hiv_datafile='hiv_incidence_south_africa.csv'
-    art_datafile='art_coverage_south_africa.csv'
+    hiv_datafile='../test_data/hiv_incidence_south_africa.csv'
+    art_datafile='../test_data/art_coverage_south_africa.csv'
 
     sim = hpv.Sim(
         pars=pars,
