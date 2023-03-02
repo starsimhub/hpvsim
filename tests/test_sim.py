@@ -17,15 +17,18 @@ do_save = 0
 def test_microsim():
     sc.heading('Minimal sim test')
 
-    sim = hpv.Sim()
+    # sim = hpv.Sim()
     pars = {
         'n_agents': 500, # CK: values smaller than this fail
         'init_hpv_prev': .1,
         'n_years': 2,
         'burnin': 0,
         'genotypes': [16,18],
+        'model_hiv':False,
         }
-    sim.update_pars(pars)
+    sim = hpv.Sim(pars=pars)
+    sim.initialize()
+    # sim.update_pars(pars)
     sim.run()
     sim.summarize()
     sim.brief()
@@ -86,11 +89,11 @@ def test_epi():
 
     par_effects = [
         ParEffects('model_hiv',     [False, True],  ['cin1s', 'cin2s', 'cins', 'cancers']),
-        ParEffects('beta',          [0.01, 0.99],   'infections'),
-        ParEffects('condoms',       [0.90, 0.10],   'infections'),
-        ParEffects('acts',          [1, 200],       'infections'),
-        ParEffects('debut',         [25, 15],       'infections'),
-        ParEffects('init_hpv_prev', [0.1, 0.8],     'infections'),
+        ParEffects('beta',          [0.01, 0.99],   ['infections']),
+        ParEffects('condoms',       [0.90, 0.10],   ['infections']),
+        ParEffects('acts',          [1, 200],       ['infections']),
+        ParEffects('debut',         [25, 15],       ['infections']),
+        ParEffects('init_hpv_prev', [0.1, 0.8],     ['infections']),
     ]
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
@@ -427,14 +430,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim0 = test_microsim()
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
     s0, s1 = test_epi()
-    sim3 = test_states()
-    sim4 = test_flexible_inputs()
-    sim5 = test_result_consistency()
-    sim6 = test_location_loading()
-    sim7 = test_resuming()
+    # sim3 = test_states()
+    # sim4 = test_flexible_inputs()
+    # sim5 = test_result_consistency()
+    # sim6 = test_location_loading()
+    # sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')

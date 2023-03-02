@@ -94,6 +94,7 @@ class HIVsim(hpb.ParsObj):
             hpd.State('dur_hiv', hpd.default_float, np.nan),
         ]
         people.meta.all_states += hiv_states
+        return
 
 
     def init_results(self, sim):
