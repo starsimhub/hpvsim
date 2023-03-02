@@ -14,6 +14,8 @@ debug = 1
 n_agents = [50e3,500][debug] # Swap between sizes
 start = [1950,1990][debug]
 ms_agent_ratio = [100,10][debug]
+hiv_datafile = '../test_data/hiv_incidence_south_africa.csv'
+art_datafile = '../test_data/art_coverage_south_africa.csv'
 
 
 #%% Define the tests
@@ -28,9 +30,6 @@ def test_calibration_hiv():
         'end': 2020,
     }
 
-    hiv_datafile='../test_data/hiv_incidence_south_africa.csv'
-    art_datafile='../test_data/art_coverage_south_africa.csv'
-
     sim = hpv.Sim(
         pars=pars,
         hiv_datafile=hiv_datafile,
@@ -43,10 +42,10 @@ def test_calibration_hiv():
     )
     genotype_pars = dict(
         hpv16=dict(
-            sev_rate=[0.5, 0.2, 1.0],
+            sev_fn=dict(k=[0.5, 0.2, 1.0],)
         ),
         hpv18=dict(
-            sev_rate=[0.5, 0.2, 1.0],
+            sev_fn=dict(k=[0.5, 0.2, 1.0],)
         )
     )
 
@@ -59,9 +58,9 @@ def test_calibration_hiv():
 
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars,
                             datafiles=[
-                                'south_africa_hpv_data.csv',
-                                'south_africa_cancer_data_2020.csv',
-                                'south_africa_cancer_data_hiv_2020.csv',
+                                '../test_data/south_africa_hpv_data.csv',
+                                '../test_data/south_africa_cancer_data_2020.csv',
+                                # '../test_data/south_africa_cancer_data_hiv_2020.csv',
                             ],
                             total_trials=3, n_workers=1)
     calib.calibrate(die=True)
@@ -93,9 +92,6 @@ def test_hiv():
         # }
     }
 
-
-    hiv_datafile = '../test_data/hiv_incidence_south_africa.csv'
-    art_datafile = '../test_data/art_coverage_south_africa.csv'
 
     sim = hpv.Sim(
         pars=pars,
@@ -138,8 +134,8 @@ def test_impact_on_cancer():
 
     base_sim = hpv.Sim(
         pars=pars,
-        hiv_datafile='./test_data/hiv_incidence_south_africa.csv',
-        art_datafile='./test_data/art_coverage_south_africa.csv'
+        hiv_datafile=hiv_datafile,
+        art_datafile=art_datafile
     )
 
     scenarios = {
@@ -178,7 +174,7 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
     sim0 = test_hiv()
-    # sim1 = test_impact_on_cancer()
-    # sim, calib = test_calibration_hiv()
+    sim1 = test_impact_on_cancer()
+    sim, calib = test_calibration_hiv()
     sc.toc(T)
     print('Done.')
