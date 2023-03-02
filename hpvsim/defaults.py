@@ -238,6 +238,7 @@ flows = [
     Flow('cin1s',                   color='#c1ad71',    label='CIN1s'),
     Flow('cin2s',                   color='#c1981d',    label='CIN2s'),
     Flow('cin3s',                   color='#b86113',    label='CIN3s'),
+    Flow('cins',                    color='#b86113',    label='CINs'),
     Flow('cancers',                 color='#5f5cd2',    label='Cancers'),
     Flow('detected_cancers',        color='#5f5cd2',    label='Cancer detections', by_genotype=False),
     Flow('cancer_deaths',           color='#000000',    label='Cancer deaths', by_genotype=False),

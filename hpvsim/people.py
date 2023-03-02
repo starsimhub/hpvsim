@@ -180,12 +180,17 @@ class People(hpb.BasePeople):
         ng = self.pars['n_genotypes']
         for g in range(ng):
             self.check_transformation(g) # check for new transformations, persistence, or clearance
-            cases_by_age, cases = self.check_cancer(g)
-            self.update_severity(g)
-            self.check_clearance(g)
-            self.flows['cancers'] += cases  # Increment flows (summed over all genotypes)
-            self.genotype_flows['cancers'][g] = cases  # Store flows by genotype
-            self.age_flows['cancers'] += cases_by_age  # Increment flows by age (summed over all genotypes)
+            self.update_severity(g) # update severity values
+            self.check_clearance(g) # check for clearance
+
+            for key in ['cin1s','cin2s','cin3s','cancers']:  # update flows
+                cases_by_age, cases = self.check_progress(key, g)
+                self.flows[key] += cases  # Increment flows (summed over all genotypes)
+                self.genotype_flows[key][g] = cases # Store flows by genotype
+                self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
+            self.flows['cins'] += self.flows['cin1s']+self.flows['cin2s']+self.flows['cin3s']
+            self.genotype_flows['cins'][g] = self.genotype_flows['cin1s'][g]+self.genotype_flows['cin2s'][g]+self.genotype_flows['cin3s'][g]
+            self.age_flows['cins'] += self.age_flows['cin1s']+self.age_flows['cin2s']+self.age_flows['cin3s']
 
         # Perform updates that are not genotype specific
         self.flows['cancer_deaths'] = self.check_cancer_deaths()
@@ -318,7 +323,9 @@ class People(hpb.BasePeople):
         return
 
     def update_severity(self, genotype):
-        ''' Update disease severity for women with infection'''
+        '''
+        Update disease severity for women with infection and calculate their CIN status
+        '''
         gpars = self.pars['genotype_pars'][genotype]
         fg_inds = hpu.true(self.is_female & self.infectious[genotype,:]) # Indices of women infected with this genotype
         time_with_infection = (self.t - self.date_exposed[genotype, fg_inds]) * self.dt
@@ -418,6 +425,49 @@ class People(hpb.BasePeople):
         self.transformed[genotype, inds] = True  # Now transformed, cannot clear
         self.date_clearance[genotype, inds] = np.nan  # Remove their clearance dates
         return
+
+
+    def check_progress(self, what, genotype):
+        ''' Wrapper function for all the new progression checks '''
+        if what=='cin1s':       cases_by_age, cases = self.check_cin1(genotype)
+        elif what=='cin2s':     cases_by_age, cases = self.check_cin2(genotype)
+        elif what=='cin3s':     cases_by_age, cases = self.check_cin3(genotype)
+        elif what=='cancers':   cases_by_age, cases = self.check_cancer(genotype)
+        return cases_by_age, cases
+
+
+    def check_cin1(self, genotype):
+        ''' Check for new progressions to CIN1 '''
+        # Only include infectious females who haven't already cleared CIN1 or progressed to CIN2
+        filters = self.infectious[genotype,:]*self.is_female*~(self.date_clearance[genotype,:]<=self.t)*(self.date_cin2[genotype,:]>=self.t)
+        filter_inds = filters.nonzero()[0]
+        inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
+        self.cin1[genotype, inds] = True
+        # Age calculations
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        return cases_by_age, self.scale_flows(inds)
+
+
+    def check_cin2(self, genotype):
+        ''' Check for new progressions to CIN2 '''
+        filter_inds = self.true_by_genotype('cin1', genotype)
+        inds = self.check_inds(self.cin2[genotype,:], self.date_cin2[genotype,:], filter_inds=filter_inds)
+        self.cin2[genotype, inds] = True
+        self.cin1[genotype, inds] = False # No longer counted as CIN1
+        # Age calculations
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        return cases_by_age, self.scale_flows(inds)
+
+
+    def check_cin3(self, genotype):
+        ''' Check for new progressions to CIN3 '''
+        filter_inds = self.true_by_genotype('cin2', genotype)
+        inds = self.check_inds(self.cin3[genotype,:], self.date_cin3[genotype,:], filter_inds=filter_inds)
+        self.cin3[genotype, inds] = True
+        self.cin2[genotype, inds] = False # No longer counted as CIN2
+        # Age calculations
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        return cases_by_age, self.scale_flows(inds)
 
 
     def check_cancer(self, genotype):
