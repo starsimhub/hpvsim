@@ -60,7 +60,7 @@ def test_calibration_hiv():
                             datafiles=[
                                 '../test_data/south_africa_hpv_data.csv',
                                 '../test_data/south_africa_cancer_data_2020.csv',
-                                # '../test_data/south_africa_cancer_data_hiv_2020.csv',
+                                '../test_data/south_africa_cancer_data_hiv_2020.csv',
                             ],
                             total_trials=3, n_workers=1)
     calib.calibrate(die=True)
