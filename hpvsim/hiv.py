@@ -94,7 +94,7 @@ class HIVsim(hpb.ParsObj):
             hpd.State('dur_hiv', hpd.default_float, np.nan),
         ]
         people.meta.all_states += hiv_states
-        return people
+        return
 
 
     def init_results(self, sim):
@@ -442,12 +442,12 @@ class HIVsim(hpb.ParsObj):
         self.results['hiv_prevalence'][:] = res['n_hiv'][:]/ simres['n_alive'][:]
         self.results['hpv_prevalence_by_age_with_hiv'][:] = safedivide(res['n_hpv_by_age_with_hiv'][:], ng*res['n_hiv_by_age'][:])
         self.results['hpv_prevalence_by_age_no_hiv'][:] = safedivide(res['n_hpv_by_age_no_hiv'][:], ng*no_hiv_by_age)
-        self.results['art_coverage'][:] = res['n_art'][:]/res['n_hiv'][:]
+        self.results['art_coverage'][:] = safedivide(res['n_art'][:],res['n_hiv'][:])
 
         # Compute cancer incidence
         scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
-        self.results['cancer_incidence_with_hiv'][:] = res['cancers_with_hiv'][:]/ res['n_females_with_hiv_alive'][:]*scale_factor
-        self.results['cancer_incidence_no_hiv'][:] = res['cancers_no_hiv'][:]/ res['n_females_no_hiv_alive'][:]*scale_factor
+        self.results['cancer_incidence_with_hiv'][:] = safedivide(res['cancers_with_hiv'][:], res['n_females_with_hiv_alive'][:])*scale_factor
+        self.results['cancer_incidence_no_hiv'][:] = safedivide(res['cancers_no_hiv'][:], res['n_females_no_hiv_alive'][:])*scale_factor
 
         sim.results = sc.mergedicts(simres, self.results)
         return
