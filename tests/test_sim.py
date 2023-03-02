@@ -18,31 +18,18 @@ def test_microsim():
     sc.heading('Minimal sim test')
 
     # Define baseline parameters and initialize sim
-    base_pars = {
+    sim = hpv.Sim()
+    pars = {
         'n_agents': 500, # CK: values smaller than this fail
         'init_hpv_prev': .1,
         'n_years': 2,
         'burnin': 0,
         'genotypes': [16,18],
         }
-    sim = hpv.Sim(pars=base_pars, art_datafile=None, hiv_datafile=None)
-    sim.initialize()
+    sim.update_pars(pars)
     sim.run()
-
-    # # sim = hpv.Sim()
-    # pars = {
-    #     'n_agents': 500, # CK: values smaller than this fail
-    #     'init_hpv_prev': .1,
-    #     'n_years': 2,
-    #     'burnin': 0,
-    #     'genotypes': [16,18],
-    #     }
-    # sim = hpv.Sim(pars=pars)
-    # sim.initialize()
-    # # sim.update_pars(pars)
-    # sim.run()
-    # sim.summarize()
-    # sim.brief()
+    sim.summarize()
+    sim.brief()
 
     return sim
 
