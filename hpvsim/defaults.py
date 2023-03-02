@@ -78,7 +78,6 @@ class PeopleMeta(sc.prettyobj):
         State('age',            default_float,  np.nan), # Float
         State('sex',            default_float,  np.nan), # Float
         State('debut',          default_float,  np.nan), # Float
-        State('rel_sev',        default_float,  np.nan), # Float
         State('doses',          default_int,    0),  # Number of doses of the prophylactic vaccine given per person
         State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
         State('vaccine_source', default_int,    -1), # Index of the prophylactic vaccine that individual received
@@ -116,12 +115,10 @@ class PeopleMeta(sc.prettyobj):
     sev = [
         # Markers of disease severity.
         State('sev', default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
-        State('sev_rate', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
-        State('sev_infl', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
     ]
 
     rel_states = [
-        State('rel_sev_infl', default_float, 1.0),  # Individual relative risk for rate severe disease growth (does not vary by genotype)
+        State('rel_sev', default_float, 1.0),  # Individual relative risk for rate severe disease growth (does not vary by genotype)
         State('rel_sus', default_float, 1.0),       # Individual relative risk for acquiring infection (does not vary by genotype)
         State('rel_imm', default_float, 1.0)        # Individual relative level of immunity acquired from infection clearance/vaccination
     ]
