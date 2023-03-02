@@ -17,45 +17,34 @@ class HIVsim(hpb.ParsObj):
         '''
 
     def __init__(self, sim, art_datafile, hiv_datafile, hiv_pars):
+        '''
+        Initialization
+        '''
+
+        # Define some basic settings and attributes
+        self.cd4states = ['lt200', 'gt200'] # code names for HIV states
+        self.cd4statesfull = ['CD4<200', '200<CD4<500'] # full names for HIV states
+        self.cd4_lb = [0, 200] # Lower bound for CD4 states
+        self.cd4_ub = [200, 500] # Lower bound for CD4 states
+        self.ncd4 = len(self.cd4states)
+        self.people = sim.people # store the whole people object - TODO, is this too big? also, need to ensure it's removed by sim.shrink
+
+        # Load in the parameters from provided datafiles
         pars = self.load_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
-        self.people = sim.people
+
         # Define default parameters, can be overwritten by hiv_pars
         pars['hiv_pars'] = {
             'rel_sus': { # Increased risk of acquiring HPV
-                'cat1': {
-                    'cd4_lower': 0,
-                    'cd4_upper': 200,
-                    'value': 2.2
+                'lt200': 2.2,
+                'gt200': 2.2,
                 },
-                'cat2': {
-                    'cd4_lower': 200,
-                    'cd4_upper': 500,
-                    'value': 2.2
-                }
-            },
-            'rel_sev': { # Speed up growth of disease severity
-                'cat1':{
-                    'cd4_lower': 0,
-                    'cd4_upper': 200,
-                    'value': 1.2
+            'rel_sev': { # Increased risk of disease severity
+                'lt200': 1.2,
+                'gt200': 1.1,
                 },
-                'cat2': {
-                    'cd4_lower': 200,
-                    'cd4_upper': 500,
-                    'value': 1.1
-                }
-            },
             'rel_imm': { # Reduction in neutralizing/t-cell immunity acquired after infection/vaccination
-                'cat1': {
-                    'cd4_lower': 0,
-                    'cd4_upper': 200,
-                    'value': 0.36
-                },
-                'cat2': {
-                    'cd4_lower': 200,
-                    'cd4_upper': 500,
-                    'value': 0.76
-                }
+                'lt200': 0.36,
+                'gt200': 0.76,
             },
             'rel_reactivation_prob': 3, # Unused for now, TODO: add in rel_reactivation to make functional
             'time_to_hiv_death_shape': 2, # shape parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
@@ -237,15 +226,16 @@ class HIVsim(hpb.ParsObj):
             self.people.cd4[art_inds] += cd4_change
 
             inds_to_update = sc.autolist()
-            for ir, rel_par in enumerate(['rel_sus', 'rel_sev', 'rel_imm']):
-                for cat, catvals in self['hiv_pars'][rel_par].items():
-                    inds = sc.findinds((self.people.cd4 >= catvals['cd4_lower']) & (self.people.cd4 < catvals['cd4_upper']))
-                    if len(inds):
-                        inds_to_update += list(inds)
-                        self.people[rel_par][inds] = catvals['value']
+
+            for sn, cd4state in enumerate(self.cd4states):
+                inds = sc.findinds((self.people.cd4 >= self.cd4_lb[sn]) & (self.people.cd4 < self.cd4_ub[sn]))
+                inds_to_update += list(inds)
+                if len(inds):
+                    for ir, rel_par in enumerate(['rel_sus', 'rel_sev', 'rel_imm']):
+                        self.people[rel_par][inds] = self['hiv_pars'][rel_par][cd4state]
 
             if len(inds_to_update):
-                inds_to_update = np.array(list(set(inds_to_update)))
+                inds_to_update = np.array(inds_to_update)
                 self.update_hpv_progs(inds_to_update)
 
         return
