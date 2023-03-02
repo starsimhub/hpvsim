@@ -222,16 +222,10 @@ class HIVsim(hpb.ParsObj):
             mpy = 12
             months_on_ART = (people.t - people.date_art[art_inds]) * mpy
             cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
-            try:
-                people.cd4[art_inds] += cd4_change
-            except:
-                import traceback;
-                traceback.print_exc();
-                import pdb;
-                pdb.set_trace()
+            people.cd4[art_inds] += cd4_change
 
+            # Update people's relative susceptibility, severity, and immunity
             inds_to_update = sc.autolist()
-
             for sn, cd4state in enumerate(self.cd4states):
                 inds = sc.findinds((people.cd4 >= self.cd4_lb[sn]) & (people.cd4 < self.cd4_ub[sn]))
                 inds_to_update += list(inds)
