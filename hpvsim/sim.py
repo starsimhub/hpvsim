@@ -550,7 +550,7 @@ class Sim(hpb.BaseSim):
         if self.popfile and self.popdict is None: # If there's a popdict, we initialize it
             self.load_population(init_people=False)
 
-        # Actually make the people
+        # Make the people
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
         
         # Figure out the scale factors
@@ -566,7 +566,11 @@ class Sim(hpb.BaseSim):
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
-        
+
+        # Deal with HIV
+        self.init_hiv()
+        self.people = self.hivsim.init_states(self.people)
+
         # Finish initialization
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
@@ -584,8 +588,7 @@ class Sim(hpb.BaseSim):
                 raise ValueError('Must supply HIV and ART datafiles to model HIV.')
         self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
                                    hiv_pars=self['hiv_pars'])
-        self.people.set_pars(pars=self.pars, hivsim=self.hivsim) # Replace the saved parameters with this simulation's
-        return 
+        return
 
     def init_interventions(self):
         ''' Initialize and validate the interventions '''

@@ -55,7 +55,6 @@ class HIVsim(hpb.ParsObj):
             'dt_art': 5.0 # Timestep at which people originally not on ART can initiate care
         }
 
-        self.init_states(sim.people)
         self.update_pars(old_pars=pars, new_pars=hiv_pars, create=True)
         self.init_results(sim)
 
@@ -64,6 +63,7 @@ class HIVsim(hpb.ParsObj):
         self.cd4_decline_diff = np.diff(cd4_decline)
 
         return
+
 
     def update_pars(self, old_pars=None, new_pars=None, create=True):
         if len(new_pars):
@@ -81,8 +81,8 @@ class HIVsim(hpb.ParsObj):
         # Call update_pars() for ParsObj
         super().update_pars(pars=old_pars, create=create)
 
-
-    def init_states(self, people):
+    @staticmethod
+    def init_states(people):
         hiv_states = [
             hpd.State('cd4', hpd.default_float, np.nan),
             hpd.State('hiv', bool, False),
@@ -94,7 +94,7 @@ class HIVsim(hpb.ParsObj):
             hpd.State('dur_hiv', hpd.default_float, np.nan),
         ]
         people.meta.all_states += hiv_states
-        return
+        return people
 
 
     def init_results(self, sim):
@@ -137,8 +137,8 @@ class HIVsim(hpb.ParsObj):
         results['n_art'] = init_res('Number on ART')
         results['art_coverage'] = init_res('ART coverage')
 
-
         self.results = results
+
         return
 
 

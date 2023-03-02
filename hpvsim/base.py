@@ -955,7 +955,7 @@ class BasePeople(FlexPretty):
         return len(self._data[base_key])
 
 
-    def set_pars(self, pars=None, hivsim=None):
+    def set_pars(self, pars=None):
         '''
         Re-link the parameters stored in the people object to the sim containing it,
         and perform some basic validation.
@@ -982,7 +982,6 @@ class BasePeople(FlexPretty):
         pars['n_agents'] = int(pars['n_agents'])
         pars.setdefault('location', None)
         self.pars = pars # Actually store the pars
-        self.hivsim = hivsim # And now set HIV
         return
 
 

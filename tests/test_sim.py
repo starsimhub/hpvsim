@@ -17,21 +17,32 @@ do_save = 0
 def test_microsim():
     sc.heading('Minimal sim test')
 
-    # sim = hpv.Sim()
-    pars = {
+    # Define baseline parameters and initialize sim
+    base_pars = {
         'n_agents': 500, # CK: values smaller than this fail
         'init_hpv_prev': .1,
         'n_years': 2,
         'burnin': 0,
         'genotypes': [16,18],
-        'model_hiv':False,
         }
-    sim = hpv.Sim(pars=pars)
+    sim = hpv.Sim(pars=base_pars, art_datafile=None, hiv_datafile=None)
     sim.initialize()
-    # sim.update_pars(pars)
     sim.run()
-    sim.summarize()
-    sim.brief()
+
+    # # sim = hpv.Sim()
+    # pars = {
+    #     'n_agents': 500, # CK: values smaller than this fail
+    #     'init_hpv_prev': .1,
+    #     'n_years': 2,
+    #     'burnin': 0,
+    #     'genotypes': [16,18],
+    #     }
+    # sim = hpv.Sim(pars=pars)
+    # sim.initialize()
+    # # sim.update_pars(pars)
+    # sim.run()
+    # sim.summarize()
+    # sim.brief()
 
     return sim
 
@@ -136,11 +147,8 @@ def test_epi():
             v0 = s0.results[var][:].sum()
             v1 = s1.results[var][:].sum()
             print(f'Checking {var:10s} with varying {par_effect.par:10s} ... ', end='')
-            if v0 <= v1:
-                print(f'✓ ({v0} <= {v1})')
-            else:
-                print(f'Expected {var} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})')
-            #     assert v0 <= v1, f'Expected {var} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
+            assert v0 <= v1, f'Expected {var} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
+            print(f'✓ ({v0} <= {v1})')
 
     return s0, s1
 
@@ -430,14 +438,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
-    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
     s0, s1 = test_epi()
-    # sim3 = test_states()
-    # sim4 = test_flexible_inputs()
-    # sim5 = test_result_consistency()
-    # sim6 = test_location_loading()
-    # sim7 = test_resuming()
+    sim3 = test_states()
+    sim4 = test_flexible_inputs()
+    sim5 = test_result_consistency()
+    sim6 = test_location_loading()
+    sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')
