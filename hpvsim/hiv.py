@@ -149,6 +149,7 @@ class HIVsim(hpb.ParsObj):
 
         art_cov = self['art_adherence']  # Shorten
         shape = self['hiv_pars']['time_to_hiv_death_shape']
+        dt = people.pars['dt']
 
         # Extract index of current year
         all_years = np.array(list(art_cov.keys()))
@@ -176,7 +177,7 @@ class HIVsim(hpb.ParsObj):
             scale = np.maximum(scale, 0)
             time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(no_art_inds))
             people.dur_hiv[no_art_inds] = time_to_hiv_death
-            people.date_dead_hiv[no_art_inds] = people.t + sc.randround(time_to_hiv_death / people.dt)
+            people.date_dead_hiv[no_art_inds] = people.t + sc.randround(time_to_hiv_death / dt)
 
         # Find those on ART who will not be virologically suppressed and assign time to HIV death
         art_failure_prob = self['hiv_pars']['art_failure_prob']
@@ -188,7 +189,7 @@ class HIVsim(hpb.ParsObj):
         scale = np.maximum(scale, 0)
         time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(art_failure_inds))
         people.dur_hiv[art_failure_inds] = time_to_hiv_death
-        people.date_dead_hiv[art_failure_inds] = people.t + sc.randround(time_to_hiv_death / people.dt)
+        people.date_dead_hiv[art_failure_inds] = people.t + sc.randround(time_to_hiv_death / dt)
 
         return
 
@@ -208,13 +209,14 @@ class HIVsim(hpb.ParsObj):
         '''
         Update CD4 counts
         '''
+        dt = people.pars['dt']
         filter_inds = people.true('hiv')
         if len(filter_inds):
             art_inds = filter_inds[hpu.true(people.art[filter_inds])]
             not_art_inds = filter_inds[hpu.false(people.art[filter_inds])]
 
             # First take care of people not on ART
-            frac_prognosis = (people.t - people.date_hiv[not_art_inds]) * people.dt / people.dur_hiv[not_art_inds]
+            frac_prognosis = (people.t - people.date_hiv[not_art_inds]) * dt / people.dur_hiv[not_art_inds]
             frac_prognosis = (100*frac_prognosis).astype(hpd.default_int)
             cd4_change = self.cd4_decline_diff[frac_prognosis]
             people.cd4[not_art_inds] += cd4_change
@@ -234,7 +236,7 @@ class HIVsim(hpb.ParsObj):
         '''
         # Pull out anyone with prevalent infection who is not on ART, check if they get on today
         t = people.t
-        dt = people.dt
+        dt = people.pars['dt']
 
         update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt)) # Ensure it's an integer not smaller than 1
         if t % update_freq == 0:

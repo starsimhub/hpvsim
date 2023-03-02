@@ -568,8 +568,8 @@ class Sim(hpb.BaseSim):
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
 
         # Deal with HIV
-        self.init_hiv()
-        self.people = self.hivsim.init_states(self.people)
+        self.init_hiv() # Creates the hivsim object, which is stored in the sim
+        self.people = self.hivsim.init_states(self.people) # Adds some states to the people
 
         # Finish initialization
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
@@ -720,9 +720,14 @@ class Sim(hpb.BaseSim):
         dur_pship = self['dur_pship']
         age_act_pars = self['age_act_pars']
         trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
+        year = self.yearvec[t]
+
+        # Make HIV-related updates
+        if self.pars['model_hiv']:
+            self.hivsim.step(people=self.people, year=year)
 
         # Update demographics, states, and partnerships
-        self.people.update_states_pre(t=t, year=self.yearvec[t]) # This also ages people, applies deaths, and generates new births
+        self.people.update_states_pre(t=t, year=year) # This also ages people, applies deaths, and generates new births
         people = self.people # Shorten
         people.dissolve_partnerships(t=t) # Dissolve partnerships
         tind = self.yearvec[t] - self['start']
