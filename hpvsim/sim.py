@@ -78,6 +78,7 @@ class Sim(hpb.BaseSim):
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
         self.init_immunity() # initialize information about immunity
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
+        self.init_hiv() # Initialize HIV states, attributes, and parameters
         self.init_analyzers()  # ...and the analyzers...
         hpu.set_seed(self['rand_seed']+1)  # Reset the random seed to the default run seed, so that if the simulation is run with reset_seed=False right after initialization, it will still produce the same output
         self.initialized   = True
@@ -567,9 +568,7 @@ class Sim(hpb.BaseSim):
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
         
         # Finish initialization
-        self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
-                                   hiv_pars=self['hiv_pars'])
-        self.people.initialize(sim_pars=self.pars, hivsim=self.hivsim) # Fully initialize the people
+        self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])
@@ -578,6 +577,15 @@ class Sim(hpb.BaseSim):
 
         return self
 
+    def init_hiv(self):
+        ''' Initialize states, attributes, and parameters relating to HIV '''
+        if self.pars['model_hiv']:
+            if self.hiv_datafile is None or self.art_datafile is None:
+                raise ValueError('Must supply HIV and ART datafiles to model HIV.')
+        self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
+                                   hiv_pars=self['hiv_pars'])
+        self.people.set_pars(pars=self.pars, hivsim=self.hivsim) # Replace the saved parameters with this simulation's
+        return 
 
     def init_interventions(self):
         ''' Initialize and validate the interventions '''

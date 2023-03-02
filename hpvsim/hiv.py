@@ -27,7 +27,6 @@ class HIVsim(hpb.ParsObj):
         self.cd4_lb = [0, 200] # Lower bound for CD4 states
         self.cd4_ub = [200, 500] # Lower bound for CD4 states
         self.ncd4 = len(self.cd4states)
-        self.people = sim.people # store the whole people object - TODO, is this too big? also, need to ensure it's removed by sim.shrink
 
         # Load in the parameters from provided datafiles
         pars = self.load_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
@@ -56,7 +55,7 @@ class HIVsim(hpb.ParsObj):
             'dt_art': 5.0 # Timestep at which people originally not on ART can initiate care
         }
 
-        self.init_states()
+        self.init_states(sim.people)
         self.update_pars(old_pars=pars, new_pars=hiv_pars, create=True)
         self.init_results(sim)
 
@@ -83,7 +82,7 @@ class HIVsim(hpb.ParsObj):
         super().update_pars(pars=old_pars, create=create)
 
 
-    def init_states(self):
+    def init_states(self, people):
         hiv_states = [
             hpd.State('cd4', hpd.default_float, np.nan),
             hpd.State('hiv', bool, False),
@@ -94,7 +93,7 @@ class HIVsim(hpb.ParsObj):
             hpd.State('dead_hiv', bool, False),
             hpd.State('dur_hiv', hpd.default_float, np.nan),
         ]
-        self.people.meta.all_states += hiv_states
+        people.meta.all_states += hiv_states
 
 
     def init_results(self, sim):
@@ -144,7 +143,7 @@ class HIVsim(hpb.ParsObj):
 
     # %% HIV methods
 
-    def set_hiv_prognoses(self, inds, year=None, incident=True):
+    def set_hiv_prognoses(self, people, inds, year=None, incident=True):
         ''' Set HIV outcomes '''
 
         art_cov = self['art_adherence']  # Shorten
@@ -158,25 +157,25 @@ class HIVsim(hpb.ParsObj):
         # Apply ART coverage by age to people
         art_covs = art_cov[nearest_year]#[1, :]
 
-        art_probs = np.zeros(len(self.people), dtype=hpd.default_float)
+        art_probs = np.zeros(len(people), dtype=hpd.default_float)
         art_probs[inds] = art_covs
 
         # Get indices of people who are on ART
         art_bools = hpu.binomial_arr(art_probs)
         art_inds = hpu.true(art_bools)
-        self.people.art[art_inds] = True
-        self.people.date_art[art_inds] = self.people.t
-        self.people.date_dead_hiv[art_inds] = np.nan
-        self.people.dur_hiv[art_inds] = np.nan
+        people.art[art_inds] = True
+        people.date_art[art_inds] = people.t
+        people.date_dead_hiv[art_inds] = np.nan
+        people.dur_hiv[art_inds] = np.nan
 
         if incident:
             # Filter those who are not on ART and assign time to HIV death
             no_art_inds = np.setdiff1d(inds, art_inds)
-            scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[no_art_inds])
+            scale = self['hiv_pars']['time_to_hiv_death_scale'](people.age[no_art_inds])
             scale = np.maximum(scale, 0)
             time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(no_art_inds))
-            self.people.dur_hiv[no_art_inds] = time_to_hiv_death
-            self.people.date_dead_hiv[no_art_inds] = self.people.t + sc.randround(time_to_hiv_death / self.people.dt)
+            people.dur_hiv[no_art_inds] = time_to_hiv_death
+            people.date_dead_hiv[no_art_inds] = people.t + sc.randround(time_to_hiv_death / people.dt)
 
         # Find those on ART who will not be virologically suppressed and assign time to HIV death
         art_failure_prob = self['hiv_pars']['art_failure_prob']
@@ -184,166 +183,172 @@ class HIVsim(hpb.ParsObj):
         art_failure_bools = hpu.binomial_arr(art_failure_probs)
         art_failure_inds = art_inds[art_failure_bools]
 
-        scale = self['hiv_pars']['time_to_hiv_death_scale'](self.people.age[art_failure_inds])
+        scale = self['hiv_pars']['time_to_hiv_death_scale'](people.age[art_failure_inds])
         scale = np.maximum(scale, 0)
         time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(art_failure_inds))
-        self.people.dur_hiv[art_failure_inds] = time_to_hiv_death
-        self.people.date_dead_hiv[art_failure_inds] = self.people.t + sc.randround(time_to_hiv_death / self.people.dt)
+        people.dur_hiv[art_failure_inds] = time_to_hiv_death
+        people.date_dead_hiv[art_failure_inds] = people.t + sc.randround(time_to_hiv_death / people.dt)
 
         return
 
 
-    def check_hiv_mortality(self):
+    def check_hiv_mortality(self, people):
         '''
         Check for new deaths from HIV
         '''
-        filter_inds = self.people.true('hiv')
-        inds = self.people.check_inds(self.people.dead_hiv, self.people.date_dead_hiv, filter_inds=filter_inds)
-        self.people.remove_people(inds, cause='hiv')
-        self.people['hiv'][inds] = False
+        filter_inds = people.true('hiv')
+        inds = people.check_inds(people.dead_hiv, people.date_dead_hiv, filter_inds=filter_inds)
+        people.remove_people(inds, cause='hiv')
+        people['hiv'][inds] = False
         return
 
 
-    def check_cd4(self):
+    def check_cd4(self, people):
         '''
         Check for current cd4
         '''
-        filter_inds = self.people.true('hiv')
+        filter_inds = people.true('hiv')
         if len(filter_inds):
-            art_inds = filter_inds[hpu.true(self.people.art[filter_inds])]
-            not_art_inds = filter_inds[hpu.false(self.people.art[filter_inds])]
+            art_inds = filter_inds[hpu.true(people.art[filter_inds])]
+            not_art_inds = filter_inds[hpu.false(people.art[filter_inds])]
 
             # First take care of people not on ART
-            frac_prognosis = 100 * (self.people.t - self.people.date_hiv[not_art_inds]) * self.people.dt / \
-                             self.people.dur_hiv[not_art_inds]
-            cd4_change = self.cd4_decline_diff[frac_prognosis.astype(np.int64)]
-            self.people.cd4[not_art_inds] += cd4_change
+            frac_prognosis = (people.t - people.date_hiv[not_art_inds]) * people.dt / people.dur_hiv[not_art_inds]
+            frac_prognosis = (100*frac_prognosis).astype(hpd.default_int)
+            cd4_change = self.cd4_decline_diff[frac_prognosis]
+            people.cd4[not_art_inds] += cd4_change
 
             # Now take care of people on ART
             mpy = 12
-            months_on_ART = (self.people.t - self.people.date_art[art_inds]) * mpy
+            months_on_ART = (people.t - people.date_art[art_inds]) * mpy
             cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
-            self.people.cd4[art_inds] += cd4_change
+            try:
+                people.cd4[art_inds] += cd4_change
+            except:
+                import traceback;
+                traceback.print_exc();
+                import pdb;
+                pdb.set_trace()
 
             inds_to_update = sc.autolist()
 
             for sn, cd4state in enumerate(self.cd4states):
-                inds = sc.findinds((self.people.cd4 >= self.cd4_lb[sn]) & (self.people.cd4 < self.cd4_ub[sn]))
+                inds = sc.findinds((people.cd4 >= self.cd4_lb[sn]) & (people.cd4 < self.cd4_ub[sn]))
                 inds_to_update += list(inds)
                 if len(inds):
                     for ir, rel_par in enumerate(['rel_sus', 'rel_sev', 'rel_imm']):
-                        self.people[rel_par][inds] = self['hiv_pars'][rel_par][cd4state]
+                        people[rel_par][inds] = self['hiv_pars'][rel_par][cd4state]
 
             if len(inds_to_update):
                 inds_to_update = np.array(inds_to_update)
-                self.update_hpv_progs(inds_to_update)
+                self.update_hpv_progs(people, inds_to_update)
 
         return
 
 
-    def step(self, year=None):
+    def step(self, people=None, year=None):
         '''
         Wrapper method that checks for new HIV infections, updates prognoses, etc.
         '''
         # Pull out anyone with prevalent infection who is not on ART, check if they get on today
-        t = self.people.t
-        dt = self.people.dt
+        t = people.t
+        dt = people.dt
 
         update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt)) # Ensure it's an integer not smaller than 1
         if t % update_freq == 0:
-            no_art_inds = hpu.true(self.people.hiv * ~self.people.art)
+            no_art_inds = hpu.true(people.hiv * ~people.art)
             if len(no_art_inds):
-                self.set_hiv_prognoses(no_art_inds, year=year, incident=False)
+                self.set_hiv_prognoses(people, no_art_inds, year=year, incident=False)
 
-        new_infection_inds = self.new_hiv_infections(year) # Newly acquired HIV infections
+        new_infection_inds = self.new_hiv_infections(people, year) # Newly acquired HIV infections
         if len(new_infection_inds):
-            self.set_hiv_prognoses(new_infection_inds, year=year)  # Set ART adherence for those with HIV
+            self.set_hiv_prognoses(people, new_infection_inds, year=year)  # Set ART adherence for those with HIV
 
-        self.check_hiv_mortality()
-        self.check_cd4()
-        self.update_hiv_results(new_infection_inds)
-        new_infections = self.people.scale_flows(new_infection_inds) # Return scaled number of infections
+        self.check_hiv_mortality(people)
+        self.check_cd4(people)
+        self.update_hiv_results(people, new_infection_inds)
+        new_infections = people.scale_flows(new_infection_inds) # Return scaled number of infections
         return new_infections
 
 
-    def new_hiv_infections(self, year=None):
+    def new_hiv_infections(self, people, year=None):
         '''Apply HIV infection rates to population'''
         hiv_pars = self['infection_rates']
         all_years = np.array(list(hiv_pars.keys()))
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
         hiv_year = hiv_pars[nearest_year]
-        dt = self.people.pars['dt']
+        dt = people.pars['dt']
 
-        hiv_probs = np.zeros(len(self.people), dtype=hpd.default_float)
+        hiv_probs = np.zeros(len(people), dtype=hpd.default_float)
         for sk in ['f', 'm']:
             hiv_year_sex = hiv_year[sk]
             age_bins = hiv_year_sex[:, 0]
             hiv_rates = hiv_year_sex[:, 1] * dt
-            mf_inds = self.people.is_female if sk == 'f' else self.people.is_male
-            mf_inds *= self.people.alive  # Only include people alive
-            age_inds = np.digitize(self.people.age[mf_inds], age_bins)
+            mf_inds = people.is_female if sk == 'f' else people.is_male
+            mf_inds *= people.alive  # Only include people alive
+            age_inds = np.digitize(people.age[mf_inds], age_bins)
             hiv_probs[mf_inds] = hiv_rates[age_inds]
-        hiv_probs[self.people.hiv] = 0  # not at risk if already infected
+        hiv_probs[people.hiv] = 0  # not at risk if already infected
 
         # Get indices of people who acquire HIV
         hiv_inds = hpu.true(hpu.binomial_arr(hiv_probs))
-        self.people.hiv[hiv_inds] = True
-        self.people.cd4[hiv_inds] = hpu.sample(**self['hiv_pars']['cd4_start'], size=len(hiv_inds))
-        self.people.date_hiv[hiv_inds] = self.people.t
+        people.hiv[hiv_inds] = True
+        people.cd4[hiv_inds] = hpu.sample(**self['hiv_pars']['cd4_start'], size=len(hiv_inds))
+        people.date_hiv[hiv_inds] = people.t
 
         return hiv_inds
 
 
-    def update_hpv_progs(self, hiv_inds):
-        dt = self.people.pars['dt']
-        for g in range(self.people.pars['n_genotypes']):
-            gpars = self.people.pars['genotype_pars'][self.people.pars['genotype_map'][g]]
-            hpv_inds = hpu.itruei((self.people.is_female & self.people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
+    def update_hpv_progs(self, people, hiv_inds):
+        dt = people.pars['dt']
+        for g in range(people.pars['n_genotypes']):
+            gpars = people.pars['genotype_pars'][g]
+            hpv_inds = hpu.itruei((people.is_female & people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
             if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
-                self.people.set_severity(hpv_inds, g, gpars, dt, set_sev=False)
+                people.set_severity(hpv_inds, g, gpars, dt, set_sev=False)
         return
 
-    def update_hiv_results(self, hiv_inds):
-        if self.people.t % self.resfreq == self.resfreq - 1:
+    def update_hiv_results(self, people, hiv_inds):
+        if people.t % self.resfreq == self.resfreq - 1:
             # Update stock and flows
-            idx = int(self.people.t / self.resfreq)
-            self.results['hiv_infections'][idx] = self.people.scale_flows(hiv_inds)
-            self.results['hiv_infections_by_age'][:, idx] = np.histogram(self.people.age[hiv_inds], bins=self.people.age_bins, weights=self.people.scale[hiv_inds])[0]
-            self.results['n_hiv'][idx] = self.people.count('hiv')
-            hivinds = hpu.true(self.people['hiv'])
-            self.results['n_hiv_by_age'][:, idx] = np.histogram(self.people.age[hivinds], bins=self.people.age_bins, weights=self.people.scale[hivinds])[0]
+            idx = int(people.t / self.resfreq)
+            self.results['hiv_infections'][idx] = people.scale_flows(hiv_inds)
+            self.results['hiv_infections_by_age'][:, idx] = np.histogram(people.age[hiv_inds], bins=people.age_bins, weights=people.scale[hiv_inds])[0]
+            self.results['n_hiv'][idx] = people.count('hiv')
+            hivinds = hpu.true(people['hiv'])
+            self.results['n_hiv_by_age'][:, idx] = np.histogram(people.age[hivinds], bins=people.age_bins, weights=people.scale[hivinds])[0]
 
             # Pull out those on ART:
-            self.results['n_art'][idx] = self.people.count('art')
+            self.results['n_art'][idx] = people.count('art')
 
             # Pull out those with HPV and HIV+
-            hpvhivinds = hpu.true((self.people['hiv']) & self.people['infectious'])
-            self.results['n_hpv_by_age_with_hiv'][:, idx] = np.histogram(self.people.age[hpvhivinds], bins=self.people.age_bins, weights=self.people.scale[hpvhivinds])[0]
+            hpvhivinds = hpu.true((people['hiv']) & people['infectious'])
+            self.results['n_hpv_by_age_with_hiv'][:, idx] = np.histogram(people.age[hpvhivinds], bins=people.age_bins, weights=people.scale[hpvhivinds])[0]
 
             # Pull out those with HPV and HIV-
-            hpvnohivinds = hpu.true(~(self.people['hiv']) & self.people['infectious'])
-            self.results['n_hpv_by_age_no_hiv'][:, idx] = np.histogram(self.people.age[hpvnohivinds], bins=self.people.age_bins, weights=self.people.scale[hpvnohivinds])[0]
+            hpvnohivinds = hpu.true(~(people['hiv']) & people['infectious'])
+            self.results['n_hpv_by_age_no_hiv'][:, idx] = np.histogram(people.age[hpvnohivinds], bins=people.age_bins, weights=people.scale[hpvnohivinds])[0]
 
             # Pull out those with cancer and HIV+
-            cancer_today_inds = hpu.true(self.people.date_cancerous == self.people.t)
+            cancer_today_inds = hpu.true(people.date_cancerous == people.t)
             if len(cancer_today_inds):
-                hiv_bools = self.people.hiv[cancer_today_inds]
+                hiv_bools = people.hiv[cancer_today_inds]
                 cancer_today_hiv_pos_inds = cancer_today_inds[hiv_bools]
                 cancer_today_hiv_neg_inds = cancer_today_inds[~hiv_bools]
-                self.results['cancers_with_hiv'][idx] = self.people.scale_flows(cancer_today_hiv_pos_inds)
-                self.results['cancers_no_hiv'][idx] = self.people.scale_flows(cancer_today_hiv_neg_inds)
-                self.results['cancers_by_age_with_hiv'][:, idx] = np.histogram(self.people.age[cancer_today_hiv_pos_inds], bins=self.people.age_bins, weights=self.people.scale[cancer_today_hiv_pos_inds])[0]
-                self.results['cancers_by_age_no_hiv'][:, idx] = np.histogram(self.people.age[cancer_today_hiv_neg_inds], bins=self.people.age_bins, weights=self.people.scale[cancer_today_hiv_neg_inds])[0]
+                self.results['cancers_with_hiv'][idx] = people.scale_flows(cancer_today_hiv_pos_inds)
+                self.results['cancers_no_hiv'][idx] = people.scale_flows(cancer_today_hiv_neg_inds)
+                self.results['cancers_by_age_with_hiv'][:, idx] = np.histogram(people.age[cancer_today_hiv_pos_inds], bins=people.age_bins, weights=people.scale[cancer_today_hiv_pos_inds])[0]
+                self.results['cancers_by_age_no_hiv'][:, idx] = np.histogram(people.age[cancer_today_hiv_neg_inds], bins=people.age_bins, weights=people.scale[cancer_today_hiv_neg_inds])[0]
 
-            alive_female_hiv_inds = hpu.true(self.people.alive*self.people.is_female*self.people.hiv)
-            self.results['n_females_with_hiv_alive'][idx] = self.people.scale_flows(alive_female_hiv_inds)
-            self.results['n_females_with_hiv_alive_by_age'][:, idx] = np.histogram(self.people.age[alive_female_hiv_inds], bins=self.people.age_bins,
-                 weights=self.people.scale[alive_female_hiv_inds])[0]
-            alive_female_no_hiv_inds = hpu.true(self.people.alive * self.people.is_female * ~self.people.hiv)
-            self.results['n_females_no_hiv_alive'][idx] = self.people.scale_flows(alive_female_no_hiv_inds)
-            self.results['n_females_no_hiv_alive_by_age'][:, idx] = np.histogram(self.people.age[alive_female_no_hiv_inds], bins=self.people.age_bins,
-                 weights=self.people.scale[alive_female_no_hiv_inds])[0]
+            alive_female_hiv_inds = hpu.true(people.alive*people.is_female*people.hiv)
+            self.results['n_females_with_hiv_alive'][idx] = people.scale_flows(alive_female_hiv_inds)
+            self.results['n_females_with_hiv_alive_by_age'][:, idx] = np.histogram(people.age[alive_female_hiv_inds], bins=people.age_bins,
+                 weights=people.scale[alive_female_hiv_inds])[0]
+            alive_female_no_hiv_inds = hpu.true(people.alive * people.is_female * ~people.hiv)
+            self.results['n_females_no_hiv_alive'][idx] = people.scale_flows(alive_female_no_hiv_inds)
+            self.results['n_females_no_hiv_alive_by_age'][:, idx] = np.histogram(people.age[alive_female_no_hiv_inds], bins=people.age_bins,
+                 weights=people.scale[alive_female_no_hiv_inds])[0]
 
     def get_hiv_data(self, hiv_datafile=None, art_datafile=None):
         '''

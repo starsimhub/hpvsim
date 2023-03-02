@@ -109,7 +109,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def initialize(self, sim_pars=None, hivsim=None):
+    def initialize(self, sim_pars=None):
         ''' Perform initializations '''
         super().initialize() # Initialize states
         
@@ -138,7 +138,6 @@ class People(hpb.BasePeople):
 
         # Additional validation
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
-        self.set_pars(pars=sim_pars, hivsim=hivsim) # Replace the saved parameters with this simulation's
 
         self.initialized = True
         return
@@ -157,7 +156,7 @@ class People(hpb.BasePeople):
 
         # Check for HIV acquisitions
         if self.pars['model_hiv']:
-            _ = self.hivsim.step(year=year)
+            _ = self.hivsim.step(people=self, year=year)
 
         # Perform updates that are not genotype-specific
         update_freq = max(1, int(self.pars['dt_demog'] / self.pars['dt'])) # Ensure it's an integer not smaller than 1
