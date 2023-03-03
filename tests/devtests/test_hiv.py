@@ -9,7 +9,7 @@ import numpy as np
 
 do_plot = 0
 do_save = 0
-debug = 1
+debug = 0
 
 n_agents = [50e3,500][debug] # Swap between sizes
 start = [1950,1990][debug]
@@ -105,7 +105,8 @@ def test_hiv():
         ],
         'HPV prevalence by HIV status': [
             'hpv_prevalence_by_age_with_hiv',
-            'hpv_prevalence_by_age_no_hiv'
+            'hpv_prevalence_by_age_no_hiv',
+            'hpv_prevalence_by_age'
         ],
         'Age standardized cancer incidence (per 100,000 women)': [
             'asr_cancer_incidence',
@@ -113,6 +114,7 @@ def test_hiv():
             'cancer_incidence_no_hiv',
         ],
         'Cancers by age and HIV status': [
+            'cancers_by_age',
             'cancers_by_age_with_hiv',
             'cancers_by_age_no_hiv'
         ]
