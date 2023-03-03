@@ -1093,10 +1093,13 @@ class age_causal_infection(Analyzer):
                 date_cin1 = sim.people.date_cin1[cancer_genotypes, cancer_inds]
                 date_cin2 = sim.people.date_cin2[cancer_genotypes, cancer_inds]
                 date_cin3 = sim.people.date_cin3[cancer_genotypes, cancer_inds]
+                fast_progressors = hpu.true(date_cin3 > sim.t)
                 hpv_time = (date_cin1 - date_exposed) * sim['dt']
                 cin1_time = (date_cin2 - date_cin1) * sim['dt']
                 cin2_time = (date_cin3 - date_cin2) * sim['dt']
+                cin2_time[fast_progressors] =(sim.t - date_cin2[fast_progressors]) * sim['dt']
                 cin3_time = (sim.t - date_cin3) * sim['dt']
+                cin3_time[fast_progressors] = 0
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()

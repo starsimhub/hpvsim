@@ -292,7 +292,6 @@ class People(hpb.BasePeople):
 
         # Set dates of cin1, 2, 3 for all women who get infected
         ccdict = self.pars['clinical_cutoffs']
-        rel_sev_vals = self.rel_sev[inds]
         self.date_cin1[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['precin'],    rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
         self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
         self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
@@ -308,8 +307,17 @@ class People(hpb.BasePeople):
                                                          sc.randround(time_to_clear / dt))
 
         self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal[is_transform] / dt)
-        dur_transformed = hpu.sample(**self.pars['dur_transformed'], size=len(transform_inds))
-        self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + sc.randround(dur_transformed / dt)
+        dur_transformed = sc.randround(hpu.sample(**self.pars['dur_transformed'], size=len(transform_inds))/dt)
+        improbable_bools = (self.date_transformed[g, transform_inds] + dur_transformed ) < self.date_cin3[g, transform_inds]
+        if len(hpu.true(improbable_bools)):
+            # Figure out how much duration of transformation needs to be extended to ensure they pass through cin2/3 before cancer
+            improbable_inds = transform_inds[hpu.true(improbable_bools)]
+            date_cancer = (self.date_transformed[g, improbable_inds] + dur_transformed[improbable_bools])
+            time_gap_cin3 =  (self.date_cin3[g, improbable_inds] - date_cancer)
+            time_gap_carcinoma = (self.date_carcinoma[g, improbable_inds] - date_cancer)
+            additional_time = np.random.uniform(time_gap_cin3, time_gap_carcinoma, size=len(improbable_inds)).astype(hpd.default_int)
+            dur_transformed[improbable_bools] += additional_time
+        self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + dur_transformed
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + dur_transformed
 
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
@@ -485,14 +493,14 @@ class People(hpb.BasePeople):
                 self.date_cin1[g, inds] = np.nan
                 self.date_cin2[g, inds] = np.nan
                 self.date_cin3[g, inds] = np.nan
-            else:
-                date_cin2 = self.date_cin2[g,inds]
-                change_inds = hpu.true(date_cin2 > self.t)
-                self.date_cin2[g,inds[change_inds]] = np.nan
-
-                date_cin3 = self.date_cin3[g,inds]
-                change_inds = hpu.true(date_cin3 > self.t)
-                self.date_cin3[g,inds[change_inds]] = np.nan
+            # else:
+            #     date_cin2 = self.date_cin2[g,inds]
+            #     change_inds = hpu.true(date_cin2 > self.t)
+            #     self.date_cin2[g,inds[change_inds]] = np.nan
+            #
+            #     date_cin3 = self.date_cin3[g,inds]
+            #     change_inds = hpu.true(date_cin3 > self.t)
+            #     self.date_cin3[g,inds[change_inds]] = np.nan
 
         # Set the properties related to cell changes and disease severity markers
         self.cancerous[genotype, inds] = True
