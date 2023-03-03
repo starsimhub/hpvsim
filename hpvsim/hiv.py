@@ -38,7 +38,7 @@ class HIVsim(hpb.ParsObj):
                 'gt200': 2.2,
                 },
             'rel_sev': { # Increased risk of disease severity
-                'lt200': 1.5,
+                'lt200': 1.8,
                 'gt200': 1.2,
                 },
             'rel_imm': { # Reduction in neutralizing/t-cell immunity acquired after infection/vaccination
@@ -294,7 +294,7 @@ class HIVsim(hpb.ParsObj):
             hiv_inds += list(inds)
             if len(inds):
                 for ir, rel_par in enumerate(['rel_sus', 'rel_sev', 'rel_imm']):
-                    people[rel_par][inds] = self['hiv_pars'][rel_par][cd4state]
+                    people[rel_par][inds] *= self['hiv_pars'][rel_par][cd4state]
 
         # If anyone has HIV, update their HPV parameters
         if len(hiv_inds):

@@ -175,8 +175,8 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv()
+    # sim0 = test_hiv()
     sim1 = test_impact_on_cancer()
-    sim, calib = test_calibration_hiv()
+    # sim, calib = test_calibration_hiv()
     sc.toc(T)
     print('Done.')

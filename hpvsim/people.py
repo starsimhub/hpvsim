@@ -244,7 +244,7 @@ class People(hpb.BasePeople):
             # Create extra disease severity values for the extra agents
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
-            extra_rel_sevs = hpu.sample(**self.pars['sev_dist'], size=full_size)
+            extra_rel_sevs = hpu.sample(**self.pars['sev_dist'], size=full_size)*self.rel_sev[inds][:,None]
             extra_sev = hppar.compute_severity(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate maximal severity
 
             # Based on the extra severity values, determine additional transformation probabilities
