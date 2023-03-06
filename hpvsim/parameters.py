@@ -7,6 +7,7 @@ import sciris as sc
 import pandas as pd
 from .settings import options as hpo # For setting global options
 from . import misc as hpm
+from . import utils as hpu
 from . import defaults as hpd
 from .data import loaders as hpdata
 
@@ -59,6 +60,7 @@ def make_pars(**kwargs):
     pars['use_waning']      = False         # Whether or not to use waning immunity. If set to False, immunity from infection and vaccination is assumed to stay at the same level permanently
     pars['use_migration']   = True          # Whether to estimate migration rates to correct the total population size
     pars['model_hiv']       = False         # Whether or not to model HIV natural history
+    pars['hiv_pars']        = sc.objdict()  # Can be directly modified by passing in arguments listed in hiv_pars
 
     # Network parameters, generally initialized after the population has been constructed
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
@@ -85,6 +87,7 @@ def make_pars(**kwargs):
     pars['dur_transformed']     = dict(dist='normal_pos', par1=5.77, par2=5)  # Duration of transformed infection prior to onset of invasive cervical cancer (years)
     pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
     pars['clinical_cutoffs']    = dict(precin=0.03, cin1=0.353, cin2=0.676, cin3=0.99) # Parameters used to map disease severity onto cytological grades
+    pars['sev_dist']            = dict(dist='normal_pos', par1=1.0, par2=0.05) # Distribution to draw individual level severity scale factors
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
@@ -325,32 +328,25 @@ def get_genotype_pars(default=False, genotype=None):
     pars = sc.objdict()
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_episomal = dict(dist='lognormal', par1=4.5, par2=9) # Duration of episomal infection prior to cancer
-    pars.hpv16.sev_rate    = 0.3 # Rate of disease severity progression. Used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv16.sev_rate_sd = 0.015 # Standard deviation of the disease severity progression rate
-    pars.hpv16.sev_infl    = 13 # Point of inflection for severity growth
-    pars.hpv16.rel_beta     = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.transform_prob  = 0.00025 # Annual rate of transformed cell invading
-    pars.hpv16.sero_prob    = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
+    pars.hpv16.dur_episomal     = dict(dist='lognormal', par1=4.5, par2=9) # Duration of episomal infection prior to cancer
+    pars.hpv16.sev_fn           = dict(form='logf3', k=0.3, x_infl=13, s=1) # Function mapping duration of infection to severity
+    pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
+    pars.hpv16.transform_prob   = 0.00025 # Annual rate of transformed cell invading
+    pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_episomal = dict(dist='lognormal', par1=3.5, par2=9) # Duration of infection prior to cancer
-    pars.hpv18.sev_rate    = 0.238 # Rate of disease severity progression. Used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hpv18.sev_rate_sd = 0.015 # Standard deviation of the disease severity progression rate
-    pars.hpv18.sev_infl    = 14 # Point of inflection for severity growth
-    pars.hpv18.rel_beta     = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.transform_prob  = 0.00015
-    pars.hpv18.sero_prob    = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
+    pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=3.5, par2=9) # Duration of infection prior to cancer
+    pars.hpv18.sev_fn           = dict(form='logf3', k=0.238, x_infl=14, s=1) # Function mapping duration of infection to severity
+    pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
+    pars.hpv18.transform_prob   = 0.00015 # Annual rate of transformed cell invading
+    pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
-    pars.hrhpv.dur_episomal = dict(dist='lognormal', par1=5, par2=10) # Duration of infection prior to cancer
-    pars.hrhpv.sev_rate    = 0.35 # Rate of disease severity progression. Used as the growth rate within a logistic function that maps durations to progression probabilities
-    pars.hrhpv.sev_rate_sd = 0.015 # Standard deviation of the disease severity progression rate
-    pars.hrhpv.sev_infl    = 15 # Point of inflection for severity growth
-    pars.hrhpv.rel_beta     = 0.9 # placeholder
-    pars.hrhpv.transform_prob  = 0.00015
-    pars.hrhpv.sero_prob    = 0.60 # placeholder
-
+    pars.hrhpv.dur_episomal     = dict(dist='lognormal', par1=5, par2=10) # Duration of infection prior to cancer
+    pars.hrhpv.sev_fn           = dict(form='logf3', k=0.35, x_infl=15, s=1) # Function mapping duration of infection to severity
+    pars.hrhpv.rel_beta         = 0.9 # placeholder
+    pars.hrhpv.transform_prob   = 0.00015
+    pars.hrhpv.sero_prob        = 0.60 # placeholder
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
@@ -580,3 +576,69 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
 
 
 
+#%% Methods for computing severity
+
+def compute_severity(t, rel_sev=None, pars=None):
+    '''
+    Process functional form and parameters into values:
+    '''
+
+    pars = sc.dcp(pars)
+    form = pars.pop('form')
+    choices = [
+        'logf2',
+        'logf3',
+    ]
+
+    # Scale t
+    if rel_sev is not None:
+        t = rel_sev * t
+
+    # Process inputs
+    if form is None or form == 'logf2':
+        output = hpu.logf2(t, **pars)
+
+    elif form == 'logf3':
+        output = hpu.logf3(t, **pars)
+
+    elif callable(form):
+        output = form(t, **pars)
+
+    else:
+        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
+        raise NotImplementedError(errormsg)
+
+    return output
+
+
+def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
+    '''
+    Compute time to given severity level given input parameters
+    '''
+
+    pars = sc.dcp(pars)
+    form = pars.pop('form')
+    choices = [
+        'logf2',
+        'logf3',
+    ]
+
+    # Process inputs
+    if form is None or form == 'logf2':
+        output = hpu.invlogf2(sev_vals, **pars)
+
+    elif form == 'logf3':
+        output = hpu.invlogf3(sev_vals, **pars)
+
+    elif callable(form):
+        output = form(sev_vals, **pars)
+
+    else:
+        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
+        raise NotImplementedError(errormsg)
+
+    # Scale by relative severity
+    if rel_sev is not None:
+        output = output / rel_sev
+
+    return output

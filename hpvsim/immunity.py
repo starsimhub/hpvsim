@@ -108,21 +108,26 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
             people.cell_imm[imm_source, prior_imm_inds] = np.maximum(new_cell_imm, people.cell_imm[imm_source, prior_imm_inds])
 
         if len(no_prior_imm_inds):
-            people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
+            people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds)) * people.rel_imm[no_prior_imm_inds]
             people.cell_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['cell_imm_init'], size=len(no_prior_imm_inds))
     else:
         # Vaccination by dose
         dose1_inds = inds[people.doses[inds]==1] # First doses
         dose2_inds = inds[people.doses[inds]==2] # Second doses
-        dose3_inds = inds[people.doses[inds]==3] # Third doses
+        dose3_inds = inds[people.doses[inds]>=3] # Third doses or beyond
         if imm_pars['doses']>1:
             imm_pars['imm_boost'] = sc.promotetolist(imm_pars['imm_boost'])
         if len(dose1_inds)>0: # Initialize immunity for newly vaccinated people
-            people.peak_imm[imm_source, dose1_inds] = hpu.sample(**imm_pars['imm_init'], size=len(dose1_inds))
+            people.peak_imm[imm_source, dose1_inds] = hpu.sample(**imm_pars['imm_init'], size=len(dose1_inds)) * people.rel_imm[dose1_inds]
         if len(dose2_inds) > 0: # Boost immunity for people receiving 2nd dose...
-            people.peak_imm[imm_source, dose2_inds] *= imm_pars['imm_boost'][0]
+            new_peak = hpu.sample(**imm_pars['imm_init'], size=len(dose2_inds)) * people.rel_imm[dose2_inds]
+            boosted_peak = people.peak_imm[imm_source, dose2_inds] * imm_pars['imm_boost'][0]
+            people.peak_imm[imm_source, dose2_inds] = np.maximum(new_peak, boosted_peak)
         if len(dose3_inds) > 0:
-            people.peak_imm[imm_source, dose3_inds] *= imm_pars['imm_boost'][1]
+            new_peak = hpu.sample(**imm_pars['imm_init'], size=len(dose3_inds)) * people.rel_imm[dose3_inds]
+            boosted_peak = people.peak_imm[imm_source, dose3_inds] * imm_pars['imm_boost'][1]
+            people.peak_imm[imm_source, dose3_inds] = np.maximum(new_peak, boosted_peak)
+
 
     base_t = people.t + offset if offset is not None else people.t
     people.t_imm_event[imm_source, inds] = base_t

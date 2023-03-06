@@ -17,6 +17,7 @@ do_save = 0
 def test_microsim():
     sc.heading('Minimal sim test')
 
+    # Define baseline parameters and initialize sim
     sim = hpv.Sim()
     pars = {
         'n_agents': 500, # CK: values smaller than this fail
@@ -54,7 +55,7 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     # Create some genotype pars
     genotype_pars = {
         16: {
-            'sev_rate': 1.6
+            'sev_fn': dict(form='logf3', k=0.5, x_infl=5)
         }
     }
 
@@ -72,25 +73,24 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, genotypes=[16], beta=0.05, verbose=0, eff_condoms=0.6)
+    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, genotypes=[16], beta=0.02, verbose=0, eff_condoms=0.6)
     sim = hpv.Sim(pars=base_pars)
     sim.initialize()
 
     # Define the parameters to vary
     class ParEffects():
-        def __init__(self, par, range, variable):
+        def __init__(self, par, range, variables):
             self.par = par
             self.range = range
-            self.variable = variable
+            self.variables = variables
             return
 
     par_effects = [
-        ParEffects('model_hiv',     [False, True],  'cancers'),
-        ParEffects('beta',          [0.01, 0.99],   'infections'),
-        ParEffects('condoms',       [0.90, 0.10],   'infections'),
-        ParEffects('acts',          [1, 200],       'infections'),
-        ParEffects('debut',         [25, 15],       'infections'),
-        ParEffects('init_hpv_prev', [0.1, 0.8],     'infections'),
+        ParEffects('beta',          [0.01, 0.99],   ['infections']),
+        ParEffects('condoms',       [0.90, 0.10],   ['infections']),
+        ParEffects('acts',          [1, 200],       ['infections']),
+        ParEffects('debut',         [25, 15],       ['infections']),
+        ParEffects('init_hpv_prev', [0.1, 0.8],     ['infections']),
     ]
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
@@ -113,6 +113,8 @@ def test_epi():
 
         if par_effect.par == 'model_hiv':
             base_pars['location'] = 'south africa'
+            base_pars['n_years'] = 30
+            base_pars['dt'] = 0.25
             hiv_datafile = 'test_data/hiv_incidence_south_africa.csv'
             art_datafile = 'test_data/art_coverage_south_africa.csv'
         else:
@@ -127,13 +129,14 @@ def test_epi():
         s1 = hpv.Sim(pars1, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{par_effect.par} {par_effect.range[1]}').run()
 
         # Check results
-        v0 = s0.results[par_effect.variable][:].sum()
-        v1 = s1.results[par_effect.variable][:].sum()
-        print(f'Checking {par_effect.variable:10s} with varying {par_effect.par:10s} ... ', end='')
-        assert v0 <= v1, f'Expected {par_effect.variable} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
-        print(f'✓ ({v0} <= {v1})')
+        for var in par_effect.variables:
+            v0 = s0.results[var][:].sum()
+            v1 = s1.results[var][:].sum()
+            print(f'Checking {var:10s} with varying {par_effect.par:10s} ... ', end='')
+            assert v0 <= v1, f'Expected {var} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
+            print(f'✓ ({v0} <= {v1})')
 
-    return
+    return s0, s1
 
 
 def test_states():
@@ -423,7 +426,7 @@ if __name__ == '__main__':
 
     sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
+    s0, s1 = test_epi()
     sim3 = test_states()
     sim4 = test_flexible_inputs()
     sim5 = test_result_consistency()

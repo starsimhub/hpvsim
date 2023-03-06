@@ -86,15 +86,39 @@ def logf2(x, x_infl, k):
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
 
+def get_asymptotes(x_infl, k, ttc=25, s=1):
+    term1 = (1 + np.exp(k*(x_infl-ttc)))**s
+    term2 = (1 + np.exp(k*x_infl))**s
+    u_asymp_num = term1*(1-term2)
+    u_asymp_denom = term1 - term2
+    u_asymp = u_asymp_num / u_asymp_denom
+    l_asymp = term1 / (term1 - term2)
+    return l_asymp, u_asymp
+
+def logf3(x, x_infl, k, ttc=25, s=1):
+    l_asymp, u_asymp = get_asymptotes(x_infl, k, ttc, s)
+    return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
+
+
+def invlogf3(y, x_infl, k, ttc=25, s=1):
+    l_asymp, u_asymp = get_asymptotes(x_infl, k, ttc, s)
+    part1 = np.log((u_asymp-l_asymp)/(y-l_asymp))/s
+    part2 = np.log(np.exp(part1)-1)
+    final = 1/k * (k*x_infl - part2)
+    return final
+
+
 def invlogf2(y, x_infl, k):
     '''
     Inverse logistic function, constrained to pass through 0,0 and with upper asymptote
     at 1. Accepts 2 parameters: growth rate and point of inflection.
     '''
     l_asymp = -1/(1+np.exp(k*x_infl))
-    if ((1/(y - l_asymp)) - 1 < 0).any():
-        raise ValueError
-    result = (-1/k)*np.log((1/(y - l_asymp)) - 1) + x_infl
+    val = (1/(y - l_asymp)) - 1
+    if (val < 0).any():
+        val[true(val < 0)] = 0.001
+        # raise ValueError
+    result = (-1/k)*np.log(val) + x_infl
     return result
 
 

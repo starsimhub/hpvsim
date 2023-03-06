@@ -69,134 +69,172 @@ class PeopleMeta(sc.prettyobj):
     # If the default value is None, then the array will not be initialized - this is faster and can
     # be used for variables where the People object explicitly supplies the values e.g. age
 
-    # Set the properties of a person
-    person = [
-        State('uid',            default_int),           # Int
-        State('scale',          default_float,  1.0), # Float
-        State('level0',         bool,  True), # "Normal" people
-        State('level1',         bool,  False), # "High-resolution" people: e.g. cancer agents
-        State('age',            default_float,  np.nan), # Float
-        State('sex',            default_float,  np.nan), # Float
-        State('debut',          default_float,  np.nan), # Float
-        State('doses',          default_int,    0),  # Number of doses of the prophylactic vaccine given per person
-        State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
-        State('vaccine_source', default_int,    -1), # Index of the prophylactic vaccine that individual received
-        State('screens',        default_int,    0),  # Number of screens given per person
-        State('cin_treatments', default_int,    0),  # Number of CIN treatments given per person
-        State('cancer_treatments', default_int,    0),  # Number of cancer treatments given per person
-        State('art_adherence',  default_float, 0, label='adherence on ART', color='#aaa8ff')
-    ]
+    def __init__(self):
 
-    # Set the states that a person can be in
-    # The following three groupings are all mutually exclusive and collectively exhaustive.
-    alive_states = [
-        # States related to whether or not the person is alive or dead
-        State('alive',          bool,   True,   label='Population'),    # Save this as a state so we can record population sizes
-        State('dead_cancer',    bool,   False,  label='Cumulative cancer deaths'),   # Dead from cancer
-        State('dead_other',     bool,   False,  label='Cumulative deaths from other causes'),   # Dead from all other causes
-        State('emigrated',      bool,   False,  label='Emigrated'),  # Emigrated
-    ]
+        # Set the properties of a person
+        self.person = [
+            State('uid',            default_int),           # Int
+            State('scale',          default_float,  1.0), # Float
+            State('level0',         bool,  True), # "Normal" people
+            State('level1',         bool,  False), # "High-resolution" people: e.g. cancer agents
+            State('age',            default_float,  np.nan), # Float
+            State('sex',            default_float,  np.nan), # Float
+            State('debut',          default_float,  np.nan), # Float
+            State('sev',            default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
+            State('rel_sev',        default_float, 1.0), # Individual relative risk for rate severe disease growth (does not vary by genotype)
+            State('rel_sus',        default_float, 1.0), # Individual relative risk for acquiring infection (does not vary by genotype)
+            State('rel_imm',        default_float, 1.0), # Individual relative level of immunity acquired from infection clearance/vaccination
+            State('doses',          default_int,    0),  # Number of doses of the prophylactic vaccine given per person
+            State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
+            State('vaccine_source', default_int,    -1), # Index of the prophylactic vaccine that individual received
+            State('screens',        default_int,    0),  # Number of screens given per person
+            State('cin_treatments', default_int,    0),  # Number of CIN treatments given per person
+            State('cancer_treatments', default_int,    0),  # Number of cancer treatments given per person
+            State('art_adherence',  default_float, 0, label='adherence on ART', color='#aaa8ff')
+        ]
 
-    viral_states = [
-        # States related to whether virus is present
-        State('susceptible',    bool, True,     'n_genotypes', label='Number susceptible', color='#4d771e'),               # Allowable dysp states: no_dysp
-        State('infectious',     bool, False,    'n_genotypes', label='Number infectious',  color='#c78f65'),               # Allowable dysp states: no_dysp, cin1, cin2, cin3
-        State('inactive',       bool, False,    'n_genotypes', label='Number with inactive infection', color='#9e1149'),   # Allowable dysp states: no_dysp, cancer in at least one genotype
-    ]
+        ###### The following section consists of all the boolean states
 
-    cell_states = [
-        # States related to the cellular changes present in the cervix.
-        State('normal',         bool, True, 'n_genotypes', label='Number with no cellular changes', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
-        State('episomal',       bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
-        State('transformed',    bool, False, 'n_genotypes', label='Number with transformation', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
-        State('cancerous',      bool, False, 'n_genotypes', label='Number with cancer', color='#5f5cd2'),      # Allowable viral states: inactive
-    ]
+        # The following three groupings are all mutually exclusive and collectively exhaustive.
+        self.alive_states = [
+            # States related to whether or not the person is alive or dead
+            State('alive',          bool,   True,   label='Population'),    # Save this as a state so we can record population sizes
+            State('dead_cancer',    bool,   False,  label='Cumulative cancer deaths'),   # Dead from cancer
+            State('dead_other',     bool,   False,  label='Cumulative deaths from other causes'),   # Dead from all other causes
+            State('emigrated',      bool,   False,  label='Emigrated'),  # Emigrated
+        ]
 
-    sev = [
-        # Markers of disease severity.
-        State('sev', default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
-        State('sev_rate', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
-        State('sev_infl', default_float, np.nan, shape='n_genotypes'), # Individual samples from parameters in a logistic function that maps duration of infection to severity
-    ]
+        self.viral_states = [
+            # States related to whether virus is present
+            State('susceptible',    bool, True,     'n_genotypes', label='Number susceptible', color='#4d771e'),               # Allowable dysp states: no_dysp
+            State('infectious',     bool, False,    'n_genotypes', label='Number infectious',  color='#c78f65'),               # Allowable dysp states: no_dysp, cin1, cin2, cin3
+            State('inactive',       bool, False,    'n_genotypes', label='Number with inactive infection', color='#9e1149'),   # Allowable dysp states: no_dysp, cancer in at least one genotype
+        ]
 
-    rel_states = [
-        State('rel_sev_infl', default_float, 1.0),  # Individual relative risk for rate severe disease growth (does not vary by genotype)
-        State('rel_sus', default_float, 1.0)        # Individual relative risk for acquiring infection (does not vary by genotype)
-    ]
+        self.cell_states = [
+            # States related to the cellular changes present in the cervix.
+            State('normal',         bool, True, 'n_genotypes', label='Number with no cellular changes', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
+            State('episomal',       bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
+            State('transformed',    bool, False, 'n_genotypes', label='Number with transformation', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
+            State('cancerous',      bool, False, 'n_genotypes', label='Number with cancer', color='#5f5cd2'),      # Allowable viral states: inactive
+        ]
 
-    derived_states = [
-        # From the viral states, cell states, and severity markers, we derive the following additional states:
-        State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # Union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
-        State('abnormal',   bool, False, 'n_genotypes', label='Number with abnormal cells', color='#9e1149'),  # Union of episomal, transformed, and cancerous. Allowable viral states: infectious
-        State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#5f5cd2'), # Intersection of normal and inactive.
-        State('precin',     bool, False, 'n_genotypes', label='Number with precin', color='#9e1149'), # Defined as those with sev < clinical_cuttoff[0]
-        State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'), # Defined as those with clinical_cuttoff[0] < sev < clinical_cuttoff[1]
-        State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'), # Defined as those with clinical_cuttoff[1] < sev < clinical_cuttoff[2]
-        State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'), # Defined as those with clinical_cuttoff[2] < sev < clinical_cuttoff[3]
-        State('carcinoma',  bool, False, 'n_genotypes', label='Number with carcinoma in situ', color='#5f5cd2'), # Defined as those with clinical_cuttoff[3] < sev < clinical_cuttoff[4]
-        State('cin',        bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#5f5cd2'), # Union of CIN1, CIN3, CIN3, and carcinoma in situ
-    ]
+        self.derived_states = [
+            # From the viral states, cell states, and severity markers, we derive the following additional states:
+            State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # Union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
+            State('abnormal',   bool, False, 'n_genotypes', label='Number with abnormal cells', color='#9e1149'),  # Union of episomal, transformed, and cancerous. Allowable viral states: infectious
+            State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#5f5cd2'), # Intersection of normal and inactive.
+            State('precin',     bool, False, 'n_genotypes', label='Number with precin', color='#9e1149'), # Defined as those with sev < clinical_cuttoff[0]
+            State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'), # Defined as those with clinical_cuttoff[0] < sev < clinical_cuttoff[1]
+            State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'), # Defined as those with clinical_cuttoff[1] < sev < clinical_cuttoff[2]
+            State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'), # Defined as those with clinical_cuttoff[2] < sev < clinical_cuttoff[3]
+            State('carcinoma',  bool, False, 'n_genotypes', label='Number with carcinoma in situ', color='#5f5cd2'), # Defined as those with clinical_cuttoff[3] < sev < clinical_cuttoff[4]
+            State('cin',        bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#5f5cd2'), # Union of CIN1, CIN3, CIN3, and carcinoma in situ
+        ]
 
-    hiv_states = [
-        State('hiv',        bool, False, label='Number infected with HIV', color='#5c399c'),
-    ]
+        # Additional intervention states
+        self.intv_states = [
+            State('detected_cancer',    bool,   False, label='Number with detected cancer'), # Whether the person's cancer has been detected
+            State('screened',           bool,   False, label='Number screened'), # Whether the person has been screened (how does this change over time?)
+            State('cin_treated',        bool,   False, label='Number treated for precancerous lesions'), # Whether the person has been treated for CINs
+            State('cancer_treated',     bool,   False, label='Number treated for cancer'), # Whether the person has been treated for cancer
+            State('vaccinated',         bool,   False, label='Number vaccinated'), # Whether the person has received the prophylactic vaccine
+            State('tx_vaccinated',      bool,   False, label='Number given therapeutic vaccine'), # Whether the person has received the therapeutic vaccine
+        ]
 
-    # Additional intervention states
-    intv_states = [
-        State('detected_cancer',    bool,   False, label='Number with detected cancer'), # Whether the person's cancer has been detected
-        State('screened',           bool,   False, label='Number screend'), # Whether the person has been screened (how does this change over time?)
-        State('cin_treated',        bool,   False, label='Number treated for precancerous lesions'), # Whether the person has been treated for CINs
-        State('cancer_treated',     bool,   False, label='Number treated for cancer'), # Whether the person has been treated for cancer
-        State('vaccinated',         bool,   False, label='Number vaccinated'), # Whether the person has received the prophylactic vaccine
-        State('tx_vaccinated',      bool,   False, label='Number given therapeutic vaccine'), # Whether the person has received the therapeutic vaccine
-    ]
+        # Any other stock states - add a placeholder here to be populated later
+        self.other_stock_states = []
+
+        # Immune states, by genotype/vaccine
+        self.imm_states = [
+            State('sus_imm',        default_float,  0,'n_imm_sources'),  # Float, by genotype
+            State('peak_imm',       default_float,  0,'n_imm_sources'),  # Float, peak level of immunity
+            State('nab_imm',        default_float,  0,'n_imm_sources'),  # Float, current immunity level
+            State('t_imm_event',    default_int,    0,'n_imm_sources'),  # Int, time since immunity event
+            State('cell_imm',       default_float,  0,'n_imm_sources'),
+        ]
+
+        # Relationship states
+        self.rship_states = [
+            State('rship_start_dates', default_float, np.nan, shape='n_partner_types'),
+            State('rship_end_dates', default_float, np.nan, shape='n_partner_types'),
+            State('n_rships', default_int, 0, shape='n_partner_types'),
+            State('partners', default_float, np.nan, shape='n_partner_types'),  # Int by relationship type
+            State('current_partners', default_float, 0, 'n_partner_types'),  # Int by relationship type
+        ]
+
+        # Duration of different states: these are floats per person -- used in people.py
+        self.durs = [
+            State('dur_infection',      default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present. Defined for males and females. For females, dur_infection = dur_episomal + dur_transformed. For males, it's taken from a separate distribution
+            State('dur_precin',         default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV prior to precancerous changes
+            State('dur_cin',            default_float, np.nan, shape='n_genotypes'), # Length of time that a person has precancerous changes
+            State('dur_episomal',       default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
+            State('dur_transformed',    default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
+            State('dur_cancer',         default_float, np.nan, shape='n_genotypes'), # Duration of cancer
+        ]
 
     # Collection of mutually exclusive + collectively exhaustive states
-    mece_states = alive_states + viral_states + cell_states
+    @property
+    def mece_states(self):
+        return self.alive_states + self.viral_states + self.cell_states
 
     # Collection of states that we store as stock results
-    stock_states = viral_states + cell_states + derived_states + intv_states + hiv_states
+    @property
+    def stock_states(self):
+        return self.viral_states + self.cell_states + self.derived_states + self.intv_states + self.other_stock_states
+
+    # Collection of states for which we store associated dates
+    @property
+    def date_states(self):
+        return [state for state in self.alive_states + self.stock_states if not state.fill_value]
 
     # Set dates
-    # Convert each MECE state and derived state into a date except for susceptible, alive, and no_dysp (which are True by default)
-    dates = [State(f'date_{state.name}', default_float, np.nan, shape=state.shape) for state in mece_states+derived_states+intv_states if not state.fill_value]
+    @property
+    def dates(self):
+        ''' Dates are stored for all states except susceptible, and alive, and normal (which are True by default) '''
+        dates = [State(f'date_{state.name}', default_float, np.nan, shape=state.shape) for state in self.date_states]
+        dates += [
+            State('date_clearance', default_float, np.nan, shape='n_genotypes'),
+            State('date_exposed', default_float, np.nan, shape='n_genotypes'),
+        ]
+        return dates
 
-    # Immune states, by genotype/vaccine
-    imm_states = [
-        State('sus_imm',        default_float,  0,'n_imm_sources'),  # Float, by genotype
-        State('peak_imm',       default_float,  0,'n_imm_sources'),  # Float, peak level of immunity
-        State('nab_imm',        default_float,  0,'n_imm_sources'),  # Float, current immunity level
-        State('t_imm_event',    default_int,    0,'n_imm_sources'),  # Int, time since immunity event
-        State('cell_imm',       default_float,  0,'n_imm_sources'),
-    ]
+    # All states
+    @property
+    def all_states(self):
+        return self.person + self.alive_states + self.viral_states + self.cell_states + self.derived_states + self.intv_states + self.other_stock_states + self.imm_states + self.rship_states + self.durs
 
-    # Relationship states
-    rship_states = [
-        State('rship_start_dates', default_float, np.nan, shape='n_partner_types'),
-        State('rship_end_dates', default_float, np.nan, shape='n_partner_types'),
-        State('n_rships', default_int, 0, shape='n_partner_types'),
-        State('partners', default_float, np.nan, shape='n_partner_types'),  # Int by relationship type
-        State('current_partners', default_float, 0, 'n_partner_types'),  # Int by relationship type
-    ]
+    # States to set - same as above but does not include derived states
+    @property
+    def states_to_set(self):
+        return self.person + self.alive_states + self.viral_states + self.cell_states + self.intv_states + self.other_stock_states + self.imm_states + self.rship_states + self.durs + self.dates
 
-    dates += [
-        State('date_clearance',     default_float, np.nan, shape='n_genotypes'),
-        State('date_exposed',       default_float, np.nan, shape='n_genotypes'),
-        State('date_hiv',           default_float, np.nan),
-    ]
+    @property
+    def stock_keys(self):
+        return [state.name for state in self.stock_states]
 
-    # Duration of different states: these are floats per person -- used in people.py
-    durs = [
-        State('dur_infection',      default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present. Defined for males and females. For females, dur_infection = dur_episomal + dur_transformed. For males, it's taken from a separate distribution
-        State('dur_episomal',       default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
-        State('dur_transformed',    default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
-        State('dur_cancer',         default_float, np.nan, shape='n_genotypes'), # Duration of cancer
-    ]
+    @property
+    def stock_names(self):
+        return [state.label for state in self.stock_states]
 
-    all_states = person + mece_states + imm_states + hiv_states + intv_states + dates + durs + rship_states + sev + rel_states
+    @property
+    def stock_colors(self):
+        return [state.color for state in self.stock_states]
 
-    @classmethod
-    def validate(cls):
+    @property
+    def genotype_stock_keys(self):
+        return [state.name for state in self.stock_states if state.shape=='n_genotypes']
+
+    @property
+    def other_stock_keys(self):
+        return [state.name for state in self.other_stock_states]
+
+    @property
+    def intv_stock_keys(self):
+        return [state.name for state in self.intv_states]
+
+
+    def validate(self):
         """
         Check that states are valid
 
@@ -211,9 +249,9 @@ class PeopleMeta(sc.prettyobj):
 
         """
         # Validate
-        state_types = ['person', 'mece_states', 'imm_states', 'hiv_states', 'intv_states', 'dates', 'durs', 'sev', 'all_states']
+        state_types = ['person', 'mece_states', 'imm_states', 'intv_states', 'dates', 'durs', 'all_states']
         for state_type in state_types:
-            states = getattr(cls, state_type)
+            states = getattr(self, state_type)
             n_states        = len(states)
             n_unique_states = len(set(states))
             if n_states != n_unique_states: # pragma: no cover
@@ -241,24 +279,17 @@ flows = [
     Flow('cin1s',                   color='#c1ad71',    label='CIN1s'),
     Flow('cin2s',                   color='#c1981d',    label='CIN2s'),
     Flow('cin3s',                   color='#b86113',    label='CIN3s'),
+    Flow('cins',                    color='#b86113',    label='CINs'),
     Flow('cancers',                 color='#5f5cd2',    label='Cancers'),
     Flow('detected_cancers',        color='#5f5cd2',    label='Cancer detections', by_genotype=False),
     Flow('cancer_deaths',           color='#000000',    label='Cancer deaths', by_genotype=False),
     Flow('detected_cancer_deaths',  color='#000000',    label='Detected cancer deaths', by_genotype=False),
     Flow('reinfections',            color='#732e26',    label='Reinfections'),
     Flow('reactivations',           color='#732e26',    label='Reactivations'),
-    Flow('hiv_infections',          color='#5c399c',    label='HIV infections', by_genotype=False)
 ]
 flow_keys           = [flow.name for flow in flows]
 genotype_flow_keys  = [flow.name for flow in flows if flow.by_genotype]
 
-# Stocks: the number in each of the following states
-# All are stored (1) by genotype and (2) as the total across genotypes
-stock_keys   = [state.name for state in PeopleMeta.stock_states]
-stock_names  = [state.label for state in PeopleMeta.stock_states]
-stock_colors = [state.color for state in PeopleMeta.stock_states]
-total_stock_keys = [state.name for state in PeopleMeta.stock_states if state.shape=='n_genotypes']
-other_stock_keys = [state.name for state in PeopleMeta.intv_states+PeopleMeta.hiv_states]
 
 # Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
@@ -284,8 +315,8 @@ type_dist_names  = ['Pre-CIN', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
 
 default_init_prev = {
     'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
-    'm'             : np.array([ 0.0, 0.05, 0.07, 0.05, 0.02, 0.01, 0.0005, 0]),
-    'f'             : np.array([ 0.0, 0.05, 0.07, 0.05, 0.02, 0.01, 0.0005, 0]),
+    'm'             : np.array([ 0.0, 0.25, 0.6, 0.25, 0.05, 0.01, 0.0005, 0]),
+    'f'             : np.array([ 0.0, 0.35, 0.7, 0.25, 0.05, 0.01, 0.0005, 0]),
 }
 
 
