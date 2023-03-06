@@ -264,7 +264,7 @@ class People(hpb.BasePeople):
 
                 # Create the new agents and assign them the same properties as the existing agents
                 new_inds = self._grow(n_new_agents)
-                for state in self.meta.all_states:
+                for state in self.meta.states_to_set:
                     if state.ndim == 1:
                         self[state.name][new_inds] = self[state.name][extra_source_inds]
                     elif state.ndim == 2:
@@ -336,6 +336,9 @@ class People(hpb.BasePeople):
         rel_sevs = self.rel_sev[fg_inds]
         if (time_with_infection<0).any():
             errormsg = 'Time with infection cannot be less than zero.'
+            raise ValueError(errormsg)
+        if (np.isnan(self.date_exposed[genotype, fg_inds])).any():
+            errormsg = f'No date of exposure defined for {hpu.iundefined(self.date_exposed[genotype, fg_inds],fg_inds)} on timestep {self.t}'
             raise ValueError(errormsg)
 
         self.sev[genotype, fg_inds] = hppar.compute_severity(time_with_infection, rel_sev=rel_sevs, pars=gpars['sev_fn'])
@@ -816,16 +819,18 @@ class People(hpb.BasePeople):
         elif cause == 'emigration':
             self.emigrated[inds] = True
         elif cause == 'hiv':
-            pass # handled by hivsim
+            self.dead_hiv[inds] = True
         else:
-            errormsg = f'Cause of death must be one of "other", "cancer", or "emigration", not {cause}.'
+            errormsg = f'Cause of death must be one of "other", "cancer", "emigration", or "hiv", not {cause}.'
             raise ValueError(errormsg)
 
         # Set states to false
         self.alive[inds] = False
-        for state in hpd.total_stock_keys:
+        for state in self.meta.genotype_stock_keys:
             self[state][:, inds] = False
-        for state in hpd.other_stock_keys:
+        for state in self.meta.intv_stock_keys:
+            self[state][inds] = False
+        for state in self.meta.other_stock_keys:
             self[state][inds] = False
 
         # Wipe future dates
