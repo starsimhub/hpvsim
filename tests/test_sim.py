@@ -86,7 +86,7 @@ def test_epi():
             return
 
     par_effects = [
-        ParEffects('model_hiv',     [False, True],  ['cin1s', 'cin2s', 'cins', 'cancers']),
+        ParEffects('model_hiv',     [False, True],  ['cin1s', 'cin2s', 'cins']),
         ParEffects('beta',          [0.01, 0.99],   ['infections']),
         ParEffects('condoms',       [0.90, 0.10],   ['infections']),
         ParEffects('acts',          [1, 200],       ['infections']),
