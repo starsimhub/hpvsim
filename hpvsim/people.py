@@ -308,14 +308,14 @@ class People(hpb.BasePeople):
 
         self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal[is_transform] / dt)
         dur_transformed = sc.randround(hpu.sample(**self.pars['dur_transformed'], size=len(transform_inds))/dt)
-        improbable_bools = (self.date_transformed[g, transform_inds] + dur_transformed ) < self.date_cin3[g, transform_inds]
+        improbable_bools = (self.date_transformed[g, transform_inds] + dur_transformed ) < self.date_cin2[g, transform_inds]
         if len(hpu.true(improbable_bools)):
             # Figure out how much duration of transformation needs to be extended to ensure they pass through cin2/3 before cancer
             improbable_inds = transform_inds[hpu.true(improbable_bools)]
             date_cancer = (self.date_transformed[g, improbable_inds] + dur_transformed[improbable_bools])
-            time_gap_cin3 =  (self.date_cin3[g, improbable_inds] - date_cancer)
+            time_gap_cin2 =  (self.date_cin2[g, improbable_inds] - date_cancer)
             time_gap_carcinoma = (self.date_carcinoma[g, improbable_inds] - date_cancer)
-            additional_time = np.random.uniform(time_gap_cin3, time_gap_carcinoma, size=len(improbable_inds)).astype(hpd.default_int)
+            additional_time = np.random.uniform(time_gap_cin2, time_gap_carcinoma, size=len(improbable_inds)).astype(hpd.default_int)
             dur_transformed[improbable_bools] += additional_time
         self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + dur_transformed
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + dur_transformed
