@@ -206,6 +206,7 @@ class People(hpb.BasePeople):
         # Set length of infection, which is moderated by any prior cell-level immunity
         cell_imm = self.cell_imm[g, inds]
         self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-cell_imm)
+        self.dur_infection[g, inds]  = self.dur_episomal[g, inds]
 
         # Set infection severity and outcomes
         self.set_severity(inds, g, gpars, dt)
@@ -433,7 +434,8 @@ class People(hpb.BasePeople):
             gpars = self.pars['genotype_pars'][self.pars['genotype_map'][genotype]]
             dt = self.pars['dt']
             dur_infection = self.dur_infection[genotype, inds]
-            new_rel_sev = hppar.compute_rel_sev(ccdict['cin2'], dur_infection, pars=gpars['sev_fn'])
+            threshold_sev = (ccdict['cin2']+ccdict['cin3'])/2
+            new_rel_sev = hppar.compute_rel_sev(threshold_sev, dur_infection, pars=gpars['sev_fn'])
             old_rel_sev = self.rel_sev[inds]
             self.rel_sev[inds] = np.fmax(new_rel_sev, old_rel_sev)
 
@@ -441,6 +443,7 @@ class People(hpb.BasePeople):
             date_cin3 = self.date_cin3[genotype, inds]
 
             # Adjust dates of cin
+            date_cancer = self.date_cancerous[genotype, inds]
 
             not_yet_cin2_bool = self.t < date_cin2
             not_yet_cin3_bool = self.t < date_cin3
@@ -452,6 +455,15 @@ class People(hpb.BasePeople):
 
             self.date_cin2[genotype, inds[not_yet_cin2_bool]] = np.minimum(date_cin2[not_yet_cin2_bool], new_date_cin2)
             self.date_cin3[genotype, inds[not_yet_cin3_bool]] = np.minimum(date_cin3[not_yet_cin3_bool], new_date_cin3)
+
+            if (date_cancer < self.date_cin3[genotype, inds]).any():
+                print('iamhere')
+
+            if (date_cancer < self.date_cin2[genotype, inds]).any():
+                print('iamhere')
+
+            if (self.date_cin3[genotype, inds] < self.date_cin2[genotype, inds]).any():
+                print('iamhere')
 
         return
 
