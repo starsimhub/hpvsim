@@ -221,7 +221,7 @@ class People(hpb.BasePeople):
         # Firstly, calculate the overall maximal severity that each woman will have
         dur_episomal = self.dur_episomal[g, inds]
         if set_sev: self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
-        sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate maximal severity
+        sevs = hppar.compute_severity_integral(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate maximal severity
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob_par = gpars['transform_prob'] # Pull out the genotype-specific parameter governing the probability of transformation
@@ -245,7 +245,7 @@ class People(hpb.BasePeople):
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
             extra_rel_sevs = hpu.sample(**self.pars['sev_dist'], size=full_size)
-            extra_sev = hppar.compute_severity(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate maximal severity
+            extra_sev = hppar.compute_severity_integral(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate maximal severity
 
             # Based on the extra severity values, determine additional transformation probabilities
             extra_transform_probs = hpu.transform_prob(transform_prob_par, extra_sev[:, 1:])
