@@ -789,7 +789,7 @@ class People(hpb.BasePeople):
 
         # Compute disease progression for females
         if len(f_inds)>0:
-            gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
+            gpars = self.pars['genotype_pars'][g]
             self.set_prognoses(f_inds, g, gpars, dt)
 
         # Compute infection clearance for males
