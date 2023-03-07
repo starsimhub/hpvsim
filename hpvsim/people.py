@@ -336,7 +336,7 @@ class People(hpb.BasePeople):
 
         if len(fg_inds):
 
-            self.sev[genotype, fg_inds] += hppar.compute_severity_diff(time_with_infection, rel_sev=rel_sevs, pars=gpars['sev_fn'])
+            self.sev[genotype, fg_inds] += hppar.compute_severity_diff(time_with_infection, rel_sev=rel_sevs, pars=gpars['sev_fn'], dt=self.pars['dt'])
         # self.sev[genotype, fg_inds] = hppar.compute_severity(time_with_infection, rel_sev=rel_sevs, pars=gpars['sev_fn'])
         if (np.isnan(self.sev[genotype, fg_inds])).any():
             errormsg = 'Invalid severity values.'

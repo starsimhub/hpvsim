@@ -611,7 +611,7 @@ def compute_severity(t, rel_sev=None, pars=None):
     return output
 
 
-def compute_severity_diff(t, rel_sev=None, pars=None):
+def compute_severity_diff(t, rel_sev=None, pars=None, dt=None):
     '''
     Return severity differential:
     '''
@@ -623,7 +623,9 @@ def compute_severity_diff(t, rel_sev=None, pars=None):
         'logf3',
     ]
 
-    t0 = t - 1
+    if dt is None:
+        dt = 1
+    t0 = t - dt
 
     # Scale t
     if rel_sev is not None:
