@@ -122,12 +122,16 @@ def invlogf2(y, x_infl, k):
     return result
 
 
-def transform_prob(tp,dysp):
+def transform_prob(tp,dysp,min_ccut=None):
     '''
     Returns transformation probability given % of dysplastic cells
+    Cannot transform unless you reach cin1 minimally
     '''
-
-    return 1-np.power(1-tp, dysp*100)
+    if min_ccut is None:
+        min_ccut = 0.03
+    result = 1-np.power(1-tp, dysp*100)
+    result[dysp<min_ccut] = 0
+    return result
 
 
 def clearance_prob(init_clearance_prob, clearance_decay, dysp):

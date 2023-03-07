@@ -611,6 +611,46 @@ def compute_severity(t, rel_sev=None, pars=None):
     return output
 
 
+def compute_severity_diff(t, rel_sev=None, pars=None):
+    '''
+    Return severity differential:
+    '''
+
+    pars = sc.dcp(pars)
+    form = pars.pop('form')
+    choices = [
+        'logf2',
+        'logf3',
+    ]
+
+    t0 = t - 1
+
+    # Scale t
+    if rel_sev is not None:
+        t0 = rel_sev * t0
+        t = rel_sev * t
+
+    # Process inputs
+    if form is None or form == 'logf2':
+        output = hpu.logf2(t, **pars)
+        output0 = hpu.logf2(t0, **pars)
+
+    elif form == 'logf3':
+        output = hpu.logf3(t, **pars)
+        output0 = hpu.logf3(t0, **pars)
+
+    elif callable(form):
+        output = form(t, **pars)
+        output0 = form(t0, **pars)
+
+    else:
+        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
+        raise NotImplementedError(errormsg)
+
+    diff = output - output0
+    return diff
+
+
 def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
     '''
     Compute time to given severity level given input parameters
@@ -640,5 +680,37 @@ def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
     # Scale by relative severity
     if rel_sev is not None:
         output = output / rel_sev
+
+    return output
+
+
+def compute_rel_sev(sev_vals, dur_transformed, pars=None):
+    '''
+    Compute relative severity given input parameters
+    '''
+
+    pars = sc.dcp(pars)
+    form = pars.pop('form')
+    choices = [
+        'logf2',
+        'logf3',
+    ]
+
+    # Process inputs
+    if form is None or form == 'logf2':
+        output = hpu.invlogf2(sev_vals, **pars)
+
+    elif form == 'logf3':
+        output = hpu.invlogf3(sev_vals, **pars)
+
+    elif callable(form):
+        output = form(sev_vals, **pars)
+
+    else:
+        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
+        raise NotImplementedError(errormsg)
+
+    # Scale by relative severity
+    output = output / dur_transformed
 
     return output
