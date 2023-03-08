@@ -1097,16 +1097,9 @@ class age_causal_infection(Analyzer):
                 hpv_time = (date_cin1 - date_exposed) * sim['dt']
                 cin1_time = (date_cin2 - date_cin1) * sim['dt']
                 cin2_time = (date_cin3 - date_cin2) * sim['dt']
-                # cin2_time[fast_progressors] =(sim.t - date_cin2[fast_progressors]) * sim['dt']
-                if (date_cin2 > sim.t).any():
-                    print('iamhere')
                 cin3_time = (sim.t - date_cin3) * sim['dt']
                 cin3_time[fast_progressors] = 0
                 total_time = (sim.t - date_exposed) * sim['dt']
-                if (cin2_time < 0).any():
-                    print('iamhere')
-                if (cin3_time < 0).any():
-                    print('iamhere')
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()
                 self.dwelltime['precin'] += hpv_time.tolist()
