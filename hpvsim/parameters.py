@@ -611,48 +611,6 @@ def compute_severity(t, rel_sev=None, pars=None):
     return output
 
 
-def compute_severity_diff(t, rel_sev=None, pars=None, dt=None):
-    '''
-    Return severity differential:
-    '''
-
-    pars = sc.dcp(pars)
-    form = pars.pop('form')
-    choices = [
-        'logf2',
-        'logf3',
-    ]
-
-    if dt is None:
-        dt = 1
-    t0 = t - dt
-
-    # Scale t
-    if rel_sev is not None:
-        t0 = rel_sev * t0
-        t = rel_sev * t
-
-    # Process inputs
-    if form is None or form == 'logf2':
-        output = hpu.logf2(t, **pars)
-        output0 = hpu.logf2(t0, **pars)
-
-    elif form == 'logf3':
-        output = hpu.logf3(t, **pars)
-        output0 = hpu.logf3(t0, **pars)
-
-    elif callable(form):
-        output = form(t, **pars)
-        output0 = form(t0, **pars)
-
-    else:
-        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
-        raise NotImplementedError(errormsg)
-
-    diff = output - output0
-    return diff
-
-
 def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
     '''
     Compute time to given severity level given input parameters

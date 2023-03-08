@@ -175,7 +175,7 @@ class People(hpb.BasePeople):
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
         for g in range(ng):
-            self.check_transformation(g) # check for new transformations, persistence, or clearance
+            self.check_transformation(g)  # check for new transformations
             self.update_severity(g) # update severity values
             self.check_clearance(g) # check for clearance
 
@@ -293,9 +293,6 @@ class People(hpb.BasePeople):
             transform_prob_arr[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
 
         # Set dates of cin1, 2, 3 for all women who get infected
-
-
-
         self.date_cin1[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['precin'],    rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
         self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
         self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
@@ -312,6 +309,7 @@ class People(hpb.BasePeople):
 
         self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal[is_transform] / dt)
         dur_transformed = sc.randround(hpu.sample(**self.pars['dur_transformed'], size=len(transform_inds))/dt)
+        dur_transformed[dur_transformed == 0] = 1 # ensure cancer occurs at least one timestep after transformation
         self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + dur_transformed
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + dur_transformed*dt
 
@@ -345,7 +343,6 @@ class People(hpb.BasePeople):
             # Now pull out those who are transformed
             transform_bools = self.transformed[genotype, fg_inds]
             self.sev[genotype, fg_inds[transform_bools]] += rel_sevs[transform_bools]*self.pars['dt']
-
 
         if (np.isnan(self.sev[genotype, fg_inds])).any():
             errormsg = 'Invalid severity values.'
@@ -448,26 +445,25 @@ class People(hpb.BasePeople):
             new_max_sev = np.fmax(threshold_sev, current_max_sev)
             current_sev = self.sev[genotype, inds]
             slopes = (new_max_sev - current_sev)/dur_transformation
-            self.rel_sev[genotype, inds] = slopes
-
-            if 50256 in inds:
-                print('iamhere')
 
             # Adjust dates of cin
             not_yet_cin2_bool = (current_sev < ccdict['cin1'])
             not_yet_cin3_bool = (current_sev < ccdict['cin2'])
 
-            date_cin2 = self.t + sc.randround(((ccdict['cin1'] - current_sev[not_yet_cin2_bool])/slopes[not_yet_cin2_bool])/dt)
-            date_cin3 = self.t + sc.randround((((ccdict['cin2'] - current_sev[not_yet_cin3_bool])/slopes[not_yet_cin3_bool])/dt) + 1/dt)
+            # if ((current_sev > ccdict['cin1']) & (self.date_cin2[genotype,inds]>self.t)).any():
+            #     improbable_inds = hpu.true((current_sev > ccdict['cin1']) & (self.date_cin2[genotype,inds]>self.t))
+            #     improb_sev = current_sev[improbable_inds]
+            #     improb_dates = self.date_cin2[genotype, inds[improbable_inds]]
+            #     diff = improb_dates - self.t
+            #     print(f'stop, whats wrong here??')
 
-            if len(hpu.false(not_yet_cin2_bool)):
-                print('iamhere')
+            date_cin2 = self.t + sc.randround(((ccdict['cin1'] - current_sev[not_yet_cin2_bool])/slopes[not_yet_cin2_bool])/dt)
+            date_cin3 = self.t + sc.randround((((ccdict['cin2'] - current_sev[not_yet_cin3_bool])/slopes[not_yet_cin3_bool])/dt)+(1/dt))
+
             self.date_cin2[genotype, inds[not_yet_cin2_bool]] = date_cin2
             self.date_cin3[genotype, inds[not_yet_cin3_bool]] = date_cin3
 
-            if (self.date_cin3[genotype, inds] < self.date_cin2[genotype, inds]).any():
-                print('iamhere')
-
+            self.rel_sev[genotype, inds] = slopes
         return
 
 
