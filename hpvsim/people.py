@@ -175,8 +175,8 @@ class People(hpb.BasePeople):
         # Perform updates that are genotype-specific
         ng = self.pars['n_genotypes']
         for g in range(ng):
+            self.check_clearance(g) # check for clearance (need to do this first)
             self.update_severity(g) # update severity values
-            self.check_clearance(g) # check for clearance
             self.check_transformation(g)  # check for new transformations
 
             for key in ['cin1s','cin2s','cin3s','cancers']:  # update flows
