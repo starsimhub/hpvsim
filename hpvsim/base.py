@@ -936,13 +936,7 @@ class BasePeople(FlexPretty):
         for state in self.meta.states_to_set:
             self._data[state.name] = state.new(self.pars, self._n)
         self._map_arrays()
-        try:
-            self['uid'][:] = np.arange(self.pars['n_agents'])
-        except:
-            import traceback;
-            traceback.print_exc();
-            import pdb;
-            pdb.set_trace()
+        self['uid'][:] = np.arange(self.pars['n_agents'])
         return
 
 
