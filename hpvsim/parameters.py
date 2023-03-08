@@ -643,34 +643,3 @@ def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
 
     return output
 
-
-def compute_rel_sev(sev_vals, dur_transformed, pars=None):
-    '''
-    Compute relative severity given input parameters
-    '''
-
-    pars = sc.dcp(pars)
-    form = pars.pop('form')
-    choices = [
-        'logf2',
-        'logf3',
-    ]
-
-    # Process inputs
-    if form is None or form == 'logf2':
-        output = hpu.invlogf2(sev_vals, **pars)
-
-    elif form == 'logf3':
-        output = hpu.invlogf3(sev_vals, **pars)
-
-    elif callable(form):
-        output = form(sev_vals, **pars)
-
-    else:
-        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
-        raise NotImplementedError(errormsg)
-
-    # Scale by relative severity
-    output = output / dur_transformed
-
-    return output
