@@ -96,7 +96,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['age'] = ages
         popdict['sex'] = sexes
         popdict['debut'] = debuts
-        popdict['rel_sev'] = rel_sev
+        popdict['rel_sev'] = np.ones(((sim['n_genotypes']), len(ages)))*rel_sev[None,:]
         popdict['partners'] = partners
 
         is_active = ages > debuts

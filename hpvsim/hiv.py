@@ -301,7 +301,10 @@ class HIVsim(hpb.ParsObj):
             hiv_inds += list(inds)
             if len(inds):
                 for ir, rel_par in enumerate(['rel_sus', 'rel_sev', 'rel_imm']):
-                    people[rel_par][inds] = self['hiv_pars'][rel_par][cd4state]
+                    if rel_par == 'rel_sev':
+                        people[rel_par][:,inds] = self['hiv_pars'][rel_par][cd4state]
+                    else:
+                        people[rel_par][inds] = self['hiv_pars'][rel_par][cd4state]
 
         # If anyone has HIV, update their HPV parameters
         if len(hiv_inds):
