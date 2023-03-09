@@ -642,8 +642,6 @@ def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
 
     return output
 
-<<<<<<< HEAD
-=======
 
 def compute_severity_integral(t, rel_sev=None, pars=None):
     '''
@@ -677,4 +675,3 @@ def compute_severity_integral(t, rel_sev=None, pars=None):
 
     return output
 
->>>>>>> transform-prob
