@@ -458,10 +458,15 @@ class People(hpb.BasePeople):
             #     print(f'stop, whats wrong here??')
 
             date_cin2 = self.t + sc.randround(((ccdict['cin1'] - current_sev[not_yet_cin2_bool])/slopes[not_yet_cin2_bool])/dt)
-            date_cin3 = self.t + sc.randround((((ccdict['cin2'] - current_sev[not_yet_cin3_bool])/slopes[not_yet_cin3_bool])/dt)+(1/dt))
+            date_cin3 = self.t + sc.randround((((ccdict['cin2'] - current_sev[not_yet_cin3_bool])/slopes[not_yet_cin3_bool])/dt))
 
             self.date_cin2[genotype, inds[not_yet_cin2_bool]] = date_cin2
             self.date_cin3[genotype, inds[not_yet_cin3_bool]] = date_cin3
+
+            # if cancer occurs within same year as cin3 and randomly happens first due to sc.randround, adjust
+            if (self.date_cancerous[genotype,inds] < self.date_cin3[genotype,inds]).any():
+                finicky_inds = hpu.true(self.date_cancerous[genotype,inds] < self.date_cin3[genotype,inds])
+                self.date_cancerous[genotype, inds[finicky_inds]] += 1/dt
 
             self.rel_sev[genotype, inds] = slopes
         return
