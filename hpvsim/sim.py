@@ -56,8 +56,11 @@ class Sim(hpb.BaseSim):
         self.load_data(datafile) # Load the data, if provided
 
         # Update parameters
-        if not pars.get('location') or pars['location'] is None:
-            pars['location'] = default_location
+        if pars is None:
+            pars = dict(location=default_location)
+        else:
+            if not pars.get('location') or pars['location'] is None:
+                pars['location'] = default_location
 
         self.update_pars(pars, **kwargs)   # Update the parameters
 
