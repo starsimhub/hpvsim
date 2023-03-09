@@ -560,7 +560,6 @@ class People(hpb.BasePeople):
         self.date_cin1[genotype, inds] = np.nan
         self.date_cin2[genotype, inds] = np.nan
         self.date_cin3[genotype, inds] = np.nan
-        self.date_carcinoma[genotype, inds] = np.nan
 
         return
 
