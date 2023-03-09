@@ -134,7 +134,7 @@ def transform_prob(tp,dysp,min_ccut=None):
     Cannot transform unless you reach cin1 minimally
     '''
     if min_ccut is None:
-        min_ccut = 0.03
+        min_ccut = 0.0
     result = 1-np.power(1-tp, dysp*100)
     result[dysp<min_ccut] = 0
     return result

@@ -232,13 +232,13 @@ class People(hpb.BasePeople):
 
         # Non-multiscale version
         if n_extra == 1:
-            transform_prob_arr = hpu.transform_prob(transform_prob_par, sevs, min_ccut=ccdict['precin'])
+            transform_prob_arr = hpu.transform_prob(transform_prob_par, sevs)
 
         # Multiscale version
         elif n_extra > 1:
 
             # Firstly, determine who will transform based on severity values, and scale them to create more agents
-            transform_probs = hpu.transform_prob(transform_prob_par, sevs, min_ccut=ccdict['precin']) # Use this to determine probability of transformation
+            transform_probs = hpu.transform_prob(transform_prob_par, sevs) # Use this to determine probability of transformation
             is_transform = hpu.binomial_arr(transform_probs) # Select who transforms - NB, this array gets extended later
             transform_inds = inds[is_transform] # Indices of those who transform
             self.scale[transform_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
@@ -250,7 +250,7 @@ class People(hpb.BasePeople):
             extra_sev = hppar.compute_severity_integral(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate maximal severity
 
             # Based on the extra severity values, determine additional transformation probabilities
-            extra_transform_probs = hpu.transform_prob(transform_prob_par, extra_sev[:, 1:], min_ccut=ccdict['precin'])
+            extra_transform_probs = hpu.transform_prob(transform_prob_par, extra_sev[:, 1:])
             extra_transform_bools = hpu.binomial_arr(extra_transform_probs)
             extra_transform_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
             extra_transform_counts = extra_transform_bools.sum(axis=1)  # Find out how many new cancer cases we have
