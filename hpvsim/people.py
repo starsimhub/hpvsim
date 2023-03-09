@@ -296,7 +296,6 @@ class People(hpb.BasePeople):
         self.date_cin1[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['precin'],    rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
         self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
         self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
-        self.date_carcinoma[g, inds]    = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin3'],      rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
 
         # Now handle women who transform - need to adjust their length of infection and set more dates
         is_transform = hpu.binomial_arr(transform_prob_arr)
@@ -308,10 +307,9 @@ class People(hpb.BasePeople):
                                                          sc.randround(time_to_clear / dt))
 
         self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal[is_transform] / dt)
-        dur_transformed = sc.randround(hpu.sample(**self.pars['dur_transformed'], size=len(transform_inds))/dt)
-        dur_transformed[dur_transformed == 0] = 1 # ensure cancer occurs at least one timestep after transformation
-        self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + dur_transformed
-        self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + dur_transformed*dt
+        self.date_cancerous[g, transform_inds] = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn']) / dt)
+        dur_transformed = (self.date_cancerous[g, transform_inds] - self.date_cin3[g, transform_inds])*dt
+        self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + dur_transformed
 
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
         self.date_dead_cancer[transform_inds] = self.date_cancerous[g, transform_inds] + sc.randround(dur_cancer / dt)
@@ -334,15 +332,7 @@ class People(hpb.BasePeople):
             errormsg = f'No date of exposure defined for {hpu.iundefined(self.date_exposed[genotype, fg_inds],fg_inds)} on timestep {self.t}'
             raise ValueError(errormsg)
 
-        if len(fg_inds):
-
-            # First pull out those still in episomal infection
-            episomal_bools = self.episomal[genotype, fg_inds]
-            self.sev[genotype, fg_inds[episomal_bools]] = hppar.compute_severity(time_with_infection[episomal_bools], rel_sev=rel_sevs[episomal_bools], pars=gpars['sev_fn'])
-
-            # Now pull out those who are transformed
-            transform_bools = self.transformed[genotype, fg_inds]
-            self.sev[genotype, fg_inds[transform_bools]] += rel_sevs[transform_bools]*self.pars['dt']
+        self.sev[genotype, fg_inds] = hppar.compute_severity(time_with_infection, rel_sev=rel_sevs, pars=gpars['sev_fn'])
 
         if (np.isnan(self.sev[genotype, fg_inds])).any():
             errormsg = 'Invalid severity values.'
@@ -433,42 +423,6 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.transformed[genotype,:], self.date_transformed[genotype,:], filter_inds=filter_inds)
         self.transformed[genotype, inds] = True  # Now transformed, cannot clear
         self.date_clearance[genotype, inds] = np.nan  # Remove their clearance dates
-
-        if len(inds):
-            # Update rel_sev
-            ccdict = self.pars['clinical_cutoffs']
-            gpars = self.pars['genotype_pars'][self.pars['genotype_map'][genotype]]
-            dt = self.pars['dt']
-            dur_transformation = (self.date_cancerous[genotype, inds] - self.t)*dt
-            threshold_sev = (ccdict['cin2']+ccdict['cin3'])/2 # Value that we need to reach at a minimum before cancer occurs
-            current_max_sev = hppar.compute_severity(self.dur_infection[genotype,inds], rel_sev=self.rel_sev[genotype, inds], pars=gpars['sev_fn']) # Value we would reach with no kink
-            new_max_sev = np.fmax(threshold_sev, current_max_sev)
-            current_sev = self.sev[genotype, inds]
-            slopes = (new_max_sev - current_sev)/dur_transformation
-
-            # Adjust dates of cin
-            not_yet_cin2_bool = (current_sev < ccdict['cin1'])
-            not_yet_cin3_bool = (current_sev < ccdict['cin2'])
-
-            # if ((current_sev > ccdict['cin1']) & (self.date_cin2[genotype,inds]>self.t)).any():
-            #     improbable_inds = hpu.true((current_sev > ccdict['cin1']) & (self.date_cin2[genotype,inds]>self.t))
-            #     improb_sev = current_sev[improbable_inds]
-            #     improb_dates = self.date_cin2[genotype, inds[improbable_inds]]
-            #     diff = improb_dates - self.t
-            #     print(f'stop, whats wrong here??')
-
-            date_cin2 = self.t + sc.randround(((ccdict['cin1'] - current_sev[not_yet_cin2_bool])/slopes[not_yet_cin2_bool])/dt)
-            date_cin3 = self.t + sc.randround((((ccdict['cin2'] - current_sev[not_yet_cin3_bool])/slopes[not_yet_cin3_bool])/dt))
-
-            self.date_cin2[genotype, inds[not_yet_cin2_bool]] = date_cin2
-            self.date_cin3[genotype, inds[not_yet_cin3_bool]] = date_cin3
-
-            # if cancer occurs within same year as cin3 and randomly happens first due to sc.randround, adjust
-            if (self.date_cancerous[genotype,inds] < self.date_cin3[genotype,inds]).any():
-                finicky_inds = hpu.true(self.date_cancerous[genotype,inds] < self.date_cin3[genotype,inds])
-                self.date_cancerous[genotype, inds[finicky_inds]] += 1/dt
-
-            self.rel_sev[genotype, inds] = slopes
         return
 
 

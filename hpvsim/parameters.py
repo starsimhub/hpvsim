@@ -84,7 +84,6 @@ def make_pars(**kwargs):
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation']    = 0.025 # Placeholder; unused unless hpv_control_prob>0
     pars['dur_cancer']          = dict(dist='lognormal', par1=12.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
-    pars['dur_transformed']     = dict(dist='normal_pos', par1=5.77, par2=5)  # Duration of transformed infection prior to onset of invasive cervical cancer (years)
     pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
     pars['clinical_cutoffs']    = dict(precin=0.03, cin1=0.353, cin2=0.676, cin3=0.99) # Parameters used to map disease severity onto cytological grades
     pars['sev_dist']            = dict(dist='normal_pos', par1=1.0, par2=0.05) # Distribution to draw individual level severity scale factors
