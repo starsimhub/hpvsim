@@ -48,12 +48,20 @@ class Sim(hpb.BaseSim):
 
         # Make default parameters (using values from parameters.py)
         default_pars = hppar.make_pars(version=version) # Start with default pars
+        default_location = sc.dcp(default_pars['location']) # Pull out the default location here
+        default_pars['location'] = None # Don't load the default location here
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
         # Load data, including datafile that are used to create additional optional parameters
         self.load_data(datafile) # Load the data, if provided
 
         # Update parameters
+        if pars is None:
+            pars = dict(location=default_location)
+        else:
+            if not pars.get('location') or pars['location'] is None:
+                pars['location'] = default_location
+
         self.update_pars(pars, **kwargs)   # Update the parameters
 
         return
