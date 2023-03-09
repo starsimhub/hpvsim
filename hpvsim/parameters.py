@@ -642,3 +642,39 @@ def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
 
     return output
 
+<<<<<<< HEAD
+=======
+
+def compute_severity_integral(t, rel_sev=None, pars=None):
+    '''
+    Process functional form and parameters into values:
+    '''
+
+    pars = sc.dcp(pars)
+    form = pars.pop('form')
+    choices = [
+        # 'logf2', # TODO: haven't added this yet
+        'logf3',
+    ]
+
+    # Scale t
+    if rel_sev is not None:
+        t = rel_sev * t
+
+    # Process inputs
+    # if form is None or form == 'logf2':
+    #     output = hpu.logf2(t, **pars)
+
+    if form == 'logf3':
+        output = hpu.intlogf3(t, **pars)
+
+    elif callable(form):
+        output = form(t, **pars)
+
+    else:
+        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
+        raise NotImplementedError(errormsg)
+
+    return output
+
+>>>>>>> transform-prob

@@ -261,7 +261,7 @@ def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
-    sim = hpv.Sim(n_agents=100, genotypes=[16], label='test_label')
+    sim = hpv.Sim(n_agents=100, ms_agent_ratio=1, genotypes=[16], label='test_label')
     sim.reset_layer_pars()
     sim.initialize()
     sim.reset_layer_pars()
@@ -281,12 +281,14 @@ def test_flexible_inputs():
     with pytest.raises(ValueError):
         sim.validate_pars()
 
+
     # Can't have both end_days and n_years None
     sim['end'] = None
     sim['n_years'] = None
     with pytest.raises(ValueError):
         sim.validate_pars()
     sim['n_years'] = 10 # Restore
+
 
     # Check different initial conditions
     sim['init_hpv_prev'] = [0.08, 0.2] # Can't accept an array without age brackets

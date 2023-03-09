@@ -107,6 +107,12 @@ def invlogf3(y, x_infl, k, ttc=25, s=1):
     final = 1/k * (k*x_infl - part2)
     return final
 
+def intlogf3(upper, k, x_infl, ttc=25, s=1, rel_sev=None):
+    l_asymp, u_asymp = get_asymptotes(k, x_infl, ttc, s)
+    if rel_sev is not None: upper = rel_sev * upper
+    val_at_0    = 1/k* ((u_asymp-l_asymp)*np.log(np.exp(k*x_infl)+1))
+    val_at_lim  = 1/k* ((u_asymp-l_asymp)*np.log(np.exp(k*(x_infl-upper))+1)) + u_asymp*upper
+    return val_at_lim-val_at_0
 
 def invlogf2(y, x_infl, k):
     '''
