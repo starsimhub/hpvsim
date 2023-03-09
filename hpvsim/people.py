@@ -223,7 +223,7 @@ class People(hpb.BasePeople):
         # Firstly, calculate the overall maximal severity that each woman will have
         dur_episomal = self.dur_episomal[g, inds]
         if set_sev: self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
-        sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate maximal severity
+        sevs = hppar.compute_severity_integral(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate maximal severity
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob_par = gpars['transform_prob'] # Pull out the genotype-specific parameter governing the probability of transformation
@@ -232,13 +232,13 @@ class People(hpb.BasePeople):
 
         # Non-multiscale version
         if n_extra == 1:
-            transform_prob_arr = hpu.transform_prob(transform_prob_par, sevs, min_ccut=ccdict['precin'])
+            transform_prob_arr = hpu.transform_prob(transform_prob_par, sevs)
 
         # Multiscale version
         elif n_extra > 1:
 
             # Firstly, determine who will transform based on severity values, and scale them to create more agents
-            transform_probs = hpu.transform_prob(transform_prob_par, sevs, min_ccut=ccdict['precin']) # Use this to determine probability of transformation
+            transform_probs = hpu.transform_prob(transform_prob_par, sevs) # Use this to determine probability of transformation
             is_transform = hpu.binomial_arr(transform_probs) # Select who transforms - NB, this array gets extended later
             transform_inds = inds[is_transform] # Indices of those who transform
             self.scale[transform_inds] = cancer_scale  # Shrink the weight of the original agents, but otherwise leave them the same
@@ -247,10 +247,10 @@ class People(hpb.BasePeople):
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
             extra_rel_sevs = np.ones(full_size)*self.rel_sev[inds][:,None]
-            extra_sev = hppar.compute_severity(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate maximal severity
+            extra_sev = hppar.compute_severity_integral(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate maximal severity
 
             # Based on the extra severity values, determine additional transformation probabilities
-            extra_transform_probs = hpu.transform_prob(transform_prob_par, extra_sev[:, 1:], min_ccut=ccdict['precin'])
+            extra_transform_probs = hpu.transform_prob(transform_prob_par, extra_sev[:, 1:])
             extra_transform_bools = hpu.binomial_arr(extra_transform_probs)
             extra_transform_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
             extra_transform_counts = extra_transform_bools.sum(axis=1)  # Find out how many new cancer cases we have
@@ -788,7 +788,7 @@ class People(hpb.BasePeople):
 
         # Compute disease progression for females
         if len(f_inds)>0:
-            gpars = self.pars['genotype_pars'][self.pars['genotype_map'][g]]
+            gpars = self.pars['genotype_pars'][g]
             self.set_prognoses(f_inds, g, gpars, dt)
 
         # Compute infection clearance for males
