@@ -1410,13 +1410,6 @@ class BasePeople(FlexPretty):
                  self.sev < self.pars['clinical_cutoffs']['cin3'])).astype(bool)
 
     @property
-    def carcinoma(self):
-        '''
-        Boolean array of everyone with whose disease severity level lies within the thresholds for carcinoma in situ
-        '''
-        return (self.sev >= self.pars['clinical_cutoffs']['cin3']).astype(bool)
-
-    @property
     def cin(self):
         '''
         Boolean array of everyone with whose disease severity level meets the threshold for detectable cell changes
