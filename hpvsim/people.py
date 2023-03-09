@@ -223,7 +223,7 @@ class People(hpb.BasePeople):
         # Firstly, calculate the overall maximal severity that each woman will have
         dur_episomal = self.dur_episomal[g, inds]
         if set_sev: self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
-        sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])  # Calculate maximal severity
+        sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate maximal severity
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob_par = gpars['transform_prob'] # Pull out the genotype-specific parameter governing the probability of transformation
@@ -246,7 +246,7 @@ class People(hpb.BasePeople):
             # Create extra disease severity values for the extra agents
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
-            extra_rel_sevs = np.ones(full_size)*self.rel_sev[g,inds][:,None]
+            extra_rel_sevs = np.ones(full_size)*self.rel_sev[inds][:,None]
             extra_sev = hppar.compute_severity(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate maximal severity
 
             # Based on the extra severity values, determine additional transformation probabilities
@@ -293,9 +293,9 @@ class People(hpb.BasePeople):
             transform_prob_arr[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
 
         # Set dates of cin1, 2, 3 for all women who get infected
-        self.date_cin1[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['precin'],    rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
-        self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
-        self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn'])/dt)
+        self.date_cin1[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['precin'],    rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
+        self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
+        self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
 
         # Now handle women who transform - need to adjust their length of infection and set more dates
         is_transform = hpu.binomial_arr(transform_prob_arr)
@@ -307,7 +307,7 @@ class People(hpb.BasePeople):
                                                          sc.randround(time_to_clear / dt))
 
         self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal[is_transform] / dt)
-        self.date_cancerous[g, transform_inds] = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[g, inds], pars=gpars['sev_fn']) / dt)
+        self.date_cancerous[g, transform_inds] = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[inds], pars=gpars['sev_fn']) / dt)
         dur_transformed = (self.date_cancerous[g, transform_inds] - self.date_cin3[g, transform_inds])*dt
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + dur_transformed
 
@@ -324,7 +324,7 @@ class People(hpb.BasePeople):
         gpars = self.pars['genotype_pars'][genotype]
         fg_inds = hpu.true(self.is_female & self.infectious[genotype,:]) # Indices of women infected with this genotype
         time_with_infection = (self.t - self.date_exposed[genotype, fg_inds]) * self.dt
-        rel_sevs = self.rel_sev[genotype, fg_inds]
+        rel_sevs = self.rel_sev[fg_inds]
         if (time_with_infection<0).any():
             errormsg = 'Time with infection cannot be less than zero.'
             raise ValueError(errormsg)
@@ -625,7 +625,7 @@ class People(hpb.BasePeople):
             self.scale[new_inds]        = self.pars['pop_scale']
             self.sex[new_inds]          = sexes
             self.debut[new_inds]        = debuts
-            self.rel_sev[:,new_inds]    = np.ones(((self.pars['n_genotypes']), len(new_inds)))*rel_sev[None,:]
+            self.rel_sev[new_inds]    = rel_sev
             self.partners[:,new_inds]   = partners
 
             if immunity is not None:
