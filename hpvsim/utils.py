@@ -85,7 +85,6 @@ def logf2(x, x_infl, k):
     l_asymp = -1/(1+np.exp(k*x_infl))
     return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
 
-
 def get_asymptotes(x_infl, k, ttc=25, s=1):
     term1 = (1 + np.exp(k*(x_infl-ttc)))**s # Note, this is 1 for most parameter combinations
     term2 = (1 + np.exp(k*x_infl))**s
@@ -99,7 +98,6 @@ def logf3(x, x_infl, k, ttc=25, s=1):
     l_asymp, u_asymp = get_asymptotes(x_infl, k, ttc, s)
     return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
 
-
 def invlogf3(y, x_infl, k, ttc=25, s=1):
     l_asymp, u_asymp = get_asymptotes(x_infl, k, ttc, s)
     part1 = np.log((u_asymp-l_asymp)/(y-l_asymp))/s
@@ -107,12 +105,16 @@ def invlogf3(y, x_infl, k, ttc=25, s=1):
     final = 1/k * (k*x_infl - part2)
     return final
 
+def indef_int_logf3(x, k, x_infl, ttc, s=1):
+    num = np.exp(-x_infl*k)*(np.exp(k*ttc)+np.exp(x_infl*k))*((np.exp(x_infl*k)+1)*np.log(np.exp(k*x)+np.exp(x_infl*k))-k*x)
+    denom = k*(np.exp(k*ttc)-1)
+    return num/denom
+
 def intlogf3(upper, k, x_infl, ttc, s=1):
 
-    l_asymp, u_asymp = get_asymptotes(k, x_infl, ttc, s)
-    val_at_0    = 1/k* ((u_asymp-l_asymp)*np.log(np.exp(k*x_infl)+1))
-    val_at_lim  = 1/k* ((u_asymp-l_asymp)*np.log(np.exp(k*(x_infl-upper))+1)) + u_asymp*upper
-    integral = val_at_lim-val_at_0
+    val_at_0    = indef_int_logf3(0, k, x_infl, ttc)
+    val_at_lim  = indef_int_logf3(upper, k, x_infl, ttc)
+    integral    = val_at_lim-val_at_0
 
     # Deal with those whose duration of infection exceeds the time to cancer
     # Note, another option would be to set their transformation probability to 1
