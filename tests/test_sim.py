@@ -181,9 +181,9 @@ def test_states():
                 d0 = (~((~people.infectious[g,:]) & people.cin[g,:])).any()
                 if not d0:
                     raise ValueError('People without active infection should not have detectable cell changes/')
-                d1 = (people.normal[g,:] | people.precin[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.carcinoma[g,:] | people.cancerous[g,:] | removed).all()
+                d1 = (people.normal[g,:] | people.precin[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
                 if not d1:
-                    raise ValueError('States {normal, precin, cin1, cin2, cin3, carcinoma, cancerous} should be collectively exhaustive but are not.')
+                    raise ValueError('States {normal, precin, cin1, cin2, cin3, cancerous} should be collectively exhaustive but are not.')
                 d2 = ~(people.precin[g,:] & people.cin1[g,:]).all()
                 if not d2:
                     raise ValueError('States {precin, cin1} should be mutually exclusive but are not.')

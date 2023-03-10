@@ -41,7 +41,7 @@ if __name__ == '__main__':
     # Start timing
     T = sc.tic()
 
-    fig, axes = pl.subplots(3, 2, figsize=(10, 12))
+
     colors = sc.gridcolors(10)
     t = np.arange(0,30,0.1) # Array of years
     x_infl = 7 # Fix point of inflection
@@ -54,9 +54,10 @@ if __name__ == '__main__':
 
     n_samples = 20
 
-
+    rel_sev_sds = [0.05, 0.15, 0.25]
+    fig, axes = pl.subplots(3, len(rel_sev_sds), figsize=(12, 12))
     k = 0.4
-    for irs_sd, rel_sev_sd in enumerate([0.05, 0.1]):
+    for irs_sd, rel_sev_sd in enumerate(rel_sev_sds):
         rel_sevs = hpv.utils.sample(**dict(dist='normal_pos', par1=1.0, par2=rel_sev_sd),
                                     size=n_samples)  # Distribution to draw individual level severity scale factors
         for ittc, ttc in enumerate([5, 10, 25]):
