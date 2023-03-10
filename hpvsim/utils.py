@@ -95,9 +95,6 @@ def get_asymptotes(x_infl, k, ttc=25, s=1):
     l_asymp = term1 / (term1 - term2)
     return l_asymp, u_asymp
 
-def sample():
-    u_asymp = (1 + np.exp(k*(x_infl-ttc)))*(1-(1 + np.exp(k*x_infl))) / ((1 + np.exp(k*(x_infl-ttc))) - (1 + np.exp(k*x_infl)))
-
 def logf3(x, x_infl, k, ttc=25, s=1):
     l_asymp, u_asymp = get_asymptotes(x_infl, k, ttc, s)
     return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
