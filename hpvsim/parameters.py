@@ -663,8 +663,17 @@ def compute_severity_integral(t, rel_sev=None, pars=None):
     # if form is None or form == 'logf2':
     #     output = hpu.logf2(t, **pars)
 
+
+
     if form == 'logf3':
         output = hpu.intlogf3(t, **pars)
+
+    elif form == 'cumsum':
+        max_t = np.max(t)
+        t_sequence = np.arange(0, max_t, 0.1)
+        array_output = hpu.logf3(t_sequence, **pars)
+        cumsum_output = np.cumsum(array_output)/10
+        output = cumsum_output[sc.findnearest(t_sequence, t)]
 
     elif callable(form):
         output = form(t, **pars)
