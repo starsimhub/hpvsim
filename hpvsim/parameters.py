@@ -113,7 +113,7 @@ def make_pars(**kwargs):
                                         [.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005,   0]])
 
     # The following variables are stored within the pars dict for ease of access, but should not be directly specified.
-    # Rather, they are automaticall constructed during sim initialization.
+    # Rather, they are automatically constructed during sim initialization.
     pars['immunity_map']    = None  # dictionary mapping the index of immune source to the type of immunity (vaccine vs natural)
     pars['imm_kin']         = None  # Constructed during sim initialization using the nab_decay parameters
     pars['genotype_map']    = dict()  # Reverse mapping from number to genotype key
@@ -121,6 +121,7 @@ def make_pars(**kwargs):
     pars['n_imm_sources']   = 1 # The number of immunity sources circulating in the population
     pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
+    pars['cumdysp']         = None
 
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
@@ -328,7 +329,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_episomal     = dict(dist='lognormal', par1=4.5, par2=9) # Duration of episomal infection prior to cancer
-    pars.hpv16.sev_fn           = dict(form='logf3', k=0.3, x_infl=4, s=1, ttc=5) # Function mapping duration of infection to severity
+    pars.hpv16.sev_fn           = dict(form='logf3', k=0.3, x_infl=4, s=1, ttc=25) # Function mapping duration of infection to severity
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.transform_prob   = 2/1e5 # Annual rate of transformed cell invading
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
@@ -643,7 +644,7 @@ def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
     return output
 
 
-def compute_severity_integral(t, rel_sev=None, pars=None):
+def compute_severity_integral(t, rel_sev=None, pars=None, cumdysp=None):
     '''
     Process functional form and parameters into values:
     '''
@@ -669,11 +670,9 @@ def compute_severity_integral(t, rel_sev=None, pars=None):
         output = hpu.intlogf3(t, **pars)
 
     elif form == 'cumsum':
-        max_t = np.max(t)
-        t_sequence = np.arange(0, max_t, 0.1)
-        array_output = hpu.logf3(t_sequence, **pars)
-        cumsum_output = np.cumsum(array_output)/10
-        output = cumsum_output[sc.findnearest(t_sequence, t)]
+        t = np.around(t).astype(int)
+        t[t>len(cumdysp)-1] = len(cumdysp)-1
+        output = cumdysp[t]
 
     elif callable(form):
         output = form(t, **pars)

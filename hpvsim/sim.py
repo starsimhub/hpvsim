@@ -361,6 +361,19 @@ class Sim(hpb.BaseSim):
 
         # Set the number of immunity sources
         self['n_imm_sources'] = len(self['genotypes'])
+        t_step = self['dt']
+        t_sequence = np.arange(0, 200, t_step)
+        timesteps = t_sequence/t_step
+        cumdysp_arr = pd.DataFrame()
+        cumdysp_arr['timestep'] = timesteps
+        for gtype in range(len_pars):
+            glabel = self['genotype_map'][gtype]
+            gpars = sc.dcp(self['genotype_pars'][glabel])
+            sev_fn = gpars['sev_fn']
+            sev_fn.pop('form')
+            cumdysp_arr[glabel] = np.cumsum(hpu.logf3(t_sequence, **sev_fn))*t_step
+
+        self['cumdysp'] = cumdysp_arr
 
         return
 
