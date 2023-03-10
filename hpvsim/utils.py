@@ -87,13 +87,16 @@ def logf2(x, x_infl, k):
 
 
 def get_asymptotes(x_infl, k, ttc=25, s=1):
-    term1 = (1 + np.exp(k*(x_infl-ttc)))**s
+    term1 = (1 + np.exp(k*(x_infl-ttc)))**s # Note, this is 1 for most parameter combinations
     term2 = (1 + np.exp(k*x_infl))**s
     u_asymp_num = term1*(1-term2)
     u_asymp_denom = term1 - term2
     u_asymp = u_asymp_num / u_asymp_denom
     l_asymp = term1 / (term1 - term2)
     return l_asymp, u_asymp
+
+def sample():
+    u_asymp = (1 + np.exp(k*(x_infl-ttc)))*(1-(1 + np.exp(k*x_infl))) / ((1 + np.exp(k*(x_infl-ttc))) - (1 + np.exp(k*x_infl)))
 
 def logf3(x, x_infl, k, ttc=25, s=1):
     l_asymp, u_asymp = get_asymptotes(x_infl, k, ttc, s)
@@ -107,12 +110,20 @@ def invlogf3(y, x_infl, k, ttc=25, s=1):
     final = 1/k * (k*x_infl - part2)
     return final
 
-def intlogf3(upper, k, x_infl, ttc=25, s=1, rel_sev=None):
+def intlogf3(upper, k, x_infl, ttc, s=1):
+
     l_asymp, u_asymp = get_asymptotes(k, x_infl, ttc, s)
-    if rel_sev is not None: upper = rel_sev * upper
     val_at_0    = 1/k* ((u_asymp-l_asymp)*np.log(np.exp(k*x_infl)+1))
     val_at_lim  = 1/k* ((u_asymp-l_asymp)*np.log(np.exp(k*(x_infl-upper))+1)) + u_asymp*upper
-    return val_at_lim-val_at_0
+    integral = val_at_lim-val_at_0
+
+    # Deal with those whose duration of infection exceeds the time to cancer
+    # Note, another option would be to set their transformation probability to 1
+    exceeding_ttc_inds = true(upper > ttc)
+    excess_integral = upper[exceeding_ttc_inds] - ttc
+    integral[exceeding_ttc_inds] += excess_integral
+
+    return integral
 
 def invlogf2(y, x_infl, k):
     '''
