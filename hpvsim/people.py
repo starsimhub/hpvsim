@@ -308,8 +308,8 @@ class People(hpb.BasePeople):
 
         self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal[is_transform] / dt)
         self.date_cancerous[g, transform_inds] = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn']) / dt)
-        dur_transformed = (self.date_cancerous[g, transform_inds] - self.date_cin3[g, transform_inds])*dt
-        self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + dur_transformed
+        self.dur_transformed[g, transform_inds] = (self.date_cancerous[g, transform_inds] - self.date_cin3[g, transform_inds])*dt
+        self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + self.dur_transformed[g, transform_inds]
 
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
         self.date_dead_cancer[transform_inds] = self.date_cancerous[g, transform_inds] + sc.randround(dur_cancer / dt)
