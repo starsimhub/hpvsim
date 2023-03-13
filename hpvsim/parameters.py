@@ -345,7 +345,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv.dur_episomal     = dict(dist='lognormal', par1=5, par2=10) # Duration of infection prior to cancer
     pars.hrhpv.sev_fn           = dict(form='logf3', k=0.35, x_infl=15, s=1, ttc=25) # Function mapping duration of infection to severity
     pars.hrhpv.rel_beta         = 0.9 # placeholder
-    pars.hrhpv.transform_fn     = dict(prob=1/1e5, integral='analytic')
+    pars.hrhpv.transform_fn     = dict(prob=1/1e5, integral=None)
     pars.hrhpv.sero_prob        = 0.60 # placeholder
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
