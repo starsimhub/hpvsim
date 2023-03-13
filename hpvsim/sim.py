@@ -84,8 +84,9 @@ class Sim(hpb.BaseSim):
         self.init_genotypes() # Initialize the genotypes
         self.init_results() # After initializing the genotypes and people, create the results structure
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
-        self.init_immunity() # initialize information about immunity
+        self.init_dysplasia() # Includes immunity matrices and cumulative dysplasia arrays
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
+        self.init_immunity() # Includes immunity matrices and cumulative dysplasia arrays
         self.init_analyzers()  # ...and the analyzers...
         hpu.set_seed(self['rand_seed']+1)  # Reset the random seed to the default run seed, so that if the simulation is run with reset_seed=False right after initialization, it will still produce the same output
         self.initialized   = True
@@ -356,30 +357,11 @@ class Sim(hpb.BaseSim):
                                 errormsg = f"Parameter {gparname} does not exist for genotype {g}"
                                 raise ValueError(errormsg)
 
-        len_pars = len(self['genotype_pars'])
-        self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
+        self['n_genotypes'] = len(self['genotype_pars'])  # Each genotype has an entry in genotype_pars
 
         # Set the number of immunity sources
         self['n_imm_sources'] = len(self['genotypes'])
-        t_step = self['dt']
-        t_sequence = np.arange(0, 200, t_step)
-        timesteps = t_sequence/t_step
-        cumdysp_arr = pd.DataFrame()
-        cumdysp_arr['timestep'] = timesteps
-        for gtype in range(len_pars):
-            glabel = self['genotype_map'][gtype]
-            gpars = sc.dcp(self['genotype_pars'][glabel])
-            sev_fn = gpars['sev_fn']
-            sev_fn.pop('form')
-            cumdysp_arr[glabel] = np.cumsum(hpu.logf3(t_sequence, **sev_fn))*t_step
 
-        self['cumdysp'] = cumdysp_arr
-
-        return
-
-    def init_immunity(self, create=True):
-        ''' Initialize immunity matrices '''
-        hpimm.init_immunity(self, create=create)
         return
 
 
@@ -542,6 +524,44 @@ class Sim(hpb.BaseSim):
         return
 
 
+    def init_interventions(self):
+        ''' Initialize and validate the interventions '''
+
+        # Initialization
+        self.interventions = sc.autolist()
+
+        # Translate the intervention specs into actual interventions
+        for i,intervention in enumerate(self['interventions']):
+            if isinstance(intervention, type) and issubclass(intervention, hpi.Intervention):
+                intervention = intervention() # Convert from a class to an instance of a class
+            if isinstance(intervention, hpi.Intervention):
+                intervention.initialize(self)
+                self.interventions += intervention
+            elif callable(intervention):
+                self.interventions += intervention
+            else:
+                errormsg = f'Intervention {intervention} does not seem to be a valid intervention: must be a function or hpv.Intervention subclass'
+                raise TypeError(errormsg)
+
+        return
+
+    def init_dysplasia(self, upper_dysp_lim=200):
+        # Initialize cumulative dysplasia arrays
+        t_step = self['dt']
+        t_sequence = np.arange(0, upper_dysp_lim, t_step)
+        timesteps = t_sequence/t_step
+        cumdysp = dict()
+        cumdysp['timestep'] = timesteps
+        for g in range(self['n_genotypes']):
+            sev_fn = self['genotype_pars'][g]['sev_fn']
+            glabel = self['genotype_map'][g]
+            dysp_arr = hppar.compute_severity(t_sequence, rel_sev=None, pars=sev_fn)
+            cumdysp[glabel] = np.cumsum(dysp_arr)*t_step
+
+        self['cumdysp'] = cumdysp # Store
+
+        return
+
     def init_people(self, popdict=None, init_states=False, reset=False, verbose=None, **kwargs):
         '''
         Create the people and the network.
@@ -601,37 +621,6 @@ class Sim(hpb.BaseSim):
 
         return self
 
-    def init_hiv(self):
-        ''' Initialize states, attributes, and parameters relating to HIV '''
-        if self.pars['model_hiv']:
-            if self.hiv_datafile is None or self.art_datafile is None:
-                raise ValueError('Must supply HIV and ART datafiles to model HIV.')
-        self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
-                                   hiv_pars=self['hiv_pars'])
-        return
-
-    def init_interventions(self):
-        ''' Initialize and validate the interventions '''
-
-        # Initialization
-        self.interventions = sc.autolist()
-
-        # Translate the intervention specs into actual interventions
-        for i,intervention in enumerate(self['interventions']):
-            if isinstance(intervention, type) and issubclass(intervention, hpi.Intervention):
-                intervention = intervention() # Convert from a class to an instance of a class
-            if isinstance(intervention, hpi.Intervention):
-                intervention.initialize(self)
-                self.interventions += intervention
-            elif callable(intervention):
-                self.interventions += intervention
-            else:
-                errormsg = f'Intervention {intervention} does not seem to be a valid intervention: must be a function or hpv.Intervention subclass'
-                raise TypeError(errormsg)
-
-        return
-
-
     def init_analyzers(self):
         ''' Initialize the analyzers '''
 
@@ -648,24 +637,43 @@ class Sim(hpb.BaseSim):
             return analyzer
 
         # Interpret analyzers
-        for ai,analyzer in enumerate(self['analyzers']):
+        for ai, analyzer in enumerate(self['analyzers']):
             if isinstance(analyzer, str):
-                analyzer_list = sc.tolist(convert_analyzer(analyzer)) # If not a list, turn it into one - for consistency of processing
+                analyzer_list = sc.tolist(
+                    convert_analyzer(analyzer))  # If not a list, turn it into one - for consistency of processing
                 for az in analyzer_list:
-                    if isinstance(az, str): az = convert_analyzer(az) # It might still be a string
-                    self.analyzers += az() # Unpack list
+                    if isinstance(az, str): az = convert_analyzer(az)  # It might still be a string
+                    self.analyzers += az()  # Unpack list
             else:
                 if isinstance(analyzer, type) and issubclass(analyzer, hpa.Analyzer):
-                    analyzer = analyzer() # Convert from a class to an instance of a class
+                    analyzer = analyzer()  # Convert from a class to an instance of a class
                 if not (isinstance(analyzer, hpa.Analyzer) or callable(analyzer)):
                     errormsg = f'Analyzer {analyzer} does not seem to be a valid analyzer: must be a function or hpv.Analyzer subclass'
                     raise TypeError(errormsg)
-                self.analyzers += analyzer # Add it in
+                self.analyzers += analyzer  # Add it in
 
         for analyzer in self.analyzers:
             if isinstance(analyzer, hpa.Analyzer):
                 analyzer.initialize(self)
-                
+
+        return
+
+
+    def init_immunity(self, create=True):
+        ''' Initialize immunity matrices and cumulative dysplasia '''
+
+        # Initialize immunity arrays
+        hpimm.init_immunity(self, create=create)
+        return
+
+
+    def init_hiv(self):
+        ''' Initialize states, attributes, and parameters relating to HIV '''
+        if self.pars['model_hiv']:
+            if self.hiv_datafile is None or self.art_datafile is None:
+                raise ValueError('Must supply HIV and ART datafiles to model HIV.')
+        self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
+                                   hiv_pars=self['hiv_pars'])
         return
 
 

@@ -644,7 +644,7 @@ def compute_inv_severity(sev_vals, rel_sev=None, pars=None):
     return output
 
 
-def compute_severity_integral(t, rel_sev=None, pars=None, cumdysp=None):
+def compute_severity_integral(t, rel_sev=None, pars=None):
     '''
     Process functional form and parameters into values:
     '''
@@ -652,8 +652,8 @@ def compute_severity_integral(t, rel_sev=None, pars=None, cumdysp=None):
     pars = sc.dcp(pars)
     form = pars.pop('form')
     choices = [
-        # 'logf2', # TODO: haven't added this yet
-        'logf3',
+        'logf2',
+        'logf3 with s=1',
     ]
 
     # Scale t
@@ -661,24 +661,18 @@ def compute_severity_integral(t, rel_sev=None, pars=None, cumdysp=None):
         t = rel_sev * t
 
     # Process inputs
-    # if form is None or form == 'logf2':
-    #     output = hpu.logf2(t, **pars)
+    if form is None or form == 'logf2':
+        output = hpu.intlogf2(t, **pars)
 
-
-
-    if form == 'logf3':
-        output = hpu.intlogf3(t, **pars)
-
-    elif form == 'cumsum':
-        t = np.around(t).astype(int)
-        t[t>len(cumdysp)-1] = len(cumdysp)-1
-        output = cumdysp[t]
-
-    elif callable(form):
-        output = form(t, **pars)
+    elif form=='logf3':
+        s = pars.pop('s')
+        if s==1:
+            output = hpu.intlogf2(t, **pars)
+        else:
+            errormsg = f'Analytic integral for logf3 only implemented for s=1. Select integral=numeric.'
 
     else:
-        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
+        errormsg = f'Analytic integral for the selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}, or select integral=numeric.'
         raise NotImplementedError(errormsg)
 
     return output
