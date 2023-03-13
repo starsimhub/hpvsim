@@ -8,6 +8,10 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.1.2 (2023-03-13)
+---------------------------
+- Fixes bug that never computed cancer deaths by age
+- *Github info* PR `554 <https://github.com/amath-idm/hpvsim/pull/554>`__
 
 Version 1.1.1 (2023-03-01)
 ---------------------------
