@@ -214,7 +214,7 @@ class People(hpb.BasePeople):
         return
 
 
-    def set_severity(self, inds, g, gpars, dt, set_sev=True, integral='analytic'):
+    def set_severity(self, inds, g, gpars, dt, set_sev=True):
         '''
         Set severity levels for individual women
         Args:
@@ -231,16 +231,16 @@ class People(hpb.BasePeople):
 
         # Calculate the integral of severity for each woman
         dur_episomal = self.dur_episomal[g, inds]
-        if integral=='analytic':
+        if gpars['transform_fn']['integral']=='analytic':
             sevs = hppar.compute_severity_integral(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
-        elif integral=='numeric':
+        elif gpars['transform_fn']['integral']=='numeric':
             cumdysp = self.pars['cumdysp'][self.pars['genotype_map'][g]]
             t = np.around(dur_episomal/dt).astype(int) # Round
             t[t > len(cumdysp) - 1] = len(cumdysp) - 1
             sevs = cumdysp[t]
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
-        transform_prob_par = gpars['transform_prob'] # Pull out the genotype-specific parameter governing the probability of transformation
+        transform_prob_par = gpars['transform_fn']['prob'] # Pull out the genotype-specific parameter governing the probability of transformation
         n_extra = self.pars['ms_agent_ratio']
         cancer_scale = self.pars['pop_scale'] / n_extra
 
@@ -262,15 +262,13 @@ class People(hpb.BasePeople):
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
             extra_rel_sevs = np.ones(full_size)*self.rel_sev[inds][:,None]
 
-            if integral == 'analytic':
+            if gpars['transform_fn']['integral'] == 'analytic':
                 extra_sev = hppar.compute_severity_integral(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
-            elif integral == 'numeric':
+            elif gpars['transform_fn']['integral'] == 'numeric':
                 cumdysp = self.pars['cumdysp'][self.pars['genotype_map'][g]]
                 t = np.around(extra_dur_episomal/dt*extra_rel_sevs).astype(int)  # Round
                 t[t > len(cumdysp) - 1] = len(cumdysp) - 1
                 extra_sev = cumdysp[t]
-
-            # extra_sev = hppar.compute_severity_integral(extra_dur_episomal/dt, rel_sev=extra_rel_sevs, pars={'form': 'cumsum'}, cumdysp=cumdysp)  # Calculate cumulative severity
 
             # Based on the extra severity values, determine additional transformation probabilities
             extra_transform_probs = hpu.transform_prob(transform_prob_par, extra_sev[:, 1:])

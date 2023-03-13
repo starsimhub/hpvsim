@@ -55,7 +55,7 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     # Create some genotype pars
     genotype_pars = {
         16: {
-            'sev_fn': dict(form='logf3', k=0.5, x_infl=5)
+            'sev_fn': dict(form='logf3', k=0.5, x_infl=5, s=1)
         }
     }
 
@@ -426,8 +426,9 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
-    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim0 = test_microsim()
+    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    print(f'Cancers: {sim1.results["cancers"][-1]}')
     # s0, s1 = test_epi()
     # sim3 = test_states()
     # sim4 = test_flexible_inputs()

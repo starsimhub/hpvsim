@@ -149,14 +149,17 @@ def intlogf2(upper, k, x_infl, ttc=25):
     '''
     Integral of logf2 between 0 and the limit given by upper
     '''
+    # Find the upper limits not including the part past time to cancer
+    exceeding_ttc_inds = (upper > ttc).nonzero()
+    lims_to_find = np.minimum(ttc, upper)
 
-    val_at_0    = indef_int_logf2(0, k, x_infl, ttc)
-    val_at_lim  = indef_int_logf2(upper, k, x_infl, ttc)
-    integral    = val_at_lim-val_at_0
+    # Take the integral
+    val_at_0 = indef_int_logf2(0, k, x_infl, ttc)
+    val_at_lim = indef_int_logf2(lims_to_find, k, x_infl, ttc)
+    integral = val_at_lim - val_at_0
 
     # Deal with those whose duration of infection exceeds the time to cancer
     # Note, another option would be to set their transformation probability to 1
-    exceeding_ttc_inds = true(upper > ttc)
     excess_integral = upper[exceeding_ttc_inds] - ttc
     integral[exceeding_ttc_inds] += excess_integral
 

@@ -84,7 +84,6 @@ class Sim(hpb.BaseSim):
         self.init_genotypes() # Initialize the genotypes
         self.init_results() # After initializing the genotypes and people, create the results structure
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
-        self.init_dysplasia() # Includes immunity matrices and cumulative dysplasia arrays
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_immunity() # Includes immunity matrices and cumulative dysplasia arrays
         self.init_analyzers()  # ...and the analyzers...
@@ -304,7 +303,7 @@ class Sim(hpb.BaseSim):
         return init_hpv_prev, age_brackets
 
 
-    def init_genotypes(self):
+    def init_genotypes(self, upper_dysp_lim=200):
         ''' Initialize the genotype parameters '''
         if self._orig_pars and 'genotypes' in self._orig_pars:
             self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
@@ -361,6 +360,21 @@ class Sim(hpb.BaseSim):
 
         # Set the number of immunity sources
         self['n_imm_sources'] = len(self['genotypes'])
+
+        # Do any precomputations for the genotype transformation functions
+        t_step = self['dt']
+        t_sequence = np.arange(0, upper_dysp_lim, t_step)
+        timesteps = t_sequence / t_step
+        cumdysp = dict()
+        for g in range(self['n_genotypes']):
+            sev_fn = self['genotype_pars'][g]['sev_fn']
+            transform_fn = self['genotype_pars'][g]['transform_fn']
+            if transform_fn['integral']=='numeric':
+                glabel = self['genotype_map'][g]
+                dysp_arr = hppar.compute_severity(t_sequence, rel_sev=None, pars=sev_fn)
+                cumdysp[glabel] = np.cumsum(dysp_arr) * t_step
+
+        self['cumdysp'] = cumdysp  # Store
 
         return
 
@@ -545,22 +559,6 @@ class Sim(hpb.BaseSim):
 
         return
 
-    def init_dysplasia(self, upper_dysp_lim=200):
-        # Initialize cumulative dysplasia arrays
-        t_step = self['dt']
-        t_sequence = np.arange(0, upper_dysp_lim, t_step)
-        timesteps = t_sequence/t_step
-        cumdysp = dict()
-        cumdysp['timestep'] = timesteps
-        for g in range(self['n_genotypes']):
-            sev_fn = self['genotype_pars'][g]['sev_fn']
-            glabel = self['genotype_map'][g]
-            dysp_arr = hppar.compute_severity(t_sequence, rel_sev=None, pars=sev_fn)
-            cumdysp[glabel] = np.cumsum(dysp_arr)*t_step
-
-        self['cumdysp'] = cumdysp # Store
-
-        return
 
     def init_people(self, popdict=None, init_states=False, reset=False, verbose=None, **kwargs):
         '''

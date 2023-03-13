@@ -121,7 +121,7 @@ def make_pars(**kwargs):
     pars['n_imm_sources']   = 1 # The number of immunity sources circulating in the population
     pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
-    pars['cumdysp']         = None
+    pars['cumdysp']         = dict()
 
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
@@ -331,21 +331,21 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.dur_episomal     = dict(dist='lognormal', par1=4.5, par2=9) # Duration of episomal infection prior to cancer
     pars.hpv16.sev_fn           = dict(form='logf3', k=0.3, x_infl=4, s=1, ttc=25) # Function mapping duration of infection to severity
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.transform_prob   = 2/1e5 # Annual rate of transformed cell invading
+    pars.hpv16.transform_fn     = dict(prob=2/1e5, integral='analytic') # Annual rate of transformed cell invading
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=3.5, par2=9) # Duration of infection prior to cancer
     pars.hpv18.sev_fn           = dict(form='logf3', k=0.238, x_infl=14, s=1, ttc=25) # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.transform_prob   = 2/1e5 # Annual rate of transformed cell invading
+    pars.hpv18.transform_fn     = dict(prob=2/1e5, integral='analytic') # Annual rate of transformed cell invading
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_episomal     = dict(dist='lognormal', par1=5, par2=10) # Duration of infection prior to cancer
     pars.hrhpv.sev_fn           = dict(form='logf3', k=0.35, x_infl=15, s=1, ttc=25) # Function mapping duration of infection to severity
     pars.hrhpv.rel_beta         = 0.9 # placeholder
-    pars.hrhpv.transform_prob   = 1/1e5
+    pars.hrhpv.transform_fn     = dict(prob=1/1e5, integral='analytic')
     pars.hrhpv.sero_prob        = 0.60 # placeholder
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
