@@ -239,7 +239,7 @@ class People(hpb.BasePeople):
             t[t > len(cumdysp) - 1] = len(cumdysp) - 1
             sevs = cumdysp[t]
         elif gpars['transform_fn']['integral'] is None:
-            extra_sev = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
+            sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob_par = gpars['transform_fn']['prob'] # Pull out the genotype-specific parameter governing the probability of transformation
