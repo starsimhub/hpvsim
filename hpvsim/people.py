@@ -189,7 +189,9 @@ class People(hpb.BasePeople):
             self.age_flows['cins'] += self.age_flows['cin1s']+self.age_flows['cin2s']+self.age_flows['cin3s']
 
         # Perform updates that are not genotype specific
-        self.flows['cancer_deaths'] = self.check_cancer_deaths()
+        deaths_by_age, deaths = self.check_cancer_deaths()
+        self.flows['cancer_deaths'] = deaths
+        self.age_flows['cancer_deaths'] = deaths_by_age
 
         # Before applying interventions or new infections, calculate the pool of susceptibles
         self.sus_pool = self.susceptible.all(axis=0) # True for people with no infection at the start of the timestep
@@ -516,13 +518,12 @@ class People(hpb.BasePeople):
         filter_inds = self.true('cancerous')
         inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
         self.remove_people(inds, cause='cancer')
-        if len(inds):
-            cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
 
         # check which of these were detected by symptom or screening
         self.flows['detected_cancer_deaths'] += self.scale_flows(hpu.true(self.detected_cancer[inds]))
 
-        return self.scale_flows(inds)
+        return cases_by_age, self.scale_flows(inds)
 
 
     def check_clearance(self, genotype):
