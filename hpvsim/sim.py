@@ -84,8 +84,8 @@ class Sim(hpb.BaseSim):
         self.init_genotypes() # Initialize the genotypes
         self.init_results() # After initializing the genotypes and people, create the results structure
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
-        self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_immunity() # Includes immunity matrices and cumulative dysplasia arrays
+        self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
         self.init_analyzers()  # ...and the analyzers...
         hpu.set_seed(self['rand_seed']+1)  # Reset the random seed to the default run seed, so that if the simulation is run with reset_seed=False right after initialization, it will still produce the same output
         self.initialized   = True
