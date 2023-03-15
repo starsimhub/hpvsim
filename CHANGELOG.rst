@@ -8,6 +8,20 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.1.4 (2023-03-15)
+---------------------------
+- Fixes bug that caused location data to be loaded twice
+- *Github info* PR `546 <https://github.com/amath-idm/hpvsim/pull/546>`__
+
+Version 1.1.3 (2023-03-14)
+---------------------------
+- Fixes bug that misses some ways you can specify sex for vaccination
+- *Github info* PR `555 <https://github.com/amath-idm/hpvsim/pull/555>`__
+
+Version 1.1.2 (2023-03-13)
+---------------------------
+- Fixes bug that never computed cancer deaths by age
+- *Github info* PR `554 <https://github.com/amath-idm/hpvsim/pull/554>`__
 
 Version 1.1.1 (2023-03-01)
 ---------------------------
