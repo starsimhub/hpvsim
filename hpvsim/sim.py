@@ -368,8 +368,8 @@ class Sim(hpb.BaseSim):
         cumdysp = dict()
         for g in range(self['n_genotypes']):
             sev_fn = self['genotype_pars'][g]['sev_fn']
-            transform_fn = self['genotype_pars'][g]['transform_fn']
-            if transform_fn['integral']=='numeric':
+            sev_integral = self['genotype_pars'][g]['sev_integral']
+            if sev_integral=='numeric':
                 glabel = self['genotype_map'][g]
                 dysp_arr = hppar.compute_severity(t_sequence, rel_sev=None, pars=sev_fn)
                 cumdysp[glabel] = np.cumsum(dysp_arr) * t_step
