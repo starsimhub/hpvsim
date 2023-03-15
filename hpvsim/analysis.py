@@ -849,7 +849,9 @@ class age_results(Analyzer):
             if 'compute_fit' in rdict.keys():
                 self.mismatch += self.compute(rkey)
 
-        sim.fit = self.mismatch
+        # Add to sim.fit
+        if hasattr(sim,'fit'): sim.fit += self.mismatch
+        else: sim.fit = self.mismatch
 
         return
 
