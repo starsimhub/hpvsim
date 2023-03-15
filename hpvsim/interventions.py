@@ -578,7 +578,18 @@ class BaseVaccination(Intervention):
         # Deal with sex
         if sc.checktype(sex,'listlike'):
             if sc.checktype(sex[0],'str'): # If provided as ['f','m'], convert to [0,1]
-                self.sex = np.array([0,1])
+                sex_list = sc.autolist()
+                for isex in sex:
+                    if isex=='f':
+                        sex_list += 0
+                    elif isex=='m':
+                        sex_list += 1
+                    else:
+                        errormsg = f'Sex "{isex}" not understood.'
+                        raise ValueError(errormsg)
+                self.sex = sc.promotetoarray(sex_list)
+            else:
+                self.sex=sc.promotetoarray(sex)
         elif sc.checktype(sex, 'str'):  # If provided as 'f' or 'm', convert to 0 or 1
             if sex=='f':
                 self.sex = np.array([0])
