@@ -222,7 +222,6 @@ class People(hpb.BasePeople):
             g: genotype index
             dt: timestep
             set_sev: whether or not to set initial severity
-            integral: accepts 'analytic' or 'numeric'
         '''
 
         # Pull out useful variables
