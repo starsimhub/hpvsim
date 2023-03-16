@@ -179,14 +179,15 @@ class People(hpb.BasePeople):
             self.update_severity(g) # update severity values
             self.check_transformation(g)  # check for new transformations
 
-            for key in ['cin1s','cin2s','cin3s','cancers']:  # update flows
-                cases_by_age, cases = self.check_progress(key, g)
-                self.flows[key] += cases  # Increment flows (summed over all genotypes)
-                self.genotype_flows[key][g] = cases # Store flows by genotype
-                self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
-            self.flows['cins'] += self.flows['cin1s']+self.flows['cin2s']+self.flows['cin3s']
-            self.genotype_flows['cins'][g] = self.genotype_flows['cin1s'][g]+self.genotype_flows['cin2s'][g]+self.genotype_flows['cin3s'][g]
-            self.age_flows['cins'] += self.age_flows['cin1s']+self.age_flows['cin2s']+self.age_flows['cin3s']
+            if t % update_freq == 0:
+                for key in ['cin1s','cin2s','cin3s','cancers']:  # update flows
+                    cases_by_age, cases = self.check_progress(key, g)
+                    self.flows[key] += cases  # Increment flows (summed over all genotypes)
+                    self.genotype_flows[key][g] = cases # Store flows by genotype
+                    self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
+                self.flows['cins'] += self.flows['cin1s']+self.flows['cin2s']+self.flows['cin3s']
+                self.genotype_flows['cins'][g] = self.genotype_flows['cin1s'][g]+self.genotype_flows['cin2s'][g]+self.genotype_flows['cin3s'][g]
+                self.age_flows['cins'] += self.age_flows['cin1s']+self.age_flows['cin2s']+self.age_flows['cin3s']
 
         # Perform updates that are not genotype specific
         deaths_by_age, deaths = self.check_cancer_deaths()
@@ -554,37 +555,48 @@ class People(hpb.BasePeople):
         '''
         Check for HPV clearance.
         '''
-        filter_inds = self.true_by_genotype('infectious', genotype)
-        inds = self.check_inds_true(self.infectious[genotype,:], self.date_clearance[genotype,:], filter_inds=filter_inds)
+        f_filter_inds = (self.is_female_alive & self.infectious[genotype,:]).nonzero()[-1]
+        m_filter_inds = (self.is_male_alive   & self.infectious[genotype,:]).nonzero()[-1]
+        f_inds = self.check_inds_true(self.infectious[genotype,:], self.date_clearance[genotype,:], filter_inds=f_filter_inds)
+        m_inds = self.check_inds_true(self.infectious[genotype,:], self.date_clearance[genotype,:], filter_inds=m_filter_inds)
+        m_cleared_inds = m_inds # All males clear
 
-        # Determine who clears and who controls
-        latent_probs = np.full(len(inds), self.pars['hpv_control_prob'], dtype=hpd.default_float)
-        latent_bools = hpu.binomial_arr(latent_probs)
+        # For females, determine who clears and who controls
+        if self.pars['hpv_control_prob']>0:
+            latent_probs = np.full(len(f_inds), self.pars['hpv_control_prob'], dtype=hpd.default_float)
+            latent_bools = hpu.binomial_arr(latent_probs)
+            latent_inds = f_inds[latent_bools]
 
-        latent_inds = inds[latent_bools]
-        cleared_inds = inds[~latent_bools]
+            if len(latent_inds):
+                self.susceptible[genotype, latent_inds] = False  # should already be false
+                self.infectious[genotype, latent_inds] = False
+                self.inactive[genotype, latent_inds] = True
+                self.date_clearance[genotype, latent_inds] = np.nan
+
+            f_cleared_inds = f_inds[~latent_bools]
+
+        else:
+            f_cleared_inds = f_inds
+
+        cleared_inds = np.array(m_cleared_inds.tolist()+f_cleared_inds.tolist())
 
         # Now reset disease states
         if len(cleared_inds):
             self.susceptible[genotype, cleared_inds] = True
             self.infectious[genotype, cleared_inds] = False
             self.inactive[genotype, cleared_inds] = False # should already be false
-            female_cleared_inds = np.intersect1d(cleared_inds, self.f_inds) # Only give natural immunity to females
-            hpimm.update_peak_immunity(self, female_cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
 
-        if len(latent_inds):
-            self.susceptible[genotype, latent_inds] = False # should already be false
-            self.infectious[genotype, latent_inds] = False
-            self.inactive[genotype, latent_inds] = True
-            self.date_clearance[genotype, latent_inds] = np.nan
+        if len(f_cleared_inds):
+            # female_cleared_inds = np.intersect1d(cleared_inds, self.f_inds) # Only give natural immunity to females
+            hpimm.update_peak_immunity(self, f_cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
 
         # Whether infection is controlled on not, clear all cell changes and severity markeres
-        self.episomal[genotype, inds] = False
-        self.transformed[genotype, inds] = False
-        self.sev[genotype, inds] = np.nan
-        self.date_cin1[genotype, inds] = np.nan
-        self.date_cin2[genotype, inds] = np.nan
-        self.date_cin3[genotype, inds] = np.nan
+        self.episomal[genotype, f_inds] = False
+        self.transformed[genotype, f_inds] = False
+        self.sev[genotype, f_inds] = np.nan
+        self.date_cin1[genotype, f_inds] = np.nan
+        self.date_cin2[genotype, f_inds] = np.nan
+        self.date_cin3[genotype, f_inds] = np.nan
 
         return
 
