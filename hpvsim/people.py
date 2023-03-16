@@ -243,7 +243,7 @@ class People(hpb.BasePeople):
             sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
-        transform_prob_par = gpars['transform_prob'] # Pull out the genotype-specific parameter governing the probability of transformation
+        transform_prob_par = gpars['transform_fn']['prob'] # Pull out the genotype-specific parameter governing the probability of transformation
         n_extra = self.pars['ms_agent_ratio']
         cancer_scale = self.pars['pop_scale'] / n_extra
 
@@ -692,21 +692,32 @@ class People(hpb.BasePeople):
             ages = self.age[alive_inds].astype(int) # Return ages for everyone level 0 and alive
             count_ages = np.bincount(ages, minlength=age_dist_data.shape[0]) # Bin and count them
             expected = age_dist_data['PopTotal'].values*scale # Compute how many of each age we would expect in population
-            difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
+            difference = (expected-count_ages).astype(int) # Compute difference between expected and simulated for each age
             n_migrate = np.sum(difference) # Compute total migrations (in and out)
             ages_to_remove = hpu.true(difference<0) # Ages where we have too many, need to apply emigration
-            n_to_remove = [int(i) for i in difference[ages_to_remove]] # Determine number of agents to remove for each age
+            n_to_remove = difference[ages_to_remove] # Determine number of agents to remove for each age
             ages_to_add = hpu.true(difference>0) # Ages where we have too few, need to apply imigration
-            n_to_add = [int(i) for i in difference[ages_to_add]] # Determine number of agents to add for each age
+            n_to_add = difference[ages_to_add] # Determine number of agents to add for each age
             ages_to_add_list = np.repeat(ages_to_add, n_to_add)
             self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list))
 
-            for ind, diff in enumerate(n_to_remove): #TODO: is there a faster way to do this than in a for loop?
+            remove_frac = n_to_remove / n_to_remove.sum()
+            remove_probs = np.zeros_like(alive_inds)
+            for ind in range(len(n_to_remove)):
                 age = ages_to_remove[ind]
-                alive_this_age_inds = np.where(ages==age)[0]
-                inds = hpu.choose(len(alive_this_age_inds), -diff)
-                migrate_inds = alive_inds[alive_this_age_inds[inds]]
-                self.remove_people(migrate_inds, cause='emigration')  # Remove people
+                inds_this_age = hpu.true(ages==age)
+                remove_probs[inds_this_age] = remove_frac[ind]
+            migrate_inds = hpu.choose_w(remove_probs, -n_to_remove.sum())
+
+            # old_migrate_inds = []
+            # for ind, diff in enumerate(n_to_remove): #TODO: is there a faster way to do this than in a for loop?
+            #     age = ages_to_remove[ind]
+            #     alive_this_age_inds = np.where(ages==age)[0]
+            #     inds = hpu.choose(len(alive_this_age_inds), -diff)
+            #     old_migrate_inds += alive_inds[alive_this_age_inds[inds]].tolist()
+            # old_migrate_inds = np.array(old_migrate_inds)
+
+            self.remove_people(migrate_inds, cause='emigration')  # Remove people
 
         else:
             n_migrate = 0
