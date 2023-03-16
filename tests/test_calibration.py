@@ -42,6 +42,12 @@ def test_calibration():
                             total_trials=3, n_workers=1)
     calib.calibrate(die=True)
     calib.plot(res_to_plot=4)
+
+    sim = hpv.Sim(pars)
+    calib_pars = calib.trial_pars_to_sim_pars(which_pars=0)
+    sim.initialize()
+    sim.update_pars(calib_pars)
+    sim.run().plot()
     return sim, calib
 
 
