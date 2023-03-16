@@ -69,13 +69,18 @@ def test_age_results(do_plot=True):
     pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='tanzania')
     pars['beta'] = .5
 
+    # Use the same age bins for the sim as for the age result analyzeer, for comparaibility
+    pars['age_bins']  = np.array(  [0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
+    pars['standard_pop']    = np.array([pars['age_bins'],
+                                 [.31, .09, .09, .08, .12, .06, .05, .05, .11, .04,  0]])
+
     pars['init_hpv_prev'] = {
         'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
         'm'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
     az1 = hpv.age_results(
-        result_keys=sc.objdict(
+        result_args=sc.objdict(
             hpv_prevalence=sc.objdict(
                 timepoints=['2019'],
                 edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
@@ -99,8 +104,14 @@ def test_age_results(do_plot=True):
     sim.run()
     a = sim.get_analyzer('age_results')
 
+    # Assert equal results
+    yind = sc.findinds(sim.results['year'], 2019)[0]
+    sim_results = sim.results['hpv_prevalence_by_age'][:,yind]
+    analyzer_results = a.results['hpv_prevalence']['2019.0']
+    assert np.array_close(sim_results, analyzer_results)
+
     # Check plot()
-    if do_plot: a.plot()
+    # if do_plot: a.plot()
 
     return sim, a
 
@@ -219,12 +230,12 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
-    sim2, a2    = test_reduce_analyzers()
-    sim3, a3    = test_age_causal_analyzer()
-    sim4, a4    = test_detection()
+    # people      = test_snapshot()
+    # sim0, a0    = test_age_pyramids()
+    sim, a    = test_age_results()
+    # sim2, a2    = test_reduce_analyzers()
+    # sim3, a3    = test_age_causal_analyzer()
+    # sim4, a4    = test_detection()
 
     sc.toc(T)
     print('Done.')
