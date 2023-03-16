@@ -244,7 +244,7 @@ class People(hpb.BasePeople):
             sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
-        transform_prob_par = gpars['transform_fn']['prob'] # Pull out the genotype-specific parameter governing the probability of transformation
+        transform_prob_par = gpars['transform_prob'] # Pull out the genotype-specific parameter governing the probability of transformation
         n_extra = self.pars['ms_agent_ratio']
         cancer_scale = self.pars['pop_scale'] / n_extra
 
@@ -720,14 +720,6 @@ class People(hpb.BasePeople):
                 inds_this_age = hpu.true(ages==age)
                 remove_probs[inds_this_age] = remove_frac[ind]
             migrate_inds = hpu.choose_w(remove_probs, -n_to_remove.sum())
-
-            # old_migrate_inds = []
-            # for ind, diff in enumerate(n_to_remove): #TODO: is there a faster way to do this than in a for loop?
-            #     age = ages_to_remove[ind]
-            #     alive_this_age_inds = np.where(ages==age)[0]
-            #     inds = hpu.choose(len(alive_this_age_inds), -diff)
-            #     old_migrate_inds += alive_inds[alive_this_age_inds[inds]].tolist()
-            # old_migrate_inds = np.array(old_migrate_inds)
 
             self.remove_people(migrate_inds, cause='emigration')  # Remove people
 

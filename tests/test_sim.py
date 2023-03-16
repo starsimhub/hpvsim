@@ -34,7 +34,7 @@ def test_microsim():
     return sim
 
 
-def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest, turn off
+def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being run via pytest, turn off
     sc.heading('Basic sim test')
 
     # Settings
@@ -60,7 +60,8 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     }
 
     sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars, rand_seed=seed)
-    sim.run(verbose=verbose)
+    if do_run:
+        sim.run(verbose=verbose)
 
     # Optionally plot
     if do_plot:

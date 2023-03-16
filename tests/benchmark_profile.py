@@ -23,7 +23,7 @@ import sciris as sc
 import hpvsim as hpv
 from test_sim import test_sim
 
-sim = test_sim(do_plot=False, n_agents=50e3) # For debugging regular sim
+sim = test_sim(do_plot=False, n_agents=50e3, do_run=False) # For debugging regular sim
 to_profile = 'update_pre' # Must be one of the options listed below
 
 func_options = {
