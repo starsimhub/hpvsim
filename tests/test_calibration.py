@@ -5,6 +5,7 @@ Test calibration
 #%% Imports and settings
 import sciris as sc
 import hpvsim as hpv
+import numpy as np
 
 do_plot = 1
 do_save = 0
@@ -17,9 +18,18 @@ def test_calibration():
     sc.heading('Testing calibration')
 
     pars = dict(n_agents=n_agents, start=1980, end=2020, dt=0.25, location='south africa')
-    sim = hpv.Sim(pars)
+    # pars['age_bins']  = np.array([ 0., 20., 25., 30., 40., 45., 50., 55., 65., 100])
+    # pars['standard_pop']    = np.array([pars['age_bins'],
+    #                              [.4, .08, .08, .12, .06, .06, .05, .07, .08, 0]])
+    pars['init_hpv_prev'] = 0.6
+    pars['age_bins']  = np.array([ 0., 20., 30., 40., 50., 60., 70., 80., 100])
+    pars['standard_pop']    = np.array([pars['age_bins'],
+                                 [.4, .16, .12, .12, .09, .07, .03, .01, 0]])
+
+    sim = hpv.Sim(pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
     calib_pars = dict(
         beta=[0.05, 0.010, 0.20],
+
     )
     genotype_pars = dict(
         hpv16=dict(
@@ -41,6 +51,14 @@ def test_calibration():
                             total_trials=3, n_workers=1)
     calib.calibrate(die=True)
     calib.plot(res_to_plot=4)
+
+    # Make sure that rerunning the sims with the best pars from the calibration gives the same results
+    calib_pars = calib.trial_pars_to_sim_pars(which_pars=0)
+    pars = sc.mergedicts(pars,calib_pars)
+    sim = hpv.Sim(pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
+    sim.run().plot()
+
+
     return sim, calib
 
 
@@ -49,7 +67,36 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    sim2, calib = test_calibration()
+    sim, calib = test_calibration()
+
+    # Check sim results against stored results in calib
+    best_run = calib.df.index[0]
+    year = 2019
+    yind = sc.findinds(sim.results['year'], year)[0]
+    calib_cancer_results = calib.analyzer_results[best_run]['cancers'][2019]
+    sim_cancer_results = sim.results['cancers_by_age'][:, yind]
+    # np.allclose(calib_cancer_results,sim_cancer_results) # THESE SHOULD BE THE SAME -- WHY AREN'T THEY??
+
+    # Loading the sim saved during calibration and check that the results there are the same
+    calib_sim = sc.load(f'sim{best_run}.obj')
+    calib_sim_cancer_results = calib_sim.results['cancers_by_age'][:, yind]
+    assert np.allclose(calib_cancer_results, calib_sim_cancer_results) # THIS WORKS
+
+    # Now copy the pars from the saved sim into a new one and rerun it
+    calib_sim_pars = calib_sim.pars
+    calib_sim_pars['analyzers'] = []
+    rerun_sim = hpv.Sim(pars=calib_sim_pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
+    rerun_sim.run()
+    rerun_sim_cancer_results = rerun_sim.results['cancers_by_age'][:, yind]
+    assert np.allclose(rerun_sim_cancer_results, sim_cancer_results)  # THIS WORKS
+    # assert np.allclose(calib_sim_cancer_results, rerun_sim_cancer_results)  # THIS DOESN'T
+
+    # Compare people -- can see that pplsim['infectious'] and pplcalib_sim['infectious']
+    # are different from the start, including different lengths
+    pplsim = sim.get_analyzer('snapshot').snapshots['1980.0']
+    pplrerun_sim = rerun_sim.get_analyzer('snapshot').snapshots['1980.0']
+    pplcalib_sim = calib_sim.get_analyzer('snapshot').snapshots['1980.0']
+
 
     sc.toc(T)
     print('Done.')

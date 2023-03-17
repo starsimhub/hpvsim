@@ -173,15 +173,16 @@ class Calibration(sc.prettyobj):
 
     def run_sim(self, calib_pars=None, genotype_pars=None, hiv_pars=None, label=None, return_sim=False):
         ''' Create and run a simulation '''
-        sim = self.sim.copy()
+        sim = sc.dcp(self.sim)
         if label: sim.label = label
 
         new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
         sim.update_pars(new_pars)
+        sim.initialize(reset=True, init_analyzers=False) # RS debugging: Try reinitializing...
 
         # Run the sim
         try:
-            sim.run()
+            sim.run(reset_seed=False) # RS debugging: Try setting to false...
             if return_sim:
                 return sim
             else:
@@ -465,6 +466,9 @@ class Calibration(sc.prettyobj):
             results = dict(sim=sim_results, analyzer=sim.get_analyzer().results, extra_sim_results=extra_sim_results)
             filename = self.tmp_filename % trial.number
             sc.save(filename, results)
+
+            # Temporarily store the whole sim
+            sc.save(f'sim{trial.number}.obj', sim)
 
         return sim.fit
 
@@ -774,7 +778,7 @@ class Calibration(sc.prettyobj):
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_args[resname].name+', '+ date.replace('.0', ''))
+                    ax.set_title(f'{self.result_args[resname].name}, {date}')
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
@@ -787,7 +791,6 @@ class Calibration(sc.prettyobj):
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
                 ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
-
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
