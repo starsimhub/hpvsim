@@ -18,7 +18,7 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(n_agents=n_agents, start=1980, end=2020, dt=0.25, location='south africa')
+    pars = dict(n_agents=n_agents, start=1950, end=2020, dt=0.25, location='south africa')
     # pars['age_bins']  = np.array([ 0., 20., 25., 30., 40., 45., 50., 55., 65., 100])
     # pars['standard_pop']    = np.array([pars['age_bins'],
     #                              [.4, .08, .08, .12, .06, .06, .05, .07, .08, 0]])
@@ -29,7 +29,7 @@ def test_calibration():
 
     sim = hpv.Sim(pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
     calib_pars = dict(
-        beta=[0.05, 0.010, 0.20],
+        beta=[0.25, 0.10, 0.30],
 
     )
     genotype_pars = dict(
