@@ -59,14 +59,27 @@ def test_calibration():
     sim = hpv.Sim(pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
     sim.run().plot()
 
-    sim_cancer_results = sim.results['cancers_by_age'][:,-1]
-    calib_cancer_results = calib.analyzer_results[calib.df['index'].reset_index()['index'][0]]['cancers'][2020]
+    sim_cancer_by_age_results = sim.results['cancers_by_age'][:,-1]
+    calib_cancer_by_age_results = calib.analyzer_results[calib.df['index'].reset_index()['index'][0]]['cancers'][2020]
     x = calib.analyzer_results[calib.df['index'].reset_index()['index'][0]]['cancers']['bins']
 
-    fig, ax = pl.subplots()
-    ax.plot(x, sim_cancer_results, label='sim results')
-    ax.plot(x, calib_cancer_results, label='calb results')
-    ax.legend()
+    fig, axes = pl.subplots(1,2)
+    axes[0].plot(x, sim_cancer_by_age_results, label='sim results')
+    axes[0].plot(x, calib_cancer_by_age_results, label='calib results')
+    axes[0].set_title('Cancers by age')
+    axes[0].set_xlabel('Age')
+    axes[0].legend()
+
+    sim_cancer_results = sim.results['asr_cancer_incidence'].values
+    calib_cancer_results = calib.extra_sim_results[1 + calib.df['index'].reset_index()['index'][0]][
+        'asr_cancer_incidence'].values
+    x = sim.results['year']
+
+    axes[1].plot(x, sim_cancer_results, label='sim results')
+    axes[1].plot(x, calib_cancer_results, label='calib results')
+    axes[1].set_title('ASR cancer incidence')
+    axes[1].set_xlabel('Year')
+    fig.tight_layout()
     fig.show()
 
 
