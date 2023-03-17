@@ -674,7 +674,6 @@ class age_results(Analyzer):
                 raise ValueError(errormsg)
 
             # Translate the name of the result to the people attribute
-            # by_hiv = False
             result_name = sc.dcp(rk)
             na = len(rdict.bins)
 
@@ -842,8 +841,8 @@ class age_results(Analyzer):
                             denom = bin_ages(inds=ppl.alive, bins=bins)
                     else:  # Denominator is females
                         denom = bin_ages(inds=ppl.f_inds, bins=bins)
-                        if by_genotype: denom = denom[None, :]
-                        self.results[rkey][date] = self.results[rkey][date] / (denom * ng)
+                    if rdict.by_genotype: denom = denom[None, :]
+                    self.results[rkey][date] = self.results[rkey][date] / (denom * ng)
 
                 if 'incidence' in rkey:
                     if 'hpv' in rkey:  # Denominator is susceptible population

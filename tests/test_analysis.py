@@ -83,19 +83,19 @@ def test_age_results(do_plot=True, test_what=''):
         result_args=sc.objdict(
             hpv_prevalence=sc.objdict(
                 years=2019,
-                edges=age_bins[:-1],
+                edges=age_bins,
             ),
             infections=sc.objdict(
                 years=2019,
-                edges=age_bins[:-1],
+                edges=age_bins,
             ),
             cancer_incidence=sc.objdict(
                 years=2019,
-                edges=age_bins[:-1],
+                edges=age_bins,
             ),
             cancers=sc.objdict(
                 years=2019,
-                edges=age_bins[:-1],
+                edges=age_bins,
             )
         )
     )
@@ -107,15 +107,13 @@ def test_age_results(do_plot=True, test_what=''):
     # Assert equal results
     year = 2019
     yind = sc.findinds(sim.results['year'], year)[0]
-    for result in ['hpv_prevalence']:#, 'infections', 'cancer_incidence', 'cancers']:
+    for result in ['infections', 'cancer_incidence', 'cancers']: # NB Still a problem with hpv_prevalence
         sim_result_name = result + '_by_age'
         sim_results = sim.results[sim_result_name][:,yind]
         analyzer_results = a.results[result][year]
-        # if not np.allclose(sim_results,analyzer_results):
-        # assert np.allclose(sim_results,analyzer_results)
+        assert np.allclose(sim_results/analyzer_results,np.ones_like(sim_results),5e-2) # 5% difference OK
 
-
-    return sim, a, sim_results, analyzer_results
+    return sim, a
 
 
 def test_reduce_analyzers():
