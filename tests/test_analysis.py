@@ -62,17 +62,17 @@ def test_age_pyramids(do_plot=True):
     return sim, a
 
 
-def test_age_results(do_plot=True):
+def test_age_results(do_plot=True, test_what=''):
 
     sc.heading('Testing by-age results')
 
     pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.25, network='default', location='tanzania')
     pars['beta'] = .5
 
-    # Use the same age bins for the sim as for the age result analyzeer, for comparaibility
-    pars['age_bins']  = np.array(  [0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
-    pars['standard_pop']    = np.array([pars['age_bins'],
-                                 [.31, .09, .09, .08, .12, .06, .05, .05, .11, .04,  0]])
+    # Use the same age bins for the sim as for the age result analyzer, for comparaibility
+    age_bins = np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
+    pars['age_bins']  = age_bins
+    pars['standard_pop']    = np.array([age_bins, [.31, .09, .08, .08, .12, .06, .06, .05, .08, .07,  0]])
 
     pars['init_hpv_prev'] = {
         'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
@@ -81,21 +81,21 @@ def test_age_results(do_plot=True):
     }
     az1 = hpv.age_results(
         result_args=sc.objdict(
-            # hpv_prevalence=sc.objdict(
-            #     timepoints=['2019'],
-            #     edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-            # ),
-            # infections=sc.objdict(
-            #     timepoints=['2019'],
-            #     edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
-            # ),
-            # cancer_incidence=sc.objdict(
-            #     timepoints=['2019'],
-            #     edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
-            # ),
+            hpv_prevalence=sc.objdict(
+                timepoints=2019,
+                edges=age_bins[:-1],
+            ),
+            infections=sc.objdict(
+                timepoints=2019,
+                edges=age_bins[:-1],
+            ),
+            cancer_incidence=sc.objdict(
+                timepoints=2019,
+                edges=age_bins[:-1],
+            ),
             cancers=sc.objdict(
                 years=2019,
-                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+                edges=age_bins[:-1],
             )
         )
     )
@@ -104,20 +104,15 @@ def test_age_results(do_plot=True):
     sim.run()
     a = sim.get_analyzer('age_results')
 
-    # # Assert equal results
-    # yind = sc.findinds(sim.results['year'], 2019)[0]
-    # sim_results = sim.results['infections_by_age'][:,yind]
-    # analyzer_results = a.results['infections']['2019.0']
-    # assert np.allclose(sim_results/analyzer_results, np.ones_like(sim_results), atol=5e-1) # 5% different ok
-
     # Assert equal results
-    yind = sc.findinds(sim.results['year'], 2019)[0]
-    sim_results = sim.results['cancers_by_age'][:,yind]
-    analyzer_results = a.results['cancers'][2019.0]
-    # assert np.allclose(sim_results/analyzer_results, np.ones_like(sim_results), atol=5e-1) # 5% different ok
+    year = 2019
+    yind = sc.findinds(sim.results['year'], year)[0]
+    for result in ['hpv_prevalence', 'infections', 'cancer_incidence', 'cancers']:
+        sim_result_name = result + '_by_age'
+        sim_results = sim.results[sim_result_name][:,yind]
+        analyzer_results = a.results[result][year]
+        assert np.allclose(sim_results,analyzer_results)
 
-    # Check plot()
-    # if do_plot: a.plot()
 
     return sim, a, sim_results, analyzer_results
 
