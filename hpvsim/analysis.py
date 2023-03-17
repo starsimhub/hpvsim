@@ -543,15 +543,15 @@ class age_results(Analyzer):
 
     '''
 
-    def __init__(self, result_keys=None, die=False, edges=None, timepoints=None, result_args=None, **kwargs):
+    def __init__(self, result_keys=None, die=False, edges=None, years=None, result_args=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         self.mismatch       = 0
         self.die            = die  # Whether or not to raise an exception
         self.start          = None # Store the start year of the simulation
         self.edges          = edges or np.array([0., 15., 20., 25., 30., 35., 40., 45., 50., 55., 60., 65., 70., 75., 80., 85., 100.])
-        self.timepoints     = timepoints
+        self.years          = years
         self.result_keys    = result_keys or ['infections', 'cancers']
-        self.results        = sc.odict() # Store the age results
+        self.results        = sc.objdict() # Store the age results
         self.result_args    = result_args
         return
 
@@ -563,17 +563,24 @@ class age_results(Analyzer):
         # Handle timepoints and dates
         self.start = sim['start']  # Store the simulation start
         self.end = sim['end']  # Store simulation end
-        if self.timepoints is None:
-            self.timepoints = [f'{sim["end"]}']
-            self.timepoints, self.dates = sim.get_t(self.timepoints, return_date_format='str') # Ensure timepoints and dates are in the right format
+
+        # Make defaults
+        if self.years is None:
+            self.years = sim["end"]
+        self.years = sc.promotetoarray(self.years)
+        self.timepoints = []
+        for y in self.years:
+            self.timepoints.append(sc.findinds(sim.yearvec,y) + int(1 / sim['dt']) - 1)
 
         # Handle which results to make. Specification of the results to make is stored in result_args
         if self.result_args is None: # Make defaults if none are provided
             self.result_args = sc.objdict()
             for rkey in self.result_keys:
-                self.result_args[rkey] = sc.objdict(timepoints=self.dates, edges=self.edges)
+                self.result_args[rkey] = sc.objdict(years=self.years, edges=self.edges)
+
         elif sc.checktype(self.result_args, dict): # Ensure it's an object dict
             self.result_args = sc.objdict(self.result_args)
+
         else: # Raise an error
             errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(self.result_args)}.'
             raise TypeError(errormsg)
@@ -582,11 +589,12 @@ class age_results(Analyzer):
         self.dt = sim['dt']
         self.resfreq = sim.resfreq
 
-        self.validate_results(sim)
-
         # Store genotypes
         self.ng = sim['n_genotypes']
         self.glabels = [g.upper() for g in sim['genotype_map'].values()]
+
+        # Initialize result structure and validate the result variable arguments
+        self.validate_variables(sim)
 
         # Store colors
         for rkey in self.result_args.keys():
@@ -602,17 +610,21 @@ class age_results(Analyzer):
         return
 
 
-    def validate_results(self, sim):
+    def validate_variables(self, sim):
+        '''
+        Check that the variables
+        '''
         choices = sim.result_keys('total')+[k for k in sim.result_keys('genotype')]
         if sim['model_hiv']:
             choices += list(sim.hivsim.results.keys())
+
         for rk, rdict in self.result_args.items():
             if rk not in choices:
                 strm = '\n'.join(choices)
                 errormsg = f'Cannot compute age results for {rk}. Please enter one of the standard sim result_keys to the age_results analyzer; choices are {strm}.'
                 raise ValueError(errormsg)
             else:
-                self.results[rk] = sc.objdict()
+                self.results[rk] = dict() # Store the results. Not an odict because keyed by year
 
             # Handle the data file
             # If data is provided, extract timepoints, edges, age bins and labels from that
@@ -645,21 +657,71 @@ class age_results(Analyzer):
                 rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
                                     range(len(rdict.bins) - 1)]
                 rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
-                if 'timepoints' not in rdict.keys():
-                    errormsg = 'Did not provide timepoints for this age analyzer'
+                if 'years' not in rdict.keys():
+                    errormsg = 'Did not provide years for this age analyzer'
                     raise ValueError(errormsg)
+                rdict.years = sc.promotetoarray(rdict.years)
 
-            if not rdict.get('dates') or rdict.dates is None:
-                rdict.timepoints, rdict.dates = sim.get_t(rdict.timepoints, return_date_format='str')  # Ensure timepoints and dates are in the right format
+            if not rdict.get('timepoints') or rdict.timepoints is None:
+                rdict.timepoints = []
+                for y in rdict.years:
+                    rdict.timepoints.append(sc.findinds(sim.yearvec, y)[0] + int(1 / sim['dt']) - 1)
+
             max_hist_time = rdict.timepoints[-1]
-            max_sim_time = sim['end']
+            max_sim_time = sim.tvec[-1]
             if max_hist_time > max_sim_time:
-                errormsg = f'Cannot create age results for {rdict.dates[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
+                errormsg = f'Cannot create age results for {rdict.years[-1]} ({max_hist_time}) because the simulation ends on {self.end} ({max_sim_time})'
                 raise ValueError(errormsg)
 
-            rdict.calcpoints = []
-            for tpi, tp in enumerate(rdict.timepoints):
-                rdict.calcpoints += [tp + i for i in range(int(1 / self.dt))]
+            # Translate the name of the result to the people attribute
+            # by_hiv = False
+            result_name = sc.dcp(rk)
+            na = len(rdict.bins)
+
+            # Clean up the name
+            if 'genotype' in result_name: # Results by genotype
+                result_name = result_name.replace('_by_genotype','') # remove "by_genotype" from result name
+                rdict.size = (na, ng)
+                rdict.by_genotype = True
+            else: # Total results
+                rdict.size = na
+                rdict.by_genotype = False
+            rdict.by_hiv = False
+            if '_with_hiv' in result_name:
+                result_name = result_name.replace('_with_hiv', '')  # remove "_with_hiv" from result name
+                rdict.by_hiv = True
+                # rdict.hiv_attr = 'hiv'
+            elif '_no_hiv' in result_name:
+                result_name = result_name.replace('_no_hiv', '')  # remove "_no_hiv" from result name
+                rdict.by_hiv = True
+                # attr3 = ~ppl['hiv']
+
+            # Figure out if it's a flow or incidence
+            if result_name in hpd.flow_keys or 'incidence' in result_name or 'mortality' in result_name:
+                date_attr, attr = self.convert_rname_flows(result_name)
+                rdict.result_type = 'flow'
+            elif result_name[:2] == 'n_' or 'prevalence' in result_name:
+                attr = self.convert_rname_stocks(result_name)  # Convert to a people attribute
+                date_attr = None
+                rdict.result_type = 'stock'
+
+            rdict.attr = attr
+            rdict.date_attr = date_attr
+
+            # Initialize results
+            for year in rdict.years:
+                self.results[rk][year] = np.zeros(rdict.size)
+
+            # For flows, we calculate results on all the timepoints throughout the year, not just the last one
+            if rdict.result_type == 'flow':
+                rdict.calcpoints = []
+                rdict.calcpointyears = []
+                for tpi, tp in enumerate(rdict.timepoints):
+                    rdict.calcpoints += [tp+i+1 for i in range(-int(1/self.dt),0)]
+                    rdict.calcpointyears += [sim.yearvec[tp-(int(1/sim['dt'])-1)]]*int(1/self.dt)
+            else:
+                rdict.calcpoints = sc.dcp(rdict.timepoints)
+                rdict.calcpointyears = [sim.yearvec[tp-(int(1/sim['dt'])-1)] for tp in rdict.calcpoints]
 
             if 'compute_fit' in rdict.keys() and rdict.compute_fit:
                 if rdict.data is None:
@@ -718,135 +780,98 @@ class age_results(Analyzer):
             return np.histogram(ppl.age[inds], bins=bins, weights=ppl.scale[inds])[0] # Bin the people
 
         # Go through each result key and determine if this is a timepoint where age results are requested
-        for result, result_dict in self.result_args.items():
+        for rkey, rdict in self.result_args.items():
 
             # Establish initial quantities
-            bins = result_dict.edges
-            na = len(result_dict.bins)
-            if 'genotype' in result: # Results by genotype
-                result_name = result.replace('_by_genotype','') # remove "by_genotype" from result name
-                size = (na, ng)
-                by_genotype = True
-            else: # Total results
-                result_name = result[:]
-                size = na
-                by_genotype = False
+            bins = rdict.edges
+            na = len(rdict.bins)
 
-            # This section is completed for stocks
-            if sim.t in result_dict.timepoints:
+            # TODO FIX THIS
+            if 'compute_fit' in rdict.keys():
+                thisdatadf = rdict.data[(rdict.data.year == float(date)) & (rdict.data.name == result)]
+                unique_genotypes = thisdatadf.genotype.unique()
+                ng = len(unique_genotypes)  # CAREFUL, THIS IS OVERWRITING
 
-                ind = sc.findinds(result_dict.timepoints, sim.t)[0]  # Get the index
-                date = result_dict.dates[ind]  # Create the date which will be used to key the results
-                self.results[result][date] = np.zeros(size)
+            # Calculate flows and stocks over all calcpoints
+            if sim.t in rdict.calcpoints:
 
-                if 'compute_fit' in result_dict.keys():
-                    thisdatadf = result_dict.data[(result_dict.data.year == float(date)) & (result_dict.data.name == result)]
-                    unique_genotypes = thisdatadf.genotype.unique()
-                    ng = len(unique_genotypes) # CAREFUL, THIS IS OVERWRITING
+                date_ind = sc.findinds(rdict.calcpoints, sim.t)[0]  # Get the index
+                date = rdict.calcpointyears[date_ind]  # Create the date which will be used to key the results
 
-                # Both annual stocks and prevalence require us to calculate the current stocks.
-                # Unlike incidence, these don't have to be aggregated over multiple timepoints.
-                if result_name[0] == 'n' or 'prevalence' in result_name:
-                    by_hiv = False
-                    if '_with_hiv' in result_name:
-                        result_name = result_name.replace('_with_hiv', '')  # remove "_with_hiv" from result name
-                        by_hiv = True
-                        attr2 = ppl['hiv']
-                    elif '_no_hiv' in result_name:
-                        result_name = result_name.replace('_no_hiv', '')  # remove "_no_hiv" from result name
-                        by_hiv = True
-                        attr2 = ~ppl['hiv']
+                # Figure out if it's a flow
+                if rdict.result_type == 'flow':
 
-                    attr = self.convert_rname_stocks(result_name) # Convert to a people attribute
-                    if attr in ppl.keys():
-                        if not by_genotype:
-                            if by_hiv:
-                                inds = (ppl[attr].any(axis=0) * attr2).nonzero()[-1]  # Pull out people for which this state is true
-                            else:
-                                inds = ppl[attr].any(axis=0).nonzero()[-1]  # Pull out people for which this state is true
-                            self.results[result][date] = bin_ages(inds, bins)
+                    if not rdict.by_genotype:  # Results across all genotypes
+                        if rkey == 'detected_cancer_deaths':
+                            inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl['detected_cancer'])).nonzero()[-1]
                         else:
-                            for g in range(ng):
-                                inds = ppl[attr][g, :].nonzero()[-1]
-                                self.results[result][date][g, :] = bin_ages(inds, bins)  # Bin the people
-
-                        if 'prevalence' in result:
-                            # Need to divide by the right denominator
-                            if 'hpv' in result:  # Denominator is whole population
-                                if by_hiv:
-                                    inds = sc.findinds(attr2)
-                                    denom = bin_ages(inds=inds, bins=bins)
-                                else:
-                                    denom = bin_ages(inds=ppl.alive, bins=bins)
-                            else:  # Denominator is females
-                                denom = bin_ages(inds=ppl.f_inds, bins=bins)
-                            if by_genotype: denom = denom[None, :]
-                            self.results[result][date] = self.results[result][date] / (denom*ng)
-
-                self.date = date # Need to store the date for subsequent calcpoints
-                self.timepoint = sim.t # Need to store the timepoints for subsequent calcpoints
-
-            # Both annual new cases and incidence require us to calculate the new cases over all
-            # the timepoints that belong to the requested year.
-            if sim.t in result_dict.calcpoints:
-                by_hiv = False
-                if '_with_hiv' in result_name:
-                    result_name = result_name.replace('_with_hiv','') # remove "_with_hiv" from result name
-                    by_hiv = True
-                    attr3 = ppl['hiv']
-                elif '_no_hiv' in result_name:
-                    result_name = result_name.replace('_no_hiv', '')  # remove "_no_hiv" from result name
-                    by_hiv = True
-                    attr3 = ~ppl['hiv']
-
-                # Figure out if it's a flow or incidence
-                if result_name in hpd.flow_keys or 'incidence' in result_name or 'mortality' in result_name:
-
-                    date = self.date  # Stored just above for use here
-                    attr1, attr2 = self.convert_rname_flows(result_name)
-
-                    if not by_genotype:  # Results across all genotypes
-                        if result_name == 'detected_cancer_deaths':
-                            inds = ((ppl[attr1] == sim.t) * (ppl[attr2]) * (ppl['detected_cancer'])).nonzero()[-1]
-                        else:
-                            if by_hiv:
-                                inds = ((ppl[attr1] == sim.t) * (ppl[attr2]) * (attr3)).nonzero()[-1]
+                            if rdict.by_hiv:
+                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (attr3)).nonzero()[-1]
                             else:
-                                inds = ((ppl[attr1] == sim.t) * (ppl[attr2])).nonzero()[-1]
-                        self.results[result][date] += bin_ages(inds, bins)  # Bin the people
+                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr])).nonzero()[-1]
+                        self.results[rkey][date] += bin_ages(inds, bins)  # Bin the people
+
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
-                            inds = ((ppl[attr1][g, :] == sim.t) * (ppl[attr2][g, :])).nonzero()[-1]
-                            self.results[result][date][:, g] += bin_ages(inds, bins)  # Bin the people
+                            inds = ((ppl[rdict.date_attr][g, :] == sim.t) * (ppl[rdict.attr][g, :])).nonzero()[-1]
+                            self.results[rkey][date][:, g] += bin_ages(inds, bins)  # Bin the people
 
-                    # Figure out if this is the last timepoint in the year we're calculating results for
-                    if sim.t == self.timepoint+self.resfreq-1:
-                        if 'incidence' in result:
-                            # Need to divide by the right denominator
-                            if 'hpv' in result:  # Denominator is susceptible population
-                                denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
-                            else:  # Denominator is females at risk for cancer
-                                if by_hiv:
-                                    inds = sc.findinds(ppl.is_female_alive & attr3 * ~ppl.cancerous.any(axis=0))
-                                else:
-                                    inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
-                                denom = bin_ages(inds, bins) / 1e5  # CIN and cancer are per 100,000 women
-                            if 'total' not in result and 'cancer' not in result: denom = denom[None, :]
-                            self.results[result][date] = self.results[result][date] / denom
+                # This section is completed for stocks
+                elif rdict.result_type == 'stock':
 
-                        if 'mortality' in result:
-                            # Need to divide by the right denominator
-                            # first need to find people who died of other causes today and add them back into denom
-                            denom = bin_ages(inds=ppl.is_female_alive, bins=bins)
-                            scale_factor =  1e5  # per 100,000 women
-                            denom /= scale_factor
-                            self.results[result][date] = self.results[result][date] / denom
+                    if not rdict.by_genotype:
+                        if rdict.by_hiv:
+                            inds = (ppl[rdict.attr].any(axis=0) * attr2).nonzero()[-1]
+                        else:
+                            inds = ppl[rdict.attr].any(axis=0).nonzero()[-1]
+                        self.results[rkey][date] = bin_ages(inds, bins)
+                    else:
+                        for g in range(ng):
+                            inds = ppl[rdict.attr][g, :].nonzero()[-1]
+                            self.results[rkey][date][g, :] = bin_ages(inds, bins)  # Bin the people
+
+            # On the final timepoint in the year, normalize
+            if sim.t in rdict.timepoints:
+
+                if 'prevalence' in rkey:
+                    if 'hpv' in rkey:  # Denominator is whole population
+                        if rdict.by_hiv:
+                            inds = sc.findinds(attr2)
+                            denom = bin_ages(inds=inds, bins=bins)
+                        else:
+                            denom = bin_ages(inds=ppl.alive, bins=bins)
+                    else:  # Denominator is females
+                        denom = bin_ages(inds=ppl.f_inds, bins=bins)
+                        if by_genotype: denom = denom[None, :]
+                        self.results[rkey][date] = self.results[rkey][date] / (denom * ng)
+
+                if 'incidence' in rkey:
+                    if 'hpv' in rkey:  # Denominator is susceptible population
+                        denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
+                    else:  # Denominator is females at risk for cancer
+                        if rdict.by_hiv:
+                            inds = sc.findinds(ppl.is_female_alive & attr3 * ~ppl.cancerous.any(axis=0))
+                        else:
+                            inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
+                        denom = bin_ages(inds, bins) / 1e5  # CIN and cancer are per 100,000 women
+                    # if 'total' not in result and 'cancer' not in result: denom = denom[None, :] # THIS IS IT!!!!
+                    self.results[rkey][date] = self.results[rkey][date] / denom
+
+                if 'mortality' in rkey:
+                    # first need to find people who died of other causes today and add them back into denom
+                    denom = bin_ages(inds=ppl.is_female_alive, bins=bins)
+                    scale_factor =  1e5  # per 100,000 women
+                    denom /= scale_factor
+                    self.results[rkey][date] = self.results[rkey][date] / denom
+
+        return
 
 
     def finalize(self, sim):
         super().finalize()
         for rkey, rdict in self.result_args.items():
-            validate_recorded_dates(sim, requested_dates=rdict.dates, recorded_dates=self.results[rkey].keys()[1:], die=self.die)
+            recorded_dates = [k for k in self.results[rkey].keys()][1:]
+            validate_recorded_dates(sim, requested_dates=rdict.years, recorded_dates=recorded_dates, die=self.die)
             if 'compute_fit' in rdict.keys():
                 self.mismatch += self.compute(rkey)
 
