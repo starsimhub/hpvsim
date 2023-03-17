@@ -6,10 +6,11 @@ Test calibration
 import sciris as sc
 import hpvsim as hpv
 import numpy as np
+import pylab as pl
 
 do_plot = 1
 do_save = 0
-n_agents = 2e3
+n_agents = 20e3
 
 
 #%% Define the tests
@@ -48,7 +49,7 @@ def test_calibration():
                                 'test_data/south_africa_cancer_data_2020.csv',
                             ],
                             extra_sim_results=extra_sim_results,
-                            total_trials=3, n_workers=1)
+                            total_trials=10, n_workers=1)
     calib.calibrate(die=True)
     calib.plot(res_to_plot=4)
 
@@ -57,6 +58,16 @@ def test_calibration():
     pars = sc.mergedicts(pars,calib_pars)
     sim = hpv.Sim(pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
     sim.run().plot()
+
+    sim_cancer_results = sim.results['cancers_by_age'][:,-1]
+    calib_cancer_results = calib.analyzer_results[calib.df['index'].reset_index()['index'][0]]['cancers'][2020]
+    x = calib.analyzer_results[calib.df['index'].reset_index()['index'][0]]['cancers']['bins']
+
+    fig, ax = pl.subplots()
+    ax.plot(x, sim_cancer_results, label='sim results')
+    ax.plot(x, calib_cancer_results, label='calb results')
+    ax.legend()
+    fig.show()
 
 
     return sim, calib
@@ -73,7 +84,7 @@ if __name__ == '__main__':
     best_run = calib.df.index[0]
     year = 2019
     yind = sc.findinds(sim.results['year'], year)[0]
-    calib_cancer_results = calib.analyzer_results[best_run]['cancers'][2019]
+    calib_cancer_results = calib.analyzer_results[best_run]['cancers'][2020]
     sim_cancer_results = sim.results['cancers_by_age'][:, yind]
     # np.allclose(calib_cancer_results,sim_cancer_results) # THESE SHOULD BE THE SAME -- WHY AREN'T THEY??
 
