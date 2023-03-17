@@ -111,7 +111,7 @@ def test_age_results(do_plot=True, test_what=''):
         sim_result_name = result + '_by_age'
         sim_results = sim.results[sim_result_name][:,yind]
         analyzer_results = a.results[result][year]
-        assert np.allclose(sim_results/analyzer_results,np.ones_like(sim_results),5e-2) # 5% difference OK
+        assert np.allclose(sim_results,analyzer_results,rtol=5e-2)
 
     return sim, a
 
@@ -232,7 +232,7 @@ if __name__ == '__main__':
 
     # people      = test_snapshot()
     # sim0, a0    = test_age_pyramids()
-    sim, a, sim_results, analyzer_results    = test_age_results()
+    sim, a        = test_age_results()
     # sim2, a2    = test_reduce_analyzers()
     # sim3, a3    = test_age_causal_analyzer()
     # sim4, a4    = test_detection()
