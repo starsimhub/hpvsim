@@ -178,11 +178,11 @@ class Calibration(sc.prettyobj):
 
         new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
         sim.update_pars(new_pars)
-        sim.init_people(reset=True, init_states=True)
+        sim.initialize(reset=True, init_analyzers=False) # RS debugging: Try reinitializing...
 
         # Run the sim
         try:
-            sim.run()
+            sim.run(reset_seed=False) # RS debugging: Try setting to false...
             if return_sim:
                 return sim
             else:

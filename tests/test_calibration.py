@@ -26,7 +26,7 @@ def test_calibration():
     pars['standard_pop']    = np.array([pars['age_bins'],
                                  [.4, .16, .12, .12, .09, .07, .03, .01, 0]])
 
-    sim = hpv.Sim(pars)
+    sim = hpv.Sim(pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
     calib_pars = dict(
         beta=[0.5, 0.3, 0.8],
         dur_transformed=dict(par1=[5, 3, 10]),
@@ -55,7 +55,7 @@ def test_calibration():
     # Make sure that rerunning the sims with the best pars from the calibration gives the same results
     calib_pars = calib.trial_pars_to_sim_pars(which_pars=0)
     pars = sc.mergedicts(pars,calib_pars)
-    sim = hpv.Sim(pars)
+    sim = hpv.Sim(pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
     sim.run().plot()
 
 
@@ -85,12 +85,17 @@ if __name__ == '__main__':
     # Now copy the pars from the saved sim into a new one and rerun it
     calib_sim_pars = calib_sim.pars
     calib_sim_pars['analyzers'] = []
-    rerun_sim = hpv.Sim(pars=calib_sim_pars)
+    rerun_sim = hpv.Sim(pars=calib_sim_pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
     rerun_sim.run()
     rerun_sim_cancer_results = rerun_sim.results['cancers_by_age'][:, yind]
     assert np.allclose(rerun_sim_cancer_results, sim_cancer_results)  # THIS WORKS
-    # assert np.allclose(rerun_sim_cancer_results, calib_sim_cancer_results)  # THIS DOESN'T
+    # assert np.allclose(calib_sim_cancer_results, rerun_sim_cancer_results)  # THIS DOESN'T
 
+    # Compare people -- can see that pplsim['infectious'] and pplcalib_sim['infectious']
+    # are different from the start, including different lengths
+    pplsim = sim.get_analyzer('snapshot').snapshots['1980.0']
+    pplrerun_sim = rerun_sim.get_analyzer('snapshot').snapshots['1980.0']
+    pplcalib_sim = calib_sim.get_analyzer('snapshot').snapshots['1980.0']
 
 
     sc.toc(T)
