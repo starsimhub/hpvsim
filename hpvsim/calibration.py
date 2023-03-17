@@ -173,7 +173,7 @@ class Calibration(sc.prettyobj):
 
     def run_sim(self, calib_pars=None, genotype_pars=None, hiv_pars=None, label=None, return_sim=False):
         ''' Create and run a simulation '''
-        sim = self.sim.copy()
+        sim = sc.dcp(self.sim)
         if label: sim.label = label
 
         new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
@@ -466,6 +466,9 @@ class Calibration(sc.prettyobj):
             results = dict(sim=sim_results, analyzer=sim.get_analyzer().results, extra_sim_results=extra_sim_results)
             filename = self.tmp_filename % trial.number
             sc.save(filename, results)
+
+            # Temporarily store the whole sim
+            sc.save(f'sim{trial.number}.obj', sim)
 
         return sim.fit
 

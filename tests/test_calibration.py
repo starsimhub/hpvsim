@@ -58,16 +58,6 @@ def test_calibration():
     sim = hpv.Sim(pars)
     sim.run().plot()
 
-    # # Check sim results against stored results in calib
-    # calib_hpv_results = calib.analyzer_results[0]['hpv_prevalence']['2010.0']
-    # yind = sc.findinds(sim.results['year'], 2010)[0]
-    # sim_hpv_results = sim.results['hpv_prevalence_by_age'][:,yind]
-    # # assert np.allclose(sim_hpv_results, calib_hpv_results)
-
-    # # Check sim results against stored results in calib
-    # calib_cancer_results = calib.analyzer_results[0]['cancers']['2019.0']
-    # yind = sc.findinds(sim.results['year'], 2019)[0]
-    # sim_cancer_results = sim.results['cancers_by_age'][:, yind]
 
     return sim, calib
 
@@ -78,6 +68,30 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim, calib = test_calibration()
+
+    # Check sim results against stored results in calib
+    best_run = calib.df.index[0]
+    year = 2019
+    yind = sc.findinds(sim.results['year'], year)[0]
+    calib_cancer_results = calib.analyzer_results[best_run]['cancers'][2019]
+    sim_cancer_results = sim.results['cancers_by_age'][:, yind]
+    # np.allclose(calib_cancer_results,sim_cancer_results) # THESE SHOULD BE THE SAME -- WHY AREN'T THEY??
+
+    # Loading the sim saved during calibration and check that the results there are the same
+    calib_sim = sc.load(f'sim{best_run}.obj')
+    calib_sim_cancer_results = calib_sim.results['cancers_by_age'][:, yind]
+    assert np.allclose(calib_cancer_results, calib_sim_cancer_results) # THIS WORKS
+
+    # Now copy the pars from the saved sim into a new one and rerun it
+    calib_sim_pars = calib_sim.pars
+    calib_sim_pars['analyzers'] = []
+    rerun_sim = hpv.Sim(pars=calib_sim_pars)
+    rerun_sim.run()
+    rerun_sim_cancer_results = rerun_sim.results['cancers_by_age'][:, yind]
+    assert np.allclose(rerun_sim_cancer_results, sim_cancer_results)  # THIS WORKS
+    # assert np.allclose(rerun_sim_cancer_results, calib_sim_cancer_results)  # THIS DOESN'T
+
+
 
     sc.toc(T)
     print('Done.')
