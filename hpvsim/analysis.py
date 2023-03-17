@@ -637,7 +637,7 @@ class age_results(Analyzer):
 
                 # extract edges, age bins and labels from that
                 # Handle edges, age bins, and labels
-                rdict.timepoints = rdict.data.year.unique()
+                rdict.years = rdict.data.year.unique()
                 rdict.age_labels = []
                 rdict.edges = np.array(rdict.data.age.unique(), dtype=float)
                 rdict.edges = np.append(rdict.edges, 100)
@@ -785,17 +785,17 @@ class age_results(Analyzer):
             bins = rdict.edges
             na = len(rdict.bins)
 
-            # TODO FIX THIS
-            if 'compute_fit' in rdict.keys():
-                thisdatadf = rdict.data[(rdict.data.year == float(date)) & (rdict.data.name == result)]
-                unique_genotypes = thisdatadf.genotype.unique()
-                ng = len(unique_genotypes)  # CAREFUL, THIS IS OVERWRITING
-
             # Calculate flows and stocks over all calcpoints
             if sim.t in rdict.calcpoints:
 
                 date_ind = sc.findinds(rdict.calcpoints, sim.t)[0]  # Get the index
                 date = rdict.calcpointyears[date_ind]  # Create the date which will be used to key the results
+
+                # TODO FIX THIS
+                if 'compute_fit' in rdict.keys():
+                    thisdatadf = rdict.data[(rdict.data.year == float(date)) & (rdict.data.name == rkey)]
+                    unique_genotypes = thisdatadf.genotype.unique()
+                    ng = len(unique_genotypes)  # CAREFUL, THIS IS OVERWRITING
 
                 # Figure out if it's a flow
                 if rdict.result_type == 'flow':
@@ -872,7 +872,7 @@ class age_results(Analyzer):
             recorded_dates = [k for k in self.results[rkey].keys()][1:]
             validate_recorded_dates(sim, requested_dates=rdict.years, recorded_dates=recorded_dates, die=self.die)
             if 'compute_fit' in rdict.keys():
-                self.mismatch += self.compute(rkey)
+                self.mismatch += self.compute_mismatch(rkey)
 
         sim.fit = self.mismatch
 
@@ -959,13 +959,15 @@ class age_results(Analyzer):
         return reduced_analyzer
 
 
-    def compute(self, key):
+    def compute_mismatch(self, key):
+        ''' Compute mismatch between analyzer results and datafile'''
+
         res = []
         resargs = self.result_args[key]
         results = self.results[key]
         for name, group in resargs.data.groupby(['genotype', 'year']):
             genotype = name[0]
-            year = str(name[1]) + '.0'
+            year = name[1]
             if 'genotype' in key:
                 sim_res = list(results[year][self.glabels.index(genotype)])
                 res.extend(sim_res)
