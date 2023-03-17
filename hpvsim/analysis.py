@@ -676,6 +676,7 @@ class age_results(Analyzer):
             # Translate the name of the result to the people attribute
             result_name = sc.dcp(rk)
             na = len(rdict.bins)
+            ng = sim['n_genotypes']
 
             # Clean up the name
             if 'genotype' in result_name: # Results by genotype
@@ -689,7 +690,7 @@ class age_results(Analyzer):
             if '_with_hiv' in result_name:
                 result_name = result_name.replace('_with_hiv', '')  # remove "_with_hiv" from result name
                 rdict.by_hiv = True
-                # rdict.hiv_attr = 'hiv'
+                rdict.hiv_attr = 'hiv'
             elif '_no_hiv' in result_name:
                 result_name = result_name.replace('_no_hiv', '')  # remove "_no_hiv" from result name
                 rdict.by_hiv = True
@@ -805,7 +806,7 @@ class age_results(Analyzer):
                             inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl['detected_cancer'])).nonzero()[-1]
                         else:
                             if rdict.by_hiv:
-                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (attr3)).nonzero()[-1]
+                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl[rdict.hiv_attr])).nonzero()[-1]
                             else:
                                 inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr])).nonzero()[-1]
                         self.results[rkey][date] += bin_ages(inds, bins)  # Bin the people
@@ -820,7 +821,7 @@ class age_results(Analyzer):
 
                     if not rdict.by_genotype:
                         if rdict.by_hiv:
-                            inds = (ppl[rdict.attr].any(axis=0) * attr2).nonzero()[-1]
+                            inds = (ppl[rdict.attr].any(axis=0) * ppl[rdict.hiv_attr]).nonzero()[-1]
                         else:
                             inds = ppl[rdict.attr].any(axis=0).nonzero()[-1]
                         self.results[rkey][date] = bin_ages(inds, bins)
@@ -835,7 +836,7 @@ class age_results(Analyzer):
                 if 'prevalence' in rkey:
                     if 'hpv' in rkey:  # Denominator is whole population
                         if rdict.by_hiv:
-                            inds = sc.findinds(attr2)
+                            inds = sc.findinds(ppl[rdict.hiv_attr])
                             denom = bin_ages(inds=inds, bins=bins)
                         else:
                             denom = bin_ages(inds=ppl.alive, bins=bins)
@@ -849,7 +850,7 @@ class age_results(Analyzer):
                         denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
                     else:  # Denominator is females at risk for cancer
                         if rdict.by_hiv:
-                            inds = sc.findinds(ppl.is_female_alive & attr3 * ~ppl.cancerous.any(axis=0))
+                            inds = sc.findinds(ppl.is_female_alive & ppl[rdict.hiv_attr] * ~ppl.cancerous.any(axis=0))
                         else:
                             inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
                         denom = bin_ages(inds, bins) / 1e5  # CIN and cancer are per 100,000 women

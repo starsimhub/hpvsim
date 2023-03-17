@@ -89,7 +89,7 @@ if __name__ == '__main__':
     rerun_sim.run()
     rerun_sim_cancer_results = rerun_sim.results['cancers_by_age'][:, yind]
     assert np.allclose(rerun_sim_cancer_results, sim_cancer_results)  # THIS WORKS
-    # assert np.allclose(calib_sim_cancer_results, rerun_sim_cancer_results)  # THIS DOESN'T
+    assert np.allclose(calib_sim_cancer_results, rerun_sim_cancer_results)  # THIS WORKS
 
     # Compare people -- can see that pplsim['infectious'] and pplcalib_sim['infectious']
     # are different from the start, including different lengths
