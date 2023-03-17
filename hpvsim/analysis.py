@@ -742,7 +742,7 @@ class age_results(Analyzer):
                 if 'compute_fit' in result_dict.keys():
                     thisdatadf = result_dict.data[(result_dict.data.year == float(date)) & (result_dict.data.name == result)]
                     unique_genotypes = thisdatadf.genotype.unique()
-                    ng = len(unique_genotypes)
+                    ng = len(unique_genotypes) # CAREFUL, THIS IS OVERWRITING
 
                 # Both annual stocks and prevalence require us to calculate the current stocks.
                 # Unlike incidence, these don't have to be aggregated over multiple timepoints.
@@ -777,11 +777,11 @@ class age_results(Analyzer):
                                     inds = sc.findinds(attr2)
                                     denom = bin_ages(inds=inds, bins=bins)
                                 else:
-                                    denom = bin_ages(inds=None, bins=bins)
+                                    denom = bin_ages(inds=ppl.alive, bins=bins)
                             else:  # Denominator is females
                                 denom = bin_ages(inds=ppl.f_inds, bins=bins)
                             if by_genotype: denom = denom[None, :]
-                            self.results[result][date] = self.results[result][date] / denom
+                            self.results[result][date] = self.results[result][date] / (denom*ng)
 
                 self.date = date # Need to store the date for subsequent calcpoints
                 self.timepoint = sim.t # Need to store the timepoints for subsequent calcpoints
@@ -798,6 +798,7 @@ class age_results(Analyzer):
                     result_name = result_name.replace('_no_hiv', '')  # remove "_no_hiv" from result name
                     by_hiv = True
                     attr3 = ~ppl['hiv']
+
                 # Figure out if it's a flow or incidence
                 if result_name in hpd.flow_keys or 'incidence' in result_name or 'mortality' in result_name:
 
