@@ -532,6 +532,10 @@ class People(hpb.BasePeople):
         # Age results
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
 
+        if self.t == 280:
+            print(f'inds that got cancer from genotype {genotype} on {self.t} are {inds} in sim')
+            print(f'Dates of cancer should have been {self.date_cancerous[genotype,inds]} on {self.t}')
+
         return cases_by_age, self.scale_flows(inds)
 
 

@@ -810,7 +810,8 @@ class age_results(Analyzer):
                             else:
                                 inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr])).nonzero()[-1]
                         self.results[rkey][date] += bin_ages(inds, bins)  # Bin the people
-
+                        if sim.t == 280:
+                            print(f'inds that got cancer on {sim.t} are {inds} in analyzer')
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
                             inds = ((ppl[rdict.date_attr][g, :] == sim.t) * (ppl[rdict.attr][g, :])).nonzero()[-1]
@@ -876,8 +877,9 @@ class age_results(Analyzer):
                 self.mismatch += self.compute_mismatch(rkey)
 
         # Add to sim.fit
-        if hasattr(sim,'fit'): sim.fit += self.mismatch
-        else: sim.fit = self.mismatch
+        sim.fit = self.mismatch
+        # if hasattr(sim,'fit'): sim.fit += self.mismatch
+        # else: sim.fit = self.mismatch
 
         return
 
