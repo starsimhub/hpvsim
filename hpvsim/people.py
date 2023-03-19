@@ -340,11 +340,11 @@ class People(hpb.BasePeople):
         # happens, if severity is already above the threshold.
         dur_episomal_transformed = dur_episomal[is_transform] # Duration of episomal infection for those who transform
         self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal_transformed/dt)
-        time_to_carcinoma = hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn'])
+        time_to_cancer = hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn'])
 
         # Calculate duration of transformed infection. The minimum ensures that anyone who
         # transforms after they've already exceeded the severity cutoff goes straight to cancer
-        self.dur_transformed[g, transform_inds] = np.minimum(time_to_carcinoma - dur_episomal_transformed, 0)
+        self.dur_transformed[g, transform_inds] = np.minimum(time_to_cancer - dur_episomal_transformed, 0)
         self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + sc.randround(self.dur_transformed[g, transform_inds]/dt)
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + self.dur_transformed[g, transform_inds]
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
