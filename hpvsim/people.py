@@ -323,22 +323,30 @@ class People(hpb.BasePeople):
         self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
         self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
 
-        # Now handle women who transform - need to adjust their length of infection and set more dates
+        # Determine who goes to cancer
         is_transform = hpu.binomial_arr(transform_prob_arr)
         transform_inds = inds[is_transform]
         no_cancer_inds = inds[~is_transform]  # Indices of those who eventually heal lesion/clear infection
+
+        # Set date of clearance for those who don't go to cancer
         time_to_clear = dur_episomal[~is_transform]
         self.date_clearance[g, no_cancer_inds] = np.fmax(self.date_clearance[g, no_cancer_inds],
                                                          self.date_exposed[g, no_cancer_inds] +
                                                          sc.randround(time_to_clear / dt))
 
-        dur_episomal_transformed = sc.randround(dur_episomal[is_transform]/dt) # Duration of episomal infection for those who transform
-        self.date_transformed[g, transform_inds] = self.t + dur_episomal_transformed
-        time_to_carcinoma = sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn']) / dt)
-        self.date_cancerous[g, transform_inds] = self.t + np.fmax(dur_episomal_transformed, time_to_carcinoma)
-        self.dur_transformed[g, transform_inds] = (self.date_cancerous[g, transform_inds] - self.date_cin3[g, transform_inds])*dt
-        self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + self.dur_transformed[g, transform_inds]
+        # Set dates for those who go to cancer. Transformation is assumed to occur at
+        # the end of episomal infection, while cancer is assumed to begin once severity
+        # exceeds the CIN3 cutoff, which may mean that it begins as soon as transformation
+        # happens, if severity is already above the threshold.
+        dur_episomal_transformed = dur_episomal[is_transform] # Duration of episomal infection for those who transform
+        self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal_transformed/dt)
+        time_to_cancer = hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn'])
 
+        # Calculate duration of transformed infection. The minimum ensures that anyone who
+        # transforms after they've already exceeded the severity cutoff goes straight to cancer
+        self.dur_transformed[g, transform_inds] = np.maximum(time_to_cancer - dur_episomal_transformed, 0)
+        self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + sc.randround(self.dur_transformed[g, transform_inds]/dt)
+        self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + self.dur_transformed[g, transform_inds]
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
         self.date_dead_cancer[transform_inds] = self.date_cancerous[g, transform_inds] + sc.randround(dur_cancer / dt)
         self.dur_cancer[g, transform_inds] = dur_cancer
