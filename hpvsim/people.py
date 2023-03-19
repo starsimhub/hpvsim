@@ -554,37 +554,48 @@ class People(hpb.BasePeople):
         '''
         Check for HPV clearance.
         '''
-        filter_inds = self.true_by_genotype('infectious', genotype)
-        inds = self.check_inds_true(self.infectious[genotype,:], self.date_clearance[genotype,:], filter_inds=filter_inds)
+        f_filter_inds = (self.is_female_alive & self.infectious[genotype,:]).nonzero()[-1]
+        m_filter_inds = (self.is_male_alive   & self.infectious[genotype,:]).nonzero()[-1]
+        f_inds = self.check_inds_true(self.infectious[genotype,:], self.date_clearance[genotype,:], filter_inds=f_filter_inds)
+        m_inds = self.check_inds_true(self.infectious[genotype,:], self.date_clearance[genotype,:], filter_inds=m_filter_inds)
+        m_cleared_inds = m_inds # All males clear
 
-        # Determine who clears and who controls
-        latent_probs = np.full(len(inds), self.pars['hpv_control_prob'], dtype=hpd.default_float)
-        latent_bools = hpu.binomial_arr(latent_probs)
+        # For females, determine who clears and who controls
+        if self.pars['hpv_control_prob']>0:
+            latent_probs = np.full(len(f_inds), self.pars['hpv_control_prob'], dtype=hpd.default_float)
+            latent_bools = hpu.binomial_arr(latent_probs)
+            latent_inds = f_inds[latent_bools]
 
-        latent_inds = inds[latent_bools]
-        cleared_inds = inds[~latent_bools]
+            if len(latent_inds):
+                self.susceptible[genotype, latent_inds] = False  # should already be false
+                self.infectious[genotype, latent_inds] = False
+                self.inactive[genotype, latent_inds] = True
+                self.date_clearance[genotype, latent_inds] = np.nan
+
+            f_cleared_inds = f_inds[~latent_bools]
+
+        else:
+            f_cleared_inds = f_inds
+
+        cleared_inds = np.array(m_cleared_inds.tolist()+f_cleared_inds.tolist())
 
         # Now reset disease states
         if len(cleared_inds):
             self.susceptible[genotype, cleared_inds] = True
             self.infectious[genotype, cleared_inds] = False
             self.inactive[genotype, cleared_inds] = False # should already be false
-            female_cleared_inds = np.intersect1d(cleared_inds, self.f_inds) # Only give natural immunity to females
-            hpimm.update_peak_immunity(self, female_cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
 
-        if len(latent_inds):
-            self.susceptible[genotype, latent_inds] = False # should already be false
-            self.infectious[genotype, latent_inds] = False
-            self.inactive[genotype, latent_inds] = True
-            self.date_clearance[genotype, latent_inds] = np.nan
+        if len(f_cleared_inds):
+            # female_cleared_inds = np.intersect1d(cleared_inds, self.f_inds) # Only give natural immunity to females
+            hpimm.update_peak_immunity(self, f_cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
 
         # Whether infection is controlled on not, clear all cell changes and severity markeres
-        self.episomal[genotype, inds] = False
-        self.transformed[genotype, inds] = False
-        self.sev[genotype, inds] = np.nan
-        self.date_cin1[genotype, inds] = np.nan
-        self.date_cin2[genotype, inds] = np.nan
-        self.date_cin3[genotype, inds] = np.nan
+        self.episomal[genotype, f_inds] = False
+        self.transformed[genotype, f_inds] = False
+        self.sev[genotype, f_inds] = np.nan
+        self.date_cin1[genotype, f_inds] = np.nan
+        self.date_cin2[genotype, f_inds] = np.nan
+        self.date_cin3[genotype, f_inds] = np.nan
 
         return
 
@@ -692,21 +703,24 @@ class People(hpb.BasePeople):
             ages = self.age[alive_inds].astype(int) # Return ages for everyone level 0 and alive
             count_ages = np.bincount(ages, minlength=age_dist_data.shape[0]) # Bin and count them
             expected = age_dist_data['PopTotal'].values*scale # Compute how many of each age we would expect in population
-            difference = np.array([int(i) for i in (expected - count_ages)]) # Compute difference between expected and simulated for each age
+            difference = (expected-count_ages).astype(int) # Compute difference between expected and simulated for each age
             n_migrate = np.sum(difference) # Compute total migrations (in and out)
             ages_to_remove = hpu.true(difference<0) # Ages where we have too many, need to apply emigration
-            n_to_remove = [int(i) for i in difference[ages_to_remove]] # Determine number of agents to remove for each age
+            n_to_remove = difference[ages_to_remove] # Determine number of agents to remove for each age
             ages_to_add = hpu.true(difference>0) # Ages where we have too few, need to apply imigration
-            n_to_add = [int(i) for i in difference[ages_to_add]] # Determine number of agents to add for each age
+            n_to_add = difference[ages_to_add] # Determine number of agents to add for each age
             ages_to_add_list = np.repeat(ages_to_add, n_to_add)
             self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list))
 
-            for ind, diff in enumerate(n_to_remove): #TODO: is there a faster way to do this than in a for loop?
+            remove_frac = n_to_remove / n_to_remove.sum()
+            remove_probs = np.zeros_like(alive_inds)
+            for ind in range(len(n_to_remove)):
                 age = ages_to_remove[ind]
-                alive_this_age_inds = np.where(ages==age)[0]
-                inds = hpu.choose(len(alive_this_age_inds), -diff)
-                migrate_inds = alive_inds[alive_this_age_inds[inds]]
-                self.remove_people(migrate_inds, cause='emigration')  # Remove people
+                inds_this_age = hpu.true(ages==age)
+                remove_probs[inds_this_age] = remove_frac[ind]
+            migrate_inds = hpu.choose_w(remove_probs, -n_to_remove.sum())
+
+            self.remove_people(migrate_inds, cause='emigration')  # Remove people
 
         else:
             n_migrate = 0

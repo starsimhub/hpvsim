@@ -22,11 +22,9 @@ step(): 78.4%
 import sciris as sc
 import hpvsim as hpv
 from test_sim import test_sim
-from test_interventions import test_new_interventions
 
-sim0 = test_sim(do_plot=False, n_agents=50e3) # For debugging regular sim
-sim1 = test_new_interventions() # For debuggin interventions
-to_profile = 'apply_int' # Must be one of the options listed below
+sim = test_sim(do_plot=False, n_agents=50e3, do_run=False) # For debugging regular sim
+to_profile = 'update_pre' # Must be one of the options listed below
 
 func_options = {
     'initialize':    sim.initialize,
@@ -34,14 +32,15 @@ func_options = {
     'person':        hpv.Person.__init__,
     'make_people':   hpv.make_people,
     'init_people':   sim.init_people,
-
     'get_age':       hpv.data.get_age_distribution,
     'run':           sim.run,
     'step':          sim.step,
     'apply_int':     hpv.interventions.treat_num.apply,
     'update_pre':    hpv.people.People.update_states_pre,
+    'check_clearance': hpv.people.People.check_clearance,
+    'remove_people': hpv.people.People.remove_people,
     'death':         hpv.people.People.apply_death_rates,
     'infect':        hpv.people.People.infect,
 }
 
-sc.profile(run=sim1.run, follow=func_options[to_profile])
+sc.profile(run=sim.run, follow=func_options[to_profile])
