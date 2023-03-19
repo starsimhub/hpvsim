@@ -875,9 +875,8 @@ class age_results(Analyzer):
                 self.mismatch += self.compute_mismatch(rkey)
 
         # Add to sim.fit
-        sim.fit = self.mismatch
-        # if hasattr(sim,'fit'): sim.fit += self.mismatch
-        # else: sim.fit = self.mismatch
+        if hasattr(sim,'fit'): sim.fit += self.mismatch
+        else: sim.fit = self.mismatch
 
         return
 
@@ -935,29 +934,29 @@ class age_results(Analyzer):
             raw[reskey] = {}
             reduced_analyzer.results[reskey] = sc.objdict()
             reduced_analyzer.results[reskey]['bins'] = base_analyzer.results[reskey]['bins']
-            for date,tp in zip(base_analyzer.result_args[reskey].dates, base_analyzer.result_args[reskey].timepoints):
-                ashape = analyzer.results[reskey][date].shape # Figure out dimensions
+            for year,tp in zip(base_analyzer.result_args[reskey].years, base_analyzer.result_args[reskey].timepoints):
+                ashape = analyzer.results[reskey][year].shape # Figure out dimensions
                 new_ashape = ashape + (len(analyzers),)
-                raw[reskey][date] = np.zeros(new_ashape)
+                raw[reskey][year] = np.zeros(new_ashape)
                 for a, analyzer in enumerate(analyzers):
-                    vals = analyzer.results[reskey][date]
+                    vals = analyzer.results[reskey][year]
                     if len(ashape) == 1:
-                        raw[reskey][date][:, a] = vals
+                        raw[reskey][year][:, a] = vals
                     elif len(ashape) == 2:
-                        raw[reskey][date][:, :, a] = vals
+                        raw[reskey][year][:, :, a] = vals
 
                 # Summarizing the aggregated list
-                reduced_analyzer.results[reskey][date] = sc.objdict()
+                reduced_analyzer.results[reskey][year] = sc.objdict()
                 if use_mean:
-                    r_mean = np.mean(raw[reskey][date], axis=-1)
-                    r_std = np.std(raw[reskey][date], axis=-1)
-                    reduced_analyzer.results[reskey][date].best = r_mean
-                    reduced_analyzer.results[reskey][date].low  = r_mean - bounds * r_std
-                    reduced_analyzer.results[reskey][date].high = r_mean + bounds * r_std
+                    r_mean = np.mean(raw[reskey][year], axis=-1)
+                    r_std = np.std(raw[reskey][year], axis=-1)
+                    reduced_analyzer.results[reskey][year].best = r_mean
+                    reduced_analyzer.results[reskey][year].low  = r_mean - bounds * r_std
+                    reduced_analyzer.results[reskey][year].high = r_mean + bounds * r_std
                 else:
-                    reduced_analyzer.results[reskey][date].best = np.quantile(raw[reskey][date], q=0.5, axis=-1)
-                    reduced_analyzer.results[reskey][date].low  = np.quantile(raw[reskey][date], q=quantiles['low'], axis=-1)
-                    reduced_analyzer.results[reskey][date].high = np.quantile(raw[reskey][date], q=quantiles['high'], axis=-1)
+                    reduced_analyzer.results[reskey][year].best = np.quantile(raw[reskey][year], q=0.5, axis=-1)
+                    reduced_analyzer.results[reskey][year].low  = np.quantile(raw[reskey][year], q=quantiles['low'], axis=-1)
+                    reduced_analyzer.results[reskey][year].high = np.quantile(raw[reskey][year], q=quantiles['high'], axis=-1)
 
         return reduced_analyzer
 
