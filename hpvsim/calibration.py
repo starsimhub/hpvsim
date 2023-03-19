@@ -75,7 +75,7 @@ class Calibration(sc.prettyobj):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_results=None,
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_result_keys=None,
                  par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
 
@@ -97,7 +97,7 @@ class Calibration(sc.prettyobj):
         self.calib_pars     = calib_pars
         self.genotype_pars  = genotype_pars
         self.hiv_pars       = hiv_pars
-        self.extra_sim_results = extra_sim_results
+        self.extra_sim_result_keys = extra_sim_result_keys
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
         self.die            = die
@@ -110,16 +110,7 @@ class Calibration(sc.prettyobj):
             self.target_data.append(hpm.load_data(datafile))
 
         sim_results = sc.objdict()
-
         age_result_args = sc.objdict()
-        extra_sim_results = sc.objdict()
-
-        if self.extra_sim_results:
-            for extra_result in self.extra_sim_results:
-                extra_sim_results[extra_result] = sc.objdict()
-            self.extra_sim_results_keys = extra_sim_results.keys()
-        else:
-            self.extra_sim_results_keys = None
 
         # Go through each of the target keys and determine how we are going to get the results from sim
         for targ in self.target_data:
@@ -160,8 +151,8 @@ class Calibration(sc.prettyobj):
                 self.result_args[rkey].name = self.sim.results[rkey].name
                 self.result_args[rkey].color = self.sim.results[rkey].color
 
-        if self.extra_sim_results:
-            for rkey in self.extra_sim_results_keys:
+        if self.extra_sim_result_keys:
+            for rkey in self.extra_sim_result_keys:
                 self.result_args[rkey] = sc.objdict()
                 self.result_args[rkey].name = self.sim.results[rkey].name
                 self.result_args[rkey].color = self.sim.results[rkey].color
@@ -456,8 +447,8 @@ class Calibration(sc.prettyobj):
             sim_results[rkey] = model_output
 
         extra_sim_results = sc.objdict()
-        if self.extra_sim_results:
-            for rkey in self.extra_sim_results_keys:
+        if self.extra_sim_result_keys:
+            for rkey in self.extra_sim_result_keys:
                 model_output = sim.results[rkey]
                 extra_sim_results[rkey] = model_output
 
@@ -568,6 +559,7 @@ class Calibration(sc.prettyobj):
         # Replace with something else, this is fragile
         self.analyzer_results = []
         self.sim_results = []
+        self.extra_sim_results = []
         if load:
             print('Loading saved results...')
             for trial in study.trials:
