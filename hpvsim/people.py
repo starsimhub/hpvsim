@@ -344,7 +344,7 @@ class People(hpb.BasePeople):
 
         # Calculate duration of transformed infection. The minimum ensures that anyone who
         # transforms after they've already exceeded the severity cutoff goes straight to cancer
-        self.dur_transformed[g, transform_inds] = np.minimum(time_to_cancer - dur_episomal_transformed, 0)
+        self.dur_transformed[g, transform_inds] = np.maximum(time_to_cancer - dur_episomal_transformed, 0)
         self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + sc.randround(self.dur_transformed[g, transform_inds]/dt)
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + self.dur_transformed[g, transform_inds]
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
