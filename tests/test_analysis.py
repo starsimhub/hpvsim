@@ -135,7 +135,7 @@ def test_reduce_analyzers():
             edges=np.linspace(0, 100, 21))
 
         az = hpv.age_results(
-            result_keys=sc.objdict(
+            result_args=sc.objdict(
                 cancer_incidence=sc.objdict(
                     years=2020,
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
