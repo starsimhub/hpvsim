@@ -458,9 +458,6 @@ class Calibration(sc.prettyobj):
             filename = self.tmp_filename % trial.number
             sc.save(filename, results)
 
-            # Temporarily store the whole sim
-            # sc.save(f'sim{trial.number}.obj', sim)
-
         return sim.fit
 
 
