@@ -18,7 +18,7 @@ def test_calibration():
 
     sc.heading('Testing calibration')
 
-    pars = dict(n_agents=n_agents, start=1950, end=2020, dt=0.25, location='south africa')
+    pars = dict(n_agents=n_agents, start=1980, end=2020, dt=0.25, location='south africa')
     # pars['age_bins']  = np.array([ 0., 20., 25., 30., 40., 45., 50., 55., 65., 100])
     # pars['standard_pop']    = np.array([pars['age_bins'],
     #                              [.4, .08, .08, .12, .06, .06, .05, .07, .08, 0]])
