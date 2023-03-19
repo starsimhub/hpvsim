@@ -92,28 +92,7 @@ def test_calibration(do_plot=True):
         fig.show()
 
     # In addition to the plots, assert that they must be equal
-    assert np.allclose(calib_cancer_results,sim_cancer_results) # THESE SHOULD BE THE SAME -- WHY AREN'T THEY??
-
-    # # Additional tests added fro debugging, to be removed before merge
-    # # # Loading the sim saved during calibration and check that the results there are the same
-    # # calib_sim = sc.load(f'sim{best_run}.obj')
-    # # calib_sim_cancer_results = calib_sim.results['cancers_by_age'][:, yind]
-    # # assert np.allclose(calib_cancer_results, calib_sim_cancer_results) # THIS WORKS
-    #
-    # # # Now copy the pars from the saved sim into a new one and rerun it
-    # # calib_sim_pars = calib_sim.pars
-    # # calib_sim_pars['analyzers'] = []
-    # # rerun_sim = hpv.Sim(pars=calib_sim_pars, analyzers=[hpv.snapshot(timepoints=['1980'])])
-    # # rerun_sim.run()
-    # # rerun_sim_cancer_results = rerun_sim.results['cancers_by_age'][:, yind]
-    # # assert np.allclose(rerun_sim_cancer_results, sim_cancer_results)  # THIS WORKS
-    # # assert np.allclose(calib_sim_cancer_results, rerun_sim_cancer_results)  # THIS WORKS
-    #
-    # # # Compare people
-    # # pplsim = sim.get_analyzer('snapshot').snapshots['1980.0']
-    # # # pplrerun_sim = rerun_sim.get_analyzer('snapshot').snapshots['1980.0']
-    # # pplcalib_sim = calib_sim.get_analyzer('snapshot').snapshots['1980.0']
-    # # assert len(pplsim)==len(pplcalib_sim)
+    assert np.allclose(calib_cancer_results,sim_cancer_results)
 
     return sim, calib
 
