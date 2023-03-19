@@ -932,7 +932,7 @@ class age_results(Analyzer):
         raw = {}
         for reskey in base_analyzer.results.keys():
             raw[reskey] = {}
-            reduced_analyzer.results[reskey] = sc.objdict()
+            reduced_analyzer.results[reskey] = dict()
             reduced_analyzer.results[reskey]['bins'] = base_analyzer.results[reskey]['bins']
             for year,tp in zip(base_analyzer.result_args[reskey].years, base_analyzer.result_args[reskey].timepoints):
                 ashape = analyzer.results[reskey][year].shape # Figure out dimensions
