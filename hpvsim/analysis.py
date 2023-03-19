@@ -992,12 +992,12 @@ class age_results(Analyzer):
             errormsg = 'Cannot plot since no age results were recorded)'
             raise ValueError(errormsg)
         else:
-            dates_per_result = [len(rk['dates']) for rk in self.result_args.values()]
-            n_plots = sum(dates_per_result)
+            years_per_result = [len(rk['years']) for rk in self.result_args.values()]
+            n_plots = sum(years_per_result)
             to_plot_args = []
             for rkey in self.result_keys:
-                for date in self.result_args[rkey]['dates']:
-                    to_plot_args.append([rkey,date])
+                for year in self.result_args[rkey]['years']:
+                    to_plot_args.append([rkey,year])
         return n_plots, to_plot_args
 
 
@@ -1043,7 +1043,7 @@ class age_results(Analyzer):
 
         # Labels and legends
         ax.set_xlabel('Age')
-        ax.set_title(resargs.name+' - '+date.split('.')[0])
+        ax.set_title(f'{resargs.name} - {date}')
         ax.legend()
         pl.xticks(x, resargs.age_labels)
 
@@ -1083,9 +1083,9 @@ class age_results(Analyzer):
             for rkey,resdict in self.results.items():
                 pl.subplots_adjust(**axis_args)
                 by_genotype=True if 'genotype' in rkey else False
-                for date in self.result_args[rkey]['dates']:
+                for year in self.result_args[rkey]['years']:
                     ax = pl.subplot(n_rows, n_cols, plot_count)
-                    ax = self.plot_single(ax, rkey, date, by_genotype, plot_args=plot_args, scatter_args=scatter_args)
+                    ax = self.plot_single(ax, rkey, year, by_genotype, plot_args=plot_args, scatter_args=scatter_args)
                     plot_count+=1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)

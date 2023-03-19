@@ -103,6 +103,7 @@ def test_age_results(do_plot=True, test_what=''):
     sim = hpv.Sim(pars, genotypes=[16, 18], analyzers=[az1])
     sim.run()
     a = sim.get_analyzer('age_results')
+    a.plot()
 
     # Assert equal results
     year = 2019
