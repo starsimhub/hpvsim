@@ -522,8 +522,6 @@ class age_results(Analyzer):
 
     **Example**::
 
-        # Construct your own result_args if you want different timepoints / age buckets for each one
-
         result_args=sc.objdict(
             hpv_prevalence=sc.objdict(
                 timepoints=[1990],
@@ -537,20 +535,13 @@ class age_results(Analyzer):
         sim.run()
         age_results = sim['analyzers'][0]
 
-        # Alternatively, use standard timepoints and age buckets across all results
-
-        sim = hpv.Sim(analyzers=hpv.age_results(result_keys=['cancers']))
-
     '''
 
-    def __init__(self, result_keys=None, die=False, edges=None, years=None, result_args=None, **kwargs):
+    def __init__(self, die=False, result_args=None, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
-        self.mismatch       = 0
+        self.mismatch       = 0 # TODO, should this be set to np.nan initially?
         self.die            = die  # Whether or not to raise an exception
         self.start          = None # Store the start year of the simulation
-        self.edges          = edges or np.array([0., 15., 20., 25., 30., 35., 40., 45., 50., 55., 60., 65., 70., 75., 80., 85., 100.])
-        self.years          = years
-        self.result_keys    = result_keys or ['infections', 'cancers']
         self.results        = sc.objdict() # Store the age results
         self.result_args    = result_args
         return
@@ -564,26 +555,13 @@ class age_results(Analyzer):
         self.start = sim['start']  # Store the simulation start
         self.end = sim['end']  # Store simulation end
 
-        # Make defaults
-        if self.years is None:
-            self.years = sim["end"]
-        self.years = sc.promotetoarray(self.years)
-        self.timepoints = []
-        for y in self.years:
-            self.timepoints.append(sc.findinds(sim.yearvec,y) + int(1 / sim['dt']) - 1)
-
         # Handle which results to make. Specification of the results to make is stored in result_args
-        if self.result_args is None: # Make defaults if none are provided
-            self.result_args = sc.objdict()
-            for rkey in self.result_keys:
-                self.result_args[rkey] = sc.objdict(years=self.years, edges=self.edges)
-
-        elif sc.checktype(self.result_args, dict): # Ensure it's an object dict
+        if sc.checktype(self.result_args, dict): # Ensure it's an object dict
             self.result_args = sc.objdict(self.result_args)
-
         else: # Raise an error
-            errormsg = f'result_args must be a dict with keys for the timepoints and edges you want to compute, not {type(self.result_args)}.'
+            errormsg = f'result_args must be a dict with keys for the years and edges you want to compute, not {type(self.result_args)}.'
             raise TypeError(errormsg)
+        self.result_keys = self.result_args.keys()
 
         # Handle dt - if we're storing annual results we'll need to aggregate them over several consecutive timesteps
         self.dt = sim['dt']
