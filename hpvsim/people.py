@@ -179,15 +179,14 @@ class People(hpb.BasePeople):
             self.update_severity(g) # update severity values
             self.check_transformation(g)  # check for new transformations
 
-            if t % update_freq == 0:
-                for key in ['cin1s','cin2s','cin3s','cancers']:  # update flows
-                    cases_by_age, cases = self.check_progress(key, g)
-                    self.flows[key] += cases  # Increment flows (summed over all genotypes)
-                    self.genotype_flows[key][g] = cases # Store flows by genotype
-                    self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
-                self.flows['cins'] += self.flows['cin1s']+self.flows['cin2s']+self.flows['cin3s']
-                self.genotype_flows['cins'][g] = self.genotype_flows['cin1s'][g]+self.genotype_flows['cin2s'][g]+self.genotype_flows['cin3s'][g]
-                self.age_flows['cins'] += self.age_flows['cin1s']+self.age_flows['cin2s']+self.age_flows['cin3s']
+            for key in ['cin1s','cin2s','cin3s','cancers']:  # update flows
+                cases_by_age, cases = self.check_progress(key, g)
+                self.flows[key] += cases  # Increment flows (summed over all genotypes)
+                self.genotype_flows[key][g] = cases # Store flows by genotype
+                self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
+            self.flows['cins'] += self.flows['cin1s']+self.flows['cin2s']+self.flows['cin3s']
+            self.genotype_flows['cins'][g] = self.genotype_flows['cin1s'][g]+self.genotype_flows['cin2s'][g]+self.genotype_flows['cin3s'][g]
+            self.age_flows['cins'] += self.age_flows['cin1s']+self.age_flows['cin2s']+self.age_flows['cin3s']
 
         # Perform updates that are not genotype specific
         deaths_by_age, deaths = self.check_cancer_deaths()
