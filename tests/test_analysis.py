@@ -136,11 +136,11 @@ def test_reduce_analyzers():
         az = hpv.age_results(
             result_keys=sc.objdict(
                 cancer_incidence=sc.objdict(
-                    timepoints=['2020'],
+                    years=2020,
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 ),
                 cancer_mortality=sc.objdict(
-                    timepoints=['2020'],
+                    years=2020,
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 )
             )
@@ -232,7 +232,7 @@ if __name__ == '__main__':
 
     people      = test_snapshot()
     sim0, a0    = test_age_pyramids()
-    sim1, a1        = test_age_results()
+    sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()
     sim3, a3    = test_age_causal_analyzer()
     sim4, a4    = test_detection()
