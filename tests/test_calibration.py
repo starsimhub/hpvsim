@@ -125,6 +125,5 @@ if __name__ == '__main__':
 
     sim, calib = test_calibration()
 
-
     sc.toc(T)
     print('Done.')
