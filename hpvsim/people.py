@@ -332,9 +332,10 @@ class People(hpb.BasePeople):
                                                          self.date_exposed[g, no_cancer_inds] +
                                                          sc.randround(time_to_clear / dt))
 
-        dur_episomal_transformed = sc.randround(dur_episomal[is_transform]/dt)
+        dur_episomal_transformed = sc.randround(dur_episomal[is_transform]/dt) # Duration of episomal infection for those who transform
         self.date_transformed[g, transform_inds] = self.t + dur_episomal_transformed
-        self.date_cancerous[g, transform_inds] = self.t + np.fmax(dur_episomal_transformed, sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn']) / dt))
+        time_to_carcinoma = sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn']) / dt)
+        self.date_cancerous[g, transform_inds] = self.t + np.fmax(dur_episomal_transformed, time_to_carcinoma)
         self.dur_transformed[g, transform_inds] = (self.date_cancerous[g, transform_inds] - self.date_cin3[g, transform_inds])*dt
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + self.dur_transformed[g, transform_inds]
 
