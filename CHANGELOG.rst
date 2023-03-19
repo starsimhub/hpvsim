@@ -10,6 +10,14 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 Version 1.2.0 (2023-03-16)
 ---------------------------
+- Changes to improve run speed, most notably changes to how migration is applied
+- Additional tests to ensure consistency between calibration results, age analyzer results, and sim results
+- Updates to natural history to prevent people progressing too quickly to cancer
+- *Github info* PR `550 <https://github.com/amath-idm/hpvsim/pull/550>`__
+
+
+Version 1.2.0 (2023-03-16)
+---------------------------
 - Updates to natural history to prevent people progressing too quickly to cancer
 - *Github info* PR `550 <https://github.com/amath-idm/hpvsim/pull/550>`__
 
