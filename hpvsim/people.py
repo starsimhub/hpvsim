@@ -332,8 +332,9 @@ class People(hpb.BasePeople):
                                                          self.date_exposed[g, no_cancer_inds] +
                                                          sc.randround(time_to_clear / dt))
 
-        self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal[is_transform] / dt)
-        self.date_cancerous[g, transform_inds] = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn']) / dt)
+        dur_episomal_transformed = sc.randround(dur_episomal[is_transform]/dt)
+        self.date_transformed[g, transform_inds] = self.t + dur_episomal_transformed
+        self.date_cancerous[g, transform_inds] = self.t + np.fmax(dur_episomal_transformed, sc.randround(hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn']) / dt))
         self.dur_transformed[g, transform_inds] = (self.date_cancerous[g, transform_inds] - self.date_cin3[g, transform_inds])*dt
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + self.dur_transformed[g, transform_inds]
 
@@ -532,9 +533,6 @@ class People(hpb.BasePeople):
         # Age results
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
 
-        if self.t == 280:
-            print(f'inds that got cancer from genotype {genotype} on {self.t} are {inds} in sim')
-            print(f'Dates of cancer should have been {self.date_cancerous[genotype,inds]} on {self.t}')
 
         return cases_by_age, self.scale_flows(inds)
 
