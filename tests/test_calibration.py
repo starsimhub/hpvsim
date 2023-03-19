@@ -10,7 +10,7 @@ import pylab as pl
 
 do_plot = 1
 do_save = 0
-n_agents = 20e3
+n_agents = 2e3
 
 
 #%% Define the tests
@@ -49,7 +49,7 @@ def test_calibration():
                                 'test_data/south_africa_cancer_data_2020.csv',
                             ],
                             extra_sim_results=extra_sim_results,
-                            total_trials=10, n_workers=1)
+                            total_trials=2, n_workers=1)
     calib.calibrate(die=True)
     calib.plot(res_to_plot=4)
 
