@@ -711,8 +711,8 @@ class People(hpb.BasePeople):
             data_pop0 = np.interp(sim_start, data_years, data_pop)
             scale = sim_pop0 / data_pop0 # Scale factor
             alive_inds = hpu.true(self.alive_level0)
-            ages = self.age[alive_inds].astype(int) # Return ages for everyone level 0 and alive
-            count_ages = np.bincount(ages, minlength=age_dist_data.shape[0]) # Bin and count them
+            alive_ages = self.age[alive_inds].astype(int) # Return ages for everyone level 0 and alive
+            count_ages = np.bincount(alive_ages, minlength=age_dist_data.shape[0]) # Bin and count them
             expected = age_dist_data['PopTotal'].values*scale # Compute how many of each age we would expect in population
             difference = (expected-count_ages).astype(int) # Compute difference between expected and simulated for each age
             n_migrate = np.sum(difference) # Compute total migrations (in and out)
@@ -723,14 +723,14 @@ class People(hpb.BasePeople):
             ages_to_add_list = np.repeat(ages_to_add, n_to_add)
             self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list))
 
-            remove_frac = n_to_remove / n_to_remove.sum()
-            remove_probs = np.zeros_like(alive_inds)
-            for ind in range(len(n_to_remove)):
+            # Remove people
+            remove_frac = n_to_remove / count_ages[ages_to_remove]
+            remove_probs = np.zeros(len(self))
+            for ind,rf in enumerate(remove_frac):
                 age = ages_to_remove[ind]
-                inds_this_age = hpu.true(ages==age)
-                remove_probs[inds_this_age] = remove_frac[ind]
+                inds_this_age = hpu.true((self.age>=age) * (self.age<age+1) * self.alive_level0)
+                remove_probs[inds_this_age] = -rf
             migrate_inds = hpu.choose_w(remove_probs, -n_to_remove.sum())
-
             self.remove_people(migrate_inds, cause='emigration')  # Remove people
 
         else:

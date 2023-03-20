@@ -15,7 +15,6 @@ Version 1.2.0 (2023-03-19)
 - Updates to natural history to prevent people progressing too quickly to cancer
 - *Github info* PR `550 <https://github.com/amath-idm/hpvsim/pull/550>`__
 
-
 Version 1.1.4 (2023-03-15)
 ---------------------------
 - Fixes bug that caused location data to be loaded twice
