@@ -773,7 +773,6 @@ class age_results(Analyzer):
                 date_ind = sc.findinds(rdict.calcpoints, sim.t)[0]  # Get the index
                 date = rdict.calcpointyears[date_ind]  # Create the date which will be used to key the results
 
-                # TODO FIX THIS
                 if 'compute_fit' in rdict.keys():
                     thisdatadf = rdict.data[(rdict.data.year == float(date)) & (rdict.data.name == rkey)]
                     unique_genotypes = thisdatadf.genotype.unique()
