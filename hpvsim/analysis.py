@@ -513,10 +513,7 @@ class age_results(Analyzer):
     Constructs results by age at specified points within the sim. Can be used with data
 
     Args:
-        result_args (dict): dict of results to generate and associated timepoints/age-bins to generate each result as well as whether to compute_fit
-        result_keys (list): list of results to generate - used to construct result_args is result_args is not provided
-        timepoints  (list): list of timepoints - used to construct result_args is result_args is not provided
-        edges       (arr): list of edges of age bins - used to construct result_args is result_args is not provided
+        result_args (dict): dict of results to generate and associated years/age-bins to generate each result as well as whether to compute_fit
         die         (bool): whether or not to raise an exception if errors are found
         kwargs      (dict): passed to :py:class:`Analyzer`
 
@@ -537,11 +534,10 @@ class age_results(Analyzer):
 
     '''
 
-    def __init__(self, die=False, result_args=None, **kwargs):
+    def __init__(self, result_args=None, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         self.mismatch       = 0 # TODO, should this be set to np.nan initially?
         self.die            = die  # Whether or not to raise an exception
-        self.start          = None # Store the start year of the simulation
         self.results        = sc.objdict() # Store the age results
         self.result_args    = result_args
         return
@@ -550,10 +546,6 @@ class age_results(Analyzer):
     def initialize(self, sim):
 
         super().initialize()
-
-        # Handle timepoints and dates
-        self.start = sim['start']  # Store the simulation start
-        self.end = sim['end']  # Store simulation end
 
         # Handle which results to make. Specification of the results to make is stored in result_args
         if sc.checktype(self.result_args, dict): # Ensure it's an object dict
@@ -590,7 +582,7 @@ class age_results(Analyzer):
 
     def validate_variables(self, sim):
         '''
-        Check that the variables
+        Check that the variables in result_args are valid, and initialize the result structure
         '''
         choices = sim.result_keys('total')+[k for k in sim.result_keys('genotype')]
         if sim['model_hiv']:
@@ -604,8 +596,7 @@ class age_results(Analyzer):
             else:
                 self.results[rk] = dict() # Store the results. Not an odict because keyed by year
 
-            # Handle the data file
-            # If data is provided, extract timepoints, edges, age bins and labels from that
+            # If a datafile has been provided, read it in and get the age bins and years
             if 'datafile' in rdict.keys():
                 if sc.isstring(rdict.datafile):
                     rdict.data = hpm.load_data(rdict.datafile, check_date=False)
@@ -613,38 +604,50 @@ class age_results(Analyzer):
                     rdict.data = rdict.datafile  # Use it directly
                     rdict.datafile = None
 
-                # extract edges, age bins and labels from that
-                # Handle edges, age bins, and labels
+                # Get edges, age bins, and labels from datafile. This assumes
+                # that the datafile has bins, and we make the edges by appending
+                # the last point of the sim age bin edges.
                 rdict.years = rdict.data.year.unique()
-                rdict.age_labels = []
-                rdict.edges = np.array(rdict.data.age.unique(), dtype=float)
-                rdict.edges = np.append(rdict.edges, 100)
-                rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
+                rdict.bins = np.array(rdict.data.age.unique(), dtype=float)
+                rdict.edges = np.append(rdict.edges, sim['age_bin_edges'][-1])
                 self.results[rk]['bins'] = rdict.bins
-                rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
-                                        range(len(rdict.bins) - 1)]
-                rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
 
             else:
-                # Handle edges, age bins, and labels
-                rdict.age_labels = []
+
+                # Use years and age bin edges provided, or use defaults from sim
                 if (not hasattr(rdict,'edges')) or rdict.edges is None:  # Default age bins
-                    rdict.edges = np.linspace(0, 100, 11)
+                    msg = f'Did not provide edges for age analyzer {rk}'
+                    if self.die:
+                        raise ValueError(msg)
+                    else:
+                        warnmsg += ', using age bin edges from sim'
+                        hpm.warn(warnmsg)
+                        rdict.edges = sim['age_bin_edges']
                 rdict.bins = rdict.edges[:-1]  # Don't include the last edge in the bins
                 self.results[rk]['bins'] = rdict.bins
-                rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
-                                    range(len(rdict.bins) - 1)]
-                rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
+
                 if 'years' not in rdict.keys():
-                    errormsg = 'Did not provide years for this age analyzer'
-                    raise ValueError(errormsg)
+                    msg = f'Did not provide years for age analyzer {rk}'
+                    if self.die:
+                        raise ValueError(msg)
+                    else:
+                        warnmsg += ', using final year of sim'
+                        hpm.warn(warnmsg)
+                        rdict.years = sim['end']
                 rdict.years = sc.promotetoarray(rdict.years)
 
+            # Construct age labels used for plotting
+            rdict.age_labels = [f'{int(rdict.bins[i])}-{int(rdict.bins[i + 1])}' for i in
+                                range(len(rdict.bins) - 1)]
+            rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
+
+            # Construct timepoints
             if not rdict.get('timepoints') or rdict.timepoints is None:
                 rdict.timepoints = []
                 for y in rdict.years:
                     rdict.timepoints.append(sc.findinds(sim.yearvec, y)[0] + int(1 / sim['dt']) - 1)
 
+            # Check that the requested timepoints are in the sim
             max_hist_time = rdict.timepoints[-1]
             max_sim_time = sim.tvec[-1]
             if max_hist_time > max_sim_time:

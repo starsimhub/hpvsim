@@ -70,9 +70,9 @@ def test_age_results(do_plot=True, test_what=''):
     pars['beta'] = .5
 
     # Use the same age bins for the sim as for the age result analyzer, for comparaibility
-    age_bins = np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
-    pars['age_bins']  = age_bins
-    pars['standard_pop']    = np.array([age_bins, [.31, .09, .08, .08, .12, .06, .06, .05, .08, .07,  0]])
+    age_bin_edges = np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
+    pars['age_bin_edges']  = age_bin_edges
+    pars['standard_pop']    = np.array([age_bin_edges, [.31, .09, .08, .08, .12, .06, .06, .05, .08, .07,  0]])
 
     pars['init_hpv_prev'] = {
         'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
@@ -83,19 +83,19 @@ def test_age_results(do_plot=True, test_what=''):
         result_args=sc.objdict(
             hpv_prevalence=sc.objdict(
                 years=2019,
-                edges=age_bins,
+                edges=age_bin_edges,
             ),
             infections=sc.objdict(
                 years=2019,
-                edges=age_bins,
+                edges=age_bin_edges,
             ),
             cancer_incidence=sc.objdict(
                 years=2019,
-                edges=age_bins,
+                edges=age_bin_edges,
             ),
             cancers=sc.objdict(
                 years=2019,
-                edges=age_bins,
+                edges=age_bin_edges,
             )
         )
     )

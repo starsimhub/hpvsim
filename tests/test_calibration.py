@@ -22,7 +22,7 @@ def test_calibration(do_plot=True):
     pars['init_hpv_prev'] = 0.6 # Set high init_prev to generate more cancers
 
     # Change the sim age bins so they're the same as the analyzer age bins
-    pars['age_bins']  = np.array([ 0., 20., 30., 40., 50., 60., 70., 80., 100])
+    pars['age_bin_edges']  = np.array([ 0., 20., 30., 40., 50., 60., 70., 80., 100])
     pars['standard_pop']    = np.array([pars['age_bins'], [.4, .16, .12, .12, .09, .07, .03, .01, 0]])
 
     # Save a snapshot so we can compare people later if needed

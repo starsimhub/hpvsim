@@ -59,7 +59,7 @@ class People(hpb.BasePeople):
         self.pop_age_trend = pop_age_trend
         self.init_contacts() # Initialize the contacts
         self.ng = self.pars['n_genotypes']
-        self.na = len(self.pars['age_bins'])-1
+        self.na = len(self.pars['age_bin_edges'])-1
 
         self.lag_bins = np.linspace(0,50,51)
         self.rship_lags = dict()
@@ -67,7 +67,7 @@ class People(hpb.BasePeople):
             self.rship_lags[lkey] = np.zeros(len(self.lag_bins)-1, dtype=hpd.default_float)
 
         # Store age bins
-        self.age_bins = self.pars['age_bins'] # Age bins for age results
+        self.age_bin_edges = self.pars['age_bin_edges'] # Age bins for age results
 
         if strict:
             self.lock() # If strict is true, stop further keys from being set (does not affect attributes)
@@ -479,7 +479,7 @@ class People(hpb.BasePeople):
         inds = self.check_inds(self.cin1[genotype,:], self.date_cin1[genotype,:], filter_inds=filter_inds)
         self.cin1[genotype, inds] = True
         # Age calculations
-        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
         return cases_by_age, self.scale_flows(inds)
 
 
@@ -490,7 +490,7 @@ class People(hpb.BasePeople):
         self.cin2[genotype, inds] = True
         self.cin1[genotype, inds] = False # No longer counted as CIN1
         # Age calculations
-        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
         return cases_by_age, self.scale_flows(inds)
 
 
@@ -501,7 +501,7 @@ class People(hpb.BasePeople):
         self.cin3[genotype, inds] = True
         self.cin2[genotype, inds] = False # No longer counted as CIN2
         # Age calculations
-        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
         return cases_by_age, self.scale_flows(inds)
 
 
@@ -540,7 +540,7 @@ class People(hpb.BasePeople):
         self.sev[:, inds] = np.nan # NOTE: setting this to nan means this people no longer counts as CIN1/2/3, since those categories are based on this value
 
         # Age results
-        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
 
 
         return cases_by_age, self.scale_flows(inds)
@@ -553,7 +553,7 @@ class People(hpb.BasePeople):
         filter_inds = self.true('cancerous')
         inds = self.check_inds(self.dead_cancer, self.date_dead_cancer, filter_inds=filter_inds)
         self.remove_people(inds, cause='cancer')
-        cases_by_age = np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+        cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
 
         # check which of these were detected by symptom or screening
         self.flows['detected_cancer_deaths'] += self.scale_flows(hpu.true(self.detected_cancer[inds]))
@@ -809,7 +809,7 @@ class People(hpb.BasePeople):
         if layer == 'reactivation':
             self.genotype_flows['reactivations'][g] += self.scale_flows(inds)
             self.flows['reactivations']             += self.scale_flows(inds)
-            self.age_flows['reactivations']         += np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+            self.age_flows['reactivations']         += np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
             self.latent[g, inds] = False # Adjust states -- no longer latent
 
         # Update states, genotype info, and flows
@@ -823,7 +823,7 @@ class People(hpb.BasePeople):
             # Create overall flows
             self.flows['infections']                += self.scale_flows(inds) # Add the total count to the total flow data
             self.genotype_flows['infections'][g]    += self.scale_flows(inds) # Add the count by genotype to the flow data
-            self.age_flows['infections'][:]         += np.histogram(self.age[inds], bins=self.age_bins, weights=self.scale[inds])[0]
+            self.age_flows['infections'][:]         += np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
 
             # Create by-sex flows
             infs_female = self.scale_flows(hpu.true(self.is_female[inds]))
