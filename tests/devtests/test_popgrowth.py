@@ -62,3 +62,4 @@ for label, mig in {'With migration': True}.items():
     pl.legend()
     sc.figlayout()
     pl.show()
+
