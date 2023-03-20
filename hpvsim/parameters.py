@@ -108,8 +108,8 @@ def make_pars(**kwargs):
     pars['stopping_func']   = None # A function to call to stop the sim partway through
 
     # Population distribution of the World Standard Population, used to calculate age-standardised rates (ASR) of incidence
-    pars['age_bins']        = np.array( [  0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75,    80,    85, 100])
-    pars['standard_pop']    = np.array([pars['age_bins'],
+    pars['age_bin_edges']        = np.array( [  0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75,    80,    85, 100])
+    pars['standard_pop']    = np.array([pars['age_bin_edges'],
                                         [.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005,   0]])
 
     # The following variables are stored within the pars dict for ease of access, but should not be directly specified.

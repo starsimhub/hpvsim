@@ -74,7 +74,7 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def initialize(self, reset=False, init_states=True, **kwargs):
+    def initialize(self, reset=False, init_states=True, init_analyzers=True, **kwargs):
         '''
         Perform all initializations on the sim.
         '''
@@ -86,7 +86,7 @@ class Sim(hpb.BaseSim):
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
         self.init_immunity() # Includes immunity matrices and cumulative dysplasia arrays
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
-        self.init_analyzers()  # ...and the analyzers...
+        if init_analyzers: self.init_analyzers()  # ...and the analyzers...
         hpu.set_seed(self['rand_seed']+1)  # Reset the random seed to the default run seed, so that if the simulation is run with reset_seed=False right after initialization, it will still produce the same output
         self.initialized   = True
         self.complete      = False
@@ -426,7 +426,7 @@ class Sim(hpb.BaseSim):
         results = sc.objdict()
 
         ng = self['n_genotypes'] # Number of genotypes
-        na = len(self['age_bins']) - 1 # Number of age bins
+        na = len(self['age_bin_edges']) - 1 # Number of age bins
 
         # Create flows
         for flow in hpd.flows:
@@ -733,7 +733,7 @@ class Sim(hpb.BaseSim):
         dt = self['dt'] # Timestep
         t = self.t
         ng = self['n_genotypes']
-        na = len(self.pars['age_bins']) - 1 # Number of age bins
+        na = len(self.pars['age_bin_edges']) - 1 # Number of age bins
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         beta = self['beta']
@@ -858,19 +858,19 @@ class Sim(hpb.BaseSim):
 
             # Number infectious/susceptible by age, for prevalence calculations
             infinds = hpu.true(people['infectious'])
-            self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bins, weights=people.scale[infinds])[0]
+            self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bin_edges, weights=people.scale[infinds])[0]
             susinds = hpu.true(people['susceptible'])
-            self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bins, weights=people.scale[susinds])[0]
+            self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bin_edges, weights=people.scale[susinds])[0]
             transformedinds = hpu.true(people['transformed'])
-            self.results[f'n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bins, weights=people.scale[transformedinds])[0]
+            self.results[f'n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bin_edges, weights=people.scale[transformedinds])[0]
             precininds = hpu.true(people['precin'])
-            self.results[f'n_precin_by_age'][:, idx] = np.histogram(people.age[precininds], bins=people.age_bins, weights=people.scale[precininds])[0]
+            self.results[f'n_precin_by_age'][:, idx] = np.histogram(people.age[precininds], bins=people.age_bin_edges, weights=people.scale[precininds])[0]
             cin1inds = hpu.true(people['cin1'])
-            self.results[f'n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bins, weights=people.scale[cin1inds])[0]
+            self.results[f'n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bin_edges, weights=people.scale[cin1inds])[0]
             cin2inds = hpu.true(people['cin2'])
-            self.results[f'n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bins, weights=people.scale[cin2inds])[0]
+            self.results[f'n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bin_edges, weights=people.scale[cin2inds])[0]
             cin3inds = hpu.true(people['cin3'])
-            self.results[f'n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bins, weights=people.scale[cin3inds])[0]
+            self.results[f'n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bin_edges, weights=people.scale[cin3inds])[0]
 
             # Create total stocks
             for key in self.people.meta.genotype_stock_keys:
@@ -908,8 +908,8 @@ class Sim(hpb.BaseSim):
             self.results['n_alive'][idx] = people.scale_flows(alive_inds)
             self.results['n_alive_by_sex'][0,idx] = people.scale_flows((people.alive*people.is_female).nonzero()[0])
             self.results['n_alive_by_sex'][1,idx] = people.scale_flows((people.alive*people.is_male).nonzero()[0])
-            self.results['n_alive_by_age'][:,idx] = np.histogram(people.age[alive_inds], bins=people.age_bins, weights=people.scale[alive_inds])[0]
-            self.results['n_females_alive_by_age'][:,idx] = np.histogram(people.age[alive_female_inds], bins=people.age_bins, weights=people.scale[alive_female_inds])[0]
+            self.results['n_alive_by_age'][:,idx] = np.histogram(people.age[alive_inds], bins=people.age_bin_edges, weights=people.scale[alive_inds])[0]
+            self.results['n_females_alive_by_age'][:,idx] = np.histogram(people.age[alive_female_inds], bins=people.age_bin_edges, weights=people.scale[alive_female_inds])[0]
 
         # Apply analyzers
         for i,analyzer in enumerate(self.analyzers):
