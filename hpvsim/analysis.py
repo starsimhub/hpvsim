@@ -609,7 +609,7 @@ class age_results(Analyzer):
                 # the last point of the sim age bin edges.
                 rdict.years = rdict.data.year.unique()
                 rdict.bins = np.array(rdict.data.age.unique(), dtype=float)
-                rdict.edges = np.append(rdict.edges, sim['age_bin_edges'][-1])
+                rdict.edges = np.append(rdict.bins, sim['age_bin_edges'][-1])
                 self.results[rk]['bins'] = rdict.bins
 
             else:
