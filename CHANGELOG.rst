@@ -8,6 +8,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.1.5 (2023-03-23)
+---------------------------
+- Adds cross-protection functionality to t-cell immunity and adds `sev_imm` attribute to people
+- *Github info* PR `564 <https://github.com/amath-idm/hpvsim/pull/564>`__
+
 Version 1.1.4 (2023-03-15)
 ---------------------------
 - Fixes bug that caused location data to be loaded twice
