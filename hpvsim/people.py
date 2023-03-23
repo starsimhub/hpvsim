@@ -206,8 +206,8 @@ class People(hpb.BasePeople):
         '''
 
         # Set length of infection, which is moderated by any prior cell-level immunity
-        cell_imm = self.cell_imm[g, inds]
-        self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-cell_imm)
+        sev_imm = self.sev_imm[g, inds]
+        self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-sev_imm)
 
         # Set infection severity and outcomes
         self.set_severity(inds, g, gpars, dt)
