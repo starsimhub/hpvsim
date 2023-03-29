@@ -1382,15 +1382,14 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with whose disease severity level does not meet the threshold for detectable cell changes
         '''
-        return (self.sev < self.pars['clinical_cutoffs']['precin']).astype(bool)
+        return (self.infectious & np.isnan(self.sev)).astype(bool)
 
     @property
     def cin1(self):
         '''
         Boolean array of everyone with whose disease severity level lies within the thresholds for CIN1-level cell changes
         '''
-        return ((self.sev >= self.pars['clinical_cutoffs']['precin']) * (
-                 self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+        return (self.sev < self.pars['clinical_cutoffs']['cin1']).astype(bool)
 
     @property
     def cin2(self):
@@ -1412,7 +1411,7 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with whose disease severity level meets the threshold for detectable cell changes
         '''
-        return (self.sev >= self.pars['clinical_cutoffs']['precin']).astype(bool)
+        return (~np.isnan(self.sev)).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''

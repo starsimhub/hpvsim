@@ -210,8 +210,22 @@ class People(hpb.BasePeople):
         self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-cell_imm)
         self.dur_infection[g, inds]  = self.dur_episomal[g, inds]
 
+        # Determine how long before precancerous cell changes
+        dur_precin = hpu.sample(**gpars['dur_precin'], size=len(inds)) # Sample from distribution
+        cin_bools = self.dur_episomal[g, inds] > dur_precin # Pull out those whose infection is long enough for precancer
+        cin_inds = inds[cin_bools]
+        nocin_inds = inds[~cin_bools]
+        self.dur_precin[g, inds] = np.minimum(self.dur_episomal[g, inds], dur_precin)
+        self.dur_cin[g, cin_inds] = self.dur_episomal[g, cin_inds] - self.dur_precin[g, cin_inds]
+
+        # Set date of clearance for those who don't develop precancer
+        self.date_clearance[g, nocin_inds] = self.t + sc.randround(self.dur_precin[g, nocin_inds]/dt)
+
+        # Set date of onset of precancer and eventual severity outcomes for those who develop precancer
+        self.date_cin1[g, cin_inds] = self.t + sc.randround(self.dur_precin[g, cin_inds]/dt)
+
         # Set infection severity and outcomes
-        self.set_severity(inds, g, gpars, dt)
+        self.set_severity(inds[cin_bools], g, gpars, dt)
 
         return
 
@@ -232,15 +246,22 @@ class People(hpb.BasePeople):
 
         # Calculate the integral of severity for each woman
         dur_episomal = self.dur_episomal[g, inds]
+        dur_cin = self.dur_cin[g, inds]
         if gpars['sev_integral']=='analytic':
-            sevs = hppar.compute_severity_integral(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
+            sevs = hppar.compute_severity_integral(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
         elif gpars['sev_integral']=='numeric':
             cumdysp = self.pars['cumdysp'][self.pars['genotype_map'][g]]
-            t = np.around(dur_episomal/dt).astype(int) # Round
+            t = np.around(dur_cin/dt).astype(int) # Round
             t[t > len(cumdysp) - 1] = len(cumdysp) - 1
-            sevs = cumdysp[t]
+            try:
+                sevs = cumdysp[t]
+            except:
+                import traceback;
+                traceback.print_exc();
+                import pdb;
+                pdb.set_trace()
         elif gpars['sev_integral'] is None:
-            sevs = hppar.compute_severity(dur_episomal, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
+            sevs = hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])
 
         # Now figure out probabilities of cellular transformations preceding cancer, based on this severity level
         transform_prob_par = gpars['transform_prob'] # Pull out the genotype-specific parameter governing the probability of transformation
@@ -263,17 +284,19 @@ class People(hpb.BasePeople):
             # Create extra disease severity values for the extra agents
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
             extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
+            extra_dur_precin = hpu.sample(**gpars['dur_precin'], size=full_size)
+            extra_dur_cin = np.maximum(extra_dur_episomal - extra_dur_precin, 0)
             extra_rel_sevs = np.ones(full_size)*self.rel_sev[inds][:,None]
 
             if gpars['sev_integral'] == 'analytic':
-                extra_sev = hppar.compute_severity_integral(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
+                extra_sev = hppar.compute_severity_integral(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
             elif gpars['sev_integral'] == 'numeric':
                 cumdysp = self.pars['cumdysp'][self.pars['genotype_map'][g]]
-                t = np.around(extra_dur_episomal/dt*extra_rel_sevs).astype(int)  # Round
+                t = np.around(extra_dur_cin/dt*extra_rel_sevs).astype(int)  # Round
                 t[t > len(cumdysp) - 1] = len(cumdysp) - 1
                 extra_sev = cumdysp[t]
             elif gpars['sev_integral'] is None:
-                extra_sev = hppar.compute_severity(extra_dur_episomal, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
+                extra_sev = hppar.compute_severity(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
 
             # Based on the extra severity values, determine additional transformation probabilities
             extra_transform_probs = hpu.transform_prob(transform_prob_par, extra_sev[:, 1:])
@@ -307,7 +330,11 @@ class People(hpb.BasePeople):
                 inds = np.append(inds, new_inds)
                 is_transform = np.append(is_transform, np.full(len(new_inds), fill_value=True))
                 new_dur_episomal = extra_dur_episomal[:,1:][extra_transform_bools]
+                new_dur_precin = extra_dur_precin[:, 1:][extra_transform_bools]
+                new_dur_cin = extra_dur_cin[:, 1:][extra_transform_bools]
                 self.dur_episomal[g, new_inds] = new_dur_episomal
+                self.dur_precin[g, new_inds] = new_dur_precin
+                self.dur_cin[g, new_inds] = new_dur_cin
                 self.dur_infection[g, new_inds] = new_dur_episomal
                 self.date_infectious[g, new_inds] = self.t
                 self.date_exposed[g, new_inds] = self.t
@@ -319,7 +346,6 @@ class People(hpb.BasePeople):
             transform_prob_arr[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
 
         # Set dates of cin1, 2, 3 for all women who get infected
-        self.date_cin1[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['precin'],    rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
         self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
         self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
 

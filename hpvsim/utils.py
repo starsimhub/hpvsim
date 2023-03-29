@@ -61,20 +61,12 @@ def find_contacts(p1, p2, inds): # pragma: no cover
     return pairing_partners
 
 
-def logf1(x, k):
+def logf1(x, k, ttc=25):
     '''
-    The concave part of a logistic function, with point of inflexion at 0,0
-    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
+    Logistic function passing through (0,0) and (ttc,1).
+    Accepts 1 parameter which determines the growth rate.
     '''
-    return (2 / (1 + np.exp(-k * x))) - 1
-
-
-def invlogf1(y, k):
-    '''
-    The inverse of the concave part of a logistic function, with point of inflexion at 0,0
-    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
-    '''
-    return (-1/k)*np.log(2/(y + 1) - 1)
+    return logf3(x, k, 0, 1, ttc=ttc)
 
 
 def get_asymptotes(k, x_infl, s, ttc=25):
@@ -115,7 +107,7 @@ def logf2(x, k, x_infl, ttc=25):
          x_infl: point of inflection, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          ttc (time to cancer): x value for which the curve passess through 1. For x values beyond this, the function returns 1
     '''
-    return logf3(x, x_infl, k, s, ttc=ttc)
+    return logf3(x, k, x_infl, s=1, ttc=ttc)
 
 
 def invlogf3(y, k, x_infl, s, ttc=25):
@@ -134,6 +126,14 @@ def invlogf2(y, k, x_infl, ttc=25):
     Inverse of logf2; see definition there for arguments
     '''
     return invlogf3(y, k, x_infl, 1, ttc=ttc)
+
+
+def invlogf1(y, k, ttc=25):
+    '''
+    The inverse of the concave part of a logistic function, with point of inflexion at 0,0
+    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
+    '''
+    return invlogf3(y, k, 0, 1, ttc=ttc)
 
 
 def indef_int_logf2(x, k, x_infl, ttc=25):
@@ -164,6 +164,20 @@ def intlogf2(upper, k, x_infl, ttc=25):
     integral[exceeding_ttc_inds] += excess_integral
 
     return integral
+
+
+def indef_int_logf1(x, k, ttc=25):
+    '''
+    Indefinite integral of logf1; see definition there for arguments
+    '''
+    return indef_int_logf2(x, k, 0, ttc=ttc)
+
+
+def intlogf1(upper, k, ttc=25):
+    '''
+    Integral of logf1 between 0 and the limit given by upper
+    '''
+    return intlogf2(x, k, 0, ttc=ttc)
 
 
 def transform_prob(tp, dysp):

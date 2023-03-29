@@ -44,54 +44,36 @@ if __name__ == '__main__':
 
     colors = sc.gridcolors(10)
     t = np.arange(0,30,0.1) # Array of years
-    x_infl = 15 # Fix point of inflection
-    ttc = 25
-    tp = 3 / 1e4
-    s = 1
-    rel_sev=1
-    rel_sev_sd = 0.15
-    k = 0.4
-    # Try different growth rates:
-    # karr = np.linspace(0.001, 1, 6)
+    rel_sev = 1
+    pars_n = {'k': 0.241455, 'x_infl': 12.0686, 's': 1, 'ttc': 6.04416}
+    pars_i = {'k': 0.279961, 'x_infl': 5.86349, 's': 1, 'ttc': 9.5469}
+    apars_n = {'form': 'logf3', 'k': 0.241455, 'x_infl': 12.0686, 's': 1, 'ttc': 6.04416}
+    apars_i = {'form': 'logf3', 'k': 0.279961, 'x_infl': 5.86349, 's': 1, 'ttc': 9.5469}
+    tp_n = 3.53262e-05
+    tp_i = 1.8846e-05
 
     n_samples = 20
 
-    ks = [0.25, 0.35, 0.45]
-    fig, axes = pl.subplots(3, len(ks), figsize=(12, 12))
+    fig, axes = pl.subplots(2, 2, figsize=(12, 12))
 
-    for ik, k in enumerate(ks):
-        rel_sevs = hpv.utils.sample(**dict(dist='normal_pos', par1=1.0, par2=rel_sev_sd),
-                                    size=n_samples)  # Distribution to draw individual level severity scale factors
-        # for ittc, ttc in enumerate([5, 10, 25]):
-        for isn, s in enumerate([0.5, 1, 1.5]):
-            ax = axes[0,ik]
-            for irs, rel_sev in enumerate(rel_sevs):
-                dysp = logf3(t * rel_sev, x_infl, k, ttc, s)
-                if irs == 0:
-                    ax.plot(t, dysp, color=colors[isn], label=f's={s}', lw=0.5)
-                else:
-                    ax.plot(t, dysp, color=colors[isn], lw=0.5)
-            ax.set_title(f'Severity, sev rate={k}')
-            ax.legend()
+    ax = axes[0,0]
+    ax.plot(t, logf3(t * rel_sev, **pars_i), color=colors[1], label=f'India', lw=2)
+    ax.plot(t, logf3(t * rel_sev, **pars_n), color=colors[2], label=f'Nigeria', lw=2)
+    ax.set_title(f'Severity')
 
-            for rel_sev in rel_sevs:
-                ax = axes[1, ik]
-                t_step = 0.25
-                t_sequence = np.arange(0, 200, t_step)
-                timesteps = t_sequence / t_step
-                cumdysp_arr = np.cumsum(logf3(t_sequence, x_infl, k, ttc, s)) * t_step
-                cum_dysp = hppar.compute_severity_integral(t / t_step, rel_sev=rel_sev, pars=dict(form='cumsum'),
-                                                           cumdysp=cumdysp_arr)
+    ax = axes[1,0]
+    cum_dysp_i = hppar.compute_severity_integral(t, rel_sev=rel_sev, pars=apars_i)
+    cum_dysp_n = hppar.compute_severity_integral(t, rel_sev=rel_sev, pars=apars_n)
+    ax.plot(t, cum_dysp_i, color=colors[1], lw=2)
+    ax.plot(t, cum_dysp_n, color=colors[2], lw=2)
+    ax.set_title(f'Cumulative severity')
 
-                ax.plot(t, cum_dysp, color=colors[isn], lw=0.5)
-                ax.set_title(f'Cumulative severity, sev rate={k}')
+    ax= axes[0,1]
+    ax.plot(t, transform_prob(tp_i, cum_dysp_i), color=colors[1])
+    ax.plot(t, transform_prob(tp_n, cum_dysp_n), color=colors[2])
+    ax.set_title(f'Probability of transformation')
 
-                ax= axes[2, ik]
-                y = transform_prob(tp, cum_dysp)
-                ax.plot(t, y, color=colors[isn])
-                ax.set_title(f'Probability of transformation, sev rate={k}')
-
-    # axes[0].legend(frameon=False)
+    axes[0,0].legend(frameon=False)
     pl.show()
 
     sc.toc(T)
