@@ -253,13 +253,7 @@ class People(hpb.BasePeople):
             cumdysp = self.pars['cumdysp'][self.pars['genotype_map'][g]]
             t = np.around(dur_cin/dt).astype(int) # Round
             t[t > len(cumdysp) - 1] = len(cumdysp) - 1
-            try:
-                sevs = cumdysp[t]
-            except:
-                import traceback;
-                traceback.print_exc();
-                import pdb;
-                pdb.set_trace()
+            sevs = cumdysp[t]
         elif gpars['sev_integral'] is None:
             sevs = hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])
 
