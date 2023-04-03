@@ -356,7 +356,7 @@ class People(hpb.BasePeople):
 
         # Set dates for those who go to cancer. Transformation is assumed to occur at
         # the end of episomal infection, while cancer is assumed to begin once severity
-        # exceeds the CIN3 cutoff, which may mean that it begins as soon as transformation
+        # exceeds the cancer cutoff, which may mean that it begins as soon as transformation
         # happens, if severity is already above the threshold.
         dur_episomal_transformed = dur_episomal[is_transform] # Duration of episomal infection for those who transform
         self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal_transformed/dt)

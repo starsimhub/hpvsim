@@ -45,6 +45,8 @@ if __name__ == '__main__':
     colors = sc.gridcolors(10)
     t = np.arange(0,30,0.1) # Array of years
     rel_sev = 1
+
+    multical_i=f'results/india_{mc_filename}_pars.obj'
     pars_n = {'k': 0.241455, 'x_infl': 12.0686, 's': 1, 'ttc': 6.04416}
     pars_i = {'k': 0.279961, 'x_infl': 5.86349, 's': 1, 'ttc': 9.5469}
     apars_n = {'form': 'logf3', 'k': 0.241455, 'x_infl': 12.0686, 's': 1, 'ttc': 6.04416}
