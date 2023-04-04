@@ -41,7 +41,7 @@ setup(
     install_requires=[
         'numpy',
         'scipy',
-        'pandas>=1.4.0', 
+        'pandas>=1.4.0,<2.0.0', 
         'sciris>=2.0.4',
         'matplotlib',
         'seaborn',
