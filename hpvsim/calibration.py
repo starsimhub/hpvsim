@@ -696,9 +696,10 @@ class Calibration(sc.prettyobj):
 
         # Initialize
         fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
-        for ax in axes.flat[n_plots:]:
-            ax.set_visible(False)
-        axes = axes.flatten()
+        if n_plots>1:
+            for ax in axes.flat[n_plots:]:
+                ax.set_visible(False)
+            axes = axes.flatten()
         pl.subplots_adjust(**axis_args)
 
         # Pull out attributes that don't vary by run
