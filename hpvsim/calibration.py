@@ -724,7 +724,10 @@ class Calibration(sc.prettyobj):
                 for date in all_dates[rn]:
 
                     # Initialize axis and data storage structures
-                    ax = axes[plot_count]
+                    if n_plots>1:
+                        ax = axes[plot_count]
+                    else:
+                        ax = axes
                     bins = []
                     genotypes = []
                     values = []
