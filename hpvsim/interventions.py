@@ -17,7 +17,7 @@ from collections import defaultdict
 
 #%% Define data files
 datafiles = sc.objdict()
-for key in ['dx', 'tx', 'vx']:
+for key in ['dx', 'tx', 'vx', 'txvx']:
     datafiles[key] = hpd.datadir / f'products_{key}.csv'
 
 
@@ -1220,7 +1220,7 @@ class campaign_txvx(BaseTxVx, CampaignDelivery):
 
     def __init__(self, product=None, prob=None, age_range=None, eligibility=None,
                  years=None, interpolate=True, annual_prob=None, **kwargs):
-        BaseScreening.__init__(self, product=product, age_range=age_range, eligibility=eligibility, **kwargs)
+        BaseTxVx.__init__(self, product=product, age_range=age_range, eligibility=eligibility, **kwargs)
         CampaignDelivery.__init__(self, prob=prob, years=years, interpolate=interpolate, annual_prob=annual_prob)
 
     def initialize(self, sim):
@@ -1318,10 +1318,14 @@ class tx(Product):
     Treatment products include anything used to treat cancer or precancer, as well as therapeutic vaccination.
     They change fundamental properties about People, including their prognoses and infectiousness.
     '''
-    def __init__(self, df, clearance=0.8, name=None):
+    def __init__(self, df, clearance=0.8, genotype_pars=None, imm_init=None, imm_boost=None):
         self.df = df
         self.clearance = clearance
         self.name = df.name.unique()[0]
+        self.genotype_pars=genotype_pars
+        self.imm_init = imm_init
+        self.imm_boost = imm_boost
+        self.imm_source = None
         self.states = df.state.unique()
         self.genotypes = df.genotype.unique()
         self.ng = len(self.genotypes)
@@ -1345,7 +1349,7 @@ class tx(Product):
         for state in self.states: # Loop over states
             for g,genotype in sim['genotype_map'].items(): # Loop over genotypes in the sim
 
-                theseinds = inds[hpu.true(people[state][g, inds])] # Extract people for whom this state is true for this genotype]
+                theseinds = inds[hpu.true(people[state][g, inds])] # Extract people for whom this state is true for this genotype
 
                 if len(theseinds):
 
@@ -1384,6 +1388,11 @@ class tx(Product):
         elif return_format=='array':
             output = tx_successful
 
+        if self.imm_init is not None:
+            people.cell_imm[self.imm_source, inds] = hpu.sample(**self.imm_init, size=len(inds))
+        elif self.imm_boost is not None:
+            people.cell_imm[self.imm_source, inds] *= self.imm_boost
+        people.t_imm_event[self.imm_source, inds] = people.t
         return output
 
 
@@ -1465,9 +1474,19 @@ def default_tx(prod_name=None):
     Create default treatment products
     '''
     dftx = pd.read_csv(datafiles.tx) # Read in dataframe with parameters
+    dftxvx = pd.read_csv(datafiles.txvx)
     txprods = dict()
     for name in dftx.name.unique():
-        txprods[name] = tx(dftx[dftx.name==name])
+        if name =='txvx1':
+            txprods[name] = tx(dftx[dftx.name==name],
+                               genotype_pars=dftxvx[dftxvx.name==name],
+                               imm_init=dict(dist='beta_mean', par1=0.35, par2=0.025))
+        elif name == 'txvx2':
+            txprods[name] = tx(dftx[dftx.name==name],
+                               genotype_pars=dftxvx[dftxvx.name==name],
+                               imm_boost=1.5)
+        else:
+            txprods[name] = tx(dftx[dftx.name == name])
     if prod_name is not None:   return txprods[prod_name]
     else:                       return txprods
 

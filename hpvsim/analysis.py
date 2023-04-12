@@ -616,9 +616,9 @@ class age_results(Analyzer):
 
                 # Use years and age bin edges provided, or use defaults from sim
                 if (not hasattr(rdict,'edges')) or rdict.edges is None:  # Default age bins
-                    msg = f'Did not provide edges for age analyzer {rk}'
+                    warnmsg = f'Did not provide edges for age analyzer {rk}'
                     if self.die:
-                        raise ValueError(msg)
+                        raise ValueError(warnmsg)
                     else:
                         warnmsg += ', using age bin edges from sim'
                         hpm.warn(warnmsg)
@@ -627,9 +627,9 @@ class age_results(Analyzer):
                 self.results[rk]['bins'] = rdict.bins
 
                 if 'years' not in rdict.keys():
-                    msg = f'Did not provide years for age analyzer {rk}'
+                    warnmsg = f'Did not provide years for age analyzer {rk}'
                     if self.die:
-                        raise ValueError(msg)
+                        raise ValueError(warnmsg)
                     else:
                         warnmsg += ', using final year of sim'
                         hpm.warn(warnmsg)
