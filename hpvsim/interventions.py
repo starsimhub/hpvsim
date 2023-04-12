@@ -1390,9 +1390,10 @@ class tx(Product):
 
         if self.imm_init is not None:
             people.cell_imm[self.imm_source, inds] = hpu.sample(**self.imm_init, size=len(inds))
+            people.t_imm_event[self.imm_source, inds] = people.t
         elif self.imm_boost is not None:
             people.cell_imm[self.imm_source, inds] *= self.imm_boost
-        people.t_imm_event[self.imm_source, inds] = people.t
+            people.t_imm_event[self.imm_source, inds] = people.t
         return output
 
 
