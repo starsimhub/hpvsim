@@ -80,6 +80,7 @@ class PeopleMeta(sc.prettyobj):
             State('age',            default_float,  np.nan), # Float
             State('sex',            default_float,  np.nan), # Float
             State('debut',          default_float,  np.nan), # Float
+            State('ever_partnered', bool,  False), # Whether this person has ever been partnered
             State('sev',            default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
             State('rel_sev',        default_float, 1.0), # Individual relative risk for rate severe disease growth
             State('rel_sus',        default_float, 1.0), # Individual relative risk for acquiring infection (does not vary by genotype)

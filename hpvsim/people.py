@@ -112,7 +112,7 @@ class People(hpb.BasePeople):
     def initialize(self, sim_pars=None):
         ''' Perform initializations '''
         super().initialize() # Initialize states
-        
+
         # Handle partners and contacts
         kwargs = self.kwargs
         if 'partners' in kwargs:
@@ -123,6 +123,9 @@ class People(hpb.BasePeople):
                 self.rship_start_dates[ln,self.current_partners[ln]>0] = 0
         if 'contacts' in kwargs:
             self.add_contacts(kwargs.pop('contacts')) # Also updated each step
+
+        self.n_rships[:] = self.current_partners
+        self.ever_partnered[:] = self.current_partners.sum(axis=0)>0
 
         # Handle all other values, e.g. age
         for key,value in kwargs.items():
@@ -138,8 +141,8 @@ class People(hpb.BasePeople):
 
         # Additional validation
         self.validate(sim_pars=sim_pars) # First, check that essential-to-match parameters match
-
         self.initialized = True
+
         return
 
 
@@ -405,6 +408,7 @@ class People(hpb.BasePeople):
 
         for lno,lkey in enumerate(self.layer_keys()):
             layer = self.contacts[lkey]
+
             to_dissolve = (~self['alive'][layer['m']]) + (~self['alive'][layer['f']]) + ( (self.t*self.pars['dt']) > layer['end']).astype(bool)
             dissolved = layer.pop_inds(to_dissolve) # Remove them from the contacts list
 
@@ -437,6 +441,8 @@ class People(hpb.BasePeople):
             new_pships[lkey], current_partners, new_pship_inds, new_pship_counts = hppop.make_contacts(**pship_args)
 
             # Update relationship info
+            if len(new_pship_inds)>0:
+                self.ever_partnered[new_pship_inds] = True
             self.current_partners[:] = current_partners
             if len(new_pship_inds):
                 self.rship_start_dates[lno, new_pship_inds] = self.t
@@ -691,7 +697,7 @@ class People(hpb.BasePeople):
             self.scale[new_inds]        = self.pars['pop_scale']
             self.sex[new_inds]          = sexes
             self.debut[new_inds]        = debuts
-            self.rel_sev[new_inds]    = rel_sev
+            self.rel_sev[new_inds]      = rel_sev
             self.partners[:,new_inds]   = partners
 
             if immunity is not None:

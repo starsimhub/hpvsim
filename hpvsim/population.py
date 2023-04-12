@@ -300,6 +300,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
         f += these_f_contacts.tolist()
     f = np.array(f)
+    # f = f_eligible_inds
 
     # Probabilities for males to be selected for new relationships
     m_probs                 = np.zeros(n_agents)    # Begin by assigning everyone equal probability of forming a new relationship
@@ -329,6 +330,13 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         # Count how many contacts there actually are
         new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
         current_partners[lno, new_pship_inds] += new_pship_counts
+
+        # f_sorted = f.sort()
+        # conditions = is_female & (age > 35) * (age < 40)
+        # denom = hpu.true(conditions)
+        # num_conditions = conditions * (current_partners[0, :] > 0)
+        # num_inds = hpu.true(num_conditions)
+        # prop_active = len(num_inds) / len(denom)
 
     return f, m, current_partners, new_pship_inds, new_pship_counts
 

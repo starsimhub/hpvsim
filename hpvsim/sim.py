@@ -590,7 +590,7 @@ class Sim(hpb.BaseSim):
 
         # Make the people
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
-        
+
         # Figure out the scale factors
         if self['total_pop'] is not None and total_pop is not None: # If no pop_scale has been provided, try to get it from the location
             errormsg = 'You can either define total_pop explicitly or via the location, but not both'
