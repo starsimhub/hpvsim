@@ -56,8 +56,8 @@ def init_immunity(sim, create=True):
     # Dimension for immunity matrix
     ndim = ng + nv + ntxv
 
-    # If immunity values have been provided, process them
-    if sim['immunity'] is None or create:
+    # If cross-immunity values have been provided, process them
+    if sim['cross_immunity_sus'] is None or create:
 
         # Precompute waning - same for all genotypes
         if sim['use_waning']:
@@ -88,9 +88,45 @@ def init_immunity(sim, create=True):
             immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
 
-        sim['immunity'] = immunity
+        sim['cross_immunity_sus'] = immunity
 
-    sim['immunity'] = sim['immunity'].astype('float32')
+
+    # If cross-immunity values have been provided, process them
+    if sim['cross_immunity_sev'] is None or create:
+
+        # Precompute waning - same for all genotypes
+        if sim['use_waning']:
+            imm_decay = sc.dcp(sim['imm_decay'])
+            if 'half_life' in imm_decay.keys():
+                imm_decay['half_life'] /= sim['dt']
+            sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
+
+        sim['immunity_map'] = dict()
+        # Firstly, initialize immunity matrix with defaults. These are then overwitten with specific values below
+        immunity = np.ones((ng, ng), dtype=hpd.default_float)  # Fill with defaults
+
+        # Next, overwrite these defaults with any known immunity values about specific genotypes
+        default_cross_immunity = hppar.get_cross_immunity(cross_imm_med=sim['cross_imm_high'], cross_imm_high=sim['cross_imm_higher'])
+        for i in range(ng):
+            sim['immunity_map'][i] = 'infection'
+            label_i = sim['genotype_map'][i]
+            for j in range(ng):
+                label_j = sim['genotype_map'][j]
+                if label_i in default_cross_immunity and label_j in default_cross_immunity:
+                    immunity[j][i] = default_cross_immunity[label_j][label_i]
+
+        for vi,vx_intv in enumerate(all_vx_intvs):
+            genotype_pars_df = vx_intv.product.genotype_pars[vx_intv.product.genotype_pars.genotype.isin(sim['genotype_map'].values())] # TODO fix this
+            vacc_mapping = [genotype_pars_df[genotype_pars_df.genotype==gtype].rel_imm.values[0] for gtype in sim['genotype_map'].values()]
+            vacc_mapping += [1]*(vi+1) # Add on some ones to pad out the matrix
+            vacc_mapping = np.reshape(vacc_mapping, (len(immunity)+1, 1)).astype(hpd.default_float) # Reshape
+            immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
+            immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
+
+        sim['cross_immunity_sev'] = immunity
+
+    sim['cross_immunity_sus'] = sim['cross_immunity_sus'].astype('float32')
+    sim['cross_immunity_sev'] = sim['cross_immunity_sev'].astype('float32')
     sim['n_imm_sources'] = ndim
 
     return
@@ -189,9 +225,10 @@ def check_immunity(people):
     some (30% of 90%) protection against infection with HPV18, and so on.
 
     '''
-    immunity = people.pars['immunity'] # cross-immunity/own-immunity scalars to be applied to immunity level
-    sus_imm = np.dot(immunity, people.nab_imm) # Dot product gives immunity to all genotypes
-    sev_imm = np.dot(immunity, people.cell_imm)  # Dot product gives immunity to all genotypes
+    cross_immunity_sus = people.pars['cross_immunity_sus'] # cross-immunity/own-immunity scalars to be applied to sus immunity level
+    cross_immunity_sev = people.pars['cross_immunity_sev'] # cross-immunity/own-immunity scalars to be applied to sev immunity level
+    sus_imm = np.dot(cross_immunity_sus, people.nab_imm) # Dot product gives immunity to all genotypes
+    sev_imm = np.dot(cross_immunity_sev, people.cell_imm)  # Dot product gives immunity to all genotypes
     people.sus_imm[:] = np.minimum(sus_imm, np.ones_like(sus_imm))  # Don't let this be above 1
     people.sev_imm[:] = np.minimum(sev_imm, np.ones_like(sev_imm))  # Don't let this be above 1
     return
