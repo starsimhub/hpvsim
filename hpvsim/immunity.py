@@ -19,20 +19,39 @@ def init_immunity(sim, create=True):
     # Pull out all of the circulating genotypes for cross-immunity
     ng = sim['n_genotypes']
 
-    # Pull out all the vaccination interventions
+    # Pull out all the unique vaccine products
     vx_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseVaccination)]
-    nv = 1 if len(vx_intvs) else 0
+    vx_intv_prods = [x.input_args['product'].replace('2','') for x in sim['interventions'] if isinstance(x, hpi.BaseVaccination)]
+    unique_vx_prods, unique_vx_prod_inds = np.unique(vx_intv_prods, return_index=True)
+    unique_vx_prod_dict = dict()
+    for unique_vx_prod, unique_vx_prod_ind in zip(unique_vx_prods, unique_vx_prod_inds):
+        unique_vx_prod_dict[unique_vx_prod] = unique_vx_prod_ind
+    nv = len(unique_vx_prods) if len(vx_intvs) else 0
 
-    for vx_intv in vx_intvs:
-        vx_intv.imm_source = ng
+    unique_vx_intvs = sc.autolist()
+    for ind in unique_vx_prod_inds:
+        unique_vx_intvs += vx_intvs[ind]
+
+    for iv, vx_intv in enumerate(vx_intvs):
+        vx_intv.product.imm_source = unique_vx_prod_dict[vx_intv_prods[iv]]+ng
 
     txv_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseTxVx)]
-    ntxv = 1 if len(txv_intvs) else 0
+    txv_intv_prods = [x.product.name.replace('2', '1') for x in sim['interventions'] if
+                     isinstance(x, hpi.BaseTxVx)]
+    unique_txv_prods, unique_txv_prod_inds = np.unique(txv_intv_prods, return_index=True)
+    unique_txv_prod_dict = dict()
+    for unique_txv_prod, unique_txv_prod_ind in zip(unique_txv_prods, unique_txv_prod_inds):
+        unique_txv_prod_dict[unique_txv_prod] = unique_txv_prod_ind
+    ntxv = len(unique_txv_prods) if len(txv_intvs) else 0
 
-    for txvx_intv in txv_intvs:
-        txvx_intv.imm_source = ng+1
+    unique_txv_intvs = sc.autolist()
+    for ind in unique_txv_prod_inds:
+        unique_txv_intvs += txv_intvs[ind]
 
-    all_vx_intvs = vx_intvs + txv_intvs
+    for itxv, txv_intv in enumerate(txv_intvs):
+        txv_intv.product.imm_source = unique_txv_prod_dict[txv_intv_prods[itxv]] + ng + ntxv
+
+    all_vx_intvs = unique_vx_intvs + unique_txv_intvs
 
     # Dimension for immunity matrix
     ndim = ng + nv + ntxv
