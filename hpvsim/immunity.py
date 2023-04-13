@@ -49,7 +49,7 @@ def init_immunity(sim, create=True):
         unique_txv_intvs += txv_intvs[ind]
 
     for itxv, txv_intv in enumerate(txv_intvs):
-        txv_intv.product.imm_source = unique_txv_prod_dict[txv_intv_prods[itxv]] + ng + ntxv
+        txv_intv.product.imm_source = unique_txv_prod_dict[txv_intv_prods[itxv]] + ng + nv
 
     all_vx_intvs = unique_vx_intvs + unique_txv_intvs
 
