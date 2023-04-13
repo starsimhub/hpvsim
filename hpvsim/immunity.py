@@ -21,10 +21,16 @@ def init_immunity(sim, create=True):
 
     # Pull out all the vaccination interventions
     vx_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseVaccination)]
-    nv = len(vx_intvs)
+    nv = 1 if len(vx_intvs) else 0
+
+    for vx_intv in vx_intvs:
+        vx_intv.imm_source = ng
 
     txv_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseTxVx)]
-    ntxv = len(txv_intvs)
+    ntxv = 1 if len(txv_intvs) else 0
+
+    for txvx_intv in txv_intvs:
+        txvx_intv.imm_source = ng+1
 
     all_vx_intvs = vx_intvs + txv_intvs
 
@@ -55,7 +61,6 @@ def init_immunity(sim, create=True):
                 if label_i in default_cross_immunity and label_j in default_cross_immunity:
                     immunity[j][i] = default_cross_immunity[label_j][label_i]
 
-        imm_source = ng
         for vi,vx_intv in enumerate(all_vx_intvs):
             genotype_pars_df = vx_intv.product.genotype_pars[vx_intv.product.genotype_pars.genotype.isin(sim['genotype_map'].values())] # TODO fix this
             vacc_mapping = [genotype_pars_df[genotype_pars_df.genotype==gtype].rel_imm.values[0] for gtype in sim['genotype_map'].values()]
@@ -63,9 +68,6 @@ def init_immunity(sim, create=True):
             vacc_mapping = np.reshape(vacc_mapping, (len(immunity)+1, 1)).astype(hpd.default_float) # Reshape
             immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
-            vx_intv.product.imm_source = imm_source
-            imm_source += 1
-
 
         sim['immunity'] = immunity
 
