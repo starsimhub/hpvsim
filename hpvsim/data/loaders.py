@@ -63,6 +63,7 @@ def get_country_aliases(wb=False):
        'Hong Kong':      'China, Hong Kong Special Administrative Region',
        'Macao':          'China, Macao Special Administrative Region',
        "Cote d'Ivoire":  "Côte d'Ivoire",
+       "Cote dIvoire":   "Côte d'Ivoire",
        "Ivory Coast":    "Côte d'Ivoire",
        'DRC':            'Democratic Republic of the Congo',
        'Iran':           'Iran (Islamic Republic of)',
@@ -90,7 +91,7 @@ def get_country_aliases(wb=False):
         for key,val in country_mappings.items():
             if val == 'Democratic Republic of the Congo':
                 country_mappings[key] = 'Congo, Dem. Rep.'
-            if val == "Cote d'Ivoire":
+            if val in ["Cote d'Ivoire", "Cote dIvoire", "Côte d'Ivoire"]:
                 country_mappings[key] = "Cote d'Ivoire"
 
     return country_mappings # Convert to lowercase
