@@ -431,7 +431,8 @@ class People(hpb.BasePeople):
         new_pships = dict()
 
         # Loop over layers
-        for lno, lkey in enumerate(self.layer_keys()):
+        lno=0
+        for lkey in self.layer_keys():
             pship_args = dict(
                 lno=lno, tind=tind, partners=self.partners[lno], current_partners=self.current_partners,
                 sexes=self.sex, ages=self.age, debuts=self.debut, is_female=self.is_female, is_active=self.is_active,
@@ -449,6 +450,8 @@ class People(hpb.BasePeople):
                 self.n_rships[lno, new_pship_inds] += new_pship_counts
                 lags = self.rship_start_dates[lno, new_pship_inds] - self.rship_end_dates[lno, new_pship_inds]
                 self.rship_lags[lkey] += np.histogram(lags, self.lag_bins)[0]
+
+            lno += 1
 
         self.add_contacts(new_pships)
 

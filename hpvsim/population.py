@@ -107,13 +107,15 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         if microstructure in ['random', 'default']:
             contacts = dict()
             current_partners = np.zeros((len(lkeys),n_agents))
-            for lno,lkey in enumerate(lkeys):
+            lno=0
+            for lkey in lkeys:
                 contacts[lkey], current_partners,_,_ = make_contacts(
                     lno=lno, tind=0, partners=partners[lno,:], current_partners=current_partners,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
                     pref_weight=100, durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey], **kwargs
                 )
+                lno += 1
 
         else:
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
@@ -300,7 +302,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
         f += these_f_contacts.tolist()
     f = np.array(f)
-    # f = f_eligible_inds
 
     # Probabilities for males to be selected for new relationships
     m_probs                 = np.zeros(n_agents)    # Begin by assigning everyone equal probability of forming a new relationship
