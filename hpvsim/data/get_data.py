@@ -160,7 +160,7 @@ def quick_download(verbose=True, init=False):
             print('Note: this automatic download only happens once, when HPVsim is first run.\n\n')
     filepath = sc.makefilepath(filesdir / f'tmp_{data_file}.zip')
     sc.download(url=quick_url, filename=filepath, convert=False, verbose=verbose)
-    sc.loadzip(filepath, outfolder=filesdir)
+    sc.unzip(filepath, outfolder=filesdir)
     sc.rmpath(filepath)
     if verbose:
         print('\nData downloaded.')
