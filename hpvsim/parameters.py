@@ -93,9 +93,12 @@ def make_pars(**kwargs):
     pars['imm_decay']       = dict(form=None)  # decay rate, with half life in years
     pars['cell_imm_init']   = dict(dist='beta_mean', par1=0.25, par2=0.025) # beta distribution for level of immunity against persistence/progression of infection following infection clearance and seroconversion
     pars['imm_boost']       = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
-    pars['immunity']        = None  # Matrix of immunity and cross-immunity factors, set by init_immunity() in immunity.py
+    pars['cross_immunity_sus'] = None  # Matrix of susceptibility cross-immunity factors, set by init_immunity() in immunity.py
+    pars['cross_immunity_sev'] = None  # Matrix of severity cross-immunity factors, set by init_immunity() in immunity.py
+    pars['cross_imm_low']   = 0.15
     pars['cross_imm_med']   = 0.3
     pars['cross_imm_high']  = 0.5
+    pars['cross_imm_higher'] = 0.7
 
     # Genotype parameters
     pars['genotypes']       = [16, 18, 'hrhpv']  # Genotypes to model
