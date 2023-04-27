@@ -189,7 +189,6 @@ def transform_prob(tp, dysp):
           = 2* dysp * (dysp/2)**2, assuming that b = c = 1/2 a
           = 1/2 * dysp**3
     '''
-    # return 1-np.power(1-tp, (dysp*100))
     return 1-np.power(1-tp, 0.5*((dysp*100)**3))
 
 
