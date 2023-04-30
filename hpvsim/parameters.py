@@ -75,7 +75,7 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']                = 0.21   # Per-act transmission probability; absolute value, calibrated
+    pars['beta']                = 0.2   # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
     pars['eff_condoms']         = 0.7   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
@@ -333,7 +333,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.hpv16.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of episomal infection prior to cancer
-    pars.hpv16.sev_fn           = dict(form='logf2', k=0.4, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv16.sev_fn           = dict(form='logf2', k=0.25, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.transform_prob   = 9/1e11 # Annual rate of transformed cell invading
     pars.hpv16.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
@@ -342,7 +342,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.hpv18.sev_fn           = dict(form='logf2', k=0.4, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv18.sev_fn           = dict(form='logf2', k=0.17, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.transform_prob   = 8 / 1e11 # Annual rate of transformed cell invading
     pars.hpv18.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
@@ -351,7 +351,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hrhpv = sc.objdict()
     pars.hrhpv.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.hrhpv.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.hrhpv.sev_fn           = dict(form='logf2', k=0.4, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hrhpv.sev_fn           = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hrhpv.rel_beta         = 0.9 # placeholder
     pars.hrhpv.transform_prob   = 7 / 1e11 # Annual rate of transformed cell invading
     pars.hrhpv.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
