@@ -341,8 +341,8 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=2, par2=6) # Duration of infection prior to cancer
-    pars.hpv18.sev_fn           = dict(form='logf2', k=0.2, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
+    pars.hpv18.sev_fn           = dict(form='logf2', k=0.25, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.transform_prob   = 8 / 1e11 # Annual rate of transformed cell invading
     pars.hpv18.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
