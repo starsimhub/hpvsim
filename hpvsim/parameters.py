@@ -95,10 +95,10 @@ def make_pars(**kwargs):
     pars['imm_boost']       = []  # Multiplicative factor applied to a person's immunity levels if they get reinfected. No data on this, assumption.
     pars['cross_immunity_sus'] = None  # Matrix of susceptibility cross-immunity factors, set by init_immunity() in immunity.py
     pars['cross_immunity_sev'] = None  # Matrix of severity cross-immunity factors, set by init_immunity() in immunity.py
-    pars['cross_imm_low']   = 0.15
-    pars['cross_imm_med']   = 0.3
-    pars['cross_imm_high']  = 0.5
-    pars['cross_imm_higher'] = 0.7
+    pars['cross_imm_sus_med']   = 0.3
+    pars['cross_imm_sus_high']  = 0.5
+    pars['cross_imm_sev_med']   = 0.5
+    pars['cross_imm_sev_high']  = 0.7
 
     # Genotype parameters
     pars['genotypes']       = [16, 18, 'hrhpv']  # Genotypes to model
