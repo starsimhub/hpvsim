@@ -210,7 +210,9 @@ class People(hpb.BasePeople):
 
         # Set length of infection, which is moderated by any prior cell-level immunity
         sev_imm = self.sev_imm[g, inds]
-        self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-sev_imm)
+        age_mod = np.ones(len(inds))
+        age_mod[self.age[inds]>= self.pars['age_risk']['age']] = self.pars['age_risk']['risk']
+        self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-sev_imm)*age_mod
         self.dur_infection[g, inds]  = self.dur_episomal[g, inds]
 
         # Determine how long before precancerous cell changes
