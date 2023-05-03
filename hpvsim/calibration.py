@@ -418,6 +418,12 @@ class Calibration(sc.prettyobj):
                         if (len(par_highlowlist) > 3):
                             step = par_highlowlist[3]
                         else: step = None
+                    elif isinstance(par_highlowlist, list):
+                        low, high = par_highlowlist[1], par_highlowlist[2]
+                        if (len(par_highlowlist) > 3):
+                            step = par_highlowlist[3]
+                        else:
+                            step = None
                     pars[key][parkey] = sampler_fn(sampler_key, low, high, step=step)
 
         return pars
