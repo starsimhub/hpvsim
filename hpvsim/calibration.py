@@ -386,6 +386,7 @@ class Calibration(sc.prettyobj):
         for key, val in pardict.items():
             if isinstance(val, list):
                 low, high = val[1], val[2]
+                step = val[3] if len(val)>3 else step=None
                 if key in self.par_samplers:  # If a custom sampler is used, get it now
                     try:
                         sampler_fn = getattr(trial, self.par_samplers[key])
@@ -398,7 +399,7 @@ class Calibration(sc.prettyobj):
                     sampler_key = gname + '_' + key
                 else:
                     sampler_key = key
-                pars[key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
+                pars[key] = sampler_fn(sampler_key, low, high, step)  # Sample from values within this range
 
             elif isinstance(val, dict):
                 sampler_fn = trial.suggest_float
@@ -410,7 +411,9 @@ class Calibration(sc.prettyobj):
                         sampler_key = key + '_' + parkey
                     if isinstance(par_highlowlist, dict):
                         par_highlowlist = par_highlowlist['value']
-                    pars[key][parkey] = sampler_fn(sampler_key, par_highlowlist[1], par_highlowlist[2])
+                        low, high = par_highlowlist[1], par_highlowlist[2]
+                        step = par_highlowlist[3] if len(par_highlowlist) > 3 else step = None
+                    pars[key][parkey] = sampler_fn(sampler_key, low, high, step)
 
         return pars
 
