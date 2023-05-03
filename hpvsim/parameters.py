@@ -99,6 +99,7 @@ def make_pars(**kwargs):
     pars['cross_imm_sus_high']  = 0.5
     pars['cross_imm_sev_med']   = 0.5
     pars['cross_imm_sev_high']  = 0.7
+    pars['own_imm_hr'] = 0.9
 
     # Genotype parameters
     pars['genotypes']       = [16, 18, 'hrhpv']  # Genotypes to model
@@ -360,7 +361,7 @@ def get_genotype_pars(default=False, genotype=None):
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
 
-def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, default=False, genotype=None):
+def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None, default=False, genotype=None):
     '''
     Get the cross immunity between each genotype in a sim
     '''
@@ -381,7 +382,7 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, default=False, g
         hrhpv=dict(
             hpv16=cross_imm_med,
             hpv18=cross_imm_med,
-            hrhpv=cross_imm_med,
+            hrhpv=own_imm_hr,
         ),
 
     )
