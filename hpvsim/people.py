@@ -383,19 +383,21 @@ class People(hpb.BasePeople):
         Update disease severity for women with infection and update their current severity
         '''
         gpars = self.pars['genotype_pars'][genotype]
-        fg_inds = hpu.true(self.is_female & self.cin[genotype,:]) # Indices of women infected with this genotype
+        fg_inds = hpu.true(self.is_female & self.infectious[genotype,:]) # Indices of women infected with this genotype
         time_with_dysplasia = (self.t - self.date_cin1[genotype, fg_inds]) * self.dt
-        rel_sevs = self.rel_sev[fg_inds]
+        fg_cin_inds = fg_inds[hpu.true(time_with_dysplasia>0)]
+        time_with_dysplasia = time_with_dysplasia[time_with_dysplasia > 0]
+        rel_sevs = self.rel_sev[fg_cin_inds]
         if (time_with_dysplasia<0).any():
             errormsg = 'Time with dysplasia cannot be less than zero.'
             raise ValueError(errormsg)
-        if (np.isnan(self.date_exposed[genotype, fg_inds])).any():
-            errormsg = f'No date of exposure defined for {hpu.iundefined(self.date_exposed[genotype, fg_inds],fg_inds)} on timestep {self.t}'
+        if (np.isnan(self.date_exposed[genotype, fg_cin_inds])).any():
+            errormsg = f'No date of exposure defined for {hpu.iundefined(self.date_exposed[genotype, fg_cin_inds],fg_cin_inds)} on timestep {self.t}'
             raise ValueError(errormsg)
 
-        self.sev[genotype, fg_inds] = hppar.compute_severity(time_with_dysplasia, rel_sev=rel_sevs, pars=gpars['sev_fn'])
+        self.sev[genotype, fg_cin_inds] = hppar.compute_severity(time_with_dysplasia, rel_sev=rel_sevs, pars=gpars['sev_fn'])
 
-        if (np.isnan(self.sev[genotype, fg_inds])).any():
+        if (np.isnan(self.sev[genotype, fg_cin_inds])).any():
             errormsg = 'Invalid severity values.'
             raise ValueError(errormsg)
 
