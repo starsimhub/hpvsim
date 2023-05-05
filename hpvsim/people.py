@@ -383,7 +383,7 @@ class People(hpb.BasePeople):
         Update disease severity for women with infection and update their current severity
         '''
         gpars = self.pars['genotype_pars'][genotype]
-        fg_inds = hpu.true(self.is_female & self.infectious[genotype,:]) # Indices of women infected with this genotype
+        fg_inds = hpu.true(self.is_female & self.cin[genotype,:]) # Indices of women infected with this genotype
         time_with_dysplasia = (self.t - self.date_cin1[genotype, fg_inds]) * self.dt
         rel_sevs = self.rel_sev[fg_inds]
         if (time_with_dysplasia<0).any():
