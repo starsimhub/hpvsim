@@ -345,8 +345,8 @@ class People(hpb.BasePeople):
             transform_prob_arr[is_transform] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
 
         # Set dates of cin1, 2, 3 for all women who get infected
-        self.date_cin2[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
-        self.date_cin3[g, inds]         = self.t + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
+        self.date_cin2[g, inds]         = self.date_cin1[g,inds] + sc.randround(hppar.compute_inv_severity(ccdict['cin1'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
+        self.date_cin3[g, inds]         = self.date_cin1[g,inds] + sc.randround(hppar.compute_inv_severity(ccdict['cin2'],      rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])/dt)
 
         # Determine who goes to cancer
         is_transform = hpu.binomial_arr(transform_prob_arr)
