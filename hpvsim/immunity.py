@@ -21,7 +21,7 @@ def init_immunity(sim, create=True):
 
     # Pull out all the unique vaccine products
     vx_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseVaccination)]
-    vx_intv_prods = [x.input_args['product'].replace('2','') for x in sim['interventions'] if isinstance(x, hpi.BaseVaccination)]
+    vx_intv_prods = [x.product.genotype_pars['name'].values[0] for x in vx_intvs]
     unique_vx_prods, unique_vx_prod_inds = np.unique(vx_intv_prods, return_index=True)
     unique_vx_prod_dict = dict()
     for unique_vx_prod, unique_vx_prod_ind in zip(unique_vx_prods, unique_vx_prod_inds):
@@ -36,8 +36,7 @@ def init_immunity(sim, create=True):
         vx_intv.product.imm_source = unique_vx_prod_dict[vx_intv_prods[iv]]+ng
 
     txv_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseTxVx)]
-    txv_intv_prods = [x.product.name.replace('2', '1') for x in sim['interventions'] if
-                     isinstance(x, hpi.BaseTxVx)]
+    txv_intv_prods = [x.product.name.replace('2', '1') for x in txv_intvs]
     unique_txv_prods, unique_txv_prod_inds = np.unique(txv_intv_prods, return_index=True)
     unique_txv_prod_dict = dict()
     for unique_txv_prod, unique_txv_prod_ind in zip(unique_txv_prods, unique_txv_prod_inds):

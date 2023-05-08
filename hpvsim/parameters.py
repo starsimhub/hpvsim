@@ -87,6 +87,7 @@ def make_pars(**kwargs):
     pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
     pars['clinical_cutoffs']    = dict(cin1=0.33, cin2=0.676, cin3=0.8) # Parameters used to map disease severity onto cytological grades
     pars['sev_dist']            = dict(dist='normal_pos', par1=1.0, par2=0.2) # Distribution to draw individual level severity scale factors
+    pars['age_risk']            = dict(age=30, risk=1)
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
