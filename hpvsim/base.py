@@ -1411,7 +1411,7 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with whose disease severity level meets the threshold for detectable cell changes
         '''
-        return (self.sev>0).astype(bool)
+        return (~np.isnan(self.sev)).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
