@@ -247,7 +247,7 @@ class People(hpb.BasePeople):
 
         # Pull out useful variables
         ccdict = self.pars['clinical_cutoffs']
-        if set_sev: self.sev[g, inds] = 0
+        if set_sev: self.sev[g, inds] = 0 # For those who develop dysplasia, sev begins at 0 on their first day of infection
 
         # Calculate the integral of severity for each woman
         dur_episomal = self.dur_episomal[g, inds]
