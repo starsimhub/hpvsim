@@ -247,7 +247,7 @@ class People(hpb.BasePeople):
 
         # Pull out useful variables
         ccdict = self.pars['clinical_cutoffs']
-        if set_sev: self.sev[g, inds] = 0 # Severity starts at 0 on day 1 of infection
+        if set_sev: self.sev[g, inds] = 0
 
         # Calculate the integral of severity for each woman
         dur_episomal = self.dur_episomal[g, inds]
@@ -383,21 +383,27 @@ class People(hpb.BasePeople):
         Update disease severity for women with infection and update their current severity
         '''
         gpars = self.pars['genotype_pars'][genotype]
+
+        # Only need to update severity for people who with dysplasia underway
         fg_inds = hpu.true(self.is_female & self.infectious[genotype,:]) # Indices of women infected with this genotype
-        time_with_dysplasia = (self.t - self.date_cin1[genotype, fg_inds]) * self.dt
-        fg_cin_inds = fg_inds[hpu.true(time_with_dysplasia>0)]
-        time_with_dysplasia = time_with_dysplasia[time_with_dysplasia > 0]
-        rel_sevs = self.rel_sev[fg_cin_inds]
-        if (time_with_dysplasia<0).any():
-            errormsg = 'Time with dysplasia cannot be less than zero.'
+        fg_cin_inds = hpu.true(self.is_female & ~np.isnan(self.sev[genotype,:]) & self.infectious[genotype,:]) # Indices of women infected with this genotype who will develop CIN1
+        fg_cin_underway_inds = fg_cin_inds[(self.t >= self.date_cin1[genotype, fg_cin_inds])] # Indices of women for whom dysplasia is underway
+
+        time_with_dysplasia = (self.t - self.date_cin1[genotype, fg_cin_underway_inds]) * self.dt
+        rel_sevs = self.rel_sev[fg_cin_underway_inds]
+        if (time_with_dysplasia<0).any() or (np.isnan(time_with_dysplasia)).any():
+            errormsg = 'Time with dysplasia cannot be less than zero or NaN.'
             raise ValueError(errormsg)
         if (np.isnan(self.date_exposed[genotype, fg_cin_inds])).any():
             errormsg = f'No date of exposure defined for {hpu.iundefined(self.date_exposed[genotype, fg_cin_inds],fg_cin_inds)} on timestep {self.t}'
             raise ValueError(errormsg)
+        if (np.isnan(self.date_cin1[genotype, fg_cin_inds])).any():
+            errormsg = f'No date of dysplasia onset defined for {hpu.iundefined(self.date_cin1[genotype, fg_cin_inds],fg_cin_inds)} on timestep {self.t}'
+            raise ValueError(errormsg)
 
-        self.sev[genotype, fg_cin_inds] = hppar.compute_severity(time_with_dysplasia, rel_sev=rel_sevs, pars=gpars['sev_fn'])
+        self.sev[genotype, fg_cin_underway_inds] = hppar.compute_severity(time_with_dysplasia, rel_sev=rel_sevs, pars=gpars['sev_fn'])
 
-        if (np.isnan(self.sev[genotype, fg_cin_inds])).any():
+        if (np.isnan(self.sev[genotype, fg_cin_underway_inds])).any():
             errormsg = 'Invalid severity values.'
             raise ValueError(errormsg)
 

@@ -232,9 +232,9 @@ def test_states():
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
                 # Severity markers
-                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.infectious[g,:] & people.is_female & ~removed))) == 0
+                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.cin[g,:] & people.is_female & ~removed))) == 0
                 if not v1:
-                    raise ValueError('All women with active infection should have a severity marker.')
+                    raise ValueError('All women with CINs should have a severity marker.')
                 v2 = len(hpv.true((~np.isnan(people.sev[g,:]) & ~people.infectious[g,:] & people.is_female & ~removed))) == 0
                 if not v2:
                     raise ValueError('No women without active infection should have severity markers.')
@@ -428,9 +428,9 @@ if __name__ == '__main__':
     T = sc.tic()
 
     # sim0 = test_microsim()
-    sim1 = test_sim(do_plot=do_plot, do_save=do_save)
+    # sim1 = test_sim(do_plot=do_plot, do_save=do_save)
     # s0, s1 = test_epi()
-    # sim3 = test_states()
+    sim3 = test_states()
     # sim4 = test_flexible_inputs()
     # sim5 = test_result_consistency()
     # sim6 = test_location_loading()
