@@ -449,10 +449,13 @@ class Calibration(sc.prettyobj):
 
         sim = self.run_sim(calib_pars, genotype_pars, hiv_pars, return_sim=True)
 
-        # Compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
+        # Compute fit for sim results and save sim results (TODO: THIS IS FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
         for rkey in self.sim_results:
-            model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
+            if sim.results[rkey][:].ndim==1:
+                model_output = sim.results[rkey][self.sim_results[rkey].timepoints[0]]
+            else:
+                model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
             diffs = self.sim_results[rkey].data.value - model_output
             gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output)
             losses = gofs * self.sim_results[rkey].weights
