@@ -711,11 +711,6 @@ class Calibration(sc.prettyobj):
             n_plots = sum(dates_per_result) + other_results
             n_rows, n_cols = sc.get_rows_cols(n_plots)
 
-        import traceback;
-        traceback.print_exc();
-        import pdb;
-        pdb.set_trace()
-
         # Initialize
         fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
         if n_plots>1:
