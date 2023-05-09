@@ -850,6 +850,7 @@ class People(hpb.BasePeople):
             self.flows['reactivations']             += self.scale_flows(inds)
             self.age_flows['reactivations']         += np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
             self.latent[g, inds] = False # Adjust states -- no longer latent
+            self.date_reactivated[g,inds] = base_t
 
         # Update states, genotype info, and flows
         self.susceptible[g, inds]   = False # no longer susceptible

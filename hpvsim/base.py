@@ -1389,7 +1389,7 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with whose disease severity level lies within the thresholds for CIN1-level cell changes
         '''
-        return (self.sev < self.pars['clinical_cutoffs']['cin1']).astype(bool)
+        return ((self.sev > 0) * (self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
 
     @property
     def cin2(self):
