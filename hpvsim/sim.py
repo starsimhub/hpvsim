@@ -441,6 +441,7 @@ class Sim(hpb.BaseSim):
 
         # Only by-age stock result we will need is number infectious, susceptible, and with cin, for HPV and CIN prevalence/incidence calculations
         results[f'n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
+        results[f'n_females_infectious_by_age']     = init_res('Number of females infectious by age', n_rows=na, color=stock.color)
         results[f'n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
         results[f'n_transformed_by_age']            = init_res('Number transformed by age', n_rows=na, color=stock.color)
         results[f'n_precin_by_age']                 = init_res('Number Pre-CIN by age', n_rows=na, color=stock.color)
@@ -858,7 +859,10 @@ class Sim(hpb.BaseSim):
         if t % self.resfreq == self.resfreq-1:
 
             # Number infectious/susceptible by age, for prevalence calculations
+            f_inds = hpu.true(people['sex']==0)
             infinds = hpu.true(people['infectious'])
+            f_infinds = np.intersect1d(f_inds, infinds)
+            self.results[f'n_females_infectious_by_age'][:, idx] = np.histogram(people.age[f_infinds], bins=people.age_bin_edges, weights=people.scale[f_infinds])[0]
             self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bin_edges, weights=people.scale[infinds])[0]
             susinds = hpu.true(people['susceptible'])
             self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bin_edges, weights=people.scale[susinds])[0]
@@ -1069,8 +1073,7 @@ class Sim(hpb.BaseSim):
 
         alive_females = res['n_alive_by_sex'][0,:]
 
-        self.results['female_hpv_prevalence_by_age'][:] = safedivide((res['n_precin_by_age'][:] + res['n_cin1_by_age'][:]
-                                                                      + res['n_cin2_by_age'][:] + res['n_cin3_by_age'][:]),
+        self.results['female_hpv_prevalence_by_age'][:] = safedivide((res['n_females_infectious_by_age'][:]),
                                                                      res['n_females_alive_by_age'][:])
 
         self.results['precin_prevalence'][:] = safedivide(res['n_precin'][:], ng * alive_females)
