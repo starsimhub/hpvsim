@@ -1,7 +1,7 @@
 {
   "time": {
-    "initialize": 0.018,
-    "run": 2.202
+    "initialize": 0.014,
+    "run": 1.846
   },
   "parameters": {
     "n_agents": 10000,
@@ -10,5 +10,5 @@
     "n_interventions": 7,
     "n_analyzers": 0
   },
-  "cpu_performance": 0.30280973256951815
+  "cpu_performance": 0.5840715639931042
 }

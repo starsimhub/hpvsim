@@ -822,7 +822,7 @@ class age_results(Analyzer):
                     else:  # Denominator is females
                         denom = bin_ages(inds=ppl.f_inds, bins=bins)
                     if rdict.by_genotype: denom = denom[None, :]
-                    self.results[rkey][date] = self.results[rkey][date] / (denom * ng)
+                    self.results[rkey][date] = self.results[rkey][date] / (denom)
 
                 if 'incidence' in rkey:
                     if 'hpv' in rkey:  # Denominator is susceptible population
