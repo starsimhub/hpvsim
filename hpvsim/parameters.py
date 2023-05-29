@@ -257,7 +257,7 @@ def get_genotype_choices():
         'hpv18':    ['hpv18', '18'],
         'hi5':      ['hi5hpv', 'hi5hpv', 'cross-protective'],
         'ohr':      ['ohrhpv', 'non-cross-protective'],
-        'hr':       ['allhr', 'allhrhpv', 'hrhpv', 'oncogenic', 'hr10', 'hi10']
+        'hr':       ['allhr', 'allhrhpv', 'hrhpv', 'oncogenic', 'hr10', 'hi10'],
         'lo':       ['lohpv'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
