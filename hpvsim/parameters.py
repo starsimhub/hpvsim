@@ -257,6 +257,7 @@ def get_genotype_choices():
         'hpv18':    ['hpv18', '18'],
         'hi5':      ['hi5hpv', 'hi5hpv', 'cross-protective'],
         'ohr':      ['ohrhpv', 'non-cross-protective'],
+        'hr':       ['allhr', 'allhrhpv', 'hrhpv', 'oncogenic', 'hr10', 'hi10']
         'lo':       ['lohpv'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
@@ -352,7 +353,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
-    # High-risk oncogenic types included in 9valent vaccine
+    # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
     pars.hi5 = sc.objdict()
     pars.hi5.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.hi5.dur_episomal       = dict(dist='lognormal', par1=2, par2=6) # Duration of infection prior to cancer
@@ -362,7 +363,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hi5.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hi5.sero_prob          = 0.60 # placeholder
 
-    # Other high-risk: oncogenic but not covered in 9valent vaccine
+    # Other high-risk: oncogenic but not covered in 9valent vaccine: 35, 39, 51, 56, 59
     pars.ohr = sc.objdict()
     pars.ohr.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.ohr.dur_episomal       = dict(dist='lognormal', par1=2, par2=6) # Duration of infection prior to cancer
@@ -371,6 +372,17 @@ def get_genotype_pars(default=False, genotype=None):
     pars.ohr.transform_prob     = 7 / 1e11 # Annual rate of transformed cell invading
     pars.ohr.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.ohr.sero_prob          = 0.60 # placeholder
+
+    # All other high-risk types: 31, 33, 35, 39, 45, 51, 52, 56, 58, 59
+    # Warning: this should not be used in conjuction with hi5 or ohr
+    pars.hr = sc.objdict()
+    pars.hr.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
+    pars.hr.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
+    pars.hr.sev_fn           = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hr.rel_beta         = 0.9 # placeholder
+    pars.hr.transform_prob   = 7 / 1e11 # Annual rate of transformed cell invading
+    pars.hr.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
+    pars.hr.sero_prob        = 0.60 # placeholder
 
     # Low-risk
     pars.lr = sc.objdict()
@@ -396,6 +408,7 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
             hpv18=cross_imm_high,
             hi5=cross_imm_med,
             ohr=cross_imm_med,
+            hr=cross_imm_med,
             lr=cross_imm_med,
         ),
 
@@ -404,6 +417,7 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
             hpv18=1.0,  # Default for own-immunity
             hi5=cross_imm_med,
             ohr=cross_imm_med,
+            hr=cross_imm_med,
             lr=cross_imm_med,
         ),
 
@@ -412,6 +426,7 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
             hpv18=cross_imm_med,
             hi5=own_imm_hr,
             ohr=cross_imm_med,
+            hr=cross_imm_med,
             lr=cross_imm_med,
         ),
 
@@ -420,6 +435,7 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
             hpv18=cross_imm_med,
             hi5=cross_imm_med,
             ohr=own_imm_hr,
+            hr=cross_imm_med,
             lr=cross_imm_med,
         ),
 
@@ -428,6 +444,7 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
             hpv18=cross_imm_med,
             hi5=cross_imm_med,
             ohr=cross_imm_med,
+            hr=cross_imm_med,
             lr=own_imm_hr,
         ),
 
