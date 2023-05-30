@@ -86,7 +86,7 @@ def make_pars(**kwargs):
     pars['dur_cancer']          = dict(dist='lognormal', par1=8.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
     pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
     pars['clinical_cutoffs']    = dict(cin1=0.33, cin2=0.676, cin3=0.8) # Parameters used to map disease severity onto cytological grades
-    pars['sev_dist']            = dict(dist='normal_pos', par1=1.0, par2=0.2) # Distribution to draw individual level severity scale factors
+    pars['sev_dist']            = dict(dist='normal_pos', par1=1.0, par2=0.25) # Distribution to draw individual level severity scale factors
     pars['age_risk']            = dict(age=30, risk=1)
 
     # Parameters used to calculate immunity
@@ -103,7 +103,7 @@ def make_pars(**kwargs):
     pars['own_imm_hr'] = 0.9
 
     # Genotype parameters
-    pars['genotypes']       = [16, 18, 'hrhpv']  # Genotypes to model
+    pars['genotypes']       = [16, 18, 'hi5']  # Genotypes to model
     pars['genotype_pars']   = sc.objdict()  # Can be directly modified by passing in arguments listed in get_genotype_pars
 
     # Events and interventions
@@ -253,9 +253,12 @@ def get_genotype_choices():
     '''
     # List of choices available
     choices = {
-        'hpv16':  ['hpv16', '16'],
-        'hpv18': ['hpv18', '18'],
-        'hrhpv': ['hrhpv', 'ohrhpv', 'hr', 'ohr'],
+        'hpv16':    ['hpv16', '16'],
+        'hpv18':    ['hpv18', '18'],
+        'hi5':      ['hi5hpv', 'hi5hpv', 'cross-protective'],
+        'ohr':      ['ohrhpv', 'non-cross-protective'],
+        'hr':       ['allhr', 'allhrhpv', 'hrhpv', 'oncogenic', 'hr10', 'hi10'],
+        'lo':       ['lohpv'],
     }
     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
     return choices, mapping
@@ -289,22 +292,6 @@ def get_vaccine_choices():
     return choices, mapping
 
 
-
-def get_treatment_choices():
-    '''
-    Define valid pre-defined treatment names
-    '''
-    # List of choices currently available: new ones can be added to the list along with their aliases
-    choices = {
-        'default': ['default', None],
-        'ablative':  ['ablative', 'thermal_ablation', 'TA'],
-        'excisional': ['excisional', 'leep'],
-        'radiation': ['radiation']
-    }
-    mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
-    return choices, mapping
-
-
 def _get_from_pars(pars, default=False, key=None, defaultkey='default'):
     ''' Helper function to get the right output from genotype functions '''
 
@@ -334,30 +321,62 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hpv16.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of episomal infection prior to cancer
-    pars.hpv16.sev_fn           = dict(form='logf2', k=0.25, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv16.dur_episomal     = dict(dist='lognormal', par1=2, par2=5) # Duration of episomal infection prior to cancer
+    pars.hpv16.sev_fn           = dict(form='logf2', k=0.175, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.transform_prob   = 9/1e11 # Annual rate of transformed cell invading
+    pars.hpv16.transform_prob   = 1.3e-9 # Annual rate of transformed cell invading
     pars.hpv16.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.hpv18.sev_fn           = dict(form='logf2', k=0.2, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=2, par2=5) # Duration of infection prior to cancer
+    pars.hpv18.sev_fn           = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.transform_prob   = 8 / 1e11 # Annual rate of transformed cell invading
+    pars.hpv18.transform_prob   = 1.0e-9 # Annual rate of transformed cell invading
     pars.hpv18.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
-    pars.hrhpv = sc.objdict()
-    pars.hrhpv.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hrhpv.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.hrhpv.sev_fn           = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
-    pars.hrhpv.rel_beta         = 0.9 # placeholder
-    pars.hrhpv.transform_prob   = 7 / 1e11 # Annual rate of transformed cell invading
-    pars.hrhpv.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
-    pars.hrhpv.sero_prob        = 0.60 # placeholder
+    # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
+    pars.hi5 = sc.objdict()
+    pars.hi5.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
+    pars.hi5.dur_episomal       = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
+    pars.hi5.sev_fn             = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hi5.rel_beta           = 0.9 # placeholder
+    pars.hi5.transform_prob     = 3e-10 # Annual rate of transformed cell invading
+    pars.hi5.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
+    pars.hi5.sero_prob          = 0.60 # placeholder
+
+    # Other high-risk: oncogenic but not covered in 9valent vaccine: 35, 39, 51, 56, 59
+    pars.ohr = sc.objdict()
+    pars.ohr.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
+    pars.ohr.dur_episomal       = dict(dist='lognormal', par1=2, par2=6) # Duration of infection prior to cancer
+    pars.ohr.sev_fn             = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.ohr.rel_beta           = 0.9 # placeholder
+    pars.ohr.transform_prob     = 3e-10 # Annual rate of transformed cell invading
+    pars.ohr.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
+    pars.ohr.sero_prob          = 0.60 # placeholder
+
+    # All other high-risk types: 31, 33, 35, 39, 45, 51, 52, 56, 58, 59
+    # Warning: this should not be used in conjuction with hi5 or ohr
+    pars.hr = sc.objdict()
+    pars.hr.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
+    pars.hr.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
+    pars.hr.sev_fn           = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hr.rel_beta         = 0.9 # placeholder
+    pars.hr.transform_prob   = 3e-10 # Annual rate of transformed cell invading
+    pars.hr.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
+    pars.hr.sero_prob        = 0.60 # placeholder
+
+    # Low-risk
+    pars.lr = sc.objdict()
+    pars.lr.dur_precin          = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
+    pars.lr.dur_episomal        = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
+    pars.lr.sev_fn              = dict(form='logf2', k=0.0, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.lr.rel_beta            = 0.9 # placeholder
+    pars.lr.transform_prob      = 0 # Annual rate of transformed cell invading
+    pars.lr.sev_integral        = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
+    pars.lr.sero_prob           = 0.60 # placeholder
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
 
@@ -371,19 +390,46 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
         hpv16 = dict(
             hpv16=1.0, # Default for own-immunity
             hpv18=cross_imm_high,
-            hrhpv=cross_imm_med,
+            hi5=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
         ),
 
         hpv18 = dict(
             hpv16=cross_imm_high,
             hpv18=1.0,  # Default for own-immunity
-            hrhpv=cross_imm_med,
+            hi5=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
         ),
 
-        hrhpv=dict(
+        hi5=dict(
             hpv16=cross_imm_med,
             hpv18=cross_imm_med,
-            hrhpv=own_imm_hr,
+            hi5=own_imm_hr,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+
+        ohr=dict(
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hi5=cross_imm_med,
+            ohr=own_imm_hr,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+
+        lr=dict(
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hi5=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=own_imm_hr,
         ),
 
     )

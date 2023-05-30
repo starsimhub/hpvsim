@@ -44,18 +44,17 @@ def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being ru
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
-        'start': 1950,
+        'start': 1970,
         'burnin': 30,
         'end': 2030,
-        'location': 'tanzania',
-        'dt': .5,
+        'ms_agent_ratio': 100
     }
     pars = sc.mergedicts(pars, kwargs)
 
     # Create some genotype pars
     genotype_pars = {
         16: {
-            'sev_fn': dict(form='logf3', k=0.5, x_infl=5, s=1)
+            'sev_fn': dict(form='logf2', k=0.25, x_infl=0, ttc=30)
         }
     }
 

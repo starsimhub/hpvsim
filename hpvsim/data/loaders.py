@@ -66,6 +66,7 @@ def get_country_aliases(wb=False):
        "Cote dIvoire":   "Côte d'Ivoire",
        "Ivory Coast":    "Côte d'Ivoire",
        'DRC':            'Democratic Republic of the Congo',
+       'Congo':          'Congo, Rep.',
        'Iran':           'Iran (Islamic Republic of)',
        'Laos':           "Lao People's Democratic Republic",
        'Micronesia':     'Micronesia (Federated States of)',

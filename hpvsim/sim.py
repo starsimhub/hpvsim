@@ -316,8 +316,8 @@ class Sim(hpb.BaseSim):
         if self['genotypes'] == 'all':
             self['genotypes'] = default_gpars.keys()
         if not len(self['genotypes']):
-            print('No genotypes provided, will simulate 16, 18, and other HR types by default')
-            self['genotypes'] = [16,18,'hrhpv']
+            print('No genotypes provided: simulating 16, 18, and 5 other pooled HR types (31, 33, 45, 52, 58).')
+            self['genotypes'] = [16,18,'hi5']
 
         # Loop over genotypes
         for i, g in enumerate(self['genotypes']):

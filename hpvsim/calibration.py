@@ -449,10 +449,13 @@ class Calibration(sc.prettyobj):
 
         sim = self.run_sim(calib_pars, genotype_pars, hiv_pars, return_sim=True)
 
-        # Compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
+        # Compute fit for sim results and save sim results (TODO: THIS IS FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
         for rkey in self.sim_results:
-            model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
+            if sim.results[rkey][:].ndim==1:
+                model_output = sim.results[rkey][self.sim_results[rkey].timepoints[0]]
+            else:
+                model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
             diffs = self.sim_results[rkey].data.value - model_output
             gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output)
             losses = gofs * self.sim_results[rkey].weights
@@ -791,28 +794,35 @@ class Calibration(sc.prettyobj):
                     plot_count += 1
 
             for rn, resname in enumerate(self.sim_results_keys):
-                x = np.arange(len(self.glabels))
-                ax = axes[plot_count]
-                bins = []
-                values = []
+                if n_plots > 1:
+                    ax = axes[plot_count]
+                else:
+                    ax = axes
+                bins = sc.autolist()
+                values = sc.autolist()
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
+                x = np.arange(len(ydata))
                 ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
                     bins += x.tolist()
-                    values += list(run[resname])
+                    if sc.isnumber(run[resname]):
+                        values += sc.promotetolist(run[resname])
+                    else:
+                        values += run[resname].tolist()
+
                 # Plot model
                 modeldf = pd.DataFrame({'bins': bins, 'values': values})
                 ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, **extra_args)
 
                 # Set title and labels
                 date = thisdatadf.year[0]
-                ax.set_xlabel('Genotype')
+                # ax.set_xlabel('Genotype')
                 ax.set_title(self.result_args[resname].name + ', ' + str(date))
                 ax.legend()
-                ax.set_xticks(x, self.glabels)
+                # ax.set_xticks(x, self.glabels)
                 plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)
