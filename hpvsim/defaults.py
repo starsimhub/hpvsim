@@ -197,6 +197,7 @@ class PeopleMeta(sc.prettyobj):
         dates += [
             State('date_clearance', default_float, np.nan, shape='n_genotypes'),
             State('date_exposed', default_float, np.nan, shape='n_genotypes'),
+            State('date_reactivated', default_float, np.nan, shape='n_genotypes'),
         ]
         return dates
 

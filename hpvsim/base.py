@@ -1380,36 +1380,36 @@ class BasePeople(FlexPretty):
     @property
     def precin(self):
         '''
-        Boolean array of everyone with whose disease severity level does not meet the threshold for detectable cell changes
+        Boolean array of females with HPV whose disease severity level does not meet the threshold for detectable cell changes
         '''
-        return (self.infectious & (np.isnan(self.sev) | (self.sev==0))).astype(bool)
+        return ((self.sex == 0) & self.infectious & (np.isnan(self.sev) | (self.sev==0))).astype(bool)
 
     @property
     def cin1(self):
         '''
-        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN1-level cell changes
+        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN1-level cell changes
         '''
-        return (self.sev < self.pars['clinical_cutoffs']['cin1']).astype(bool)
+        return ((self.sex == 0) * (self.sev > 0) * (self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
 
     @property
     def cin2(self):
         '''
-        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN2-level cell changes
+        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN2-level cell changes
         '''
-        return ((self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
+        return ((self.sex == 0) * (self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
                  self.sev < self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     @property
     def cin3(self):
         '''
-        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN3-level cell changes
+        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN3-level cell changes
         '''
-        return (self.sev >= self.pars['clinical_cutoffs']['cin2']).astype(bool)
+        return ((self.sex == 0) * (self.sev >= self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     @property
     def cin(self):
         '''
-        Boolean array of everyone with whose disease severity level meets the threshold for detectable cell changes
+        Boolean array of females with HPV whose disease severity level meets the threshold for detectable cell changes
         '''
         return (self.sev>0).astype(bool)
 
