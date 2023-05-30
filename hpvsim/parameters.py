@@ -292,22 +292,6 @@ def get_vaccine_choices():
     return choices, mapping
 
 
-
-# def get_treatment_choices():
-#     '''
-#     Define valid pre-defined treatment names
-#     '''
-#     # List of choices currently available: new ones can be added to the list along with their aliases
-#     choices = {
-#         'default': ['default', None],
-#         'ablative':  ['ablative', 'thermal_ablation', 'TA'],
-#         'excisional': ['excisional', 'leep'],
-#         'radiation': ['radiation']
-#     }
-#     mapping = {name:key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
-#     return choices, mapping
-
-
 def _get_from_pars(pars, default=False, key=None, defaultkey='default'):
     ''' Helper function to get the right output from genotype functions '''
 
@@ -338,28 +322,28 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.hpv16.dur_episomal     = dict(dist='lognormal', par1=2, par2=5) # Duration of episomal infection prior to cancer
-    pars.hpv16.sev_fn           = dict(form='logf2', k=0.25, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv16.sev_fn           = dict(form='logf2', k=0.175, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.transform_prob   = 9/1e11 # Annual rate of transformed cell invading
+    pars.hpv16.transform_prob   = 1.3e-9 # Annual rate of transformed cell invading
     pars.hpv16.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=2, par2=5) # Duration of infection prior to cancer
-    pars.hpv18.sev_fn           = dict(form='logf2', k=0.2, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv18.sev_fn           = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.transform_prob   = 8 / 1e11 # Annual rate of transformed cell invading
+    pars.hpv18.transform_prob   = 1.0e-9 # Annual rate of transformed cell invading
     pars.hpv18.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
     pars.hi5 = sc.objdict()
     pars.hi5.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hi5.dur_episomal       = dict(dist='lognormal', par1=2, par2=6) # Duration of infection prior to cancer
-    pars.hi5.sev_fn             = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hi5.dur_episomal       = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
+    pars.hi5.sev_fn             = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hi5.rel_beta           = 0.9 # placeholder
-    pars.hi5.transform_prob     = 7 / 1e11 # Annual rate of transformed cell invading
+    pars.hi5.transform_prob     = 3e-10 # Annual rate of transformed cell invading
     pars.hi5.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hi5.sero_prob          = 0.60 # placeholder
 
@@ -367,9 +351,9 @@ def get_genotype_pars(default=False, genotype=None):
     pars.ohr = sc.objdict()
     pars.ohr.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.ohr.dur_episomal       = dict(dist='lognormal', par1=2, par2=6) # Duration of infection prior to cancer
-    pars.ohr.sev_fn             = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.ohr.sev_fn             = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.ohr.rel_beta           = 0.9 # placeholder
-    pars.ohr.transform_prob     = 7 / 1e11 # Annual rate of transformed cell invading
+    pars.ohr.transform_prob     = 3e-10 # Annual rate of transformed cell invading
     pars.ohr.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.ohr.sero_prob          = 0.60 # placeholder
 
@@ -378,9 +362,9 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hr = sc.objdict()
     pars.hr.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
     pars.hr.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.hr.sev_fn           = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hr.sev_fn           = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hr.rel_beta         = 0.9 # placeholder
-    pars.hr.transform_prob   = 7 / 1e11 # Annual rate of transformed cell invading
+    pars.hr.transform_prob   = 3e-10 # Annual rate of transformed cell invading
     pars.hr.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hr.sero_prob        = 0.60 # placeholder
 
