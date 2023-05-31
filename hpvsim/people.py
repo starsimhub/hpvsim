@@ -562,14 +562,6 @@ class People(hpb.BasePeople):
                 self.date_cin1[g, inds] = np.nan
                 self.date_cin2[g, inds] = np.nan
                 self.date_cin3[g, inds] = np.nan
-            # else:
-            #     date_cin2 = self.date_cin2[g,inds]
-            #     change_inds = hpu.true(date_cin2 > self.t)
-            #     self.date_cin2[g,inds[change_inds]] = np.nan
-            #
-            #     date_cin3 = self.date_cin3[g,inds]
-            #     change_inds = hpu.true(date_cin3 > self.t)
-            #     self.date_cin3[g,inds[change_inds]] = np.nan
 
         # Set the properties related to cell changes and disease severity markers
         self.cancerous[genotype, inds] = True
