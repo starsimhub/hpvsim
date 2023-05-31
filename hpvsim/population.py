@@ -332,13 +332,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
         current_partners[lno, new_pship_inds] += new_pship_counts
 
-        # f_sorted = f.sort()
-        # conditions = is_female & (age > 35) * (age < 40)
-        # denom = hpu.true(conditions)
-        # num_conditions = conditions * (current_partners[0, :] > 0)
-        # num_inds = hpu.true(num_conditions)
-        # prop_active = len(num_inds) / len(denom)
-
     return f, m, current_partners, new_pship_inds, new_pship_counts
 
 
