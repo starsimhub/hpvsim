@@ -61,33 +61,19 @@ def find_contacts(p1, p2, inds): # pragma: no cover
     return pairing_partners
 
 
-def logf1(x, k):
+def logf1(x, k, ttc=25):
     '''
-    The concave part of a logistic function, with point of inflexion at 0,0
-    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
+    Logistic function passing through (0,0) and (ttc,1).
+    Accepts 1 parameter which determines the growth rate.
     '''
-    return (2 / (1 + np.exp(-k * x))) - 1
+    return logf3(x, k, 0, 1, ttc=ttc)
 
 
-def invlogf1(y, k):
+def get_asymptotes(k, x_infl, s, ttc=25):
     '''
-    The inverse of the concave part of a logistic function, with point of inflexion at 0,0
-    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
+    Get upper asymptotes for logistic functions
     '''
-    return (-1/k)*np.log(2/(y + 1) - 1)
-
-
-def logf2(x, x_infl, k):
-    '''
-    Logistic function, constrained to pass through 0,0 and with upper asymptote
-    at 1. Accepts 2 parameters: growth rate and point of inflection.
-    '''
-    l_asymp = -1/(1+np.exp(k*x_infl))
-    return l_asymp + 1/( 1 + np.exp(-k*(x-x_infl)))
-
-
-def get_asymptotes(x_infl, k, ttc=25, s=1):
-    term1 = (1 + np.exp(k*(x_infl-ttc)))**s
+    term1 = (1 + np.exp(k*(x_infl-ttc)))**s # Note, this is 1 for most parameter combinations
     term2 = (1 + np.exp(k*x_infl))**s
     u_asymp_num = term1*(1-term2)
     u_asymp_denom = term1 - term2
@@ -95,47 +81,116 @@ def get_asymptotes(x_infl, k, ttc=25, s=1):
     l_asymp = term1 / (term1 - term2)
     return l_asymp, u_asymp
 
-def logf3(x, x_infl, k, ttc=25, s=1):
-    l_asymp, u_asymp = get_asymptotes(x_infl, k, ttc, s)
+
+def logf3(x, k, x_infl, s, ttc=25):
+    '''
+    Logistic function passing through (0,0) and (ttc,1).
+    This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+    However, since it's constrained to pass through 2 points, there are 3 free parameters remaining.
+    Args:
+         k: growth rate, equivalent to b in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         x_infl: a location parameter, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         s: asymmetry parameter, equivalent to s in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         ttc (time to cancer): x value for which the curve passess through 1. For x values beyond this, the function returns 1
+    '''
+    l_asymp, u_asymp = get_asymptotes(k, x_infl, s, ttc)
     return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
 
 
-def invlogf3(y, x_infl, k, ttc=25, s=1):
-    l_asymp, u_asymp = get_asymptotes(x_infl, k, ttc, s)
+def logf2(x, k, x_infl, ttc=25):
+    '''
+    Logistic function constrained to pass through (0,0) and (ttc,1).
+    This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+    Since it's constrained to pass through 2 points, there are 3 free parameters remaining, and this verison fixes s=1
+    Args:
+         k: growth rate, equivalent to b in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         x_infl: point of inflection, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         ttc (time to cancer): x value for which the curve passess through 1. For x values beyond this, the function returns 1
+    '''
+    return logf3(x, k, x_infl, s=1, ttc=ttc)
+
+
+def invlogf3(y, k, x_infl, s, ttc=25):
+    '''
+    Inverse of logf3; see definition there for arguments
+    '''
+    l_asymp, u_asymp = get_asymptotes(k, x_infl, s, ttc)
     part1 = np.log((u_asymp-l_asymp)/(y-l_asymp))/s
     part2 = np.log(np.exp(part1)-1)
     final = 1/k * (k*x_infl - part2)
     return final
 
 
-def invlogf2(y, x_infl, k):
+def invlogf2(y, k, x_infl, ttc=25):
     '''
-    Inverse logistic function, constrained to pass through 0,0 and with upper asymptote
-    at 1. Accepts 2 parameters: growth rate and point of inflection.
+    Inverse of logf2; see definition there for arguments
     '''
-    l_asymp = -1/(1+np.exp(k*x_infl))
-    val = (1/(y - l_asymp)) - 1
-    if (val < 0).any():
-        val[true(val < 0)] = 0.001
-        # raise ValueError
-    result = (-1/k)*np.log(val) + x_infl
-    return result
+    return invlogf3(y, k, x_infl, 1, ttc=ttc)
 
 
-def transform_prob(tp,dysp):
+def invlogf1(y, k, ttc=25):
     '''
-    Returns transformation probability given % of dysplastic cells
+    The inverse of the concave part of a logistic function, with point of inflexion at 0,0
+    and upper asymptote at 1. Accepts 1 parameter which determines the growth rate.
     '''
+    return invlogf3(y, k, 0, 1, ttc=ttc)
 
-    return 1-np.power(1-tp, dysp*100)
 
-
-def clearance_prob(init_clearance_prob, clearance_decay, dysp):
+def indef_int_logf2(x, k, x_infl, ttc=25):
     '''
-    Returns clearance probability given % of transformed cells
+    Indefinite integral of logf2; see definition there for arguments
     '''
+    num = np.exp(-x_infl*k)*(np.exp(k*ttc)+np.exp(x_infl*k))*((np.exp(x_infl*k)+1)*np.log(np.exp(k*x)+np.exp(x_infl*k))-k*x)
+    denom = k*(np.exp(k*ttc)-1)
+    return num/denom
 
-    return init_clearance_prob*(1-(1 - np.power(1 - clearance_decay, dysp * 100)))
+
+def intlogf2(upper, k, x_infl, ttc=25):
+    '''
+    Integral of logf2 between 0 and the limit given by upper
+    '''
+    # Find the upper limits not including the part past time to cancer
+    exceeding_ttc_inds = (upper > ttc).nonzero()
+    lims_to_find = np.minimum(ttc, upper)
+
+    # Take the integral
+    val_at_0 = indef_int_logf2(0, k, x_infl, ttc)
+    val_at_lim = indef_int_logf2(lims_to_find, k, x_infl, ttc)
+    integral = val_at_lim - val_at_0
+
+    # Deal with those whose duration of infection exceeds the time to cancer
+    # Note, another option would be to set their transformation probability to 1
+    excess_integral = upper[exceeding_ttc_inds] - ttc
+    integral[exceeding_ttc_inds] += excess_integral
+
+    return integral
+
+
+def indef_int_logf1(x, k, ttc=25):
+    '''
+    Indefinite integral of logf1; see definition there for arguments
+    '''
+    return indef_int_logf2(x, k, 0, ttc=ttc)
+
+
+def intlogf1(upper, k, ttc=25):
+    '''
+    Integral of logf1 between 0 and the limit given by upper
+    '''
+    return intlogf2(x, k, 0, ttc=ttc)
+
+
+def transform_prob(tp, dysp):
+    '''
+    Returns transformation probability given dysplasia
+    Using formula for half an ellipsoid:
+        V = 1/2 * 4/3 * pi * a*b*c
+          = 2 * a*b*c
+          = 2* dysp * (dysp/2)**2, assuming that b = c = 1/2 a
+          = 1/2 * dysp**3
+    '''
+    # return 1-np.power(1-tp, ((dysp*100)**2))
+    return 1-np.power(1-tp, 0.5*((dysp*100)**3))
 
 
 #%% Sampling and seed methods

@@ -266,7 +266,7 @@ class MultiSim(hpb.FlexPretty):
         sexkeys = reduced_sim.result_keys('sex')
         agekeys = reduced_sim.result_keys('age')
         type_dist_keys = reduced_sim.result_keys('type_dist')
-        n_age_bins = len(reduced_sim['age_bins'])-1
+        n_age_bins = len(reduced_sim['age_bin_edges'])-1
 
         for reskey in totalkeys:
             raw[reskey] = np.zeros((reduced_sim.res_npts, len(self.sims)))
@@ -1068,7 +1068,7 @@ class Scenarios(hpb.ParsObj):
             # Process the simulations
             print_heading(f'Processing {scenkey}')
             ng = scen_sims[0]['n_genotypes'] # Get number of genotypes
-            na = len(scen_sims[0]['age_bins'])-1 # Get number of age bins
+            na = len(scen_sims[0]['age_bin_edges'])-1 # Get number of age bins
             scenraw = {}
             for reskey in totalkeys:
                 scenraw[reskey] = np.zeros((self.res_npts, len(scen_sims)))

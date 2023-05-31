@@ -80,8 +80,9 @@ class PeopleMeta(sc.prettyobj):
             State('age',            default_float,  np.nan), # Float
             State('sex',            default_float,  np.nan), # Float
             State('debut',          default_float,  np.nan), # Float
+            State('ever_partnered', bool,  False), # Whether this person has ever been partnered
             State('sev',            default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
-            State('rel_sev',        default_float, 1.0), # Individual relative risk for rate severe disease growth (does not vary by genotype)
+            State('rel_sev',        default_float, 1.0), # Individual relative risk for rate severe disease growth
             State('rel_sus',        default_float, 1.0), # Individual relative risk for acquiring infection (does not vary by genotype)
             State('rel_imm',        default_float, 1.0), # Individual relative level of immunity acquired from infection clearance/vaccination
             State('doses',          default_int,    0),  # Number of doses of the prophylactic vaccine given per person
@@ -128,8 +129,7 @@ class PeopleMeta(sc.prettyobj):
             State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'), # Defined as those with clinical_cuttoff[0] < sev < clinical_cuttoff[1]
             State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'), # Defined as those with clinical_cuttoff[1] < sev < clinical_cuttoff[2]
             State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'), # Defined as those with clinical_cuttoff[2] < sev < clinical_cuttoff[3]
-            State('carcinoma',  bool, False, 'n_genotypes', label='Number with carcinoma in situ', color='#5f5cd2'), # Defined as those with clinical_cuttoff[3] < sev < clinical_cuttoff[4]
-            State('cin',        bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#5f5cd2'), # Union of CIN1, CIN3, CIN3, and carcinoma in situ
+            State('cin',        bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#5f5cd2'), # Union of CIN1, CIN3, and CIN3
         ]
 
         # Additional intervention states
@@ -197,6 +197,7 @@ class PeopleMeta(sc.prettyobj):
         dates += [
             State('date_clearance', default_float, np.nan, shape='n_genotypes'),
             State('date_exposed', default_float, np.nan, shape='n_genotypes'),
+            State('date_reactivated', default_float, np.nan, shape='n_genotypes'),
         ]
         return dates
 

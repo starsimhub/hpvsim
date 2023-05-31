@@ -34,7 +34,7 @@ def test_microsim():
     return sim
 
 
-def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest, turn off
+def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being run via pytest, turn off
     sc.heading('Basic sim test')
 
     # Settings
@@ -44,23 +44,23 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
-        'start': 1950,
+        'start': 1970,
         'burnin': 30,
         'end': 2030,
-        'location': 'tanzania',
-        'dt': .5,
+        'ms_agent_ratio': 100
     }
     pars = sc.mergedicts(pars, kwargs)
 
     # Create some genotype pars
     genotype_pars = {
         16: {
-            'sev_fn': dict(form='logf3', k=0.5, x_infl=5)
+            'sev_fn': dict(form='logf2', k=0.25, x_infl=0, ttc=30)
         }
     }
 
     sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars, rand_seed=seed)
-    sim.run(verbose=verbose)
+    if do_run:
+        sim.run(verbose=verbose)
 
     # Optionally plot
     if do_plot:
@@ -181,9 +181,9 @@ def test_states():
                 d0 = (~((~people.infectious[g,:]) & people.cin[g,:])).any()
                 if not d0:
                     raise ValueError('People without active infection should not have detectable cell changes/')
-                d1 = (people.normal[g,:] | people.precin[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.carcinoma[g,:] | people.cancerous[g,:] | removed).all()
+                d1 = (people.normal[g,:] | people.precin[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
                 if not d1:
-                    raise ValueError('States {normal, precin, cin1, cin2, cin3, carcinoma, cancerous} should be collectively exhaustive but are not.')
+                    raise ValueError('States {normal, precin, cin1, cin2, cin3, cancerous} should be collectively exhaustive but are not.')
                 d2 = ~(people.precin[g,:] & people.cin1[g,:]).all()
                 if not d2:
                     raise ValueError('States {precin, cin1} should be mutually exclusive but are not.')
@@ -231,9 +231,9 @@ def test_states():
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
                 # Severity markers
-                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.infectious[g,:] & people.is_female & ~removed))) == 0
+                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.cin[g,:] & people.is_female & ~removed))) == 0
                 if not v1:
-                    raise ValueError('All women with active infection should have a severity marker.')
+                    raise ValueError('All women with CINs should have a severity marker.')
                 v2 = len(hpv.true((~np.isnan(people.sev[g,:]) & ~people.infectious[g,:] & people.is_female & ~removed))) == 0
                 if not v2:
                     raise ValueError('No women without active infection should have severity markers.')
@@ -261,7 +261,7 @@ def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
-    sim = hpv.Sim(n_agents=100, genotypes=[16], label='test_label')
+    sim = hpv.Sim(n_agents=100, ms_agent_ratio=1, genotypes=[16], label='test_label')
     sim.reset_layer_pars()
     sim.initialize()
     sim.reset_layer_pars()
@@ -281,12 +281,14 @@ def test_flexible_inputs():
     with pytest.raises(ValueError):
         sim.validate_pars()
 
+
     # Can't have both end_days and n_years None
     sim['end'] = None
     sim['n_years'] = None
     with pytest.raises(ValueError):
         sim.validate_pars()
     sim['n_years'] = 10 # Restore
+
 
     # Check different initial conditions
     sim['init_hpv_prev'] = [0.08, 0.2] # Can't accept an array without age brackets
