@@ -173,7 +173,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
     geo             = np.random.choice(range(int(pars['geostructure'])), new_n)
     if pars['clustered_risk'] > 1:
-        rel_sev     = np.zeros((len(uid)))
+        rel_sev     = np.zeros((new_n))
         rel_sevs    = hpu.sample(**pars['sev_dist'], size=int(pars['geostructure']))
         for ig, rs in enumerate(rel_sevs):
             rel_sev_cluster = hpu.sample(**sc.mergedicts(pars['sev_dist'], {'par1': rs, 'par2': pars['sev_dist']['par2']/pars['clustered_risk']}), size=len(hpu.true(geo==ig)))
