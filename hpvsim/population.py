@@ -170,9 +170,17 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut           = np.full(new_n, np.nan, dtype=hpd.default_float)
     debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
-    rel_sev         = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
     geo             = np.random.choice(range(int(pars['geostructure'])), new_n)
+    if pars['clustered_risk'] > 1:
+        rel_sev     = np.zeros((len(uid)))
+        rel_sevs    = hpu.sample(**pars['sev_dist'], size=int(pars['geostructure']))
+        for ig, rs in enumerate(rel_sevs):
+            rel_sev_cluster = hpu.sample(**sc.mergedicts(pars['sev_dist'], {'par1': rs, 'par2': pars['sev_dist']['par2']/pars['clustered_risk']}), size=len(hpu.true(geo==ig)))
+            rel_sev[geo==ig] = rel_sev_cluster
+    else:
+        rel_sev     = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
+
     return uid, sex, debut, rel_sev, partners, geo
 
 
