@@ -63,6 +63,7 @@ def make_pars(**kwargs):
     pars['hiv_pars']        = sc.objdict()  # Can be directly modified by passing in arguments listed in hiv_pars
 
     # Network parameters, generally initialized after the population has been constructed
+    pars['geostructure']    = 1     # Defines how many geographic clusters there should be in the simulated population
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
     pars['cross_layer']     = 0.05  # Proportion of females who have crosslayer relationships

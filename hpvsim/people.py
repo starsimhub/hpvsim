@@ -693,7 +693,7 @@ class People(hpb.BasePeople):
 
         if new_births>0:
             # Generate other characteristics of the new people
-            uids, sexes, debuts, rel_sev, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
+            uids, sexes, debuts, rel_sev, partners, geo = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
             
             # Grow the arrays`
             new_inds = self._grow(new_births)
@@ -704,9 +704,10 @@ class People(hpb.BasePeople):
             self.debut[new_inds]        = debuts
             self.rel_sev[new_inds]      = rel_sev
             self.partners[:,new_inds]   = partners
+            self.geo[new_inds]          = geo
 
             if immunity is not None:
-                self.nab_imm[:,new_inds] = immunity
+                self.imm[:,new_inds] = immunity
 
 
         return new_births*self.pars['pop_scale'] # These are not indices, so they scale differently
