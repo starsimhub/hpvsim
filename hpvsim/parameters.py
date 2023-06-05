@@ -65,7 +65,7 @@ def make_pars(**kwargs):
     # Network parameters, generally initialized after the population has been constructed
     pars['geostructure']    = 1     # Defines how many geographic clusters there should be in the simulated population
     pars['clustered_risk']  = 1     # Strength of relationship between rel_sev and geo-clustering, where 1 means there is no relationship and values above 1 refer to how much more similar clusters are wrt rel_sev
-    pars['random_pairing']  = True  # If no partners found, pair randomly
+    pars['random_pairing']  = False # If no partners found, pair randomly. Otherwise skip this timestep
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
     pars['cross_layer']     = 0.05  # Proportion of females who have crosslayer relationships
