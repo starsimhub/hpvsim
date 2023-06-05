@@ -294,6 +294,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     f_active        =  is_female & is_active
     m_active        = ~is_female & is_active
     underpartnered  = current_partners[lno, :] < partners  # Indices of underpartnered people
+    geo_range = np.unique(geostructure)  # Extract number of geographic clusters
 
     # Figure out how many new relationships to create by calculating the number of females
     # who are underpartnered in this layer and either unpartnered in other layers or available
@@ -308,9 +309,8 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 
     # Bin the females by age
     bins        = layer_probs[0, :]  # Extract age bins
-    geo_bin_range_f = np.unique(geostructure)
-    for gab in geo_bin_range_f:
-        f_eligible_inds = hpu.true(f_eligible * (geostructure == gab))
+    for geo in geo_range:
+        f_eligible_inds = hpu.true(f_eligible * (geostructure == geo))  # Inds of females in this geographic cluster
         age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
         bin_range_f = np.unique(age_bins_f)  # Range of bins
         f_geo = []  # Initialize the female partners
@@ -321,7 +321,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 
         # Probabilities for males to be selected for new relationships
         m_probs = np.zeros(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
-        m_active_geo = m_active * (geostructure==gab)
+        m_active_geo = m_active * (geostructure==geo) # Filter out active males in this geographic cluster
         m_probs[m_active_geo] = 1  # Only select sexually active males in this geography
         m_probs[underpartnered] *= pref_weight  # Increase weight for those who are underpartnerned
 
