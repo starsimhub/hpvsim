@@ -309,7 +309,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 
     # Bin the females by age
     bins        = layer_probs[0, :]  # Extract age bins
-    for geo in geo_range:
+    for geo in geo_range: # TODO: this is very slow if geo_range is >10; make faster!
         f_eligible_inds = hpu.true(f_eligible * (geostructure == geo))  # Inds of females in this geographic cluster
         age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
         bin_range_f = np.unique(age_bins_f)  # Range of bins
