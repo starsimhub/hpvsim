@@ -115,7 +115,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
                     pref_weight=100, durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey],
-                    geo_structure=geo, **kwargs
+                    random_pairing=sim['random_pairing'], geo_structure=geo, **kwargs
                 )
                 lno += 1
 
@@ -266,7 +266,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
 
 
 def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
-                        layer_probs, pref_weight, cross_layer, geostructure):
+                        layer_probs, pref_weight, cross_layer, random_pairing, geostructure):
     '''
     Create partnerships for a single layer
     Args:
@@ -280,6 +280,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         layer_probs         (float arr): participation rates in this layer by age and sex
         pref_weight         (float): weight that determines the extent to which people without their preferred number of partners are preferenced for selection
         cross_layer         (float): proportion of females that have cross-layer relationships
+        random_pairing      (bool): whether or not random pairing should be applied if not partners are found
         geostructure        (int arr): array containing each agents geographic location
     '''
 
@@ -325,6 +326,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         m_probs[m_active_geo] = 1  # Only select sexually active males in this geography
         m_probs[underpartnered] *= pref_weight  # Increase weight for those who are underpartnerned
 
+        f_inds_to_remove = []  # list of female inds to remove if no male parters are found for her
         # Draw male partners based on mixing matrices
         if len(f_geo) > 0:
 
@@ -338,18 +340,24 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                 male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
                 this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
                 if this_weighting.sum() == 0:
-                    this_weighting[:] = 1.0
-                    print('Warning, no males were found for pairing, choosing randomly')
+                    if random_pairing:
+                        this_weighting[:] = 1.0
+                        print('Warning, no males were found for pairing, choosing randomly')
+                    else:
+                        f_inds_to_remove += list(np.array(f_geo)[hpu.true(age_bins_f==ab)])
+                        print('Warning, no males were found for pairing, no partnerships created for this timestep')
                 nonzero_weighting = hpu.true(this_weighting != 0)
-                selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
-                m_geo += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
+                if len(nonzero_weighting):
+                    selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
+                    m_geo += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
 
-
+            f_geo = [i for i in f_geo if i not in f_inds_to_remove]  # remove the inds who don't get paired on this timestep
             # Count how many contacts there actually are
             new_pship_inds, new_pship_counts = np.unique(np.concatenate([f_geo, m_geo]), return_counts=True)
-            current_partners[lno, new_pship_inds] += new_pship_counts
-            f += f_geo
-            m += m_geo
+            if len(new_pship_inds):
+                current_partners[lno, new_pship_inds] += new_pship_counts
+                f += f_geo
+                m += m_geo
 
     f = np.array(f)
     m = np.array(m)
@@ -361,7 +369,8 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
                   sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
                   mixing=None, layer_probs=None, cross_layer=None,
-                  pref_weight=None, durations=None, acts=None, age_act_pars=None, geo_structure=None):
+                  pref_weight=None, durations=None, acts=None, age_act_pars=None, random_pairing=None,
+                  geo_structure=None):
     '''
     Make contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females using age structure if given.
@@ -370,7 +379,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
     # Create edgelist
     f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(
         lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
-        layer_probs, pref_weight, cross_layer, geo_structure)
+        layer_probs, pref_weight, cross_layer, random_pairing, geo_structure)
 
     # Convert edgelist into Contacts dict, with info about each partnership's duration,
     # coital frequency, etc
