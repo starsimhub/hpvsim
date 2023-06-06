@@ -296,6 +296,9 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     m_active        = ~is_female & is_active
     underpartnered  = current_partners[lno, :] < partners  # Indices of underpartnered people
     geo_range = np.unique(geostructure)  # Extract number of geographic clusters
+    geo_cross_mixing = 0.1  # relative mixing with people in other geo bins; should be equivalent to well-mixed when set at 1
+    geo_mixing = np.full([geo_range.size,geo_range.size], geo_cross_mixing)  # mixing matrix across geo bins
+    geo_mixing[np.diag_indices_from(geo_mixing)] = 1  # set diagonal to 1
 
     # Figure out how many new relationships to create by calculating the number of females
     # who are underpartnered in this layer and either unpartnered in other layers or available
@@ -322,8 +325,9 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 
         # Probabilities for males to be selected for new relationships
         m_probs = np.zeros(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
-        m_active_geo = m_active * (geostructure==geo) # Filter out active males in this geographic cluster
-        m_probs[m_active_geo] = 1  # Only select sexually active males in this geography
+        #m_active_geo = m_active * (geostructure==geo) # Filter out active males in this geographic cluster
+        #m_probs[m_active_geo] = 1  # Only select sexually active males in this geography
+        m_probs[m_active] = 1
         m_probs[underpartnered] *= pref_weight  # Increase weight for those who are underpartnerned
 
         f_inds_to_remove = []  # list of female inds to remove if no male parters are found for her
@@ -331,14 +335,15 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         if len(f_geo) > 0:
 
             bins = mixing[:, 0]
-            m_active_inds = hpu.true(m_active_geo)  # Indices of active males
+            #m_active_inds = hpu.true(m_active_geo)  # Indices of active males
+            m_active_inds = hpu.true(m_active)  # Indices of active males
             age_bins_f = np.digitize(age[f_geo], bins=bins) - 1  # Age bins of females that are entering new relationships
             age_bins_m = np.digitize(age[m_active_inds], bins=bins) - 1  # Age bins of active males
             bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
 
             for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
                 male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
-                this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m]  # Weight males according to the age preferences of females of this age
+                this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m] * geo_mixing[geo,geostructure[m_active_inds]] # Weight males according to the age preferences of females of this age
                 if this_weighting.sum() == 0:
                     if random_pairing:
                         this_weighting[:] = 1.0
@@ -347,7 +352,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                         f_inds_to_remove += list(np.array(f_geo)[hpu.true(age_bins_f==ab)])
                         print('Warning, no males were found for pairing, no partnerships created for this timestep')
                 nonzero_weighting = hpu.true(this_weighting != 0)
-                if len(nonzero_weighting):
+                if len(nonzero_weighting): # TODO: need to update the underpartnered male list
                     selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
                     m_geo += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
 
