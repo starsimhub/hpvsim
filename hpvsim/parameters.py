@@ -64,7 +64,8 @@ def make_pars(**kwargs):
 
     # Network parameters, generally initialized after the population has been constructed
     pars['geostructure']    = 1     # Defines how many geographic clusters there should be in the simulated population
-    pars['geo_mixing']      = 1     # Relative mixing between geo-clusters
+    pars['geo_mixing_steps']= None  # Relative mixing between geo-clusters
+    pars['geomixing']       = None  # Mixing matrix between geographic clusters
     pars['clustered_risk']  = 1     # Strength of relationship between rel_sev and geo-clustering, where 1 means there is no relationship and values above 1 refer to how much more similar clusters are wrt rel_sev
     pars['random_pairing']  = False # If no partners found, pair randomly. Otherwise skip this timestep
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
@@ -135,6 +136,7 @@ def make_pars(**kwargs):
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
     reset_layer_pars(pars)
+    get_geo_mixing(pars)
 
     return pars
 
@@ -738,3 +740,20 @@ def compute_severity_integral(t, rel_sev=None, pars=None):
 
     return output
 
+def get_geo_mixing(pars):
+    # create geo mixing preference matrix
+    # TODO: need to deal with custom input of geo mixing matrix
+    geo_size = int(pars['geostructure'])
+    geomixing = np.zeros([geo_size, geo_size])
+
+    if pars.get('geo_mixing_steps'):
+        if geo_size < len(pars['geo_mixing_steps']):
+            print('Warning: input geo_mixing_steps larger than number of geographic clusters.')
+        for i, gs in enumerate(pars['geo_mixing_steps'][:geo_size - 1]):
+            geomixing += np.diagflat(np.repeat(gs, geo_size - i - 1), i + 1)
+        geomixing += geomixing.T
+
+    geomixing[np.diag_indices_from(geomixing)] = 1  # set diagonal to 1
+    pars['geomixing'] = geomixing
+    print(geomixing)
+    return
