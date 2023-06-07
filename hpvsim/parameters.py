@@ -754,5 +754,4 @@ def get_geo_mixing(pars):
 
     geomixing[np.diag_indices_from(geomixing)] = 1  # set diagonal to 1
     pars['geomixing'] = geomixing
-    print(geomixing)
     return
