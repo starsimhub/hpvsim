@@ -345,6 +345,9 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
             for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
                 male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
                 this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m] * geomixing[geo,geostructure[m_active_inds]] # Weight males according to the age preferences of females of this age
+                this_weighting_norm =  (this_weighting-np.min(this_weighting))/(np.max(this_weighting)-np.min(this_weighting))
+                males_selected = hpu.true(this_weighting_norm)
+                this_weighting_selected = this_weighting[males_selected]
                 if this_weighting.sum() == 0:
                     if random_pairing:
                         this_weighting[:] = 1.0
@@ -354,9 +357,16 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                         print('Warning, no males were found for pairing, no partnerships created for this timestep')
                 nonzero_weighting = hpu.true(this_weighting != 0)
                 if len(nonzero_weighting): # TODO: need to update the underpartnered male list
-                    selected_males = hpu.choose_w(this_weighting[nonzero_weighting], nm, unique=False)  # Select males
-                    m_geo += m_active_inds[nonzero_weighting[selected_males]].tolist()  # Extract the indices of the selected males and add them to the contact list
-
+                    if nm > len(this_weighting_selected):
+                        print(f'Warning, {nm} males desired but only {len(this_weighting_selected)} found.')
+                        f_inds = np.array(f_geo)[hpu.true(age_bins_f == ab)]
+                        selected_f = hpu.choose(nm, len(this_weighting_selected))
+                        f_inds_selected = f_inds[selected_f]
+                        f_inds_to_remove += list(np.setdiff1d(f_inds, f_inds_selected))
+                        nm = len(f_inds_selected)
+                    selected_males = males_selected[hpu.choose_w(this_weighting_selected, nm)] # Select males
+                    m_geo += m_active_inds[selected_males].tolist()  # Extract the indices of the selected males and add them to the contact list
+                    m_probs[selected_males] = 0
             f_geo = [i for i in f_geo if i not in f_inds_to_remove]  # remove the inds who don't get paired on this timestep
             # Count how many contacts there actually are
             new_pship_inds, new_pship_counts = np.unique(np.concatenate([f_geo, m_geo]), return_counts=True)
