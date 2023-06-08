@@ -745,7 +745,7 @@ def get_geo_mixing(pars):
     geo_size = int(pars['geostructure'])
     geomixing = np.zeros([geo_size, geo_size])
 
-    if pars.get('geo_mixing_steps'):
+    if pars['geo_mixing_steps'] is not None:
         if geo_size < len(pars['geo_mixing_steps']):
             print('Warning: input has {} mixing steps but only {} geographic clusters.'.format(len(pars['geo_mixing_steps']), geo_size))
         for i, gs in enumerate(pars['geo_mixing_steps'][:geo_size - 1]):
