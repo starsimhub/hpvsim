@@ -310,6 +310,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     f_cross_layer           = np.full(n_agents, False, dtype=bool) # Construct a boolean array indicating whether people have cross-layer relationships
     f_cross_layer[f_cross]  = True # Only true for the selected females
     f_eligible              = is_female & is_active & underpartnered & (~other_partners | f_cross_layer)
+    # TODO: do we need to check these for males?
 
     # Bin the females by age
     bins        = layer_probs[0, :]  # Extract age bins
@@ -323,9 +324,18 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     for ab in bin_range_f:  # Loop over age bins
         these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
         f += these_f_contacts.tolist()
+
+    # Select males according to their participation rate in this layer
+    m_eligible_inds = hpu.true(m_active)
+    age_bins_m = np.digitize(age[m_eligible_inds], bins=bins) - 1
+    bin_range_m = np.unique(age_bins_m)  # Range of bins
+    m_selected = []
+    for ab in bin_range_m:
+        these_m_contacts = hpu.binomial_filter(layer_probs[2][ab], m_eligible_inds[age_bins_m == ab])  # Select males according to their participation rate in this layer
+        m_selected += these_m_contacts.tolist()
     # Probabilities for males to be selected for new relationships
     m_probs = np.zeros(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
-    m_probs[m_active] = 1
+    m_probs[m_selected] = 1
     m_probs[~underpartnered] /= pref_weight  # Decrease weight for those who are not underpartnerned
 
     f_inds_to_remove = []  # list of female inds to remove if no male parters are found for her
@@ -333,23 +343,23 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     # Draw male partners based on mixing matrices
     if len(f) > 0:
         bins = mixing[:, 0]
-        m_active_inds = hpu.true(m_active)  # Indices of active males
+        #m_active_inds = hpu.true(m_active)  # Indices of active males
         age_bins_f = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
-        age_bins_m = np.digitize(age[m_active_inds], bins=bins) - 1  # Age bins of active males
+        age_bins_m = np.digitize(age[m_selected], bins=bins) - 1  # Age bins of active and participating males
         bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
         for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
             male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
             for f_select in np.array(f)[age_bins_f == ab]: # Loop through females in this age bin
-                this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m] * geomixing[geostructure[f_select], geostructure[m_active_inds]]  # Weight males according to the age preferences of females of this age
+                this_weighting = m_probs[m_selected] * male_dist[age_bins_m] * geomixing[geostructure[f_select], geostructure[m_selected]]  # Weight males according to the age preferences of females of this age
                 eligible_males = hpu.true(this_weighting) # Decide which males are eligible to partner this timestep
                 this_weighting_selected = this_weighting[eligible_males] # Subset weighting for those eligible men
                 if len(this_weighting_selected) == 0:
-                    f_inds_to_remove += f_select
+                    f_inds_to_remove += [f_select]
                     print('Warning, no males were found for pairing, no partnerships created for this timestep')
                 else:
                     selected_male = eligible_males[hpu.choose_w(this_weighting_selected, 1)]  # Select males
-                    m += m_active_inds[selected_male].tolist()  # Extract the indices of the selected males and add them to the contact list
-                    m_probs[selected_male] /= pref_weight  # Todo: maybe set at 0 so no more than 1 partners could be assigned during one time step?
+                    m += selected_male.tolist()  # Extract the indices of the selected males and add them to the contact list
+                    m_probs[selected_male] /= pref_weight
         f = [i for i in f if i not in f_inds_to_remove]  # remove the inds who don't get paired on this timestep
         # Count how many contacts there actually are
         new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
