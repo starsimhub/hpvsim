@@ -317,8 +317,8 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         f_eligible_inds = hpu.true(f_eligible * (geostructure == geo))  # Inds of females in this geographic cluster
         age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
         bin_range_f = np.unique(age_bins_f)  # Range of bins
-        f_geo = []  # Initialize the female partners
-        m_geo = []  # Initialize the male partners
+        f_geo = []  # Initialize the female partners in this geography
+        m_geo = []  # Initialize the male partners in this geography
         for ab in bin_range_f:  # Loop over age bins
             these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
             f_geo += these_f_contacts.tolist()
@@ -326,7 +326,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         # Probabilities for males to be selected for new relationships
         m_probs = np.zeros(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
         m_probs[m_active] = 1
-        m_probs[underpartnered] *= pref_weight  # Increase weight for those who are underpartnerned
+        m_probs[~underpartnered] /= pref_weight  # Decrease weight for those who are not underpartnerned
 
         f_inds_to_remove = []  # list of female inds to remove if no male parters are found for her
         # Draw male partners based on mixing matrices
@@ -341,9 +341,8 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
             for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
                 male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
                 this_weighting = m_probs[m_active_inds] * male_dist[age_bins_m] * geomixing[geo,geostructure[m_active_inds]] # Weight males according to the age preferences of females of this age
-                this_weighting_norm =  (this_weighting-np.min(this_weighting))/(np.max(this_weighting)-np.min(this_weighting)) # Normalize weights
-                males_selected = hpu.true(this_weighting_norm) # Decide which males are going to be eligible to partner this timestep
-                this_weighting_selected = this_weighting[males_selected] # Subset weighting for those eligible men
+                eligible_males = hpu.true(this_weighting) # Decide which males are eligible to partner this timestep
+                this_weighting_selected = this_weighting[eligible_males] # Subset weighting for those eligible men
                 if len(this_weighting_selected) == 0:
                     f_inds_to_remove += list(np.array(f_geo)[hpu.true(age_bins_f == ab)])
                     print('Warning, no males were found for pairing, no partnerships created for this timestep')
@@ -356,9 +355,9 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                         f_inds_selected = f_inds[selected_f]
                         f_inds_to_remove += list(np.setdiff1d(f_inds, f_inds_selected))
                         nm = len(f_inds_selected)
-                    selected_males = males_selected[hpu.choose_w(this_weighting_selected, nm)] # Select males
+                    selected_males = eligible_males[hpu.choose_w(this_weighting_selected, nm)] # Select males
                     m_geo += m_active_inds[selected_males].tolist()  # Extract the indices of the selected males and add them to the contact list
-                    m_probs[selected_males] = 0
+                    m_probs[selected_males] /= pref_weight
             f_geo = [i for i in f_geo if i not in f_inds_to_remove]  # remove the inds who don't get paired on this timestep
             # Count how many contacts there actually are
             new_pship_inds, new_pship_counts = np.unique(np.concatenate([f_geo, m_geo]), return_counts=True)
