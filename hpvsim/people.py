@@ -708,7 +708,7 @@ class People(hpb.BasePeople):
             self.geo[new_inds]          = geo
 
             if immunity is not None:
-                self.imm[:,new_inds] = immunity
+                self.nab_imm[:,new_inds] = immunity
 
 
         return new_births*self.pars['pop_scale'] # These are not indices, so they scale differently
