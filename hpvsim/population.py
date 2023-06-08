@@ -366,8 +366,8 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                         m_probs[selected_male] /= pref_weight
 
         f = [i for i in f if i not in f_inds_to_remove]  # remove the inds who don't get paired on this timestep
-        if len(f_inds_to_remove):
-            print(f'Warning, no males were found for {len(f_inds_to_remove)} women this timestep')
+        # if len(f_inds_to_remove):
+        #     print(f'Warning, no males were found for {len(f_inds_to_remove)} women this timestep')
         # Count how many contacts there actually are
         new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
         if len(new_pship_inds):
