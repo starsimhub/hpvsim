@@ -171,7 +171,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
-    geo             = np.random.choice(range(int(pars['geostructure'])), new_n)
+    geo             = np.random.choice(range(int(pars['geostructure'])), new_n) #TODO: allow these to be differently sized
 
 
     if pars['clustered_risk'] > 1: # Clustering relative severity by geographic cluster
