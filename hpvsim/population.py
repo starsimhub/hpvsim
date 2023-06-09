@@ -76,8 +76,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 warnmsg = f'Could not load age data for requested location "{location}" ({str(E)})'
                 hpm.warn(warnmsg, die=True)
 
-        uids, sexes = set_static(n_agents, sex_ratio=sex_ratio)
-        debuts, rel_sev, partners, geo = set_network(n_agents, sexes, pars=sim.pars)
+        uids, sexes, debuts, rel_sev, partners, geo = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
 
         # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
@@ -161,21 +160,13 @@ def partner_count(n_agents=None, partner_pars=None):
     return np.array(partners)
 
 
-def set_static(new_n, existing_n=0, sex_ratio=0.5):
+def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     '''
     Set static population characteristics that do not change over time.
     Can be used when adding new births, in which case the existing popsize can be given.
     '''
     uid             = np.arange(existing_n, existing_n+new_n, dtype=hpd.default_int)
     sex             = np.random.binomial(1, sex_ratio, new_n)
-
-    return uid, sex
-
-def set_network(new_n, sex, pars=None):
-    '''
-    Set static population characteristics that do not change over time.
-    Can be used when adding new births, in which case the existing popsize can be given.
-    '''
     debut           = np.full(new_n, np.nan, dtype=hpd.default_float)
     debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
@@ -194,7 +185,7 @@ def set_network(new_n, sex, pars=None):
     else:
         rel_sev     = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
 
-    return debut, rel_sev, partners, geo
+    return uid, sex, debut, rel_sev, partners, geo
 
 
 def validate_popdict(popdict, pars, verbose=True):

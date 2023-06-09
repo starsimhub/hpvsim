@@ -694,9 +694,8 @@ class People(hpb.BasePeople):
 
         if new_births>0:
             # Generate other characteristics of the new people
-            uids, sexes = hppop.set_static(new_n=new_births, existing_n=len(self))
-            debuts, rel_sev, partners, geo = hppop.set_network(new_n=new_births, sex=sexes, pars=self.pars)
-            
+            uids, sexes, debuts, rel_sev, partners, geo = hppop.set_static(new_n=new_births, existing_n=len(self),
+                                                                           pars=self.pars)
             # Grow the arrays`
             new_inds = self._grow(new_births)
             self.uid[new_inds]          = uids
