@@ -176,7 +176,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
 
     if pars['clustered_risk'] > 1: # Clustering relative severity by geographic cluster
         rel_sev     = np.zeros((new_n))
-        rel_sevs    = hpu.sample(**pars['sev_dist'], size=int(pars['geostructure']))
+        rel_sevs    = pars['cluster_rel_sev']
         # For each unique cluster, draw rel_sev values from a rel_sev dist with adjusted SD based upon degree of clustering
         for ig, rs in enumerate(rel_sevs):
             rel_sev_cluster = hpu.sample(**sc.mergedicts(pars['sev_dist'], {'par1': rs, 'par2': pars['sev_dist']['par2']/pars['clustered_risk']}),

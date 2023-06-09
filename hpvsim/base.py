@@ -297,6 +297,9 @@ class BaseSim(ParsObj):
                 location = pars['location']
                 pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
             if pars.get('geostructure'):
+                if not create:
+                    pars = sc.mergedicts(pars, {'sev_dist':self['sev_dist']})
+
                 hppar.get_geo_mixing(pars)
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
