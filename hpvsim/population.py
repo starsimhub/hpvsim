@@ -287,8 +287,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     '''
 
     # Initialize
-    f_paired           = [] # Initialize the female partners
-    m_paired           = [] # Initialize the male partners
     new_pship_inds, new_pship_counts = [], [] # Initialize the indices and counts of new partnerships
 
     # Useful variables
@@ -297,8 +295,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     f_active        =  is_female & is_active
     m_active        = ~is_female & is_active
     underpartnered  = current_partners[lno, :] < partners  # Indices of underpartnered people
-    geo_range = np.unique(geostructure)  # Extract number of geographic clusters
-
 
     # Figure out how many new relationships to create by calculating the number of females
     # who are underpartnered in this layer and either unpartnered in other layers or available
@@ -311,7 +307,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     f_cross_layer[f_cross]  = True # Only true for the selected females
     f_eligible              = is_female & is_active & underpartnered & (~other_partners | f_cross_layer)
     m_eligible              = m_active & underpartnered
-    # TODO: do we need to check these for males?
 
     # Bin the females by age
     bins        = layer_probs[0, :]  # Extract age bins
@@ -337,13 +332,11 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     # Probabilities for males to be selected for new relationships
     m_probs = np.zeros(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
     m_probs[m_selected] = 1
-
     f_inds_to_remove = []  # list of female inds to remove if no male parters are found for her
 
     # Draw male partners based on mixing matrices
     if len(f) > 0:
         bins = mixing[:, 0]
-        #m_active_inds = hpu.true(m_active)  # Indices of active males
         age_bins_f = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
         age_bins_m = np.digitize(age[m_selected], bins=bins) - 1  # Age bins of active and participating males
         bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
@@ -366,14 +359,10 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                         m_probs[selected_male] /= pref_weight
 
         f = [i for i in f if i not in f_inds_to_remove]  # remove the inds who don't get paired on this timestep
-        # if len(f_inds_to_remove):
-        #     print(f'Warning, no males were found for {len(f_inds_to_remove)} women this timestep')
         # Count how many contacts there actually are
         new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
         if len(new_pship_inds):
             current_partners[lno, new_pship_inds] += new_pship_counts
-            f_paired += f
-            m_paired += m
 
     f_paired = np.array(f)
     m_paired = np.array(m)
