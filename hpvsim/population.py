@@ -307,8 +307,8 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     cross_inds              = hpu.binomial_filter(cross_layer, other_partners_inds) # Indices who have cross-layer relationships
     cross_layer_bools       = np.full(n_agents, False, dtype=bool) # Construct a boolean array indicating whether people have cross-layer relationships
     cross_layer_bools[cross_inds]  = True # Only true for the selected agents
-    f_eligible              = is_female & is_active & underpartnered & (~other_partners | cross_layer_bools)
-    m_eligible              = m_active & underpartnered& (~other_partners | cross_layer_bools)
+    f_eligible              = f_active & underpartnered & (~other_partners | cross_layer_bools)
+    m_eligible              = m_active & underpartnered & (~other_partners | cross_layer_bools)
 
     # Bin the females by age
     bins        = layer_probs[0, :]  # Extract age bins
