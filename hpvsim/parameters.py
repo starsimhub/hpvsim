@@ -70,7 +70,7 @@ def make_pars(**kwargs):
     pars['cluster_rel_sev'] = None  # Array of cluster-specific rel_sev values
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
-    pars['cross_layer']     = 0.05  # Proportion of females who have crosslayer relationships
+    pars['cross_layer']     = 0.05  # Proportion of agents who have concurrent cross-layer relationships
     pars['partners']        = None  # The number of concurrent sexual partners for each partnership type
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
     pars['condoms']         = None  # The proportion of acts in which condoms are used for each partnership type

@@ -284,7 +284,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         is_female           (bool arr): whether each person is female
         layer_probs         (float arr): participation rates in this layer by age and sex
         pref_weight         (float): weight that determines the extent to which people without their preferred number of partners are preferenced for selection
-        cross_layer         (float): proportion of females that have cross-layer relationships
+        cross_layer         (float): proportion of agents that have cross-layer relationships
         geostructure        (int arr): array containing each agents geographic location
         geomixing           (float arr): geo mixing matrix
     '''
@@ -298,17 +298,17 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     m_active        = ~is_female & is_active
     underpartnered  = current_partners[lno, :] < partners  # Indices of underpartnered people
 
-    # Figure out how many new relationships to create by calculating the number of females
+    # Figure out how many new relationships to create by calculating the number of agents
     # who are underpartnered in this layer and either unpartnered in other layers or available
     # for cross-layer participation
     other_layers            = np.delete(np.arange(n_layers), lno)  # Indices of all other layers but this one
     other_partners          = current_partners[other_layers, :].any(axis=0)  # Whether or not people already partnered in other layers
-    other_partners_f        = hpu.true(other_partners & f_active) # Indices of sexually active females with parthers in other layers
-    f_cross                 = hpu.binomial_filter(cross_layer, other_partners_f) # Indices of females who have cross-layer relationships
-    f_cross_layer           = np.full(n_agents, False, dtype=bool) # Construct a boolean array indicating whether people have cross-layer relationships
-    f_cross_layer[f_cross]  = True # Only true for the selected females
-    f_eligible              = is_female & is_active & underpartnered & (~other_partners | f_cross_layer)
-    m_eligible              = m_active & underpartnered
+    other_partners_inds     = hpu.true(other_partners) # Indices of sexually active agents with partners in other layers
+    cross_inds              = hpu.binomial_filter(cross_layer, other_partners_inds) # Indices who have cross-layer relationships
+    cross_layer_bools       = np.full(n_agents, False, dtype=bool) # Construct a boolean array indicating whether people have cross-layer relationships
+    cross_layer_bools[cross_inds]  = True # Only true for the selected agents
+    f_eligible              = is_female & is_active & underpartnered & (~other_partners | cross_layer_bools)
+    m_eligible              = m_active & underpartnered& (~other_partners | cross_layer_bools)
 
     # Bin the females by age
     bins        = layer_probs[0, :]  # Extract age bins
@@ -318,7 +318,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
     bin_range_f = np.unique(age_bins_f)  # Range of bins
     f = []  # Initialize the female partners
-
     for ab in bin_range_f:  # Loop over age bins
         these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
         f += these_f_contacts.tolist()
@@ -331,7 +330,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     for ab in bin_range_m:
         these_m_contacts = hpu.binomial_filter(layer_probs[2][ab], m_eligible_inds[age_bins_m == ab])  # Select males according to their participation rate in this layer
         m += these_m_contacts.tolist()
-
 
     # Create preference matrix between eligible females and males that combines age and geo mixing
     age_bins_f = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
