@@ -340,7 +340,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     geo_probs = geomixing[geo_m, geo_f]
     pair_probs = np.multiply(age_probs, geo_probs)
 
-    f_to_remove = pair_probs.max(axis=0)==0  # list of female inds to remove if no male parters are found for her
+    f_to_remove = pair_probs.max(axis=0)==0  # list of female inds to remove if no male partners are found for her
     f = [i for i, flag in zip(f, f_to_remove) if ~flag]  # remove the inds who don't get paired on this timestep
     selected_males = []
     if len(f):
