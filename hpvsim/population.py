@@ -129,6 +129,9 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['contacts'] = contacts
         popdict['current_partners'] = current_partners
 
+    else:
+        ages = popdict['age']
+
     # Do minimal validation and create the people
     validate_popdict(popdict, sim.pars, verbose=verbose)
     people = hpppl.People(sim.pars, pop_trend=pop_trend, pop_age_trend=pop_age_trend, **popdict) # List for storing the people
