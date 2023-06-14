@@ -348,9 +348,21 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     selected_males = []
     if len(f):
         pair_probs = pair_probs[:,np.invert(f_to_remove)]
-        pair_probs_norm = pair_probs/pair_probs.sum(axis=0,keepdims=1)
-        selected_males = np.array(m)[hpu.choose_m(pair_probs_norm)]
-        # TODO: current selection algorithm may assign more than 1 females to the same male partner; need to change matching algorithm!
+        choices = []
+        fems = np.arange(len(f))
+        f_paired_bools = np.full(len(fems), True, dtype=bool)
+        np.random.shuffle(fems)
+        for fem in fems:
+            m_col = pair_probs[:,fem]
+            if m_col.sum() > 0:
+                m_col_norm = m_col / m_col.sum()
+                choice = np.random.choice(len(m_col_norm), 1, replace=False, p=m_col_norm)
+                choices.append(choice)
+                pair_probs[choice,:] = 0 # Once male partner is assigned, remove from eligible pool
+            else:
+                f_paired_bools[fem] = False
+        selected_males = np.array(m)[np.array(choices).flatten()]
+        f = np.array(f)[f_paired_bools]
         # Count how many contacts there actually are
         new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, selected_males]), return_counts=True)
     if len(new_pship_inds):
