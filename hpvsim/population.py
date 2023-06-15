@@ -76,8 +76,6 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 warnmsg = f'Could not load age data for requested location "{location}" ({str(E)})'
                 hpm.warn(warnmsg, die=True)
 
-        uids, sexes, debuts, rel_sev, partners, geo = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
-
         # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
         age_data_max   = age_data[:,1]
@@ -85,13 +83,15 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         age_data_prob   = age_data[:,2]
         age_data_prob   /= age_data_prob.sum() # Ensure it sums to 1
         age_bins        = hpu.n_multinomial(age_data_prob, n_agents) # Choose age bins
-        print(f'Geo clusters: {np.unique(geo).max()+1} , first 5 age bins: {age_bins[:5]}')
-        # TODO: age_bins drawn differently for different number of geo clusters, strange!
 
         if dt_round_age:
             ages = age_data_min[age_bins] + np.random.randint(age_data_range[age_bins]/dt)*dt # Uniformly distribute within this age bin
         else:
             ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(n_agents) # Uniformly distribute within this age bin
+
+        uids, sexes, debuts, rel_sev, partners, geo = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
+        print(f'Geo clusters: {np.unique(geo).max()+1} , first 5 age bins: {age_bins[:5]}')
+        # TODO: age_bins drawn differently for different number of geo clusters, strange!
 
         # Store output
         popdict = {}
