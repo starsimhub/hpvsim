@@ -24,7 +24,7 @@ from .settings import options as hpo
 class Sim(hpb.BaseSim):
 
     def __init__(self, pars=None, datafile=None, label=None,
-                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
+                 popfile=None, popdict=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
                  **kwargs):
 
         # Set attributes
@@ -35,8 +35,8 @@ class Sim(hpb.BaseSim):
         self.hiv_datafile  = hiv_datafile # The name of the HIV data file
         self.popfile       = popfile  # The population file
         self.data          = None     # The data
-        self.popdict       = people   # The population dictionary
-        self.people        = None     # Initialize these here so methods that check their length can see they're empty
+        self.popdict       = popdict   # The population dictionary
+        self.people        = people    # People object
         self.t             = None     # The current time in the simulation (during execution); outside of sim.step(), its value corresponds to next timestep to be computed
         self.results       = {}       # For storing results
         self.summary       = None     # For storing a summary of the results
