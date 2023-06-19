@@ -588,7 +588,7 @@ class Sim(hpb.BaseSim):
                 resetstr = ' (resetting people)' if reset else ' (warning: not resetting sim.people)'
             print(f'Initializing sim{resetstr} with {self["n_agents"]:0n} agents')
         if self.popfile and self.popdict is None: # If there's a popdict, we initialize it
-            self.load_population(init_people=False)
+            self.load_population(init_people=False) #TODO: no method for this
 
         # Make the people
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
