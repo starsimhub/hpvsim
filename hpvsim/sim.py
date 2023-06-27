@@ -164,6 +164,22 @@ class Sim(hpb.BaseSim):
         return
 
 
+    def validate_dt(self):
+        '''
+        Check that 1/dt is an integer value, otherwise results and time vectors will have mismatching shapes.
+        init_results explicitly makes this assumption by casting resfrequency = int(1/dt).
+        '''
+        dt = self['dt']
+        reciprocal = 1.0 / dt   # Compute the reciprocal of dt
+        if not reciprocal.is_integer():  # Check if reciprocal is not a whole number
+            # Round the reciprocal to the closest even number
+            reciprocal = np.round(reciprocal)
+            rounded_dt = 1.0 / reciprocal
+            self['dt'] = rounded_dt
+            warnmsg = f"Warning: Provided time step dt: {dt} resulted in a non-integer number of steps/year. Rounded to {rounded_dt}."
+            print(warnmsg)
+
+
     def validate_pars(self, validate_layers=True):
         '''
         Some parameters can take multiple types; this makes them consistent.
@@ -226,7 +242,7 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def initialise_time_vecs(self):
+    def init_time_vecs(self):
         '''
         Construct vectors things that keep track of time
         '''
