@@ -172,12 +172,13 @@ class Sim(hpb.BaseSim):
         dt = self['dt']
         reciprocal = 1.0 / dt   # Compute the reciprocal of dt
         if not reciprocal.is_integer():  # Check if reciprocal is not a whole number
-            # Round the reciprocal to the closest even number
-            reciprocal = np.round(reciprocal)
+            # Round the reciprocal to the closest even
+            reciprocal = int(reciprocal)
             rounded_dt = 1.0 / reciprocal
             self['dt'] = rounded_dt
-            warnmsg = f"Warning: Provided time step dt: {dt} resulted in a non-integer number of steps/year. Rounded to {rounded_dt}."
-            print(warnmsg)
+            if self.verbose:
+                warnmsg = f"Warning: Provided time step dt: {dt} resulted in a non-integer number of steps/year. Rounded to {rounded_dt}."
+                print(warnmsg)
 
 
     def validate_pars(self, validate_layers=True):
