@@ -79,7 +79,9 @@ class Sim(hpb.BaseSim):
         Perform all initializations on the sim.
         '''
         self.t = 0  # The current time index
-        self.validate_pars() # Ensure parameters have valid values
+        self.validate_pars()  # Ensure parameters have valid values
+        self.validate_dt()
+        self.init_time_vecs()  # Initialise time vectors
         hpu.set_seed(self['rand_seed']) # Reset the random seed before the population is created
         self.init_genotypes() # Initialize the genotypes
         self.init_results() # After initializing the genotypes and people, create the results structure
@@ -171,12 +173,12 @@ class Sim(hpb.BaseSim):
         '''
         dt = self['dt']
         reciprocal = 1.0 / dt   # Compute the reciprocal of dt
-        if not reciprocal.is_integer():  # Check if reciprocal is not a whole number
-            # Round the reciprocal to the closest even
+        if not reciprocal.is_integer():  # Check if reciprocal is not a whole (integer) number
+            # Round the reciprocal
             reciprocal = int(reciprocal)
             rounded_dt = 1.0 / reciprocal
             self['dt'] = rounded_dt
-            if self.verbose:
+            if self['verbose']:
                 warnmsg = f"Warning: Provided time step dt: {dt} resulted in a non-integer number of steps/year. Rounded to {rounded_dt}."
                 print(warnmsg)
 
