@@ -197,12 +197,6 @@ class Sim(hpb.BaseSim):
                 errormsg = 'You must supply one of n_years and end."'
                 raise ValueError(errormsg)
 
-        # Construct other things that keep track of time
-        self.years      = sc.inclusiverange(self['start'],self['end'])
-        self.yearvec    = sc.inclusiverange(start=self['start'], stop=self['end']+1-self['dt'], step=self['dt']) # Includes all the timepoints in the last year
-        self.npts       = len(self.yearvec)
-        self.tvec       = np.arange(self.npts)
-
         # Handle population network data
         network_choices = ['random', 'default']
         choice = self['network']
@@ -230,6 +224,16 @@ class Sim(hpb.BaseSim):
             raise ValueError(errormsg)
 
         return
+
+
+    def initialise_time_vecs(self):
+        '''
+        Construct vectors things that keep track of time
+        '''
+        self.years      = sc.inclusiverange(self['start'],self['end'])
+        self.yearvec    = sc.inclusiverange(start=self['start'], stop=self['end']+1-self['dt'], step=self['dt']) # Includes all the timepoints in the last year
+        self.npts       = len(self.yearvec)
+        self.tvec       = np.arange(self.npts)
 
 
     def validate_init_conditions(self, init_hpv_prev):
