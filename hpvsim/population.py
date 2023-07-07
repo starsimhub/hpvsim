@@ -90,8 +90,6 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(n_agents) # Uniformly distribute within this age bin
 
         uids, sexes, debuts, rel_sev, partners, geo = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
-        print(f'Geo clusters: {np.unique(geo).max()+1} , first 5 age bins: {age_bins[:5]}')
-        # TODO: age_bins drawn differently for different number of geo clusters, strange!
 
         # Store output
         popdict = {}
@@ -345,23 +343,22 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 
     f_to_remove = pair_probs.max(axis=0)==0  # list of female inds to remove if no male partners are found for her
     f = [i for i, flag in zip(f, f_to_remove) if ~flag]  # remove the inds who don't get paired on this timestep
-    selected_males = []
     if len(f):
         pair_probs = pair_probs[:,np.invert(f_to_remove)]
-        choices = []
         fems = np.arange(len(f))
         f_paired_bools = np.full(len(fems), True, dtype=bool)
+        selected_males = np.full(len(fems), np.nan)
         np.random.shuffle(fems)
         for fem in fems:
             m_col = pair_probs[:,fem]
             if m_col.sum() > 0:
                 m_col_norm = m_col / m_col.sum()
                 choice = np.random.choice(len(m_col_norm), 1, replace=False, p=m_col_norm)
-                choices.append(choice)
+                selected_males[fem] = np.array(m)[choice]
                 pair_probs[choice,:] = 0 # Once male partner is assigned, remove from eligible pool
             else:
                 f_paired_bools[fem] = False
-        selected_males = np.array(m)[np.array(choices).flatten()]
+        selected_males = selected_males[~np.isnan(selected_males)].astype(int)
         f = np.array(f)[f_paired_bools]
         # Count how many contacts there actually are
         new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, selected_males]), return_counts=True)

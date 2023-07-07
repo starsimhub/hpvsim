@@ -1967,7 +1967,7 @@ class Layer(FlexDict):
             'm':     hpd.default_int,   # Male
             'acts':  hpd.default_float, # Default transmissibility for this contact type
             'dur':   hpd.default_float, # Duration of partnership
-            'start': hpd.default_int, # Date of partnership start
+            'start': hpd.default_float, # Date of partnership start
             'end':   hpd.default_float, # Date of partnership end
             'age_f': hpd.default_float,  # Age of female partner
             'age_m': hpd.default_float,  # Age of male partner
