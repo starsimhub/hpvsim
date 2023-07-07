@@ -19,7 +19,7 @@ import sciris as sc
 from . import loaders
 
 # Set parameters
-data_version = '1.1' # Data version
+data_version = '1.2' # Data version
 data_file = f'hpvsim_data_v{data_version}.zip'
 quick_url = f'https://github.com/amath-idm/hpvsim_data/blob/main/{data_file}?raw=true'
 age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
