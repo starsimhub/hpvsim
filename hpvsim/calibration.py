@@ -760,7 +760,17 @@ class Calibration(sc.prettyobj):
                             # Plot data
                             if glabel in unique_genotypes:
                                 ydata = np.array(thisdatadf[thisdatadf.genotype == glabel].value)
-                                ax.scatter(x, ydata, color=self.result_args[resname].color[g], marker='s', label=f'Data - {glabel}')
+                                if isinstance(ydata[0], str):
+                                    data_to_plot = np.zeros((2, len(ydata)))
+                                    for iy, idata in enumerate(ydata):
+                                        i_list = [idx for idx in idata.split(',')]
+                                        data_to_plot[0,iy] = float(i_list[0].replace('[', ''))
+                                        data_to_plot[1,iy] = float(i_list[1].replace(']', ''))
+                                    ax.scatter(x, data_to_plot[0,:], color=self.result_args[resname].color[g], marker='_',
+                                               label=f'Data - {glabel}')
+                                    ax.scatter(x, data_to_plot[1, :], color=self.result_args[resname].color[g], marker='_')
+                                else:
+                                    ax.scatter(x, ydata, color=self.result_args[resname].color[g], marker='s', label=f'Data - {glabel}')
 
                             # Construct a dataframe with things in the most logical order for plotting
                             for run_num, run in enumerate(analyzer_results):
@@ -775,7 +785,17 @@ class Calibration(sc.prettyobj):
                     else:
                         # Plot data
                         ydata = np.array(thisdatadf.value)
-                        ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data')
+                        if isinstance(ydata[0], str):
+                            data_to_plot = np.zeros((2, len(ydata)))
+                            for iy, idata in enumerate(ydata):
+                                i_list = [idx for idx in idata.split(',')]
+                                data_to_plot[0, iy] = float(i_list[0].replace('[', ''))
+                                data_to_plot[1, iy] = float(i_list[1].replace(']', ''))
+
+                            ax.scatter(x, data_to_plot[0,:], color=self.result_args[resname].color, marker='_', label='Data')
+                            ax.scatter(x, data_to_plot[1, :], color=self.result_args[resname].color, marker='_')
+                        else:
+                            ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data')
 
                         # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(analyzer_results):
@@ -803,7 +823,17 @@ class Calibration(sc.prettyobj):
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
                 x = np.arange(len(ydata))
-                ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
+                if isinstance(ydata[0], str):
+                    data_to_plot = np.zeros((2, len(ydata)))
+                    for iy, idata in enumerate(ydata):
+                        i_list = [idx for idx in idata.split(',')]
+                        data_to_plot[0, iy] = float(i_list[0].replace('[', ''))
+                        data_to_plot[1, iy] = float(i_list[1].replace(']', ''))
+
+                    ax.scatter(x, data_to_plot[0, :], color=pl.cm.Reds(0.95), marker='_', label='Data')
+                    ax.scatter(x, data_to_plot[1, :], color=pl.cm.Reds(0.95), marker='_')
+                else:
+                    ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
