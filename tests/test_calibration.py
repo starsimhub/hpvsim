@@ -139,14 +139,20 @@ def test_calib_range(do_plot=True):
     )
 
     def estimator(actual, predicted):
+        actuals = []
+        for i in actual:
+            i_list = [idx for idx in i.split(',')]
+            i_list[0] = float(i_list[0].replace('[', ''))
+            i_list[1] = float(i_list[1].replace(']', ''))
+            actuals.append(i_list)
         gofs = np.zeros(len(predicted))
         for iv, val in enumerate(predicted):
-            if val> actual[1,iv]:
-                gofs[iv] = abs(actual[1,iv]-val)
-            elif val < actual[0,iv]:
-                gofs[iv] = abs(actual[0, iv] - val)
+            if val> np.max(actuals[iv]):
+                gofs[iv] = abs(np.max(actuals[iv])-val)
+            elif val < np.min(actuals[iv]):
+                gofs[iv] = abs(np.min(actuals[iv])-val)
 
-        actual_max = abs(actual).max()
+        actual_max = np.array(actuals).max()
         if actual_max > 0:
             gofs /= actual_max
 

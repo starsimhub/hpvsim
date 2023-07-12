@@ -457,11 +457,7 @@ class Calibration(sc.prettyobj):
                 model_output = sim.results[rkey][self.sim_results[rkey].timepoints[0]]
             else:
                 model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
-            if self.estimator is not None:
-                gofs = hpm.compute_gof(np.vstack((self.sim_results[rkey].data.lb, self.sim_results[rkey].data.ub)),
-                                       model_output, estimator=self.estimator)
-            else:
-                gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output)
+            gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output, estimator=self.estimator)
             losses = gofs * self.sim_results[rkey].weights
             mismatch = losses.sum()
             sim.fit += mismatch

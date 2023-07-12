@@ -540,7 +540,7 @@ class age_results(Analyzer):
         self.die            = die  # Whether or not to raise an exception
         self.results        = sc.objdict() # Store the age results
         self.result_args    = result_args
-        self.estimator = estimator
+        self.estimator      = estimator # Estimator to be used for computation of GOF
         return
 
 
@@ -959,11 +959,7 @@ class age_results(Analyzer):
                 res.extend(sim_res)
 
         self.result_args[key].data['model_output'] = res
-        if self.estimator is not None:
-            self.result_args[key].data['gofs'] = hpm.compute_gof(np.vstack((np.array(resargs.data['lb'].values),np.array(resargs.data['ub'].values))),
-                                                                 resargs.data['model_output'].values, estimator=self.estimator)
-        else:
-            self.result_args[key].data['gofs'] = hpm.compute_gof(resargs.data['value'].values, resargs.data['model_output'].values)
+        self.result_args[key].data['gofs'] = hpm.compute_gof(resargs.data['value'].values, resargs.data['model_output'].values, estimator=self.estimator)
         self.result_args[key].data['losses'] = resargs.data['gofs'].values * resargs.weights
         self.result_args[key].mismatch = resargs.data['losses'].sum()
 
