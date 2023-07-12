@@ -76,7 +76,7 @@ class Calibration(sc.prettyobj):
     '''
 
     def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_result_keys=None,
-                 par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
+                 par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None, estimator=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
 
         import multiprocessing as mp # Import here since it's also slow
@@ -100,6 +100,7 @@ class Calibration(sc.prettyobj):
         self.extra_sim_result_keys = extra_sim_result_keys
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
+        self.estimator      = estimator
         self.die            = die
         self.verbose        = verbose
         self.calibrated     = False
@@ -128,7 +129,7 @@ class Calibration(sc.prettyobj):
                     data=sc.dcp(targ)
                 )
 
-        ar = hpa.age_results(result_args=age_result_args)
+        ar = hpa.age_results(result_args=age_result_args, estimator=estimator)
         self.sim['analyzers'] += [ar]
         if hiv_pars is not None:
             self.sim['model_hiv'] = True # if calibrating HIV parameters, make sure model is running HIV
@@ -456,8 +457,11 @@ class Calibration(sc.prettyobj):
                 model_output = sim.results[rkey][self.sim_results[rkey].timepoints[0]]
             else:
                 model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
-            diffs = self.sim_results[rkey].data.value - model_output
-            gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output)
+            if self.estimator is not None:
+                gofs = hpm.compute_gof(np.vstack((self.sim_results[rkey].data.lb, self.sim_results[rkey].data.ub)),
+                                       model_output, estimator=self.estimator)
+            else:
+                gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output)
             losses = gofs * self.sim_results[rkey].weights
             mismatch = losses.sum()
             sim.fit += mismatch
@@ -486,7 +490,7 @@ class Calibration(sc.prettyobj):
         else:
             op.logging.set_verbosity(op.logging.ERROR)
         study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
-        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None) # [tesst]
+        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None)
         return output
 
 
