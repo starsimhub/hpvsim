@@ -77,7 +77,7 @@ class Calibration(sc.prettyobj):
 
     def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_result_keys=None,
                  par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None, estimator=None,
-                 keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
+                 keep_db=None, storage=None, rand_seed=None, sampler=None, label=None, die=False, verbose=True):
 
         import multiprocessing as mp # Import here since it's also slow
 
@@ -89,7 +89,8 @@ class Calibration(sc.prettyobj):
         if keep_db   is None: keep_db   = False
         if storage   is None: storage   = f'sqlite:///{db_name}'
         if total_trials is not None: n_trials = int(np.ceil(total_trials/n_workers))
-        self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name, keep_db=keep_db, storage=storage, rand_seed=rand_seed)
+        self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name,
+                                     keep_db=keep_db, storage=storage, rand_seed=rand_seed, sampler=sampler)
 
         # Handle other inputs
         self.label          = label
@@ -523,13 +524,7 @@ class Calibration(sc.prettyobj):
         op = import_optuna()
         if not self.run_args.keep_db:
             self.remove_db()
-        if self.run_args.rand_seed is not None:
-            sampler = op.samplers.RandomSampler(self.run_args.rand_seed)
-            sampler.reseed_rng()
-            raise NotImplementedError('Implemented but does not work')
-        else:
-            sampler = None
-        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=sampler)
+        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=self.run_args.sampler)
         return output
 
 
