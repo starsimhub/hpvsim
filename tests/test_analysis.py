@@ -85,10 +85,6 @@ def test_age_results(do_plot=True, test_what=''):
                 years=2019,
                 edges=age_bin_edges,
             ),
-            lsil_prevalence=sc.objdict(
-                years=2019,
-                edges=age_bin_edges,
-            ),
             infections=sc.objdict(
                 years=2019,
                 edges=age_bin_edges,
@@ -235,8 +231,8 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    # people      = test_snapshot()
-    # sim0, a0    = test_age_pyramids()
+    people      = test_snapshot()
+    sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()
     sim3, a3    = test_age_causal_analyzer()
