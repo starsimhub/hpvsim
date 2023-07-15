@@ -722,6 +722,7 @@ class age_results(Analyzer):
         attr = rname.replace('_prevalence', '')  # Strip out terms that aren't stored in the people
         if attr[0] == 'n': attr = attr[2:] # Remove n, used to identify stocks
         if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
+        if attr == 'lsil': attr = ['precin', 'cin1']
         if attr == 'cancer': attr = 'cancerous'
         return attr
 
@@ -802,6 +803,9 @@ class age_results(Analyzer):
                     if not rdict.by_genotype:
                         if rdict.by_hiv:
                             inds = (ppl[rdict.attr].any(axis=0) * ppl[rdict.hiv_attr]).nonzero()[-1]
+                        elif isinstance(rdict.attr, list):
+                            inds = (ppl[rdict.attr[0]].any(axis=0) + ppl[rdict.attr[1]].any(axis=0)).nonzero()[-1]
+                            inds = np.unique(inds)
                         else:
                             inds = ppl[rdict.attr].any(axis=0).nonzero()[-1]
                         self.results[rkey][date] = bin_ages(inds, bins)
