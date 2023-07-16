@@ -541,7 +541,8 @@ def compute_gof(actual, predicted, normalize=True, use_frac=False, use_squared=F
     '''
 
     # Handle inputs
-    actual    = np.array(sc.dcp(actual), dtype=float)
+    if estimator is None:
+        actual    = np.array(sc.dcp(actual), dtype=float)
     predicted = np.array(sc.dcp(predicted), dtype=float)
 
     # Scikit-learn estimator is supplied: use that

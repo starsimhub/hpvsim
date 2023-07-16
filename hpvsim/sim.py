@@ -528,6 +528,8 @@ class Sim(hpb.BaseSim):
         results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=stock_colors[3])
         results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=stock_colors[3])
         results['female_hpv_prevalence_by_age'] = init_res('Female HPV prevalence by age', n_rows=na, color=stock_colors[3])
+        results['lsil_prevalence'] = init_res('HPV/CIN1 prevalence', color=stock_colors[3])
+        results['lsil_prevalence_by_age'] = init_res('HPV/CIN1 prevalence by age', n_rows=na, color=stock_colors[3])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -1091,6 +1093,9 @@ class Sim(hpb.BaseSim):
         self.results['cin3_prevalence'][:] = safedivide(res['n_cin3'][:], ng*alive_females)
         self.results['cin3_prevalence_by_genotype'][:] = safedivide(res['n_cin3_by_genotype'][:], alive_females)
         self.results['cin3_prevalence_by_age'][:] = safedivide(res['n_cin3_by_age'][:],
+                                                               res['n_females_alive_by_age'][:])
+
+        self.results['lsil_prevalence_by_age'][:] = safedivide((res['n_precin_by_age'][:]+res['n_cin1_by_age'][:]),
                                                                res['n_females_alive_by_age'][:])
         # Compute cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]
