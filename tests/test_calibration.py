@@ -138,6 +138,8 @@ def test_calib_range(do_plot=True):
         )
     )
 
+    extra_sim_analyzers = [hpv.age_causal_infection(start_year=2000)]
+
     def estimator(actual, predicted):
         actuals = []
         for i in actual:
@@ -168,6 +170,7 @@ def test_calib_range(do_plot=True):
                                 'test_data/south_africa_type_distribution_cancer.csv'
                             ],
                             estimator=estimator,
+                            extra_sim_analyers=extra_sim_analyzers,
                             total_trials=1, n_workers=1)
     calib.calibrate(die=True)
     calib.plot(res_to_plot=4)
