@@ -44,6 +44,7 @@ class Calibration(sc.prettyobj):
         genotype_pars(dict) : a dictionary of the genotype-specific parameters to calibrate of the format dict(genotype=dict(key1=[best, low, high]))
         hiv_pars     (dict) : a dictionary of the hiv-specific parameters to calibrate of the format dict(key1=[best, low, high])
         extra_sim_results (list) : list of result strings to store
+        extra_sim_analyers (list) : list of analyzers to store
         fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
         par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_float
         n_trials     (int)  : the number of trials per worker
@@ -75,7 +76,8 @@ class Calibration(sc.prettyobj):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_result_keys=None,
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None,
+                 extra_sim_result_keys=None, extra_sim_analyers=None,
                  par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None, estimator=None,
                  keep_db=None, storage=None, rand_seed=None, sampler=None, label=None, die=False, verbose=True):
 
@@ -99,6 +101,7 @@ class Calibration(sc.prettyobj):
         self.genotype_pars  = genotype_pars
         self.hiv_pars       = hiv_pars
         self.extra_sim_result_keys = extra_sim_result_keys
+        self.extra_sim_analyers = extra_sim_analyers
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
         self.estimator      = estimator
@@ -132,6 +135,8 @@ class Calibration(sc.prettyobj):
 
         ar = hpa.age_results(result_args=age_result_args, estimator=estimator)
         self.sim['analyzers'] += [ar]
+        if self.extra_sim_analyers is not None:
+            self.sim['analyzers'] += self.extra_sim_analyers
         if hiv_pars is not None:
             self.sim['model_hiv'] = True # if calibrating HIV parameters, make sure model is running HIV
         self.sim.initialize()
@@ -474,9 +479,16 @@ class Calibration(sc.prettyobj):
                 model_output = sim.results[rkey]
                 extra_sim_results[rkey] = model_output
 
+        extra_analyzer_results = sc.objdict()
+        if self.extra_sim_analyers is not None:
+            for extra_an in self.extra_sim_analyers:
+                analyzer = sim.get_analyzer(extra_an.label)
+                extra_analyzer_results[extra_an.label] = analyzer
+
         # Store results in temporary files (TODO: consider alternatives)
         if save:
-            results = dict(sim=sim_results, analyzer=sim.get_analyzer().results, extra_sim_results=extra_sim_results)
+            results = dict(sim=sim_results, analyzer=sim.get_analyzer('age_results').results,
+                           extra_sim_results=extra_sim_results, extra_analyzer_results=extra_analyzer_results)
             filename = self.tmp_filename % trial.number
             sc.save(filename, results)
 
@@ -573,6 +585,7 @@ class Calibration(sc.prettyobj):
         self.analyzer_results = []
         self.sim_results = []
         self.extra_sim_results = []
+        self.extra_analyzer_results = []
         if load:
             print('Loading saved results...')
             for trial in study.trials:
@@ -583,6 +596,7 @@ class Calibration(sc.prettyobj):
                     self.sim_results.append(results['sim'])
                     self.analyzer_results.append(results['analyzer'])
                     self.extra_sim_results.append(results['extra_sim_results'])
+                    self.extra_analyzer_results.append(results['extra_analyzer_results'])
                     if tidyup:
                         try:
                             os.remove(filename)
