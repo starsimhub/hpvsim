@@ -169,7 +169,7 @@ class Calibration(sc.prettyobj):
         sim = sc.dcp(self.sim)
         if label: sim.label = label
 
-        new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
+        new_pars = self.get_full_pars(self, sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
         sim.update_pars(new_pars)
         sim.initialize(reset=True, init_analyzers=False) # Necessary to reinitialize the sim here so that the initial infections get the right parameters
 
@@ -189,21 +189,26 @@ class Calibration(sc.prettyobj):
                 hpm.warn(warnmsg)
                 output = None if return_sim else np.inf
                 return output
-
+            
+    ''' added to update nested dict'''
+    def update_nested_dict(self, original_dict, update_dict):
+        new_dict = original_dict.copy()
+        for key, value in update_dict.items():
+            if isinstance(value, dict) and key in original_dict and isinstance(original_dict[key], dict):
+                new_dict[key] = self.update_nested_dict(original_dict[key], value)
+            else:
+                new_dict[key] = value
+        return new_dict
 
     @staticmethod
-    def get_full_pars(sim=None, calib_pars=None, genotype_pars=None, hiv_pars=None):
+    def get_full_pars(self, sim=None, calib_pars=None, genotype_pars=None, hiv_pars=None):
         ''' Make a full pardict from the subset of regular sim parameters, genotype parameters, and hiv parameters used in calibration'''
-
         # Prepare the parameters
         if calib_pars is not None:
             new_pars = {}
             for name, par in calib_pars.items():
                 if isinstance(par, dict):
-                    simpar = sim.pars[name]
-                    for parkey, parval in par.items():
-                        simpar[parkey] = parval
-                    new_pars[name] = simpar
+                    new_pars[name] = self.update_nested_dict(sim.pars[name], par)
                 else:
                     if name in sim.pars:
                         new_pars[name] = par
@@ -215,6 +220,7 @@ class Calibration(sc.prettyobj):
                 raise ValueError(errormsg)
         else:
             new_pars = {}
+
         if genotype_pars is not None:
             new_genotype_pars = {}
             for gname, gpars in genotype_pars.items():
@@ -329,7 +335,27 @@ class Calibration(sc.prettyobj):
             return all_pars
         else:
             return calib_pars, genotype_pars, hiv_pars
+    
+    def get_nested_dict_keys(self, nested_dict, prefix=''):
+        keys = []
+        for key, value in nested_dict.items():
+            new_key = prefix + '_' + key if prefix else key
+            if isinstance(value, dict):
+                nested_keys = self.get_nested_dict_keys(value, prefix=new_key)
+                keys.extend(nested_keys)
+            else:
+                keys.append(new_key)
+        return ''.join(keys)
 
+    def get_nested_dict_par_bounds(self, nested_dict):
+        par_bounds = {}
+        for key, val in nested_dict.items():
+            if isinstance(val, list):
+                par_bounds[key] = np.array([val[1], val[2]])
+            elif isinstance(val, dict):
+                nested_par_bounds = self.get_nested_dict_par_bounds(val)
+                par_bounds.update(nested_par_bounds)
+        return par_bounds
 
     def sim_to_sample_pars(self):
         ''' Convert sim pars to sample pars '''
@@ -344,10 +370,8 @@ class Calibration(sc.prettyobj):
                     initial_pars[key] = val[0]
                     par_bounds[key] = np.array([val[1], val[2]])
                 elif isinstance(val, dict):
-                    for parkey, par_highlowlist in val.items():
-                        sampler_key = key + '_' + parkey + '_'
-                        initial_pars[sampler_key] = par_highlowlist[0]
-                        par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
+                    initial_pars[key] = self.get_nested_dict_keys(val)
+                    par_bounds[key] = self.get_nested_dict_par_bounds(val)              
 
         # Convert genotype pars
         if self.genotype_pars is not None:
@@ -407,27 +431,7 @@ class Calibration(sc.prettyobj):
                 pars[key] = sampler_fn(sampler_key, low, high, step=step)  # Sample from values within this range
 
             elif isinstance(val, dict):
-                sampler_fn = trial.suggest_float
-                pars[key] = dict()
-                for parkey, par_highlowlist in val.items():
-                    if gname is not None:
-                        sampler_key = gname + '_' + key + '_' + parkey
-                    else:
-                        sampler_key = key + '_' + parkey
-                    if isinstance(par_highlowlist, dict):
-                        par_highlowlist = par_highlowlist['value']
-                        low, high = par_highlowlist[1], par_highlowlist[2]
-                        if (len(par_highlowlist) > 3):
-                            step = par_highlowlist[3]
-                        else: step = None
-                    elif isinstance(par_highlowlist, list):
-                        low, high = par_highlowlist[1], par_highlowlist[2]
-                        if (len(par_highlowlist) > 3):
-                            step = par_highlowlist[3]
-                        else:
-                            step = None
-                    pars[key][parkey] = sampler_fn(sampler_key, low, high, step=step)
-
+                pars[key] = self.trial_to_sim_pars(val, trial, gname)
         return pars
 
 
@@ -486,7 +490,7 @@ class Calibration(sc.prettyobj):
             op.logging.set_verbosity(op.logging.DEBUG)
         else:
             op.logging.set_verbosity(op.logging.ERROR)
-        study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
+        study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler = self.run_args.sampler)
         output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None)
         return output
 
@@ -555,7 +559,7 @@ class Calibration(sc.prettyobj):
         t0 = sc.tic()
         self.make_study()
         self.run_workers()
-        study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
+        study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler = self.run_args.sampler)
         self.best_pars = sc.objdict(study.best_params)
         self.elapsed = sc.toc(t0, output=True)
 
