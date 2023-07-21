@@ -127,11 +127,14 @@ def test_calib_range(do_plot=True):
     # Define the calibration parameters
     calib_pars = dict(
         beta=[0.25, 0.10, 0.30],
+        cell_imm_init=dict(par1=[0.03, 0.03, 0.02]),
 
     )
     genotype_pars = dict(
         hpv16=dict(
             sev_fn=dict(k=[0.5, 0.2, 1.0]),
+            dur_precin=dict(par1=[1, 1, 6, 0.05],
+                          par2=[1,1,2.5,0.1])
             ),
         hpv18=dict(
             sev_fn=dict(k=[0.5, 0.2, 1.0]),
