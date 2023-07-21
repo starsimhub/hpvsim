@@ -734,7 +734,7 @@ class age_results(Analyzer):
         if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
         mapping = {
-            'infections': ['date_infectious', 'infectious'],
+            'infections': ['date_exposed', 'infectious'],
             'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
             'cins':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
             'cin1': ['date_cin1', 'cin1'],
