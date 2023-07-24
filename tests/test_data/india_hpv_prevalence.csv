@@ -1,0 +1,7 @@
+﻿year,name,age,sex,genotype,value
+2020,lsil_prevalence,15,female,total,"[.1,.19]"
+2020,lsil_prevalence,24,female,total,"[.1,.16]"
+2020,lsil_prevalence,34,female,total,"[.1,.16]"
+2020,lsil_prevalence,44,female,total,"[.1,.16]"
+2020,lsil_prevalence,54,female,total,"[.06,.25]"
+2020,lsil_prevalence,64,female,total,"[.05,.25]"
