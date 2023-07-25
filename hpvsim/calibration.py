@@ -208,7 +208,6 @@ class Calibration(sc.prettyobj):
     @staticmethod
     def get_full_pars(self, sim=None, calib_pars=None, genotype_pars=None, hiv_pars=None):
         ''' Make a full pardict from the subset of regular sim parameters, genotype parameters, and hiv parameters used in calibration'''
-        print("start get_full_pars")
         # Prepare the parameters
         if calib_pars is not None:
             new_pars = {}
@@ -335,12 +334,9 @@ class Calibration(sc.prettyobj):
             else:
                 calib_pars[name] = trial_pars[name]
 
-        print("calib_pars ", calib_pars)
-        print("genotype_pars ", genotype_pars)
-
         # Return
         if return_full:
-            all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
+            all_pars = self.get_full_pars(self, sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
             return all_pars
         else:
             return calib_pars, genotype_pars, hiv_pars

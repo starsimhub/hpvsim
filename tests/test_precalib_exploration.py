@@ -118,7 +118,7 @@ def one_way_SA(base_pars, calib_pars, genotype_pars, n_test, datafiles, extra_si
                             name=name, estimator=estimator,
                             sampler = op.samplers.BruteForceSampler(),
                             datafiles=datafiles, extra_sim_result_keys=extra_sim_result_keys,
-                            extra_sim_analyers=extra_sim_analyzers,
+                            extra_sim_analyzers=extra_sim_analyzers,
                             n_trials=1, n_workers=min(mp.cpu_count(),n_test))
     calib.calibrate(die=True)
     sc.saveobj(f'results/{name}.obj', calib)
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     org_calib = sc.load('test_data/india_calib_july18.obj')
     org_sim = org_calib.sim
     best_pars = org_calib.trial_pars_to_sim_pars()
-    org_sim.update_pars()
+    org_sim.update_pars(best_pars)
     org_pars = org_sim.pars
     custom_param_space = pd.read_csv('param_space_filled.csv', index_col = 0)
     custom_param_space = custom_param_space[custom_param_space['Notes'].isin(['Assume'])]  # Filter parameters
