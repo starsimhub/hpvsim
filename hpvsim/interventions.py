@@ -1485,7 +1485,7 @@ def default_tx(prod_name=None):
         elif name == 'txvx2':
             txprods[name] = tx(dftx[dftx.name==name],
                                genotype_pars=dftxvx[dftxvx.name==name],
-                               imm_boost=1.5)
+                               imm_boost=2)
         else:
             txprods[name] = tx(dftx[dftx.name == name])
     if prod_name is not None:   return txprods[prod_name]
