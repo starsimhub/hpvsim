@@ -182,12 +182,13 @@ if __name__ == '__main__':
 # Read results
 location = 'india'
 import glob
-pattern = f'results/{location}_*_calib.obj'
+pattern = f'results_by_hpv_control/results_hpv_control_0.0/{location}_*_calib.obj'
 file_paths = glob.glob(pattern)
 
 df_glob = pd.DataFrame()
 for file_path in file_paths:
     calib = sc.load(file_path)
+    calib.df = calib.df.sort_values(by='index')
     calib_result = pd.DataFrame()
     param_name = (calib.initial_pars.keys()[0])
     param_name = file_path.split(str(location)+"_")[1].split("_calib")[0]
@@ -198,7 +199,6 @@ for file_path in file_paths:
     calib_result['median_age_causal_infection_hpv'] = [np.median(calib.extra_analyzer_results[i]['age_causal_infection'].age_causal) for i in range(len(calib.df))]
     calib_result['mismatch'] = [calib.df.iloc[i].mismatch for i in range(len(calib.df))]
     df_glob = pd.concat([df_glob, calib_result], ignore_index=True)
-
 
 # %% Plot results
 
@@ -253,8 +253,91 @@ for outcome in outcome_list:
 #     tornado_chart_sorted(sexual_df, outcome, sexual_beh_param)
 
 
+# %% Plot two-way SA
+import glob
+import pandas as pd
+import numpy as np
 
-# %%
+location = 'india'
+pattern = f'results_by_hpv_control/results_hpv_control_*.csv'
+file_paths = glob.glob(pattern)
+
+dfs = [pd.read_csv(file, index_col = 0) for file in file_paths]
+dfs_name = [file.split('.csv')[0].split('_')[-1] for file in file_paths]
+
+merged_df = dfs[0].copy()
+merged_df.columns = [col + f'_{dfs_name[0]}' if col not in ['param_name', 'param_value'] else col for col in merged_df.columns]
+for i, df in enumerate(dfs[1:], start=1):
+    df.columns = [col + f'_{dfs_name[i]}' if col not in ['param_name', 'param_value'] else col for col in df.columns]
+    merged_df = pd.merge(merged_df, df, how='outer', on=['param_name', 'param_value'])
+
+first_two_columns = ['param_name', 'param_value']
+other_columns = sorted(col for col in merged_df.columns if col not in first_two_columns)
+merged_df = merged_df[first_two_columns + other_columns]
+merged_df = merged_df.sort_values(by=['param_name', 'param_value'])
+merged_df.to_csv('results/results_combined.csv')
+
+
+# %% Plot two-way SA
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def full_sensitivity_chart_multi(df, outcomes):
+    param_list = df['param_name'].unique()
+    
+    glob_min = 0; glob_max = 0
+    for outcome in outcomes:
+        glob_min = min(glob_min, df[outcome].min())
+        glob_max = max(glob_max, df[outcome].max())
+    y_range = [glob_min * 0.9, glob_max * 1.1]
+
+    nrow = len(param_list) // 5 + 1
+    fig, axes = plt.subplots(nrows=nrow, ncols=5, figsize=(15, 3 * nrow))
+    axes = axes.flatten()
+
+    for i, param in enumerate(param_list):
+        df_param = df[df['param_name'] == param]
+        for outcome in outcomes:
+            ax = axes[i]
+            # ax.set_ylim(y_range)
+            if i== 0:
+                sns.lineplot(data=df_param, x='param_value', y=outcome, ax=ax, 
+                             label=f'hpv_control_prob: {outcome.split("_")[-1]}')
+                            #    ,marker='o', linewidth=0.5)
+                ax.legend_.remove()
+            else: 
+                sns.lineplot(data=df_param, x='param_value', y=outcome, ax=ax) 
+                            #  ,marker='o', linewidth=0.5)
+                
+            ax.set_title(f"{param}", fontsize=11)
+            ax.set_xlabel('Range', fontsize=8)
+            ax.set_ylabel('')
+    
+    if len(param_list) < len(axes):
+        for k in range(len(param_list), len(axes)):
+            axes[k].axis('off')
+    lines, labels = [], []
+    for ax in axes:
+        ax_lines, ax_labels = ax.get_legend_handles_labels()
+        lines.extend(ax_lines)
+        labels.extend(ax_labels)
+    fig.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, 0.97), ncol=len(outcomes), bbox_transform=fig.transFigure)
+    
+    name = '_'.join(outcomes[0].split('_')[:-1])
+    plt.suptitle(f'Sensitivity to {name}', fontsize=20)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.97])
+    # plt.show()
+    plt.savefig(f'{name}_by_hpvcontrol.png')
+
+# Group columns by their prefixes
+grouped_cols = merged_df.columns.to_series().groupby(merged_df.columns.str.split('_').str[:-1].str.join('_'))
+grouped_cols_2d = ([list(cols) for _, cols in grouped_cols])
+
+for outcomes in grouped_cols_2d:
+    if 'param_name' not in outcomes:
+        full_sensitivity_chart_multi(merged_df, outcomes)
+
 
 # TODO: 
 # Try CMAES - with restart
@@ -268,3 +351,5 @@ for outcome in outcome_list:
 # address nested dicts in get_full_pars, trial_to_sim, and sim_to_sample_pars (did not touch genotypepars and hivpars)
 # Use BruteForceSampler for exploration. If this sampler is used, your input for calib_pars should include [lower, upper, stepsize]. Optuna will run for each stepsize
 # Changed extra_sim_analyers to extra_sim_analyzers
+
+# %%
