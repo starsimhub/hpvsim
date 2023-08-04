@@ -43,7 +43,7 @@
     "births": 11699224.3025,
     "other_deaths": 3033311.75,
     "migration": -2861157.446,
-    "asr_cancer_incidence": 17.750854847316464,
+    "asr_cancer_incidence": 17.750854847316468,
     "asr_cancer_mortality": 0.0,
     "new_total_vaccinated": 0.0,
     "cum_total_vaccinated": 0.0,
@@ -74,6 +74,7 @@
     "precin_prevalence": 0.010173317452683685,
     "cin1_prevalence": 0.018587959336107716,
     "cin2_prevalence": 0.006498473475872346,
-    "cin3_prevalence": 0.005347272934044091
+    "cin3_prevalence": 0.005347272934044091,
+    "lsil_prevalence": 0.0
   }
 }
