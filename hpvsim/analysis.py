@@ -734,7 +734,7 @@ class age_results(Analyzer):
         if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
         mapping = {
-            'infections': ['date_infectious', 'infectious'],
+            'infections': ['date_exposed', 'infectious'],
             'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
             'cins':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
             'cin1': ['date_cin1', 'cin1'],
@@ -790,7 +790,7 @@ class age_results(Analyzer):
                             if rdict.by_hiv:
                                 inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl[rdict.hiv_attr])).nonzero()[-1]
                             else:
-                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr])).nonzero()[-1]
+                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl.is_female_alive) * (ppl[rdict.attr])).nonzero()[-1]
                         self.results[rkey][date] += bin_ages(inds, bins)  # Bin the people
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
@@ -831,7 +831,8 @@ class age_results(Analyzer):
 
                 if 'incidence' in rkey:
                     if 'hpv' in rkey:  # Denominator is susceptible population
-                        denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
+                        inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
+                        denom = bin_ages(inds=inds, bins=bins)
                     else:  # Denominator is females at risk for cancer
                         if rdict.by_hiv:
                             inds = sc.findinds(ppl.is_female_alive & ppl[rdict.hiv_attr] * ~ppl.cancerous.any(axis=0))

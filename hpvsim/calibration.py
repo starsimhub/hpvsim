@@ -779,11 +779,11 @@ class Calibration(sc.prettyobj):
                                         i_list = [idx for idx in idata.split(',')]
                                         data_to_plot[0,iy] = float(i_list[0].replace('[', ''))
                                         data_to_plot[1,iy] = float(i_list[1].replace(']', ''))
-                                    ax.scatter(x, data_to_plot[0,:], color=self.result_args[resname].color[g], marker='_',
+                                    ax.scatter(x, data_to_plot[0,:], color=self.result_args[resname].color[g], s=200, marker='_',
                                                label=f'Data - {glabel}')
-                                    ax.scatter(x, data_to_plot[1, :], color=self.result_args[resname].color[g], marker='_')
+                                    ax.scatter(x, data_to_plot[1, :], color=self.result_args[resname].color[g], s=200, marker='_')
                                 else:
-                                    ax.scatter(x, ydata, color=self.result_args[resname].color[g], marker='s', label=f'Data - {glabel}')
+                                    ax.scatter(x, ydata, color=self.result_args[resname].color[g], marker='s', s=200, label=f'Data - {glabel}')
 
                             # Construct a dataframe with things in the most logical order for plotting
                             for run_num, run in enumerate(analyzer_results):
@@ -805,10 +805,10 @@ class Calibration(sc.prettyobj):
                                 data_to_plot[0, iy] = float(i_list[0].replace('[', ''))
                                 data_to_plot[1, iy] = float(i_list[1].replace(']', ''))
 
-                            ax.scatter(x, data_to_plot[0,:], color=self.result_args[resname].color, marker='_', label='Data')
-                            ax.scatter(x, data_to_plot[1, :], color=self.result_args[resname].color, marker='_')
+                            ax.scatter(x, data_to_plot[0,:], color=self.result_args[resname].color, marker='_', s=200, label='Data')
+                            ax.scatter(x, data_to_plot[1, :], color=self.result_args[resname].color, marker='_', s=200)
                         else:
-                            ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data')
+                            ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data', s=200)
 
                         # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(analyzer_results):
@@ -843,10 +843,10 @@ class Calibration(sc.prettyobj):
                         data_to_plot[0, iy] = float(i_list[0].replace('[', ''))
                         data_to_plot[1, iy] = float(i_list[1].replace(']', ''))
 
-                    ax.scatter(x, data_to_plot[0, :], color=pl.cm.Reds(0.95), marker='_', label='Data')
-                    ax.scatter(x, data_to_plot[1, :], color=pl.cm.Reds(0.95), marker='_')
+                    ax.scatter(x, data_to_plot[0, :], color=pl.cm.Reds(0.95), marker='_', label='Data', s=200)
+                    ax.scatter(x, data_to_plot[1, :], color=pl.cm.Reds(0.95), marker='_', s=200)
                 else:
-                    ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
+                    ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data', s=200)
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
