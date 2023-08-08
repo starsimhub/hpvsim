@@ -408,8 +408,7 @@ class Calibration(sc.prettyobj):
 
         return initial_pars, par_bounds
 
-
-    def trial_to_sim_pars(self, pardict=None, trial=None, gname=None):
+    def trial_to_sim_pars(self, pardict=None, trial=None, gname=None,  parent_key=None):
         '''
         Take in an optuna trial and sample from pars, after extracting them from the structure they're provided in
         '''
@@ -429,16 +428,23 @@ class Calibration(sc.prettyobj):
                         raise AttributeError(errormsg) from E
                 else:
                     sampler_fn = trial.suggest_float
-                if gname is not None:
-                    sampler_key = gname + '_' + key
-                else:
-                    sampler_key = key
+                
+                sampler_key = ''
+                if gname:
+                    sampler_key += gname + '_'
+                if parent_key:
+                    sampler_key += parent_key + '_'
+                sampler_key += key
+                    
                 pars[key] = sampler_fn(sampler_key, low, high, step=step)  # Sample from values within this range
 
             elif isinstance(val, dict):
-                pars[key] = self.trial_to_sim_pars(val, trial, gname)
+                if parent_key:
+                    nested_parent_key = parent_key + '_' + key
+                else:
+                    nested_parent_key = key
+                pars[key] = self.trial_to_sim_pars(val, trial, gname, parent_key=nested_parent_key)
         return pars
-
 
     def run_trial(self, trial, save=True):
         ''' Define the objective for Optuna '''
