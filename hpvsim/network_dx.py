@@ -230,6 +230,9 @@ def geo_demo():
     sc.heading('Geostructure test')
 
     sim0 = hpv.Sim(pars=base_pars)
+    sim0['geostructure'] = 10
+    sim0.update_pars()
+    sim0.run()
     # Default: well-mixed (1 geo cluster)
     assert sim0['geostructure'] == 1
     # Multiple geo clusters
@@ -240,7 +243,7 @@ def geo_demo():
     print(sim1['geomixing'])
     # Modifying mixing steps
     pars2 = pars1
-    pars2['geo_mixing_steps'] = [0.5, 0.01] # diagonal is 1 by default, set sub-diagonal to 0.5,
+    pars2['geo_mixing_steps'] = [0.5, 0.01] # diagonal is 1 by default, set relative mixing at 0.5 for adjacent clusters, 0.01 for clusters with distance = 2
     sim2 = hpv.Sim(pars=pars2)
     print(sim2['geomixing'])
 

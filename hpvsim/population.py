@@ -343,8 +343,10 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 
     f_to_remove = pair_probs.max(axis=0)==0  # list of female inds to remove if no male partners are found for her
     f = [i for i, flag in zip(f, f_to_remove) if ~flag]  # remove the inds who don't get paired on this timestep
+    selected_males = []
     if len(f):
         pair_probs = pair_probs[:,np.invert(f_to_remove)]
+
         fems = np.arange(len(f))
         f_paired_bools = np.full(len(fems), True, dtype=bool)
         selected_males = np.full(len(fems), np.nan)
