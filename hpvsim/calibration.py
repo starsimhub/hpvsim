@@ -328,11 +328,30 @@ class Calibration(sc.prettyobj):
         for name, par in self.calib_pars.items():
             if isinstance(par, dict):
                 simpar = self.sim.pars[name]
-                for parkey in par.keys():
-                    simpar[parkey] = trial_pars[f'{name}_{parkey}']
-                calib_pars[name] = simpar
+                for subname, subpar in par.items():
+                    if isinstance(subpar, dict):
+                        subsimpar = simpar[subname]
+                        for subsubname, subsubpar in subpar.items():
+                            parkey = f'{name}_{subname}_{subsubname}'
+                            if parkey in trial_pars:
+                                subsimpar[subsubname] = trial_pars[parkey]
+                        simpar[subname] = subsimpar
+                    else: 
+                        parkey = f'{name}_{subname}'
+                        if parkey in trial_pars:
+                            simpar[subname] = trial_pars[parkey]
+                    calib_pars[name] = simpar
             else:
                 calib_pars[name] = trial_pars[name]
+                
+        # for name, par in self.calib_pars.items():
+        #     if isinstance(par, dict):
+        #         simpar = self.sim.pars[name]
+        #         for parkey in par.keys():
+        #             simpar[parkey] = trial_pars[f'{name}_{parkey}']
+        #         calib_pars[name] = simpar
+        #     else:
+        #         calib_pars[name] = trial_pars[name]
 
         # Return
         if return_full:
