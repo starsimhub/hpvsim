@@ -11,19 +11,19 @@ All notable changes to the codebase are documented in this file. Changes that ma
 Version 1.2.2 (2023-08-11)
 ---------------------------
 - Improved tests and included ``conda`` environment specification.
-- *Github info* PR `576 <https://github.com/amath-idm/hpvsim/pull/550>`__
+- *Github info* PR `598 <https://github.com/amath-idm/hpvsim/pull/598>`__
 
 Version 1.2.1 (2023-07-09)
 ---------------------------
 - Updated data files being used. 
-- *Github info* PR `576 <https://github.com/amath-idm/hpvsim/pull/550>`__
+- *Github info* PR `586 <https://github.com/amath-idm/hpvsim/pull/586>`__
 
 Version 1.2.0 (2023-05-31)
 ---------------------------
 - Changes to improve run speed, most notably changes to how migration is applied
 - Additional tests to ensure consistency between calibration results, age analyzer results, and sim results
 - Updates to natural history to prevent people progressing too quickly to cancer
-- *Github info* PR `576 <https://github.com/amath-idm/hpvsim/pull/550>`__
+- *Github info* PR `576 <https://github.com/amath-idm/hpvsim/pull/576>`__
 
 Version 1.1.5 (2023-03-23)
 ---------------------------
