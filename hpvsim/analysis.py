@@ -642,6 +642,7 @@ class age_results(Analyzer):
                                 range(len(rdict.bins) - 1)]
             rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
 
+
             # Construct timepoints
             if not rdict.get('timepoints') or rdict.timepoints is None:
                 rdict.timepoints = []
@@ -782,7 +783,6 @@ class age_results(Analyzer):
 
                 # Figure out if it's a flow
                 if rdict.result_type == 'flow':
-
                     if not rdict.by_genotype:  # Results across all genotypes
                         if rkey == 'detected_cancer_deaths':
                             inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl['detected_cancer'])).nonzero()[-1]
@@ -825,7 +825,8 @@ class age_results(Analyzer):
                         else:
                             denom = bin_ages(inds=ppl.alive, bins=bins)
                     else:  # Denominator is females
-                        denom = bin_ages(inds=ppl.f_inds, bins=bins)
+                        # denom = bin_ages(inds=ppl.f_inds, bins=bins)
+                        denom = bin_ages(inds=ppl.is_female_alive, bins=bins)
                     if rdict.by_genotype: denom = denom[None, :]
                     self.results[rkey][date] = self.results[rkey][date] / (denom)
 
@@ -953,6 +954,7 @@ class age_results(Analyzer):
         res = []
         resargs = self.result_args[key]
         results = self.results[key]
+
         for name, group in resargs.data.groupby(['genotype', 'year']):
             genotype = name[0]
             year = name[1]
