@@ -9,7 +9,7 @@ import math
 import warnings
     
 pd.set_option('display.max_columns', None)
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore')
 
 #%% First, make a csv that lists all parameters
 def get_all_param_space(sim):
@@ -40,7 +40,7 @@ def get_all_param_space(sim):
 #%% Given custom_made param_space, functions to prepare for calibration
 
 # Create calib_pars dictionary from csv file (string to nested dict)
-def create_nested_dict(keys, base_value, lower_bound, upper_bound, n_test):
+def create_nested_dict(keys, base_value, lower_bound, upper_bound, n_test=None):
     nested_dict = {}
     current_dict = nested_dict
     key_list = keys.split('/')
@@ -48,10 +48,13 @@ def create_nested_dict(keys, base_value, lower_bound, upper_bound, n_test):
     for key in key_list[:-1]:
         current_dict[key] = {}
         current_dict = current_dict[key]
-    current_dict[last_key] = [base_value, lower_bound, upper_bound, math.floor((upper_bound - lower_bound) / (n_test-1)*10e3)/10e3]
+    if n_test is not None:
+        current_dict[last_key] = [base_value, lower_bound, upper_bound, math.floor((upper_bound - lower_bound) / (n_test-1)*1e10)/1e10]
+    else:
+        current_dict[last_key] = [base_value, lower_bound, upper_bound]
     return nested_dict
 
-# Nested dict's keys to string
+# Nested dict's keys to string. Supports only one parameter
 def get_nested_dict_keys(nested_dict, prefix=''):
     keys = []
     for key, value in nested_dict.items():
@@ -76,6 +79,7 @@ def estimator(actual, predicted):
                 gofs[iv] = abs(np.max(actuals[iv])-val)
             elif val < np.min(actuals[iv]):
                 gofs[iv] = abs(np.min(actuals[iv])-val)
+        
 
         actual_max = np.array(actuals).max()
         if actual_max > 0:
@@ -86,7 +90,7 @@ def estimator(actual, predicted):
         return gofs
 
 # Get list of calibration parameters
-def get_calib_list(custom_param_space, n_test):
+def get_calib_list(custom_param_space, n_test=None):
     calib_list = []
     for _, row in custom_param_space.iterrows():
         keys = row['param_name']
@@ -98,16 +102,15 @@ def get_calib_list(custom_param_space, n_test):
         calib_list.append(calib_param)
     return calib_list
 
-
-def one_way_SA(base_pars, calib_pars, genotype_pars, n_test, datafiles, extra_sim_result_keys, extra_sim_analyzers):
+def precalib_SA(location, base_pars, calib_pars, genotype_pars, total_trials, n_workers, datafiles, extra_sim_result_keys, extra_sim_analyzers, sampler, result_folder):
     import optuna as op
     import multiprocessing as mp
     pars_name = ''
-    if calib_pars is not None: pars_name = get_nested_dict_keys(calib_pars)
-    elif genotype_pars is not None: pars_name = get_nested_dict_keys(genotype_pars)
-    name = f'{location}_{pars_name}_calib'
-
-    if f'{name}.obj' in os.listdir('results'):
+    # if calib_pars is not None: pars_name = get_nested_dict_keys(calib_pars)
+    # elif genotype_pars is not None: pars_name = get_nested_dict_keys(genotype_pars)
+    # name = f'{location}_{pars_name}_calib_nolatent'
+    name = 'test'
+    if f'{name}.obj' in os.listdir(result_folder):
         print(f"{name} already processed. Skipping.")
         return
 
@@ -115,12 +118,15 @@ def one_way_SA(base_pars, calib_pars, genotype_pars, n_test, datafiles, extra_si
 
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             name=name, estimator=estimator,
-                            sampler = op.samplers.BruteForceSampler(),
+                            sampler = sampler,
                             datafiles=datafiles, extra_sim_result_keys=extra_sim_result_keys,
                             extra_sim_analyzers=extra_sim_analyzers,
-                            n_trials=1, n_workers=min(mp.cpu_count(),n_test))
+                            total_trials=total_trials, n_workers=n_workers)
     calib.calibrate(die=True)
-    sc.saveobj(f'results/{name}.obj', calib)
+    # calib.plot()
+    # sc.saveobj(f'{result_folder}/{name}.obj', calib)
+    return (sim, calib)
+
 
     
 # def plot_tornado_chart()
@@ -133,19 +139,19 @@ if __name__ == '__main__':
     # Make full parameter space if you haven't done already
     # sim = sc.load('test_data/india_calib_july18.obj').sim
     # param_space = get_all_param_space(sim)
-    # # Save the parameter space to a csv. If a parameter is numeric or can vary, fill the lower and upper bound at best. 
-    # # Also, if you have the best parameter estimate, change the base values based on that.
-    # # If a parameter is hard to test lower and upper bound, fill with NA 
     # param_space.to_csv('param_space.csv')
+    # custom_param_space = pd.read_csv(f'param_space_filled_nolatency.csv', index_col = 0)
+    # custom_param_space = custom_param_space[custom_param_space['Notes'].isin(['Assume'])]  # Filter parameters
 
     # Read calibration files and decide settings
-    org_calib = sc.load('test_data/india_calib_july18.obj')
+    result_folder = '../../hpvsim_txvx_analyses/results'
+    org_calib = sc.load(f'{result_folder}/india_calib_aug7_nolatency.obj')
     org_sim = org_calib.sim
     best_pars = org_calib.trial_pars_to_sim_pars()
     org_sim.update_pars(best_pars)
     org_pars = org_sim.pars
-    custom_param_space = pd.read_csv('param_space_filled.csv', index_col = 0)
-    custom_param_space = custom_param_space[custom_param_space['Notes'].isin(['Assume'])]  # Filter parameters
+    # custom_param_space = pd.read_csv(f'param_space_filled_nolatency.csv', index_col = 0)
+    # custom_param_space = custom_param_space[custom_param_space['Notes'].isin(['Assume','Provided'])]  # Filter parameters
     
     # Use your Own Calibration settings
     location ='india'
@@ -158,20 +164,27 @@ if __name__ == '__main__':
     ]
     extra_sim_result_keys = ['asr_cancer_incidence', 'n_precin_by_age', 'n_cin1_by_age', 'n_females_alive_by_age']
     extra_sim_analyzers = [hpv.age_causal_infection(start_year=2000)]  
-    n_test = 8
+    n_test = 1
+    # org_pars['n_agents'] = 100
 
-    calib_list = get_calib_list(custom_param_space, n_test)
+    #%% actual running
+    import optuna as op
 
-    for calib_to_pars in calib_list:
-        print(calib_to_pars)
-        base_pars = sc.dcp(org_pars)
-        base_pars['analyzers'] = []
-        calib_pars = None; genotype_pars = None 
-        if 'genotype_pars' in calib_to_pars.keys():
-            genotype_pars = calib_to_pars['genotype_pars']
-        else:
-            calib_pars = calib_to_pars
-        one_way_SA(base_pars, calib_pars, genotype_pars, n_test, datafiles, extra_sim_result_keys, extra_sim_analyzers)
+    # calib_list = get_calib_list(custom_param_space, n_test)
+    calib_to_pars = [{'n_agents': [org_pars['n_agents'],org_pars['n_agents'],org_pars['n_agents']+10,1]}][0]
+    # for calib_to_pars in calib_list:
+        # print(calib_to_pars)
+    base_pars = sc.dcp(org_pars)
+    base_pars['analyzers'] = []
+    calib_pars = None; genotype_pars = None 
+    if 'genotype_pars' in calib_to_pars.keys():
+        genotype_pars = calib_to_pars['genotype_pars']
+    else:
+        calib_pars = calib_to_pars
+    
+    (sim, calib)= precalib_SA(base_pars, calib_pars, genotype_pars, n_test, datafiles, extra_sim_result_keys, extra_sim_analyzers, op.samplers.BruteForceSampler() ,result_folder)
 
-    # sc.toc(T)
+    sc.toc(T)
     print('Done.')
+
+# 
