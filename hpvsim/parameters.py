@@ -63,10 +63,11 @@ def make_pars(**kwargs):
     pars['hiv_pars']        = sc.objdict()  # Can be directly modified by passing in arguments listed in hiv_pars
 
     # Network parameters, generally initialized after the population has been constructed
-    pars['geostructure']    = 1     # Defines how many geographic clusters there should be in the simulated population
-    pars['geo_mixing_steps']= None  # List of mixing preferences between geo-clusters by distance, elements should be [0, 1]
-    pars['geomixing']       = None  # Mixing matrix between geographic clusters
-    pars['clustered_risk']  = 1     # Strength of relationship between rel_sev and geo-clustering, where 1 means there is no relationship and values above 1 refer to how much more similar clusters are wrt rel_sev
+    pars['n_clusters']    = 1     # Defines how many clusters (e.g., geospatial) there should be in the simulated population
+    pars['mixing_steps']= None  # List of relative mixing weights between clusters by relative distance, length = n_clusters - 1, elements should be [0, 1].
+    # E.g, for 3 clusters, mixing_steps=[1,1] means full mixing; mixing_steps = [0, 0] means no between cluster mixing.
+    pars['add_mixing']       = None  # Mixing matrix between clusters
+    pars['clustered_risk']  = 1     # Strength of relationship between rel_sev and clustering, where 1 means there is no relationship and values above 1 refer to how much more similar clusters are wrt rel_sev
     pars['cluster_rel_sev'] = None  # Array of cluster-specific rel_sev values
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
@@ -136,7 +137,7 @@ def make_pars(**kwargs):
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
     reset_layer_pars(pars)
-    get_geo_mixing(pars)
+    add_mixing(pars) # additional assortative mixing
 
     return pars
 
@@ -740,24 +741,24 @@ def compute_severity_integral(t, rel_sev=None, pars=None):
 
     return output
 
-def get_geo_mixing(pars):
+def add_mixing(pars):
     # create geo mixing preference matrix
     # TODO: need to deal with custom input of geo mixing matrix
-    geo_size = int(pars['geostructure'])
-    geomixing = np.zeros([geo_size, geo_size])
+    cluster_size = int(pars['n_clusters'])
+    add_mixing = np.zeros([cluster_size, cluster_size])
 
 #    if pars.get('geo_mixing_steps'):
-    if pars['geo_mixing_steps'] is not None:
-        if geo_size < len(pars['geo_mixing_steps']):
-            print('Warning: input has {} mixing steps but only {} geographic clusters.'.format(len(pars['geo_mixing_steps']), geo_size))
-        for i, gs in enumerate(pars['geo_mixing_steps'][:geo_size - 1]):
-            geomixing += np.diagflat(np.repeat(gs, geo_size - i - 1), i + 1)
-        geomixing += geomixing.T
+    if pars['mixing_steps'] is not None:
+        if cluster_size < len(pars['mixing_steps']):
+            print('Warning: input has {} mixing steps but only {} clusters.'.format(len(pars['mixing_steps']), cluster_size))
+        for i, gs in enumerate(pars['mixing_steps'][:cluster_size - 1]):
+            add_mixing += np.diagflat(np.repeat(gs, cluster_size - i - 1), i + 1)
+        add_mixing += add_mixing.T
 
-    geomixing[np.diag_indices_from(geomixing)] = 1  # set diagonal to 1
-    pars['geomixing'] = geomixing
+    add_mixing[np.diag_indices_from(add_mixing)] = 1  # set diagonal to 1
+    pars['add_mixing'] = add_mixing
 
     if 'sev_dist' in pars:
-        rel_sevs = hpu.sample(**pars['sev_dist'], size=geo_size)
+        rel_sevs = hpu.sample(**pars['sev_dist'], size=cluster_size)
         pars['cluster_rel_sev'] = rel_sevs
     return

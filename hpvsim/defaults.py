@@ -74,7 +74,7 @@ class PeopleMeta(sc.prettyobj):
         # Set the properties of a person
         self.person = [
             State('uid',            default_int),           # Int
-            State('geo',            default_int,    0),     # Int
+            State('cluster',            default_int,    0),     # Int
             State('scale',          default_float,  1.0), # Float
             State('level0',         bool,  True), # "Normal" people
             State('level1',         bool,  False), # "High-resolution" people: e.g. cancer agents

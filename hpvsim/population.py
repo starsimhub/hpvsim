@@ -89,7 +89,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         else:
             ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(n_agents) # Uniformly distribute within this age bin
 
-        uids, sexes, debuts, rel_sev, partners, geo = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
+        uids, sexes, debuts, rel_sev, partners, cluster = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
 
         # Store output
         popdict = {}
@@ -99,7 +99,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['debut'] = debuts
         popdict['rel_sev'] = rel_sev
         popdict['partners'] = partners
-        popdict['geo'] = geo
+        popdict['cluster'] = cluster
 
         is_active = ages > debuts
         is_female = sexes == 0
@@ -116,7 +116,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
                     pref_weight=100, durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey],
-                    geo_structure=geo, geomixing=sim['geomixing'], **kwargs
+                    cluster=cluster, add_mixing=sim['add_mixing'], **kwargs
                 )
                 lno += 1
 
@@ -175,21 +175,21 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
-    geo             = np.random.choice(range(int(pars['geostructure'])), new_n) #TODO: allow these to be differently sized
+    cluster         = np.random.choice(range(int(pars['n_clusters'])), new_n) #TODO: allow these to be differently sized
 
 
-    if pars['clustered_risk'] > 1: # Clustering relative severity by geographic cluster
+    if pars['clustered_risk'] > 1: # Clustering relative severity by cluster
         rel_sev     = np.zeros((new_n))
         rel_sevs    = pars['cluster_rel_sev']
         # For each unique cluster, draw rel_sev values from a rel_sev dist with adjusted SD based upon degree of clustering
         for ig, rs in enumerate(rel_sevs):
             rel_sev_cluster = hpu.sample(**sc.mergedicts(pars['sev_dist'], {'par1': rs, 'par2': pars['sev_dist']['par2']/pars['clustered_risk']}),
-                                         size=len(hpu.true(geo==ig)))
-            rel_sev[geo==ig] = rel_sev_cluster
+                                         size=len(hpu.true(cluster==ig)))
+            rel_sev[cluster==ig] = rel_sev_cluster
     else:
         rel_sev     = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
 
-    return uid, sex, debut, rel_sev, partners, geo
+    return uid, sex, debut, rel_sev, partners, cluster
 
 
 def validate_popdict(popdict, pars, verbose=True):
@@ -272,7 +272,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
 
 
 def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
-                        layer_probs, pref_weight, cross_layer, geostructure, geomixing):
+                        layer_probs, pref_weight, cross_layer, cluster, add_mixing):
     '''
     Create partnerships for a single layer
     Args:
@@ -286,8 +286,8 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         layer_probs         (float arr): participation rates in this layer by age and sex
         pref_weight         (float): weight that determines the extent to which people without their preferred number of partners are preferenced for selection
         cross_layer         (float): proportion of agents that have cross-layer relationships
-        geostructure        (int arr): array containing each agents geographic location
-        geomixing           (float arr): geo mixing matrix
+        cluster             (int arr): array containing each agent's cluster id
+        add_mixing          (float arr): additional mixing matrix
     '''
     # Initialize
     new_pship_inds, new_pship_counts = [], []  # Initialize the indices and counts of new partnerships
@@ -332,14 +332,14 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         these_m_contacts = hpu.binomial_filter(layer_probs[2][ab], m_eligible_inds[age_bins_m == ab])  # Select males according to their participation rate in this layer
         m += these_m_contacts.tolist()
 
-    # Create preference matrix between eligible females and males that combines age and geo mixing
+    # Create preference matrix between eligible females and males that combines age and additional mixing
     age_bins_f = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
     age_bins_m = np.digitize(age[m], bins=bins) - 1  # Age bins of active and participating males
     age_f, age_m = np.meshgrid(age_bins_f, age_bins_m)
-    geo_f, geo_m = np.meshgrid(geostructure[f], geostructure[m])
+    cluster_f, cluster_m = np.meshgrid(cluster[f], cluster[m])
     age_probs = mixing[age_m, age_f+1]
-    geo_probs = geomixing[geo_m, geo_f]
-    pair_probs = np.multiply(age_probs, geo_probs)
+    cluster_probs = add_mixing[cluster_m, cluster_f]
+    pair_probs = np.multiply(age_probs, cluster_probs)
 
     f_to_remove = pair_probs.max(axis=0)==0  # list of female inds to remove if no male partners are found for her
     f = [i for i, flag in zip(f, f_to_remove) if ~flag]  # remove the inds who don't get paired on this timestep
@@ -378,7 +378,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
                   sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
                   mixing=None, layer_probs=None, cross_layer=None,
                   pref_weight=None, durations=None, acts=None, age_act_pars=None,
-                  geo_structure=None, geomixing=None):
+                  cluster=None, add_mixing=None):
     '''
     Make contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females using age structure if given.
@@ -387,7 +387,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
     # Create edgelist
     f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(
         lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
-        layer_probs, pref_weight, cross_layer, geo_structure, geomixing)
+        layer_probs, pref_weight, cross_layer, cluster, add_mixing)
 
     # Convert edgelist into Contacts dict, with info about each partnership's duration,
     # coital frequency, etc

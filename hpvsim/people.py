@@ -447,7 +447,7 @@ class People(hpb.BasePeople):
                 sexes=self.sex, ages=self.age, debuts=self.debut, is_female=self.is_female, is_active=self.is_active,
                 mixing=mixing[lkey], layer_probs=layer_probs[lkey], cross_layer=cross_layer,
                 pref_weight=pref_weight, durations=dur_pship[lkey], acts=acts[lkey], age_act_pars=age_act_pars[lkey],
-                geo_structure=self.geo, geomixing=self.pars['geomixing']
+                cluster=self.cluster, add_mixing=self.pars['add_mixing']
             )
             new_pships[lkey], current_partners, new_pship_inds, new_pship_counts = hppop.make_contacts(**pship_args)
 
@@ -694,7 +694,7 @@ class People(hpb.BasePeople):
 
         if new_births>0:
             # Generate other characteristics of the new people
-            uids, sexes, debuts, rel_sev, partners, geo = hppop.set_static(new_n=new_births, existing_n=len(self),
+            uids, sexes, debuts, rel_sev, partners, cluster = hppop.set_static(new_n=new_births, existing_n=len(self),
                                                                            pars=self.pars)
             # Grow the arrays`
             new_inds = self._grow(new_births)
@@ -705,7 +705,7 @@ class People(hpb.BasePeople):
             self.debut[new_inds]        = debuts
             self.rel_sev[new_inds]      = rel_sev
             self.partners[:,new_inds]   = partners
-            self.geo[new_inds]          = geo
+            self.cluster[new_inds]      = cluster
 
             if immunity is not None:
                 self.nab_imm[:,new_inds] = immunity
