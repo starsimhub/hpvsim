@@ -22,12 +22,11 @@ base_pars = {
 #%% Network analyzer
 # TODO: move this to analysis.py?
 class new_pairs_snap(hpv.Analyzer):
-    def __init__(self, start_year=None, by_year=3, **kwargs):
+    def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
         self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype'])
         self.start_year = start_year
         self.yearvec = None
-        self.by_year = by_year
 
     def initialize(self, sim):
         super().initialize()
@@ -75,18 +74,17 @@ class new_pairs_snap(hpv.Analyzer):
         else:
             pl.show()
 
-def run_network(geos, geo_mix, start, end, pop):
+def run_network(clusters, mixing_steps, start, end, pop):
 
-    #labels = ['Clustered network', 'Status quo']
-    labels = []
+    labels = ['Status quo', 'Clustered network']
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
     )
     snaps = []
-    new_pairs = new_pairs_snap(start_year = 2010)
+    new_pairs = new_pairs_snap(start_year = 2012)
     df_new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype', 'sim'])
     fig0, axes = pl.subplots(2, 1)
-    for i, (geostruct, geo_mixing) in enumerate(zip(geos, geo_mix)):
+    for i, (n_clusters, mixing) in enumerate(zip(clusters, mixing_steps)):
         print(i)
         pars = dict(
             n_agents=pop,
@@ -94,10 +92,9 @@ def run_network(geos, geo_mix, start, end, pop):
             end=end,
             location='nigeria',
             ms_agent_ratio=100,
-            geostructure=geostruct,
+            n_clusters=n_clusters,
             #clustered_risk=risk,
-            #geo_mixing=geo_mixing,
-            geo_mixing_steps = geo_mixing,
+            mixing_steps = mixing_steps,
             #random_pairing=True,
             analyzers=[snap, new_pairs]
         )
@@ -105,13 +102,13 @@ def run_network(geos, geo_mix, start, end, pop):
         sim = hpv.Sim(pars=pars)
         sim.run()
         # Plot age mixing
-        labels += ['{} geo-cluster, {} mixing steps'.format(geostruct, len(geo_mixing))]
+        labels += ['{} cluster, {} mixing steps'.format(n_clusters, len(mixing))]
         snaps.append(sim.get_analyzer([0]))
         new_pairs_snaps = sim.get_analyzer([1]).new_pairs
         new_pairs_snaps['sim'] = i
         df_new_pairs = pd.concat([df_new_pairs, new_pairs_snaps])
         ## Network diagnostics
-        plot_mixing(sim, df_new_pairs)
+        plot_mixing(df_new_pairs)
 
         axes[0].plot(sim.results['year'], sim.results['infections'], label=labels[i])
         axes[1].plot(sim.results['year'], sim.results['cancers'])
@@ -135,10 +132,9 @@ def run_network(geos, geo_mix, start, end, pop):
         rships_f = np.zeros((3, len(people.age_bin_edges)))
         rships_m = np.zeros((3, len(people.age_bin_edges)))
         for lk, lkey in enumerate(['m', 'c', 'o']):
-            active_ages = people.age#[(people.n_rships[lk,:] >= 1)]
-            n_rships = people.n_rships#[:,(people.n_rships[lk,:] >= 1)]
+            active_ages = people.age
+            n_rships = people.n_rships
             age_bins = np.digitize(active_ages, bins=people.age_bin_edges) - 1
-
 
             for ab in np.unique(age_bins):
                 inds_f = (age_bins==ab) & people.is_female
@@ -161,9 +157,9 @@ def run_network(geos, geo_mix, start, end, pop):
     for i, isnap in enumerate(snaps):
         people2020 = isnap.snapshots[3]
         font_size = 15
-        font_family = 'Libertinus Sans'
+        #font_family = 'Libertinus Sans'
         pl.rcParams['font.size'] = font_size
-        pl.rcParams['font.family'] = font_family
+        #pl.rcParams['font.family'] = font_family
 
         # ax = axes.flatten()
         people = people2020
@@ -184,7 +180,7 @@ def run_network(geos, geo_mix, start, end, pop):
 #%% Define the tests
 
 
-def plot_mixing(sim, df_new_pairs):
+def plot_mixing(df_new_pairs):
     for runind in df_new_pairs.sim.unique():
         for i, rtype in enumerate(['m','c','o']):
             df = df_new_pairs[(df_new_pairs['sim'] == runind) & (df_new_pairs['rtype'] == rtype)]
@@ -208,14 +204,14 @@ def plot_mixing(sim, df_new_pairs):
                 ax[j//nc, j%nc].set_title(year)
 
             fig.colorbar(h[3], ax=ax)
-            mixing = sim['mixing'][rtype]
-            age_bins = mixing[:,0]
-            mixing = mixing[:,1:]
-            mixing_norm_col = mixing / mixing.max(axis=0)
-            mixing_norm_col[np.isnan(mixing_norm_col)] = 0
-            X, Y = np.meshgrid(age_bins, age_bins)
-            h = ax[nr-1, nc-1].pcolormesh(X, Y, mixing_norm_col, norm=mpl.colors.LogNorm())
-            ax[nr-1, nc-1].set_title('Input')
+            #mixing = sim['mixing'][rtype]
+            #age_bins = mixing[:,0]
+            #mixing = mixing[:,1:]
+            #mixing_norm_col = mixing / mixing.max(axis=0)
+            #mixing_norm_col[np.isnan(mixing_norm_col)] = 0
+            #X, Y = np.meshgrid(age_bins, age_bins)
+            #h = ax[nr-1, nc-1].pcolormesh(X, Y, mixing_norm_col, norm=mpl.colors.LogNorm())
+            #ax[nr-1, nc-1].set_title('Input')
 
             fig.text(0.5, 0.04, 'Age of female partner', ha='center', fontsize=24)
             fig.text(0.04, 0.5, 'Age of male partner', va='center', rotation='vertical', fontsize=24)
@@ -226,26 +222,22 @@ def plot_mixing(sim, df_new_pairs):
             fig.show()
 
 
-def geo_demo():
-    sc.heading('Geostructure test')
-
-    sim0 = hpv.Sim(pars=base_pars)
-    sim0['geostructure'] = 10
-    sim0.update_pars()
-    sim0.run()
+def cluster_demo():
+    sc.heading('Cluster test')
     # Default: well-mixed (1 geo cluster)
-    assert sim0['geostructure'] == 1
+    sim0 = hpv.Sim(pars=base_pars)
+    assert sim0['n_clusters'] == 1
     # Multiple geo clusters
     pars1 = base_pars
-    pars1['geostructure'] = 10
-    pars1['geo_mixing_steps'] = np.repeat(1,9) # TODO: automatically adjust geo_mixing_steps as well-mixed when given geostructure input > 1?
+    pars1['n_clusters'] = 10
+    pars1['mixing_steps'] = np.repeat(1,9) # TODO: automatically adjust mixing_steps as well-mixed when given n_clusters > 1?
     sim1 = hpv.Sim(pars=pars1)
-    print(sim1['geomixing'])
+    print(sim1['add_mixing'])
     # Modifying mixing steps
     pars2 = pars1
-    pars2['geo_mixing_steps'] = [0.5, 0.01] # diagonal is 1 by default, set relative mixing at 0.5 for adjacent clusters, 0.01 for clusters with distance = 2
+    pars2['mixing_steps'] = [0.5, 0.01] # diagonal is 1 by default, set relative mixing at 0.5 for adjacent clusters, 0.01 for clusters with distance = 2
     sim2 = hpv.Sim(pars=pars2)
-    print(sim2['geomixing'])
+    print(sim2['add_mixing'])
 
 
 #%% Run as a script
@@ -253,13 +245,13 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    geos = [1, 10]
-    geo_mix = [[1], np.repeat(1,9)]
+    clusters = [2, 10]
+    mixing_steps = [[1], np.repeat(1,9)]
     start = 1970
     end = 2020
     pop = 10e3
-    run_network(geos, geo_mix, start, end, pop)
-    geo_demo()
+    run_network(clusters, mixing_steps, start, end, pop)
+    cluster_demo()
 
     sc.toc(T)
     print('Done.')
