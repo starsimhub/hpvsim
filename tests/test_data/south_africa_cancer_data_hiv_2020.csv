@@ -1,0 +1,9 @@
+year,name,age,sex,genotype,value
+2019,cancers_with_hiv,0,female,total,10
+2019,cancers_with_hiv,20,female,total,221
+2019,cancers_with_hiv,30,female,total,1845
+2019,cancers_with_hiv,40,female,total,2559
+2019,cancers_with_hiv,50,female,total,1748
+2019,cancers_with_hiv,60,female,total,1269
+2019,cancers_with_hiv,70,female,total,695
+2019,cancers_with_hiv,80,female,total,406

@@ -293,10 +293,9 @@ class BaseSim(ParsObj):
             # Handle other special parameters
             if pars.get('network'):
                 hppar.reset_layer_pars(pars, force=False)
-            location = 'nigeria'
             if pars.get('location'):
                 location = pars['location']
-            pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
+                pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
 
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
@@ -910,7 +909,7 @@ class BasePeople(FlexPretty):
         ''' Initialize essential attributes used for filtering '''
         
         # Set meta attribute here, because BasePeople methods expect it to exist
-        self.meta = hpd.PeopleMeta  # Store list of keys and dtypes
+        self.meta = hpd.PeopleMeta()  # Store list of keys and dtypes
         self.meta.validate()
 
         # Define lock attribute here, since BasePeople.lock()/unlock() requires it
@@ -933,7 +932,7 @@ class BasePeople(FlexPretty):
 
     def initialize(self):
         ''' Initialize underlying storage and map arrays '''
-        for state in self.meta.all_states:
+        for state in self.meta.states_to_set:
             self._data[state.name] = state.new(self.pars, self._n)
         self._map_arrays()
         self['uid'][:] = np.arange(self.pars['n_agents'])
@@ -955,7 +954,7 @@ class BasePeople(FlexPretty):
         return len(self._data[base_key])
 
 
-    def set_pars(self, pars=None, hiv_pars=None):
+    def set_pars(self, pars=None):
         '''
         Re-link the parameters stored in the people object to the sim containing it,
         and perform some basic validation.
@@ -982,7 +981,6 @@ class BasePeople(FlexPretty):
         pars['n_agents'] = int(pars['n_agents'])
         pars.setdefault('location', None)
         self.pars = pars # Actually store the pars
-        self.hiv_pars = hiv_pars # And now set HIV
         return
 
 
@@ -1058,7 +1056,7 @@ class BasePeople(FlexPretty):
         new_total = orig_n + n
         if new_total > self._s:
             n_new = max(n, int(self._s / 2))  # Minimum 50% growth
-            for state in self.meta.all_states:
+            for state in self.meta.states_to_set:
                 self._data[state.name] = np.concatenate([self._data[state.name], state.new(self.pars, n_new)], axis=self._data[state.name].ndim-1)
             self._s += n_new
         self._n += n
@@ -1382,47 +1380,38 @@ class BasePeople(FlexPretty):
     @property
     def precin(self):
         '''
-        Boolean array of everyone with whose disease severity level does not meet the threshold for detectable cell changes
+        Boolean array of females with HPV whose disease severity level does not meet the threshold for detectable cell changes
         '''
-        return (self.sev < self.pars['clinical_cutoffs']['precin']).astype(bool)
+        return ((self.sex == 0) & self.infectious & (np.isnan(self.sev) | (self.sev==0))).astype(bool)
 
     @property
     def cin1(self):
         '''
-        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN1-level cell changes
+        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN1-level cell changes
         '''
-        return ((self.sev >= self.pars['clinical_cutoffs']['precin']) * (
-                 self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
+        return ((self.sex == 0) * (self.sev > 0) * (self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
 
     @property
     def cin2(self):
         '''
-        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN2-level cell changes
+        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN2-level cell changes
         '''
-        return ((self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
+        return ((self.sex == 0) * (self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
                  self.sev < self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     @property
     def cin3(self):
         '''
-        Boolean array of everyone with whose disease severity level lies within the thresholds for CIN3-level cell changes
+        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN3-level cell changes
         '''
-        return ((self.sev >= self.pars['clinical_cutoffs']['cin2']) * (
-                 self.sev < self.pars['clinical_cutoffs']['cin3'])).astype(bool)
-
-    @property
-    def carcinoma(self):
-        '''
-        Boolean array of everyone with whose disease severity level lies within the thresholds for carcinoma in situ
-        '''
-        return (self.sev >= self.pars['clinical_cutoffs']['cin3']).astype(bool)
+        return ((self.sex == 0) * (self.sev >= self.pars['clinical_cutoffs']['cin2'])).astype(bool)
 
     @property
     def cin(self):
         '''
-        Boolean array of everyone with whose disease severity level meets the threshold for detectable cell changes
+        Boolean array of females with HPV whose disease severity level meets the threshold for detectable cell changes
         '''
-        return (self.sev >= self.pars['clinical_cutoffs']['precin']).astype(bool)
+        return (self.sev>0).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
@@ -1476,8 +1465,8 @@ class BasePeople(FlexPretty):
         return out
 
     def keys(self):
-        ''' Returns keys for all properties of the people object '''
-        return [state.name for state in self.meta.all_states]
+        ''' Returns keys for all non-derived properties of the people object '''
+        return [state.name for state in self.meta.states_to_set]
 
     def person_keys(self):
         ''' Returns keys specific to a person (e.g., their age) '''
@@ -1789,7 +1778,7 @@ class Person(sc.prettyobj):
     Class for a single person. Note: this is largely deprecated since sim.people
     is now based on arrays rather than being a list of people.
     '''
-    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, partners=None, current_partners=None,
+    def __init__(self, pars=None, uid=None, age=-1, sex=-1, debut=-1, rel_sev=-1, partners=None, current_partners=None,
                  rship_start_dates=None, rship_end_dates=None, n_rships=None):
         self.uid                = uid # This person's unique identifier
         self.age                = hpd.default_float(age) # Age of the person (in years)
@@ -1800,6 +1789,7 @@ class Person(sc.prettyobj):
         self.rship_end_dates    = rship_end_dates # Timepoint of most recent breakup/relationship dissolution
         self.n_rships           = n_rships # Total number of relationships during the simulation
         self.debut              = hpd.default_float(debut) # Age of sexual debut
+        self.rel_sev            = hpd.default_float(rel_sev) # Relative severity
         return
 
 

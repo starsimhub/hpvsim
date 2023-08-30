@@ -8,6 +8,66 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.2.2 (2023-08-11)
+---------------------------
+- Improved tests and included ``conda`` environment specification.
+- *Github info* PR `598 <https://github.com/amath-idm/hpvsim/pull/598>`__
+
+Version 1.2.1 (2023-07-09)
+---------------------------
+- Updated data files being used. 
+- *Github info* PR `586 <https://github.com/amath-idm/hpvsim/pull/586>`__
+
+Version 1.2.0 (2023-05-31)
+---------------------------
+- Changes to improve run speed, most notably changes to how migration is applied
+- Additional tests to ensure consistency between calibration results, age analyzer results, and sim results
+- Updates to natural history to prevent people progressing too quickly to cancer
+- *Github info* PR `576 <https://github.com/amath-idm/hpvsim/pull/576>`__
+
+Version 1.1.5 (2023-03-23)
+---------------------------
+- Adds cross-protection functionality to t-cell immunity and adds `sev_imm` attribute to people
+- *Github info* PR `564 <https://github.com/amath-idm/hpvsim/pull/564>`__
+
+Version 1.1.4 (2023-03-15)
+---------------------------
+- Fixes bug that caused location data to be loaded twice
+- *Github info* PR `546 <https://github.com/amath-idm/hpvsim/pull/546>`__
+
+Version 1.1.3 (2023-03-14)
+---------------------------
+- Fixes bug that misses some ways you can specify sex for vaccination
+- *Github info* PR `555 <https://github.com/amath-idm/hpvsim/pull/555>`__
+
+Version 1.1.2 (2023-03-13)
+---------------------------
+- Fixes bug that never computed cancer deaths by age
+- *Github info* PR `554 <https://github.com/amath-idm/hpvsim/pull/554>`__
+
+Version 1.1.1 (2023-03-01)
+---------------------------
+- Sets time to and date of HIV death for those not on ART and who fail on ART
+- Moves all HIV attributes, parameters, and results into hivsim class instance
+- Merges HIV results with sim.results at conclusion of simulation
+- Adds HIV pars as an argument to calibration as well as HIV-specific results to age-results analyzer
+- Allows for flexible severity growth functions
+- *Github info* PR `542 <https://github.com/amath-idm/hpvsim/pull/542>`__
+
+
+Version 1.1.0 (2023-02-16)
+---------------------------
+- Moves all HIV functionality into hiv.py
+- Establishes new class HIVsim, which is defined by a set of parameters and methods for updating a people object
+- Bug fix for setting people.sev wrong on day of infection
+- *Github info* PR `526 <https://github.com/amath-idm/hpvsim/pull/526>`__
+
+
+Version 1.0.1 (2023-02-09)
+---------------------------
+- Fixes computation of dur_episomal by adjusting for dt
+- *GitHub info*: PR `527 <https://github.com/amath-idm/hpvsim/pull/527>`__
+
 
 Version 1.0.0 (2023-01-31)
 ---------------------------

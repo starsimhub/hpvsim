@@ -19,7 +19,7 @@ import sciris as sc
 from . import loaders
 
 # Set parameters
-data_version = '1.1' # Data version
+data_version = '1.2' # Data version
 data_file = f'hpvsim_data_v{data_version}.zip'
 quick_url = f'https://github.com/amath-idm/hpvsim_data/blob/main/{data_file}?raw=true'
 age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
@@ -28,10 +28,20 @@ base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standar
 years = ['1950-2021', '2022-2100']
 
 
-thisdir = sc.path(sc.thisdir())
+thisdir = sc.thispath()
 filesdir = thisdir / 'files'
 
 __all__ = ['get_data', 'quick_download', 'check_downloaded', 'remove_data']
+
+
+def set_filesdir(path):
+    ''' Used to change the file folder '''
+    global filesdir
+    orig = filesdir
+    filesdir = path
+    print(f'Done: filesdir reset from {orig} to {filesdir}')
+    return
+
 
 def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None, tidy=None):
     ''' Download data from UN Population Division '''
@@ -103,7 +113,7 @@ def get_birth_data(start=1960, end=2020):
     try:
         import wbgapi as wb
     except Exception as E:
-        errormsg = f'Could not import wbgapi: cannot download raw data'
+        errormsg = 'Could not import wbgapi: cannot download raw data'
         raise ModuleNotFoundError(errormsg) from E
     T = sc.timer()
     birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
@@ -130,7 +140,7 @@ def parallel_downloader(which):
 
 
 def get_data():
-    ''' Download data '''
+    ''' Download data in parallel '''
     sc.heading('Downloading HPVsim data, please be patient...')
     T = sc.timer()
 
@@ -160,7 +170,7 @@ def quick_download(verbose=True, init=False):
             print('Note: this automatic download only happens once, when HPVsim is first run.\n\n')
     filepath = sc.makefilepath(filesdir / f'tmp_{data_file}.zip')
     sc.download(url=quick_url, filename=filepath, convert=False, verbose=verbose)
-    sc.loadzip(filepath, outfolder=filesdir)
+    sc.unzip(filepath, outfolder=filesdir)
     sc.rmpath(filepath)
     if verbose:
         print('\nData downloaded.')
@@ -210,6 +220,3 @@ def remove_data(verbose=True, **kwargs):
         sc.rmpath(fn, verbose=verbose, **kwargs)
     if verbose: print('Data files removed.')
     return
-
-if __name__ == '__main__':
-    quick_download()

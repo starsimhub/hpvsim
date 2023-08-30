@@ -76,7 +76,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 warnmsg = f'Could not load age data for requested location "{location}" ({str(E)})'
                 hpm.warn(warnmsg, die=True)
 
-        uids, sexes, debuts, partners = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
+        uids, sexes, debuts, rel_sev, partners = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
 
         # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
@@ -96,6 +96,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         popdict['age'] = ages
         popdict['sex'] = sexes
         popdict['debut'] = debuts
+        popdict['rel_sev'] = rel_sev
         popdict['partners'] = partners
 
         is_active = ages > debuts
@@ -106,13 +107,15 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         if microstructure in ['random', 'default']:
             contacts = dict()
             current_partners = np.zeros((len(lkeys),n_agents))
-            for lno,lkey in enumerate(lkeys):
+            lno=0
+            for lkey in lkeys:
                 contacts[lkey], current_partners,_,_ = make_contacts(
                     lno=lno, tind=0, partners=partners[lno,:], current_partners=current_partners,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
                     pref_weight=100, durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey], **kwargs
                 )
+                lno += 1
 
         else:
             errormsg = f'Microstructure type "{microstructure}" not found; choices are random or TBC'
@@ -165,8 +168,9 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut           = np.full(new_n, np.nan, dtype=hpd.default_float)
     debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
+    rel_sev         = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
-    return uid, sex, debut, partners
+    return uid, sex, debut, rel_sev, partners
 
 
 def validate_popdict(popdict, pars, verbose=True):

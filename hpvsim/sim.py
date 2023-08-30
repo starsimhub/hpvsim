@@ -12,6 +12,7 @@ from . import defaults as hpd
 from . import utils as hpu
 from . import population as hppop
 from . import parameters as hppar
+from . import hiv as hphiv
 from . import analysis as hpa
 from . import plotting as hpplt
 from . import immunity as hpimm
@@ -23,7 +24,8 @@ from .settings import options as hpo
 class Sim(hpb.BaseSim):
 
     def __init__(self, pars=None, datafile=None, label=None,
-                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None, **kwargs):
+                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
+                 **kwargs):
 
         # Set attributes
         self.label         = label    # The label/name of the simulation
@@ -46,14 +48,20 @@ class Sim(hpb.BaseSim):
 
         # Make default parameters (using values from parameters.py)
         default_pars = hppar.make_pars(version=version) # Start with default pars
+        default_location = sc.dcp(default_pars['location']) # Pull out the default location here
+        default_pars['location'] = None # Don't load the default location here
         super().__init__(default_pars) # Initialize and set the parameters as attributes
 
         # Load data, including datafile that are used to create additional optional parameters
-        location = pars.get('location') if pars else None
         self.load_data(datafile) # Load the data, if provided
-        self.load_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile) # Load any data that's used to create additional parameters (thus far, HIV and ART)
 
         # Update parameters
+        if pars is None:
+            pars = dict(location=default_location)
+        else:
+            if not pars.get('location') or pars['location'] is None:
+                pars['location'] = default_location
+
         self.update_pars(pars, **kwargs)   # Update the parameters
 
         return
@@ -66,14 +74,7 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def load_hiv_data(self, location=None, hiv_datafile=None, art_datafile=None, **kwargs):
-        ''' Load any data files that are used to create additional parameters, if provided '''
-        self.hiv_data = sc.objdict()
-        self.hiv_data.infection_rates, self.hiv_data.art_adherence = hppar.get_hiv_data(location=location, hiv_datafile=hiv_datafile, art_datafile=art_datafile)
-        return
-
-
-    def initialize(self, reset=False, init_states=True, **kwargs):
+    def initialize(self, reset=False, init_states=True, init_analyzers=True, **kwargs):
         '''
         Perform all initializations on the sim.
         '''
@@ -83,9 +84,9 @@ class Sim(hpb.BaseSim):
         self.init_genotypes() # Initialize the genotypes
         self.init_results() # After initializing the genotypes and people, create the results structure
         self.init_interventions()  # Initialize the interventions BEFORE the people, because then vaccination interventions get counted in immunity structures
-        self.init_immunity() # initialize information about immunity
+        self.init_immunity() # Includes immunity matrices and cumulative dysplasia arrays
         self.init_people(reset=reset, init_states=init_states, **kwargs) # Create all the people (the heaviest step)
-        self.init_analyzers()  # ...and the analyzers...
+        if init_analyzers: self.init_analyzers()  # ...and the analyzers...
         hpu.set_seed(self['rand_seed']+1)  # Reset the random seed to the default run seed, so that if the simulation is run with reset_seed=False right after initialization, it will still produce the same output
         self.initialized   = True
         self.complete      = False
@@ -228,12 +229,6 @@ class Sim(hpb.BaseSim):
             errormsg = f'Verbose argument should be either "brief", -1, or a float, not {type(self["verbose"])} "{self["verbose"]}"'
             raise ValueError(errormsg)
 
-        # Handle HIV
-        if self['model_hiv']:
-            if self.hiv_data['infection_rates'] is None or self.hiv_data['art_adherence'] is None:
-                errormsg = 'Data on HIV infection rates and ART adherence must be provided if model_hiv is True.'
-                raise ValueError(errormsg)
-
         return
 
 
@@ -308,7 +303,7 @@ class Sim(hpb.BaseSim):
         return init_hpv_prev, age_brackets
 
 
-    def init_genotypes(self):
+    def init_genotypes(self, upper_dysp_lim=200):
         ''' Initialize the genotype parameters '''
         if self._orig_pars and 'genotypes' in self._orig_pars:
             self['genotypes'] = self._orig_pars.pop('genotypes')  # Restore
@@ -321,8 +316,8 @@ class Sim(hpb.BaseSim):
         if self['genotypes'] == 'all':
             self['genotypes'] = default_gpars.keys()
         if not len(self['genotypes']):
-            print('No genotypes provided, will simulate 16, 18, and other HR types by default')
-            self['genotypes'] = [16,18,'hrhpv']
+            print('No genotypes provided: simulating 16, 18, and 5 other pooled HR types (31, 33, 45, 52, 58).')
+            self['genotypes'] = [16,18,'hi5']
 
         # Loop over genotypes
         for i, g in enumerate(self['genotypes']):
@@ -361,17 +356,26 @@ class Sim(hpb.BaseSim):
                                 errormsg = f"Parameter {gparname} does not exist for genotype {g}"
                                 raise ValueError(errormsg)
 
-        len_pars = len(self['genotype_pars'])
-        self['n_genotypes'] = len_pars  # Each genotype has an entry in genotype_pars
+        self['n_genotypes'] = len(self['genotype_pars'])  # Each genotype has an entry in genotype_pars
 
         # Set the number of immunity sources
         self['n_imm_sources'] = len(self['genotypes'])
 
-        return
+        # Do any precomputations for the genotype transformation functions
+        t_step = self['dt']
+        t_sequence = np.arange(0, upper_dysp_lim, t_step)
+        timesteps = t_sequence / t_step
+        cumdysp = dict()
+        for g in range(self['n_genotypes']):
+            sev_fn = self['genotype_pars'][g]['sev_fn']
+            sev_integral = self['genotype_pars'][g]['sev_integral']
+            if sev_integral=='numeric':
+                glabel = self['genotype_map'][g]
+                dysp_arr = hppar.compute_severity(t_sequence, rel_sev=None, pars=sev_fn)
+                cumdysp[glabel] = np.cumsum(dysp_arr) * t_step
 
-    def init_immunity(self, create=True):
-        ''' Initialize immunity matrices '''
-        hpimm.init_immunity(self, create=create)
+        self['cumdysp'] = cumdysp  # Store
+
         return
 
 
@@ -422,7 +426,7 @@ class Sim(hpb.BaseSim):
         results = sc.objdict()
 
         ng = self['n_genotypes'] # Number of genotypes
-        na = len(self['age_bins']) - 1 # Number of age bins
+        na = len(self['age_bin_edges']) - 1 # Number of age bins
 
         # Create flows
         for flow in hpd.flows:
@@ -431,12 +435,13 @@ class Sim(hpb.BaseSim):
             results[flow.name+'_by_age']        = init_res(flow.label+' by age', n_rows=na, color=flow.color)
 
         # Create stocks
-        for stock in hpd.PeopleMeta.stock_states:
+        for stock in hpd.PeopleMeta().stock_states:
             results[f'n_{stock.name}']              = init_res(stock.label, color=stock.color)
             results[f'n_{stock.name}_by_genotype']  = init_res(stock.label+' by genotype', n_rows=ng)
 
         # Only by-age stock result we will need is number infectious, susceptible, and with cin, for HPV and CIN prevalence/incidence calculations
         results[f'n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
+        results[f'n_females_infectious_by_age']     = init_res('Number of females infectious by age', n_rows=na, color=stock.color)
         results[f'n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
         results[f'n_transformed_by_age']            = init_res('Number transformed by age', n_rows=na, color=stock.color)
         results[f'n_precin_by_age']                 = init_res('Number Pre-CIN by age', n_rows=na, color=stock.color)
@@ -462,7 +467,7 @@ class Sim(hpb.BaseSim):
         results['asr_cancer_incidence'] = init_res('Age-adjusted cervical cancer incidence', scale=False)
         results['asr_cancer_mortality'] = init_res('Age-adjusted cervical cancer mortality', scale=False)
 
-        stock_colors = [i for i in set(hpd.stock_colors) if i is not None]
+        stock_colors = [i for i in set(hpd.PeopleMeta().stock_colors) if i is not None]
 
         # Type distributions by cytology
         for var, name in zip(hpd.type_dist_keys, hpd.type_dist_names):
@@ -507,8 +512,6 @@ class Sim(hpb.BaseSim):
         results['n_females_alive_by_age'] = init_res('Number females alive by age', n_rows=na)
         results['cdr'] = init_res('Crude death rate', scale=False)
         results['cbr'] = init_res('Crude birth rate', scale=False, color='#fcba03')
-        results['hiv_incidence'] = init_res('HIV incidence')
-        results['hiv_prevalence'] = init_res('HIV prevalence')
         results['hpv_prevalence'] = init_res('HPV prevalence', color=stock_colors[0])
         results['hpv_prevalence_by_genotype'] = init_res('HPV prevalence', n_rows=ng, color=stock_colors[0])
         results['hpv_prevalence_by_age'] = init_res('HPV prevalence by age', n_rows=na, color=stock_colors[0])
@@ -524,6 +527,7 @@ class Sim(hpb.BaseSim):
         results['cin3_prevalence'] = init_res('CIN3 prevalence', color=stock_colors[3])
         results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=stock_colors[3])
         results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=stock_colors[3])
+        results['female_hpv_prevalence_by_age'] = init_res('Female HPV prevalence by age', n_rows=na, color=stock_colors[3])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -532,6 +536,28 @@ class Sim(hpb.BaseSim):
         # Final items
         self.results = results
         self.results_ready = False
+
+        return
+
+
+    def init_interventions(self):
+        ''' Initialize and validate the interventions '''
+
+        # Initialization
+        self.interventions = sc.autolist()
+
+        # Translate the intervention specs into actual interventions
+        for i,intervention in enumerate(self['interventions']):
+            if isinstance(intervention, type) and issubclass(intervention, hpi.Intervention):
+                intervention = intervention() # Convert from a class to an instance of a class
+            if isinstance(intervention, hpi.Intervention):
+                intervention.initialize(self)
+                self.interventions += intervention
+            elif callable(intervention):
+                self.interventions += intervention
+            else:
+                errormsg = f'Intervention {intervention} does not seem to be a valid intervention: must be a function or hpv.Intervention subclass'
+                raise TypeError(errormsg)
 
         return
 
@@ -564,9 +590,9 @@ class Sim(hpb.BaseSim):
         if self.popfile and self.popdict is None: # If there's a popdict, we initialize it
             self.load_population(init_people=False)
 
-        # Actually make the people
+        # Make the people
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
-        
+
         # Figure out the scale factors
         if self['total_pop'] is not None and total_pop is not None: # If no pop_scale has been provided, try to get it from the location
             errormsg = 'You can either define total_pop explicitly or via the location, but not both'
@@ -580,9 +606,13 @@ class Sim(hpb.BaseSim):
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
-        
+
+        # Deal with HIV
+        self.init_hiv() # Creates the hivsim object, which is stored in the sim
+        self.hivsim.init_states(self.people) # Adds some states to the people
+
         # Finish initialization
-        self.people.initialize(sim_pars=self.pars, hiv_pars=self.hiv_data) # Fully initialize the people
+        self.people.initialize(sim_pars=self.pars) # Fully initialize the people
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])
@@ -590,29 +620,6 @@ class Sim(hpb.BaseSim):
             self.init_states(age_brackets=age_brackets, init_hpv_prev=init_hpv_prev)
 
         return self
-
-
-    def init_interventions(self):
-        ''' Initialize and validate the interventions '''
-
-        # Initialization
-        self.interventions = sc.autolist()
-
-        # Translate the intervention specs into actual interventions
-        for i,intervention in enumerate(self['interventions']):
-            if isinstance(intervention, type) and issubclass(intervention, hpi.Intervention):
-                intervention = intervention() # Convert from a class to an instance of a class
-            if isinstance(intervention, hpi.Intervention):
-                intervention.initialize(self)
-                self.interventions += intervention
-            elif callable(intervention):
-                self.interventions += intervention
-            else:
-                errormsg = f'Intervention {intervention} does not seem to be a valid intervention: must be a function or hpv.Intervention subclass'
-                raise TypeError(errormsg)
-
-        return
-
 
     def init_analyzers(self):
         ''' Initialize the analyzers '''
@@ -630,24 +637,43 @@ class Sim(hpb.BaseSim):
             return analyzer
 
         # Interpret analyzers
-        for ai,analyzer in enumerate(self['analyzers']):
+        for ai, analyzer in enumerate(self['analyzers']):
             if isinstance(analyzer, str):
-                analyzer_list = sc.tolist(convert_analyzer(analyzer)) # If not a list, turn it into one - for consistency of processing
+                analyzer_list = sc.tolist(
+                    convert_analyzer(analyzer))  # If not a list, turn it into one - for consistency of processing
                 for az in analyzer_list:
-                    if isinstance(az, str): az = convert_analyzer(az) # It might still be a string
-                    self.analyzers += az() # Unpack list
+                    if isinstance(az, str): az = convert_analyzer(az)  # It might still be a string
+                    self.analyzers += az()  # Unpack list
             else:
                 if isinstance(analyzer, type) and issubclass(analyzer, hpa.Analyzer):
-                    analyzer = analyzer() # Convert from a class to an instance of a class
+                    analyzer = analyzer()  # Convert from a class to an instance of a class
                 if not (isinstance(analyzer, hpa.Analyzer) or callable(analyzer)):
                     errormsg = f'Analyzer {analyzer} does not seem to be a valid analyzer: must be a function or hpv.Analyzer subclass'
                     raise TypeError(errormsg)
-                self.analyzers += analyzer # Add it in
+                self.analyzers += analyzer  # Add it in
 
         for analyzer in self.analyzers:
             if isinstance(analyzer, hpa.Analyzer):
                 analyzer.initialize(self)
-                
+
+        return
+
+
+    def init_immunity(self, create=True):
+        ''' Initialize immunity matrices and cumulative dysplasia '''
+
+        # Initialize immunity arrays
+        hpimm.init_immunity(self, create=create)
+        return
+
+
+    def init_hiv(self):
+        ''' Initialize states, attributes, and parameters relating to HIV '''
+        if self.pars['model_hiv']:
+            if self.hiv_datafile is None or self.art_datafile is None:
+                raise ValueError('Must supply HIV and ART datafiles to model HIV.')
+        self.hivsim = hphiv.HIVsim(self, hiv_datafile=self.hiv_datafile, art_datafile=self.art_datafile,
+                                   hiv_pars=self['hiv_pars'])
         return
 
 
@@ -709,7 +735,7 @@ class Sim(hpb.BaseSim):
         dt = self['dt'] # Timestep
         t = self.t
         ng = self['n_genotypes']
-        na = len(self.pars['age_bins']) - 1 # Number of age bins
+        na = len(self.pars['age_bin_edges']) - 1 # Number of age bins
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         beta = self['beta']
@@ -722,9 +748,14 @@ class Sim(hpb.BaseSim):
         dur_pship = self['dur_pship']
         age_act_pars = self['age_act_pars']
         trans = np.array([self['transf2m'],self['transm2f']]) # F2M first since that's the order things are done later
+        year = self.yearvec[t]
+
+        # Make HIV-related updates
+        if self.pars['model_hiv']:
+            self.hivsim.step(people=self.people, year=year)
 
         # Update demographics, states, and partnerships
-        self.people.update_states_pre(t=t, year=self.yearvec[t]) # This also ages people, applies deaths, and generates new births
+        self.people.update_states_pre(t=t, year=year) # This also ages people, applies deaths, and generates new births
         people = self.people # Shorten
         people.dissolve_partnerships(t=t) # Dissolve partnerships
         tind = self.yearvec[t] - self['start']
@@ -742,7 +773,6 @@ class Sim(hpb.BaseSim):
                 t_since_boost = (t - people.t_imm_event[:,inds]).ravel()
                 current_imm = imm_kin_pars[t_since_boost].reshape(ss) # Get people's current level of immunity
                 people.nab_imm[:,inds] = current_imm*people.peak_imm[:,inds] # Set immunity relative to peak
-                    # return imm
         else:
             people.nab_imm[:] = people.peak_imm
         hpimm.check_immunity(people)
@@ -750,12 +780,7 @@ class Sim(hpb.BaseSim):
         # Shorten more variables
         gen_betas = np.array([g['rel_beta'] * beta for g in gen_pars.values()], dtype=hpd.default_float)
         sus_imm = people.sus_imm
-        hiv_rel_sus = np.ones(len(people), dtype=hpd.default_float)
-        hiv_inds = hpu.true(people.hiv)
-        immune_compromise = 1 - people.art_adherence[hiv_inds]
-        mod = immune_compromise * self['hiv_pars']['rel_sus']
-        mod[mod < 1] = 1
-        hiv_rel_sus[hiv_inds] *= mod
+        rel_sus = people.rel_sus
 
         inf = people.infectious.copy() # calculate transmission based on infectiousness at start of timestep i.e. someone infected in one layer cannot transmit the infection via a different layer in the same timestep
 
@@ -787,7 +812,7 @@ class Sim(hpb.BaseSim):
 
                 # Compute transmissibility for each partnership
                 for pship_inds, sources, targets, this_foi in discordant_pairs:
-                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * hiv_rel_sus[targets] # Pull out the transmissibility associated with this partnership
+                    betas = this_foi[pship_inds] * (1. - sus_imm[g,targets]) * rel_sus[targets] # Pull out the transmissibility associated with this partnership
                     transmissions = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
                     target_inds   = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
@@ -799,14 +824,14 @@ class Sim(hpb.BaseSim):
             if len(latent_inds):
                 reactivation_probs = np.full_like(latent_inds, self['hpv_reactivation'] * dt, dtype=hpd.default_float)
 
-                if self['model_hiv']:
-                    # determine if any of these inds have HIV and adjust their probs
-                    hiv_latent_inds = latent_inds[hpu.true(people.hiv[latent_inds])]
-                    if len(hiv_latent_inds):
-                        immune_compromise = 1 - people.art_adherence[hiv_latent_inds]
-                        mod = immune_compromise * self['hiv_pars']['reactivation_prob']
-                        mod[mod < 1] = 1
-                        reactivation_probs[hpu.true(people.hiv[latent_inds])] *= mod
+                # if self['model_hiv']:
+                #     # determine if any of these inds have HIV and adjust their probs
+                #     hiv_latent_inds = latent_inds[hpu.true(people.hiv[latent_inds])]
+                #     if len(hiv_latent_inds):
+                #         immune_compromise = 1 - people.art_adherence[hiv_latent_inds]
+                #         mod = immune_compromise * self['hiv_pars']['reactivation_prob']
+                #         mod[mod < 1] = 1
+                #         reactivation_probs[hpu.true(people.hiv[latent_inds])] *= mod
                 is_reactivated = hpu.binomial_arr(reactivation_probs)
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
@@ -834,22 +859,26 @@ class Sim(hpb.BaseSim):
         if t % self.resfreq == self.resfreq-1:
 
             # Number infectious/susceptible by age, for prevalence calculations
+            f_inds = hpu.true(people['sex']==0)
             infinds = hpu.true(people['infectious'])
-            self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bins, weights=people.scale[infinds])[0]
+            f_infinds = np.intersect1d(f_inds, infinds)
+            self.results[f'n_females_infectious_by_age'][:, idx] = np.histogram(people.age[f_infinds], bins=people.age_bin_edges, weights=people.scale[f_infinds])[0]
+            self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bin_edges, weights=people.scale[infinds])[0]
             susinds = hpu.true(people['susceptible'])
-            self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bins, weights=people.scale[susinds])[0]
+            self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bin_edges, weights=people.scale[susinds])[0]
             transformedinds = hpu.true(people['transformed'])
-            self.results[f'n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bins, weights=people.scale[transformedinds])[0]
+            self.results[f'n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bin_edges, weights=people.scale[transformedinds])[0]
             precininds = hpu.true(people['precin'])
-            self.results[f'n_precin_by_age'][:, idx] = np.histogram(people.age[precininds], bins=people.age_bins, weights=people.scale[precininds])[0]
+            self.results[f'n_precin_by_age'][:, idx] = np.histogram(people.age[precininds], bins=people.age_bin_edges, weights=people.scale[precininds])[0]
             cin1inds = hpu.true(people['cin1'])
-            self.results[f'n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bins, weights=people.scale[cin1inds])[0]
+            self.results[f'n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bin_edges, weights=people.scale[cin1inds])[0]
             cin2inds = hpu.true(people['cin2'])
-            self.results[f'n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bins, weights=people.scale[cin2inds])[0]
+            self.results[f'n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bin_edges, weights=people.scale[cin2inds])[0]
             cin3inds = hpu.true(people['cin3'])
-            self.results[f'n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bins, weights=people.scale[cin3inds])[0]
+            self.results[f'n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bin_edges, weights=people.scale[cin3inds])[0]
+
             # Create total stocks
-            for key in hpd.total_stock_keys:
+            for key in self.people.meta.genotype_stock_keys:
 
                 # Stocks by genotype
                 for g in range(ng):
@@ -864,11 +893,8 @@ class Sim(hpb.BaseSim):
                     self.results[f'n_{key}'][idx] = people.count(key)
 
             # Create stocks of interventions
-            for key in [state.name for state in hpd.PeopleMeta.intv_states]:
+            for key in self.people.meta.intv_stock_keys:
                 self.results[f'n_{key}'][idx] = people.count(key)
-
-            # Count total hiv infections
-            self.results['n_hiv'][idx] = people.count('hiv')
 
             # Update cancers and cancers by age
             cases_by_age = self.results['cancers_by_age'][:, idx]
@@ -887,8 +913,8 @@ class Sim(hpb.BaseSim):
             self.results['n_alive'][idx] = people.scale_flows(alive_inds)
             self.results['n_alive_by_sex'][0,idx] = people.scale_flows((people.alive*people.is_female).nonzero()[0])
             self.results['n_alive_by_sex'][1,idx] = people.scale_flows((people.alive*people.is_male).nonzero()[0])
-            self.results['n_alive_by_age'][:,idx] = np.histogram(people.age[alive_inds], bins=people.age_bins, weights=people.scale[alive_inds])[0]
-            self.results['n_females_alive_by_age'][:,idx] = np.histogram(people.age[alive_female_inds], bins=people.age_bins, weights=people.scale[alive_female_inds])[0]
+            self.results['n_alive_by_age'][:,idx] = np.histogram(people.age[alive_inds], bins=people.age_bin_edges, weights=people.scale[alive_inds])[0]
+            self.results['n_females_alive_by_age'][:,idx] = np.histogram(people.age[alive_female_inds], bins=people.age_bin_edges, weights=people.scale[alive_female_inds])[0]
 
         # Apply analyzers
         for i,analyzer in enumerate(self.analyzers):
@@ -991,7 +1017,10 @@ class Sim(hpb.BaseSim):
 
         # Finalize analyzers and interventions
         self.finalize_analyzers()
-        # self.finalize_interventions()
+        # self.finalize_interventions() #TODO: why is this commented out?
+
+        if self['model_hiv']:
+            self.hivsim.finalize(self)
 
         # Final settings
         self.results_ready = True # Set this first so self.summary() knows to print the results
@@ -1035,40 +1064,41 @@ class Sim(hpb.BaseSim):
                 answer[:, fill_inds] = num[:, fill_inds] / denom[fill_inds]
             return answer
         ng = self.pars['n_genotypes']
-        self.results['hpv_incidence'][:]                = sc.safedivide(res['infections'][:], ng*res['n_susceptible'][:])
+        self.results['hpv_incidence'][:]                = safedivide(res['infections'][:], ng*res['n_susceptible'][:])
         self.results['hpv_incidence_by_genotype'][:]    = safedivide(res['infections_by_genotype'][:], res['n_susceptible_by_genotype'][:])
         self.results['hpv_incidence_by_age'][:]         = safedivide(res['infections_by_age'][:], ng*res['n_susceptible_by_age'][:])
-        self.results['hpv_prevalence'][:]               = sc.safedivide(res['n_infectious'][:], ng*res['n_alive'][:])
+        self.results['hpv_prevalence'][:]               = safedivide(res['n_infectious'][:], ng*res['n_alive'][:])
         self.results['hpv_prevalence_by_genotype'][:]   = safedivide(res['n_infectious_by_genotype'][:], res['n_alive'][:])
-        self.results['hpv_prevalence_by_age'][:]        = safedivide(res['n_infectious_by_age'][:], ng*res['n_alive_by_age'][:])
-        self.results['hiv_incidence'][:]                = sc.safedivide(res['hiv_infections'][:], (res['n_alive'][:]-res['n_hiv'][:]))
-        self.results['hiv_prevalence'][:]               = sc.safedivide(res['n_hiv'][:], res['n_alive'][:])
+        self.results['hpv_prevalence_by_age'][:]        = safedivide(res['n_infectious_by_age'][:], res['n_alive_by_age'][:])
 
         alive_females = res['n_alive_by_sex'][0,:]
 
-        self.results['precin_prevalence'][:] = sc.safedivide(res['n_precin'][:], ng * alive_females)
+        self.results['female_hpv_prevalence_by_age'][:] = safedivide((res['n_females_infectious_by_age'][:]),
+                                                                     res['n_females_alive_by_age'][:])
+
+        self.results['precin_prevalence'][:] = safedivide(res['n_precin'][:], ng * alive_females)
         self.results['precin_prevalence_by_genotype'][:] = safedivide(res['n_precin_by_genotype'][:], alive_females)
         self.results['precin_prevalence_by_age'][:] = safedivide(res['n_precin_by_age'][:],
-                                                               ng * res['n_females_alive_by_age'][:])
-        self.results['cin1_prevalence'][:] = sc.safedivide(res['n_cin1'][:], ng*alive_females)
+                                                               res['n_females_alive_by_age'][:])
+        self.results['cin1_prevalence'][:] = safedivide(res['n_cin1'][:], ng*alive_females)
         self.results['cin1_prevalence_by_genotype'][:] = safedivide(res['n_cin1_by_genotype'][:], alive_females)
         self.results['cin1_prevalence_by_age'][:] = safedivide(res['n_cin1_by_age'][:],
-                                                               ng*res['n_females_alive_by_age'][:])
-        self.results['cin2_prevalence'][:] = sc.safedivide(res['n_cin2'][:], ng*alive_females)
+                                                               res['n_females_alive_by_age'][:])
+        self.results['cin2_prevalence'][:] = safedivide(res['n_cin2'][:], ng*alive_females)
         self.results['cin2_prevalence_by_genotype'][:] = safedivide(res['n_cin2_by_genotype'][:], alive_females)
         self.results['cin2_prevalence_by_age'][:] = safedivide(res['n_cin2_by_age'][:],
-                                                               ng*res['n_females_alive_by_age'][:])
-        self.results['cin3_prevalence'][:] = sc.safedivide(res['n_cin3'][:], ng*alive_females)
+                                                               res['n_females_alive_by_age'][:])
+        self.results['cin3_prevalence'][:] = safedivide(res['n_cin3'][:], ng*alive_females)
         self.results['cin3_prevalence_by_genotype'][:] = safedivide(res['n_cin3_by_genotype'][:], alive_females)
         self.results['cin3_prevalence_by_age'][:] = safedivide(res['n_cin3_by_age'][:],
-                                                               ng*res['n_females_alive_by_age'][:])
-        # Compute CIN and cancer incidence.
+                                                               res['n_females_alive_by_age'][:])
+        # Compute cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]
-        scale_factor = 1e5  # Cancer and CIN incidence are displayed as rates per 100k women
+        scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
         demoninator = at_risk_females / scale_factor
         self.results['cancer_incidence'][:]             = res['cancers'][:] / demoninator
         self.results['cancer_incidence_by_genotype'][:] = res['cancers_by_genotype'][:] / demoninator
-        self.results['cancer_incidence_by_age'][:]      = sc.safedivide(res['cancers'][:], res['n_females_alive_by_age'][:]/scale_factor)
+        self.results['cancer_incidence_by_age'][:]      = safedivide(res['cancers_by_age'][:], res['n_females_alive_by_age'][:]/scale_factor)
 
         # Compute cancer mortality. Denominator is all women alive
         denominator = alive_females/scale_factor

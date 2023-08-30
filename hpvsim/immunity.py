@@ -19,15 +19,44 @@ def init_immunity(sim, create=True):
     # Pull out all of the circulating genotypes for cross-immunity
     ng = sim['n_genotypes']
 
-    # Pull out all the vaccination interventions
+    # Pull out all the unique vaccine products
     vx_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseVaccination)]
-    nv = len(vx_intvs)
+    vx_intv_prods = [x.product.genotype_pars['name'].values[0] for x in vx_intvs]
+    unique_vx_prods, unique_vx_prod_inds = np.unique(vx_intv_prods, return_index=True)
+    unique_vx_prod_dict = dict()
+    for unique_vx_prod, unique_vx_prod_ind in zip(unique_vx_prods, unique_vx_prod_inds):
+        unique_vx_prod_dict[unique_vx_prod] = unique_vx_prod_ind
+    nv = len(unique_vx_prods) if len(vx_intvs) else 0
+
+    unique_vx_intvs = sc.autolist()
+    for ind in unique_vx_prod_inds:
+        unique_vx_intvs += vx_intvs[ind]
+
+    for iv, vx_intv in enumerate(vx_intvs):
+        vx_intv.product.imm_source = unique_vx_prod_dict[vx_intv_prods[iv]]+ng
+
+    txv_intvs = [x for x in sim['interventions'] if isinstance(x, hpi.BaseTxVx)]
+    txv_intv_prods = [x.product.name.replace('2', '1') for x in txv_intvs]
+    unique_txv_prods, unique_txv_prod_inds = np.unique(txv_intv_prods, return_index=True)
+    unique_txv_prod_dict = dict()
+    for unique_txv_prod, unique_txv_prod_ind in zip(unique_txv_prods, unique_txv_prod_inds):
+        unique_txv_prod_dict[unique_txv_prod] = unique_txv_prod_ind
+    ntxv = len(unique_txv_prods) if len(txv_intvs) else 0
+
+    unique_txv_intvs = sc.autolist()
+    for ind in unique_txv_prod_inds:
+        unique_txv_intvs += txv_intvs[ind]
+
+    for itxv, txv_intv in enumerate(txv_intvs):
+        txv_intv.product.imm_source = unique_txv_prod_dict[txv_intv_prods[itxv]] + ng + nv
+
+    all_vx_intvs = unique_vx_intvs + unique_txv_intvs
 
     # Dimension for immunity matrix
-    ndim = ng + nv
+    ndim = ng + nv + ntxv
 
-    # If immunity values have been provided, process them
-    if sim['immunity'] is None or create:
+    # If cross-immunity values have been provided, process them
+    if sim['cross_immunity_sus'] is None or create:
 
         # Precompute waning - same for all genotypes
         if sim['use_waning']:
@@ -41,7 +70,8 @@ def init_immunity(sim, create=True):
         immunity = np.ones((ng, ng), dtype=hpd.default_float)  # Fill with defaults
 
         # Next, overwrite these defaults with any known immunity values about specific genotypes
-        default_cross_immunity = hppar.get_cross_immunity(cross_imm_med=sim['cross_imm_med'], cross_imm_high=sim['cross_imm_high'])
+        default_cross_immunity = hppar.get_cross_immunity(cross_imm_med=sim['cross_imm_sus_med'], cross_imm_high=sim['cross_imm_sus_high'],
+                                                          own_imm_hr=sim['own_imm_hr'])
         for i in range(ng):
             sim['immunity_map'][i] = 'infection'
             label_i = sim['genotype_map'][i]
@@ -50,20 +80,54 @@ def init_immunity(sim, create=True):
                 if label_i in default_cross_immunity and label_j in default_cross_immunity:
                     immunity[j][i] = default_cross_immunity[label_j][label_i]
 
-        imm_source = ng
-        for vi,vx_intv in enumerate(vx_intvs):
+        for vi,vx_intv in enumerate(all_vx_intvs):
             genotype_pars_df = vx_intv.product.genotype_pars[vx_intv.product.genotype_pars.genotype.isin(sim['genotype_map'].values())] # TODO fix this
             vacc_mapping = [genotype_pars_df[genotype_pars_df.genotype==gtype].rel_imm.values[0] for gtype in sim['genotype_map'].values()]
             vacc_mapping += [1]*(vi+1) # Add on some ones to pad out the matrix
             vacc_mapping = np.reshape(vacc_mapping, (len(immunity)+1, 1)).astype(hpd.default_float) # Reshape
             immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
             immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
-            vx_intv.product.imm_source = imm_source
-            imm_source += 1
 
-        sim['immunity'] = immunity
+        sim['cross_immunity_sus'] = immunity
 
-    sim['immunity'] = sim['immunity'].astype('float32')
+
+    # If cross-immunity values have been provided, process them
+    if sim['cross_immunity_sev'] is None or create:
+
+        # Precompute waning - same for all genotypes
+        if sim['use_waning']:
+            imm_decay = sc.dcp(sim['imm_decay'])
+            if 'half_life' in imm_decay.keys():
+                imm_decay['half_life'] /= sim['dt']
+            sim['imm_kin'] = precompute_waning(t=sim.tvec, pars=imm_decay)
+
+        sim['immunity_map'] = dict()
+        # Firstly, initialize immunity matrix with defaults. These are then overwitten with specific values below
+        immunity = np.ones((ng, ng), dtype=hpd.default_float)  # Fill with defaults
+
+        # Next, overwrite these defaults with any known immunity values about specific genotypes
+        default_cross_immunity = hppar.get_cross_immunity(cross_imm_med=sim['cross_imm_sev_med'], cross_imm_high=sim['cross_imm_sev_high'],
+                                                          own_imm_hr=sim['own_imm_hr'])
+        for i in range(ng):
+            sim['immunity_map'][i] = 'infection'
+            label_i = sim['genotype_map'][i]
+            for j in range(ng):
+                label_j = sim['genotype_map'][j]
+                if label_i in default_cross_immunity and label_j in default_cross_immunity:
+                    immunity[j][i] = default_cross_immunity[label_j][label_i]
+
+        for vi,vx_intv in enumerate(all_vx_intvs):
+            genotype_pars_df = vx_intv.product.genotype_pars[vx_intv.product.genotype_pars.genotype.isin(sim['genotype_map'].values())] # TODO fix this
+            vacc_mapping = [genotype_pars_df[genotype_pars_df.genotype==gtype].rel_imm.values[0] for gtype in sim['genotype_map'].values()]
+            vacc_mapping += [1]*(vi+1) # Add on some ones to pad out the matrix
+            vacc_mapping = np.reshape(vacc_mapping, (len(immunity)+1, 1)).astype(hpd.default_float) # Reshape
+            immunity = np.hstack((immunity, vacc_mapping[0:len(immunity),]))
+            immunity = np.vstack((immunity, np.transpose(vacc_mapping)))
+
+        sim['cross_immunity_sev'] = immunity
+
+    sim['cross_immunity_sus'] = sim['cross_immunity_sus'].astype('float32')
+    sim['cross_immunity_sev'] = sim['cross_immunity_sev'].astype('float32')
     sim['n_imm_sources'] = ndim
 
     return
@@ -73,7 +137,7 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
     '''
         Update immunity level
 
-        This function updates the immunity for individuals when an infection or vaccination occurs.
+        This function updates the immunity for individuals when an infection is cleared or vaccination occurs.
             - individuals that are infected and already have immunity from a previous vaccination/infection have their immunity level;
             - individuals without prior immunity are assigned an initial level drawn from a distribution. This level
                 depends on whether the immunity is from a natural infection or from a vaccination (and if so, on the type of vaccine).
@@ -108,21 +172,26 @@ def update_peak_immunity(people, inds, imm_pars, imm_source, offset=None, infect
             people.cell_imm[imm_source, prior_imm_inds] = np.maximum(new_cell_imm, people.cell_imm[imm_source, prior_imm_inds])
 
         if len(no_prior_imm_inds):
-            people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds))
-            people.cell_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['cell_imm_init'], size=len(no_prior_imm_inds))
+            people.peak_imm[imm_source, no_prior_imm_inds] = is_seroconvert[~has_imm] * hpu.sample(**imm_pars['imm_init'], size=len(no_prior_imm_inds)) * people.rel_imm[no_prior_imm_inds]
+            people.cell_imm[imm_source, no_prior_imm_inds] = hpu.sample(**imm_pars['cell_imm_init'], size=len(no_prior_imm_inds)) * people.rel_imm[no_prior_imm_inds]
     else:
         # Vaccination by dose
         dose1_inds = inds[people.doses[inds]==1] # First doses
         dose2_inds = inds[people.doses[inds]==2] # Second doses
-        dose3_inds = inds[people.doses[inds]==3] # Third doses
+        dose3_inds = inds[people.doses[inds]>=3] # Third doses or beyond
         if imm_pars['doses']>1:
             imm_pars['imm_boost'] = sc.promotetolist(imm_pars['imm_boost'])
         if len(dose1_inds)>0: # Initialize immunity for newly vaccinated people
-            people.peak_imm[imm_source, dose1_inds] = hpu.sample(**imm_pars['imm_init'], size=len(dose1_inds))
+            people.peak_imm[imm_source, dose1_inds] = hpu.sample(**imm_pars['imm_init'], size=len(dose1_inds)) * people.rel_imm[dose1_inds]
         if len(dose2_inds) > 0: # Boost immunity for people receiving 2nd dose...
-            people.peak_imm[imm_source, dose2_inds] *= imm_pars['imm_boost'][0]
+            new_peak = hpu.sample(**imm_pars['imm_init'], size=len(dose2_inds)) * people.rel_imm[dose2_inds]
+            boosted_peak = people.peak_imm[imm_source, dose2_inds] * imm_pars['imm_boost'][0]
+            people.peak_imm[imm_source, dose2_inds] = np.maximum(new_peak, boosted_peak)
         if len(dose3_inds) > 0:
-            people.peak_imm[imm_source, dose3_inds] *= imm_pars['imm_boost'][1]
+            new_peak = hpu.sample(**imm_pars['imm_init'], size=len(dose3_inds)) * people.rel_imm[dose3_inds]
+            boosted_peak = people.peak_imm[imm_source, dose3_inds] * imm_pars['imm_boost'][1]
+            people.peak_imm[imm_source, dose3_inds] = np.maximum(new_peak, boosted_peak)
+
 
     base_t = people.t + offset if offset is not None else people.t
     people.t_imm_event[imm_source, inds] = base_t
@@ -157,9 +226,12 @@ def check_immunity(people):
     some (30% of 90%) protection against infection with HPV18, and so on.
 
     '''
-    immunity = people.pars['immunity'] # cross-immunity/own-immunity scalars to be applied to immunity level
-    sus_imm = np.dot(immunity,people.nab_imm) # Dot product gives immunity to all genotypes
-    people.sus_imm[:] = np.minimum(sus_imm, np.ones_like(sus_imm)) # Don't let this be above 1
+    cross_immunity_sus = people.pars['cross_immunity_sus'] # cross-immunity/own-immunity scalars to be applied to sus immunity level
+    cross_immunity_sev = people.pars['cross_immunity_sev'] # cross-immunity/own-immunity scalars to be applied to sev immunity level
+    sus_imm = np.dot(cross_immunity_sus, people.nab_imm) # Dot product gives immunity to all genotypes
+    sev_imm = np.dot(cross_immunity_sev, people.cell_imm)  # Dot product gives immunity to all genotypes
+    people.sus_imm[:] = np.minimum(sus_imm, np.ones_like(sus_imm))  # Don't let this be above 1
+    people.sev_imm[:] = np.minimum(sev_imm, np.ones_like(sev_imm))  # Don't let this be above 1
     return
 
 

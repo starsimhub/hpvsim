@@ -62,12 +62,17 @@ def test_age_pyramids(do_plot=True):
     return sim, a
 
 
-def test_age_results(do_plot=True):
+def test_age_results(do_plot=True, test_what=''):
 
     sc.heading('Testing by-age results')
 
-    pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.5, network='default', location='tanzania')
+    pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.25, network='default', location='tanzania')
     pars['beta'] = .5
+
+    # Use the same age bins for the sim as for the age result analyzer, for comparaibility
+    age_bin_edges = np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.])
+    pars['age_bin_edges']  = age_bin_edges
+    pars['standard_pop']    = np.array([age_bin_edges, [.31, .09, .08, .08, .12, .06, .06, .05, .08, .07,  0]])
 
     pars['init_hpv_prev'] = {
         'age_brackets'  : np.array([  12,   17,   24,   34,  44,   64,    80, 150]),
@@ -75,22 +80,22 @@ def test_age_results(do_plot=True):
         'f'             : np.array([ 0.0, 0.75, 0.9, 0.45, 0.1, 0.05, 0.005, 0]),
     }
     az1 = hpv.age_results(
-        result_keys=sc.objdict(
+        result_args=sc.objdict(
             hpv_prevalence=sc.objdict(
-                timepoints=['2019'],
-                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+                years=2019,
+                edges=age_bin_edges,
             ),
             infections=sc.objdict(
-                timepoints=['2019'],
-                edges=np.array([0., 15., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+                years=2019,
+                edges=age_bin_edges,
             ),
             cancer_incidence=sc.objdict(
-                timepoints=['2019'],
-                edges=np.array([0.,20.,25.,30.,40.,45.,50.,55.,65.,100.]),
+                years=2019,
+                edges=age_bin_edges,
             ),
-            cancer_mortality=sc.objdict(
-                timepoints=['2019'],
-                edges=np.array([0., 20., 25., 30., 40., 45., 50., 55., 65., 100.]),
+            cancers=sc.objdict(
+                years=2019,
+                edges=age_bin_edges,
             )
         )
     )
@@ -98,9 +103,16 @@ def test_age_results(do_plot=True):
     sim = hpv.Sim(pars, genotypes=[16, 18], analyzers=[az1])
     sim.run()
     a = sim.get_analyzer('age_results')
+    a.plot()
 
-    # Check plot()
-    if do_plot: a.plot()
+    # Assert equal results
+    year = 2019
+    yind = sc.findinds(sim.results['year'], year)[0]
+    for result in ['infections', 'cancer_incidence', 'cancers']: # NB Still a problem with hpv_prevalence
+        sim_result_name = result + '_by_age'
+        sim_results = sim.results[sim_result_name][:,yind]
+        analyzer_results = a.results[result][year]
+        assert np.allclose(sim_results,analyzer_results,rtol=5e-2)
 
     return sim, a
 
@@ -123,13 +135,13 @@ def test_reduce_analyzers():
             edges=np.linspace(0, 100, 21))
 
         az = hpv.age_results(
-            result_keys=sc.objdict(
+            result_args=sc.objdict(
                 cancer_incidence=sc.objdict(
-                    timepoints=['2020'],
+                    years=2020,
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 ),
                 cancer_mortality=sc.objdict(
-                    timepoints=['2020'],
+                    years=2020,
                     edges=np.array([0.,15.,20.,25.,30.,40.,45.,50.,55.,60.,65.,70.,75.,80.,100.]),
                 )
             )

@@ -25,7 +25,6 @@ for label, mig in {'With migration': True}.items():
         beta = 0.1,
         dt = 0.5,
         use_migration = mig,
-        use_multiscale = True,
         ms_agent_ratio = 100,
     )
 
@@ -63,3 +62,4 @@ for label, mig in {'With migration': True}.items():
     pl.legend()
     sc.figlayout()
     pl.show()
+

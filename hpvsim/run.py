@@ -266,7 +266,7 @@ class MultiSim(hpb.FlexPretty):
         sexkeys = reduced_sim.result_keys('sex')
         agekeys = reduced_sim.result_keys('age')
         type_dist_keys = reduced_sim.result_keys('type_dist')
-        n_age_bins = len(reduced_sim['age_bins'])-1
+        n_age_bins = len(reduced_sim['age_bin_edges'])-1
 
         for reskey in totalkeys:
             raw[reskey] = np.zeros((reduced_sim.res_npts, len(self.sims)))
@@ -1020,6 +1020,8 @@ class Scenarios(hpb.ParsObj):
         for scenkey,scen in self.scenarios.items():
             scenname = scen['name']
             scenpars = scen['pars']
+
+
             allpars = sc.mergedicts(scenpars, {'location': self.base_sim['location']})
 
             # This is necessary for plotting, and since self.npts is defined prior to run
@@ -1051,6 +1053,10 @@ class Scenarios(hpb.ParsObj):
             # Initialize the sim, including potentially the people and initial states
             scen_sim.initialize(reset=reset_people, init_states=reset_init_states)
 
+            if 'hiv_pars' in scen.keys():
+                hiv_scenpars = {'hiv_pars': sc.mergedicts(scen_sim.hivsim.pars['hiv_pars'], scen['hiv_pars'])}
+                scen_sim.hivsim.update_pars(hiv_scenpars)
+
             run_args = dict(n_runs=self['n_runs'], noise=self['noise'], noisepar=self['noisepar'], keep_people=keep_people, verbose=verbose)
             if debug:
                 print('Running in debug mode (not parallelized)')
@@ -1062,7 +1068,7 @@ class Scenarios(hpb.ParsObj):
             # Process the simulations
             print_heading(f'Processing {scenkey}')
             ng = scen_sims[0]['n_genotypes'] # Get number of genotypes
-            na = len(scen_sims[0]['age_bins'])-1 # Get number of age bins
+            na = len(scen_sims[0]['age_bin_edges'])-1 # Get number of age bins
             scenraw = {}
             for reskey in totalkeys:
                 scenraw[reskey] = np.zeros((self.res_npts, len(scen_sims)))

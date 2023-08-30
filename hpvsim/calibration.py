@@ -41,6 +41,8 @@ class Calibration(sc.prettyobj):
         sim          (Sim)  : the simulation to calibrate
         datafiles    (list) : list of datafile strings to calibrate to
         calib_pars   (dict) : a dictionary of the parameters to calibrate of the format dict(key1=[best, low, high])
+        genotype_pars(dict) : a dictionary of the genotype-specific parameters to calibrate of the format dict(genotype=dict(key1=[best, low, high]))
+        hiv_pars     (dict) : a dictionary of the hiv-specific parameters to calibrate of the format dict(key1=[best, low, high])
         extra_sim_results (list) : list of result strings to store
         fit_args     (dict) : a dictionary of options that are passed to sim.compute_fit() to calculate the goodness-of-fit
         par_samplers (dict) : an optional mapping from parameters to the Optuna sampler to use for choosing new points for each; by default, suggest_float
@@ -73,7 +75,7 @@ class Calibration(sc.prettyobj):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, fit_args=None, extra_sim_results=None,
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_result_keys=None,
                  par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None,
                  keep_db=None, storage=None, rand_seed=None, label=None, die=False, verbose=True):
 
@@ -94,7 +96,8 @@ class Calibration(sc.prettyobj):
         self.sim            = sim
         self.calib_pars     = calib_pars
         self.genotype_pars  = genotype_pars
-        self.extra_sim_results = extra_sim_results
+        self.hiv_pars       = hiv_pars
+        self.extra_sim_result_keys = extra_sim_result_keys
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
         self.die            = die
@@ -107,16 +110,7 @@ class Calibration(sc.prettyobj):
             self.target_data.append(hpm.load_data(datafile))
 
         sim_results = sc.objdict()
-
         age_result_args = sc.objdict()
-        extra_sim_results = sc.objdict()
-
-        if self.extra_sim_results:
-            for extra_result in self.extra_sim_results:
-                extra_sim_results[extra_result] = sc.objdict()
-            self.extra_sim_results_keys = extra_sim_results.keys()
-        else:
-            self.extra_sim_results_keys = None
 
         # Go through each of the target keys and determine how we are going to get the results from sim
         for targ in self.target_data:
@@ -136,6 +130,8 @@ class Calibration(sc.prettyobj):
 
         ar = hpa.age_results(result_args=age_result_args)
         self.sim['analyzers'] += [ar]
+        if hiv_pars is not None:
+            self.sim['model_hiv'] = True # if calibrating HIV parameters, make sure model is running HIV
         self.sim.initialize()
         for rkey in sim_results.keys():
             sim_results[rkey].timepoints = sim.get_t(sim_results[rkey].data.year.unique()[0], return_date_format='str')[0]//sim.resfreq
@@ -148,11 +144,15 @@ class Calibration(sc.prettyobj):
         self.result_args = sc.objdict()
         for rkey in self.age_results_keys + self.sim_results_keys:
             self.result_args[rkey] = sc.objdict()
-            self.result_args[rkey].name = self.sim.results[rkey].name
-            self.result_args[rkey].color = self.sim.results[rkey].color
+            if 'hiv' in rkey:
+                self.result_args[rkey].name = self.sim.hivsim.results[rkey].name
+                self.result_args[rkey].color = self.sim.hivsim.results[rkey].color
+            else:
+                self.result_args[rkey].name = self.sim.results[rkey].name
+                self.result_args[rkey].color = self.sim.results[rkey].color
 
-        if self.extra_sim_results:
-            for rkey in self.extra_sim_results_keys:
+        if self.extra_sim_result_keys:
+            for rkey in self.extra_sim_result_keys:
                 self.result_args[rkey] = sc.objdict()
                 self.result_args[rkey].name = self.sim.results[rkey].name
                 self.result_args[rkey].color = self.sim.results[rkey].color
@@ -162,13 +162,14 @@ class Calibration(sc.prettyobj):
         return
 
 
-    def run_sim(self, calib_pars=None, genotype_pars=None, label=None, return_sim=False):
+    def run_sim(self, calib_pars=None, genotype_pars=None, hiv_pars=None, label=None, return_sim=False):
         ''' Create and run a simulation '''
-        sim = self.sim.copy()
+        sim = sc.dcp(self.sim)
         if label: sim.label = label
 
-        new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars)
+        new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
         sim.update_pars(new_pars)
+        sim.initialize(reset=True, init_analyzers=False) # Necessary to reinitialize the sim here so that the initial infections get the right parameters
 
         # Run the sim
         try:
@@ -189,8 +190,8 @@ class Calibration(sc.prettyobj):
 
 
     @staticmethod
-    def get_full_pars(sim=None, calib_pars=None, genotype_pars=None):
-        ''' Make a full pardict from the subset of regular sim parameters and genotype parameters used in calibration'''
+    def get_full_pars(sim=None, calib_pars=None, genotype_pars=None, hiv_pars=None):
+        ''' Make a full pardict from the subset of regular sim parameters, genotype parameters, and hiv parameters used in calibration'''
 
         # Prepare the parameters
         if calib_pars is not None:
@@ -228,6 +229,23 @@ class Calibration(sc.prettyobj):
             all_genotype_pars.update(new_genotype_pars)
             new_pars['genotype_pars'] = all_genotype_pars
 
+        if hiv_pars is not None:
+            hiv_pars = {}
+            for name, par in hiv_pars.items():
+                if isinstance(par, dict):
+                    hivsimpar = sim.hivsim.pars['hiv_pars'][name]
+                    for parkey, parval in par.items():
+                        if isinstance(parval, dict):
+                            for parvalkey, parvalval in parval.items():
+                                hivsimpar[parkey][parvalkey] = parvalval
+                        else:
+                            hivsimpar[parkey] = parval
+                    hiv_pars[name] = hivsimpar
+                else:
+                    if name in sim.hivsim.pars['hiv_pars']:
+                        hiv_pars[name] = par
+            new_pars['hiv_pars'] = hiv_pars
+
         return new_pars
 
 
@@ -257,6 +275,7 @@ class Calibration(sc.prettyobj):
         # Initialize
         calib_pars = {}
         genotype_pars = sc.objdict()
+        hiv_pars = sc.objdict()
 
         # Deal with trial parameters
         if trial_pars is None:
@@ -281,6 +300,17 @@ class Calibration(sc.prettyobj):
                     this_genotype_pars[gpar] = trial_pars[f'{gname}_{gpar}']
             genotype_pars[gname] = this_genotype_pars
 
+        # Handle hiv sim parameters
+        if self.hiv_pars is not None:
+            for name, par in self.hiv_pars.items():
+                if isinstance(par, dict):
+                    hivsimpar = self.sim.hivsim.pars['hiv_pars'][name]
+                    for parkey in par.keys():
+                        hivsimpar[parkey] = trial_pars[f'{name}_{parkey}']
+                    hiv_pars[name] = hivsimpar
+                else:
+                    hiv_pars[name] = trial_pars[name]
+
         # Handle regular sim parameters
         for name, par in self.calib_pars.items():
             if isinstance(par, dict):
@@ -293,10 +323,10 @@ class Calibration(sc.prettyobj):
 
         # Return
         if return_full:
-            all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars)
+            all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
             return all_pars
         else:
-            return calib_pars, genotype_pars
+            return calib_pars, genotype_pars, hiv_pars
 
 
     def sim_to_sample_pars(self):
@@ -331,6 +361,20 @@ class Calibration(sc.prettyobj):
                             initial_pars[sampler_key] = par_highlowlist[0]
                             par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
 
+        # Convert hiv pars
+        if self.hiv_pars is not None:
+            for key, val in self.hiv_pars.items():
+                if isinstance(val, list):
+                    initial_pars[key] = val[0]
+                    par_bounds[key] = np.array([val[1], val[2]])
+                elif isinstance(val, dict):
+                    for parkey, par_highlowlist in val.items():
+                        sampler_key = key + '_' + parkey + '_'
+                        if isinstance(par_highlowlist, dict):
+                            par_highlowlist = par_highlowlist['value']
+                        initial_pars[sampler_key] = par_highlowlist[0]
+                        par_bounds[sampler_key] = np.array([par_highlowlist[1], par_highlowlist[2]])
+
         return initial_pars, par_bounds
 
 
@@ -342,6 +386,10 @@ class Calibration(sc.prettyobj):
         for key, val in pardict.items():
             if isinstance(val, list):
                 low, high = val[1], val[2]
+                if (len(val)>3):
+                    step = val[3]
+                else:
+                    step=None
                 if key in self.par_samplers:  # If a custom sampler is used, get it now
                     try:
                         sampler_fn = getattr(trial, self.par_samplers[key])
@@ -354,7 +402,7 @@ class Calibration(sc.prettyobj):
                     sampler_key = gname + '_' + key
                 else:
                     sampler_key = key
-                pars[key] = sampler_fn(sampler_key, low, high)  # Sample from values within this range
+                pars[key] = sampler_fn(sampler_key, low, high, step=step)  # Sample from values within this range
 
             elif isinstance(val, dict):
                 sampler_fn = trial.suggest_float
@@ -364,7 +412,19 @@ class Calibration(sc.prettyobj):
                         sampler_key = gname + '_' + key + '_' + parkey
                     else:
                         sampler_key = key + '_' + parkey
-                    pars[key][parkey] = sampler_fn(sampler_key, par_highlowlist[1], par_highlowlist[2])
+                    if isinstance(par_highlowlist, dict):
+                        par_highlowlist = par_highlowlist['value']
+                        low, high = par_highlowlist[1], par_highlowlist[2]
+                        if (len(par_highlowlist) > 3):
+                            step = par_highlowlist[3]
+                        else: step = None
+                    elif isinstance(par_highlowlist, list):
+                        low, high = par_highlowlist[1], par_highlowlist[2]
+                        if (len(par_highlowlist) > 3):
+                            step = par_highlowlist[3]
+                        else:
+                            step = None
+                    pars[key][parkey] = sampler_fn(sampler_key, low, high, step=step)
 
         return pars
 
@@ -378,17 +438,24 @@ class Calibration(sc.prettyobj):
                 genotype_pars[gname] = self.trial_to_sim_pars(pardict, trial, gname=gname)
         else:
             genotype_pars = None
+        if self.hiv_pars is not None:
+            hiv_pars = self.trial_to_sim_pars(self.hiv_pars, trial)
+        else:
+            hiv_pars = None
         if self.calib_pars is not None:
             calib_pars = self.trial_to_sim_pars(self.calib_pars, trial)
         else:
             calib_pars = None
 
-        sim = self.run_sim(calib_pars, genotype_pars, return_sim=True)
+        sim = self.run_sim(calib_pars, genotype_pars, hiv_pars, return_sim=True)
 
-        # Compute fit for sim results and save sim results (TODO: THIS IS BY GENOTYPE FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
+        # Compute fit for sim results and save sim results (TODO: THIS IS FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
         for rkey in self.sim_results:
-            model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
+            if sim.results[rkey][:].ndim==1:
+                model_output = sim.results[rkey][self.sim_results[rkey].timepoints[0]]
+            else:
+                model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
             diffs = self.sim_results[rkey].data.value - model_output
             gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output)
             losses = gofs * self.sim_results[rkey].weights
@@ -397,8 +464,8 @@ class Calibration(sc.prettyobj):
             sim_results[rkey] = model_output
 
         extra_sim_results = sc.objdict()
-        if self.extra_sim_results:
-            for rkey in self.extra_sim_results_keys:
+        if self.extra_sim_result_keys:
+            for rkey in self.extra_sim_result_keys:
                 model_output = sim.results[rkey]
                 extra_sim_results[rkey] = model_output
 
@@ -466,7 +533,7 @@ class Calibration(sc.prettyobj):
         return output
 
 
-    def calibrate(self, calib_pars=None, genotype_pars=None, verbose=True, load=True, tidyup=True, **kwargs):
+    def calibrate(self, calib_pars=None, genotype_pars=None, hiv_pars=None, verbose=True, load=True, tidyup=True, **kwargs):
         '''
         Actually perform calibration.
 
@@ -482,7 +549,9 @@ class Calibration(sc.prettyobj):
             self.calib_pars = calib_pars
         if genotype_pars is not None:
             self.genotype_pars = genotype_pars
-        if (self.calib_pars is None) and (self.genotype_pars is None):
+        if hiv_pars is not None:
+            self.hiv_pars = hiv_pars
+        if (self.calib_pars is None) and (self.genotype_pars is None) and (self.hiv_pars is None):
             errormsg = 'You must supply calibration parameters (calib_pars or genotype_pars) either when creating the calibration object or when calling calibrate().'
             raise ValueError(errormsg)
         self.run_args.update(kwargs) # Update optuna settings
@@ -504,6 +573,7 @@ class Calibration(sc.prettyobj):
         # Replace with something else, this is fragile
         self.analyzer_results = []
         self.sim_results = []
+        self.extra_sim_results = []
         if load:
             print('Loading saved results...')
             for trial in study.trials:
@@ -643,9 +713,10 @@ class Calibration(sc.prettyobj):
 
         # Initialize
         fig, axes = pl.subplots(n_rows, n_cols, **fig_args)
-        for ax in axes.flat[n_plots:]:
-            ax.set_visible(False)
-        axes = axes.flatten()
+        if n_plots>1:
+            for ax in axes.flat[n_plots:]:
+                ax.set_visible(False)
+            axes = axes.flatten()
         pl.subplots_adjust(**axis_args)
 
         # Pull out attributes that don't vary by run
@@ -670,7 +741,10 @@ class Calibration(sc.prettyobj):
                 for date in all_dates[rn]:
 
                     # Initialize axis and data storage structures
-                    ax = axes[plot_count]
+                    if n_plots>1:
+                        ax = axes[plot_count]
+                    else:
+                        ax = axes
                     bins = []
                     genotypes = []
                     values = []
@@ -714,35 +788,41 @@ class Calibration(sc.prettyobj):
 
                     # Set title and labels
                     ax.set_xlabel('Age group')
-                    ax.set_title(self.result_args[resname].name+', '+ date.replace('.0', ''))
+                    ax.set_title(f'{self.result_args[resname].name}, {date}')
                     ax.legend()
                     ax.set_xticks(x, age_labels[resname])
                     plot_count += 1
 
             for rn, resname in enumerate(self.sim_results_keys):
-                x = np.arange(len(self.glabels))
-                ax = axes[plot_count]
-                bins = []
-                values = []
+                if n_plots > 1:
+                    ax = axes[plot_count]
+                else:
+                    ax = axes
+                bins = sc.autolist()
+                values = sc.autolist()
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
+                x = np.arange(len(ydata))
                 ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
-
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):
                     bins += x.tolist()
-                    values += list(run[resname])
+                    if sc.isnumber(run[resname]):
+                        values += sc.promotetolist(run[resname])
+                    else:
+                        values += run[resname].tolist()
+
                 # Plot model
                 modeldf = pd.DataFrame({'bins': bins, 'values': values})
                 ax = plot_func(ax=ax, x='bins', y='values', data=modeldf, **extra_args)
 
                 # Set title and labels
                 date = thisdatadf.year[0]
-                ax.set_xlabel('Genotype')
+                # ax.set_xlabel('Genotype')
                 ax.set_title(self.result_args[resname].name + ', ' + str(date))
                 ax.legend()
-                ax.set_xticks(x, self.glabels)
+                # ax.set_xticks(x, self.glabels)
                 plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)

@@ -17,6 +17,7 @@ do_save = 0
 def test_microsim():
     sc.heading('Minimal sim test')
 
+    # Define baseline parameters and initialize sim
     sim = hpv.Sim()
     pars = {
         'n_agents': 500, # CK: values smaller than this fail
@@ -33,7 +34,7 @@ def test_microsim():
     return sim
 
 
-def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest, turn off
+def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being run via pytest, turn off
     sc.heading('Basic sim test')
 
     # Settings
@@ -43,23 +44,23 @@ def test_sim(do_plot=False, do_save=False, **kwargs): # If being run via pytest,
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
-        'start': 1950,
+        'start': 1970,
         'burnin': 30,
         'end': 2030,
-        'location': 'tanzania',
-        'dt': .5,
+        'ms_agent_ratio': 100
     }
     pars = sc.mergedicts(pars, kwargs)
 
     # Create some genotype pars
     genotype_pars = {
         16: {
-            'sev_rate': 1.6
+            'sev_fn': dict(form='logf2', k=0.25, x_infl=0, ttc=30)
         }
     }
 
     sim = hpv.Sim(pars=pars, genotype_pars=genotype_pars, rand_seed=seed)
-    sim.run(verbose=verbose)
+    if do_run:
+        sim.run(verbose=verbose)
 
     # Optionally plot
     if do_plot:
@@ -72,25 +73,24 @@ def test_epi():
     sc.heading('Test basic epi dynamics')
 
     # Define baseline parameters and initialize sim
-    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, genotypes=[16], beta=0.05, verbose=0, eff_condoms=0.6)
+    base_pars = dict(n_agents=3e3, n_years=20, dt=0.5, genotypes=[16], beta=0.02, verbose=0, eff_condoms=0.6)
     sim = hpv.Sim(pars=base_pars)
     sim.initialize()
 
     # Define the parameters to vary
     class ParEffects():
-        def __init__(self, par, range, variable):
+        def __init__(self, par, range, variables):
             self.par = par
             self.range = range
-            self.variable = variable
+            self.variables = variables
             return
 
     par_effects = [
-        # ParEffects('model_hiv',     [False, True],  'cancers'),
-        ParEffects('beta',          [0.01, 0.99],   'infections'),
-        ParEffects('condoms',       [0.90, 0.10],   'infections'),
-        ParEffects('acts',          [1, 200],       'infections'),
-        ParEffects('debut',         [25, 15],       'infections'),
-        ParEffects('init_hpv_prev', [0.1, 0.8],     'infections'),
+        ParEffects('beta',          [0.01, 0.99],   ['infections']),
+        ParEffects('condoms',       [0.90, 0.10],   ['infections']),
+        ParEffects('acts',          [1, 200],       ['infections']),
+        ParEffects('debut',         [25, 15],       ['infections']),
+        ParEffects('init_hpv_prev', [0.1, 0.8],     ['infections']),
     ]
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
@@ -113,6 +113,8 @@ def test_epi():
 
         if par_effect.par == 'model_hiv':
             base_pars['location'] = 'south africa'
+            base_pars['n_years'] = 30
+            base_pars['dt'] = 0.25
             hiv_datafile = 'test_data/hiv_incidence_south_africa.csv'
             art_datafile = 'test_data/art_coverage_south_africa.csv'
         else:
@@ -127,13 +129,14 @@ def test_epi():
         s1 = hpv.Sim(pars1, art_datafile=art_datafile, hiv_datafile=hiv_datafile, label=f'{par_effect.par} {par_effect.range[1]}').run()
 
         # Check results
-        v0 = s0.results[par_effect.variable][:].sum()
-        v1 = s1.results[par_effect.variable][:].sum()
-        print(f'Checking {par_effect.variable:10s} with varying {par_effect.par:10s} ... ', end='')
-        assert v0 <= v1, f'Expected {par_effect.variable} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
-        print(f'✓ ({v0} <= {v1})')
+        for var in par_effect.variables:
+            v0 = s0.results[var][:].sum()
+            v1 = s1.results[var][:].sum()
+            print(f'Checking {var:10s} with varying {par_effect.par:10s} ... ', end='')
+            assert v0 <= v1, f'Expected {var} to be lower with {par_effect.par}={lo} than with {par_effect.par}={hi}, but {v0} > {v1})'
+            print(f'✓ ({v0} <= {v1})')
 
-    return
+    return s0, s1
 
 
 def test_states():
@@ -178,9 +181,9 @@ def test_states():
                 d0 = (~((~people.infectious[g,:]) & people.cin[g,:])).any()
                 if not d0:
                     raise ValueError('People without active infection should not have detectable cell changes/')
-                d1 = (people.normal[g,:] | people.precin[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.carcinoma[g,:] | people.cancerous[g,:] | removed).all()
+                d1 = (people.normal[g,:] | people.precin[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
                 if not d1:
-                    raise ValueError('States {normal, precin, cin1, cin2, cin3, carcinoma, cancerous} should be collectively exhaustive but are not.')
+                    raise ValueError('States {normal, precin, cin1, cin2, cin3, cancerous} should be collectively exhaustive but are not.')
                 d2 = ~(people.precin[g,:] & people.cin1[g,:]).all()
                 if not d2:
                     raise ValueError('States {precin, cin1} should be mutually exclusive but are not.')
@@ -228,9 +231,9 @@ def test_states():
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
                 # Severity markers
-                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.infectious[g,:] & people.is_female & ~removed))) == 0
+                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.cin[g,:] & people.is_female & ~removed))) == 0
                 if not v1:
-                    raise ValueError('All women with active infection should have a severity marker.')
+                    raise ValueError('All women with CINs should have a severity marker.')
                 v2 = len(hpv.true((~np.isnan(people.sev[g,:]) & ~people.infectious[g,:] & people.is_female & ~removed))) == 0
                 if not v2:
                     raise ValueError('No women without active infection should have severity markers.')
@@ -258,7 +261,7 @@ def test_flexible_inputs():
     sc.heading('Testing flexibility of sim inputs')
 
     # Test resetting layer parameters
-    sim = hpv.Sim(n_agents=100, genotypes=[16], label='test_label')
+    sim = hpv.Sim(n_agents=100, ms_agent_ratio=1, genotypes=[16], label='test_label')
     sim.reset_layer_pars()
     sim.initialize()
     sim.reset_layer_pars()
@@ -278,12 +281,14 @@ def test_flexible_inputs():
     with pytest.raises(ValueError):
         sim.validate_pars()
 
+
     # Can't have both end_days and n_years None
     sim['end'] = None
     sim['n_years'] = None
     with pytest.raises(ValueError):
         sim.validate_pars()
     sim['n_years'] = 10 # Restore
+
 
     # Check different initial conditions
     sim['init_hpv_prev'] = [0.08, 0.2] # Can't accept an array without age brackets
@@ -423,7 +428,7 @@ if __name__ == '__main__':
 
     sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    sim2 = test_epi()
+    s0, s1 = test_epi()
     sim3 = test_states()
     sim4 = test_flexible_inputs()
     sim5 = test_result_consistency()
