@@ -231,7 +231,7 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3', None),
 
 # Configure nbsphinx
 nbsphinx_kernel_name = "python"
-nbsphinx_timeout = 90 # Time in seconds; use -1 for no timeout
+nbsphinx_timeout = 180 # Time in seconds; use -1 for no timeout
 nbsphinx_execute_arguments = [
     "--InlineBackend.figure_formats={'svg', 'pdf'}",
     "--InlineBackend.rc=figure.dpi=96",
