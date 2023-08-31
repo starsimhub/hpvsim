@@ -7,6 +7,8 @@ downloaded, and if not, downloads them using the quick_download() function. The
 a separate repository, hpvsim_data.
 
 To ensure the data is updated, update the data_version parameter below.
+
+Running this file as a script will remove and then re-download all data.
 '''
 
 import os
@@ -14,10 +16,10 @@ import sys
 import numpy as np
 import pandas as pd
 import sciris as sc
-from . import loaders
+from hpvsim.data import loaders
 
 # Set parameters
-data_version = '1.2' # Data version
+data_version = '1.3' # Data version
 data_file = f'hpvsim_data_v{data_version}.zip'
 quick_url = f'https://github.com/amath-idm/hpvsim_data/blob/main/{data_file}?raw=true'
 age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
@@ -81,6 +83,8 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
     dd = {}
     for l,inds in ldict.items():
         dd[l] = df.iloc[inds,:]
+    
+    assert dd[l][columns[-1]].dtype != object, "Last column should be numeric type, not mixed or string type"
         
     sc.save(filesdir/outfile, dd)
     T.toc(f'Done with {label}')
@@ -244,3 +248,12 @@ def remove_data(verbose=True, **kwargs):
         sc.rmpath(fn, verbose=verbose, **kwargs)
     if verbose: print('Data files removed.')
     return
+
+
+if __name__ == '__main__':
+    
+    ans = input('Are you sure you want to remove and redownload data? y/[n] ')
+    if ans == 'y':
+        remove_data()
+        get_data()
+        check_downloaded()
