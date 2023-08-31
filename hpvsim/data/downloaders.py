@@ -76,15 +76,8 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
 
     # Parse by location
     df = pd.concat(dfs)
-    locs = df["Location"].unique()
-    ldict = {l:[] for l in locs}
-    for i,l in enumerate(df["Location"].values):
-        ldict[l].append(i)
-    dd = {}
-    for l,inds in ldict.items():
-        dd[l] = df.iloc[inds,:]
-    
-    assert dd[l][columns[-1]].dtype != object, "Last column should be numeric type, not mixed or string type"
+    dd = sc.objdict({l:d for l,d in df.groupby('Location')})
+    assert dd[0][columns[-1]].dtype != object, "Last column should be numeric type, not mixed or string type"
         
     sc.save(filesdir/outfile, dd)
     T.toc(f'Done with {label}')
