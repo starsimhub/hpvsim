@@ -60,15 +60,11 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
             print(f'\nDownloading from {url}, this may take a while...')
             sc.download(url, filename=local_zip)
             sc.unzip(local_zip, outfolder=filesdir)
-            # filehandle, _ = request.urlretrieve(url)
-            # zip_file_object = zipfile.ZipFile(filehandle, 'r')
-            # zip_file_object.extractall()
         else:
             print(f'Skipping {local_csv}, already downloaded')
 
         # Extract the parts used in the model and save
         df = pd.read_csv(local_csv, usecols=columns)
-        # df = df[columns]
         dfs.append(df)
         if tidy:
             print(f'Removing {local_base}')
@@ -87,9 +83,7 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
         dd[l] = df.iloc[inds,:]
         
     sc.save(filesdir/outfile, dd)
-
-    T.toc(doprint=False)
-    print(f'Done with {label}: took {T.timings[:].sum():0.1f} s.')
+    T.toc(f'Done with {label}')
 
     return dd
 
@@ -143,8 +137,8 @@ def get_birth_data(start=1960, end=2020, force=None, tidy=None):
     birth_rates = pd.read_csv(local_path)
     d = dict()
     for country in birth_rates['Country'].unique():
-        d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,2:]
-        # print('HIIIIII', country, d[country].dtype) # TEMP: FIX
+        d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,3:]
+        d[country] = d[country].astype(float) # Loaded as an object otherwise!
     d['years'] = np.arange(start, end)
     sc.save(filesdir/'birth_rates.obj', d)
     
