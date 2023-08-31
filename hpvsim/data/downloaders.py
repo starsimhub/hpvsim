@@ -70,8 +70,8 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
         dfs.append(df)
         if tidy:
             print(f'Removing {local_base}')
-            os.remove(local_zip)
-            os.remove(local_csv)
+            sc.rmpath(local_zip, die=False)
+            sc.rmpath(local_csv, die=False)
         T.toctic(label=f'  Done with {label} for {year}')
 
     # Parse by location
@@ -148,7 +148,7 @@ def get_birth_data(start=1960, end=2020, force=None, tidy=None):
     
     if tidy:
         print(f'Removing {local_path}')
-        os.remove(local_path)
+        sc.rmpath(local_path, die=False)
             
     T.toc(label='Done with birth data')
     return d
