@@ -11,8 +11,6 @@ To ensure the data is updated, update the data_version parameter below.
 
 import os
 import sys
-import zipfile
-from urllib import request
 import numpy as np
 import pandas as pd
 import sciris as sc
@@ -48,33 +46,46 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
     if force is None: force = False
     if tidy  is None: tidy  = True
 
-    sc.heading(f'Downloading {label} data...')
+    sc.heading(f'Getting {label} data...')
     T = sc.timer()
     dfs = []
 
     # Download data if it's not already in the directory
     for year in years:
         url = f'{base_url}{file_stem}{year}.zip'
-        local_path = f'{file_stem}{year}.csv'
-        if force or not os.path.exists(local_path):
+        local_base = filesdir/f'{file_stem}{year}'
+        local_zip = f'{local_base}.zip'
+        local_csv = f'{local_base}.csv'
+        if force or not os.path.exists(local_csv):
             print(f'\nDownloading from {url}, this may take a while...')
-            filehandle, _ = request.urlretrieve(url)
-            zip_file_object = zipfile.ZipFile(filehandle, 'r')
-            zip_file_object.extractall()
+            sc.download(url, filename=local_zip)
+            sc.unzip(local_zip, outfolder=filesdir)
+            # filehandle, _ = request.urlretrieve(url)
+            # zip_file_object = zipfile.ZipFile(filehandle, 'r')
+            # zip_file_object.extractall()
         else:
-            print(f'Skipping {local_path}, already downloaded')
+            print(f'Skipping {local_csv}, already downloaded')
 
         # Extract the parts used in the model and save
-        df = pd.read_csv(local_path)
-        df = df[columns]
+        df = pd.read_csv(local_csv, usecols=columns)
+        # df = df[columns]
         dfs.append(df)
         if tidy:
-            print(f'Removing {local_path}')
-            os.remove(local_path)
+            print(f'Removing {local_base}')
+            os.remove(local_zip)
+            os.remove(local_csv)
         T.toctic(label=f'  Done with {label} for {year}')
 
+    # Parse by location
     df = pd.concat(dfs)
-    dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
+    locs = df["Location"].unique()
+    ldict = {l:[] for l in locs}
+    for i,l in enumerate(df["Location"].values):
+        ldict[l].append(i)
+    dd = {}
+    for l,inds in ldict.items():
+        dd[l] = df.iloc[inds,:]
+        
     sc.save(filesdir/outfile, dd)
 
     T.toc(doprint=False)
@@ -107,39 +118,58 @@ def get_ex_data(force=None, tidy=None):
     return get_UN_data(**kw)
 
 
-def get_birth_data(start=1960, end=2020):
+def get_birth_data(start=1960, end=2020, force=None, tidy=None):
     ''' Import crude birth rates from WB '''
-    sc.heading('Downloading World Bank birth rate data...')
-    try:
-        import wbgapi as wb
-    except Exception as E:
-        errormsg = 'Could not import wbgapi: cannot download raw data'
-        raise ModuleNotFoundError(errormsg) from E
+    
+    if force is None: force = False
+    if tidy  is None: tidy  = True
+    
+    sc.heading('Getting World Bank birth rate data...')
     T = sc.timer()
-    birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
+    
+    local_path = filesdir/'world_bank_birth_rates.csv'
+    if force or not os.path.exists(local_path):
+        print('Downloading World Bank birth rate data...')
+        try:
+            import wbgapi as wb
+        except Exception as E:
+            errormsg = 'Could not import wbgapi: cannot download raw data'
+            raise ModuleNotFoundError(errormsg) from E
+        birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
+        birth_rates.to_csv(local_path)
+    else:
+        print(f'Skipping {local_path}, already downloaded')
+    
+    birth_rates = pd.read_csv(local_path)
     d = dict()
     for country in birth_rates['Country'].unique():
         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,2:]
+        # print('HIIIIII', country, d[country].dtype) # TEMP: FIX
     d['years'] = np.arange(start, end)
-    sc.saveobj(filesdir/'birth_rates.obj', d)
+    sc.save(filesdir/'birth_rates.obj', d)
+    
+    if tidy:
+        print(f'Removing {local_path}')
+        os.remove(local_path)
+            
     T.toc(label='Done with birth data')
     return d
 
 
-def parallel_downloader(which):
+def parallel_downloader(which, **kwargs):
     ''' Function for use with a parallel download function '''
     if which in ['age', 'ages']:
-        get_age_data()
+        get_age_data(**kwargs)
     if which in ['birth', 'births']:
-        get_birth_data()
+        get_birth_data(**kwargs)
     if which in ['death', 'deaths']:
-        get_death_data()
+        get_death_data(**kwargs)
     if which in ['life_expectancy', 'ex']:
-        get_ex_data()
+        get_ex_data(**kwargs)
     return
 
 
-def get_data():
+def get_data(serial=False, **kwargs):
     ''' Download data in parallel '''
     sc.heading('Downloading HPVsim data, please be patient...')
     T = sc.timer()
@@ -156,7 +186,7 @@ def get_data():
         which = ['age', 'birth', 'death', 'life_expectancy']
 
     # Actually download
-    sc.parallelize(parallel_downloader, which)
+    sc.parallelize(parallel_downloader, which, kwargs=kwargs, serial=serial)
     T.toc('Done downloading data for HPVsim')
 
     return
