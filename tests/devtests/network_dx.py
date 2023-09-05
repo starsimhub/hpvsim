@@ -20,7 +20,7 @@ base_pars = {
 }
 
 #%% Network analyzer
-# TODO: move this to analysis.py?
+
 class new_pairs_snap(hpv.Analyzer):
     def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
@@ -85,7 +85,6 @@ def run_network(clusters, mixing_steps, start, end, pop):
     df_new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype', 'sim'])
     fig0, axes = pl.subplots(2, 1)
     for i, (n_clusters, mixing) in enumerate(zip(clusters, mixing_steps)):
-        print(i)
         pars = dict(
             n_agents=pop,
             start=start,
@@ -94,7 +93,7 @@ def run_network(clusters, mixing_steps, start, end, pop):
             ms_agent_ratio=100,
             n_clusters=n_clusters,
             #clustered_risk=risk,
-            mixing_steps = mixing_steps,
+            mixing_steps = mixing,
             #random_pairing=True,
             analyzers=[snap, new_pairs]
         )
@@ -245,8 +244,8 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    clusters = [2, 10]
-    mixing_steps = [[1], np.repeat(1,9)]
+    clusters = [2, 5]
+    mixing_steps = [[1], [0.7,0.5,0,0]]
     start = 1970
     end = 2020
     pop = 10e3

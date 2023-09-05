@@ -340,31 +340,30 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     age_probs = mixing[age_m, age_f+1]
     cluster_probs = add_mixing[cluster_m, cluster_f]
     pair_probs = np.multiply(age_probs, cluster_probs)
-
-    pair_probs.max(axis=0) == 0
-    f_to_remove = pair_probs.max(axis=0)==0  # list of female inds to remove if no male partners are found for her
-    f = [i for i, flag in zip(f, f_to_remove) if ~flag]  # remove the inds who don't get paired on this timestep
     selected_males = []
-    if len(f):
-        pair_probs = pair_probs[:,np.invert(f_to_remove)]
+    if pair_probs.size != 0:
+        f_to_remove = pair_probs.max(axis=0) == 0  # list of female inds to remove if no male partners are found for her
+        f = [i for i, flag in zip(f, f_to_remove) if ~flag]  # remove the inds who don't get paired on this timestep
+        if len(f):
+            pair_probs = pair_probs[:,np.invert(f_to_remove)]
 
-        fems = np.arange(len(f))
-        f_paired_bools = np.full(len(fems), True, dtype=bool)
-        selected_males = np.full(len(fems), np.nan)
-        np.random.shuffle(fems)
-        for fem in fems:
-            m_col = pair_probs[:,fem]
-            if m_col.sum() > 0:
-                m_col_norm = m_col / m_col.sum()
-                choice = np.random.choice(len(m_col_norm), 1, replace=False, p=m_col_norm)
-                selected_males[fem] = np.array(m)[choice]
-                pair_probs[choice,:] = 0 # Once male partner is assigned, remove from eligible pool
-            else:
-                f_paired_bools[fem] = False
-        selected_males = selected_males[~np.isnan(selected_males)].astype(int)
-        f = np.array(f)[f_paired_bools]
-        # Count how many contacts there actually are
-        new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, selected_males]), return_counts=True)
+            fems = np.arange(len(f))
+            f_paired_bools = np.full(len(fems), True, dtype=bool)
+            selected_males = np.full(len(fems), np.nan)
+            np.random.shuffle(fems)
+            for fem in fems:
+                m_col = pair_probs[:,fem]
+                if m_col.sum() > 0:
+                    m_col_norm = m_col / m_col.sum()
+                    choice = np.random.choice(len(m_col_norm), 1, replace=False, p=m_col_norm)
+                    selected_males[fem] = np.array(m)[choice]
+                    pair_probs[choice,:] = 0 # Once male partner is assigned, remove from eligible pool
+                else:
+                    f_paired_bools[fem] = False
+            selected_males = selected_males[~np.isnan(selected_males)].astype(int)
+            f = np.array(f)[f_paired_bools]
+            # Count how many contacts there actually are
+            new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, selected_males]), return_counts=True)
     if len(new_pship_inds):
         current_partners[lno, new_pship_inds] += new_pship_counts
 
@@ -394,7 +393,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
     # coital frequency, etc
     output = {}
 
-    if len(f):
+    if len(f) and len(m):
         # Scale number of acts by age of couple
         acts = hpu.sample(**acts, size=len(f))
         kwargs = dict(acts=acts,
