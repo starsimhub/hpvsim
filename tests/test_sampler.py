@@ -1,5 +1,4 @@
 #%% test
-import itertools
 from numbers import Real
 from typing import Any
 from typing import Dict
@@ -20,16 +19,16 @@ from optuna.trial import FrozenTrial
 from optuna.trial import TrialState
 import optuna as op
 
+from optuna.pruners import BasePruner
+from optuna.trial import TrialState
+
 GridValueType = Union[str, float, int, bool, None]
 
-
 _logger = get_logger(__name__)
-
 
 class PredefinedSampler(BaseSampler):
     """Sampler modified from GridSampler
     """
-
     def __init__(
         self, search_space: Mapping[str, Sequence[GridValueType]], samp_list, seed: Optional[int] = None
     ) -> None:
@@ -43,7 +42,7 @@ class PredefinedSampler(BaseSampler):
 
         # self._all_grids = list(itertools.product(*self._search_space.values()))
         self._all_grids = samp_list
-        
+        self._visit_grids = []
         self._param_names = list(search_space.keys())
         self._n_min_trials = len(self._all_grids)
         self._rng = np.random.RandomState(seed)
@@ -63,11 +62,13 @@ class PredefinedSampler(BaseSampler):
         # When the trial is created by RetryFailedTrialCallback or enqueue_trial, we should not
         # assign a new grid_id.
         if "grid_id" in trial.system_attrs or "fixed_params" in trial.system_attrs:
+            print ("grid_id in trial.system_attrs")
             return {}
 
         target_grids = self._get_unvisited_grid_ids(study)
 
         if len(target_grids) == 0:
+            
             # This case may occur with distributed optimization or trial queue. If there is no
             # target grid, `PredefinedSampler` evaluates a visited, duplicated point with the current
             # trial. After that, the optimization stops.
@@ -77,13 +78,14 @@ class PredefinedSampler(BaseSampler):
                 "exhausted. This may happen due to a timing issue during distributed optimization "
                 "or when re-running optimizations on already finished studies."
             )
-
+            
             # One of all grids is randomly picked up in this case.
             target_grids = list(range(len(self._all_grids)))
 
         # In distributed optimization, multiple workers may simultaneously pick up the same grid.
         # To make the conflict less frequent, the grid is chosen randomly.
         grid_id = int(self._rng.choice(target_grids))
+                    
 
         study._storage.set_trial_system_attr(trial._trial_id, "search_space", self._search_space)
         study._storage.set_trial_system_attr(trial._trial_id, "grid_id", grid_id)
@@ -116,6 +118,7 @@ class PredefinedSampler(BaseSampler):
         # Current selection logic may evaluate the same parameters multiple times.
         # See https://gist.github.com/c-bata/f759f64becb24eea2040f4b2e3afce8f for details.
         grid_id = trial.system_attrs["grid_id"]
+        # print("run grid ", grid_id)
         param_value = self._all_grids[grid_id][self._param_names.index(param_name)]
         contains = param_distribution._contains(param_distribution.to_internal_repr(param_value))
         if not contains:
@@ -135,7 +138,8 @@ class PredefinedSampler(BaseSampler):
         values: Optional[Sequence[float]],
     ) -> None:
         target_grids = self._get_unvisited_grid_ids(study)
-
+        # if len(target_grids)%50==0:
+        #     print("left sample: ",len(target_grids) )
         if len(target_grids) == 0:
             study.stop()
         elif len(target_grids) == 1:
@@ -172,10 +176,11 @@ class PredefinedSampler(BaseSampler):
             ):
                 if t.state.is_finished():
                     visited_grids.append(t.system_attrs["grid_id"])
-                elif t.state == TrialState.RUNNING:
+                elif t.state == TrialState.RUNNING or t.state == TrialState.WAITING:
                     running_grids.append(t.system_attrs["grid_id"])
 
         unvisited_grids = set(range(self._n_min_trials)) - set(visited_grids) - set(running_grids)
+        # print(f'visited_grids {visited_grids} running_grids {running_grids}')
 
         # If evaluations for all grids have been started, return grids that have not yet finished
         # because all grids should be evaluated before stopping the optimization.
@@ -203,4 +208,3 @@ class PredefinedSampler(BaseSampler):
                     return False
 
         return True
-

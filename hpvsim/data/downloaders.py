@@ -74,7 +74,8 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
         T.toctic(label=f'  Done with {label} for {year}')
 
     df = pd.concat(dfs)
-    dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
+    # dd = {l:df[df["Location"]==l] for l in df["Location"].unique()}
+    dd = {l:d for l,d in df.groupby('Location')}
     sc.save(filesdir/outfile, dd)
 
     T.toc(doprint=False)
