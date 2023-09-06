@@ -2,7 +2,7 @@
 import sciris as sc
 import hpvsim as hpv
 import optuna as op
-from test_sampler import PredefinedSampler
+from tests.test_sampler import PredefinedSampler
 import numpy as np
 import pandas as pd
 import math
@@ -103,16 +103,7 @@ def estimator(actual, predicted):
 
         return gofs
 
-def run_precalib_exploration(location, default_pars, custom_param_space, calib_space, total_trials, n_workers, save_results):
-    # Read target data. The data value consists of lower and upper bound
-    datafiles = [
-        f'test_data/{location}_hpv_prevalence.csv',
-        f'test_data/{location}_cancer_cases.csv',
-        f'test_data/{location}_cin1_types.csv',
-        f'test_data/{location}_cin3_types.csv',
-        f'test_data/{location}_cancer_types.csv',
-    ]
-
+def run_precalib_exploration(location, datafiles, default_pars, custom_param_space, calib_space, total_trials, n_workers, name, save_results):
     # Prepare for calibration
     X = sample_lhs(total_trials, calib_space)
     calib_list = get_calib_list(custom_param_space)
@@ -140,7 +131,6 @@ def run_precalib_exploration(location, default_pars, custom_param_space, calib_s
     if save_results:
         sc.saveobj(f'results/{name}.obj', calib)
 
-#%% Now analyze the results
 # expand list types of outcomes
 def expand_array_column(df, array_column_name):
     array_data = df[array_column_name]
@@ -207,7 +197,7 @@ def get_interest_outcome(Y, outcome_level):
     outcomes[2] = sorted(Y.columns, key=custom_sort_key)
     return (outcomes[outcome_level])
 
-def heatmap(param_importance, outcomes):
+def heatmap(param_importance, outcomes, save_plot):
     import matplotlib.pyplot as plt
     import seaborn as sns
     from sklearn.preprocessing import StandardScaler
@@ -219,47 +209,49 @@ def heatmap(param_importance, outcomes):
     heatmap.set_xticklabels(df.index, rotation=90, fontsize=7) 
     heatmap.set_yticklabels(df.columns, rotation=0, fontsize=7)
     plt.show()
+    if save_plot:
+        plt.savefig('pre_calib.png')
 
 #%% Configure a simulation with some parameters. If you already have .obj file, you could read sim from there
-location ='india'
-pars = dict(n_agents=10e3, start=1980, end=2020, n_years=40, location=location, verbose=0)
-sim = hpv.Sim(pars)
-sim.run()
-default_pars = sim.pars
+# location ='india'
+# pars = dict(n_agents=10e3, start=1980, end=2020, n_years=40, location=location, verbose=0)
+# sim = hpv.Sim(pars)
+# sim.run()
+# default_pars = sim.pars
 
-# Read all input parameters from sim and save to csv. Custom fill parameters' lower and upper bounds.
-param_space = get_all_param_space(default_pars)
-param_space.to_csv('param_space.csv')
+# # Read all input parameters from sim and save to csv. Custom fill parameters' lower and upper bounds.
+# param_space = get_all_param_space(default_pars)
+# param_space.to_csv('param_space.csv')
 
-#%% When the lower and upper bound 
-# Read user-defined param space and define a calibration space. 
-custom_param_space, calib_space = get_calib_space('param_space_filled.csv', ['Assume'])
+# #%% When the lower and upper bound 
+# # Read user-defined param space and define a calibration space. 
+# custom_param_space, calib_space = get_calib_space('param_space_filled.csv', ['Assume'])
 
-# Set calibration settings
-total_trials = 1000 #number of total lhs samples
-n_workers = 40 # number of CPUs
-name = f'precalib_{location}'
-save_results = True
+# # Set calibration settings
+# total_trials = 1000 #number of total lhs samples
+# n_workers = 40 # number of CPUs
+# name = f'precalib_{location}'
+# save_results = True
 
-# Finally, run calibration
-run_precalib_exploration(location, default_pars, custom_param_space, calib_space, total_trials, n_workers, save_results)
+# # Finally, run calibration
+# run_precalib_exploration(location, default_pars, custom_param_space, calib_space, total_trials, n_workers, save_results)
 
-#%% Analyze the results
+# #%% Analyze the results
 
-# Read calibration results and organize the results
-calib = sc.load(f'results/{name}.obj')
-custom_param_space, calib_space  = get_calib_space('param_space_filled.csv', ['Assume'])
-result_df = organize_results(calib, calib_space)
+# # Read calibration results and organize the results
+# calib = sc.load(f'results/{name}.obj')
+# custom_param_space, calib_space  = get_calib_space('param_space_filled.csv', ['Assume'])
+# result_df = organize_results(calib, calib_space)
 
-# Now analyze the parameter importance using machine learning. Current version supports LinearRegression, RandomForest, and XGBoost
-param_cols = calib_space['names']
-X = result_df[param_cols]
-Y = result_df[result_df.columns.difference(param_cols+['index'])]
-param_importance = fit_model('XGBoost', X, Y)
+# # Now analyze the parameter importance using machine learning. Current version supports LinearRegression, RandomForest, and XGBoost
+# param_cols = calib_space['names']
+# X = result_df[param_cols]
+# Y = result_df[result_df.columns.difference(param_cols+['index'])]
+# param_importance = fit_model('XGBoost', X, Y)
 
-# %%Plot results. Users can specify the outcome level 0 to 2
-outcomes = get_interest_outcome(Y, outcome_level=1)
-outcomes = ['hpv_prevalence']
-heatmap(param_importance, outcomes)
+# # %%Plot results. Users can specify the outcome level 0 to 2
+# outcomes = get_interest_outcome(Y, outcome_level=1)
+# outcomes = ['hpv_prevalence']
+# heatmap(param_importance, outcomes)
 
 # %%
