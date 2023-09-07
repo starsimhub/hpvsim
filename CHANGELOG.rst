@@ -8,14 +8,15 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 1.2.2 (2023-07-12)
+Version 1.2.2 (2023-08-11)
 ---------------------------
-- Updates to calibration and analyzer to allow a user to pass in a custom estimator
-- *Github info* PR `588 <https://github.com/amath-idm/hpvsim/pull/588>`__
+- Improved tests and included ``conda`` environment specification.
+- *Github info* PR `598 <https://github.com/amath-idm/hpvsim/pull/598>`__
 
 Version 1.2.1 (2023-07-09)
 ---------------------------
-- Updating WPP data
+- Updated data files being used. 
+- *Github info* PR `586 <https://github.com/amath-idm/hpvsim/pull/586>`__
 
 Version 1.2.0 (2023-05-31)
 ---------------------------

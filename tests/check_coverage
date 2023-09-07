@@ -2,7 +2,7 @@
 
 echo 'Running tests...'
 export SCIRIS_BACKEND='agg' # Don't show plots
-pytest -v test_*.py --cov-config=.coveragerc --cov=../hpvsim --workers auto --durations=0
+pytest -v test_*.py --cov-config=.coveragerc --cov=../hpvsim -n auto --durations=0
 
 echo 'Creating HTML report...'
 coverage html

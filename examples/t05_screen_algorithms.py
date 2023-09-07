@@ -318,12 +318,12 @@ def make_algorithms(sim=None, seed=0, debug=debug):
     # Create, run, and plot the simulations
     sim0 = hpv.Sim(label='No screening')
     sim1 = hpv.Sim(interventions=algo1, label='Algorithm 1')
-    sim2 = hpv.Sim(interventions=algo1, label='Algorithm 2')
-    sim3 = hpv.Sim(interventions=algo1, label='Algorithm 3')
-    sim4 = hpv.Sim(interventions=algo1, label='Algorithm 4')
-    sim5 = hpv.Sim(interventions=algo1, label='Algorithm 5')
-    sim6 = hpv.Sim(interventions=algo1, label='Algorithm 6')
-    sim7 = hpv.Sim(interventions=algo1, label='Algorithm 7')
+    sim2 = hpv.Sim(interventions=algo2, label='Algorithm 2')
+    sim3 = hpv.Sim(interventions=algo3, label='Algorithm 3')
+    sim4 = hpv.Sim(interventions=algo4, label='Algorithm 4')
+    sim5 = hpv.Sim(interventions=algo5, label='Algorithm 5')
+    sim6 = hpv.Sim(interventions=algo6, label='Algorithm 6')
+    sim7 = hpv.Sim(interventions=algo7, label='Algorithm 7')
     msim = hpv.parallel([sim0, sim1, sim2, sim3, sim4, sim5, sim6, sim7])
 
     msim.compare()
