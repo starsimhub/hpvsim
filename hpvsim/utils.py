@@ -518,9 +518,9 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
         probs = np.ones(n_choices)/n_choices
     return np.random.choice(n_choices, n_samples, p=probs, replace=not(unique))
 
-def choose_m(probs, n=1): #
+def choose_m(probs): #
     '''
-    Choose n items (e.g., people) from each column of an array with distribution probs.
+    Choose 1 item (e.g., people) from each column of an array with distribution probs.
 
     Args:
         probs (array): matrix of probabilities, each column should sum to 1
@@ -534,27 +534,13 @@ def choose_m(probs, n=1): #
         # Among two males and two females, choose 1 male partner for each female partner with nonequal probability.
     '''
 
-    # Check input
-    choices = [np.random.choice(probs.shape[0], n, replace=False, p=i) for i in probs.T]
+    c = probs.cumsum(axis=0)
+    u = np.random.rand(len(c), 1)
 
-    return np.array(choices).flatten()
+    choices = (u < c).argmax(axis=0)
 
-def choose_p(probs): #
-    '''
-    Randomly generate pairs of indices (e.g., partnerships) with a matrix of probabilities
+    return choices
 
-    Args:
-        probs (array): matrix of probabilities, elements should be [0,1]
-    **Example**::
-
-        choices = hpv.choose_p([0.2, 0.5, 1],
-                                [0.6, 0.1, 0.1])
-        # Randomly form partnerships among two males and two females
-    '''
-
-    # Check input
-
-    return np.random.rand(*probs.shape) <= probs
 
 
 #%% Simple array operations
