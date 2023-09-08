@@ -535,13 +535,13 @@ def get_mixing(network=None):
         layer_probs = dict(
             m=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,     70,     75],
-                [ 0,  0,  0.04,   0.1,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.2,  0.2,  0.1,  0.05], # Share of females of each age who are actively seeking marriage if underpartnered
-                [ 0,  0,  0.01,  0.01,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.2, 0.2, 0.1,  0.05]] # Share of males of each age who are actively seeking marriage if underpartnered
+                [ 0,  0,  0.04,   0.1,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.1,   0.05,  0.01,  0.005], # Share of females of each age who are actively seeking marriage if underpartnered
+                [ 0,  0,  0.01,  0.01,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.05,  0.01,  0.01,  0.005]] # Share of males of each age who are actively seeking marriage if underpartnered
             ),
             c=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,    55,    60,    65,    70,    75],
                 [ 0,  0,  0.10,   0.7,  0.8,  0.6,  0.6,  0.4,   0.1,  0.05, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001], # Share of females of each age actively seeking casual relationships if underpartnered
-                [ 0,  0,  0.05,   0.7,  0.8,  0.6,  0.6,  0.4,   0.4,   0.3,   0.2,  0.2,  0.1,  0.05, 0.01, 0.01]], # Share of males of each age actively seeking casual relationships if underpartnered
+                [ 0,  0,  0.05,   0.7,  0.8,  0.6,  0.6,  0.4,   0.4,   0.3,   0.2,  0.2,  0.1,   0.05,  0.01,  0.01]], # Share of males of each age actively seeking casual relationships if underpartnered
             ),
             o=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],

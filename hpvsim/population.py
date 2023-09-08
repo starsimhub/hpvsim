@@ -339,29 +339,30 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                 age_bins_f = np.digitize(age[f_cl], bins=bins) - 1  # Age bins of females that are entering new relationships
                 age_bins_m = np.digitize(age[m_cl], bins=bins) - 1  # Age bins of participating males
                 bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
-                for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
+                # shuffle age bins
+                bin_order = np.arange(len(bin_range_f))
+                np.random.shuffle(bin_order)
+                f_selected = []
+                m_selected = []
+                for ab, nm in zip(bin_range_f[bin_order], males_needed[bin_order]):  # Loop through the age bins of females and the number of males needed for each
                     male_dist = mixing[:, ab + 1]/2  # Get the distribution of ages of the male partners of females of this age
                     # Weight males according to the preferences of females of this age
                     this_weighting = m_probs[m_cl] * male_dist[age_bins_m] * add_mixing[cl, cluster[m_cl]]
-                    if this_weighting.sum() == 0:
-                        f_inds_to_remove += list(np.array(f_cl)[hpu.true(age_bins_f == ab)])
-                        #print('Warning, no males were found for pairing, no partnerships created for this timestep')
-                    else:
+                    if this_weighting.sum() > 0:
                         this_weighting_norm = this_weighting / this_weighting.sum()
                         males_nonzero = hpu.true(this_weighting_norm)  # Remove males with 0 weights
                         this_weighting_nonzero = this_weighting[males_nonzero]
+                        f_inds = np.array(f_cl)[hpu.true(age_bins_f == ab)]  # inds of participating females in this age bin
                         if nm > len(this_weighting_nonzero):
                             #print(f'Warning, {nm} males desired but only {len(this_weighting_nonzero)} found.')
-                            f_inds = np.array(f_cl)[hpu.true(age_bins_f == ab)] # inds of participating females in this age bin
-                            selected_f = hpu.choose(nm, len(this_weighting_nonzero)) # randomly select females
-                            f_inds_selected = f_inds[selected_f] # inds of selected females
-                            f_inds_to_remove += list(np.setdiff1d(f_inds, f_inds_selected)) # inds of unselected females
-                            nm = len(f_inds_selected) # number of new partnerships in this age bin
+                            f_selected = f_inds[hpu.choose(nm, len(this_weighting_nonzero))].tolist() # randomly select females
+                            nm = len(f_selected) # number of new partnerships in this age bin
+                        else:
+                            f_selected = f_inds.tolist()
                         m_selected = np.array(m_cl)[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]].tolist()  # Select males based on mixing weights
                         m_probs[m_selected] = 0 # remove males that get partnered
-                        m += m_selected # save selected males
-                f_cl = [i for i in f_cl if i not in f_inds_to_remove]  # remove the females who don't get paired on this timestep
-                f += f_cl
+                    m += m_selected # save selected males
+                    f += f_selected
 
     elif pfa == 1: # loop through each fem
         f = []  # Initialize the female partners
