@@ -351,13 +351,13 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                     this_weighting = m_probs[m_geo] * male_dist[age_bins_m] * add_mixing[cl, cluster[m_geo]]
                     if this_weighting.sum() == 0:
                         f_inds_to_remove += list(np.array(f_geo)[hpu.true(age_bins_f == ab)])
-                        print('Warning, no males were found for pairing, no partnerships created for this timestep')
+                        #print('Warning, no males were found for pairing, no partnerships created for this timestep')
                     else:
                         this_weighting_norm = this_weighting / this_weighting.sum()
                         males_nonzero = hpu.true(this_weighting_norm)  # Decide which males are going to be eligible to partner this timestep
                         this_weighting_nonzero = this_weighting[males_nonzero]
                         if nm > len(this_weighting_nonzero):
-                            print(f'Warning, {nm} males desired but only {len(this_weighting_nonzero)} found.')
+                            #print(f'Warning, {nm} males desired but only {len(this_weighting_nonzero)} found.')
                             f_inds = np.array(f_geo)[hpu.true(age_bins_f == ab)]
                             selected_f = hpu.choose(nm, len(this_weighting_nonzero))
                             f_inds_selected = f_inds[selected_f]
