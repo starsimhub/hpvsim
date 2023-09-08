@@ -453,6 +453,8 @@ class Calibration(sc.prettyobj):
 
         # Compute fit for sim results and save sim results (TODO: THIS IS FOR A SINGLE TIMEPOINT. GENERALIZE THIS)
         sim_results = sc.objdict()
+        if sim is None:
+            x=1
         for rkey in self.sim_results:
             if sim.results[rkey][:].ndim==1:
                 model_output = sim.results[rkey][self.sim_results[rkey].timepoints[0]]
