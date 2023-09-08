@@ -289,8 +289,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         cluster             (int arr): array containing each agent's cluster id
         add_mixing          (float arr): additional mixing matrix
     '''
-    # Initialize
-    new_pship_inds, new_pship_counts = [], []  # Initialize the indices and counts of new partnerships
 
     # Useful variables
     n_agents        = len(sex)
@@ -313,92 +311,92 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 
     # Bin the females by age
     bins = layer_probs[0, :]  # Extract age bins
-
-    pfa = 0
+    cluster_range = np.unique(cluster)
     if pfa == 0: # loop through each age bin of fem
-        cluster_range = np.unique(cluster)
         f = []
         m = []
-        for cl in cluster_range:
+        for cl in cluster_range: # Loop through clusters
             m_probs = np.ones(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
-            f_inds_to_remove = []  # list of female inds to remove if no male parters are found for her
+            f_inds_to_remove = []  # list of female inds to remove if no male partners are found for her
             # Try randomly select females for pairing
-            f_eligible_inds = hpu.true(f_eligible * (cluster==cl))  # Inds of all eligible females
-            age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
+            f_eligible_inds = hpu.true(f_eligible * (cluster==cl))  # Inds of all eligible females in this cluster
+            age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of eligible females
             bin_range_f = np.unique(age_bins_f)  # Range of bins
-            f_geo = []  # Initialize the female partners
+            f_cl = []  # Initialize the female partners in this cluster
             for ab in bin_range_f:  # Loop over age bins
                 these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[
                     age_bins_f == ab])  # Select females according to their participation rate in this layer
-                f_geo += these_f_contacts.tolist()
-            if len(f_geo):
-                # Select males according to their participation rate in this layer
-                m_eligible_inds = hpu.true(m_eligible * (cluster==cl))
-                age_bins_m = np.digitize(age[m_eligible_inds], bins=bins) - 1
+                f_cl += these_f_contacts.tolist()
+            if len(f_cl):
+                m_eligible_inds = hpu.true(m_eligible * (cluster==cl)) # Inds of all eligible males in this cluster
+                age_bins_m = np.digitize(age[m_eligible_inds], bins=bins) - 1 # Age bins of eligible males
                 bin_range_m = np.unique(age_bins_m)  # Range of bins
-                m_geo = []  # Initialize the male partners
+                m_cl = []  # Initialize the male partners
                 for ab in bin_range_m:
                     these_m_contacts = hpu.binomial_filter(layer_probs[2][ab], m_eligible_inds[age_bins_m == ab])  # Select males according to their participation rate in this layer
-                    m_geo += these_m_contacts.tolist()
+                    m_cl += these_m_contacts.tolist()
                 # Draw male partners based on mixing matrices
-                bins = mixing[:, 0]
-                age_bins_f = np.digitize(age[f_geo], bins=bins) - 1  # Age bins of females that are entering new relationships
-                age_bins_m = np.digitize(age[m_geo], bins=bins) - 1  # Age bins of active and participating males
+                age_bins_f = np.digitize(age[f_cl], bins=bins) - 1  # Age bins of females that are entering new relationships
+                age_bins_m = np.digitize(age[m_cl], bins=bins) - 1  # Age bins of participating males
                 bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
                 for ab, nm in zip(bin_range_f, males_needed):  # Loop through the age bins of females and the number of males needed for each
-                    male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
+                    male_dist = mixing[:, ab + 1]/2  # Get the distribution of ages of the male partners of females of this age
                     # Weight males according to the preferences of females of this age
-                    this_weighting = m_probs[m_geo] * male_dist[age_bins_m] * add_mixing[cl, cluster[m_geo]]
+                    this_weighting = m_probs[m_cl] * male_dist[age_bins_m] * add_mixing[cl, cluster[m_cl]]
                     if this_weighting.sum() == 0:
-                        f_inds_to_remove += list(np.array(f_geo)[hpu.true(age_bins_f == ab)])
+                        f_inds_to_remove += list(np.array(f_cl)[hpu.true(age_bins_f == ab)])
                         #print('Warning, no males were found for pairing, no partnerships created for this timestep')
                     else:
                         this_weighting_norm = this_weighting / this_weighting.sum()
-                        males_nonzero = hpu.true(this_weighting_norm)  # Decide which males are going to be eligible to partner this timestep
+                        males_nonzero = hpu.true(this_weighting_norm)  # Remove males with 0 weights
                         this_weighting_nonzero = this_weighting[males_nonzero]
                         if nm > len(this_weighting_nonzero):
                             #print(f'Warning, {nm} males desired but only {len(this_weighting_nonzero)} found.')
-                            f_inds = np.array(f_geo)[hpu.true(age_bins_f == ab)]
-                            selected_f = hpu.choose(nm, len(this_weighting_nonzero))
-                            f_inds_selected = f_inds[selected_f]
-                            f_inds_to_remove += list(np.setdiff1d(f_inds, f_inds_selected))
-                            nm = len(f_inds_selected)
-                        m_selected = np.array(m_geo)[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]].tolist()  # Select males
-                        m_probs[m_selected] /= pref_weight
-                        m += m_selected
-                f_geo = [i for i in f_geo if i not in f_inds_to_remove]  # remove the inds who don't get paired on this timestep
-                f += f_geo
+                            f_inds = np.array(f_cl)[hpu.true(age_bins_f == ab)] # inds of participating females in this age bin
+                            selected_f = hpu.choose(nm, len(this_weighting_nonzero)) # randomly select females
+                            f_inds_selected = f_inds[selected_f] # inds of selected females
+                            f_inds_to_remove += list(np.setdiff1d(f_inds, f_inds_selected)) # inds of unselected females
+                            nm = len(f_inds_selected) # number of new partnerships in this age bin
+                        m_selected = np.array(m_cl)[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]].tolist()  # Select males based on mixing weights
+                        m_probs[m_selected] = 0 # remove males that get partnered
+                        m += m_selected # save selected males
+                f_cl = [i for i in f_cl if i not in f_inds_to_remove]  # remove the females who don't get paired on this timestep
+                f += f_cl
 
     elif pfa == 1: # loop through each fem
+        f = []  # Initialize the female partners
+        m = []  # Initialize the male partners
+
         # Try randomly select females for pairing
         f_eligible_inds = hpu.true(f_eligible)  # Inds of all eligible females
         age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of selected females
         bin_range_f = np.unique(age_bins_f)  # Range of bins
-        f = []  # Initialize the female partners
         for ab in bin_range_f:  # Loop over age bins
             these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[age_bins_f == ab])  # Select females according to their participation rate in this layer
             f += these_f_contacts.tolist()
 
-        # Select males according to their participation rate in this layer
-        m_eligible_inds = hpu.true(m_eligible)
-        age_bins_m = np.digitize(age[m_eligible_inds], bins=bins) - 1
+        m_eligible_inds = hpu.true(m_eligible) # Inds of all eligible males
+        age_bins_m = np.digitize(age[m_eligible_inds], bins=bins) - 1 # age bins of eligible males
         bin_range_m = np.unique(age_bins_m)  # Range of bins
-        m = []  # Initialize the male partners
         for ab in bin_range_m:
             these_m_contacts = hpu.binomial_filter(layer_probs[2][ab], m_eligible_inds[age_bins_m == ab])  # Select males according to their participation rate in this layer
             m += these_m_contacts.tolist()
-        # Create preference matrix between eligible females and males that combines age and additional mixing
-        age_bins_f = np.digitize(age[f], bins=bins) - 1  # Age bins of females that are entering new relationships
-        age_bins_m = np.digitize(age[m], bins=bins) - 1  # Age bins of active and participating males
-        age_f, age_m = np.meshgrid(age_bins_f, age_bins_m)
-        cluster_f, cluster_m = np.meshgrid(cluster[f], cluster[m])
-        age_probs = mixing[age_m, age_f + 1]
-        cluster_probs = add_mixing[cluster_m, cluster_f]
-        pair_probs = np.multiply(age_probs, cluster_probs)
-        if pair_probs.size != 0:
+
+        if len(f) and len(m):
+            # Create preference matrix between eligible females and males that combines age and additional mixing
+            age_bins_f = np.digitize(age[f], bins=bins) - 1  # Age bins of participating females
+            age_bins_m = np.digitize(age[m], bins=bins) - 1  # Age bins of participating males
+            # Construct preference matrix by combining age-mixing and other mixing weights
+            age_f, age_m = np.meshgrid(age_bins_f, age_bins_m)
+            cluster_f, cluster_m = np.meshgrid(cluster[f], cluster[m])
+            age_probs = mixing[age_m, age_f + 1]
+            cluster_probs = add_mixing[cluster_m, cluster_f]
+            pair_probs = np.multiply(age_probs, cluster_probs)
+
             f_to_remove = pair_probs.max(axis=0) == 0  # list of female inds to remove if no male partners are found for her
             f = [i for i, flag in zip(f, f_to_remove) if ~flag]  # remove the inds who don't get paired on this timestep
-            pair_probs = pair_probs[:, np.invert(f_to_remove)]
+            pair_probs = pair_probs[:, np.invert(f_to_remove)]  # remove columns of zeros from the preference matrix
+            # loop through all participating females in shuffled order
             fems = np.arange(len(f))
             f_paired_bools = np.full(len(fems), True, dtype=bool)
             selected_males = np.full(len(fems), np.nan)
@@ -407,14 +405,13 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                 m_col = pair_probs[:,fem]
                 if m_col.sum() > 0:
                     m_col_norm = m_col / m_col.sum()
-                    choice = np.random.choice(len(m_col_norm), 1, replace=False, p=m_col_norm)
+                    choice = np.random.choice(len(m_col_norm), 1, replace=False, p=m_col_norm) # choose 1 male
                     selected_males[fem] = np.array(m)[choice]
                     pair_probs[choice,:] = 0 # Once male partner is assigned, remove from eligible pool
                 else:
-                    f_paired_bools[fem] = False
-            m = selected_males[~np.isnan(selected_males)].astype(int)
-            f = np.array(f)[f_paired_bools]
-        else: f = []
+                    f_paired_bools[fem] = False # Mark females that don't get paired this timestep
+            m = selected_males[~np.isnan(selected_males)].astype(int) # Remove males that don't get paired
+            f = np.array(f)[f_paired_bools] # Remove females that don't get paired
 
     # Count how many contacts there actually are
     new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)

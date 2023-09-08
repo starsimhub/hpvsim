@@ -22,6 +22,7 @@ base_pars = {
 #%% Network analyzer
 
 class new_pairs_snap(hpv.Analyzer):
+    # analyzer for recording new partnerships of each timestep
     def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
         self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype'])
@@ -47,35 +48,7 @@ class new_pairs_snap(hpv.Analyzer):
                     self.new_pairs = pd.concat([self.new_pairs, contacts])
         return
 
-
-    def plot(self, do_save=False, filename=None, ag=False):
-        n_time = len(self.new_pairs[0])
-        check_square = n_time % np.sqrt(n_time)
-        non_square = 1
-        if check_square == 0:
-            nrows = int(np.sqrt(n_time))
-            ncols = int(np.sqrt(n_time))
-        else:
-            nrows = int(np.sqrt(n_time)) + non_square
-            ncols = int(np.sqrt(n_time))
-
-
-        fig, ax = pl.subplots(nrows, ncols, figsize=(15, 8))
-        yi = sc.findinds(self.yearvec, from_when)[0]
-        for rn, rtype in enumerate(['m', 'c', 'o']):
-            ax[0, rn].plot(self.yearvec[yi:], self.n_edges[rtype][yi:])
-            ax[0, rn].set_title(f'Edges - {rtype}')
-            ax[1, rn].plot(self.yearvec[yi:], self.n_edges_norm[rtype][yi:])
-            ax[1, rn].set_title(f'Normalized edges - {rtype}')
-        pl.tight_layout()
-        if do_save:
-            fn = 'networks' or filename
-            fig.savefig(f'{filename}.png')
-        else:
-            pl.show()
-
 def run_network(clusters, mixing_steps, start, end, pop):
-
     labels = ['Status quo', 'Clustered network']
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
@@ -94,6 +67,7 @@ def run_network(clusters, mixing_steps, start, end, pop):
             n_clusters=n_clusters,
             #clustered_risk=risk,
             mixing_steps = mixing,
+            #pfa = 1,
             #random_pairing=True,
             analyzers=[snap, new_pairs]
         )
@@ -106,13 +80,9 @@ def run_network(clusters, mixing_steps, start, end, pop):
         new_pairs_snaps = sim.get_analyzer([1]).new_pairs
         new_pairs_snaps['sim'] = i
         df_new_pairs = pd.concat([df_new_pairs, new_pairs_snaps])
-        ## Network diagnostics
         plot_mixing(df_new_pairs)
-
         axes[0].plot(sim.results['year'], sim.results['infections'], label=labels[i])
         axes[1].plot(sim.results['year'], sim.results['cancers'])
-
-
     axes[0].legend()
     axes[0].set_ylabel('Infections')
     axes[1].set_ylabel('Cancers')
@@ -122,11 +92,7 @@ def run_network(clusters, mixing_steps, start, end, pop):
     for i, isnap in enumerate(snaps):
         people2020 = isnap.snapshots[3]
         font_size = 15
-        font_family = 'Libertinus Sans'
         pl.rcParams['font.size'] = font_size
-        pl.rcParams['font.family'] = font_family
-
-        # ax = axes.flatten()
         people = people2020
         rships_f = np.zeros((3, len(people.age_bin_edges)))
         rships_m = np.zeros((3, len(people.age_bin_edges)))
@@ -134,7 +100,6 @@ def run_network(clusters, mixing_steps, start, end, pop):
             active_ages = people.age
             n_rships = people.n_rships
             age_bins = np.digitize(active_ages, bins=people.age_bin_edges) - 1
-
             for ab in np.unique(age_bins):
                 inds_f = (age_bins==ab) & people.is_female
                 inds_m = (age_bins==ab) & people.is_male
@@ -156,13 +121,8 @@ def run_network(clusters, mixing_steps, start, end, pop):
     for i, isnap in enumerate(snaps):
         people2020 = isnap.snapshots[3]
         font_size = 15
-        #font_family = 'Libertinus Sans'
         pl.rcParams['font.size'] = font_size
-        #pl.rcParams['font.family'] = font_family
-
-        # ax = axes.flatten()
         people = people2020
-
         types = ['marital', 'casual', 'one-off']
         xx = people.lag_bins[1:15] * sim['dt']
         for cn, lkey in enumerate(['m', 'c', 'o']):
@@ -171,7 +131,6 @@ def run_network(clusters, mixing_steps, start, end, pop):
             ax.bar(xx, yy, width=0.2)
             ax.set_xlabel(f'Time between {types[cn]} relationships')
         axes[i,0].set_ylabel(labels[i])
-
     fig.tight_layout()
     fig.show()
 
@@ -201,20 +160,9 @@ def plot_mixing(df_new_pairs):
                 mc = df_year.age_m  # Get the age of male contacts in marital partnership
                 h = ax[j//nc, j%nc].hist2d(fc, mc, bins=np.linspace(0, 75, 16), density=False, norm=mpl.colors.LogNorm())
                 ax[j//nc, j%nc].set_title(year)
-
             fig.colorbar(h[3], ax=ax)
-            #mixing = sim['mixing'][rtype]
-            #age_bins = mixing[:,0]
-            #mixing = mixing[:,1:]
-            #mixing_norm_col = mixing / mixing.max(axis=0)
-            #mixing_norm_col[np.isnan(mixing_norm_col)] = 0
-            #X, Y = np.meshgrid(age_bins, age_bins)
-            #h = ax[nr-1, nc-1].pcolormesh(X, Y, mixing_norm_col, norm=mpl.colors.LogNorm())
-            #ax[nr-1, nc-1].set_title('Input')
-
             fig.text(0.5, 0.04, 'Age of female partner', ha='center', fontsize=24)
             fig.text(0.04, 0.5, 'Age of male partner', va='center', rotation='vertical', fontsize=24)
-
             fig.suptitle(rtype, fontsize=24)
             fig.tight_layout(h_pad=0.5)
             fig.subplots_adjust(top=0.9, left=0.1, bottom=0.1, right=0.75)
@@ -229,7 +177,7 @@ def cluster_demo():
     # Multiple geo clusters
     pars1 = base_pars
     pars1['n_clusters'] = 10
-    pars1['mixing_steps'] = np.repeat(1,9) # TODO: automatically adjust mixing_steps as well-mixed when given n_clusters > 1?
+    pars1['mixing_steps'] = np.repeat(1,9)
     sim1 = hpv.Sim(pars=pars1)
     print(sim1['add_mixing'])
     # Modifying mixing steps
@@ -244,13 +192,12 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    clusters = [2, 5]
-    mixing_steps = [[1], [0.7,0.5,0,0]]
+    clusters = [2, 10]
+    mixing_steps = [[1], np.repeat(1,9)]
     start = 1970
     end = 2020
-    pop = 10e3
+    pop = 20e3
     run_network(clusters, mixing_steps, start, end, pop)
     cluster_demo()
-
     sc.toc(T)
     print('Done.')

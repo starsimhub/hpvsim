@@ -67,7 +67,7 @@ def make_pars(**kwargs):
     pars['mixing_steps']    = None  # List of relative mixing weights between clusters by relative distance, length = n_clusters - 1, elements should be [0, 1].
     # E.g, for 3 clusters, mixing_steps=[1,1] means full mixing; mixing_steps = [0, 0] means no between cluster mixing.
     pars['add_mixing']      = None  # Mixing matrix between clusters
-    pars['pfa']             = 0     # Switch for partnership formation algorithms
+    pars['pfa']             = 0     # Switch for partnership formation algorithms; use 0 for small number of clusters, 1 for large number of clusters (e.g., n_clusters/n_agents > 0.05)
     pars['clustered_risk']  = 1     # Strength of relationship between rel_sev and clustering, where 1 means there is no relationship and values above 1 refer to how much more similar clusters are wrt rel_sev
     pars['cluster_rel_sev'] = None  # Array of cluster-specific rel_sev values
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
@@ -535,18 +535,18 @@ def get_mixing(network=None):
         layer_probs = dict(
             m=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,     70,     75],
-                [ 0,  0,  0.04,   0.1,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.1,  0.05,  0.01,  0.001], # Share of females of each age who are newly married
-                [ 0,  0,  0.01,  0.01,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.05, 0.01, 0.001,  0.001]] # Share of males of each age who are newly married
+                [ 0,  0,  0.04,   0.1,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.2,  0.2,  0.1,  0.05], # Share of females of each age who are actively seeking marriage if underpartnered
+                [ 0,  0,  0.01,  0.01,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.2, 0.2, 0.1,  0.05]] # Share of males of each age who are actively seeking marriage if underpartnered
             ),
             c=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,    55,    60,    65,    70,    75],
-                [ 0,  0,  0.10,   0.7,  0.8,  0.6,  0.6,  0.4,   0.1,  0.05, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001], # Share of females of each age newly having casual relationships
-                [ 0,  0,  0.05,   0.7,  0.8,  0.6,  0.6,  0.4,   0.4,   0.3,   0.1,  0.05,  0.01,  0.01, 0.001, 0.001]], # Share of males of each age newly having casual relationships
+                [ 0,  0,  0.10,   0.7,  0.8,  0.6,  0.6,  0.4,   0.1,  0.05, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001], # Share of females of each age actively seeking casual relationships if underpartnered
+                [ 0,  0,  0.05,   0.7,  0.8,  0.6,  0.6,  0.4,   0.4,   0.3,   0.2,  0.2,  0.1,  0.05, 0.01, 0.01]], # Share of males of each age actively seeking casual relationships if underpartnered
             ),
             o=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  0.01,  0.05, 0.05, 0.04, 0.03, 0.02,  0.01,  0.01,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age having one-off relationships
-                [ 0,  0,  0.01,  0.01, 0.01, 0.02, 0.03, 0.04,  0.05,  0.05,  0.03, 0.02, 0.01, 0.01, 0.01, 0.01]], # Share of males of each age having one-off relationships
+                [ 0,  0,  0.01,  0.05, 0.05, 0.04, 0.03, 0.02,  0.01,  0.01,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age actively seeking one-off relationships if underpartnered
+                [ 0,  0,  0.01,  0.01, 0.01, 0.02, 0.03, 0.04,  0.05,  0.05,  0.03, 0.02, 0.01, 0.01, 0.01, 0.01]], # Share of males of each age actively seeking one-off relationships if underpartnered
             ),
         )
 
