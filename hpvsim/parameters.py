@@ -63,10 +63,11 @@ def make_pars(**kwargs):
     pars['hiv_pars']        = sc.objdict()  # Can be directly modified by passing in arguments listed in hiv_pars
 
     # Network parameters, generally initialized after the population has been constructed
-    pars['n_clusters']    = 1     # Defines how many clusters (e.g., geospatial) there should be in the simulated population
-    pars['mixing_steps']= None  # List of relative mixing weights between clusters by relative distance, length = n_clusters - 1, elements should be [0, 1].
+    pars['n_clusters']      = 1     # Defines how many clusters (e.g., geospatial) there should be in the simulated population
+    pars['mixing_steps']    = None  # List of relative mixing weights between clusters by relative distance, length = n_clusters - 1, elements should be [0, 1].
     # E.g, for 3 clusters, mixing_steps=[1,1] means full mixing; mixing_steps = [0, 0] means no between cluster mixing.
-    pars['add_mixing']       = None  # Mixing matrix between clusters
+    pars['add_mixing']      = None  # Mixing matrix between clusters
+    pars['pfa']             = 0     # Switch for partnership formation algorithms
     pars['clustered_risk']  = 1     # Strength of relationship between rel_sev and clustering, where 1 means there is no relationship and values above 1 refer to how much more similar clusters are wrt rel_sev
     pars['cluster_rel_sev'] = None  # Array of cluster-specific rel_sev values
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible

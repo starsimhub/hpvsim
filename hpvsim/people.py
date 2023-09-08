@@ -447,7 +447,7 @@ class People(hpb.BasePeople):
                 sexes=self.sex, ages=self.age, debuts=self.debut, is_female=self.is_female, is_active=self.is_active,
                 mixing=mixing[lkey], layer_probs=layer_probs[lkey], cross_layer=cross_layer,
                 pref_weight=pref_weight, durations=dur_pship[lkey], acts=acts[lkey], age_act_pars=age_act_pars[lkey],
-                cluster=self.cluster, add_mixing=self.pars['add_mixing']
+                cluster=self.cluster, add_mixing=self.pars['add_mixing'], pfa=self.pars['pfa']
             )
             new_pships[lkey], current_partners, new_pship_inds, new_pship_counts = hppop.make_contacts(**pship_args)
 

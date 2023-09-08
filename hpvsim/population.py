@@ -116,7 +116,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
                     pref_weight=100, durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey],
-                    cluster=cluster, add_mixing=sim['add_mixing'], **kwargs
+                    cluster=cluster, add_mixing=sim['add_mixing'], pfa=sim['pfa'], **kwargs
                 )
                 lno += 1
 
@@ -272,7 +272,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
 
 
 def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
-                        layer_probs, pref_weight, cross_layer, cluster, add_mixing):
+                        layer_probs, pref_weight, cross_layer, cluster, add_mixing, pfa):
     '''
     Create partnerships for a single layer
     Args:
@@ -432,7 +432,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
                   sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
                   mixing=None, layer_probs=None, cross_layer=None,
                   pref_weight=None, durations=None, acts=None, age_act_pars=None,
-                  cluster=None, add_mixing=None):
+                  cluster=None, add_mixing=None, pfa=None):
     '''
     Make contacts for a single layer as an edgelist. This will select sexually
     active male partners for sexually active females using age structure if given.
@@ -441,7 +441,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
     # Create edgelist
     f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(
         lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
-        layer_probs, pref_weight, cross_layer, cluster, add_mixing)
+        layer_probs, pref_weight, cross_layer, cluster, add_mixing, pfa)
 
     # Convert edgelist into Contacts dict, with info about each partnership's duration,
     # coital frequency, etc
