@@ -1,4 +1,4 @@
-﻿,param_name,param_type,base_value,lower_bound,upper_bound,Notes
+﻿,param_name,param_type,default_value,lower_bound,upper_bound,Notes
 0,n_agents,numeric,10000,1000,15000,Assume
 1,total_pop,other,,,,
 2,pop_scale,numeric,68887.4653,,,
