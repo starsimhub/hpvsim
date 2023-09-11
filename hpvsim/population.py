@@ -383,7 +383,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
             these_m_contacts = hpu.binomial_filter(layer_probs[2][ab], m_eligible_inds[age_bins_m == ab])  # Select males according to their participation rate in this layer
             m += these_m_contacts.tolist()
 
-        if len(f) and len(m):
+        if len(f) > 0 and len(m) > 0:
             # Create preference matrix between eligible females and males that combines age and additional mixing
             age_bins_f = np.digitize(age[f], bins=bins) - 1  # Age bins of participating females
             age_bins_m = np.digitize(age[m], bins=bins) - 1  # Age bins of participating males
@@ -413,10 +413,12 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                     f_paired_bools[fem] = False # Mark females that don't get paired this timestep
             m = selected_males[~np.isnan(selected_males)].astype(int) # Remove males that don't get paired
             f = np.array(f)[f_paired_bools] # Remove females that don't get paired
-
+        else:
+            f = []
+            m = []
     # Count how many contacts there actually are
     new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
-    if len(new_pship_inds):
+    if len(new_pship_inds) > 0:
         current_partners[lno, new_pship_inds] += new_pship_counts
 
     f_paired = np.array(f)

@@ -13,7 +13,7 @@ import pandas as pd
 do_plot = 1
 do_save = 0
 base_pars = {
-    'n_agents': 20e3,
+    'n_agents': 2e4,
     'start': 1970,
     'end': 2020,
     'location': 'nigeria'
