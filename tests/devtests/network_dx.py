@@ -13,7 +13,7 @@ import pandas as pd
 do_plot = 1
 do_save = 0
 base_pars = {
-    'n_agents': 10e3,
+    'n_agents': 20e3,
     'start': 1970,
     'end': 2020,
     'location': 'nigeria'
@@ -171,10 +171,10 @@ def plot_mixing(df_new_pairs):
 
 def cluster_demo():
     sc.heading('Cluster test')
-    # Default: well-mixed (1 geo cluster)
+    # Default: well-mixed (1 cluster)
     sim0 = hpv.Sim(pars=base_pars)
     assert sim0['n_clusters'] == 1
-    # Multiple geo clusters
+    # Multiple clusters
     pars1 = base_pars
     pars1['n_clusters'] = 10
     pars1['mixing_steps'] = np.repeat(1,9)
