@@ -8,6 +8,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.2.3 (2023-09-11)
+---------------------------
+- Improved network updating, adds clustering functionality
+- *Github info* PR `607 <https://github.com/amath-idm/hpvsim/pull/607>`__
+
 Version 1.2.2 (2023-08-11)
 ---------------------------
 - Improved tests and included ``conda`` environment specification.
