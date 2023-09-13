@@ -299,7 +299,6 @@ class BaseSim(ParsObj):
             if pars.get('n_clusters'):
                 if not create:
                     pars = sc.mergedicts(pars, {'sev_dist':self['sev_dist']})
-
                 hppar.add_mixing(pars)
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)

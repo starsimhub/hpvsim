@@ -743,23 +743,34 @@ def compute_severity_integral(t, rel_sev=None, pars=None):
     return output
 
 def add_mixing(pars):
-    # create geo mixing preference matrix
-    # TODO: need to deal with custom input of geo mixing matrix
-    cluster_size = int(pars['n_clusters'])
-    add_mixing = np.zeros([cluster_size, cluster_size])
+    '''
+    Create additional mixing matrix
+    '''
+    cluster_size = pars['n_clusters']
 
-#    if pars.get('geo_mixing_steps'):
-    if pars['mixing_steps'] is not None:
-        if cluster_size < len(pars['mixing_steps']):
-            print('Warning: input has {} mixing steps but only {} clusters.'.format(len(pars['mixing_steps']), cluster_size))
-        for i, gs in enumerate(pars['mixing_steps'][:cluster_size - 1]):
-            add_mixing += np.diagflat(np.repeat(gs, cluster_size - i - 1), i + 1)
-        add_mixing += add_mixing.T
-
-    add_mixing[np.diag_indices_from(add_mixing)] = 1  # set diagonal to 1
-    pars['add_mixing'] = add_mixing
+    if cluster_size > 1:
+        if 'add_mixing' in pars and pars['add_mixing'] is not None: # If mixing matrix is defined, check if dimension matches n_clusters
+            if pars['add_mixing'].shape != (cluster_size, cluster_size):
+                errormsg = f'dimension of input mixing matrix does not match number of clusters'
+                raise ValueError(errormsg)
+        else: # if mixing matrix is not defined, autogenerate based on mixing_steps
+            if 'mixing_steps' not in pars or pars['mixing_steps'] is None:  # if mixing_steps is not supplied, assume well-mixed
+                print('Warning: input has clusters with no mixing_steps or mixing matrix. Well-mixed cluster is assumed')
+                pars['n_clusters'] = 1
+            else:
+                if cluster_size < len(pars['mixing_steps']):
+                    print('Warning: input has {} mixing steps but only {} clusters.'.format(len(pars['mixing_steps']), cluster_size))
+                add_mixing = np.zeros([cluster_size, cluster_size])
+                for i, gs in enumerate(pars['mixing_steps'][:cluster_size - 1]):
+                    add_mixing += np.diagflat(np.repeat(gs, cluster_size - i - 1), i + 1) # fill the lower diagonal
+                add_mixing += add_mixing.T # fill the upper diagonal
+                add_mixing[np.diag_indices_from(add_mixing)] = 1  # set diagonal to 1
+                pars['add_mixing'] = add_mixing
+    if cluster_size == 1:
+        pars['add_mixing'] = np.array([[1]])
 
     if 'sev_dist' in pars:
         rel_sevs = hpu.sample(**pars['sev_dist'], size=cluster_size)
         pars['cluster_rel_sev'] = rel_sevs
+
     return
