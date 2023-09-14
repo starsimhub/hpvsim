@@ -328,7 +328,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                     age_bins_f == ab])  # Select females according to their participation rate in this layer
                 f_cl += these_f_contacts.tolist()
             if len(f_cl):
-                m_eligible_inds = hpu.true(m_eligible * (cluster==cl)) # Inds of all eligible males in this cluster
+                m_eligible_inds = hpu.true(m_eligible) # Inds of all eligible males across clusters
                 age_bins_m = np.digitize(age[m_eligible_inds], bins=bins) - 1 # Age bins of eligible males
                 bin_range_m = np.unique(age_bins_m)  # Range of bins
                 m_cl = []  # Initialize the male partners
@@ -345,12 +345,11 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                 f_selected = []
                 m_selected = []
                 for ab, nm in zip(bin_range_f[bin_order], males_needed[bin_order]):  # Loop through the age bins of females and the number of males needed for each
-                    male_dist = mixing[:, ab + 1]/2  # Get the distribution of ages of the male partners of females of this age
+                    male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
                     # Weight males according to the preferences of females of this age
                     this_weighting = m_probs[m_cl] * male_dist[age_bins_m] * add_mixing[cl, cluster[m_cl]]
                     if this_weighting.sum() > 0:
-                        this_weighting_norm = this_weighting / this_weighting.sum()
-                        males_nonzero = hpu.true(this_weighting_norm)  # Remove males with 0 weights
+                        males_nonzero = hpu.true(this_weighting)  # Remove males with 0 weights
                         this_weighting_nonzero = this_weighting[males_nonzero]
                         f_inds = np.array(f_cl)[hpu.true(age_bins_f == ab)]  # inds of participating females in this age bin
                         if nm > len(this_weighting_nonzero):
