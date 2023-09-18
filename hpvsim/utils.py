@@ -541,6 +541,30 @@ def choose_m(probs): #
 
     return choices
 
+def assign_groups(n, group_sizes):
+    '''
+    Assign n individuals to differently-sized groups.
+
+    Args:
+        n (int): number of individuals
+        group_sizes (array): relative group sizes
+
+    **Example**:
+
+        group_assignment = hpv.assign_groups(100, [0.2, 0.8]) # assign 100 individuals to two groups of 20 and 80.
+    '''
+    # Check if the sum of group sizes is approximately 1
+    if not np.isclose(np.sum(group_sizes), 1, rtol = 1e-9):
+        raise ValueError("Group sizes should sum to approximately 1")
+
+    # Calculate cumulative probabilities
+    cum_probs = np.cumsum(group_sizes)
+
+    # Generate n random numbers for binary search
+    rands = np.random.random(n)
+
+    return np.searchsorted(cum_probs, rands)
+
 
 
 #%% Simple array operations

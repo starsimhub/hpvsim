@@ -64,6 +64,7 @@ def make_pars(**kwargs):
 
     # Network parameters, generally initialized after the population has been constructed
     pars['n_clusters']      = 1     # Defines how many clusters (e.g., geospatial) there should be in the simulated population
+    pars['cluster_rel_sizes']= None  # Relative sizes of clusters. If None, assign 1/n_clusters to all clusters.
     pars['mixing_steps']    = None  # List of relative mixing weights between clusters by relative distance, length = n_clusters - 1, elements should be [0, 1].
     # E.g, for 3 clusters, mixing_steps=[1,1] means full mixing; mixing_steps = [0, 0] means no between cluster mixing.
     pars['add_mixing']      = None  # Mixing matrix between clusters
@@ -748,15 +749,23 @@ def add_mixing(pars):
     '''
     cluster_size = pars['n_clusters']
 
+    if 'cluster_rel_sizes' not in pars or pars['cluster_rel_sizes'] is None:
+        pars['cluster_rel_sizes'] = np.repeat(1/pars['n_clusters'], pars['n_clusters'])
+
+    if pars['cluster_rel_sizes'].size != pars['n_clusters']:
+        errormsg = 'Length of cluster sizes does not match number of clusters'
+        raise ValueError(errormsg)
+
     if cluster_size > 1:
         if 'add_mixing' in pars and pars['add_mixing'] is not None: # If mixing matrix is defined, check if dimension matches n_clusters
             if pars['add_mixing'].shape != (cluster_size, cluster_size):
-                errormsg = f'dimension of input mixing matrix does not match number of clusters'
+                errormsg = 'Dimension of input mixing matrix does not match number of clusters'
                 raise ValueError(errormsg)
         else: # if mixing matrix is not defined, autogenerate based on mixing_steps
             if 'mixing_steps' not in pars or pars['mixing_steps'] is None:  # if mixing_steps is not supplied, assume well-mixed
                 print('Warning: input has clusters with no mixing_steps or mixing matrix. Well-mixed cluster is assumed')
                 pars['n_clusters'] = 1
+                pars['cluster_rel_sizes'] = np.array([1])
             else:
                 if cluster_size < len(pars['mixing_steps']):
                     print('Warning: input has {} mixing steps but only {} clusters.'.format(len(pars['mixing_steps']), cluster_size))
