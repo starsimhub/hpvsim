@@ -25,7 +25,7 @@ class new_pairs_snap(hpv.Analyzer):
     # analyzer for recording new partnerships of each timestep
     def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
-        self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype'])
+        self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype', 'cluster'])
         self.start_year = start_year
         self.yearvec = None
 
@@ -55,7 +55,7 @@ def run_network(clusters, mixing_steps, start, end, pop):
     )
     snaps = []
     new_pairs = new_pairs_snap(start_year = 2012)
-    df_new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype', 'sim'])
+    df_new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype', 'cluster', 'sim'])
     fig0, axes = pl.subplots(2, 1)
     for i, (n_clusters, mixing) in enumerate(zip(clusters, mixing_steps)):
         pars = dict(
@@ -127,7 +127,7 @@ def run_network(clusters, mixing_steps, start, end, pop):
         xx = people.lag_bins[1:15] * sim['dt']
         for cn, lkey in enumerate(['m', 'c', 'o']):
             ax = axes[i,cn]
-            yy = people.rship_lags[lkey][:14] / sum(people.rship_lags[lkey])
+            yy = people.rship_lags[lkey][:14] / people.rship_lags[lkey].sum()
             ax.bar(xx, yy, width=0.2)
             ax.set_xlabel(f'Time between {types[cn]} relationships')
         axes[i,0].set_ylabel(labels[i])
@@ -168,6 +168,24 @@ def plot_mixing(df_new_pairs):
             fig.subplots_adjust(top=0.9, left=0.1, bottom=0.1, right=0.75)
             fig.show()
 
+            # plot mixing by cluster
+            fig, ax = pl.subplots(nrows=nr, ncols=nc, sharex=True, sharey=True, figsize=(15, 12))
+            for j, year in enumerate(df_new_pairs.year.unique()):
+                df_year = df[df['year'] == year]
+                fc = df_year.cluster_f  # Get the cluster of female contacts in marital partnership
+                mc = df_year.cluster_m  # Get the cluster of male contacts in marital partnership
+                cluster_range = int(fc.max()+1)
+                h = ax[j // nc, j % nc].hist2d(fc, mc, bins=(cluster_range,cluster_range), density=False,
+                                               norm=mpl.colors.LogNorm())
+                ax[j // nc, j % nc].set_title(year)
+            fig.colorbar(h[3], ax=ax)
+            fig.text(0.5, 0.04, 'Cluster of female partner', ha='center', fontsize=24)
+            fig.text(0.04, 0.5, 'Cluster of male partner', va='center', rotation='vertical', fontsize=24)
+            fig.suptitle(rtype, fontsize=24)
+            fig.tight_layout(h_pad=0.5)
+            fig.subplots_adjust(top=0.9, left=0.1, bottom=0.1, right=0.75)
+            fig.show()
+
 
 def cluster_demo():
     sc.heading('Cluster test')
@@ -187,17 +205,25 @@ def cluster_demo():
     print(sim2['add_mixing'])
 
 
+    sim0.run()
+    sim0.plot()
+    sim1.run()
+    sim1.plot()
+    sim2.run()
+    sim2.plot()
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
     clusters = [2, 10]
-    mixing_steps = [[1], np.repeat(1,9)]
+    mixing_steps = [[0.1], [0.9,0.5,0.1]]
     start = 1970
     end = 2020
-    pop = 20e3
+    pop = 2e4
     run_network(clusters, mixing_steps, start, end, pop)
-    cluster_demo()
+    #cluster_demo()
     sc.toc(T)
     print('Done.')

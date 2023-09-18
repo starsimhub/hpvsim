@@ -336,7 +336,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                         else:
                             f_selected = f_inds.tolist()
                         m_selected = np.array(m_cl)[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]].tolist()  # Select males based on mixing weights
-                        #m_probs[m_selected] = 0 # remove males that get partnered
+                        m_probs[m_selected] = 0 # remove males that get partnered
                     m += m_selected # save selected males
                     f += f_selected
 
@@ -449,6 +449,8 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
         output['acts'] = scaled_acts
         output['start'] = np.array([tind] * n_partnerships, dtype=hpd.default_float)
         output['end'] = output['start'] + output['dur']
+        output['cluster_f'] = cluster[f]
+        output['cluster_m'] = cluster[m]
 
     return output, current_partners, new_pship_inds, new_pship_counts
 
