@@ -176,17 +176,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
     cluster         = hpu.assign_groups(new_n, pars['cluster_rel_sizes'])
-
-    if pars['clustered_risk'] > 1: # Clustering relative severity by cluster
-        rel_sev     = np.zeros((new_n))
-        rel_sevs    = pars['cluster_rel_sev']
-        # For each unique cluster, draw rel_sev values from a rel_sev dist with adjusted SD based upon degree of clustering
-        for ig, rs in enumerate(rel_sevs):
-            rel_sev_cluster = hpu.sample(**sc.mergedicts(pars['sev_dist'], {'par1': rs, 'par2': pars['sev_dist']['par2']/pars['clustered_risk']}),
-                                         size=len(hpu.true(cluster==ig)))
-            rel_sev[cluster==ig] = rel_sev_cluster
-    else:
-        rel_sev     = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
+    rel_sev     = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
 
     return uid, sex, debut, rel_sev, partners, cluster
 
