@@ -82,7 +82,7 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']                = 0.35   # Per-act transmission probability; absolute value, calibrated
+    pars['beta']                = 0.2   # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
     pars['eff_condoms']         = 0.7   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
@@ -176,7 +176,7 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     # Specify defaults for basic sexual network with marital, casual, and one-off partners
     layer_defaults['default'] = dict(
         partners    = dict(m=dict(dist='poisson', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
-                           c=dict(dist='poisson', par1=0.1), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
+                           c=dict(dist='poisson', par1=0.2), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
                            o=dict(dist='poisson', par1=0.0),), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 one-off partner at a time. Can be set to zero since these relationships only last a single timestep
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts per year for people at sexual peak
                             c=dict(dist='neg_binomial', par1=10, par2=5), # Default number of acts per year for people at sexual peak
@@ -534,19 +534,19 @@ def get_mixing(network=None):
 
         layer_probs = dict(
             m=np.array([
-                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,     70,     75],
-                [ 0,  0,  0.04,   0.1,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.1,   0.05,  0.01,  0.005], # Share of females of each age who are actively seeking marriage if underpartnered
-                [ 0,  0,  0.01,  0.01,  0.1,  0.5,  0.5,  0.5,   0.5,   0.5,   0.4,  0.2,  0.05,  0.01,  0.01,  0.005]] # Share of males of each age who are actively seeking marriage if underpartnered
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.04,   0.1,  0.1,  0.5,  0.6,  0.7,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are actively seeking marriage if underpartnered
+                [ 1,  1,     1,     1,    1,    1,    1,    1,     1,     1,     1,    1,    1,    1,    1,    1]] # Share of males of each age who are actively seeking marriage if underpartnered
             ),
             c=np.array([
-                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,    55,    60,    65,    70,    75],
-                [ 0,  0,  0.10,   0.7,  0.8,  0.6,  0.6,  0.4,   0.1,  0.05, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001], # Share of females of each age actively seeking casual relationships if underpartnered
-                [ 0,  0,  0.05,   0.7,  0.8,  0.6,  0.6,  0.4,   0.4,   0.3,   0.2,  0.2,  0.1,   0.05,  0.01,  0.01]], # Share of males of each age actively seeking casual relationships if underpartnered
+                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
+                [ 0,  0,  0.10,   0.7,  0.8,  0.6,  0.6,  0.4,   0.1,  0.05,  0.001, 0.001, 0.001, 0.001, 0.001, 0.001], # Share of females of each age actively seeking casual relationships if underpartnered
+                [ 1,  1,     1,     1,    1,    1,    1,    1,     1,     1,     1,    1,    1,    1,    1,    1]] # Share of males of each age actively seeking casual relationships if underpartnered
             ),
             o=np.array([
                 [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
                 [ 0,  0,  0.01,  0.05, 0.05, 0.04, 0.03, 0.02,  0.01,  0.01,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01], # Share of females of each age actively seeking one-off relationships if underpartnered
-                [ 0,  0,  0.01,  0.01, 0.01, 0.02, 0.03, 0.04,  0.05,  0.05,  0.03, 0.02, 0.01, 0.01, 0.01, 0.01]], # Share of males of each age actively seeking one-off relationships if underpartnered
+                [ 1,  1,     1,     1,    1,    1,    1,    1,     1,     1,     1,    1,    1,    1,    1,    1]] # Share of males of each age actively seeking one-off relationships if underpartnered
             ),
         )
 

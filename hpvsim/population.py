@@ -359,7 +359,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                         else:
                             f_selected = f_inds.tolist()
                         m_selected = np.array(m_cl)[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]].tolist()  # Select males based on mixing weights
-                        m_probs[m_selected] = 0 # remove males that get partnered
+                        #m_probs[m_selected] = 0 # remove males that get partnered
                     m += m_selected # save selected males
                     f += f_selected
 
