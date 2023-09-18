@@ -565,7 +565,23 @@ def assign_groups(n, group_sizes):
 
     return np.searchsorted(cum_probs, rands)
 
+def participation_filter(inds, age, layer_probs, bins):
+    '''
+    Assign n individuals to differently-sized groups.
 
+    Args:
+        inds (array): indicies of individuals to be filtered
+        age (array): age of all individuals
+        layer_probs (array): participation rates
+
+    '''
+    age_bins = np.digitize(age[inds], bins=bins) - 1  # Age bins of individuals
+    bin_range = np.unique(age_bins)  # Range of bins
+    participating_inds = []  # Initialize the female partners in this cluster
+    for ab in bin_range:  # Loop over age bins
+        these_f_contacts = binomial_filter(layer_probs[ab], inds[age_bins == ab])  # Select females according to their participation rate in this layer
+        participating_inds += these_f_contacts.tolist()
+    return participating_inds
 
 #%% Simple array operations
 

@@ -115,7 +115,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                     lno=lno, tind=0, partners=partners[lno,:], current_partners=current_partners,
                     sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
-                    pref_weight=100, durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey],
+                    durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey],
                     cluster=cluster, add_mixing=sim['add_mixing'], pfa=sim['pfa'], **kwargs
                 )
                 lno += 1
@@ -261,7 +261,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
 
 
 def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
-                        layer_probs, pref_weight, cross_layer, cluster, add_mixing, pfa):
+                        layer_probs, cross_layer, cluster, add_mixing, pfa):
     '''
     Create partnerships for a single layer
     Args:
@@ -273,7 +273,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
         is_active           (bool arr): whether or not people are sexually active
         is_female           (bool arr): whether each person is female
         layer_probs         (float arr): participation rates in this layer by age and sex
-        pref_weight         (float): weight that determines the extent to which people without their preferred number of partners are preferenced for selection
         cross_layer         (float): proportion of agents that have cross-layer relationships
         cluster             (int arr): array containing each agent's cluster id
         add_mixing          (float arr): additional mixing matrix
@@ -309,23 +308,12 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
             f_inds_to_remove = []  # list of female inds to remove if no male partners are found for her
             # Try randomly select females for pairing
             f_eligible_inds = hpu.true(f_eligible * (cluster==cl))  # Inds of all eligible females in this cluster
-            age_bins_f = np.digitize(age[f_eligible_inds], bins=bins) - 1  # Age bins of eligible females
-            bin_range_f = np.unique(age_bins_f)  # Range of bins
-            f_cl = []  # Initialize the female partners in this cluster
-            for ab in bin_range_f:  # Loop over age bins
-                these_f_contacts = hpu.binomial_filter(layer_probs[1][ab], f_eligible_inds[
-                    age_bins_f == ab])  # Select females according to their participation rate in this layer
-                f_cl += these_f_contacts.tolist()
+            f_cl = hpu.participation_filter(f_eligible_inds, age, layer_probs[1, :], bins=layer_probs[0, :])
             if len(f_cl):
                 m_eligible_inds = hpu.true(m_eligible) # Inds of all eligible males across clusters
-                age_bins_m = np.digitize(age[m_eligible_inds], bins=bins) - 1 # Age bins of eligible males
-                bin_range_m = np.unique(age_bins_m)  # Range of bins
-                m_cl = []  # Initialize the male partners
-                for ab in bin_range_m:
-                    these_m_contacts = hpu.binomial_filter(layer_probs[2][ab], m_eligible_inds[age_bins_m == ab])  # Select males according to their participation rate in this layer
-                    m_cl += these_m_contacts.tolist()
+                m_cl = hpu.participation_filter(m_eligible_inds, age, layer_probs[2, :], bins=layer_probs[0, :])
                 # Draw male partners based on mixing matrices
-                age_bins_f = np.digitize(age[f_cl], bins=bins) - 1  # Age bins of females that are entering new relationships
+                age_bins_f = np.digitize(age[f_cl], bins=bins) - 1  # Age bins of participating females
                 age_bins_m = np.digitize(age[m_cl], bins=bins) - 1  # Age bins of participating males
                 bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
                 # shuffle age bins
@@ -419,7 +407,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
 def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
                   sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
                   mixing=None, layer_probs=None, cross_layer=None,
-                  pref_weight=None, durations=None, acts=None, age_act_pars=None,
+                  durations=None, acts=None, age_act_pars=None,
                   cluster=None, add_mixing=None, pfa=None):
     '''
     Make contacts for a single layer as an edgelist. This will select sexually
@@ -429,7 +417,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
     # Create edgelist
     f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(
         lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
-        layer_probs, pref_weight, cross_layer, cluster, add_mixing, pfa)
+        layer_probs, cross_layer, cluster, add_mixing, pfa)
 
     # Convert edgelist into Contacts dict, with info about each partnership's duration,
     # coital frequency, etc
