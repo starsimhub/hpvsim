@@ -68,7 +68,6 @@ def make_pars(**kwargs):
     pars['mixing_steps']    = None  # List of relative mixing weights between clusters by relative distance, length = n_clusters - 1, elements should be [0, 1].
     # E.g, for 3 clusters, mixing_steps=[1,1] means full mixing; mixing_steps = [0, 0] means no between cluster mixing.
     pars['add_mixing']      = None  # Mixing matrix between clusters
-    pars['pfa']             = 0     # Switch for partnership formation algorithms; use 0 for small number of clusters, 1 for large number of clusters (e.g., n_clusters/n_agents > 0.05)
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
     pars['cross_layer']     = 0.05  # Proportion of agents who have concurrent cross-layer relationships
