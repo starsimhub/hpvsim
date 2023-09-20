@@ -8,6 +8,17 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+
+Version 1.2.4 (2023-09-19)
+---------------------------
+- Fixes Matplotlib regression in plotting.
+- *Github info* PR `609 <https://github.com/amath-idm/hpvsim/pull/609>`__
+
+Version 1.2.3 (2023-08-30)
+---------------------------
+- Updates data loading to be much more efficient.
+- *Github info* PR `604 <https://github.com/amath-idm/hpvsim/pull/604>`__
+
 Version 1.2.2 (2023-08-11)
 ---------------------------
 - Improved tests and included ``conda`` environment specification.

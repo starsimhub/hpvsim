@@ -488,7 +488,7 @@ def plot_type_bars(sim, ax, date, args):
     # Plot bars
     for bar_no in range(n_bars_per_group):
         ydata = [resdict[k][bar_no] for k in range(n_groups)]  # Have to rearrange
-        ax.bar(xpositions[bar_no], ydata, **args.bar, label=g_labels[bar_no])
+        ax.bar(xpositions[bar_no], ydata, **args.bar, label=f'{g_labels[bar_no]}') # Fix Matplotlib 3.8 bug with numeric labels
 
     # Add xticks on the middle of the group bars
     ax.set_xticks([r + width for r in range(len(x))], labels)
