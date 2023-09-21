@@ -16,7 +16,7 @@ import sys
 import numpy as np
 import pandas as pd
 import sciris as sc
-from hpvsim.data import loaders
+from hpvsim.data import loaders as ld
 
 # Set parameters
 data_version = '1.3' # Data version
@@ -28,11 +28,11 @@ base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standar
 years = ['1950-2021', '2022-2100']
 
 
-thisdir = sc.thispath()
-filesdir = thisdir / 'files'
-
 __all__ = ['get_data', 'quick_download', 'check_downloaded', 'remove_data']
 
+
+# Define here to optionally be overwritten
+filesdir = ld.filesdir
 
 def set_filesdir(path):
     ''' Used to change the file folder '''
@@ -210,7 +210,7 @@ def check_downloaded(verbose=1, check_version=True):
 
     # Do file checks
     exists = dict()
-    for key,fn in loaders.files.items():
+    for key,fn in ld.files.items():
         exists[key] = os.path.exists(fn)
         if verbose>1:
             print(f'HPVsim data: checking {fn}: {exists[key]}')
@@ -222,7 +222,7 @@ def check_downloaded(verbose=1, check_version=True):
 
     # Do version check (if files exist)
     if ok and check_version:
-        metadata = sc.loadjson(loaders.files.metadata)
+        metadata = sc.loadjson(ld.files.metadata)
         match = metadata['version'] == data_version
         if verbose:
             if not match and verbose:
@@ -237,7 +237,7 @@ def check_downloaded(verbose=1, check_version=True):
 def remove_data(verbose=True, **kwargs):
     ''' Remove downloaded data; arguments passed to sc.rmpath() '''
     if verbose: sc.heading('Removing HPVsim data files')
-    for key,fn in loaders.files.items():
+    for key,fn in ld.files.items():
         sc.rmpath(fn, verbose=verbose, **kwargs)
     if verbose: print('Data files removed.')
     return
