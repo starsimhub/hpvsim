@@ -8,6 +8,10 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.2.5 (2023-09-21)
+---------------------------
+- Fixes file path when run via Jupyter.
+- *Github info* PR `610 <https://github.com/amath-idm/hpvsim/pull/610>`__
 
 Version 1.2.4 (2023-09-19)
 ---------------------------
