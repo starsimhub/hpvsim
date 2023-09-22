@@ -169,7 +169,6 @@ class PeopleMeta(sc.prettyobj):
             State('dur_infection',      default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present. Defined for males and females. For females, dur_infection = dur_episomal + dur_transformed. For males, it's taken from a separate distribution
             State('dur_precin',         default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV prior to precancerous changes
             State('dur_cin',            default_float, np.nan, shape='n_genotypes'), # Length of time that a person has precancerous changes
-            State('dur_episomal',       default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
             State('dur_transformed',    default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
             State('dur_cancer',         default_float, np.nan, shape='n_genotypes'), # Duration of cancer
         ]

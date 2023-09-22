@@ -210,18 +210,21 @@ class People(hpb.BasePeople):
 
         # Set length of infection, which is moderated by any prior cell-level immunity
         sev_imm = self.sev_imm[g, inds]
-        age_mod = np.ones(len(inds))
-        age_mod[self.age[inds]>= self.pars['age_risk']['age']] = self.pars['age_risk']['risk']
-        self.dur_episomal[g, inds]  = hpu.sample(**gpars['dur_episomal'], size=len(inds))*(1-sev_imm)*age_mod
-        self.dur_infection[g, inds]  = self.dur_episomal[g, inds]
 
         # Determine how long before precancerous cell changes
-        dur_precin = hpu.sample(**gpars['dur_precin'], size=len(inds)) # Sample from distribution
-        cin_bools = self.dur_episomal[g, inds] > dur_precin # Pull out those whose infection is long enough for precancer
+        dur_precin = hpu.sample(**gpars['dur_precin'], size=len(inds))*(1-sev_imm) # Sample from distribution
+        self.dur_infection[g, inds] = dur_precin
+        cin_probs = hppar.compute_severity(dur_precin, rel_sev=self.rel_sev[inds], pars=gpars['cin_fn'])
+        cin_bools = hpu.binomial_arr(cin_probs)
         cin_inds = inds[cin_bools]
         nocin_inds = inds[~cin_bools]
-        self.dur_precin[g, inds] = np.minimum(self.dur_episomal[g, inds], dur_precin)
-        self.dur_cin[g, cin_inds] = self.dur_episomal[g, cin_inds] - self.dur_precin[g, cin_inds]
+
+        age_mod = np.ones(len(cin_inds))
+        age_mod[self.age[cin_inds] >= self.pars['age_risk']['age']] = self.pars['age_risk']['risk']
+        sev_imm = self.sev_imm[g, cin_inds]
+        self.dur_cin[g, cin_inds] = hpu.sample(**gpars['dur_cin'], size=len(cin_inds)) * (1 - sev_imm) * age_mod
+        self.dur_precin[g, inds] = dur_precin
+        self.dur_infection[g, cin_inds] += self.dur_cin[g, cin_inds]
 
         # Set date of clearance for those who don't develop precancer
         self.date_clearance[g, nocin_inds] = self.t + sc.randround(self.dur_precin[g, nocin_inds]/dt)
@@ -250,7 +253,6 @@ class People(hpb.BasePeople):
         if set_sev: self.sev[g, inds] = 0 # For those who develop dysplasia, sev begins at 0 on their first day of infection
 
         # Calculate the integral of severity for each woman
-        dur_episomal = self.dur_episomal[g, inds]
         dur_cin = self.dur_cin[g, inds]
         if gpars['sev_integral']=='analytic':
             sevs = hppar.compute_severity_integral(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['sev_fn'])  # Calculate analytic integral of cumulative severity
@@ -282,9 +284,8 @@ class People(hpb.BasePeople):
 
             # Create extra disease severity values for the extra agents
             full_size = (len(inds), n_extra)  # Main axis is indices, but include columns for multiscale agents
-            extra_dur_episomal = hpu.sample(**gpars['dur_episomal'], size=full_size)
+            extra_dur_cin = hpu.sample(**gpars['dur_cin'], size=full_size)
             extra_dur_precin = hpu.sample(**gpars['dur_precin'], size=full_size)
-            extra_dur_cin = np.maximum(extra_dur_episomal - extra_dur_precin, 0)
             extra_rel_sevs = np.ones(full_size)*self.rel_sev[inds][:,None]
 
             if gpars['sev_integral'] == 'analytic':
@@ -328,15 +329,13 @@ class People(hpb.BasePeople):
                 # Add the new indices onto the existing vectors
                 inds = np.append(inds, new_inds)
                 is_transform = np.append(is_transform, np.full(len(new_inds), fill_value=True))
-                new_dur_episomal = extra_dur_episomal[:,1:][extra_transform_bools]
                 new_dur_precin = extra_dur_precin[:, 1:][extra_transform_bools]
                 new_dur_cin = extra_dur_cin[:, 1:][extra_transform_bools]
-                self.dur_episomal[g, new_inds] = new_dur_episomal
                 self.dur_precin[g, new_inds] = new_dur_precin
                 self.dur_cin[g, new_inds] = new_dur_cin
-                self.dur_infection[g, new_inds] = new_dur_episomal
+                self.dur_infection[g, new_inds] += new_dur_cin
                 self.date_infectious[g, new_inds] = self.t
-                dur_episomal = np.append(dur_episomal, new_dur_episomal)
+                dur_cin = np.append(dur_cin, new_dur_cin)
 
             # Finally, create an array for storing the transformation probabilities.
             # We've already figured out who's going to transform, so we fill the array with 1s for those who do.
@@ -353,7 +352,7 @@ class People(hpb.BasePeople):
         no_cancer_inds = inds[~is_transform]  # Indices of those who eventually heal lesion/clear infection
 
         # Set date of clearance for those who don't go to cancer
-        time_to_clear = dur_episomal[~is_transform]
+        time_to_clear = dur_cin[~is_transform]
         self.date_clearance[g, no_cancer_inds] = np.fmax(self.date_clearance[g, no_cancer_inds],
                                                          self.date_exposed[g, no_cancer_inds] +
                                                          sc.randround(time_to_clear / dt))
@@ -362,13 +361,13 @@ class People(hpb.BasePeople):
         # the end of episomal infection, while cancer is assumed to begin once severity
         # exceeds the cancer cutoff, which may mean that it begins as soon as transformation
         # happens, if severity is already above the threshold.
-        dur_episomal_transformed = dur_episomal[is_transform] # Duration of episomal infection for those who transform
-        self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_episomal_transformed/dt)
+        dur_cin_transformed = dur_cin[is_transform] # Duration of episomal infection for those who transform
+        self.date_transformed[g, transform_inds] = self.t + sc.randround(dur_cin_transformed/dt)
         time_to_cancer = hppar.compute_inv_severity(ccdict['cin3'], rel_sev=self.rel_sev[transform_inds], pars=gpars['sev_fn'])
 
         # Calculate duration of transformed infection. The minimum ensures that anyone who
         # transforms after they've already exceeded the severity cutoff goes straight to cancer
-        self.dur_transformed[g, transform_inds] = np.maximum(time_to_cancer - dur_episomal_transformed, 0)
+        self.dur_transformed[g, transform_inds] = np.maximum(time_to_cancer - dur_cin_transformed, 0)
         self.date_cancerous[g, transform_inds] = self.date_transformed[g, transform_inds] + sc.randround(self.dur_transformed[g, transform_inds]/dt)
         self.dur_infection[g, transform_inds] = self.dur_infection[g, transform_inds] + self.dur_transformed[g, transform_inds]
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(transform_inds))
