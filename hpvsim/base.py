@@ -612,7 +612,7 @@ class BaseSim(ParsObj):
         '''
         resdict = self.export_results(for_json=False)
         resdict = {k:v for k,v in resdict.items() if v.ndim == 1}
-        df = pd.DataFrame.from_dict(resdict)
+        df = sc.dataframe.from_dict(resdict)
         df['year'] = self.res_yearvec
         new_columns = ['t','year'] + df.columns[1:-1].tolist() # Get column order
         df = df.reindex(columns=new_columns) # Reorder so 't' and 'date' are first
@@ -641,7 +641,7 @@ class BaseSim(ParsObj):
         # Export parameters
         pars = {str(k):sc.dcp(v) for k,v in self.pars.items() if k not in skip_pars}
         pars['immunity_map'] = {str(k):v for k,v in pars['immunity_map'].items()}
-        par_df = pd.DataFrame.from_dict(sc.flattendict(pars, sep='_'), orient='index', columns=['Value'])
+        par_df = sc.dataframe.from_dict(sc.flattendict(pars, sep='_'), orient='index', columns=['Value'])
         par_df.index.name = 'Parameter'
 
         # Convert to spreadsheet
