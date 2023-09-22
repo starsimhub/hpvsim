@@ -1189,8 +1189,10 @@ class Sim(hpb.BaseSim):
         s = sc.odict()
         s['total infections'] = self.results['infections'].sum()
         s['total cancers']    = self.results['cancers'].sum()
-        s['mean age of infection'] = self.compute_age_mean('infections_by_age', t=t)
-        
+        s['mean prevalence (%)'] = self.results['hpv_prevalence'].mean()*100
+        s['mean cancer incidence (per 100k)'] = self.results['cancer_incidence'].mean()
+        s['mean age of infection (years)'] = self.compute_age_mean('infections_by_age', t=t)
+        s['mean age of cancer (years)'] = self.compute_age_mean('cancers_by_age', t=t)
 
         # Update the stored state
         if update:
