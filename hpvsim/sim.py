@@ -387,7 +387,6 @@ class Sim(hpb.BaseSim):
         # Do any precomputations for the genotype transformation functions
         t_step = self['dt']
         t_sequence = np.arange(0, upper_dysp_lim, t_step)
-        timesteps = t_sequence / t_step
         cumdysp = dict()
         for g in range(self['n_genotypes']):
             sev_fn = self['genotype_pars'][g]['sev_fn']
@@ -463,14 +462,14 @@ class Sim(hpb.BaseSim):
             results[f'n_{stock.name}_by_genotype']  = init_res(stock.label+' by genotype', n_rows=ng)
 
         # Only by-age stock result we will need is number infectious, susceptible, and with cin, for HPV and CIN prevalence/incidence calculations
-        results[f'n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
-        results[f'n_females_infectious_by_age']     = init_res('Number of females infectious by age', n_rows=na, color=stock.color)
-        results[f'n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
-        results[f'n_transformed_by_age']            = init_res('Number transformed by age', n_rows=na, color=stock.color)
-        results[f'n_precin_by_age']                 = init_res('Number Pre-CIN by age', n_rows=na, color=stock.color)
-        results[f'n_cin1_by_age']                   = init_res('Number CIN1 by age', n_rows=na, color=stock.color)
-        results[f'n_cin2_by_age']                   = init_res('Number CIN2 by age', n_rows=na, color=stock.color)
-        results[f'n_cin3_by_age']                   = init_res('Number CIN3 by age', n_rows=na, color=stock.color)
+        results['n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
+        results['n_females_infectious_by_age']     = init_res('Number of females infectious by age', n_rows=na, color=stock.color)
+        results['n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
+        results['n_transformed_by_age']            = init_res('Number transformed by age', n_rows=na, color=stock.color)
+        results['n_precin_by_age']                 = init_res('Number Pre-CIN by age', n_rows=na, color=stock.color)
+        results['n_cin1_by_age']                   = init_res('Number CIN1 by age', n_rows=na, color=stock.color)
+        results['n_cin2_by_age']                   = init_res('Number CIN2 by age', n_rows=na, color=stock.color)
+        results['n_cin3_by_age']                   = init_res('Number CIN3 by age', n_rows=na, color=stock.color)
 
         # Create incidence and prevalence results
         for var,name,color in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
@@ -758,7 +757,6 @@ class Sim(hpb.BaseSim):
         dt = self['dt'] # Timestep
         t = self.t
         ng = self['n_genotypes']
-        na = len(self.pars['age_bin_edges']) - 1 # Number of age bins
         condoms = self['condoms']
         eff_condoms = self['eff_condoms']
         beta = self['beta']
@@ -885,20 +883,20 @@ class Sim(hpb.BaseSim):
             f_inds = hpu.true(people['sex']==0)
             infinds = hpu.true(people['infectious'])
             f_infinds = np.intersect1d(f_inds, infinds)
-            self.results[f'n_females_infectious_by_age'][:, idx] = np.histogram(people.age[f_infinds], bins=people.age_bin_edges, weights=people.scale[f_infinds])[0]
-            self.results[f'n_infectious_by_age'][:, idx] = np.histogram(people.age[infinds], bins=people.age_bin_edges, weights=people.scale[infinds])[0]
             susinds = hpu.true(people['susceptible'])
-            self.results[f'n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bin_edges, weights=people.scale[susinds])[0]
             transformedinds = hpu.true(people['transformed'])
-            self.results[f'n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bin_edges, weights=people.scale[transformedinds])[0]
             precininds = hpu.true(people['precin'])
-            self.results[f'n_precin_by_age'][:, idx] = np.histogram(people.age[precininds], bins=people.age_bin_edges, weights=people.scale[precininds])[0]
             cin1inds = hpu.true(people['cin1'])
-            self.results[f'n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bin_edges, weights=people.scale[cin1inds])[0]
             cin2inds = hpu.true(people['cin2'])
-            self.results[f'n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bin_edges, weights=people.scale[cin2inds])[0]
             cin3inds = hpu.true(people['cin3'])
-            self.results[f'n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bin_edges, weights=people.scale[cin3inds])[0]
+            self.results['n_females_infectious_by_age'][:, idx] = np.histogram(people.age[f_infinds], bins=people.age_bin_edges, weights=people.scale[f_infinds])[0]
+            self.results['n_infectious_by_age'][:, idx]  = np.histogram(people.age[infinds], bins=people.age_bin_edges, weights=people.scale[infinds])[0]
+            self.results['n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bin_edges, weights=people.scale[susinds])[0]
+            self.results['n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bin_edges, weights=people.scale[transformedinds])[0]
+            self.results['n_precin_by_age'][:, idx] = np.histogram(people.age[precininds], bins=people.age_bin_edges, weights=people.scale[precininds])[0]
+            self.results['n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bin_edges, weights=people.scale[cin1inds])[0]
+            self.results['n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bin_edges, weights=people.scale[cin2inds])[0]
+            self.results['n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bin_edges, weights=people.scale[cin3inds])[0]
 
             # Create total stocks
             for key in self.people.meta.genotype_stock_keys:
@@ -1156,7 +1154,18 @@ class Sim(hpb.BaseSim):
         self.results['cum_cancer_treated'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
 
         return
-
+    
+    
+    def compute_age_mean(self, reskey, t=None):
+        if t is None:
+            t = -1
+        assert 'by_age' in reskey, 'This method can only be used for age results'
+        res = self.results[reskey][:,t]
+        edges = self['age_bin_edges']
+        mean_edges = edges[:-1] + np.diff(edges)/2
+        age_mean = ((res/res.sum())*mean_edges).sum()
+        return age_mean
+        
 
     def compute_summary(self, t=None, update=True, output=False, require_run=False):
         '''
@@ -1177,17 +1186,19 @@ class Sim(hpb.BaseSim):
             errormsg = 'Simulation not yet run'
             raise RuntimeError(errormsg)
 
-        summary = sc.objdict()
-        for key in self.result_keys('total'):
-            summary[key] = self.results[key][t]
+        s = sc.odict()
+        s['total infections'] = self.results['infections'].sum()
+        s['total cancers']    = self.results['cancers'].sum()
+        s['mean age of infection'] = self.compute_age_mean('infections_by_age', t=t)
+        
 
         # Update the stored state
         if update:
-            self.summary = summary
+            self.summary = s
 
         # Optionally return
         if output:
-            return summary
+            return s
         else:
             return
 
@@ -1219,16 +1230,13 @@ class Sim(hpb.BaseSim):
         if sep is None: sep = hpo.sep # Default separator
         labelstr = f' "{self.label}"' if self.label else ''
         string = f'Simulation{labelstr} summary:\n'
-        for key in self.result_keys('total'):
-            val = summary[key]
-            printval = f'   {val:10,.0f} '
-            label = self.results[key].name.lower().replace(',', sep)
-            if 'incidence' in key or 'prevalence' in key:
-                if key in ['hpv_prevalence', 'hpv_incidence']:
-                    printval = f'   {val*100:10.2f} '
-                    label += ' (/100)'
-                else:
-                    label += ' (/100,000)'
+        for label,val in summary.items():
+            if 'total' in label:
+                printval = f'   {val:13,.0f} '
+            elif 'mean' in label:
+                printval = f'   {val:13,.2f} '
+            else:
+                raise NotImplementedError
             string += printval + label + '\n'
 
         # Print or return string

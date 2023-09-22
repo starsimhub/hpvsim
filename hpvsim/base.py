@@ -405,7 +405,7 @@ class BaseSim(ParsObj):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
-        If which is 'main', return only the main results keys. If 'genotype', return
+        If which is 'total', return only the main results keys. If 'genotype', return
         only genotype keys. If 'all', return all keys.
 
         '''
