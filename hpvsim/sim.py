@@ -1167,7 +1167,7 @@ class Sim(hpb.BaseSim):
         return age_mean
         
 
-    def compute_summary(self, t=None, update=True, output=False, require_run=False):
+    def compute_summary(self, t=None, update=True, output=False, full=False, require_run=False):
         '''
         Compute the summary dict and string for the sim. Used internally; see
         sim.summarize() for the user version.
@@ -1194,14 +1194,22 @@ class Sim(hpb.BaseSim):
         s['mean cancer incidence (per 100k)'] = self.results['cancer_incidence'].mean()
         s['mean age of infection (years)'] = self.compute_age_mean('infections_by_age', t=t)
         s['mean age of cancer (years)'] = self.compute_age_mean('cancers_by_age', t=t)
+        
+        summary = sc.objdict()
+        for key in self.result_keys('total'):
+            summary[key] = self.results[key][t]
 
         # Update the stored state
         if update:
-            self.summary = s
+            self.short_summary = s
+            self.summary = summary
 
         # Optionally return
         if output:
-            return s
+            if full:
+                return summary
+            else:
+                return s
         else:
             return
 

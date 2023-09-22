@@ -568,7 +568,7 @@ class BaseSim(ParsObj):
 
         # Handle keys
         if keys is None:
-            keys = ['results', 'pars', 'summary']
+            keys = ['results', 'pars', 'summary', 'short_summary']
         keys = sc.promotetolist(keys)
 
         # Convert to JSON-compatible format
@@ -585,9 +585,14 @@ class BaseSim(ParsObj):
                 d['parameters'] = pardict
             elif key == 'summary':
                 if self.results_ready:
-                    d['summary'] = dict(sc.dcp(self.full_summary))
+                    d['summary'] = dict(sc.dcp(self.summary))
                 else:
                     d['summary'] = 'Summary not available (Sim has not yet been run)'
+            elif key == 'short_summary':
+                if self.results_ready:
+                    d['short_summary'] = dict(sc.dcp(self.short_summary))
+                else:
+                    d['short_summary'] = 'Full summary not available (Sim has not yet been run)'
             else: # pragma: no cover
                 try:
                     d[key] = sc.sanitizejson(getattr(self, key))
