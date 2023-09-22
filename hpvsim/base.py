@@ -585,7 +585,7 @@ class BaseSim(ParsObj):
                 d['parameters'] = pardict
             elif key == 'summary':
                 if self.results_ready:
-                    d['summary'] = dict(sc.dcp(self.summary))
+                    d['summary'] = dict(sc.dcp(self.full_summary))
                 else:
                     d['summary'] = 'Summary not available (Sim has not yet been run)'
             else: # pragma: no cover

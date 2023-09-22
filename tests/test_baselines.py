@@ -6,7 +6,6 @@ the baseline results.
 import numpy as np
 import sciris as sc
 import hpvsim as hpv
-import pandas as pd
 
 do_plot = 1
 do_save = 0
