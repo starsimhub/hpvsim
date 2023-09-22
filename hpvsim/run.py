@@ -1073,7 +1073,7 @@ class Scenarios(hpb.ParsObj):
             print('Running in debug mode (not parallelized)')
             for scenkey,scen_sims in scen_sims_dict.items():
                 for i in range(len(scen_sims)):
-                    scen_sims[i] = single_run(scen_sims[i], **run_args, **kwargs) # Ensure it has correct length -- WARNING, kludgy
+                    scen_sims[i] = single_run(scen_sims[i], **run_args, **kwargs) # Run a single sim
         else:
             all_sims = []
             for sim_list in scen_sims_dict.values():
