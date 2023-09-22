@@ -1187,9 +1187,10 @@ class Sim(hpb.BaseSim):
             raise RuntimeError(errormsg)
 
         s = sc.odict()
-        s['total infections'] = self.results['infections'].sum()
-        s['total cancers']    = self.results['cancers'].sum()
-        s['mean prevalence (%)'] = self.results['hpv_prevalence'].mean()*100
+        s['total HPV infections'] = self.results['infections'].sum()
+        s['total cancers'] = self.results['cancers'].sum()
+        s['total cancer deaths'] = self.results['cancer_deaths'].sum()
+        s['mean HPV prevalence (%)'] = self.results['hpv_prevalence'].mean()*100
         s['mean cancer incidence (per 100k)'] = self.results['cancer_incidence'].mean()
         s['mean age of infection (years)'] = self.compute_age_mean('infections_by_age', t=t)
         s['mean age of cancer (years)'] = self.compute_age_mean('cancers_by_age', t=t)
