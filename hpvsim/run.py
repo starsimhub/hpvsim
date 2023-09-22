@@ -1059,9 +1059,11 @@ class Scenarios(hpb.ParsObj):
                 hiv_scenpars = {'hiv_pars': sc.mergedicts(scen_sim.hivsim.pars['hiv_pars'], scen['hiv_pars'])}
                 scen_sim.hivsim.update_pars(hiv_scenpars)
                 
-            scen_sims = [scen_sim]*n_runs # Ensure it has correct length
+            scen_sims = []
             for i in range(n_runs):
-                scen_sims[i]['rand_seed'] += i # Reset the seed
+                sim = scen_sim.copy()
+                sim['rand_seed'] += i # Reset the seed
+                scen_sims.append(sim)
             
             scen_sims_dict[scenkey] = scen_sims
 
@@ -1071,14 +1073,17 @@ class Scenarios(hpb.ParsObj):
             print('Running in debug mode (not parallelized)')
             for scenkey,scen_sims in scen_sims_dict.items():
                 for i in range(len(scen_sims)):
-                    scen_sims[i] = single_run(scen_sim[i], **run_args, **kwargs) # Ensure it has correct length -- WARNING, kludgy
+                    scen_sims[i] = single_run(scen_sims[i], **run_args, **kwargs) # Ensure it has correct length -- WARNING, kludgy
         else:
-            all_sims = sc.mergelists(scen_sims_dict.values())
+            all_sims = []
+            for sim_list in scen_sims_dict.values():
+                all_sims.extend(list(sim_list))
             all_sims = multi_run(all_sims, **run_args, **kwargs) # This is where the sims actually get run
             count = 0
             for scenkey,scen_sims in scen_sims_dict.items():
                 n_sims = len(scen_sims)
-                scen_sims_dict[scenkey] = 
+                scen_sims_dict[scenkey] = all_sims[count:count+n_sims]
+                count += n_sims
 
         # Process sims
         for scenkey,scen_sims in scen_sims_dict.items():
