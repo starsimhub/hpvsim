@@ -1304,9 +1304,9 @@ def diff_sims(sim1, sim2, skip_key_diffs=False, skip=None, output=False, die=Fal
     '''
 
     if isinstance(sim1, Sim):
-        sim1 = sim1.compute_summary(update=False, output=True, require_run=True)
+        sim1 = sim1.compute_summary(update=False, output=True, require_run=True, full=True)
     if isinstance(sim2, Sim):
-        sim2 = sim2.compute_summary(update=False, output=True, require_run=True)
+        sim2 = sim2.compute_summary(update=False, output=True, require_run=True, full=True)
     for sim in [sim1, sim2]:
         if not isinstance(sim, dict): # pragma: no cover
             errormsg = f'Cannot compare object of type {type(sim)}, must be a sim or a sim.summary dict'
