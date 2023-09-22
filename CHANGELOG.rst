@@ -8,6 +8,13 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+
+Version 1.2.6 (2023-09-22)
+---------------------------
+- Fixes plotting issue with MultiSims and Jupyter notebooks
+- Allows scenarios to be run fully in parallel
+- *Github info* PR `614 <https://github.com/amath-idm/hpvsim/pull/614>`__
+
 Version 1.2.5 (2023-09-21)
 ---------------------------
 - Fixes file path when run via Jupyter.
