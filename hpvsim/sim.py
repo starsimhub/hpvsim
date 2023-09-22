@@ -1282,7 +1282,7 @@ class AlreadyRunError(RuntimeError):
     pass
 
 
-def diff_sims(sim1, sim2, skip_key_diffs=False, skip=None, output=False, die=False):
+def diff_sims(sim1, sim2, skip_key_diffs=False, skip=None, full=False, output=False, die=False):
     '''
     Compute the difference of the summaries of two simulations, and print any
     values which differ.
@@ -1292,6 +1292,7 @@ def diff_sims(sim1, sim2, skip_key_diffs=False, skip=None, output=False, die=Fal
         sim2 (sim/dict): ditto
         skip_key_diffs (bool): whether to skip keys that don't match between sims
         skip (list): a list of values to skip
+        full (bool): whether to use the full summary (else, brief)
         output (bool): whether to return the output as a string (otherwise print)
         die (bool): whether to raise an exception if the sims don't match
         require_run (bool): require that the simulations have been run
@@ -1304,9 +1305,9 @@ def diff_sims(sim1, sim2, skip_key_diffs=False, skip=None, output=False, die=Fal
     '''
 
     if isinstance(sim1, Sim):
-        sim1 = sim1.compute_summary(update=False, output=True, require_run=True, full=True)
+        sim1 = sim1.compute_summary(update=False, output=True, require_run=True, full=full)
     if isinstance(sim2, Sim):
-        sim2 = sim2.compute_summary(update=False, output=True, require_run=True, full=True)
+        sim2 = sim2.compute_summary(update=False, output=True, require_run=True, full=full)
     for sim in [sim1, sim2]:
         if not isinstance(sim, dict): # pragma: no cover
             errormsg = f'Cannot compare object of type {type(sim)}, must be a sim or a sim.summary dict'

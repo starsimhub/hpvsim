@@ -100,7 +100,7 @@ def test_baseline():
     new.run()
 
     # Compute the comparison
-    hpv.diff_sims(old, new, die=True)
+    hpv.diff_sims(old, new, full=True, die=True)
 
     return new
 
