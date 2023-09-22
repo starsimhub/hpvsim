@@ -777,7 +777,7 @@ class BaseSim(ParsObj):
         n_ia = len(ia_list) # Number of interventions/analyzers
 
         if label == 'summary': # Print a summary of the interventions
-            df = pd.DataFrame(columns=['ind', 'label', 'type'])
+            df = sc.dataframe(columns=['ind', 'label', 'type'])
             for ind,ia_obj in enumerate(ia_list):
                 df = df.append(dict(ind=ind, label=str(ia_obj.label), type=type(ia_obj)), ignore_index=True)
             print(f'Summary of {which}:')
@@ -1508,7 +1508,7 @@ class BasePeople(FlexPretty):
 
     def to_df(self):
         ''' Convert to a Pandas dataframe '''
-        df = pd.DataFrame.from_dict({key:self[key] for key in self.keys()})
+        df = sc.dataframe.from_dict({key:self[key] for key in self.keys()})
         return df
 
     def to_arr(self):
