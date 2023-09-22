@@ -190,7 +190,7 @@ def transform_prob(tp, dysp):
           = 1/2 * dysp**3
     '''
     # return 1-np.power(1-tp, ((dysp*100)**2))
-    return 1-np.power(1-tp, 0.5*((dysp*100)**3))
+    return 1-np.power(1-tp, 0.5*((dysp)**3)*100)
 
 
 #%% Sampling and seed methods
