@@ -75,7 +75,7 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']                = 0.2   # Per-act transmission probability; absolute value, calibrated
+    pars['beta']                = 0.35   # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
     pars['eff_condoms']         = 0.7   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
@@ -320,9 +320,9 @@ def get_genotype_pars(default=False, genotype=None):
     pars = sc.objdict()
 
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_precin       = dict(dist='lognormal', par1=2, par2=5)  # Duration of infection prior to precancer
+    pars.hpv16.dur_precin       = dict(dist='lognormal', par1=3, par2=10)  # Duration of infection prior to precancer
     pars.hpv16.dur_cin          = dict(dist='lognormal', par1=2, par2=10) # Duration of episomal infection prior to cancer
-    pars.hpv16.cin_fn           = dict(form='logf2', k=0.5, x_infl=0, ttc=10)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv16.cin_fn           = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
     pars.hpv16.sev_fn           = dict(form='logf2', k=0.175, x_infl=0, ttc=30) # Function mapping duration of cin to severity of cin
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.transform_prob   = 1.3e-4 # Annual rate of transformed cell invading
@@ -330,9 +330,9 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_precin       = dict(dist='lognormal', par1=2, par2=5)  # Duration of infection prior to precancer
+    pars.hpv18.dur_precin       = dict(dist='lognormal', par1=3, par2=10)  # Duration of infection prior to precancer
     pars.hpv18.dur_cin          = dict(dist='lognormal', par1=2, par2=10) # Duration of infection prior to cancer
-    pars.hpv18.cin_fn           = dict(form='logf2', k=0.5, x_infl=0, ttc=10)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv18.cin_fn           = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
     pars.hpv18.sev_fn           = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.transform_prob   = 1.0e-5 # Annual rate of transformed cell invading
@@ -341,9 +341,9 @@ def get_genotype_pars(default=False, genotype=None):
 
     # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
     pars.hi5 = sc.objdict()
-    pars.hi5.dur_precin         = dict(dist='lognormal', par1=2, par2=5)  # Duration of infection prior to precancer
+    pars.hi5.dur_precin         = dict(dist='lognormal', par1=3, par2=10)  # Duration of infection prior to precancer
     pars.hi5.dur_cin            = dict(dist='lognormal', par1=2, par2=10) # Duration of infection prior to cancer
-    pars.hi5.cin_fn             = dict(form='logf2', k=0.5, x_infl=0, ttc=10)  # Function mapping duration of infection to probability of developing cin
+    pars.hi5.cin_fn             = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
     pars.hi5.sev_fn             = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hi5.rel_beta           = 0.9 # placeholder
     pars.hi5.transform_prob     = 3e-5 # Annual rate of transformed cell invading
@@ -352,9 +352,9 @@ def get_genotype_pars(default=False, genotype=None):
 
     # Other high-risk: oncogenic but not covered in 9valent vaccine: 35, 39, 51, 56, 59
     pars.ohr = sc.objdict()
-    pars.ohr.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
+    pars.ohr.dur_precin         = dict(dist='lognormal', par1=3, par2=10)  # Duration of infection prior to precancer
     pars.ohr.dur_cin            = dict(dist='lognormal', par1=2, par2=10) # Duration of infection prior to cancer
-    pars.ohr.cin_fn             = dict(form='logf2', k=0.5, x_infl=0, ttc=10)  # Function mapping duration of infection to probability of developing cin
+    pars.ohr.cin_fn             = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
     pars.ohr.sev_fn             = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.ohr.rel_beta           = 0.9 # placeholder
     pars.ohr.transform_prob     = 3e-5 # Annual rate of transformed cell invading
@@ -364,9 +364,9 @@ def get_genotype_pars(default=False, genotype=None):
     # All other high-risk types: 31, 33, 35, 39, 45, 51, 52, 56, 58, 59
     # Warning: this should not be used in conjuction with hi5 or ohr
     pars.hr = sc.objdict()
-    pars.hr.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
+    pars.hr.dur_precin       = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
     pars.hr.dur_cin          = dict(dist='lognormal', par1=2, par2=10) # Duration of infection prior to cancer
-    pars.hr.cin_fn           = dict(form='logf2', k=0.5, x_infl=0, ttc=10)  # Function mapping duration of infection to probability of developing cin
+    pars.hr.cin_fn           = dict(form='linear', slope=0.1/7)  # Function mapping duration of infection to probability of developing cin
     pars.hr.sev_fn           = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.hr.rel_beta         = 0.9 # placeholder
     pars.hr.transform_prob   = 3e-10 # Annual rate of transformed cell invading
@@ -375,9 +375,9 @@ def get_genotype_pars(default=False, genotype=None):
 
     # Low-risk
     pars.lr = sc.objdict()
-    pars.lr.dur_precin          = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
+    pars.lr.dur_precin          = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
     pars.lr.dur_cin             = dict(dist='lognormal', par1=2, par2=10) # Duration of infection prior to cancer
-    pars.lr.cin_fn              = dict(form='logf2', k=0.5, x_infl=0, ttc=10)  # Function mapping duration of infection to probability of developing cin
+    pars.lr.cin_fn              = dict(form='linear', slope=0.1/7)  # Function mapping duration of infection to probability of developing cin
     pars.lr.sev_fn              = dict(form='logf2', k=0.0, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.lr.rel_beta            = 0.9 # placeholder
     pars.lr.transform_prob      = 0 # Annual rate of transformed cell invading
@@ -651,6 +651,7 @@ def compute_severity(t, rel_sev=None, pars=None):
     choices = [
         'logf2',
         'logf3',
+        'linear',
     ]
 
     # Scale t
@@ -663,6 +664,9 @@ def compute_severity(t, rel_sev=None, pars=None):
 
     elif form == 'logf3':
         output = hpu.logf3(t, **pars)
+
+    elif form == 'linear':
+        output = hpu.linear(t, **pars)
 
     elif callable(form):
         output = form(t, **pars)

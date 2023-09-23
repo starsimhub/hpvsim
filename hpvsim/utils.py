@@ -110,6 +110,13 @@ def logf2(x, k, x_infl, ttc=25):
     return logf3(x, k, x_infl, s=1, ttc=ttc)
 
 
+def linear(x, slope):
+    '''
+    Linear function
+    '''
+    return slope*x
+
+
 def invlogf3(y, k, x_infl, s, ttc=25):
     '''
     Inverse of logf3; see definition there for arguments
