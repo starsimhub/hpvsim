@@ -48,8 +48,7 @@ class new_pairs_snap(hpv.Analyzer):
                     self.new_pairs = pd.concat([self.new_pairs, contacts])
         return
 
-def run_network(clusters, mixing_steps, start, end, pop):
-    labels = ['Status quo', 'Clustered network']
+def run_network(clusters, mixing_steps, start, end, pop, labels):
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
     )
@@ -74,13 +73,15 @@ def run_network(clusters, mixing_steps, start, end, pop):
 
         sim = hpv.Sim(pars=pars)
         sim.run()
+        layer_keys = sim.people.layer_keys()
+        num_layers = len(layer_keys)
         # Plot age mixing
         labels += ['{} cluster, {} mixing steps'.format(n_clusters, len(mixing))]
         snaps.append(sim.get_analyzer([0]))
         new_pairs_snaps = sim.get_analyzer([1]).new_pairs
         new_pairs_snaps['sim'] = i
         df_new_pairs = pd.concat([df_new_pairs, new_pairs_snaps])
-        plot_mixing(df_new_pairs)
+        plot_mixing(df_new_pairs, layer_keys)
         axes[0].plot(sim.results['year'], sim.results['infections'], label=labels[i])
         axes[1].plot(sim.results['year'], sim.results['cancers'])
     axes[0].legend()
@@ -88,18 +89,16 @@ def run_network(clusters, mixing_steps, start, end, pop):
     axes[1].set_ylabel('Cancers')
     fig0.show()
 
-    fig, axes = pl.subplots(nrows=i+1, ncols=3, figsize=(14, 10), sharey='col')
+    fig, axes = pl.subplots(nrows=i+1, ncols=num_layers, figsize=(14, 10), sharey='col')
+    font_size = 15
+    pl.rcParams['font.size'] = font_size
     for i, isnap in enumerate(snaps):
-        people2020 = isnap.snapshots[3]
-        font_size = 15
-        pl.rcParams['font.size'] = font_size
-        people = people2020
-        rships_f = np.zeros((3, len(people.age_bin_edges)))
-        rships_m = np.zeros((3, len(people.age_bin_edges)))
-        for lk, lkey in enumerate(['m', 'c', 'o']):
-            active_ages = people.age
+        people = isnap.snapshots[-1] # snapshot from 2020
+        rships_f = np.zeros((num_layers, len(people.age_bin_edges)))
+        rships_m = np.zeros((num_layers, len(people.age_bin_edges)))
+        age_bins = np.digitize(people.age, bins=people.age_bin_edges) - 1
+        for lk, lkey in enumerate(layer_keys):
             n_rships = people.n_rships
-            age_bins = np.digitize(active_ages, bins=people.age_bin_edges) - 1
             for ab in np.unique(age_bins):
                 inds_f = (age_bins==ab) & people.is_female
                 inds_m = (age_bins==ab) & people.is_male
@@ -117,15 +116,13 @@ def run_network(clusters, mixing_steps, start, end, pop):
     fig.tight_layout()
     fig.show()
 
-    fig, axes = pl.subplots(nrows=i+1, ncols=3, figsize=(14, 10), sharey='col')
+    fig, axes = pl.subplots(nrows=i+1, ncols=num_layers, figsize=(14, 10), sharey='col')
+    pl.rcParams['font.size'] = font_size
     for i, isnap in enumerate(snaps):
-        people2020 = isnap.snapshots[3]
-        font_size = 15
-        pl.rcParams['font.size'] = font_size
-        people = people2020
-        types = ['marital', 'casual', 'one-off']
+        people = isnap.snapshots[-1] #snapshot from 2020
+        types = layer_keys
         xx = people.lag_bins[1:15] * sim['dt']
-        for cn, lkey in enumerate(['m', 'c', 'o']):
+        for cn, lkey in enumerate(layer_keys):
             ax = axes[i,cn]
             yy = people.rship_lags[lkey][:14] / people.rship_lags[lkey].sum()
             ax.bar(xx, yy, width=0.2)
@@ -138,9 +135,9 @@ def run_network(clusters, mixing_steps, start, end, pop):
 #%% Define the tests
 
 
-def plot_mixing(df_new_pairs):
+def plot_mixing(df_new_pairs, layer_keys):
     for runind in df_new_pairs.sim.unique():
-        for i, rtype in enumerate(['m','c','o']):
+        for i, rtype in enumerate(layer_keys):
             df = df_new_pairs[(df_new_pairs['sim'] == runind) & (df_new_pairs['rtype'] == rtype)]
             n_time = len(df.year.unique())
             check_square = n_time % np.sqrt(n_time)
@@ -205,14 +202,6 @@ def cluster_demo():
     print(sim2['add_mixing'])
 
 
-    sim0.run()
-    sim0.plot()
-    sim1.run()
-    sim1.plot()
-    sim2.run()
-    sim2.plot()
-
-
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -223,7 +212,8 @@ if __name__ == '__main__':
     start = 1970
     end = 2020
     pop = 2e4
-    run_network(clusters, mixing_steps, start, end, pop)
+    labels = ['status quo', 'clustered']
+    run_network(clusters, mixing_steps, start, end, pop, labels)
     #cluster_demo()
     sc.toc(T)
     print('Done.')
