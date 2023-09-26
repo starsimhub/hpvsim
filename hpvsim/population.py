@@ -263,7 +263,15 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
 def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
                         layer_probs, cross_layer, cluster, add_mixing):
     '''
-    Create partnerships for a single layer
+    Create partnerships for a single layer. Eligible females and males are first identified if they are sexually active,
+    underpartnered, and is available to partner for the specified type of relationship given their concurrency preference
+    and whether they already have partners in other relationship layers. Concurrency preference is randomly assigned.
+    Eligible individuals are randomly then chosen based on age- and sex-specific participation rates. The paring
+    algorithm iterates through each cluster and age bin of females, calculating relative preference of all participating
+    males by multiplying the cluster- and age-specific mixing weights. Male partners are then randomly drawn based on
+    these relative mixing weights. If there are not enough male partners to satiate all females in a cluster and age bin,
+    females are randomly dropped with no new partner in this layer and time step.
+
     Args:
         partners            (int arr): array containing each agent's desired number of partners in this layer
         current_partners    (int arr): array containing each agent's actual current number of partners in this layer
