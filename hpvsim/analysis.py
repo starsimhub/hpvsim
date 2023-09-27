@@ -728,11 +728,12 @@ class age_results(Analyzer):
         ''' Helper function for converting flow result names to people attributes '''
         attr = rname.replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
+        if attr == 'lsil': attr = ['precin', 'cin1']
         if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
         if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
         mapping = {
-            'infections': ['date_infectious', 'infectious'],
+            'infections': ['date_exposed', 'infectious'],
             'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
             'cins':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
             'cin1': ['date_cin1', 'cin1'],
@@ -788,7 +789,7 @@ class age_results(Analyzer):
                             if rdict.by_hiv:
                                 inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl[rdict.hiv_attr])).nonzero()[-1]
                             else:
-                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr])).nonzero()[-1]
+                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl.is_female_alive) * (ppl[rdict.attr])).nonzero()[-1]
                         self.results[rkey][date] += bin_ages(inds, bins)  # Bin the people
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
@@ -801,6 +802,9 @@ class age_results(Analyzer):
                     if not rdict.by_genotype:
                         if rdict.by_hiv:
                             inds = (ppl[rdict.attr].any(axis=0) * ppl[rdict.hiv_attr]).nonzero()[-1]
+                        elif isinstance(rdict.attr, list):
+                            inds = (ppl[rdict.attr[0]].any(axis=0) + ppl[rdict.attr[1]].any(axis=0)).nonzero()[-1]
+                            inds = np.unique(inds)
                         else:
                             inds = ppl[rdict.attr].any(axis=0).nonzero()[-1]
                         self.results[rkey][date] = bin_ages(inds, bins)
@@ -820,12 +824,13 @@ class age_results(Analyzer):
                         else:
                             denom = bin_ages(inds=ppl.alive, bins=bins)
                     else:  # Denominator is females
-                        denom = bin_ages(inds=ppl.f_inds, bins=bins)
+                        denom = bin_ages(inds=ppl.is_female_alive, bins=bins)
                     if rdict.by_genotype: denom = denom[None, :]
                     self.results[rkey][date] = self.results[rkey][date] / (denom)
 
                 if 'incidence' in rkey:
                     if 'hpv' in rkey:  # Denominator is susceptible population
+                        inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
                         denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
                     else:  # Denominator is females at risk for cancer
                         if rdict.by_hiv:

@@ -74,6 +74,7 @@
     "precin_prevalence": 0.05178766646764836,
     "cin1_prevalence": 0.0015250778987429966,
     "cin2_prevalence": 0.0007529832639304071,
-    "cin3_prevalence": 0.0007606275955318137
+    "cin3_prevalence": 0.0007606275955318137,
+    "lsil_prevalence": 0.0
   }
 }

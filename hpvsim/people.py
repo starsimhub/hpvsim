@@ -611,7 +611,7 @@ class People(hpb.BasePeople):
                 self.infectious[genotype, latent_inds] = False
                 self.inactive[genotype, latent_inds] = True
                 self.date_clearance[genotype, latent_inds] = np.nan
-
+                self.date_latent[genotype, latent_inds] = self.t
             f_cleared_inds = f_inds[~latent_bools]
 
         else:
@@ -850,7 +850,7 @@ class People(hpb.BasePeople):
         self.inactive[g, inds]      = False  # no longer inactive
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
-        if layer != 'seed_infection':
+        if layer != 'seed_infection' and layer !='reactivation':
             # Create overall flows
             self.flows['infections']                += self.scale_flows(inds) # Add the total count to the total flow data
             self.genotype_flows['infections'][g]    += self.scale_flows(inds) # Add the count by genotype to the flow data
