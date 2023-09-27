@@ -57,6 +57,25 @@ extensions = [
     'nbsphinx',
     'IPython.sphinxext.ipython_console_highlighting',  # Temporary fix for https://github.com/spatialaudio/nbsphinx/issues/687
     'sphinx_search.extension', # search across multiple docsets in domain
+    'myst_parser', # source files written in MD or RST
+]
+
+myst_enable_extensions = [
+    "amsmath",
+    "attrs_inline",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "inv_link",
+    "linkify",
+    "replacements",
+    "smartquotes",
+    "strikethrough",
+    "substitution",
+    "tasklist",
 ]
 
 autodoc_default_options = {
@@ -132,7 +151,12 @@ html_favicon = "images/favicon.ico"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
+
 html_static_path = ['_static']
+
+html_css_files = ['theme_overrides.css']
+
+html_js_files = ['show_block_by_os.js'] 
 
 html_context = {
     'rtd_url': 'https://docs.idmod.org/projects/hpvsim/en/latest',
