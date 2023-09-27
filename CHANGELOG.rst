@@ -12,7 +12,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 Version 1.2.8 (2023-09-27)
 ---------------------------
 - Changes the way HPV progression is modeled so that there is a probability of developing CIN (modeled linearly) based upon duration of precin (based upon Rodriguez et al. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3705579/)
-- Renames `dur_episomal` as `dur_cin`
+- Renames ``dur_episomal`` as ``dur_cin``
 - *Github info* PR `620 <https://github.com/amath-idm/hpvsim/pull/620>`__
 
 Version 1.2.7 (2023-09-22)
