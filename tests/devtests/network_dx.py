@@ -77,8 +77,8 @@ def run_network(clusters, mixing_steps, start, end, pop, labels):
         num_layers = len(layer_keys)
         # Plot age mixing
         labels += ['{} cluster, {} mixing steps'.format(n_clusters, len(mixing))]
-        snaps.append(sim.get_analyzer([0]))
-        new_pairs_snaps = sim.get_analyzer([1]).new_pairs
+        snaps.append(sim.get_analyzer('snapshot'))
+        new_pairs_snaps = sim.get_analyzer('new_pairs_snap').new_pairs
         new_pairs_snaps['sim'] = i
         df_new_pairs = pd.concat([df_new_pairs, new_pairs_snaps])
         plot_mixing(df_new_pairs, layer_keys)
@@ -97,13 +97,13 @@ def run_network(clusters, mixing_steps, start, end, pop, labels):
         rships_f = np.zeros((num_layers, len(people.age_bin_edges)))
         rships_m = np.zeros((num_layers, len(people.age_bin_edges)))
         age_bins = np.digitize(people.age, bins=people.age_bin_edges) - 1
+        n_rships = people.n_rships
         for lk, lkey in enumerate(layer_keys):
-            n_rships = people.n_rships
             for ab in np.unique(age_bins):
                 inds_f = (age_bins==ab) & people.is_female
                 inds_m = (age_bins==ab) & people.is_male
-                rships_f[lk,ab] = n_rships[lk,inds_f].sum()/len(hpv.true(inds_f))
-                rships_m[lk, ab] = n_rships[lk, inds_m].sum() / len(hpv.true(inds_m))
+                rships_f[lk,ab] = n_rships[lk,inds_f].mean()
+                rships_m[lk, ab] = n_rships[lk, inds_m].mean()
             ax = axes[i, lk]
             yy_f = rships_f[lk,:]
             yy_m = rships_m[lk,:]
@@ -201,12 +201,7 @@ def cluster_demo():
     sim2 = hpv.Sim(pars=pars2)
     print(sim2['add_mixing'])
 
-
-#%% Run as a script
-if __name__ == '__main__':
-
-    # Start timing and optionally enable interactive plotting
-    T = sc.tic()
+def network_demo():
     clusters = [2, 10]
     mixing_steps = [[0.1], [0.9,0.5,0.1]]
     start = 1970
@@ -214,6 +209,13 @@ if __name__ == '__main__':
     pop = 2e4
     labels = ['status quo', 'clustered']
     run_network(clusters, mixing_steps, start, end, pop, labels)
+
+
+#%% Run as a script
+if __name__ == '__main__':
+
+    T = sc.tic()
+    network_demo()
     #cluster_demo()
     sc.toc(T)
     print('Done.')
