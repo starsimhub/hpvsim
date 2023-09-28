@@ -6,9 +6,10 @@ Tests for network options (geostructure and diagnostic visualizations)
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
-import matplotlib as mpl
+import matplotlib.pyplot as plt
 import pylab as pl
 import pandas as pd
+import seaborn as sns
 
 do_plot = 1
 do_save = 0
@@ -116,73 +117,6 @@ def run_network(clusters, mixing_steps, start, end, pop, labels):
     fig.tight_layout()
     fig.show()
 
-    fig, axes = pl.subplots(nrows=i+1, ncols=num_layers, figsize=(14, 10), sharey='col')
-    pl.rcParams['font.size'] = font_size
-    for i, isnap in enumerate(snaps):
-        people = isnap.snapshots[-1] #snapshot from 2020
-        types = layer_keys
-        xx = people.lag_bins[1:15] * sim['dt']
-        for cn, lkey in enumerate(layer_keys):
-            ax = axes[i,cn]
-            yy = people.rship_lags[lkey][:14] / people.rship_lags[lkey].sum()
-            ax.bar(xx, yy, width=0.2)
-            ax.set_xlabel(f'Time between {types[cn]} relationships')
-        axes[i,0].set_ylabel(labels[i])
-    fig.tight_layout()
-    fig.show()
-
-
-#%% Define the tests
-
-
-def plot_mixing(df_new_pairs, layer_keys):
-    for runind in df_new_pairs.sim.unique():
-        for i, rtype in enumerate(layer_keys):
-            df = df_new_pairs[(df_new_pairs['sim'] == runind) & (df_new_pairs['rtype'] == rtype)]
-            n_time = len(df.year.unique())
-            check_square = n_time % np.sqrt(n_time)
-            non_square = 1
-            if check_square == 0:
-                nr = int(np.sqrt(n_time))
-                nc = int(np.sqrt(n_time))
-            else:
-                nr = int(np.sqrt(n_time)) + non_square
-                nc = int(np.sqrt(n_time))
-                if nr * nc < n_time:
-                    nc += 1
-            fig, ax = pl.subplots(nrows=nr, ncols=nc, sharex=True, sharey=True, figsize=(15, 12))
-            for j, year in enumerate(df_new_pairs.year.unique()):
-                df_year = df[df['year']==year]
-                fc = df_year.age_f  # Get the age of female contacts in marital partnership
-                mc = df_year.age_m  # Get the age of male contacts in marital partnership
-                h = ax[j//nc, j%nc].hist2d(fc, mc, bins=np.linspace(0, 75, 16), density=False, norm=mpl.colors.LogNorm())
-                ax[j//nc, j%nc].set_title(year)
-            fig.colorbar(h[3], ax=ax)
-            fig.text(0.5, 0.04, 'Age of female partner', ha='center', fontsize=24)
-            fig.text(0.04, 0.5, 'Age of male partner', va='center', rotation='vertical', fontsize=24)
-            fig.suptitle(rtype, fontsize=24)
-            fig.tight_layout(h_pad=0.5)
-            fig.subplots_adjust(top=0.9, left=0.1, bottom=0.1, right=0.75)
-            fig.show()
-
-            # plot mixing by cluster
-            fig, ax = pl.subplots(nrows=nr, ncols=nc, sharex=True, sharey=True, figsize=(15, 12))
-            for j, year in enumerate(df_new_pairs.year.unique()):
-                df_year = df[df['year'] == year]
-                fc = df_year.cluster_f  # Get the cluster of female contacts in marital partnership
-                mc = df_year.cluster_m  # Get the cluster of male contacts in marital partnership
-                cluster_range = int(fc.max()+1)
-                h = ax[j // nc, j % nc].hist2d(fc, mc, bins=(cluster_range,cluster_range), density=False,
-                                               norm=mpl.colors.LogNorm())
-                ax[j // nc, j % nc].set_title(year)
-            fig.colorbar(h[3], ax=ax)
-            fig.text(0.5, 0.04, 'Cluster of female partner', ha='center', fontsize=24)
-            fig.text(0.04, 0.5, 'Cluster of male partner', va='center', rotation='vertical', fontsize=24)
-            fig.suptitle(rtype, fontsize=24)
-            fig.tight_layout(h_pad=0.5)
-            fig.subplots_adjust(top=0.9, left=0.1, bottom=0.1, right=0.75)
-            fig.show()
-
 
 def cluster_demo():
     sc.heading('Cluster test')
@@ -201,15 +135,97 @@ def cluster_demo():
     sim2 = hpv.Sim(pars=pars2)
     print(sim2['add_mixing'])
 
+
 def network_demo():
-    clusters = [2, 10]
-    mixing_steps = [[0.1], [0.9,0.5,0.1]]
+    clusters = [10, 10]
+    mixing_steps = [np.ones(9), [0.9,0.5,0.1]]
     start = 1970
     end = 2020
     pop = 2e4
     labels = ['status quo', 'clustered']
-    run_network(clusters, mixing_steps, start, end, pop, labels)
 
+    sims = []
+    snap = hpv.snapshot(
+        timepoints=['1990', '2000', '2010', '2020'],
+    )
+    new_pairs = new_pairs_snap(start_year = 2012)
+    for n_clusters, mixing, label in zip(clusters, mixing_steps, labels):
+        pars = dict(
+            n_agents=pop,
+            start=start,
+            end=end,
+            location='nigeria',
+            ms_agent_ratio=100,
+            n_clusters=n_clusters,
+            mixing_steps=mixing,
+            analyzers=[snap, new_pairs]
+        )
+        sim = hpv.Sim(pars=pars, label=label)
+        sims.append(sim)
+    msim = hpv.MultiSim(sims)
+    msim.run()
+    msim.plot(style='simple')
+    plt.show()
+
+    # plot age and cluster mixing patterns for each sim
+    for sim in msim.sims:
+        plot_mixing(sim, 'age')
+        plot_mixing(sim, 'cluster')
+
+    # plot number of relationships overtime
+
+
+def plot_mixing(sim, dim):
+    df_new_pairs = sim.get_analyzer('new_pairs_snap').new_pairs
+    if dim == 'age':
+        bins = np.linspace(0, 75, 16, dtype=int)
+        bins = np.append(bins, 100)
+        df_new_pairs['x_bins'] = pd.cut(df_new_pairs['age_f'], bins)
+        df_new_pairs['y_bins'] = pd.cut(df_new_pairs['age_m'], bins)
+    elif dim == 'cluster':
+        df_new_pairs['x_bins'] = df_new_pairs['cluster_f']
+        df_new_pairs['y_bins'] = df_new_pairs['cluster_m']
+
+    count_df = df_new_pairs.groupby(['rtype', 'year', 'x_bins', 'y_bins']).size().reset_index(name='count')
+    def facet(data, **kwargs):
+        data = data.pivot(index='x_bins', columns='y_bins', values='count')
+        ax = sns.heatmap(data, **kwargs)
+        ax.invert_yaxis()
+    g = sns.FacetGrid(count_df, col='year', row='rtype', height=4)
+    g.map_dataframe(facet, cmap='viridis', cbar=True, square=True)
+    g.set_axis_labels(f'{dim} of female partners', f'{dim} of male partners')
+    g.fig.subplots_adjust(top=0.9)
+    g.fig.suptitle(sim.label)
+    g.tight_layout()
+    plt.show()
+
+def plot_rships():
+    fig, axes = pl.subplots(nrows=i+1, ncols=num_layers, figsize=(14, 10), sharey='col')
+    font_size = 15
+    pl.rcParams['font.size'] = font_size
+    for i, isnap in enumerate(snaps):
+        people = isnap.snapshots[-1] # snapshot from 2020
+        rships_f = np.zeros((num_layers, len(people.age_bin_edges)))
+        rships_m = np.zeros((num_layers, len(people.age_bin_edges)))
+        age_bins = np.digitize(people.age, bins=people.age_bin_edges) - 1
+        n_rships = people.n_rships
+        for lk, lkey in enumerate(layer_keys):
+            for ab in np.unique(age_bins):
+                inds_f = (age_bins==ab) & people.is_female
+                inds_m = (age_bins==ab) & people.is_male
+                rships_f[lk,ab] = n_rships[lk,inds_f].mean()
+                rships_m[lk, ab] = n_rships[lk, inds_m].mean()
+            ax = axes[i, lk]
+            yy_f = rships_f[lk,:]
+            yy_m = rships_m[lk,:]
+            ax.bar(people.age_bin_edges-1, yy_f, width=1.5, label='Female')
+            ax.bar(people.age_bin_edges+1, yy_m, width=1.5, label='Male')
+            ax.set_xlabel(f'Age')
+            ax.set_title(f'Average number of relationships, {lkey}')
+        axes[i, 0].set_ylabel(labels[i])
+    axes[0,2].legend()
+    fig.tight_layout()
+    fig.show()
 
 #%% Run as a script
 if __name__ == '__main__':
