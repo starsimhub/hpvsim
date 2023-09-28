@@ -175,7 +175,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
-    cluster         = hpu.assign_groups(new_n, pars['cluster_rel_sizes'])
+    cluster         = hpu.assign_groups(new_n, pars['cluster_rel_sizes']).astype(int)
     rel_sev     = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
 
     return uid, sex, debut, rel_sev, partners, cluster
@@ -312,7 +312,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     m = []
     for cl in cluster_range: # Loop through clusters
         m_probs = np.ones(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
-        f_inds_to_remove = []  # list of female inds to remove if no male partners are found for her
         # Try randomly select females for pairing
         f_eligible_inds = hpu.true(f_eligible * (cluster==cl))  # Inds of all eligible females in this cluster
         f_cl = hpu.participation_filter(f_eligible_inds, age, layer_probs[1, :], bins=layer_probs[0, :])
@@ -335,14 +334,14 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                 if this_weighting.sum() > 0:
                     males_nonzero = hpu.true(this_weighting)  # Remove males with 0 weights
                     this_weighting_nonzero = this_weighting[males_nonzero]
-                    f_inds = np.array(f_cl)[hpu.true(age_bins_f == ab)]  # inds of participating females in this age bin
+                    f_inds = f_cl[hpu.true(age_bins_f == ab)]  # inds of participating females in this age bin
                     if nm > len(this_weighting_nonzero):
                         #print(f'Warning, {nm} males desired but only {len(this_weighting_nonzero)} found.')
                         f_selected = f_inds[hpu.choose(nm, len(this_weighting_nonzero))].tolist() # randomly select females
                         nm = len(f_selected) # number of new partnerships in this age bin
                     else:
                         f_selected = f_inds.tolist()
-                    m_selected = np.array(m_cl)[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]].tolist()  # Select males based on mixing weights
+                    m_selected = m_cl[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]].tolist()  # Select males based on mixing weights
                     m_probs[m_selected] = 0 # remove males that get partnered
                 m += m_selected # save selected males
                 f += f_selected

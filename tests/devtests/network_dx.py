@@ -11,8 +11,6 @@ import pandas as pd
 import seaborn as sns
 import pylab as pl
 
-do_plot = 1
-do_save = 0
 base_pars = {
     'n_agents': 2e4,
     'start': 1970,
@@ -26,7 +24,7 @@ class new_pairs_snap(hpv.Analyzer):
     # analyzer for recording new partnerships of each timestep
     def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
-        self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype', 'cluster'])
+        self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype'])
         self.start_year = start_year
         self.yearvec = None
 
@@ -39,7 +37,8 @@ class new_pairs_snap(hpv.Analyzer):
     def apply(self, sim):
         if sim.yearvec[sim.t] >= self.start_year:
             tind = sim.yearvec[sim.t] - sim['start']
-            for rtype in ['m','c','o']:
+            layer_keys = sim.people.layer_keys()
+            for rtype in layer_keys:
                 new_rship_inds = (sim.people.contacts[rtype]['start'] == tind).nonzero()[0]
                 if len(new_rship_inds):
                     contacts = pd.DataFrame.from_dict(sim.people.contacts[rtype].get_inds(new_rship_inds))
@@ -99,7 +98,7 @@ def network_demo():
     plt.show()
 
     for sim in msim.sims:
-        # plot age and cluster mixing
+        # plot age and cluster mixing by year
         plot_mixing(sim, 'age')
         plot_mixing(sim, 'cluster')
         # plot number of relationships overtime
