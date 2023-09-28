@@ -11,6 +11,8 @@ import pandas as pd
 import seaborn as sns
 import pylab as pl
 
+hpv.options(verbose=False)
+
 base_pars = {
     'n_agents': 2e4,
     'start': 1970,
@@ -95,7 +97,6 @@ def network_demo():
     msim = hpv.MultiSim(sims)
     msim.run()
     msim.plot(style='simple')
-    plt.show()
 
     for sim in msim.sims:
         # plot age and cluster mixing by year
