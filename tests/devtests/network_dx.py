@@ -7,9 +7,9 @@ import sciris as sc
 import numpy as np
 import hpvsim as hpv
 import matplotlib.pyplot as plt
-import pylab as pl
 import pandas as pd
 import seaborn as sns
+import pylab as pl
 
 do_plot = 1
 do_save = 0
@@ -49,75 +49,6 @@ class new_pairs_snap(hpv.Analyzer):
                     self.new_pairs = pd.concat([self.new_pairs, contacts])
         return
 
-def run_network(clusters, mixing_steps, start, end, pop, labels):
-    snap = hpv.snapshot(
-        timepoints=['1990', '2000', '2010', '2020'],
-    )
-    snaps = []
-    new_pairs = new_pairs_snap(start_year = 2012)
-    df_new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype', 'cluster', 'sim'])
-    fig0, axes = pl.subplots(2, 1)
-    for i, (n_clusters, mixing) in enumerate(zip(clusters, mixing_steps)):
-        pars = dict(
-            n_agents=pop,
-            start=start,
-            end=end,
-            location='nigeria',
-            ms_agent_ratio=100,
-            n_clusters=n_clusters,
-            #clustered_risk=risk,
-            mixing_steps = mixing,
-            #pfa = 1,
-            #random_pairing=True,
-            analyzers=[snap, new_pairs]
-        )
-
-        sim = hpv.Sim(pars=pars)
-        sim.run()
-        layer_keys = sim.people.layer_keys()
-        num_layers = len(layer_keys)
-        # Plot age mixing
-        labels += ['{} cluster, {} mixing steps'.format(n_clusters, len(mixing))]
-        snaps.append(sim.get_analyzer('snapshot'))
-        new_pairs_snaps = sim.get_analyzer('new_pairs_snap').new_pairs
-        new_pairs_snaps['sim'] = i
-        df_new_pairs = pd.concat([df_new_pairs, new_pairs_snaps])
-        plot_mixing(df_new_pairs, layer_keys)
-        axes[0].plot(sim.results['year'], sim.results['infections'], label=labels[i])
-        axes[1].plot(sim.results['year'], sim.results['cancers'])
-    axes[0].legend()
-    axes[0].set_ylabel('Infections')
-    axes[1].set_ylabel('Cancers')
-    fig0.show()
-
-    fig, axes = pl.subplots(nrows=i+1, ncols=num_layers, figsize=(14, 10), sharey='col')
-    font_size = 15
-    pl.rcParams['font.size'] = font_size
-    for i, isnap in enumerate(snaps):
-        people = isnap.snapshots[-1] # snapshot from 2020
-        rships_f = np.zeros((num_layers, len(people.age_bin_edges)))
-        rships_m = np.zeros((num_layers, len(people.age_bin_edges)))
-        age_bins = np.digitize(people.age, bins=people.age_bin_edges) - 1
-        n_rships = people.n_rships
-        for lk, lkey in enumerate(layer_keys):
-            for ab in np.unique(age_bins):
-                inds_f = (age_bins==ab) & people.is_female
-                inds_m = (age_bins==ab) & people.is_male
-                rships_f[lk,ab] = n_rships[lk,inds_f].mean()
-                rships_m[lk, ab] = n_rships[lk, inds_m].mean()
-            ax = axes[i, lk]
-            yy_f = rships_f[lk,:]
-            yy_m = rships_m[lk,:]
-            ax.bar(people.age_bin_edges-1, yy_f, width=1.5, label='Female')
-            ax.bar(people.age_bin_edges+1, yy_m, width=1.5, label='Male')
-            ax.set_xlabel(f'Age')
-            ax.set_title(f'Average number of relationships, {lkey}')
-        axes[i, 0].set_ylabel(labels[i])
-    axes[0,2].legend()
-    fig.tight_layout()
-    fig.show()
-
-
 def cluster_demo():
     sc.heading('Cluster test')
     # Default: well-mixed (1 cluster)
@@ -148,7 +79,7 @@ def network_demo():
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
     )
-    new_pairs = new_pairs_snap(start_year = 2012)
+    new_pairs = new_pairs_snap(start_year = 2017)
     for n_clusters, mixing, label in zip(clusters, mixing_steps, labels):
         pars = dict(
             n_agents=pop,
@@ -167,13 +98,12 @@ def network_demo():
     msim.plot(style='simple')
     plt.show()
 
-    # plot age and cluster mixing patterns for each sim
     for sim in msim.sims:
+        # plot age and cluster mixing
         plot_mixing(sim, 'age')
         plot_mixing(sim, 'cluster')
-
-    # plot number of relationships overtime
-
+        # plot number of relationships overtime
+        plot_rships(sim)
 
 def plot_mixing(sim, dim):
     df_new_pairs = sim.get_analyzer('new_pairs_snap').new_pairs
@@ -199,33 +129,35 @@ def plot_mixing(sim, dim):
     g.tight_layout()
     plt.show()
 
-def plot_rships():
-    fig, axes = pl.subplots(nrows=i+1, ncols=num_layers, figsize=(14, 10), sharey='col')
-    font_size = 15
-    pl.rcParams['font.size'] = font_size
-    for i, isnap in enumerate(snaps):
-        people = isnap.snapshots[-1] # snapshot from 2020
-        rships_f = np.zeros((num_layers, len(people.age_bin_edges)))
-        rships_m = np.zeros((num_layers, len(people.age_bin_edges)))
-        age_bins = np.digitize(people.age, bins=people.age_bin_edges) - 1
-        n_rships = people.n_rships
-        for lk, lkey in enumerate(layer_keys):
-            for ab in np.unique(age_bins):
-                inds_f = (age_bins==ab) & people.is_female
-                inds_m = (age_bins==ab) & people.is_male
-                rships_f[lk,ab] = n_rships[lk,inds_f].mean()
-                rships_m[lk, ab] = n_rships[lk, inds_m].mean()
-            ax = axes[i, lk]
-            yy_f = rships_f[lk,:]
-            yy_m = rships_m[lk,:]
-            ax.bar(people.age_bin_edges-1, yy_f, width=1.5, label='Female')
-            ax.bar(people.age_bin_edges+1, yy_m, width=1.5, label='Male')
-            ax.set_xlabel(f'Age')
-            ax.set_title(f'Average number of relationships, {lkey}')
-        axes[i, 0].set_ylabel(labels[i])
-    axes[0,2].legend()
+def plot_rships(sim):
+    layer_keys = list(sim['partners'].keys())
+    num_layers = len(layer_keys)
+    snaps = sim.get_analyzer('snapshot')
+    people = snaps.snapshots[-1] # snapshot from 2020
+    rships_f = np.zeros((num_layers, len(people.age_bin_edges)))
+    rships_m = np.zeros((num_layers, len(people.age_bin_edges)))
+    age_bins = np.digitize(people.age, bins=people.age_bin_edges) - 1
+    n_rships = people.n_rships
+
+    fig, axes = pl.subplots(nrows=1, ncols=num_layers, figsize=(14, 10), sharey='col')
+    for lk, lkey in enumerate(layer_keys):
+        for ab in np.unique(age_bins):
+            inds_f = (age_bins==ab) & people.is_female
+            inds_m = (age_bins==ab) & people.is_male
+            rships_f[lk,ab] = n_rships[lk,inds_f].mean()
+            rships_m[lk,ab] = n_rships[lk,inds_m].mean()
+        ax = axes[lk]
+        yy_f = rships_f[lk,:]
+        yy_m = rships_m[lk,:]
+        ax.bar(people.age_bin_edges-1, yy_f, width=1.5, label='Female')
+        ax.bar(people.age_bin_edges+1, yy_m, width=1.5, label='Male')
+        ax.set_xlabel(f'Age')
+        ax.set_title(f'Average number of relationships, {lkey}')
+    axes[0].set_ylabel(sim.label)
+    axes[2].legend()
     fig.tight_layout()
     fig.show()
+
 
 #%% Run as a script
 if __name__ == '__main__':
