@@ -721,6 +721,7 @@ class age_results(Analyzer):
         attr = rname.replace('_prevalence', '')  # Strip out terms that aren't stored in the people
         if attr[0] == 'n': attr = attr[2:] # Remove n, used to identify stocks
         if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
+        if attr == 'lsil': attr = ['precin', 'cin1']
         if attr == 'cancer': attr = 'cancerous'
         return attr
 
