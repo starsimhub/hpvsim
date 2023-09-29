@@ -131,32 +131,20 @@ def plot_mixing(sim, dim):
 
 def plot_rships(sim):
     layer_keys = list(sim['partners'].keys())
-    num_layers = len(layer_keys)
     snaps = sim.get_analyzer('snapshot')
     people = snaps.snapshots[-1] # snapshot from 2020
-    rships_f = np.zeros((num_layers, len(people.age_bin_edges)))
-    rships_m = np.zeros((num_layers, len(people.age_bin_edges)))
-    age_bins = np.digitize(people.age, bins=people.age_bin_edges) - 1
-    n_rships = people.n_rships
-
-    fig, axes = pl.subplots(nrows=1, ncols=num_layers, figsize=(14, 10), sharey='col')
+    df = pd.DataFrame({'age':people.age, 'sex':people.is_female})
+    df['sex'].replace({True:'Female', False:'Male'}, inplace=True)
+    df['Age Bin'] = pd.cut(df['age'], people.age_bin_edges)
     for lk, lkey in enumerate(layer_keys):
-        for ab in np.unique(age_bins):
-            inds_f = (age_bins==ab) & people.is_female
-            inds_m = (age_bins==ab) & people.is_male
-            rships_f[lk,ab] = n_rships[lk,inds_f].mean()
-            rships_m[lk,ab] = n_rships[lk,inds_m].mean()
-        ax = axes[lk]
-        yy_f = rships_f[lk,:]
-        yy_m = rships_m[lk,:]
-        ax.bar(people.age_bin_edges-1, yy_f, width=1.5, label='Female')
-        ax.bar(people.age_bin_edges+1, yy_m, width=1.5, label='Male')
-        ax.set_xlabel(f'Age')
-        ax.set_title(f'Average number of relationships, {lkey}')
-    axes[0].set_ylabel(sim.label)
-    axes[2].legend()
-    fig.tight_layout()
-    fig.show()
+        df[lkey] = people.n_rships[lk]
+    dfm = df.melt(id_vars=['Age Bin', 'sex'], value_vars=layer_keys, var_name='Layer', value_name='n_rships')
+    g = sns.catplot(data=dfm, kind='bar', x='Age Bin', y='n_rships', hue='sex', col='Layer', sharey=False, height=8, aspect=0.5, legend_out=False, palette='tab10')
+    g.tick_params(axis='x', which='both', rotation=70)
+    g.set_ylabels('Number of Relationships')
+    g.fig.tight_layout()
+    g.fig.subplots_adjust(top=0.9)
+    g.fig.suptitle(sim.label)
 
 
 #%% Run as a script
