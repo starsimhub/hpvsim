@@ -245,16 +245,7 @@ class People(hpb.BasePeople):
 
         # Calculate the probability of cancer for each woman
         dur_cin = self.dur_cin[g, inds]
-        if gpars['sev_integral']=='analytic':
-            cancer_prob = hppar.compute_severity_integral(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['cancer_fn'])  # Calculate analytic integral of cumulative severity
-        elif gpars['sev_integral']=='numeric':
-            cumdysp = self.pars['cumdysp'][self.pars['genotype_map'][g]]
-            t = np.around(dur_cin/dt).astype(int) # Round
-            t[t > len(cumdysp) - 1] = len(cumdysp) - 1
-            cancer_prob = cumdysp[t]
-        elif gpars['sev_integral'] is None:
-            cancer_prob = hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['cancer_fn'])
-
+        cancer_prob = gpars['cancer_max']*hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['cancer_fn'])  # Calculate probability of cancer
         n_extra = self.pars['ms_agent_ratio']
         cancer_scale = self.pars['pop_scale'] / n_extra
 
@@ -272,15 +263,7 @@ class People(hpb.BasePeople):
             extra_dur_precin = hpu.sample(**gpars['dur_precin'], size=full_size)
             extra_rel_sevs = np.ones(full_size)*self.rel_sev[inds][:,None]
 
-            if gpars['sev_integral'] == 'analytic':
-                extra_cancer_probs = hppar.compute_severity_integral(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['cancer_fn'])  # Calculate analytic integral of cumulative severity
-            elif gpars['sev_integral'] == 'numeric':
-                cumdysp = self.pars['cumdysp'][self.pars['genotype_map'][g]]
-                t = np.around(extra_dur_cin/dt*extra_rel_sevs).astype(int)  # Round
-                t[t > len(cumdysp) - 1] = len(cumdysp) - 1
-                extra_cancer_probs = cumdysp[t]
-            elif gpars['sev_integral'] is None:
-                extra_cancer_probs = hppar.compute_severity(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['cancer_fn'])  # Calculate analytic integral of cumulative severity
+            extra_cancer_probs = gpars['cancer_max']*hppar.compute_severity(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['cancer_fn'])  # Calculate probability of cancer
 
             # Based on the extra severity values, determine additional transformation probabilities
             extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs[:,1:])

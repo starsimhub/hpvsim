@@ -126,7 +126,6 @@ def make_pars(**kwargs):
     pars['n_imm_sources']   = 1 # The number of immunity sources circulating in the population
     pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
-    pars['cumdysp']         = dict()
 
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
@@ -324,8 +323,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.dur_cin          = dict(dist='lognormal', par1=4, par2=10) # Duration of episomal infection prior to cancer
     pars.hpv16.cin_fn           = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
     pars.hpv16.cancer_fn        = dict(form='logf2', k=0.25, x_infl=10, ttc=60) # Function mapping duration of cin to probability of cancer
+    pars.hpv16.cancer_max       = 0.5
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
@@ -333,8 +332,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.dur_cin          = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
     pars.hpv18.cin_fn           = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
     pars.hpv18.cancer_fn        = dict(form='logf2', k=0.25, x_infl=10, ttc=60) # Function mapping duration of infection to severity
+    pars.hpv18.cancer_max       = 0.3
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
@@ -343,8 +342,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hi5.dur_cin            = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
     pars.hi5.cin_fn             = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
     pars.hi5.cancer_fn          = dict(form='logf2', k=0.25, x_infl=10, ttc=60) # Function mapping duration of infection to severity
+    pars.hi5.cancer_max         = 0.3
     pars.hi5.rel_beta           = 0.9 # placeholder
-    pars.hi5.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hi5.sero_prob          = 0.60 # placeholder
 
     # Other high-risk: oncogenic but not covered in 9valent vaccine: 35, 39, 51, 56, 59
@@ -353,8 +352,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.ohr.dur_cin            = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
     pars.ohr.cin_fn             = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
     pars.ohr.cancer_fn          = dict(form='logf2', k=0.125, x_infl=10, ttc=30) # Function mapping duration of infection to severity
+    pars.ohr.cancer_max         = 0.3
     pars.ohr.rel_beta           = 0.9 # placeholder
-    pars.ohr.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.ohr.sero_prob          = 0.60 # placeholder
 
     # All other high-risk types: 31, 33, 35, 39, 45, 51, 52, 56, 58, 59
@@ -364,8 +363,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hr.dur_cin          = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
     pars.hr.cin_fn           = dict(form='linear', slope=0.1/7)  # Function mapping duration of infection to probability of developing cin
     pars.hr.cancer_fn        = dict(form='logf2', k=0.125, x_infl=10, ttc=30) # Function mapping duration of infection to severity
+    pars.hr.cancer_max       = 0.2
     pars.hr.rel_beta         = 0.9 # placeholder
-    pars.hr.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hr.sero_prob        = 0.60 # placeholder
 
     # Low-risk
@@ -374,8 +373,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.lr.dur_cin             = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
     pars.lr.cin_fn              = dict(form='linear', slope=0.1/7)  # Function mapping duration of infection to probability of developing cin
     pars.lr.cancer_fn           = dict(form='logf2', k=0.0, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.lr.cancer_max          = 0.0
     pars.lr.rel_beta            = 0.9 # placeholder
-    pars.lr.sev_integral        = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.lr.sero_prob           = 0.60 # placeholder
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')

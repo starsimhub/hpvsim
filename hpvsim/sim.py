@@ -384,20 +384,6 @@ class Sim(hpb.BaseSim):
         # Set the number of immunity sources
         self['n_imm_sources'] = len(self['genotypes'])
 
-        # Do any precomputations for the genotype transformation functions
-        t_step = self['dt']
-        t_sequence = np.arange(0, upper_dysp_lim, t_step)
-        cumdysp = dict()
-        for g in range(self['n_genotypes']):
-            sev_fn = self['genotype_pars'][g]['cancer_fn']
-            sev_integral = self['genotype_pars'][g]['sev_integral']
-            if sev_integral=='numeric':
-                glabel = self['genotype_map'][g]
-                dysp_arr = hppar.compute_severity(t_sequence, rel_sev=None, pars=sev_fn)
-                cumdysp[glabel] = np.cumsum(dysp_arr) * t_step
-
-        self['cumdysp'] = cumdysp  # Store
-
         return
 
 
