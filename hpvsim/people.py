@@ -638,6 +638,10 @@ class People(hpb.BasePeople):
         self.date_cin2[genotype, f_inds] = np.nan
         self.date_cin3[genotype, f_inds] = np.nan
 
+        self.dur_cin[genotype, f_inds] = np.nan
+        self.dur_precin[genotype, f_inds] = np.nan
+        self.dur_infection[genotype, f_inds] = np.nan
+
         return
 
 
