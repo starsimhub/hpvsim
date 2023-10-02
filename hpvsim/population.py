@@ -113,7 +113,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             for lkey in lkeys:
                 contacts[lkey], current_partners,_,_ = make_contacts(
                     lno=lno, tind=0, partners=partners[lno,:], current_partners=current_partners,
-                    sexes=sexes, ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
+                    ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
                     durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey],
                     cluster=cluster, add_mixing=sim['add_mixing'], **kwargs
@@ -175,7 +175,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
-    cluster         = hpu.assign_groups(new_n, pars['cluster_rel_sizes']).astype(int)
+    cluster         = hpu.n_multinomial(pars['cluster_rel_sizes'], new_n).astype(int)
     rel_sev         = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
 
     return uid, sex, debut, rel_sev, partners, cluster
@@ -260,7 +260,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
     return scaled_acts
 
 
-def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active, is_female,
+def create_edgelist(lno, partners, current_partners, mixing, age, is_active, is_female,
                         layer_probs, cross_layer, cluster, add_mixing):
     '''
     Create partnerships for a single layer. Eligible females and males are first identified if they are sexually active,
@@ -273,10 +273,10 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     females are randomly dropped with no new partner in this layer and time step.
 
     Args:
+        lno                 (int): index of network layer
         partners            (int arr): array containing each agent's desired number of partners in this layer
         current_partners    (int arr): array containing each agent's actual current number of partners in this layer
         mixing              (float arr): age mixing matrix
-        sex                 (bool arr): sex
         age                 (float arr): age
         is_active           (bool arr): whether or not people are sexually active
         is_female           (bool arr): whether each person is female
@@ -287,7 +287,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     '''
 
     # Useful variables
-    n_agents        = len(sex)
+    n_agents        = len(age)
     n_layers        = current_partners.shape[0]
     f_active        =  is_female & is_active
     m_active        = ~is_female & is_active
@@ -308,15 +308,17 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     # Bin the females by age
     bins = layer_probs[0, :]  # Extract age bins
     cluster_range = np.unique(cluster)
+    # Initialize
     f = np.array([], dtype=int)
     m = np.array([], dtype=int)
-    for cl in cluster_range: # Loop through clusters
+
+    for cl in cluster_range: # Loop through clusters for females
         m_probs = np.ones(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
         # Try randomly select females for pairing
         f_eligible_inds = hpu.true(f_eligible * (cluster==cl))  # Inds of all eligible females in this cluster
         f_cl = hpu.participation_filter(f_eligible_inds, age, layer_probs[1, :], bins=layer_probs[0, :])
         if len(f_cl):
-            m_eligible_inds = hpu.true(m_eligible) # Inds of all eligible males across clusters
+            m_eligible_inds = hpu.true(m_eligible)  # Inds of all eligible males across clusters
             m_cl = hpu.participation_filter(m_eligible_inds, age, layer_probs[2, :], bins=layer_probs[0, :])
             # Draw male partners based on mixing matrices
             age_bins_f = np.digitize(age[f_cl], bins=bins) - 1  # Age bins of participating females
@@ -348,15 +350,12 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     if len(new_pship_inds) > 0:
         current_partners[lno, new_pship_inds] += new_pship_counts
 
-    f_paired = np.array(f)
-    m_paired = np.array(m)
-
-    return f_paired, m_paired, current_partners, new_pship_inds, new_pship_counts
+    return f, m, current_partners, new_pship_inds, new_pship_counts
 
 
 
 def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
-                  sexes=None, ages=None, debuts=None, is_female=None, is_active=None,
+                  ages=None, debuts=None, is_female=None, is_active=None,
                   mixing=None, layer_probs=None, cross_layer=None,
                   durations=None, acts=None, age_act_pars=None,
                   cluster=None, add_mixing=None):
@@ -367,7 +366,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
 
     # Create edgelist
     f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(
-        lno, partners, current_partners, mixing, sexes, ages, is_active, is_female,
+        lno, partners, current_partners, mixing, ages, is_active, is_female,
         layer_probs, cross_layer, cluster, add_mixing)
 
     # Convert edgelist into Contacts dict, with info about each partnership's duration,
