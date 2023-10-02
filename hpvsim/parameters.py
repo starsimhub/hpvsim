@@ -321,7 +321,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='lognormal', par1=3, par2=10)  # Duration of infection prior to precancer
     pars.hpv16.dur_cin          = dict(dist='lognormal', par1=4, par2=10) # Duration of episomal infection prior to cancer
-    pars.hpv16.cin_fn           = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv16.cin_fn           = dict(form='linear', slope=0.2/10)  # Function mapping duration of infection to probability of developing cin
     pars.hpv16.cancer_fn        = dict(form='logf2', k=0.25, x_infl=10, ttc=60) # Function mapping duration of cin to probability of cancer
     pars.hpv16.cancer_max       = 0.5
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
@@ -330,7 +330,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin       = dict(dist='lognormal', par1=3, par2=10)  # Duration of infection prior to precancer
     pars.hpv18.dur_cin          = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
-    pars.hpv18.cin_fn           = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv18.cin_fn           = dict(form='linear', slope=0.2/10)  # Function mapping duration of infection to probability of developing cin
     pars.hpv18.cancer_fn        = dict(form='logf2', k=0.25, x_infl=10, ttc=60) # Function mapping duration of infection to severity
     pars.hpv18.cancer_max       = 0.3
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
@@ -340,7 +340,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hi5 = sc.objdict()
     pars.hi5.dur_precin         = dict(dist='lognormal', par1=3, par2=10)  # Duration of infection prior to precancer
     pars.hi5.dur_cin            = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
-    pars.hi5.cin_fn             = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
+    pars.hi5.cin_fn             = dict(form='linear', slope=0.2/10)  # Function mapping duration of infection to probability of developing cin
     pars.hi5.cancer_fn          = dict(form='logf2', k=0.25, x_infl=10, ttc=60) # Function mapping duration of infection to severity
     pars.hi5.cancer_max         = 0.3
     pars.hi5.rel_beta           = 0.9 # placeholder
@@ -350,7 +350,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.ohr = sc.objdict()
     pars.ohr.dur_precin         = dict(dist='lognormal', par1=3, par2=10)  # Duration of infection prior to precancer
     pars.ohr.dur_cin            = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
-    pars.ohr.cin_fn             = dict(form='linear', slope=0.2/7)  # Function mapping duration of infection to probability of developing cin
+    pars.ohr.cin_fn             = dict(form='linear', slope=0.2/10)  # Function mapping duration of infection to probability of developing cin
     pars.ohr.cancer_fn          = dict(form='logf2', k=0.125, x_infl=10, ttc=30) # Function mapping duration of infection to severity
     pars.ohr.cancer_max         = 0.3
     pars.ohr.rel_beta           = 0.9 # placeholder
@@ -361,7 +361,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hr = sc.objdict()
     pars.hr.dur_precin       = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
     pars.hr.dur_cin          = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
-    pars.hr.cin_fn           = dict(form='linear', slope=0.1/7)  # Function mapping duration of infection to probability of developing cin
+    pars.hr.cin_fn           = dict(form='linear', slope=0.1/10)  # Function mapping duration of infection to probability of developing cin
     pars.hr.cancer_fn        = dict(form='logf2', k=0.125, x_infl=10, ttc=30) # Function mapping duration of infection to severity
     pars.hr.cancer_max       = 0.2
     pars.hr.rel_beta         = 0.9 # placeholder
@@ -371,7 +371,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.lr = sc.objdict()
     pars.lr.dur_precin          = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
     pars.lr.dur_cin             = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
-    pars.lr.cin_fn              = dict(form='linear', slope=0.1/7)  # Function mapping duration of infection to probability of developing cin
+    pars.lr.cin_fn              = dict(form='linear', slope=0.05/10)  # Function mapping duration of infection to probability of developing cin
     pars.lr.cancer_fn           = dict(form='logf2', k=0.0, x_infl=0, ttc=30) # Function mapping duration of infection to severity
     pars.lr.cancer_max          = 0.0
     pars.lr.rel_beta            = 0.9 # placeholder
