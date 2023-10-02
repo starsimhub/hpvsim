@@ -1372,7 +1372,7 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with abnormal cells. Union of episomal, transformed, and cancerous
         '''
-        return (self.episomal + self.transformed + self.cancerous).astype(bool)
+        return (self.episomal + self.cancerous).astype(bool)
 
     @property
     def latent(self):
@@ -1387,36 +1387,14 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of females with HPV whose disease severity level does not meet the threshold for detectable cell changes
         '''
-        return ((self.sex == 0) & self.infectious & (np.isnan(self.sev) | (self.sev==0))).astype(bool)
-
-    @property
-    def cin1(self):
-        '''
-        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN1-level cell changes
-        '''
-        return ((self.sex == 0) * (self.sev > 0) * (self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
-
-    @property
-    def cin2(self):
-        '''
-        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN2-level cell changes
-        '''
-        return ((self.sex == 0) * (self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
-                 self.sev < self.pars['clinical_cutoffs']['cin2'])).astype(bool)
-
-    @property
-    def cin3(self):
-        '''
-        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN3-level cell changes
-        '''
-        return ((self.sex == 0) * (self.sev >= self.pars['clinical_cutoffs']['cin2'])).astype(bool)
+        return ((self.sex == 0) & self.infectious & ~self.episomal).astype(bool)
 
     @property
     def cin(self):
         '''
         Boolean array of females with HPV whose disease severity level meets the threshold for detectable cell changes
         '''
-        return (self.sev>0).astype(bool)
+        return ((self.sex == 0) & self.infectious & self.episomal).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
