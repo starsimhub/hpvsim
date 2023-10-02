@@ -447,6 +447,7 @@ class People(hpb.BasePeople):
         filter_inds = filters.nonzero()[0]
         inds = self.check_inds(self.cin[genotype,:], self.date_cin[genotype,:], filter_inds=filter_inds)
         self.cin[genotype, inds] = True
+        self.episomal[genotype, inds] = True  # now episomal
         # Age calculations
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
         return cases_by_age, self.scale_flows(inds)
@@ -753,7 +754,6 @@ class People(hpb.BasePeople):
         # Update states, genotype info, and flows
         self.susceptible[g, inds]   = False # no longer susceptible
         self.infectious[g, inds]    = True  # now infectious
-        self.episomal[g, inds]      = True  # now episomal
         self.inactive[g, inds]      = False  # no longer inactive
 
         # Add to flow results. Note, we only count these infectious in the results if they happened at this timestep
