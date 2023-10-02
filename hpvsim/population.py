@@ -176,7 +176,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
     partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
     cluster         = hpu.assign_groups(new_n, pars['cluster_rel_sizes']).astype(int)
-    rel_sev     = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
+    rel_sev         = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
 
     return uid, sex, debut, rel_sev, partners, cluster
 
@@ -266,7 +266,7 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     Create partnerships for a single layer. Eligible females and males are first identified if they are sexually active,
     underpartnered, and is available to partner for the specified type of relationship given their concurrency preference
     and whether they already have partners in other relationship layers. Concurrency preference is randomly assigned.
-    Eligible individuals are randomly then chosen based on age- and sex-specific participation rates. The paring
+    Eligible individuals are randomly then chosen based on age- and sex-specific participation rates. The pairing
     algorithm iterates through each cluster and age bin of females, calculating relative preference of all participating
     males by multiplying the cluster- and age-specific mixing weights. Male partners are then randomly drawn based on
     these relative mixing weights. If there are not enough male partners to satiate all females in a cluster and age bin,
@@ -308,8 +308,8 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
     # Bin the females by age
     bins = layer_probs[0, :]  # Extract age bins
     cluster_range = np.unique(cluster)
-    f = []
-    m = []
+    f = np.array([], dtype=int)
+    m = np.array([], dtype=int)
     for cl in cluster_range: # Loop through clusters
         m_probs = np.ones(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
         # Try randomly select females for pairing
@@ -325,8 +325,6 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
             # shuffle age bins
             bin_order = np.arange(len(bin_range_f))
             np.random.shuffle(bin_order)
-            f_selected = []
-            m_selected = []
             for ab, nm in zip(bin_range_f[bin_order], males_needed[bin_order]):  # Loop through the age bins of females and the number of males needed for each
                 male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
                 # Weight males according to the preferences of females of this age
@@ -337,14 +335,14 @@ def create_edgelist(lno, partners, current_partners, mixing, sex, age, is_active
                     f_inds = f_cl[hpu.true(age_bins_f == ab)]  # inds of participating females in this age bin
                     if nm > len(this_weighting_nonzero):
                         #print(f'Warning, {nm} males desired but only {len(this_weighting_nonzero)} found.')
-                        f_selected = f_inds[hpu.choose(nm, len(this_weighting_nonzero))].tolist() # randomly select females
-                        nm = len(f_selected) # number of new partnerships in this age bin
+                        f_selected = f_inds[hpu.choose(nm, len(this_weighting_nonzero))] # randomly select females
+                        nm = f_selected.size # number of new partnerships in this age bin
                     else:
-                        f_selected = f_inds.tolist()
-                    m_selected = m_cl[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]].tolist()  # Select males based on mixing weights
+                        f_selected = f_inds
+                    m_selected = m_cl[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]]  # Select males based on mixing weights
                     m_probs[m_selected] = 0 # remove males that get partnered
-                m += m_selected # save selected males
-                f += f_selected
+                    m = np.concatenate((m, m_selected)) # save selected males
+                    f = np.concatenate((f, f_selected))
     # Count how many contacts there actually are
     new_pship_inds, new_pship_counts = np.unique(np.concatenate([f, m]), return_counts=True)
     if len(new_pship_inds) > 0:

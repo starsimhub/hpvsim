@@ -577,10 +577,10 @@ def participation_filter(inds, age, layer_probs, bins):
     '''
     age_bins = np.digitize(age[inds], bins=bins) - 1  # Age bins of individuals
     bin_range = np.unique(age_bins)  # Range of bins
-    participating_inds = np.array([], dtype=int)  # Initialize the female partners in this cluster
+    participating_inds = np.array([], dtype=int)  # Initialize
     for ab in bin_range:  # Loop over age bins
-        these_f_contacts = binomial_filter(layer_probs[ab], inds[age_bins == ab])  # Select females according to their participation rate in this layer
-        participating_inds = np.append(participating_inds, these_f_contacts)
+        these_contacts = binomial_filter(layer_probs[ab], inds[age_bins == ab])  # Select individuals according to their participation rate in this layer
+        participating_inds = np.append(participating_inds, these_contacts)
     return participating_inds
 
 #%% Simple array operations

@@ -744,7 +744,7 @@ def add_mixing(pars):
     '''
     Create additional mixing matrix
     '''
-    cluster_size = pars['n_clusters']
+    n_clusters = pars['n_clusters']
 
     if 'cluster_rel_sizes' not in pars or pars['cluster_rel_sizes'] is None:
         pars['cluster_rel_sizes'] = np.repeat(1/pars['n_clusters'], pars['n_clusters'])
@@ -753,9 +753,9 @@ def add_mixing(pars):
         errormsg = 'Length of cluster sizes does not match number of clusters'
         raise ValueError(errormsg)
 
-    if cluster_size > 1:
+    if n_clusters > 1:
         if 'add_mixing' in pars and pars['add_mixing'] is not None: # If mixing matrix is defined, check if dimension matches n_clusters
-            if pars['add_mixing'].shape != (cluster_size, cluster_size):
+            if pars['add_mixing'].shape != (n_clusters, n_clusters):
                 errormsg = 'Dimension of input mixing matrix does not match number of clusters'
                 raise ValueError(errormsg)
         else: # if mixing matrix is not defined, autogenerate based on mixing_steps
@@ -764,15 +764,15 @@ def add_mixing(pars):
                 pars['n_clusters'] = 1
                 pars['cluster_rel_sizes'] = np.array([1])
             else:
-                if cluster_size < len(pars['mixing_steps']):
-                    print('Warning: input has {} mixing steps but only {} clusters.'.format(len(pars['mixing_steps']), cluster_size))
-                add_mixing = np.zeros([cluster_size, cluster_size])
-                for i, gs in enumerate(pars['mixing_steps'][:cluster_size - 1]):
-                    add_mixing += np.diagflat(np.repeat(gs, cluster_size - i - 1), i + 1) # fill the lower diagonal
+                if n_clusters < len(pars['mixing_steps']):
+                    print('Warning: input has {} mixing steps but only {} clusters.'.format(len(pars['mixing_steps']), n_clusters))
+                add_mixing = np.zeros([n_clusters, n_clusters])
+                for i, gs in enumerate(pars['mixing_steps'][:n_clusters - 1]):
+                    add_mixing += np.diagflat(np.repeat(gs, n_clusters - i - 1), i + 1) # fill the lower diagonal
                 add_mixing += add_mixing.T # fill the upper diagonal
                 add_mixing[np.diag_indices_from(add_mixing)] = 1  # set diagonal to 1
                 pars['add_mixing'] = add_mixing
-    if cluster_size == 1:
+    elif n_clusters == 1:
         pars['add_mixing'] = np.array([[1]])
 
     return
