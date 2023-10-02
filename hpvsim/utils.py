@@ -341,7 +341,7 @@ def set_seed(seed=None):
 #%% Probabilities -- mostly not jitted since performance gain is minimal
 
 __all__ += ['n_binomial', 'binomial_filter', 'binomial_arr', 'n_multinomial',
-            'poisson', 'n_poisson', 'n_neg_binomial', 'choose', 'choose_r', 'choose_w', 'choose_m']
+            'poisson', 'n_poisson', 'n_neg_binomial', 'choose', 'choose_r', 'choose_w', 'participation_filter']
 
 def n_binomial(prob, n):
     '''
@@ -518,61 +518,15 @@ def choose_w(probs, n, unique=True): # No performance gain from Numba
         probs = np.ones(n_choices)/n_choices
     return np.random.choice(n_choices, n_samples, p=probs, replace=not(unique))
 
-def choose_m(probs): #
-    '''
-    Choose 1 item (e.g., people) from each column of an array with distribution probs.
-
-    Args:
-        probs (array): matrix of probabilities, each column should sum to 1
-        n (int): number of samples to choose
-        unique (bool): whether or not to ensure unique indices
-
-    **Example**::
-
-        choices = hpv.choose_m([0.2, 0.5],
-                                [0.1, 0.1])
-        # Among two males and two females, choose 1 male partner for each female partner with nonequal probability.
-    '''
-
-    c = probs.cumsum(axis=0)
-    u = np.random.rand(len(c), 1)
-
-    choices = (u < c).argmax(axis=0)
-
-    return choices
-
-def assign_groups(n, group_sizes):
-    '''
-    Assign n individuals to differently-sized groups.
-
-    Args:
-        n (int): number of individuals
-        group_sizes (array): relative group sizes
-
-    **Example**:
-
-        group_assignment = hpv.assign_groups(100, [0.2, 0.8]) # assign 100 individuals to two groups of 20 and 80.
-    '''
-    # Check if the sum of group sizes is approximately 1
-    if not np.isclose(np.sum(group_sizes), 1, rtol = 1e-9):
-        raise ValueError("Group sizes should sum to approximately 1")
-
-    # Calculate cumulative probabilities
-    cum_probs = np.cumsum(group_sizes)
-
-    # Generate n random numbers for binary search
-    rands = np.random.random(n)
-
-    return np.searchsorted(cum_probs, rands)
-
 def participation_filter(inds, age, layer_probs, bins):
     '''
-    Assign n individuals to differently-sized groups.
+    Apply age-specific participation filter to eligible individuals.
 
     Args:
         inds (array): indicies of individuals to be filtered
         age (array): age of all individuals
         layer_probs (array): participation rates
+        bins (array): age bins
 
     '''
     age_bins = np.digitize(age[inds], bins=bins) - 1  # Age bins of individuals

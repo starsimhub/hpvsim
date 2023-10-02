@@ -35,8 +35,8 @@ class Sim(hpb.BaseSim):
         self.hiv_datafile  = hiv_datafile # The name of the HIV data file
         self.popfile       = popfile  # The population file
         self.data          = None     # The data
-        self.popdict       = popdict   # The population dictionary
-        self.people        = people    # People object
+        self.popdict       = popdict  # The population dictionary
+        self.people        = people   # People object
         self.t             = None     # The current time in the simulation (during execution); outside of sim.step(), its value corresponds to next timestep to be computed
         self.results       = {}       # For storing results
         self.summary       = None     # For storing a summary of the results

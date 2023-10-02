@@ -1,5 +1,5 @@
 '''
-Tests for network options (geostructure and diagnostic visualizations)
+Tests for network options (beyond-age assortativity and diagnostic visualizations)
 '''
 
 #%% Imports and settings
@@ -9,7 +9,6 @@ import hpvsim as hpv
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import pylab as pl
 
 hpv.options(verbose=False)
 
