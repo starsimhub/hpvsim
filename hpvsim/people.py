@@ -263,8 +263,11 @@ class People(hpb.BasePeople):
             extra_dur_precin = hpu.sample(**gpars['dur_precin'], size=full_size)
             extra_rel_sevs = np.ones(full_size)*self.rel_sev[inds][:,None]
 
-            extra_cancer_probs = gpars['cancer_max']*hppar.compute_severity(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['cancer_fn'])  # Calculate probability of cancer
+            extra_cin_probs = hppar.compute_severity(extra_dur_precin, rel_sev=extra_rel_sevs, pars=gpars['cin_fn'])
+            extra_cin_bools = hpu.binomial_arr(extra_cin_probs[:,1:])
 
+            extra_cancer_probs = gpars['cancer_max']*hppar.compute_severity(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['cancer_fn'])  # Calculate probability of cancer
+            extra_cancer_probs[:,1:][~extra_cin_bools] = 0
             # Based on the extra severity values, determine additional transformation probabilities
             extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs[:,1:])
             extra_cancer_bools *= self.level0[inds, None]  # Don't allow existing cancer agents to make more cancer agents
