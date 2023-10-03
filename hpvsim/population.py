@@ -311,26 +311,29 @@ def create_edgelist(lno, partners, current_partners, mixing, age, is_active, is_
     # Initialize
     f = np.array([], dtype=int)
     m = np.array([], dtype=int)
+    # Filter males by participation rates
+    m_eligible_inds = hpu.true(m_eligible)  # Inds of all eligible males across clusters
+    m_participants = hpu.participation_filter(m_eligible_inds, age, layer_probs[2, :], bins=layer_probs[0, :])
+    age_bins_m = np.digitize(age[m_participants], bins=bins) - 1  # Age bins of participating males
 
+    # shuffle clusters
+    np.random.shuffle(cluster_range)
     for cl in cluster_range: # Loop through clusters for females
         m_probs = np.ones(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
         # Try randomly select females for pairing
         f_eligible_inds = hpu.true(f_eligible * (cluster==cl))  # Inds of all eligible females in this cluster
         f_cl = hpu.participation_filter(f_eligible_inds, age, layer_probs[1, :], bins=layer_probs[0, :])
         if len(f_cl):
-            m_eligible_inds = hpu.true(m_eligible)  # Inds of all eligible males across clusters
-            m_cl = hpu.participation_filter(m_eligible_inds, age, layer_probs[2, :], bins=layer_probs[0, :])
             # Draw male partners based on mixing matrices
-            age_bins_f = np.digitize(age[f_cl], bins=bins) - 1  # Age bins of participating females
-            age_bins_m = np.digitize(age[m_cl], bins=bins) - 1  # Age bins of participating males
+            age_bins_f = np.digitize(age[f_cl], bins=bins) - 1  # Age bins of participating females in this cluster
             bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)  # For each female age bin, how many females need partners?
             # shuffle age bins
             bin_order = np.arange(len(bin_range_f))
             np.random.shuffle(bin_order)
             for ab, nm in zip(bin_range_f[bin_order], males_needed[bin_order]):  # Loop through the age bins of females and the number of males needed for each
-                male_dist = mixing[:, ab + 1]  # Get the distribution of ages of the male partners of females of this age
+                male_dist = mixing[:, ab + 1]  # Get female preferences for male partners in this age bin
                 # Weight males according to the preferences of females of this age
-                this_weighting = m_probs[m_cl] * male_dist[age_bins_m] * add_mixing[cl, cluster[m_cl]]
+                this_weighting = m_probs[m_participants] * male_dist[age_bins_m] * add_mixing[cl, cluster[m_participants]]
                 if this_weighting.sum() > 0:
                     males_nonzero = hpu.true(this_weighting)  # Remove males with 0 weights
                     this_weighting_nonzero = this_weighting[males_nonzero]
@@ -341,7 +344,7 @@ def create_edgelist(lno, partners, current_partners, mixing, age, is_active, is_
                         nm = f_selected.size # number of new partnerships in this age bin
                     else:
                         f_selected = f_inds
-                    m_selected = m_cl[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]]  # Select males based on mixing weights
+                    m_selected = m_participants[males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]]  # Select males based on mixing weights
                     m_probs[m_selected] = 0 # remove males that get partnered
                     m = np.concatenate((m, m_selected)) # save selected males
                     f = np.concatenate((f, f_selected))

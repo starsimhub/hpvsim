@@ -25,7 +25,7 @@ class new_pairs_snap(hpv.Analyzer):
     # analyzer for recording new partnerships of each timestep
     def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
-        self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'cluster_f','cluster_m', 'year', 'rtype'])
+        self.new_pairs = pd.DataFrame()
         self.start_year = start_year
         self.yearvec = None
 
@@ -37,35 +37,16 @@ class new_pairs_snap(hpv.Analyzer):
 
     def apply(self, sim):
         if sim.yearvec[sim.t] >= self.start_year:
-            tind = sim.yearvec[sim.t] - sim['start']
+            year_since_start = sim.yearvec[sim.t] - sim['start']
             layer_keys = sim.people.layer_keys()
             for rtype in layer_keys:
-                new_rship_inds = (sim.people.contacts[rtype]['start'] == tind).nonzero()[0]
+                new_rship_inds = (sim.people.contacts[rtype]['start'] == year_since_start).nonzero()[0]
                 if len(new_rship_inds):
                     contacts = pd.DataFrame.from_dict(sim.people.contacts[rtype].get_inds(new_rship_inds))
-                    #contacts = pd.DataFrame.from_dict(sim.people.contacts[rtype])
                     contacts['year'] = int(sim.yearvec[sim.t])
                     contacts['rtype'] = rtype
                     self.new_pairs = pd.concat([self.new_pairs, contacts])
         return
-
-def cluster_demo():
-    sc.heading('Cluster test')
-    # Default: well-mixed (1 cluster)
-    sim0 = hpv.Sim(pars=base_pars)
-    assert sim0['n_clusters'] == 1
-    # Multiple clusters
-    pars1 = base_pars
-    pars1['n_clusters'] = 10
-    pars1['mixing_steps'] = np.repeat(1,9)
-    sim1 = hpv.Sim(pars=pars1)
-    print(sim1['add_mixing'])
-    # Modifying mixing steps
-    pars2 = pars1
-    pars2['mixing_steps'] = [0.5, 0.01] # diagonal is 1 by default, set relative mixing at 0.5 for adjacent clusters, 0.01 for clusters with distance = 2
-    sim2 = hpv.Sim(pars=pars2)
-    print(sim2['add_mixing'])
-
 
 def network_demo():
     clusters = [10, 10]
@@ -101,7 +82,7 @@ def network_demo():
         # plot age and cluster mixing by year
         plot_mixing(sim, 'age')
         plot_mixing(sim, 'cluster')
-        # plot number of relationships overtime
+        # plot number of relationships over time
         plot_rships(sim)
 
 def plot_mixing(sim, dim):
@@ -131,7 +112,7 @@ def plot_mixing(sim, dim):
 def plot_rships(sim):
     layer_keys = list(sim['partners'].keys())
     snaps = sim.get_analyzer('snapshot')
-    people = snaps.snapshots[-1] # snapshot from 2020
+    people = snaps.snapshots[-1] # Final snapshot (i.e. year 2020)
     df = pd.DataFrame({'age':people.age, 'sex':people.is_female})
     df['sex'].replace({True:'Female', False:'Male'}, inplace=True)
     df['Age Bin'] = pd.cut(df['age'], people.age_bin_edges)
@@ -151,6 +132,5 @@ if __name__ == '__main__':
 
     T = sc.tic()
     network_demo()
-    #cluster_demo()
     sc.toc(T)
     print('Done.')
