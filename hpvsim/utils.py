@@ -110,11 +110,11 @@ def logf2(x, k, x_infl, ttc=25):
     return logf3(x, k, x_infl, s=1, ttc=ttc)
 
 
-def linear(x, slope):
+def linear(x, slope, b=0):
     '''
     Linear function
     '''
-    return slope*x
+    return b + slope*x
 
 
 def invlogf3(y, k, x_infl, s, ttc=25):
