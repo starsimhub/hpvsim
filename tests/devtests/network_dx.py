@@ -25,7 +25,7 @@ class new_pairs_snap(hpv.Analyzer):
     # analyzer for recording new partnerships of each timestep
     def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
-        self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'year', 'rtype'])
+        self.new_pairs = pd.DataFrame(columns = ['f', 'm', 'acts', 'dur', 'start', 'end', 'age_f', 'age_m', 'cluster_f','cluster_m', 'year', 'rtype'])
         self.start_year = start_year
         self.yearvec = None
 
@@ -95,7 +95,7 @@ def network_demo():
         sims.append(sim)
     msim = hpv.MultiSim(sims)
     msim.run()
-    msim.plot(style='simple')
+    msim.plot()
 
     for sim in msim.sims:
         # plot age and cluster mixing by year
@@ -112,8 +112,8 @@ def plot_mixing(sim, dim):
         df_new_pairs['x_bins'] = pd.cut(df_new_pairs['age_f'], bins)
         df_new_pairs['y_bins'] = pd.cut(df_new_pairs['age_m'], bins)
     elif dim == 'cluster':
-        df_new_pairs['x_bins'] = df_new_pairs['cluster_f']
-        df_new_pairs['y_bins'] = df_new_pairs['cluster_m']
+        df_new_pairs['x_bins'] = df_new_pairs['cluster_f'].astype('category')
+        df_new_pairs['y_bins'] = df_new_pairs['cluster_m'].astype('category')
 
     count_df = df_new_pairs.groupby(['rtype', 'year', 'x_bins', 'y_bins']).size().reset_index(name='count')
     def facet(data, **kwargs):
