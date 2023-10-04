@@ -1,12 +1,12 @@
 Human papillomavirus simulator (HPVsim)
 =======================================
 
-.. image:: https://github.com/amath-idm/hpvsim/actions/workflows/tests.yaml/badge.svg
-    :target: https://github.com/amath-idm/hpvsim/actions/workflows/tests.yaml
+.. image:: https://github.com/institutefordiseasemodeling/hpvsim/actions/workflows/tests.yaml/badge.svg
+    :target: https://github.com/institutefordiseasemodeling/hpvsim/actions/workflows/tests.yaml
     :alt: pipeline status
 
-.. image:: https://github.com/amath-idm/hpvsim/actions/workflows/docsbuild.yaml/badge.svg
-    :target: https://github.com/amath-idm/hpvsim/actions/workflows/docsbuild.yaml
+.. image:: https://github.com/institutefordiseasemodeling/hpvsim/actions/workflows/docsbuild.yaml/badge.svg
+    :target: https://github.com/institutefordiseasemodeling/hpvsim/actions/workflows/docsbuild.yaml
     :alt: pipeline status
 
 This repository contains the code for the Starsim suite's human papillomavirus simulator, HPVsim. HPVsim is a flexible agent-based model that can be parameterized with country-specific vital dynamics, structured sexual networks, co-transmitting HPV genotypes, B- and T-cell mediated immunity, and high-resolution disease natural history. HPVsim is designed with a user-first lens: it is implemented in pure Python, has built-in tools for simulating commonly-used interventions, has been extensively tested and documented, and runs in a matter of seconds to minutes on a laptop. Useful complexity was not sacrificed: the platform is flexible, allowing bespoke scenario modeling.
