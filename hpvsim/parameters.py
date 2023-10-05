@@ -85,7 +85,7 @@ def make_pars(**kwargs):
     pars['hpv_reactivation']    = 0.025 # Placeholder; unused unless hpv_control_prob>0
     pars['dur_cancer']          = dict(dist='lognormal', par1=8.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
     pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
-    pars['sev_dist']            = dict(dist='normal_pos', par1=1.25, par2=0.2) # Distribution to draw individual level severity scale factors
+    pars['sev_dist']            = dict(dist='normal_pos', par1=1, par2=0.2) # Distribution to draw individual level severity scale factors
     pars['age_risk']            = dict(age=30, risk=2)
 
     # Parameters used to calculate immunity

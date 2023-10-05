@@ -1,0 +1,263 @@
+"""
+Plot implied natural history.
+"""
+import hpvsim as hpv
+import hpvsim.parameters as hppar
+import pylab as pl
+import pandas as pd
+from scipy.stats import lognorm, norm
+import numpy as np
+import sciris as sc
+import seaborn as sns
+
+
+# %% Functions
+
+class dwelltime_by_genotype(hpv.Analyzer):
+    '''
+    Determine the age at which people with cervical cancer were causally infected and
+    time spent between infection and cancer.
+    '''
+
+    def __init__(self, start_year=None, **kwargs):
+        super().__init__(**kwargs)
+        self.start_year = start_year
+        self.years = None
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        self.years = sim.yearvec
+        if self.start_year is None:
+            self.start_year = sim['start']
+        self.age_causal = dict()
+        self.age_cancer = dict()
+        self.dwelltime = dict()
+        self.median_age_causal = dict()
+        for gtype in range(sim['n_genotypes']):
+            self.age_causal[gtype] = []
+            self.age_cancer[gtype] = []
+        for state in ['precin', 'cin', 'total']:
+            self.dwelltime[state] = dict()
+            for gtype in range(sim['n_genotypes']):
+                self.dwelltime[state][gtype] = []
+
+    def apply(self, sim):
+        if sim.yearvec[sim.t] >= self.start_year:
+            cancer_genotypes, cancer_inds = (sim.people.date_cancerous == sim.t).nonzero()
+            if len(cancer_inds):
+                current_age = sim.people.age[cancer_inds]
+                date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
+                dur_precin = sim.people.dur_precin[cancer_genotypes, cancer_inds]
+                dur_cin = sim.people.dur_cin[cancer_genotypes, cancer_inds]
+                total_time = (sim.t - date_exposed) * sim['dt']
+                for gtype in range(sim['n_genotypes']):
+                    gtype_inds = hpv.true(cancer_genotypes == gtype)
+                    self.dwelltime['precin'][gtype] += dur_precin[gtype_inds].tolist()
+                    self.dwelltime['cin'][gtype] += dur_cin[gtype_inds].tolist()
+                    self.dwelltime['total'][gtype] += total_time[gtype_inds].tolist()
+                    self.age_causal[gtype] += (current_age[gtype_inds] - total_time[gtype_inds]).tolist()
+                    self.age_cancer[gtype] += (current_age[gtype_inds]).tolist()
+        return
+
+    def finalize(self, sim=None):
+        ''' Convert things to arrays '''
+        for gtype in range(sim['n_genotypes']):
+            self.median_age_causal[gtype] = np.quantile(self.age_causal[gtype], 0.5)
+
+
+    @staticmethod
+    def reduce(analyzers, quantiles=None):
+        if quantiles is None: quantiles = {'low': 0.1, 'high': 0.9}
+        base_az = analyzers[0]
+        reduced_az = sc.dcp(base_az)
+        reduced_az.age_causal = dict()
+        reduced_az.median_age_causal = dict()
+        reduced_az.age_cancer = dict()
+        for ng in range(len(base_az.age_causal)):
+            reduced_az.median_age_causal[ng] = sc.objdict()
+            reduced_az.age_causal[ng] = sc.objdict()
+            reduced_az.age_cancer[ng] = sc.objdict()
+            age_causal = []
+            age_cancer = []
+            median_age_causal = []
+            for ai,az in enumerate(analyzers):
+                age_causal += az.age_causal[ng]
+                age_cancer += az.age_cancer[ng]
+                median_age_causal.append(az.median_age_causal[ng])
+            reduced_az.age_causal[ng].best  = np.quantile(age_causal, 0.5)
+            reduced_az.age_causal[ng].low   = np.quantile(age_causal, quantiles['low'])
+            reduced_az.age_causal[ng].high  = np.quantile(age_causal, quantiles['high'])
+
+            reduced_az.age_cancer[ng].best  = np.quantile(age_cancer, 0.5)
+            reduced_az.age_cancer[ng].low   = np.quantile(age_cancer, quantiles['low'])
+            reduced_az.age_cancer[ng].high  = np.quantile(age_cancer, quantiles['high'])
+
+            reduced_az.median_age_causal[ng].best  = np.quantile(median_age_causal, 0.5)
+            reduced_az.median_age_causal[ng].low   = np.quantile(median_age_causal, quantiles['low'])
+            reduced_az.median_age_causal[ng].high  = np.quantile(median_age_causal, quantiles['high'])
+
+        return reduced_az
+
+def set_font(size=None, font='Libertinus Sans'):
+    ''' Set a custom font '''
+    sc.fonts(add=sc.thisdir(aspath=True) / 'assets' / 'LibertinusSans-Regular.otf')
+    sc.options(font=font, fontsize=size)
+    return
+
+def lognorm_params(par1, par2):
+    """
+    Given the mean and std. dev. of the log-normal distribution, this function
+    returns the shape and scale parameters for scipy's parameterization of the
+    distribution.
+    """
+    mean = np.log(par1 ** 2 / np.sqrt(par2 ** 2 + par1 ** 2))  # Computes the mean of the underlying normal distribution
+    sigma = np.sqrt(np.log(par2 ** 2 / par1 ** 2 + 1))  # Computes sigma for the underlying normal distribution
+
+    scale = np.exp(mean)
+    shape = sigma
+    return shape, scale
+
+def plot_nh(sim=None):
+    # Make sims
+    genotypes = ['hpv16', 'hpv18', 'hi5']
+    glabels = ['HPV16', 'HPV18', 'HI5']
+
+    dur_cin = sc.autolist()
+    cancer_fns = sc.autolist()
+    cin_fns = sc.autolist()
+    dur_precin = sc.autolist()
+    for gi, genotype in enumerate(genotypes):
+        dur_precin += sim['genotype_pars'][genotype]['dur_precin']
+        dur_cin += sim['genotype_pars'][genotype]['dur_cin']
+        cancer_fns += sim['genotype_pars'][genotype]['cancer_fn']
+        cin_fns += sim['genotype_pars'][genotype]['cin_fn']
+
+
+    ####################
+    # Make figure, set fonts and colors
+    ####################
+    set_font(size=12)
+    colors = sc.gridcolors(len(genotypes))
+    fig, axes = pl.subplots(2, 3, figsize=(11, 9))
+    axes = axes.flatten()
+    cmap = pl.cm.Oranges([0.25, 0.5, 0.75, 1])
+
+    ####################
+    # Make plots
+    ####################
+    dt = 0.25
+    this_precinx = np.arange(dt, 15+dt, dt)
+    this_cinx = np.arange(dt, 30+dt, dt)
+    n_samples = 10
+    # Durations and severity of dysplasia
+    for gi, gtype in enumerate(genotypes):
+
+        # Panel A: durations of infection
+        sigma, scale = lognorm_params(dur_precin[gi]['par1'], dur_precin[gi]['par2'])
+        rv = lognorm(sigma, 0, scale)
+        axes[0].plot(this_precinx, rv.pdf(this_precinx), color=colors[gi], lw=2, label=glabels[gi])
+
+        # Panel B: prob of dysplasia
+        dysp = hppar.compute_severity(this_precinx[:], pars=cin_fns[gi])
+        axes[1].plot(this_precinx, dysp, color=colors[gi], lw=2, label=gtype.upper())
+
+        # Panel C: durations of CIN
+        sigma, scale = lognorm_params(dur_cin[gi]['par1'], dur_cin[gi]['par2'])
+        rv = lognorm(sigma, 0, scale)
+        axes[2].plot(this_cinx, rv.pdf(this_cinx), color=colors[gi], lw=2, label=glabels[gi])
+
+        # Panel D: dysplasia
+        cancer = hppar.compute_severity(this_cinx[:], pars=cancer_fns[gi])
+        axes[3].plot(this_cinx, cancer, color=colors[gi], lw=2, label=gtype.upper())
+
+
+    axes[0].set_ylabel("")
+    axes[0].grid()
+    axes[0].set_xlabel("Duration of infection (years)")
+    axes[0].set_title("Distribution of\n infection duration")
+    axes[0].legend(frameon=False)
+
+    axes[1].set_ylabel("Probability of CIN")
+    axes[1].set_xlabel("Duration of infection (years)")
+    axes[1].set_title("Infection duration to progression\nfunction")
+    axes[1].set_ylim([0,1])
+    axes[1].grid()
+
+
+    axes[2].set_ylabel("")
+    axes[2].grid()
+    axes[2].set_xlabel("Duration of CIN (years)")
+    axes[2].set_title("Distribution of\n CIN duration")
+    axes[2].legend(frameon=False)
+
+    axes[3].set_ylim([0,1])
+    axes[3].grid()
+    # axes[2].set_ylabel("Probability of transformation")
+    axes[3].set_xlabel("Duration of CIN (years)")
+    axes[3].set_title("Probability of cancer\n within X years")
+
+    # Panel F: CIN dwelltime
+    a = sim.get_analyzer('dwelltime_by_genotype')
+    dd = {}
+    dd['dwelltime'] = sc.autolist()
+    dd['genotype'] = sc.autolist()
+    dd['state'] = sc.autolist()
+    for cin in ['precin', 'cin']:
+        dt = a.dwelltime[cin]
+        data = dt[0]+dt[1]+dt[2]
+        labels = ['HPV16']*len(dt[0]) + ['HPV18']*len(dt[1]) + ['HI5']*len(dt[2])
+        dd['dwelltime'] += data
+        dd['genotype'] += labels
+        dd['state'] += [cin.upper()]*len(labels)
+    df = pd.DataFrame(dd)
+    sns.boxplot(data=df, x="state", y="dwelltime", hue="genotype", ax=axes[5], showfliers=False, palette=colors)
+    axes[5].legend([], [], frameon=False)
+    axes[5].set_xlabel("")
+    axes[5].set_ylabel("Dwelltime")
+    axes[5].set_title('Dwelltimes from\n infection to CIN grades')
+
+    ac = {}
+    ac['age'] = sc.autolist()
+    ac['genotype'] = sc.autolist()
+    ac['state'] = sc.autolist()
+    for state, state_label in zip([a.age_causal, a.age_cancer], ['infection', 'cancer']):
+        data = state[0]+state[1]+state[2]
+        labels = ['HPV16']*len(state[0]) + ['HPV18']*len(state[1]) + ['HI5']*len(state[2])
+        ac['age'] += data
+        ac['genotype'] += labels
+        ac['state'] += [state_label.upper()]*len(labels)
+    ac_df = pd.DataFrame(ac)
+    sns.boxplot(data=ac_df, x="state", y="age", hue="genotype", ax=axes[4], showfliers=False, palette=colors)
+    axes[4].legend([], [], frameon=False)
+    axes[4].set_xlabel("")
+    axes[4].set_ylabel("Age")
+    axes[4].set_title('Age of causal infection\nand cancer')
+
+    fig.tight_layout()
+    fig.savefig(f'nathx.png')
+    fig.show()
+
+    return
+
+
+# %% Run as a script
+if __name__ == '__main__':
+
+    location = 'nigeria'
+
+    age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
+    pars = {
+        'location': location,
+        'start': 1970,
+        'end': 2020,
+        'ms_agent_ratio': 100,
+        'n_agents': 50e3,
+        'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
+    }
+    sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype])
+
+    sim.run()
+    sim.plot()
+    plot_nh(sim)
+
+    print('Done.')
