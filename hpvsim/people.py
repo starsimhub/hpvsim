@@ -217,7 +217,7 @@ class People(hpb.BasePeople):
         age_mod = np.ones(len(cin_inds))
         age_mod[self.age[cin_inds] >= self.pars['age_risk']['age']] = self.pars['age_risk']['risk']
         sev_imm = self.sev_imm[g, cin_inds]
-        self.dur_cin[g, cin_inds] = hpu.sample(**gpars['dur_cin'], size=len(cin_inds)) * (1 - sev_imm) * age_mod
+        self.dur_cin[g, cin_inds] = hpu.sample(**gpars['dur_cin'], size=len(cin_inds))* age_mod# * (1 - sev_imm)
         self.dur_precin[g, inds] = dur_precin
         self.dur_infection[g, cin_inds] += self.dur_cin[g, cin_inds]
 

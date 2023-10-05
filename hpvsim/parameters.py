@@ -85,8 +85,8 @@ def make_pars(**kwargs):
     pars['hpv_reactivation']    = 0.025 # Placeholder; unused unless hpv_control_prob>0
     pars['dur_cancer']          = dict(dist='lognormal', par1=8.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
     pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
-    pars['sev_dist']            = dict(dist='normal_pos', par1=1.0, par2=0.25) # Distribution to draw individual level severity scale factors
-    pars['age_risk']            = dict(age=30, risk=1)
+    pars['sev_dist']            = dict(dist='normal_pos', par1=1.2, par2=0.25) # Distribution to draw individual level severity scale factors
+    pars['age_risk']            = dict(age=30, risk=2)
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
@@ -319,26 +319,26 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='lognormal', par1=4, par2=20)  # Duration of infection prior to precancer
-    pars.hpv16.dur_cin          = dict(dist='lognormal', par1=7, par2=20) # Duration of episomal infection prior to cancer
-    pars.hpv16.cin_fn           = dict(form='logf2', k=0.5, x_infl=10, ttc=20)  # Function mapping duration of infection to probability of developing cin
-    pars.hpv16.cancer_fn        = dict(form='logf2', k=0.5, x_infl=10, ttc=30, y_max=0.4) # Function mapping duration of cin to probability of cancer
+    pars.hpv16.dur_cin          = dict(dist='lognormal', par1=12, par2=30) # Duration of episomal infection prior to cancer
+    pars.hpv16.cin_fn           = dict(form='logf2', k=0.5, x_infl=8, ttc=20)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv16.cancer_fn        = dict(form='logf2', k=0.5, x_infl=10, ttc=30, y_max=1) # Function mapping duration of cin to probability of cancer
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin       = dict(dist='lognormal', par1=4, par2=20)  # Duration of infection prior to precancer
-    pars.hpv18.dur_cin          = dict(dist='lognormal', par1=5, par2=20) # Duration of infection prior to cancer
-    pars.hpv18.cin_fn           = dict(form='logf2', k=0.35, x_infl=13, ttc=20)  # Function mapping duration of infection to probability of developing cin
-    pars.hpv18.cancer_fn        = dict(form='logf2', k=0.45, x_infl=10, ttc=30, y_max=0.5) # Function mapping duration of infection to severity
+    pars.hpv18.dur_cin          = dict(dist='lognormal', par1=10, par2=30) # Duration of infection prior to cancer
+    pars.hpv18.cin_fn           = dict(form='logf2', k=0.35, x_infl=11, ttc=20)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv18.cancer_fn        = dict(form='logf2', k=0.45, x_infl=10, ttc=30, y_max=1) # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
     pars.hi5 = sc.objdict()
     pars.hi5.dur_precin         = dict(dist='lognormal', par1=3, par2=20)  # Duration of infection prior to precancer
-    pars.hi5.dur_cin            = dict(dist='lognormal', par1=4, par2=20) # Duration of infection prior to cancer
-    pars.hi5.cin_fn             = dict(form='logf2', k=0.35, x_infl=13, ttc=20)  # Function mapping duration of infection to probability of developing cin
-    pars.hi5.cancer_fn          = dict(form='logf2', k=0.35, x_infl=10, ttc=30, y_max=0.5) # Function mapping duration of infection to severity
+    pars.hi5.dur_cin            = dict(dist='lognormal', par1=11, par2=30) # Duration of infection prior to cancer
+    pars.hi5.cin_fn             = dict(form='logf2', k=0.35, x_infl=12, ttc=20)  # Function mapping duration of infection to probability of developing cin
+    pars.hi5.cancer_fn          = dict(form='logf2', k=0.35, x_infl=10, ttc=30, y_max=1) # Function mapping duration of infection to severity
     pars.hi5.rel_beta           = 0.9 # placeholder
     pars.hi5.sero_prob          = 0.60 # placeholder
 

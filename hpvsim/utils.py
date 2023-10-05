@@ -107,7 +107,7 @@ def logf2(x, k, x_infl, y_max=1, ttc=25):
          x_infl: point of inflection, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
     '''
-    return logf3(x, k, x_infl, s=1, y_max=1, ttc=ttc)
+    return logf3(x, k, x_infl, s=1, y_max=y_max, ttc=ttc)
 
 
 def linear(x, slope, b=0):

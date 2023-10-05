@@ -318,7 +318,7 @@ default_init_prev = {
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
     'infections',
-    'dysplasias',
+    'cins',
     'cancers',
 ]
 
@@ -363,11 +363,10 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         if is_sim:
             plots = sc.objdict({
-                'HPV infections by age': 'infections_by_age',
-                'HPV prevalence': ['hpv_prevalence_by_genotype'],
-                'Pre-cancer prevalence by age': ['precin_prevalence_by_age', 'cin_prevalence_by_age'],
-                'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
+                'HPV prevalence by age': ['precin_prevalence_by_age'],
+                # 'HPV prevalence': ['hpv_prevalence_by_genotype'],
                 'Cancers by age': 'cancers_by_age',
+                'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'HPV type distribution': 'type_dist',
             })
 
