@@ -65,8 +65,6 @@ def make_pars(**kwargs):
     # Network parameters, generally initialized after the population has been constructed
     pars['n_clusters']      = 1     # Defines how many clusters (e.g., geospatial) there should be in the simulated population
     pars['cluster_rel_sizes']= None  # Relative sizes of clusters. If None, assign 1/n_clusters to all clusters.
-    pars['mixing_steps']    = None  # List of relative mixing weights between clusters by relative distance, length = n_clusters - 1, elements should be [0, 1].
-    # E.g, for 3 clusters, mixing_steps=[1,1] means full mixing; mixing_steps = [0, 0] means no between cluster mixing.
     pars['add_mixing']      = None  # Mixing matrix between clusters
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
@@ -758,21 +756,10 @@ def add_mixing(pars):
             if pars['add_mixing'].shape != (n_clusters, n_clusters):
                 errormsg = 'Dimension of input mixing matrix does not match number of clusters'
                 raise ValueError(errormsg)
-        else: # if mixing matrix is not defined, autogenerate based on mixing_steps
-            if 'mixing_steps' not in pars or pars['mixing_steps'] is None:  # if mixing_steps is not supplied, assume well-mixed
-                print('Warning: input has clusters with no mixing_steps or mixing matrix. Well-mixed cluster is assumed')
-                pars['n_clusters'] = 1
-                pars['cluster_rel_sizes'] = np.array([1])
-            else:
-                if n_clusters < len(pars['mixing_steps']):
-                    print('Warning: input has {} mixing steps but only {} clusters.'.format(len(pars['mixing_steps']), n_clusters))
-                add_mixing = np.zeros([n_clusters, n_clusters])
-                for i, gs in enumerate(pars['mixing_steps'][:n_clusters - 1]):
-                    add_mixing += np.diagflat(np.repeat(gs, n_clusters - i - 1), i + 1) # fill the lower diagonal
-                add_mixing += add_mixing.T # fill the upper diagonal
-                add_mixing[np.diag_indices_from(add_mixing)] = 1  # set diagonal to 1
-                pars['add_mixing'] = add_mixing
+        else:  # if add_mixing is not supplied, assume well-mixed
+            print('Warning: input has more than 1 clusters with no mixing matrix. Well-mixed cluster is assumed')
+            pars['n_clusters'] = 1
+            pars['cluster_rel_sizes'] = np.array([1])
     elif n_clusters == 1:
         pars['add_mixing'] = np.array([[1]])
-
     return

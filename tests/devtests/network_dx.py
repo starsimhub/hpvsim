@@ -49,8 +49,8 @@ class new_pairs_snap(hpv.Analyzer):
         return
 
 def network_demo():
-    clusters = [10, 10]
-    mixing_steps = [np.ones(9), [0.9,0.5,0.1]]
+    clusters = [5, 5]
+    mixing_mats = [np.ones((5,5)), np.identity(5)]
     start = 1970
     end = 2020
     pop = 2e4
@@ -61,7 +61,7 @@ def network_demo():
         timepoints=['1990', '2000', '2010', '2020'],
     )
     new_pairs = new_pairs_snap(start_year = 2017)
-    for n_clusters, mixing, label in zip(clusters, mixing_steps, labels):
+    for n_clusters, mixing, label in zip(clusters, mixing_mats, labels):
         pars = dict(
             n_agents=pop,
             start=start,
@@ -69,7 +69,7 @@ def network_demo():
             location='nigeria',
             ms_agent_ratio=100,
             n_clusters=n_clusters,
-            mixing_steps=mixing,
+            add_mixing=mixing,
             analyzers=[snap, new_pairs]
         )
         sim = hpv.Sim(pars=pars, label=label)
@@ -125,6 +125,7 @@ def plot_rships(sim):
     g.fig.tight_layout()
     g.fig.subplots_adjust(top=0.9)
     g.fig.suptitle(sim.label)
+    plt.show()
 
 
 #%% Run as a script
