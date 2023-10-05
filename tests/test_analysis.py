@@ -85,7 +85,7 @@ def test_age_results(do_plot=True, test_what=''):
                 years=2019,
                 edges=age_bin_edges,
             ),
-            infections=sc.objdict(
+            cins=sc.objdict(
                 years=2019,
                 edges=age_bin_edges,
             ),
@@ -108,7 +108,7 @@ def test_age_results(do_plot=True, test_what=''):
     # Assert equal results
     year = 2019
     yind = sc.findinds(sim.results['year'], year)[0]
-    for result in ['infections', 'cancer_incidence', 'cancers']: # NB Still a problem with hpv_prevalence
+    for result in ['cins', 'cancer_incidence', 'cancers']: # NB Still a problem with hpv_prevalence
         sim_result_name = result + '_by_age'
         sim_results = sim.results[sim_result_name][:,yind]
         analyzer_results = a.results[result][year]
