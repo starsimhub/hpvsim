@@ -181,44 +181,32 @@ def test_states():
                 d0 = (~((~people.infectious[g,:]) & people.cin[g,:])).any()
                 if not d0:
                     raise ValueError('People without active infection should not have detectable cell changes/')
-                d1 = (people.normal[g,:] | people.precin[g,:] | people.cin1[g,:] | people.cin2[g,:] | people.cin3[g,:] | people.cancerous[g,:] | removed).all()
+                d1 = (people.normal[g,:] | people.precin[g,:] | people.cin[g,:] | people.cancerous[g,:] | removed).all()
                 if not d1:
-                    raise ValueError('States {normal, precin, cin1, cin2, cin3, cancerous} should be collectively exhaustive but are not.')
-                d2 = ~(people.precin[g,:] & people.cin1[g,:]).all()
+                    raise ValueError('States {normal, precin, cin, cancerous} should be collectively exhaustive but are not.')
+                d2 = ~(people.precin[g,:] & people.cin[g,:]).all()
                 if not d2:
-                    raise ValueError('States {precin, cin1} should be mutually exclusive but are not.')
-                d3 = ~(people.cin1[g,:] & people.cin2[g,:]).all()
+                    raise ValueError('States {precin, cin} should be mutually exclusive but are not.')
+                d3 = ~(people.cin[g,:] & people.cancerous[g,:]).all()
                 if not d3:
-                    raise ValueError('States {cin1, cin2} should be mutually exclusive but are not.')
-                d4 = ~(people.cin2[g,:] & people.cin3[g,:]).all()
-                if not d4:
-                    raise ValueError('States {cin2, cin3} should be mutually exclusive but are not.')
-                d5 = ~(people.cin3[g,:] & people.cancerous[g,:]).all()
-                if not d5:
-                    raise ValueError('States {cin3, cancerous} should be mutually exclusive but are not.')
-                d6 = ~(people.cin[g,:] & people.cancerous[g,:]).all()
-                if not d6:
                     raise ValueError('States {cin, cancerous} should be mutually exclusive but are not.')
 
                 # Cellular transformation states:
-                c1 = (people.normal[g,:] | people.episomal[g,:] | people.transformed[g,:] | people.cancerous[:,:].any(axis=0) | removed).all()
+                c1 = (people.normal[g,:] | people.episomal[g,:] | people.cancerous[:,:].any(axis=0) | removed).all()
                 if not c1:
-                    raise ValueError('States {normal, episomal, transformed, cancerous} should be collectively exhaustive but are not.')
+                    raise ValueError('States {normal, episomal, cancerous} should be collectively exhaustive but are not.')
                 c2 = ~(people.normal[g,:] & people.episomal[g,:]).all()
                 if not c2:
                     raise ValueError('States {normal, episomal} should be mutually exclusive but are not.')
-                c3 = ~(people.episomal[g,:] & people.transformed[g,:]).all()
+                c3 = ~(people.episomal[g,:] & people.cancerous[:,:].any(axis=0)).all()
                 if not c3:
-                    raise ValueError('States {episomal, transformed} should be mutually exclusive but are not.')
-                c4 = ~(people.transformed[g,:] & people.cancerous[:,:].any(axis=0)).all()
-                if not c4:
-                    raise ValueError('States {transformed, cancerous} should be mutually exclusive but are not.')
+                    raise ValueError('States {episomal, cancerous} should be mutually exclusive but are not.')
 
                 # Check combinations of cell states & infection states:
                 sc1 = ~(people.normal[g,:] & people.infectious[g,:]).all() # No-one can be infectious without any cell changes
                 if not sc1:
                     raise ValueError('Everyone infectious should have abnormal cells, but they do not.')
-                sc2 = ~((people.episomal[g,:] | people.transformed[g,:]) & people.susceptible[g,:]).all() # No-one can be susceptible and have cell changes
+                sc2 = ~((people.episomal[g,:] ) & people.susceptible[g,:]).all() # No-one can be susceptible and have cell changes
                 if not sc2:
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
@@ -230,18 +218,11 @@ def test_states():
                 if not sd1:
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
-                # Severity markers
-                v1 = len(hpv.true((np.isnan(people.sev[g,:]) & people.cin[g,:] & people.is_female & ~removed))) == 0
-                if not v1:
-                    raise ValueError('All women with CINs should have a severity marker.')
-                v2 = len(hpv.true((~np.isnan(people.sev[g,:]) & ~people.infectious[g,:] & people.is_female & ~removed))) == 0
-                if not v2:
-                    raise ValueError('No women without active infection should have severity markers.')
 
                 checkall = np.array([
                     s1, s2, s3, s4,
-                    d0, d1, d2, d3, d4, d5, d6,
-                    c1, c2, c3, c4,
+                    d0, d1, d2, d3,
+                    c1, c2, c3,
                     sc1, sc2, sd1
                 ])
                 if not checkall.all():
@@ -359,7 +340,7 @@ def test_result_consistency():
 
     # Check that males don't have CINs or cancers
     male_inds = sim.people.is_male.nonzero()[0]
-    males_with_cin = hpv.defined(sim.people.date_cin1[:,male_inds])
+    males_with_cin = hpv.defined(sim.people.date_cin[:,male_inds])
     males_with_cancer = hpv.defined(sim.people.date_cancerous[:,male_inds])
     assert len(males_with_cin)==0
     assert len(males_with_cancer)==0

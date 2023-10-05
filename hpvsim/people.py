@@ -249,8 +249,11 @@ class People(hpb.BasePeople):
         n_extra = self.pars['ms_agent_ratio']
         cancer_scale = self.pars['pop_scale'] / n_extra
 
+        if n_extra == 1:
+            cancer_prob_arr = hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds],
+                                                        pars=gpars['cancer_fn'])  # Calculate probability of cancer
         # Multiscale version
-        if n_extra > 1:
+        elif n_extra > 1:
 
             # Firstly, determine who will transform based on severity values, and scale them to create more agents
             is_cancer = hpu.binomial_arr(cancer_prob) # Select who transforms - NB, this array gets extended later
