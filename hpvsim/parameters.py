@@ -322,7 +322,6 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.dur_cin          = dict(dist='lognormal', par1=5, par2=20) # Duration of episomal infection prior to cancer
     pars.hpv16.cin_fn           = dict(form='logf2', k=0.2, x_infl=5, ttc=20)  # Function mapping duration of infection to probability of developing cin
     pars.hpv16.cancer_fn        = dict(form='logf2', k=0.5, x_infl=10, ttc=30) # Function mapping duration of cin to probability of cancer
-    pars.hpv16.cancer_max       = 0.6
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
