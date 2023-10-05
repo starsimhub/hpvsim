@@ -245,7 +245,7 @@ class People(hpb.BasePeople):
 
         # Calculate the probability of cancer for each woman
         dur_cin = self.dur_cin[g, inds]
-        cancer_prob = gpars['cancer_max']*hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['cancer_fn'])  # Calculate probability of cancer
+        cancer_prob = hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds], pars=gpars['cancer_fn'])  # Calculate probability of cancer
         n_extra = self.pars['ms_agent_ratio']
         cancer_scale = self.pars['pop_scale'] / n_extra
 
@@ -266,7 +266,7 @@ class People(hpb.BasePeople):
             extra_cin_probs = hppar.compute_severity(extra_dur_precin, rel_sev=extra_rel_sevs, pars=gpars['cin_fn'])
             extra_cin_bools = hpu.binomial_arr(extra_cin_probs[:,1:])
 
-            extra_cancer_probs = gpars['cancer_max']*hppar.compute_severity(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['cancer_fn'])  # Calculate probability of cancer
+            extra_cancer_probs = hppar.compute_severity(extra_dur_cin, rel_sev=extra_rel_sevs, pars=gpars['cancer_fn'])  # Calculate probability of cancer
             extra_cancer_probs[:,1:][~extra_cin_bools] = 0
             # Based on the extra severity values, determine additional transformation probabilities
             extra_cancer_bools = hpu.binomial_arr(extra_cancer_probs[:,1:])

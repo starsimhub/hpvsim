@@ -54,7 +54,7 @@ def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being ru
     # Create some genotype pars
     genotype_pars = {
         16: {
-            'sev_fn': dict(form='logf2', k=0.25, x_infl=0, ttc=30)
+            'cin_fn': dict(form='logf2', k=0.25, x_infl=0, ttc=30)
         }
     }
 

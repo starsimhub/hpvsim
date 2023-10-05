@@ -69,22 +69,22 @@ def logf1(x, k, ttc=25):
     return logf3(x, k, 0, 1, ttc=ttc)
 
 
-def get_asymptotes(k, x_infl, s, ttc=25):
+def get_asymptotes(k, x_infl, s=1, y_max=1, ttc=25):
     '''
     Get upper asymptotes for logistic functions
     '''
     term1 = (1 + np.exp(k*(x_infl-ttc)))**s # Note, this is 1 for most parameter combinations
     term2 = (1 + np.exp(k*x_infl))**s
-    u_asymp_num = term1*(1-term2)
+    u_asymp_num = y_max*term1*(1-term2)
     u_asymp_denom = term1 - term2
     u_asymp = u_asymp_num / u_asymp_denom
-    l_asymp = term1 / (term1 - term2)
+    l_asymp = y_max * term1 / (term1 - term2)
     return l_asymp, u_asymp
 
 
-def logf3(x, k, x_infl, s, ttc=25):
+def logf3(x, k, x_infl, s=1, y_max=1, ttc=25):
     '''
-    Logistic function passing through (0,0) and (ttc,1).
+    Logistic function passing through (0,0) and (ttc,y_max).
     This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
     However, since it's constrained to pass through 2 points, there are 3 free parameters remaining.
     Args:
@@ -93,13 +93,13 @@ def logf3(x, k, x_infl, s, ttc=25):
          s: asymmetry parameter, equivalent to s in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
     '''
-    l_asymp, u_asymp = get_asymptotes(k, x_infl, s, ttc)
+    l_asymp, u_asymp = get_asymptotes(k, x_infl, s=1, y_max=y_max, ttc=ttc)
     return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
 
 
-def logf2(x, k, x_infl, ttc=25):
+def logf2(x, k, x_infl, y_max=1, ttc=25):
     '''
-    Logistic function constrained to pass through (0,0) and (ttc,1).
+    Logistic function constrained to pass through (0,0) and (ttc,y_max).
     This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
     Since it's constrained to pass through 2 points, there are 3 free parameters remaining, and this verison fixes s=1
     Args:
@@ -107,7 +107,7 @@ def logf2(x, k, x_infl, ttc=25):
          x_infl: point of inflection, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
     '''
-    return logf3(x, k, x_infl, s=1, ttc=ttc)
+    return logf3(x, k, x_infl, s=1, y_max=1, ttc=ttc)
 
 
 def linear(x, slope, b=0):
