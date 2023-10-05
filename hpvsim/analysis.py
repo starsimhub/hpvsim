@@ -721,7 +721,6 @@ class age_results(Analyzer):
         attr = rname.replace('_prevalence', '')  # Strip out terms that aren't stored in the people
         if attr[0] == 'n': attr = attr[2:] # Remove n, used to identify stocks
         if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
-        if attr == 'precin': attr = 'precin'
         if attr == 'cancer': attr = 'cancerous'
         return attr
 
@@ -729,7 +728,6 @@ class age_results(Analyzer):
         ''' Helper function for converting flow result names to people attributes '''
         attr = rname.replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
-        if attr == 'precin': attr = 'precin'
         if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
         if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
