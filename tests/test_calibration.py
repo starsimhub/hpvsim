@@ -45,10 +45,10 @@ def test_calibration(do_plot=True):
     )
     genotype_pars = dict(
         hpv16=dict(
-            sev_fn=dict(k=[0.5, 0.2, 1.0]),
+            cin_fn=dict(k=[0.5, 0.2, 1.0]),
             ),
         hpv18=dict(
-            sev_fn=dict(k=[0.5, 0.2, 1.0]),
+            cin_fn=dict(k=[0.5, 0.2, 1.0]),
         )
     )
 
