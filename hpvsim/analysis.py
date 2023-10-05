@@ -721,7 +721,7 @@ class age_results(Analyzer):
         attr = rname.replace('_prevalence', '')  # Strip out terms that aren't stored in the people
         if attr[0] == 'n': attr = attr[2:] # Remove n, used to identify stocks
         if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
-        if attr == 'lsil': attr = ['precin', 'cin1']
+        if attr == 'precin': attr = 'precin'
         if attr == 'cancer': attr = 'cancerous'
         return attr
 
@@ -729,17 +729,14 @@ class age_results(Analyzer):
         ''' Helper function for converting flow result names to people attributes '''
         attr = rname.replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
-        if attr == 'lsil': attr = ['precin', 'cin1']
+        if attr == 'precin': attr = 'precin'
         if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
         if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
         mapping = {
             'infections': ['date_exposed', 'infectious'],
-            'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
-            'cins':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
-            'cin1': ['date_cin1', 'cin1'],
-            'cin2': ['date_cin2', 'cin2'],
-            'cin3': ['date_cin3', 'cin3'],
+            'cin':  ['date_cin', 'cin'],
+            'cins':  ['date_cin', 'cin'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
             'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
@@ -1096,7 +1093,7 @@ class age_causal_infection(Analyzer):
         self.age_causal = []
         self.age_cancer = []
         self.dwelltime = dict()
-        for state in ['precin', 'cin1', 'cin2', 'cin3', 'total']:
+        for state in ['precin', 'cin', 'total']:
             self.dwelltime[state] = []
 
     def apply(self, sim):
@@ -1105,20 +1102,14 @@ class age_causal_infection(Analyzer):
             if len(cancer_inds):
                 current_age = sim.people.age[cancer_inds]
                 date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
-                date_cin1 = sim.people.date_cin1[cancer_genotypes, cancer_inds]
-                date_cin2 = sim.people.date_cin2[cancer_genotypes, cancer_inds]
-                date_cin3 = sim.people.date_cin3[cancer_genotypes, cancer_inds]
-                hpv_time = (date_cin1 - date_exposed) * sim['dt']
-                cin1_time = (date_cin2 - date_cin1) * sim['dt']
-                cin2_time = (date_cin3 - date_cin2) * sim['dt']
-                cin3_time = (sim.t - date_cin3) * sim['dt']
+                date_cin = sim.people.date_cin[cancer_genotypes, cancer_inds]
+                hpv_time = (date_cin - date_exposed) * sim['dt']
+                cin_time = (sim.t - date_cin) * sim['dt']
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()
                 self.dwelltime['precin'] += hpv_time.tolist()
-                self.dwelltime['cin1'] += cin1_time.tolist()
-                self.dwelltime['cin2'] += cin2_time.tolist()
-                self.dwelltime['cin3'] += cin3_time.tolist()
+                self.dwelltime['cin'] += cin_time.tolist()
                 self.dwelltime['total'] += total_time.tolist()
         return
 
