@@ -8,10 +8,36 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 1.2.3 (2023-09-11)
+Version 1.2.8 (2023-10-05)
 ---------------------------
 - Improved network updating, adds clustering functionality
 - *Github info* PR `607 <https://github.com/amath-idm/hpvsim/pull/607>`__
+
+Version 1.2.7 (2023-09-22)
+---------------------------
+- Updates ``sim.summary`` to have more useful information
+- *Github info* PR `618 <https://github.com/amath-idm/hpvsim/pull/618>`__
+
+Version 1.2.6 (2023-09-22)
+---------------------------
+- Fixes plotting issue with MultiSims and Jupyter notebooks
+- Allows scenarios to be run fully in parallel
+- *Github info* PR `614 <https://github.com/amath-idm/hpvsim/pull/614>`__
+
+Version 1.2.5 (2023-09-21)
+---------------------------
+- Fixes file path when run via Jupyter
+- *Github info* PR `610 <https://github.com/amath-idm/hpvsim/pull/610>`__
+
+Version 1.2.4 (2023-09-19)
+---------------------------
+- Fixes Matplotlib regression in plotting
+- *Github info* PR `609 <https://github.com/amath-idm/hpvsim/pull/609>`__
+
+Version 1.2.3 (2023-08-30)
+---------------------------
+- Updates data loading to be much more efficient
+- *Github info* PR `604 <https://github.com/amath-idm/hpvsim/pull/604>`__
 
 Version 1.2.2 (2023-08-11)
 ---------------------------
