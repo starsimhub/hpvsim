@@ -11,3 +11,4 @@ seaborn
 myst-parser
 readthedocs-sphinx-search
 jupyterlab
+linkify
