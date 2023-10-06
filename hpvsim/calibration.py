@@ -487,13 +487,7 @@ class Calibration(sc.prettyobj):
         else:
             op.logging.set_verbosity(op.logging.ERROR)
         study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
-        if self.run_args.rand_seed is not None:
-            sampler = op.samplers.RandomSampler(self.run_args.rand_seed)
-            sampler.reseed_rng()
-            raise NotImplementedError('Implemented but does not work')
-        else:
-            sampler = None
-        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=sampler)
+        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None)
         return output
 
 
@@ -530,7 +524,13 @@ class Calibration(sc.prettyobj):
         op = import_optuna()
         if not self.run_args.keep_db:
             self.remove_db()
-        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=self.run_args.sampler)
+        if self.run_args.rand_seed is not None:
+            sampler = op.samplers.RandomSampler(self.run_args.rand_seed)
+            sampler.reseed_rng()
+            raise NotImplementedError('Implemented but does not work')
+        else:
+            sampler = None
+        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=sampler)
         return output
 
 
