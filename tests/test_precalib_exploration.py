@@ -7,10 +7,10 @@ import numpy as np
 import pandas as pd
 import math
 
-# sub-function to get parameter names, types, and base values from nested dict
-def get_all_keys(dictionary, prefix=''):
+# Sub-function to get parameter names, types, and base values from nested dict
+def get_all_keys(pars, prefix=''):
     keys = []
-    for key, value in dictionary.items():
+    for key, value in pars.items():
         new_key = prefix + str(key) if prefix else str(key)
         if isinstance(value, dict):
             keys.extend(get_all_keys(value, new_key + '/'))
@@ -27,8 +27,8 @@ def get_all_keys(dictionary, prefix=''):
             keys.append([param_name, param_type, default_value])
     return keys
 
+# Get parameter settings from a sim.pars to df
 def get_all_param_space(pars):
-    # get parameter settings from a sim to df
     param_space = pd.DataFrame(columns=["param_name", "param_type", "default_value", "lower_bound",  "upper_bound", "Notes"])
     all_keys = get_all_keys(pars)
     for key in all_keys:
@@ -37,15 +37,7 @@ def get_all_param_space(pars):
     param_space.reset_index(drop=True, inplace=True)
     return param_space
 
-def sample_lhs(total_trials, calib_space):
-    from pyDOE import lhs
-    lb = calib_space.bounds[:,0]
-    ub  = calib_space.bounds[:,1]
-    sample = lhs(len(calib_space.names), total_trials)
-    final_sample = lb + sample*(ub - lb)
-    return final_sample
-
-# subfunction that maps string param to nested dict
+# Subfunction that maps a single parameter with default, lower, and upper bound to nested dict
 def create_nested_dict(keys, default_value, lower_bound, upper_bound, n_test=None):
     nested_dict = {}
     current_dict = nested_dict
@@ -103,6 +95,15 @@ def estimator(actual, predicted):
 
         return gofs
 
+# Sampler using latin hypercube sampling
+def sample_lhs(total_trials, calib_space):
+    from pyDOE import lhs
+    lb = calib_space.bounds[:,0]
+    ub  = calib_space.bounds[:,1]
+    sample = lhs(len(calib_space.names), total_trials)
+    final_sample = lb + sample*(ub - lb)
+    return final_sample
+
 def run_precalib_exploration(location, datafiles, default_pars, custom_param_space, calib_space, total_trials, n_workers, name, save_results):
     # Prepare for calibration
     X = sample_lhs(total_trials, calib_space)
@@ -114,7 +115,7 @@ def run_precalib_exploration(location, datafiles, default_pars, custom_param_spa
     if 'genotype_pars' in calib_pars:
         genotype_pars = calib_pars.pop('genotype_pars')
 
-    # Use custom sampler with predefined sample sets
+    # Use custom sampler with predefined sample sets from lhs
     search_space = {key: value for key, value in zip(calib_space['names'], calib_space['bounds'])}
     sampler = PredefinedSampler(search_space, samp_list = X) 
 
@@ -124,7 +125,7 @@ def run_precalib_exploration(location, datafiles, default_pars, custom_param_spa
     sim = hpv.Sim(default_pars)
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             name=name, estimator=estimator, 
-                            sampler = sampler, 
+                            sampler = sampler, verbose = False,
                             datafiles=datafiles, 
                             total_trials=total_trials+3*n_workers, n_workers=n_workers) 
     calib.calibrate(die=False)
@@ -162,7 +163,7 @@ def organize_results(calib):
         year = [key for key in calib.analyzer_results[0][analyzer_key].keys() if key != 'bins'][0]
         result_df[analyzer_key] = [result[analyzer_key][year] for result in calib.analyzer_results]
         age_bins = calib.analyzer_results[0][analyzer_key]['bins']
-        subcols = [f'age_{int(age_bins[i])}-{int(age_bins[i+1]-1)}' if i < len(age_bins)-1 else f'Age{int(age_bins[-1])}+' for i in range(len(age_bins))]
+        subcols = [f'age_{int(age_bins[i])}-{int(age_bins[i+1]-1)}' if i < len(age_bins)-1 else f'age{int(age_bins[-1])}+' for i in range(len(age_bins))]
         result_df = expand_array_column(result_df, analyzer_key, subcols)
 
     return (result_df)
@@ -208,7 +209,7 @@ def heatmap(param_importance, outcomes, save_plot=False, sort_by=None):
     if sort_by is not None:
         df = df.sort_values(by=sort_by, ascending = False)
     plt.figure(figsize=(0.2*df.shape[0], 0.2*df.shape[1]))
-    heatmap = sns.heatmap(df.T, cmap="Blues", linewidths=0.5, linecolor="white")
+    heatmap = sns.heatmap(np.abs(df.T), cmap="Blues", linewidths=0.5, linecolor="white")
     heatmap.set_xticks([0.5 + i for i in range(len(df.index))]) 
     heatmap.set_yticks([0.5 + i for i in range(len(df.columns))])
     heatmap.set_xticklabels(df.index, rotation=90, fontsize=7) 
@@ -216,3 +217,5 @@ def heatmap(param_importance, outcomes, save_plot=False, sort_by=None):
     plt.show()
     if save_plot:
         plt.savefig(f'results/pre_calib.png')
+
+# %%
