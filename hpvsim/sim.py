@@ -1118,8 +1118,6 @@ class Sim(hpb.BaseSim):
         self.results['cin3_prevalence_by_age'][:] = safedivide(res['n_cin3_by_age'][:],
                                                                res['n_females_alive_by_age'][:])
 
-        self.results['lsil_prevalence_by_age'][:] = safedivide((res['n_precin_by_age'][:]+res['n_cin1_by_age'][:]),
-                                                               res['n_females_alive_by_age'][:])
         # Compute cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]
         scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
