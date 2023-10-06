@@ -318,8 +318,9 @@ def create_edgelist(lno, partners, current_partners, mixing, age, is_active, is_
 
     # shuffle clusters
     np.random.shuffle(cluster_range)
+    m_probs = np.ones(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
+
     for cl in cluster_range: # Loop through clusters for females
-        m_probs = np.ones(n_agents)  # Begin by assigning everyone equal probability of forming a new relationship
         # Try randomly select females for pairing
         f_eligible_inds = hpu.true(f_eligible * (cluster==cl))  # Inds of all eligible females in this cluster
         f_cl = hpu.participation_filter(f_eligible_inds, age, layer_probs[1, :], bins=layer_probs[0, :])

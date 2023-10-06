@@ -10,15 +10,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-hpv.options(verbose=False)
-
-base_pars = {
-    'n_agents': 2e4,
-    'start': 1970,
-    'end': 2020,
-    'location': 'nigeria'
-}
-
 #%% Network analyzer
 
 class new_pairs_snap(hpv.Analyzer):
@@ -60,7 +51,7 @@ def network_demo():
     snap = hpv.snapshot(
         timepoints=['1990', '2000', '2010', '2020'],
     )
-    new_pairs = new_pairs_snap(start_year = 2017)
+    new_pairs = new_pairs_snap(start_year = end-3)
     for n_clusters, mixing, label in zip(clusters, mixing_mats, labels):
         pars = dict(
             n_agents=pop,
@@ -113,11 +104,11 @@ def plot_rships(sim):
     layer_keys = list(sim['partners'].keys())
     snaps = sim.get_analyzer('snapshot')
     people = snaps.snapshots[-1] # Final snapshot (i.e. year 2020)
-    df = pd.DataFrame({'age':people.age, 'sex':people.is_female})
+    df = pd.DataFrame({'age':people.age[people.alive==True], 'sex':people.is_female[people.alive==True]})
     df['sex'].replace({True:'Female', False:'Male'}, inplace=True)
     df['Age Bin'] = pd.cut(df['age'], people.age_bin_edges)
     for lk, lkey in enumerate(layer_keys):
-        df[lkey] = people.n_rships[lk]
+        df[lkey] = people.n_rships[lk, people.alive==True]
     dfm = df.melt(id_vars=['Age Bin', 'sex'], value_vars=layer_keys, var_name='Layer', value_name='n_rships')
     g = sns.catplot(data=dfm, kind='bar', x='Age Bin', y='n_rships', hue='sex', col='Layer', sharey=False, height=8, aspect=0.5, legend_out=False, palette='tab10')
     g.tick_params(axis='x', which='both', rotation=70)
