@@ -373,7 +373,7 @@ def tidy_up(fig, figs=None, do_save=False, fig_path=None, do_show=False, args=No
     # Use tight layout for all figures
     if args is not None and hasattr(args, 'show') and args.show['tight']:
         for f in figlist:
-            sc.figlayout(fig=f)
+            sc.figlayout(fig=f, keep=True) # keep=True is needed to avoid flushing
 
     # Handle saving
     if do_save:
@@ -488,7 +488,7 @@ def plot_type_bars(sim, ax, date, args):
     # Plot bars
     for bar_no in range(n_bars_per_group):
         ydata = [resdict[k][bar_no] for k in range(n_groups)]  # Have to rearrange
-        ax.bar(xpositions[bar_no], ydata, **args.bar, label=g_labels[bar_no])
+        ax.bar(xpositions[bar_no], ydata, **args.bar, label=f'{g_labels[bar_no]}') # Fix Matplotlib 3.8 bug with numeric labels
 
     # Add xticks on the middle of the group bars
     ax.set_xticks([r + width for r in range(len(x))], labels)
@@ -565,7 +565,7 @@ def plot_sim(to_plot=None, sim=None, fig=None, ax=None, do_save=None, fig_path=N
                 title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show)
 
 
-        output = tidy_up(fig, figs, do_save, fig_path, do_show, args)
+        output = tidy_up(fig=fig, figs=figs, do_save=do_save, fig_path=fig_path, do_show=do_show, args=args)
 
     return output
 
@@ -631,7 +631,7 @@ def plot_scens(to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=N
             if args.show['legend']:
                 title_grid_legend(ax, title, grid, commaticks, setylim, args.legend, args.show, pnum==0) # Configure the title, grid, and legend -- only show legend for first
 
-    return tidy_up(fig, figs, do_save, fig_path, do_show, args)
+    return tidy_up(fig=fig, figs=figs, do_save=do_save, fig_path=fig_path, do_show=do_show, args=args)
 
 
 def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None, fig_path=None, fig_args=None, plot_args=None,
@@ -710,7 +710,7 @@ def plot_scen_age_results(analyzer_ref=0, to_plot=None, scens=None, do_save=None
                 pnum +=1
 
 
-    return tidy_up(fig, figs, do_save, fig_path, do_show, args)
+    return tidy_up(fig=fig, figs=figs, do_save=do_save, fig_path=fig_path, do_show=do_show, args=args)
 
 
 def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, scatter_args=None,
@@ -752,7 +752,7 @@ def plot_result(key, sim=None, fig_args=None, plot_args=None, axis_args=None, sc
         plot_interventions(sim, ax) # Plot the interventions
         title_grid_legend(ax, res.name, grid, commaticks, setylim, args.legend, args.show) # Configure the title, grid, and legend
 
-    return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
+    return tidy_up(fig=fig, figs=figs, do_save=do_save, fig_path=fig_path, do_show=do_show, args=args)
 
 
 def plot_heatmap(sweep, xx, yy, x=None, y=None, xi=None, yi=None, to_plot=None, xpar=None, ypar=None, npts=None,
@@ -830,7 +830,7 @@ def plot_heatmap(sweep, xx, yy, x=None, y=None, xi=None, yi=None, to_plot=None, 
 
                 pn += 1
 
-    return tidy_up(fig, do_save, fig_path, do_show, args)
+    return tidy_up(fig=fig, figs=None, do_save=do_save, fig_path=fig_path, do_show=do_show, args=args)
 
 
 # def plot_compare(df, log_scale=True, fig_args=None, axis_args=None, style_args=None, grid=False,

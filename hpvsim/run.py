@@ -986,7 +986,7 @@ class Scenarios(hpb.ParsObj):
         return keys
 
 
-    def run(self, debug=False, keep_people=False, verbose=None, **kwargs):
+    def run(self, n_runs=None, debug=False, keep_people=False, verbose=None, **kwargs):
         '''
         Run the specified scenarios.
 
@@ -998,9 +998,9 @@ class Scenarios(hpb.ParsObj):
         Returns:
             None (modifies Scenarios object in place)
         '''
-
-        if verbose is None:
-            verbose = self['verbose']
+        
+        if n_runs  is None: n_runs  = self['n_runs']
+        if verbose is None: verbose = self['verbose']
 
         def print_heading(string):
             ''' Choose whether to print a heading, regular text, or nothing '''
@@ -1017,10 +1017,12 @@ class Scenarios(hpb.ParsObj):
         type_dist_keys = self.result_keys('type_dist')
 
         # Loop over scenarios
+        
+        # Assemble sims
+        scen_sims_dict = dict()
         for scenkey,scen in self.scenarios.items():
             scenname = scen['name']
             scenpars = scen['pars']
-
 
             allpars = sc.mergedicts(scenpars, {'location': self.base_sim['location']})
 
@@ -1056,15 +1058,35 @@ class Scenarios(hpb.ParsObj):
             if 'hiv_pars' in scen.keys():
                 hiv_scenpars = {'hiv_pars': sc.mergedicts(scen_sim.hivsim.pars['hiv_pars'], scen['hiv_pars'])}
                 scen_sim.hivsim.update_pars(hiv_scenpars)
+                
+            scen_sims = []
+            for i in range(n_runs):
+                sim = scen_sim.copy()
+                sim['rand_seed'] += i # Reset the seed
+                scen_sims.append(sim)
+            
+            scen_sims_dict[scenkey] = scen_sims
 
-            run_args = dict(n_runs=self['n_runs'], noise=self['noise'], noisepar=self['noisepar'], keep_people=keep_people, verbose=verbose)
-            if debug:
-                print('Running in debug mode (not parallelized)')
-                run_args.pop('n_runs', None) # Remove n_runs argument, not used for a single run
-                scen_sims = [single_run(scen_sim, **run_args, **kwargs)]*self['n_runs'] # Ensure it has correct length -- WARNING, kludgy
-            else:
-                scen_sims = multi_run(scen_sim, **run_args, **kwargs) # This is where the sims actually get run
+        # Run sims
+        run_args = dict(noise=self['noise'], noisepar=self['noisepar'], keep_people=keep_people, verbose=verbose)
+        if debug:
+            print('Running in debug mode (not parallelized)')
+            for scenkey,scen_sims in scen_sims_dict.items():
+                for i in range(len(scen_sims)):
+                    scen_sims[i] = single_run(scen_sims[i], **run_args, **kwargs) # Run a single sim
+        else:
+            all_sims = []
+            for sim_list in scen_sims_dict.values():
+                all_sims.extend(list(sim_list))
+            all_sims = multi_run(all_sims, **run_args, **kwargs) # This is where the sims actually get run
+            count = 0
+            for scenkey,scen_sims in scen_sims_dict.items():
+                n_sims = len(scen_sims)
+                scen_sims_dict[scenkey] = all_sims[count:count+n_sims]
+                count += n_sims
 
+        # Process sims
+        for scenkey,scen_sims in scen_sims_dict.items():
             # Process the simulations
             print_heading(f'Processing {scenkey}')
             ng = scen_sims[0]['n_genotypes'] # Get number of genotypes

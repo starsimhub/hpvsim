@@ -14,7 +14,8 @@ __all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_ag
            'get_birth_rates', 'get_life_expectancy']
 
 
-filesdir = sc.path(sc.thisdir()) / 'files'
+thisdir = sc.thispath(__file__)
+filesdir = thisdir / 'files'
 files = sc.objdict()
 files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
