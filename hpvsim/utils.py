@@ -91,7 +91,7 @@ def logf3(x, k, x_infl, s, ttc=25):
          k: growth rate, equivalent to b in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          x_infl: a location parameter, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          s: asymmetry parameter, equivalent to s in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
-         ttc (time to cancer): x value for which the curve passess through 1. For x values beyond this, the function returns 1
+         ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
     '''
     l_asymp, u_asymp = get_asymptotes(k, x_infl, s, ttc)
     return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
@@ -105,7 +105,7 @@ def logf2(x, k, x_infl, ttc=25):
     Args:
          k: growth rate, equivalent to b in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          x_infl: point of inflection, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
-         ttc (time to cancer): x value for which the curve passess through 1. For x values beyond this, the function returns 1
+         ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
     '''
     return logf3(x, k, x_infl, s=1, ttc=ttc)
 
