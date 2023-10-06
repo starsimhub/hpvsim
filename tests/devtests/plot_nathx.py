@@ -9,6 +9,7 @@ from scipy.stats import lognorm, norm
 import numpy as np
 import sciris as sc
 import seaborn as sns
+import math
 
 
 # %% Functions
@@ -127,24 +128,24 @@ def lognorm_params(par1, par2):
 def plot_nh(sim=None):
 
     cum_dist = sim.analyzers[1]
-    durs_to_cancer, counts_to_cancer = np.unique([ round(elem, 0) for elem in cum_dist.dur_to_cancer], return_counts=True)
-    durs_to_cin, counts_to_cin = np.unique([round(elem, 0) for elem in cum_dist.dur_to_cin], return_counts=True)
-    durs_to_clearance, counts_to_clearance = np.unique([round(elem, 0) for elem in cum_dist.dur_to_clearance], return_counts=True)
+    durs_to_cancer, counts_to_cancer = np.unique([ math.ceil(elem) for elem in cum_dist.dur_to_cancer], return_counts=True)
+    durs_to_cin, counts_to_cin = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_cin], return_counts=True)
+    durs_to_clearance, counts_to_clearance = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_clearance], return_counts=True)
 
     df = pd.DataFrame()
-    df['years'] = np.arange(0,40)
-    durs = np.zeros(40)
-    durs_subset = durs_to_clearance[durs_to_clearance<40]
+    df['years'] = np.arange(0,30)
+    durs = np.zeros(30)
+    durs_subset = durs_to_clearance[durs_to_clearance<30]
     durs[[int(elem) for elem in durs_subset]] = counts_to_clearance[:len(durs_subset)]
     df['n_cleared'] = durs
     df['prob_clearance'] = 100*np.cumsum(df['n_cleared'])/cum_dist.total_infections
 
-    durs_subset = durs_to_cin[durs_to_cin <40]
+    durs_subset = durs_to_cin[durs_to_cin <30]
     durs[[int(elem) for elem in durs_subset]] = counts_to_cin[:len(durs_subset)]
     df['n_cin'] = durs
     df['prob_cin'] = 100 * np.cumsum(df['n_cin']) / cum_dist.total_infections
 
-    durs_subset = durs_to_cancer[durs_to_cancer <40]
+    durs_subset = durs_to_cancer[durs_to_cancer <30]
     durs[[int(elem) for elem in durs_subset]] = counts_to_cancer[:len(durs_subset)]
     df['n_cancer'] = durs
     df['prob_cancer'] = 100 * np.cumsum(df['n_cancer']) / cum_dist.total_infections
@@ -153,15 +154,24 @@ def plot_nh(sim=None):
     ####################
     # Make figure, set fonts and colors
     ####################
-    set_font(size=12)
+    set_font(size=16)
     colors = sc.gridcolors(4)
     fig, ax = pl.subplots(figsize=(11, 9))
-    ax.plot(df['years'], df['prob_clearance'], color=colors[0], label='Cleared')
-    ax.plot(df['years'], df['prob_cin'], color=colors[1], label='Progressed')
-    ax.plot(df['years'], df['prob_cancer'], color=colors[2], label='Invaded')
+    ax.fill_between(df['years'], np.zeros(len(df['years'])), df['prob_clearance'], color=colors[0], label='Cleared')
+    ax.fill_between(df['years'], df['prob_clearance'], 100 - df['prob_cin'], color=colors[1], label='Persisted')
+    ax.fill_between(df['years'], 100 - df['prob_cin'], 100 - df['prob_cancer'], color=colors[2], label='CIN')
+    ax.fill_between(df['years'], 100 - df['prob_cancer'], 100 * np.ones(len(df['years'])), color=colors[3],
+                    label='Cancer')
+    data_years = np.arange(0,6, 0.5)
+    cleared = [0, 58, 68, 71, 78, 81, 83, 84, 84.5, 85, 85.6, 86]
+    progressed = [100, 99, 97, 96, 96, 95, 94, 93, 92, 91.5, 91.5, 91]
+    ax.scatter(data_years, cleared, color=colors[0])
+    ax.scatter(data_years, progressed, color=colors[2])
     ax.legend()
+    ax.set_xlabel('Time since infection')
+    fig.tight_layout()
+    fig.savefig(f'dist_infections.png')
     fig.show()
-
 
     # Make sims
     genotypes = ['hpv16', 'hpv18', 'hi5']
@@ -227,7 +237,6 @@ def plot_nh(sim=None):
     axes[1].set_title("Infection duration to progression\nfunction")
     axes[1].set_ylim([0,1])
     axes[1].grid()
-
 
     axes[2].set_ylabel("")
     axes[2].grid()
