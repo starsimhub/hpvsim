@@ -13,6 +13,46 @@ import seaborn as sns
 
 # %% Functions
 
+
+class cum_dist(hpv.Analyzer):
+    '''
+    Determine distribution of time to clearance, persistence, pre-cancer and cancer
+    '''
+
+    def __init__(self, start_year=None, **kwargs):
+        super().__init__(**kwargs)
+        self.start_year = start_year
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        if self.start_year is None:
+            self.start_year = sim['start']
+        self.dur_to_clearance = []
+        self.dur_to_cin = []
+        self.dur_to_cancer = []
+        self.total_infections = 0
+
+
+    def apply(self, sim):
+        if sim.yearvec[sim.t] >= self.start_year:
+            inf_genotypes, inf_inds = (sim.people.date_exposed == sim.t).nonzero()
+            self.total_infections += len(inf_inds)
+            if len(inf_inds):
+                infs_that_progress_bools = hpv.utils.defined(sim.people.date_cin[inf_genotypes, inf_inds])
+                infs_that_progress_inds = hpv.utils.idefined(sim.people.date_cin[inf_genotypes, inf_inds], inf_inds)
+                infs_to_cancer_bools = hpv.utils.defined(sim.people.date_cancerous[inf_genotypes, inf_inds])
+                infs_to_cancer_inds = hpv.utils.idefined(sim.people.date_cancerous[inf_genotypes, inf_inds], inf_inds)
+                infs_that_clear_bools = hpv.utils.defined(sim.people.date_clearance[inf_genotypes, inf_inds])
+                infs_that_clear_inds = hpv.utils.idefined(sim.people.date_clearance[inf_genotypes, inf_inds], inf_inds)
+
+                dur_to_clearance = (sim.people.date_clearance[inf_genotypes[infs_that_clear_bools], infs_that_clear_inds] - sim.t)*sim['dt']
+                dur_to_cin = (sim.people.date_cin[inf_genotypes[infs_that_progress_bools], infs_that_progress_inds] - sim.t)*sim['dt']
+                dur_to_cancer = (sim.people.date_cancerous[inf_genotypes[infs_to_cancer_bools], infs_to_cancer_inds] - sim.t)*sim['dt']
+
+                self.dur_to_clearance += dur_to_clearance.tolist()
+                self.dur_to_cin += dur_to_cin.tolist()
+                self.dur_to_cancer += dur_to_cancer.tolist()
+
 class dwelltime_by_genotype(hpv.Analyzer):
     '''
     Determine the age at which people with cervical cancer were causally infected and
@@ -65,39 +105,6 @@ class dwelltime_by_genotype(hpv.Analyzer):
             self.median_age_causal[gtype] = np.quantile(self.age_causal[gtype], 0.5)
 
 
-    @staticmethod
-    def reduce(analyzers, quantiles=None):
-        if quantiles is None: quantiles = {'low': 0.1, 'high': 0.9}
-        base_az = analyzers[0]
-        reduced_az = sc.dcp(base_az)
-        reduced_az.age_causal = dict()
-        reduced_az.median_age_causal = dict()
-        reduced_az.age_cancer = dict()
-        for ng in range(len(base_az.age_causal)):
-            reduced_az.median_age_causal[ng] = sc.objdict()
-            reduced_az.age_causal[ng] = sc.objdict()
-            reduced_az.age_cancer[ng] = sc.objdict()
-            age_causal = []
-            age_cancer = []
-            median_age_causal = []
-            for ai,az in enumerate(analyzers):
-                age_causal += az.age_causal[ng]
-                age_cancer += az.age_cancer[ng]
-                median_age_causal.append(az.median_age_causal[ng])
-            reduced_az.age_causal[ng].best  = np.quantile(age_causal, 0.5)
-            reduced_az.age_causal[ng].low   = np.quantile(age_causal, quantiles['low'])
-            reduced_az.age_causal[ng].high  = np.quantile(age_causal, quantiles['high'])
-
-            reduced_az.age_cancer[ng].best  = np.quantile(age_cancer, 0.5)
-            reduced_az.age_cancer[ng].low   = np.quantile(age_cancer, quantiles['low'])
-            reduced_az.age_cancer[ng].high  = np.quantile(age_cancer, quantiles['high'])
-
-            reduced_az.median_age_causal[ng].best  = np.quantile(median_age_causal, 0.5)
-            reduced_az.median_age_causal[ng].low   = np.quantile(median_age_causal, quantiles['low'])
-            reduced_az.median_age_causal[ng].high  = np.quantile(median_age_causal, quantiles['high'])
-
-        return reduced_az
-
 def set_font(size=None, font='Libertinus Sans'):
     ''' Set a custom font '''
     sc.fonts(add=sc.thisdir(aspath=True) / 'assets' / 'LibertinusSans-Regular.otf')
@@ -118,6 +125,12 @@ def lognorm_params(par1, par2):
     return shape, scale
 
 def plot_nh(sim=None):
+
+    cum_dist = sim.analyzers[1]
+    durs_to_cancer, counts_to_cancer = np.unique([ round(elem, 0) for elem in cum_dist.dur_to_cancer], return_counts=True)
+    durs_to_cin, counts_to_cin = np.unique([round(elem, 0) for elem in cum_dist.dur_to_cin], return_counts=True)
+    durs_to_clearance, counts_to_clearance = np.unique([round(elem, 0) for elem in cum_dist.dur_to_clearance], return_counts=True)
+
     # Make sims
     genotypes = ['hpv16', 'hpv18', 'hi5']
     glabels = ['HPV16', 'HPV18', 'HI5']
@@ -246,6 +259,7 @@ if __name__ == '__main__':
     location = 'nigeria'
 
     age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
+    inf_dist = cum_dist(start_year=2000)
     pars = {
         'location': location,
         'start': 1970,
@@ -254,7 +268,7 @@ if __name__ == '__main__':
         'n_agents': 50e3,
         'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
     }
-    sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype])
+    sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
 
     sim.run()
     sim.plot()
