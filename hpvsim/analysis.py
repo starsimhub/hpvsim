@@ -958,6 +958,8 @@ class age_results(Analyzer):
                 res.extend(sim_res)
 
         self.result_args[key].data['model_output'] = res
+        self.result_args[key].data['diffs'] = resargs.data['model_output'] - resargs.data['value']
+        self.result_args[key].data['gofs'] = hpm.compute_gof(resargs.data['value'].values, resargs.data['model_output'].values)
         self.result_args[key].data['losses'] = resargs.data['gofs'].values * resargs.weights
         self.result_args[key].mismatch = resargs.data['losses'].sum()
 
