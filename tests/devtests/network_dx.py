@@ -14,10 +14,11 @@ import seaborn as sns
 
 class new_pairs_snap(hpv.Analyzer):
     # analyzer for recording new partnerships of each timestep
-    def __init__(self, start_year=None, **kwargs):
+    def __init__(self, start_year=None, year_mod=None, **kwargs):
         super().__init__(**kwargs)
         self.new_pairs = pd.DataFrame()
         self.start_year = start_year
+        self.year_mod = year_mod
         self.yearvec = None
 
     def initialize(self, sim):
@@ -27,7 +28,10 @@ class new_pairs_snap(hpv.Analyzer):
             self.start_year = sim['start']
 
     def apply(self, sim):
-        if sim.yearvec[sim.t] >= self.start_year:
+        if sim.yearvec[sim.t] < self.start_year:
+            return
+
+        if self.year_mod is None or sim.yearvec[sim.t] % self.year_mod == 0:
             year_since_start = sim.yearvec[sim.t] - sim['start']
             layer_keys = sim.people.layer_keys()
             for rtype in layer_keys:
@@ -49,9 +53,9 @@ def network_demo():
 
     sims = []
     snap = hpv.snapshot(
-        timepoints=['1990', '2000', '2010', '2020'],
+        timepoints=['1970', '1980', '1990', '2000', '2010', '2020'],
     )
-    new_pairs = new_pairs_snap(start_year = end-3)
+    new_pairs = new_pairs_snap(start_year=start, year_mod=10)
     for n_clusters, mixing, label in zip(clusters, mixing_mats, labels):
         pars = dict(
             n_agents=pop,
@@ -98,25 +102,29 @@ def plot_mixing(sim, dim):
     g.fig.subplots_adjust(top=0.9)
     g.fig.suptitle(sim.label)
     g.tight_layout()
-    plt.show()
 
 def plot_rships(sim):
     layer_keys = list(sim['partners'].keys())
     snaps = sim.get_analyzer('snapshot')
-    people = snaps.snapshots[-1] # Final snapshot (i.e. year 2020)
-    df = pd.DataFrame({'age':people.age[people.alive==True], 'sex':people.is_female[people.alive==True]})
-    df['sex'].replace({True:'Female', False:'Male'}, inplace=True)
-    df['Age Bin'] = pd.cut(df['age'], people.age_bin_edges)
-    for lk, lkey in enumerate(layer_keys):
-        df[lkey] = people.n_rships[lk, people.alive==True]
-    dfm = df.melt(id_vars=['Age Bin', 'sex'], value_vars=layer_keys, var_name='Layer', value_name='n_rships')
-    g = sns.catplot(data=dfm, kind='bar', x='Age Bin', y='n_rships', hue='sex', col='Layer', sharey=False, height=8, aspect=0.5, legend_out=False, palette='tab10')
+
+    dfs = []
+    for year, people in snaps.snapshots.items():
+        df = pd.DataFrame({'age':people.age[people.alive==True], 'sex':people.is_female[people.alive==True]})
+        df['sex'].replace({True:'Female', False:'Male'}, inplace=True)
+        df['Age Bin'] = pd.cut(df['age'], people.age_bin_edges)
+        df['Year'] = year
+        for lk, lkey in enumerate(layer_keys):
+            df[lkey] = people.n_rships[lk, people.alive==True]
+        dfs.append(df)
+    
+    df = pd.concat(dfs)
+    dfm = df.melt(id_vars=['Age Bin', 'sex', 'Year'], value_vars=layer_keys, var_name='Layer', value_name='n_rships')
+    g = sns.catplot(data=dfm, kind='bar', x='Age Bin', y='n_rships', hue='sex', col='Year', row='Layer', sharey=False, height=5, aspect=0.75, legend_out=False, palette='tab10')
     g.tick_params(axis='x', which='both', rotation=70)
     g.set_ylabels('Number of Relationships')
     g.fig.tight_layout()
     g.fig.subplots_adjust(top=0.9)
     g.fig.suptitle(sim.label)
-    plt.show()
 
 
 #%% Run as a script
@@ -125,4 +133,5 @@ if __name__ == '__main__':
     T = sc.tic()
     network_demo()
     sc.toc(T)
+    plt.show()
     print('Done.')
