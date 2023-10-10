@@ -106,10 +106,9 @@ class dwelltime_by_genotype(hpv.Analyzer):
             self.median_age_causal[gtype] = np.quantile(self.age_causal[gtype], 0.5)
 
 
-def set_font(size=None, font='Libertinus Sans'):
+def set_font(size=None):
     ''' Set a custom font '''
-    sc.fonts(add=sc.thisdir(aspath=True) / 'assets' / 'LibertinusSans-Regular.otf')
-    sc.options(font=font, fontsize=size)
+    sc.options(fontsize=size)
     return
 
 def lognorm_params(par1, par2):
@@ -294,13 +293,110 @@ def plot_nh(sim=None):
     return
 
 
+def plot_nh_simple(sim=None):
+    # Make sims
+    genotypes = ['hpv16', 'hpv18', 'hi5']
+    glabels = ['HPV16', 'HPV18', 'HI5']
+
+    dur_cin = sc.autolist()
+    cancer_fns = sc.autolist()
+    cin_fns = sc.autolist()
+    dur_precin = sc.autolist()
+    for gi, genotype in enumerate(genotypes):
+        dur_precin += sim['genotype_pars'][genotype]['dur_precin']
+        dur_cin += sim['genotype_pars'][genotype]['dur_cin']
+        cancer_fns += sim['genotype_pars'][genotype]['cancer_fn']
+        cin_fns += sim['genotype_pars'][genotype]['cin_fn']
+
+
+    ####################
+    # Make figure, set fonts and colors
+    ####################
+    set_font(size=12)
+    colors = sc.gridcolors(len(genotypes))
+    fig, axes = pl.subplots(2, 2, figsize=(11, 9))
+    axes = axes.flatten()
+    cmap = pl.cm.Oranges([0.25, 0.5, 0.75, 1])
+
+    ####################
+    # Make plots
+    ####################
+    dt = 0.25
+    this_precinx = np.arange(dt, 15+dt, dt)
+    this_cinx = np.arange(dt, 30+dt, dt)
+    n_samples = 10
+    # Durations and severity of dysplasia
+    for gi, gtype in enumerate(genotypes):
+
+        # Panel A: durations of infection
+        sigma, scale = lognorm_params(dur_precin[gi]['par1'], dur_precin[gi]['par2'])
+        rv = lognorm(sigma, 0, scale)
+        axes[0].plot(this_precinx, rv.pdf(this_precinx), color=colors[gi], lw=2, label=glabels[gi])
+
+        # Panel B: prob of dysplasia
+        dysp = hppar.compute_severity(this_precinx[:], pars=cin_fns[gi])
+        axes[1].plot(this_precinx, dysp, color=colors[gi], lw=2, label=gtype.upper())
+
+        # Panel C: durations of CIN
+        sigma, scale = lognorm_params(dur_cin[gi]['par1'], dur_cin[gi]['par2'])
+        rv = lognorm(sigma, 0, scale)
+        axes[2].plot(this_cinx, rv.pdf(this_cinx), color=colors[gi], lw=2, label=glabels[gi])
+
+        # Panel D: dysplasia
+        cancer = hppar.compute_severity(this_cinx[:], pars=cancer_fns[gi])
+        axes[3].plot(this_cinx, cancer, color=colors[gi], lw=2, label=gtype.upper())
+
+
+    axes[0].set_ylabel("")
+    axes[0].grid()
+    axes[0].set_xlabel("Duration of infection (years)")
+    axes[0].set_title("Distribution of\n infection duration")
+    axes[0].legend(frameon=False)
+
+    axes[1].set_ylabel("Probability of CIN")
+    axes[1].set_xlabel("Duration of infection (years)")
+    axes[1].set_title("Infection duration to progression\nfunction")
+    axes[1].set_ylim([0,1])
+    axes[1].grid()
+
+    axes[2].set_ylabel("")
+    axes[2].grid()
+    axes[2].set_xlabel("Duration of CIN (years)")
+    axes[2].set_title("Distribution of\n CIN duration")
+    axes[2].legend(frameon=False)
+
+    axes[3].set_ylim([0,1])
+    axes[3].grid()
+    # axes[2].set_ylabel("Probability of transformation")
+    axes[3].set_xlabel("Duration of CIN (years)")
+    axes[3].set_title("Probability of cancer\n within X years")
+
+    fig.tight_layout()
+    fig.savefig(f'nathx_simple.png')
+    fig.show()
+    return
+
 # %% Run as a script
 if __name__ == '__main__':
 
+    sim = hpv.Sim()
+    sim.initialize()
+
+    # sim.pars['genotype_pars']['hpv16']['cin_fn']['x_infl']=0
+    # sim.pars['genotype_pars']['hpv16']['cin_fn']['k'] = 0.2
+    #
+    # sim.pars['genotype_pars']['hpv18']['cin_fn']['x_infl']=0
+    # sim.pars['genotype_pars']['hpv18']['cin_fn']['k'] = 0.2
+    # sim.pars['genotype_pars']['hpv18']['cin_fn']['y_max'] = 0.9
+    #
+    # sim.pars['genotype_pars']['hi5']['cin_fn']['x_infl']=0
+    # sim.pars['genotype_pars']['hi5']['cin_fn']['k'] = 0.2
+    # sim.pars['genotype_pars']['hi5']['cin_fn']['y_max'] = 0.85
+
+    plot_nh_simple(sim)
+
     location = 'nigeria'
 
-    age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
-    inf_dist = cum_dist(start_year=2000)
     pars = {
         'location': location,
         'start': 1970,
@@ -309,7 +405,8 @@ if __name__ == '__main__':
         'n_agents': 50e3,
         # 'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
     }
-    sim['genotype_pars']['hpv16']
+    age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
+    inf_dist = cum_dist(start_year=2000)
     sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
 
     sim.run()

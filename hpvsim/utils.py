@@ -6,6 +6,7 @@ Numerical utilities for running hpvsim.
 
 import numpy as np # For numerics
 import sciris as sc # For additional utilities
+from scipy.stats import norm
 
 
 # What functions are externally visible -- note, this gets populated in each section below
