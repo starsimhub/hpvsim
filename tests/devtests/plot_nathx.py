@@ -362,7 +362,7 @@ def plot_nh_simple(sim=None):
     axes[0].set_ylabel("")
     axes[0].grid()
     axes[0].set_xlabel("Duration of infection (years)")
-    axes[0].set_title("Distribution of\n infection duration")
+    axes[0].set_title("Probability of clearance")
     axes[0].legend(frameon=False)
 
     axes[1].set_ylabel("Probability of CIN")
