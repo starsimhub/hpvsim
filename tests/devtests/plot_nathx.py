@@ -3,6 +3,7 @@ Plot implied natural history.
 """
 import hpvsim as hpv
 import hpvsim.parameters as hppar
+import hpvsim.utils as hpu
 import pylab as pl
 import pandas as pd
 from scipy.stats import lognorm, norm
@@ -323,16 +324,26 @@ def plot_nh_simple(sim=None):
     ####################
     dt = 0.25
     this_precinx = np.arange(dt, 15+dt, dt)
+    years = np.arange(1,16,1)
     this_cinx = np.arange(dt, 30+dt, dt)
     n_samples = 10
+
+    s, scale = hpu.logn_percentiles_to_pars(1, 0.7, 3, 0.86)
+    s_16, scale_16 = hpu.logn_percentiles_to_pars(1, 0.5, 3, 0.6)
+    width = .3
+    multiplier=0
+
     # Durations and severity of dysplasia
     for gi, gtype in enumerate(genotypes):
+        offset = width * multiplier
 
         # Panel A: durations of infection
-        sigma, scale = lognorm_params(dur_precin[gi]['par1'], dur_precin[gi]['par2'])
-        rv = lognorm(sigma, 0, scale)
-        axes[0].plot(this_precinx, rv.pdf(this_precinx), color=colors[gi], lw=2, label=glabels[gi])
-
+        if gi == 0:
+            rv = lognorm(s=s_16, scale=scale_16)
+        else:
+            rv = lognorm(s=s, scale=scale)
+        axes[0].bar(years+offset - width/3, rv.cdf(years), color=colors[gi], lw=2, label=glabels[gi], width=width)
+        multiplier += 1
         # Panel B: prob of dysplasia
         dysp = hppar.compute_severity(this_precinx[:], pars=cin_fns[gi])
         axes[1].plot(this_precinx, dysp, color=colors[gi], lw=2, label=gtype.upper())
