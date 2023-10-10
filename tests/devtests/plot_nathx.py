@@ -328,8 +328,6 @@ def plot_nh_simple(sim=None):
     this_cinx = np.arange(dt, 30+dt, dt)
     n_samples = 10
 
-    s, scale = hpu.logn_percentiles_to_pars(1, 0.7, 3, 0.86)
-    s_16, scale_16 = hpu.logn_percentiles_to_pars(1, 0.5, 3, 0.6)
     width = .3
     multiplier=0
 
@@ -338,9 +336,12 @@ def plot_nh_simple(sim=None):
         offset = width * multiplier
 
         # Panel A: durations of infection
+        # axes[0].set_ylim([0,1])
         if gi == 0:
+            s_16, scale_16 = hpu.logn_percentiles_to_pars(1, 0.5, 3, 0.6)
             rv = lognorm(s=s_16, scale=scale_16)
         else:
+            s, scale = hpu.logn_percentiles_to_pars(1, 0.7, 3, 0.86)
             rv = lognorm(s=s, scale=scale)
         axes[0].bar(years+offset - width/3, rv.cdf(years), color=colors[gi], lw=2, label=glabels[gi], width=width)
         multiplier += 1
@@ -406,22 +407,22 @@ if __name__ == '__main__':
 
     plot_nh_simple(sim)
 
-    location = 'nigeria'
-
-    pars = {
-        'location': location,
-        'start': 1970,
-        'end': 2020,
-        'ms_agent_ratio': 100,
-        'n_agents': 50e3,
-        # 'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
-    }
-    age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
-    inf_dist = cum_dist(start_year=2000)
-    sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
-
-    sim.run()
-    sim.plot()
-    plot_nh(sim)
+    # location = 'nigeria'
+    #
+    # pars = {
+    #     'location': location,
+    #     'start': 1970,
+    #     'end': 2020,
+    #     'ms_agent_ratio': 100,
+    #     'n_agents': 50e3,
+    #     # 'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
+    # }
+    # age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
+    # inf_dist = cum_dist(start_year=2000)
+    # sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
+    #
+    # sim.run()
+    # sim.plot()
+    # plot_nh(sim)
 
     print('Done.')
