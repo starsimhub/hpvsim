@@ -307,8 +307,9 @@ if __name__ == '__main__':
         'end': 2020,
         'ms_agent_ratio': 100,
         'n_agents': 50e3,
-        'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
+        # 'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
     }
+    sim['genotype_pars']['hpv16']
     sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
 
     sim.run()
