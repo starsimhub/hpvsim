@@ -60,7 +60,7 @@ class outcomes_by_year(hpv.Analyzer):
     def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
         self.start_year = start_year
-        self.durations = np.arange(0,31)
+        self.durations = np.arange(0,31, .25)
         result_keys = ['cleared', 'persisted', 'progressed', 'cancer', 'dead', 'total']
         self.results = {rkey: np.zeros_like(self.durations) for rkey in result_keys}
 
@@ -82,27 +82,34 @@ class outcomes_by_year(hpv.Analyzer):
                 time_to_cancer_death = (sim.people.date_dead_cancer[inf_inds] - sim.t)*sim['dt']
                 time_to_other_death = (sim.people.date_dead_other[inf_inds] - sim.t)*sim['dt']
 
-                for dd in self.durations:
+                for idd, dd in enumerate(self.durations):
 
-                    dead = (time_to_cancer_death <= (dd+1)) | (time_to_other_death <= (dd+1))
-                    cleared = ~dead & (time_to_clear <= (dd+1))
-                    persisted = ~dead & ((time_to_clear > (dd+1)) | (time_to_cancer > (dd+1)))
-                    persisted_no_progression = persisted & ~(time_to_cin <= (dd+1))  # USing the ~ means that we also count nans
-                    persisted_with_progression = persisted & (time_to_cin <= (dd+1))
-                    cancer = ~dead & (time_to_cancer <= (dd+1))
+                    dead = (time_to_cancer_death <= (dd+.25)) | (time_to_other_death <= (dd+.25))
+                    cleared = ~dead & (time_to_clear <= (dd+.25))
+                    persisted = ~cleared & ~(time_to_cin <= (dd+.25)) # Haven't yet cleared or progressed
+                    progressed = ~cleared & (time_to_cin <= (dd+.25)) & ((time_to_clear>(dd+.25)) | (time_to_cancer > (dd+.25)))  # USing the ~ means that we also count nans
+                    cancer = ~dead & (time_to_cancer <= (dd+.25))
 
-                    derived_total = len(hpv.true(cleared)) + len(hpv.true(persisted_no_progression)) + len(hpv.true(persisted_with_progression)) + len(hpv.true(cancer)) + len(hpv.true(dead))
+                    dead_inds = hpv.true(dead)
+                    cleared_inds = hpv.true(cleared)
+                    persisted_inds = hpv.true(persisted)
+                    progressed_inds = hpv.true(progressed)
+                    cancer_inds = hpv.true(cancer)
+                    derived_total_inds = list(hpv.true(dead)) + list(hpv.true(cleared)) + list(
+                        hpv.true(persisted)) + list(hpv.true(progressed)) + list(hpv.true(cancer))
+                    duplicate_inds = set([x for x in derived_total_inds if derived_total_inds.count(x) > 1])
+                    derived_total = len(hpv.true(cleared)) + len(hpv.true(persisted)) + len(hpv.true(progressed)) + len(hpv.true(cancer)) + len(hpv.true(dead))
 
                     if derived_total != len(inf_inds):
                         errormsg = "Something is wrong!"
                         raise ValueError(errormsg)
                     scaled_total = scale.sum()
-                    self.results['cleared'][dd] += scale[hpv.true(cleared)].sum()#len(hpv.true(cleared))
-                    self.results['persisted'][dd] += scale[hpv.true(persisted_no_progression)].sum()#len(hpv.true(persisted_no_progression))
-                    self.results['progressed'][dd] += scale[hpv.true(persisted_with_progression)].sum()#len(hpv.true(persisted_with_progression))
-                    self.results['cancer'][dd] += scale[hpv.true(cancer)].sum()#len(hpv.true(cancer))
-                    self.results['dead'][dd] += scale[hpv.true(dead)].sum()#len(hpv.true(dead))
-                    self.results['total'][dd] += scaled_total#derived_total
+                    self.results['cleared'][idd] += scale[cleared_inds].sum()#len(hpv.true(cleared))
+                    self.results['persisted'][idd] += scale[persisted_inds].sum()#len(hpv.true(persisted_no_progression))
+                    self.results['progressed'][idd] += scale[progressed_inds].sum()#len(hpv.true(persisted_with_progression))
+                    self.results['cancer'][idd] += scale[cancer_inds].sum()#len(hpv.true(cancer))
+                    self.results['dead'][idd] += scale[dead_inds].sum()#len(hpv.true(dead))
+                    self.results['total'][idd] += scaled_total#derived_total
 
 
 class dwelltime_by_genotype(hpv.Analyzer):

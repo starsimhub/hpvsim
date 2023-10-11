@@ -226,7 +226,7 @@ class People(hpb.BasePeople):
         # Set date of clearance for those who don't develop precancer
         self.date_clearance[g, nocin_inds] = self.t + sc.randround(self.dur_precin[g, nocin_inds]/dt)
 
-        # Set date of onset of precancer and eventual severity outcomes for those who develop precancer
+        # Set date of onset of precancer for those who develop precancer
         self.date_cin[g, cin_inds] = self.t + sc.randround(self.dur_precin[g, cin_inds]/dt)
 
         # Set infection severity and outcomes
