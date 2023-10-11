@@ -70,7 +70,7 @@ class outcomes_by_year(hpv.Analyzer):
             self.start_year = sim['start']
 
     def apply(self, sim):
-        if sim.yearvec[sim.t] == self.start_year:
+        if sim.yearvec[sim.t] >= self.start_year:
             idx = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()  # Get people exposed on this step
             inf_inds = idx[-1]
             if len(inf_inds):
@@ -185,24 +185,26 @@ def plot_nh(sim=None):
     df['prob_persist'] = res['persisted']/res['total'] * 100
     df['prob_progressed'] = res['progressed']/res['total'] * 100
     df['prob_cancer'] = res['cancer']/res['total'] * 100
+    df['prob_dead'] = res['dead']/res['total'] * 100
 
     ####################
     # Make figure, set fonts and colors
     ####################
     set_font(size=16)
-    colors = sc.gridcolors(4)
+    colors = sc.gridcolors(5)
     fig, ax = pl.subplots(figsize=(11, 9))
-    ax.fill_between(df['years'], np.zeros(len(df['years'])), df['prob_clearance'], color=colors[0], label='Cleared')
-    ax.fill_between(df['years'], df['prob_clearance'], 100 - df['prob_persist'], color=colors[1], label='Persisted')
-    ax.fill_between(df['years'], 100 - df['prob_persist'], 100 - df['prob_progressed'], color=colors[2], label='CIN')
-    ax.fill_between(df['years'], 100 - df['prob_progressed'], 100 - df['prob_cancer'], color=colors[3],
-                    label='Cancer')
+    bottom = np.zeros(len(df['years']))
+    layers = ['prob_clearance', 'prob_persist', 'prob_progressed', 'prob_cancer', 'prob_dead']
+    labels = ['Cleared', 'Persisted', 'Progressed', 'Cancer', 'Dead']
+    for ln,layer in enumerate(layers):
+        ax.fill_between(df['years'], bottom, bottom+df[layer], color=colors[ln], label=labels[ln])
+        bottom += df[layer]
     data_years = np.arange(0,6, 0.5)
     cleared = [0, 58, 68, 71, 78, 81, 83, 84, 84.5, 85, 85.6, 86]
     progressed = [100, 99, 97, 96, 96, 95, 94, 93, 92, 91.5, 91.5, 91]
     ax.scatter(data_years, cleared, color=colors[0])
     ax.scatter(data_years, progressed, color=colors[2])
-    ax.legend()
+    ax.legend(loc='lower right')
     ax.set_xlabel('Time since infection')
     fig.tight_layout()
     fig.savefig(f'dist_infections.png')
