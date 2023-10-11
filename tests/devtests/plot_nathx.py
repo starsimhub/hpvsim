@@ -60,7 +60,8 @@ class outcomes_by_year(hpv.Analyzer):
     def __init__(self, start_year=None, **kwargs):
         super().__init__(**kwargs)
         self.start_year = start_year
-        self.durations = np.arange(0,31, .25)
+        self.interval = 1
+        self.durations = np.arange(0,31, self.interval)
         result_keys = ['cleared', 'persisted', 'progressed', 'cancer', 'dead', 'total']
         self.results = {rkey: np.zeros_like(self.durations) for rkey in result_keys}
 
@@ -84,11 +85,11 @@ class outcomes_by_year(hpv.Analyzer):
 
                 for idd, dd in enumerate(self.durations):
 
-                    dead = (time_to_cancer_death <= (dd+.25)) | (time_to_other_death <= (dd+.25))
-                    cleared = ~dead & (time_to_clear <= (dd+.25))
-                    persisted = ~cleared & ~(time_to_cin <= (dd+.25)) # Haven't yet cleared or progressed
-                    progressed = ~cleared & (time_to_cin <= (dd+.25)) & ((time_to_clear>(dd+.25)) | (time_to_cancer > (dd+.25)))  # USing the ~ means that we also count nans
-                    cancer = ~dead & (time_to_cancer <= (dd+.25))
+                    dead = (time_to_cancer_death <= (dd+self.interval)) | (time_to_other_death <= (dd+self.interval))
+                    cleared = ~dead & (time_to_clear <= (dd+self.interval))
+                    persisted = ~dead & ~cleared & ~(time_to_cin <= (dd+self.interval)) # Haven't yet cleared or progressed
+                    progressed = ~dead & ~cleared & (time_to_cin <= (dd+self.interval)) & ((time_to_clear>(dd+self.interval)) | (time_to_cancer > (dd+self.interval)))  # USing the ~ means that we also count nans
+                    cancer = ~dead & (time_to_cancer <= (dd+self.interval))
 
                     dead_inds = hpv.true(dead)
                     cleared_inds = hpv.true(cleared)
