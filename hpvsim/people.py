@@ -208,17 +208,19 @@ class People(hpb.BasePeople):
 
         # Determine how long before precancerous cell changes
         dur_precin = hpu.sample(**gpars['dur_precin'], size=len(inds))*(1-sev_imm) # Sample from distribution
+        self.dur_precin[g, inds] = dur_precin
         self.dur_infection[g, inds] = dur_precin
+
+        # Probability of progressing
         cin_probs = hppar.compute_severity(dur_precin, rel_sev=self.rel_sev[inds], pars=gpars['cin_fn'])
         cin_bools = hpu.binomial_arr(cin_probs)
         cin_inds = inds[cin_bools]
         nocin_inds = inds[~cin_bools]
 
+        # Duration of CIN
         age_mod = np.ones(len(cin_inds))
         age_mod[self.age[cin_inds] >= self.pars['age_risk']['age']] = self.pars['age_risk']['risk']
-        sev_imm = self.sev_imm[g, cin_inds]
-        self.dur_cin[g, cin_inds] = hpu.sample(**gpars['dur_cin'], size=len(cin_inds))* age_mod# * (1 - sev_imm)
-        self.dur_precin[g, inds] = dur_precin
+        self.dur_cin[g, cin_inds] = hpu.sample(**gpars['dur_cin'], size=len(cin_inds))* age_mod
         self.dur_infection[g, cin_inds] += self.dur_cin[g, cin_inds]
 
         # Set date of clearance for those who don't develop precancer
@@ -314,14 +316,14 @@ class People(hpb.BasePeople):
             cancer_prob_arr = np.zeros(len(inds))
             cancer_prob_arr[is_cancer] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
 
-
         # Determine who goes to cancer
         is_cancer = hpu.binomial_arr(cancer_prob_arr)
         cancer_inds = inds[is_cancer]
         no_cancer_inds = inds[~is_cancer]  # Indices of those who eventually heal lesion/clear infection
 
         # Set date of clearance for those who don't go to cancer
-        time_to_clear = dur_cin[~is_cancer]
+        dur_inf = self.dur_infection[g, inds]
+        time_to_clear = dur_inf[~is_cancer]
         self.date_clearance[g, no_cancer_inds] = np.fmax(self.date_clearance[g, no_cancer_inds],
                                                          self.date_exposed[g, no_cancer_inds] +
                                                          sc.randround(time_to_clear / dt))

@@ -61,7 +61,7 @@ class outcomes_by_year(hpv.Analyzer):
         super().__init__(**kwargs)
         self.start_year = start_year
         self.durations = np.arange(0,31)
-        result_keys = ['cleared', 'persisted', 'progressed', 'cancer', 'total']
+        result_keys = ['cleared', 'persisted', 'progressed', 'cancer', 'dead', 'total']
         self.results = {rkey: np.zeros_like(self.durations) for rkey in result_keys}
 
     def initialize(self, sim):
@@ -71,29 +71,37 @@ class outcomes_by_year(hpv.Analyzer):
 
     def apply(self, sim):
         if sim.yearvec[sim.t] >= self.start_year:
-            inf_genotypes, inf_inds = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()  # Get people exposed on this step
-            if len(inf_inds):
-                dur_inf = sim.people.dur_infection[inf_genotypes, inf_inds]  # Figure out their duration of infection
+            idx = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()  # Get people exposed on this step
+            inf_inds = idx[-1]
+            if len(idx[0]):
+                time_to_clear = (sim.people.date_clearance[idx] - sim.t)*sim['dt']
+                time_to_cancer = (sim.people.date_cancerous[idx] - sim.t)*sim['dt']
+                time_to_cin = (sim.people.date_cin[idx] - sim.t)*sim['dt']
 
-                for d in self.durations:
+                time_to_cancer_death = (sim.people.date_dead_cancer[inf_inds] - sim.t)*sim['dt']
+                time_to_other_death = (sim.people.date_dead_other[inf_inds] - sim.t)*sim['dt']
 
-                    n_total = np.count_nonzero((dur_inf < (d+1)))  # People around for this long
+                for dd in self.durations:
 
-                    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+                    dead = (time_to_cancer_death <= (dd+1)) | (time_to_other_death <= (dd+1))
+                    cleared = ~dead & (time_to_clear <= (dd+1))
+                    persisted = ~dead & ((time_to_clear > (dd+1)) | (time_to_cancer > (dd+1)))
+                    persisted_no_progression = persisted & ~(time_to_cin <= (dd+1))
+                    persisted_with_progression = persisted & (time_to_cin <= (dd+1))
+                    cancer = ~dead & (time_to_cancer <= (dd+1))
 
-                    dur_to_clear = (sim.people.date_clearance[inf_genotypes, inf_inds] - sim.t)*sim['dt']
-                    n_cleared = np.count_nonzero((dur_to_clear>d) & (dur_to_clear<(d+1)))
-                    dur_to_cin = (sim.people.date_cin[inf_genotypes, inf_inds] - sim.t)*sim['dt']
-                    n_cin = np.count_nonzero((dur_to_cin>d) & (dur_to_cin<(d+1)))
-                    dur_to_cancer = (sim.people.date_cancerous[inf_genotypes, inf_inds] - sim.t)*sim['dt']
-                    n_cancer = np.count_nonzero((dur_to_cancer>d) & (dur_to_cancer<(d+1)))
-                    n_persisted = n_total - n_cleared - n_cin - n_cancer
+                    derived_total = len(hpv.true(cleared)) + len(hpv.true(persisted_no_progression)) + len(hpv.true(persisted_with_progression)) + len(hpv.true(cancer)) + len(hpv.true(dead))
 
-                    self.results['cleared'][d] += n_cleared
-                    self.results['persisted'][d] += n_persisted
-                    self.results['progressed'][d] += n_cin
-                    self.results['cancer'][d] += n_cancer
-                    self.results['total'][d] += n_total
+                    if derived_total != len(idx[0]):
+                        errormsg = "Something is wrong!"
+                        raise ValueError(errormsg)
+
+                    self.results['cleared'][dd] += len(hpv.true(cleared))
+                    self.results['persisted'][dd] += len(hpv.true(persisted_no_progression))
+                    self.results['progressed'][dd] += len(hpv.true(persisted_with_progression))
+                    self.results['cancer'][dd] += len(hpv.true(cancer))
+                    self.results['dead'][dd] += len(hpv.true(dead))
+                    self.results['total'][dd] += derived_total
 
 
 class dwelltime_by_genotype(hpv.Analyzer):
