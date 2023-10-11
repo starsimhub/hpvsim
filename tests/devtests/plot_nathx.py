@@ -70,7 +70,7 @@ class outcomes_by_year(hpv.Analyzer):
             self.start_year = sim['start']
 
     def apply(self, sim):
-        if sim.yearvec[sim.t] >= self.start_year:
+        if sim.yearvec[sim.t] == self.start_year:
             idx = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()  # Get people exposed on this step
             inf_inds = idx[-1]
             if len(inf_inds):
@@ -78,6 +78,10 @@ class outcomes_by_year(hpv.Analyzer):
                 time_to_cancer = (sim.people.date_cancerous[idx] - sim.t)*sim['dt']
                 time_to_cin = (sim.people.date_cin[idx] - sim.t)*sim['dt']
 
+                # Count deaths. Note that there might be more people with a defined
+                # cancer death date than with a defined cancer date because this is
+                # counting all death, not just deaths resulting from infections on this
+                # time step.
                 time_to_cancer_death = (sim.people.date_dead_cancer[inf_inds] - sim.t)*sim['dt']
                 time_to_other_death = (sim.people.date_dead_other[inf_inds] - sim.t)*sim['dt']
 

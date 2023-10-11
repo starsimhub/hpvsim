@@ -307,7 +307,7 @@ class People(hpb.BasePeople):
                 new_dur_cin = extra_dur_cin[:, 1:][extra_cancer_bools]
                 self.dur_precin[g, new_inds] = new_dur_precin
                 self.dur_cin[g, new_inds] = new_dur_cin
-                self.dur_infection[g, new_inds] += new_dur_cin
+                self.dur_infection[g, new_inds] = new_dur_precin + new_dur_cin
                 self.date_infectious[g, new_inds] = self.t
                 dur_cin = np.append(dur_cin, new_dur_cin)
 
