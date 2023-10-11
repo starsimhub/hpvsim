@@ -74,6 +74,7 @@ class outcomes_by_year(hpv.Analyzer):
             idx = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()  # Get people exposed on this step
             inf_inds = idx[-1]
             if len(inf_inds):
+                scale = sim.people.scale[inf_inds]
                 time_to_clear = (sim.people.date_clearance[idx] - sim.t)*sim['dt']
                 time_to_cancer = (sim.people.date_cancerous[idx] - sim.t)*sim['dt']
                 time_to_cin = (sim.people.date_cin[idx] - sim.t)*sim['dt']
@@ -95,13 +96,13 @@ class outcomes_by_year(hpv.Analyzer):
                     if derived_total != len(inf_inds):
                         errormsg = "Something is wrong!"
                         raise ValueError(errormsg)
-
-                    self.results['cleared'][dd] += len(hpv.true(cleared))
-                    self.results['persisted'][dd] += len(hpv.true(persisted_no_progression))
-                    self.results['progressed'][dd] += len(hpv.true(persisted_with_progression))
-                    self.results['cancer'][dd] += len(hpv.true(cancer))
-                    self.results['dead'][dd] += len(hpv.true(dead))
-                    self.results['total'][dd] += derived_total
+                    scaled_total = scale.sum()
+                    self.results['cleared'][dd] += scale[hpv.true(cleared)].sum()#len(hpv.true(cleared))
+                    self.results['persisted'][dd] += scale[hpv.true(persisted_no_progression)].sum()#len(hpv.true(persisted_no_progression))
+                    self.results['progressed'][dd] += scale[hpv.true(persisted_with_progression)].sum()#len(hpv.true(persisted_with_progression))
+                    self.results['cancer'][dd] += scale[hpv.true(cancer)].sum()#len(hpv.true(cancer))
+                    self.results['dead'][dd] += scale[hpv.true(dead)].sum()#len(hpv.true(dead))
+                    self.results['total'][dd] += scaled_total#derived_total
 
 
 class dwelltime_by_genotype(hpv.Analyzer):
@@ -458,7 +459,7 @@ if __name__ == '__main__':
                 'end': 2020,
                 'ms_agent_ratio': 100,
                 'n_agents': 50e3,
-                # 'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
+                'sev_dist': dict(dist='normal_pos', par1=1., par2=0.001)
             }
             age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
             inf_dist = outcomes_by_year(start_year=2000)

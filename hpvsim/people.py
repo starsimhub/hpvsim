@@ -305,10 +305,12 @@ class People(hpb.BasePeople):
                 is_cancer = np.append(is_cancer, np.full(len(new_inds), fill_value=True))
                 new_dur_precin = extra_dur_precin[:, 1:][extra_cancer_bools]
                 new_dur_cin = extra_dur_cin[:, 1:][extra_cancer_bools]
+                new_dur_infection = new_dur_precin + new_dur_cin
                 self.dur_precin[g, new_inds] = new_dur_precin
                 self.dur_cin[g, new_inds] = new_dur_cin
-                self.dur_infection[g, new_inds] += new_dur_cin
+                self.dur_infection[g, new_inds] = new_dur_infection
                 self.date_infectious[g, new_inds] = self.t
+                self.date_cin[g, new_inds] = self.t + sc.randround(new_dur_precin / dt)
                 dur_cin = np.append(dur_cin, new_dur_cin)
 
             # Finally, create an array for storing the transformation probabilities.
@@ -328,10 +330,8 @@ class People(hpb.BasePeople):
                                                          self.date_exposed[g, no_cancer_inds] +
                                                          sc.randround(time_to_clear / dt))
 
-        # Set dates for those who go to cancer. Transformation is assumed to occur at
-        # the end of episomal infection, while cancer is assumed to begin once severity
-        # exceeds the cancer cutoff, which may mean that it begins as soon as transformation
-        # happens, if severity is already above the threshold.
+        # Set dates for those who go to cancer.
+        # Set date of onset of precancer and eventual severity outcomes for those who develop precancer
         dur_cin_transformed = dur_cin[is_cancer] # Duration of episomal infection for those who transform
         self.date_cancerous[g, cancer_inds] = self.date_cin[g, cancer_inds] + sc.randround(dur_cin_transformed/dt)
         self.dur_infection[g, cancer_inds] += self.dur_cin[g, cancer_inds]

@@ -331,7 +331,7 @@ def get_genotype_pars(default=False, genotype=None):
     # par1_16 = rv_16.mean()
     # par2_16 = rv_16.std()
     par1_16 = 2.5
-    par2_16 = 5
+    par2_16 = 10
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='lognormal', par1=par1_16, par2=par2_16)  # Duration of infection prior to precancer
