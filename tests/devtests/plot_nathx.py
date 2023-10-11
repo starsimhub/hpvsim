@@ -73,6 +73,11 @@ class outcomes_by_year(hpv.Analyzer):
     def apply(self, sim):
         if sim.yearvec[sim.t] == self.start_year:
             idx = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()  # Get people exposed on this step
+            # import traceback
+            # traceback.print_exc()
+            # import pdb
+            # pdb.set_trace()
+
             inf_inds = idx[-1]
             if len(inf_inds):
                 scale = sim.people.scale[inf_inds]
@@ -100,9 +105,6 @@ class outcomes_by_year(hpv.Analyzer):
                     persisted_inds = hpv.true(persisted)
                     progressed_inds = hpv.true(progressed)
                     cancer_inds = hpv.true(cancer)
-                    # derived_total_inds = list(hpv.true(dead)) + list(hpv.true(cleared)) + list(
-                    #     hpv.true(persisted)) + list(hpv.true(progressed)) + list(hpv.true(cancer))
-                    # duplicate_inds = set([x for x in derived_total_inds if derived_total_inds.count(x) > 1])
                     derived_total = len(cleared_inds) + len(persisted_inds) + len(progressed_inds) + len(cancer_inds) + len(dead_inds)
 
                     if derived_total != len(inf_inds):
