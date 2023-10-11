@@ -55,6 +55,47 @@ class cum_dist(hpv.Analyzer):
                 self.dur_to_cin += dur_to_cin.tolist()
                 self.dur_to_cancer += dur_to_cancer.tolist()
 
+
+class outcomes_by_year(hpv.Analyzer):
+    def __init__(self, start_year=None, **kwargs):
+        super().__init__(**kwargs)
+        self.start_year = start_year
+        self.durations = np.arange(0,31)
+        result_keys = ['cleared', 'persisted', 'progressed', 'cancer', 'total']
+        self.results = {rkey: np.zeros_like(self.durations) for rkey in result_keys}
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        if self.start_year is None:
+            self.start_year = sim['start']
+
+    def apply(self, sim):
+        if sim.yearvec[sim.t] >= self.start_year:
+            inf_genotypes, inf_inds = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()  # Get people exposed on this step
+            if len(inf_inds):
+                dur_inf = sim.people.dur_infection[inf_genotypes, inf_inds]  # Figure out their duration of infection
+
+                for d in self.durations:
+
+                    n_total = np.count_nonzero((dur_inf < (d+1)))  # People around for this long
+
+                    import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
+
+                    dur_to_clear = (sim.people.date_clearance[inf_genotypes, inf_inds] - sim.t)*sim['dt']
+                    n_cleared = np.count_nonzero((dur_to_clear>d) & (dur_to_clear<(d+1)))
+                    dur_to_cin = (sim.people.date_cin[inf_genotypes, inf_inds] - sim.t)*sim['dt']
+                    n_cin = np.count_nonzero((dur_to_cin>d) & (dur_to_cin<(d+1)))
+                    dur_to_cancer = (sim.people.date_cancerous[inf_genotypes, inf_inds] - sim.t)*sim['dt']
+                    n_cancer = np.count_nonzero((dur_to_cancer>d) & (dur_to_cancer<(d+1)))
+                    n_persisted = n_total - n_cleared - n_cin - n_cancer
+
+                    self.results['cleared'][d] += n_cleared
+                    self.results['persisted'][d] += n_persisted
+                    self.results['progressed'][d] += n_cin
+                    self.results['cancer'][d] += n_cancer
+                    self.results['total'][d] += n_total
+
+
 class dwelltime_by_genotype(hpv.Analyzer):
     '''
     Determine the age at which people with cervical cancer were causally infected and
@@ -128,27 +169,39 @@ def lognorm_params(par1, par2):
 def plot_nh(sim=None):
 
     cum_dist = sim.analyzers[1]
-    durs_to_cancer, counts_to_cancer = np.unique([ math.ceil(elem) for elem in cum_dist.dur_to_cancer], return_counts=True)
-    durs_to_cin, counts_to_cin = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_cin], return_counts=True)
-    durs_to_clearance, counts_to_clearance = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_clearance], return_counts=True)
+    years = np.arange(0,31)
 
-    df = pd.DataFrame()
-    df['years'] = np.arange(0,30)
-    durs = np.zeros(30)
-    durs_subset = durs_to_clearance[durs_to_clearance<30]
-    durs[[int(elem) for elem in durs_subset]] = counts_to_clearance[:len(durs_subset)]
-    df['n_cleared'] = durs
-    df['prob_clearance'] = 100*np.cumsum(df['n_cleared'])/cum_dist.total_infections
+    # Calculate histograms of outcomes
+    cancers, years = np.histogram(cum_dist.dur_to_cancer, bins=years)
+    cins, years = np.histogram(cum_dist.dur_to_cin, bins=years)
+    clearances, years = np.histogram(cum_dist.dur_to_clearance, bins=years)
 
-    durs_subset = durs_to_cin[durs_to_cin <30]
-    durs[[int(elem) for elem in durs_subset]] = counts_to_cin[:len(durs_subset)]
-    df['n_cin'] = durs
-    df['prob_cin'] = 100 * np.cumsum(df['n_cin']) / cum_dist.total_infections
+    totals = cancers + cins + clearances
+    cancer_shares = cancers/totals
+    cin_shares = cins/totals
+    clearance_shares = clearances/totals
 
-    durs_subset = durs_to_cancer[durs_to_cancer <30]
-    durs[[int(elem) for elem in durs_subset]] = counts_to_cancer[:len(durs_subset)]
-    df['n_cancer'] = durs
-    df['prob_cancer'] = 100 * np.cumsum(df['n_cancer']) / cum_dist.total_infections
+    # durs_to_cancer, counts_to_cancer = np.unique([ math.ceil(elem) for elem in cum_dist.dur_to_cancer], return_counts=True)
+    # durs_to_cin, counts_to_cin = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_cin], return_counts=True)
+    # durs_to_clearance, counts_to_clearance = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_clearance], return_counts=True)
+    #
+    # df = pd.DataFrame()
+    # df['years'] = np.arange(0,30)
+    # durs = np.zeros(30)
+    # durs_subset = durs_to_clearance[durs_to_clearance<30]
+    # durs[[int(elem) for elem in durs_subset]] = counts_to_clearance[:len(durs_subset)]
+    # df['n_cleared'] = durs
+    # df['prob_clearance'] = 100*np.cumsum(df['n_cleared'])/cum_dist.total_infections
+    #
+    # durs_subset = durs_to_cin[durs_to_cin <30]
+    # durs[[int(elem) for elem in durs_subset]] = counts_to_cin[:len(durs_subset)]
+    # df['n_cin'] = durs
+    # df['prob_cin'] = 100 * np.cumsum(df['n_cin']) / cum_dist.total_infections
+    #
+    # durs_subset = durs_to_cancer[durs_to_cancer <30]
+    # durs[[int(elem) for elem in durs_subset]] = counts_to_cancer[:len(durs_subset)]
+    # df['n_cancer'] = durs
+    # df['prob_cancer'] = 100 * np.cumsum(df['n_cancer']) / cum_dist.total_infections
 
 
     ####################
@@ -343,7 +396,7 @@ def plot_nh_simple(sim=None):
         else:
             s, scale = hpu.logn_percentiles_to_pars(1, 0.7, 3, 0.86)
             rv = lognorm(s=s, scale=scale)
-        axes[0].bar(years+offset - width/3, rv.cdf(years), color=colors[gi], lw=2, label=glabels[gi], width=width)
+        axes[0].bar(years+offset - width/3, 1-rv.cdf(years), color=colors[gi], lw=2, label=glabels[gi], width=width)
         multiplier += 1
         # Panel B: prob of dysplasia
         dysp = hppar.compute_severity(this_precinx[:], pars=cin_fns[gi])
@@ -362,7 +415,7 @@ def plot_nh_simple(sim=None):
     axes[0].set_ylabel("")
     axes[0].grid()
     axes[0].set_xlabel("Duration of infection (years)")
-    axes[0].set_title("Probability of clearance")
+    axes[0].set_title("Probability of persistance")
     axes[0].legend(frameon=False)
 
     axes[1].set_ylabel("Probability of CIN")
@@ -391,8 +444,14 @@ def plot_nh_simple(sim=None):
 # %% Run as a script
 if __name__ == '__main__':
 
-    sim = hpv.Sim()
-    sim.initialize()
+    make_simple = False
+    make_stacked = True
+    do_run = True
+
+    if make_simple:
+        sim = hpv.Sim()
+        sim.initialize()
+        plot_nh_simple(sim)
 
     # sim.pars['genotype_pars']['hpv16']['cin_fn']['x_infl']=0
     # sim.pars['genotype_pars']['hpv16']['cin_fn']['k'] = 0.2
@@ -405,24 +464,30 @@ if __name__ == '__main__':
     # sim.pars['genotype_pars']['hi5']['cin_fn']['k'] = 0.2
     # sim.pars['genotype_pars']['hi5']['cin_fn']['y_max'] = 0.85
 
-    plot_nh_simple(sim)
+    if make_stacked:
 
-    # location = 'nigeria'
-    #
-    # pars = {
-    #     'location': location,
-    #     'start': 1970,
-    #     'end': 2020,
-    #     'ms_agent_ratio': 100,
-    #     'n_agents': 50e3,
-    #     # 'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
-    # }
-    # age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
-    # inf_dist = cum_dist(start_year=2000)
-    # sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
-    #
-    # sim.run()
-    # sim.plot()
-    # plot_nh(sim)
+        location = 'nigeria'
+        if do_run:
+            pars = {
+                'location': location,
+                'start': 1970,
+                'end': 2020,
+                'ms_agent_ratio': 100,
+                'n_agents': 50e3,
+                # 'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
+            }
+            age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
+            inf_dist = outcomes_by_year(start_year=2000)
+            sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
+            sim.run()
+            sim.plot()
+            sim.shrink()
+            sc.saveobj(f'{location}.sim', sim)
+
+        else:
+            sim = sc.loadobj(f'{location}.sim')
+
+
+        plot_nh(sim)
 
     print('Done.')

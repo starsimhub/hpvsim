@@ -771,6 +771,7 @@ class People(hpb.BasePeople):
         # Compute infection clearance for males
         if len(m_inds)>0:
             dur_infection = hpu.sample(**self.pars['dur_infection_male'], size=len(m_inds))
+            self.dur_infection[g, m_inds] = dur_infection
             self.date_clearance[g, m_inds] = self.date_infectious[g, m_inds] + np.ceil(dur_infection/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return self.scale_flows(inds) # For incrementing counters
