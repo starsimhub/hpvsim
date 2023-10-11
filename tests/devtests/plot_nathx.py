@@ -109,12 +109,12 @@ class outcomes_by_year(hpv.Analyzer):
                         errormsg = "Something is wrong!"
                         raise ValueError(errormsg)
                     scaled_total = scale.sum()
-                    self.results['cleared'][idd] += len(cleared_inds)#scale[cleared_inds].sum()#len(hpv.true(cleared))
-                    self.results['persisted'][idd] += len(persisted_inds)#scale[persisted_inds].sum()#len(hpv.true(persisted_no_progression))
-                    self.results['progressed'][idd] += len(progressed_inds)#scale[progressed_inds].sum()#len(hpv.true(persisted_with_progression))
-                    self.results['cancer'][idd] += len(cancer_inds)#scale[cancer_inds].sum()#len(hpv.true(cancer))
-                    self.results['dead'][idd] += len(dead_inds)#scale[dead_inds].sum()#len(hpv.true(dead))
-                    self.results['total'][idd] += derived_total#scaled_total#derived_total
+                    self.results['cleared'][idd] += scale[cleared_inds].sum()#len(hpv.true(cleared))
+                    self.results['persisted'][idd] += scale[persisted_inds].sum()#len(hpv.true(persisted_no_progression))
+                    self.results['progressed'][idd] += scale[progressed_inds].sum()#len(hpv.true(persisted_with_progression))
+                    self.results['cancer'][idd] += scale[cancer_inds].sum()#len(hpv.true(cancer))
+                    self.results['dead'][idd] += scale[dead_inds].sum()#len(hpv.true(dead))
+                    self.results['total'][idd] += scaled_total#derived_total
 
 
 class dwelltime_by_genotype(hpv.Analyzer):
