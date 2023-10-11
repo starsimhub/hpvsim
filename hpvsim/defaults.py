@@ -90,7 +90,8 @@ class PeopleMeta(sc.prettyobj):
             State('screens',        default_int,    0),  # Number of screens given per person
             State('cin_treatments', default_int,    0),  # Number of CIN treatments given per person
             State('cancer_treatments', default_int,    0),  # Number of cancer treatments given per person
-            State('art_adherence',  default_float, 0, label='adherence on ART', color='#aaa8ff')
+            State('art_adherence',  default_float, 0, label='adherence on ART', color='#aaa8ff'),
+            State('n_infections',   default_int,    0, 'n_genotypes')
         ]
 
         ###### The following section consists of all the boolean states
