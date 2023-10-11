@@ -70,10 +70,10 @@ class outcomes_by_year(hpv.Analyzer):
             self.start_year = sim['start']
 
     def apply(self, sim):
-        if sim.yearvec[sim.t] >= self.start_year:
+        if sim.yearvec[sim.t] == self.start_year:
             idx = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()  # Get people exposed on this step
             inf_inds = idx[-1]
-            if len(idx[0]):
+            if len(inf_inds):
                 time_to_clear = (sim.people.date_clearance[idx] - sim.t)*sim['dt']
                 time_to_cancer = (sim.people.date_cancerous[idx] - sim.t)*sim['dt']
                 time_to_cin = (sim.people.date_cin[idx] - sim.t)*sim['dt']
@@ -86,13 +86,13 @@ class outcomes_by_year(hpv.Analyzer):
                     dead = (time_to_cancer_death <= (dd+1)) | (time_to_other_death <= (dd+1))
                     cleared = ~dead & (time_to_clear <= (dd+1))
                     persisted = ~dead & ((time_to_clear > (dd+1)) | (time_to_cancer > (dd+1)))
-                    persisted_no_progression = persisted & ~(time_to_cin <= (dd+1))
+                    persisted_no_progression = persisted & ~(time_to_cin <= (dd+1))  # USing the ~ means that we also count nans
                     persisted_with_progression = persisted & (time_to_cin <= (dd+1))
                     cancer = ~dead & (time_to_cancer <= (dd+1))
 
                     derived_total = len(hpv.true(cleared)) + len(hpv.true(persisted_no_progression)) + len(hpv.true(persisted_with_progression)) + len(hpv.true(cancer)) + len(hpv.true(dead))
 
-                    if derived_total != len(idx[0]):
+                    if derived_total != len(inf_inds):
                         errormsg = "Something is wrong!"
                         raise ValueError(errormsg)
 
@@ -176,41 +176,15 @@ def lognorm_params(par1, par2):
 
 def plot_nh(sim=None):
 
-    cum_dist = sim.analyzers[1]
-    years = np.arange(0,31)
+    res = sim.analyzers[1].results
+    years = sim.analyzers[1].durations
 
-    # Calculate histograms of outcomes
-    cancers, years = np.histogram(cum_dist.dur_to_cancer, bins=years)
-    cins, years = np.histogram(cum_dist.dur_to_cin, bins=years)
-    clearances, years = np.histogram(cum_dist.dur_to_clearance, bins=years)
-
-    totals = cancers + cins + clearances
-    cancer_shares = cancers/totals
-    cin_shares = cins/totals
-    clearance_shares = clearances/totals
-
-    # durs_to_cancer, counts_to_cancer = np.unique([ math.ceil(elem) for elem in cum_dist.dur_to_cancer], return_counts=True)
-    # durs_to_cin, counts_to_cin = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_cin], return_counts=True)
-    # durs_to_clearance, counts_to_clearance = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_clearance], return_counts=True)
-    #
-    # df = pd.DataFrame()
-    # df['years'] = np.arange(0,30)
-    # durs = np.zeros(30)
-    # durs_subset = durs_to_clearance[durs_to_clearance<30]
-    # durs[[int(elem) for elem in durs_subset]] = counts_to_clearance[:len(durs_subset)]
-    # df['n_cleared'] = durs
-    # df['prob_clearance'] = 100*np.cumsum(df['n_cleared'])/cum_dist.total_infections
-    #
-    # durs_subset = durs_to_cin[durs_to_cin <30]
-    # durs[[int(elem) for elem in durs_subset]] = counts_to_cin[:len(durs_subset)]
-    # df['n_cin'] = durs
-    # df['prob_cin'] = 100 * np.cumsum(df['n_cin']) / cum_dist.total_infections
-    #
-    # durs_subset = durs_to_cancer[durs_to_cancer <30]
-    # durs[[int(elem) for elem in durs_subset]] = counts_to_cancer[:len(durs_subset)]
-    # df['n_cancer'] = durs
-    # df['prob_cancer'] = 100 * np.cumsum(df['n_cancer']) / cum_dist.total_infections
-
+    df = pd.DataFrame()
+    df['years'] = years
+    df['prob_clearance'] = res['cleared']/res['total'] * 100
+    df['prob_persist'] = res['persisted']/res['total'] * 100
+    df['prob_progressed'] = res['progressed']/res['total'] * 100
+    df['prob_cancer'] = res['cancer']/res['total'] * 100
 
     ####################
     # Make figure, set fonts and colors
@@ -219,9 +193,9 @@ def plot_nh(sim=None):
     colors = sc.gridcolors(4)
     fig, ax = pl.subplots(figsize=(11, 9))
     ax.fill_between(df['years'], np.zeros(len(df['years'])), df['prob_clearance'], color=colors[0], label='Cleared')
-    ax.fill_between(df['years'], df['prob_clearance'], 100 - df['prob_cin'], color=colors[1], label='Persisted')
-    ax.fill_between(df['years'], 100 - df['prob_cin'], 100 - df['prob_cancer'], color=colors[2], label='CIN')
-    ax.fill_between(df['years'], 100 - df['prob_cancer'], 100 * np.ones(len(df['years'])), color=colors[3],
+    ax.fill_between(df['years'], df['prob_clearance'], 100 - df['prob_persist'], color=colors[1], label='Persisted')
+    ax.fill_between(df['years'], 100 - df['prob_persist'], 100 - df['prob_progressed'], color=colors[2], label='CIN')
+    ax.fill_between(df['years'], 100 - df['prob_progressed'], 100 - df['prob_cancer'], color=colors[3],
                     label='Cancer')
     data_years = np.arange(0,6, 0.5)
     cleared = [0, 58, 68, 71, 78, 81, 83, 84, 84.5, 85, 85.6, 86]
