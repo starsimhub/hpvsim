@@ -319,19 +319,13 @@ def get_genotype_pars(default=False, genotype=None):
     pars = sc.objdict()
 
     # Find parameters from Guanacaste cohort data
-    # Unpublished figure by Schiffman shows 70% hr hpv clear after 1 year, 86% after 3 years
-    s, scale = hpu.logn_percentiles_to_pars(1, 0.7, 3, 0.86)
-    rv = lognorm(s=s, scale=scale)
-    par1 = rv.mean()
-    par2 = rv.std()
+    # Unpublished figure by Schiffman shows 50% hr hpv clear after 6 months, 70% hr hpv clear after 1 year, 86% after 3 years
+    par1 = 2.5
+    par2 = 20
 
     # Unpublished figure by Schiffman shows 50% hpv16 clear after 1 year, 60% after 3 years
-    # s_16, scale_16 = hpu.logn_percentiles_to_pars(1, 0.5, 3, 0.6)
-    # rv_16 = lognorm(s=s_16, scale=scale_16)
-    # par1_16 = rv_16.mean()
-    # par2_16 = rv_16.std()
-    par1_16 = 2.5
-    par2_16 = 10
+    par1_16 = 4.5
+    par2_16 = 20
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='lognormal', par1=par1_16, par2=par2_16)  # Duration of infection prior to precancer
