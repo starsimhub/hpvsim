@@ -731,8 +731,10 @@ class People(hpb.BasePeople):
         # Count reinfections and remove any previous dates
         self.genotype_flows['reinfections'][g]  += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         self.flows['reinfections']              += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
+        self.n_infections[g,inds] += 1
         for key in ['date_clearance']:
             self[key][g, inds] = np.nan
+
 
         # Count reactivations and adjust latency status
         if layer == 'reactivation':
