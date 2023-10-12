@@ -184,26 +184,24 @@ def lognorm_params(par1, par2):
     shape = sigma
     return shape, scale
 
-def plot_nh(sim=None):
+def plot_stacked(sim=None):
+    res = sim.analyzers[1].results
+    years = sim.analyzers[1].durations
 
-    inf_res = sim.analyzers[1].inf_results
-    inf_years = sim.analyzers[1].inf_durations
+    df = pd.DataFrame()
+    df["years"] = years
+    df["prob_clearance"] = (res["cleared"]) / (res["total"]) * 100
+    df["prob_persist"] = (res["persisted"]) / (res["total"]) * 100
+    df["prob_progressed"] = (res["progressed"]) / (res["total"]) * 100
+    df["prob_cancer"] = (res["cancer"]) / (res["total"]) * 100
+    df["prob_dead"] = (res["dead"]) / (res["total"]) * 100
 
-    cin_res = sim.analyzers[1].cin_results
-    cin_years = sim.analyzers[1].cin_durations
-
-    df_inf = pd.DataFrame()
-    df_inf['years'] = inf_years
-    df_inf['prob_clearance'] = (inf_res['cleared'])/(inf_res['total']) * 100
-    df_inf['prob_persist'] = (inf_res['persisted'])/(inf_res['total']) * 100
-    df_inf['prob_progressed'] = (inf_res['progressed'])/(inf_res['total']) * 100
-    df_inf['prob_dead'] = (inf_res['dead']) / (inf_res['total']) * 100
-
-    df_cin = pd.DataFrame()
-    df_cin['years'] = cin_years
-    df_cin['prob_clearance_persist'] = (cin_res['cleared']+cin_res['persisted'])/(cin_res['total']) * 100
-    df_cin['prob_invasion'] = (cin_res['progressed'])/(cin_res['total']) * 100
-    df_cin['prob_dead'] = (cin_res['dead']) / (cin_res['total']) * 100
+    df2 = pd.DataFrame()
+    total_persisted_alive = res["total"] - res["dead"] - res["cleared"]
+    df2["years"] = years
+    df2["prob_persist"] = (res["persisted"]) / total_persisted_alive * 100
+    df2["prob_progressed"] = (res["progressed"]) / total_persisted_alive * 100
+    df2["prob_cancer"] = (res["cancer"]) / total_persisted_alive * 100
 
     ####################
     # Make figure, set fonts and colors
@@ -212,29 +210,46 @@ def plot_nh(sim=None):
     colors = sc.gridcolors(5)
     fig, axes = pl.subplots(1, 2, figsize=(11, 9))
 
-    # First INF
-    bottom = np.zeros(len(df_inf['years']))
-    layers = ['prob_clearance', 'prob_persist', 'prob_progressed', 'prob_dead']
-    labels = ['Cleared', 'Persisted', 'Progressed', 'Dead']
-    for ln,layer in enumerate(layers):
-        axes[0].fill_between(df_inf['years'], bottom, bottom+df_inf[layer], color=colors[ln], label=labels[ln])
-        bottom += df_inf[layer]
+    # Panel 1, all outcomes
+    bottom = np.zeros(len(df["years"]))
+    layers = [
+        "prob_clearance",
+        "prob_persist",
+        "prob_progressed",
+        "prob_cancer",
+        "prob_dead",
+    ]
+    labels = ["Cleared", "Persisted", "Progressed", "Cancer", "Dead"]
+    for ln, layer in enumerate(layers):
+        axes[0].fill_between(
+            df["years"], bottom, bottom + df[layer], color=colors[ln], label=labels[ln]
+        )
+        bottom += df[layer]
 
-    # Now CIN
-    bottom = np.zeros(len(df_cin['years']))
-    layers = ['prob_clearance_persist', 'prob_invasion', 'prob_dead']
-    labels = ['Regressed/Persisted', 'Invasion', 'Dead']
-    for ln,layer in enumerate(layers):
-        axes[1].fill_between(df_cin['years'], bottom, bottom+df_cin[layer], color=colors[ln], label=labels[ln])
-        bottom += df_cin[layer]
-    axes[0].legend(loc='lower right')
-    axes[1].legend(loc='lower right')
-    axes[0].set_xlabel('Time since infection')
-    axes[1].set_xlabel('Time since CIN')
+    # Panel 2, conditional on beaing alive and not cleared
+    bottom = np.zeros(len(df["years"]))
+    layers = ["prob_persist", "prob_progressed", "prob_cancer"]
+    labels = ["Persisted", "Progressed", "Cancer"]
+    for ln, layer in enumerate(layers):
+        axes[1].fill_between(
+            df2["years"],
+            bottom,
+            bottom + df2[layer],
+            color=colors[ln],
+            label=labels[ln],
+        )
+        bottom += df2[layer]
+    axes[0].legend(loc="lower right")
+    axes[1].legend(loc="lower right")
+    axes[0].set_xlabel("Time since infection")
+    axes[1].set_xlabel("Time since infection")
     fig.tight_layout()
-    fig.savefig(f'dist_infections.png')
+    fig.savefig(f"dist_infections.png")
     fig.show()
 
+    return
+
+def plot_nh(sim=None):
     # Make sims
     genotypes = ['hpv16', 'hpv18', 'hi5']
     glabels = ['HPV16', 'HPV18', 'HI5']
@@ -491,7 +506,7 @@ if __name__ == '__main__':
                 'sev_dist': dict(dist='normal_pos', par1=1., par2=0.001)
             }
             age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
-            inf_dist = outcomes_by_year_v2(start_year=2000)
+            inf_dist = outcomes_by_year(start_year=2000)
             sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
             sim.run()
             sim.plot()
@@ -501,7 +516,7 @@ if __name__ == '__main__':
         else:
             sim = sc.loadobj(f'{location}.sim')
 
-
+        plot_stacked(sim)
         plot_nh(sim)
 
     print('Done.')
