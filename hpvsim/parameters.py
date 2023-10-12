@@ -356,8 +356,8 @@ def get_genotype_pars(default=False, genotype=None):
     pars.ohr = sc.objdict()
     pars.ohr.dur_precin         = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
     pars.ohr.dur_cin            = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.ohr.cin_fn             = dict(form='logf2', k=0.45, x_infl=13, ttc=20)  # Function mapping duration of infection to probability of developing cin
-    pars.ohr.cancer_fn          = dict(form='logf2', k=0.125, x_infl=10, ttc=30, y_max=0.4) # Function mapping duration of infection to severity
+    pars.ohr.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=20, y_max=0.85)  # Function mapping duration of infection to probability of developing cin
+    pars.ohr.cancer_fn          = dict(form='logf2', k=0.125, x_infl=15, ttc=30, y_max=0.4) # Function mapping duration of infection to severity
     pars.ohr.rel_beta           = 0.9 # placeholder
     pars.ohr.sero_prob          = 0.60 # placeholder
 
