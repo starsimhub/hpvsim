@@ -62,7 +62,7 @@ class outcomes_by_year(hpv.Analyzer):
         self.start_year = start_year
         self.interval = 1
         self.durations = np.arange(0,31, self.interval)
-        result_keys = ['cleared', 'persisted', 'progressed', 'cancer', 'dead', 'total']
+        result_keys = ['cleared', 'persisted', 'progressed', 'cancer', 'dead', 'dead_cancer', 'dead_other', 'total']
         self.results = {rkey: np.zeros_like(self.durations) for rkey in result_keys}
 
     def initialize(self, sim):
@@ -89,12 +89,16 @@ class outcomes_by_year(hpv.Analyzer):
 
                 for idd, dd in enumerate(self.durations):
 
-                    dead = (time_to_cancer_death <= (dd+self.interval)) | (time_to_other_death <= (dd+self.interval))
+                    dead_cancer = (time_to_cancer_death <= (dd+self.interval)) & ~(time_to_other_death <= (dd + self.interval))
+                    dead_other = ~(time_to_cancer_death <= (dd + self.interval)) & (time_to_other_death <= (dd + self.interval))
+                    dead = (time_to_cancer_death <= (dd + self.interval)) | (time_to_other_death <= (dd + self.interval))
                     cleared = ~dead & (time_to_clear <= (dd+self.interval))
                     persisted = ~dead & ~cleared & ~(time_to_cin <= (dd+self.interval)) # Haven't yet cleared or progressed
                     progressed = ~dead & ~cleared & (time_to_cin <= (dd+self.interval)) & ((time_to_clear>(dd+self.interval)) | (time_to_cancer > (dd+self.interval)))  # USing the ~ means that we also count nans
                     cancer = ~dead & (time_to_cancer <= (dd+self.interval))
 
+                    dead_cancer_inds = hpv.true(dead_cancer)
+                    dead_other_inds = hpv.true(dead_other)
                     dead_inds = hpv.true(dead)
                     cleared_inds = hpv.true(cleared)
                     persisted_inds = hpv.true(persisted)
@@ -110,7 +114,9 @@ class outcomes_by_year(hpv.Analyzer):
                     self.results['persisted'][idd] += scale[persisted_inds].sum()#len(hpv.true(persisted_no_progression))
                     self.results['progressed'][idd] += scale[progressed_inds].sum()#len(hpv.true(persisted_with_progression))
                     self.results['cancer'][idd] += scale[cancer_inds].sum()#len(hpv.true(cancer))
-                    self.results['dead'][idd] += scale[dead_inds].sum()#len(hpv.true(dead))
+                    self.results['dead'][idd] += scale[dead_inds].sum()
+                    self.results['dead_cancer'][idd] += scale[dead_cancer_inds].sum()#len(hpv.true(dead))
+                    self.results['dead_other'][idd] += scale[dead_other_inds].sum()  # len(hpv.true(dead))
                     self.results['total'][idd] += scaled_total#derived_total
 
 
@@ -417,13 +423,10 @@ def plot_nh_simple(sim=None):
 
         # Panel A: durations of infection
         # axes[0].set_ylim([0,1])
-        if gi == 0:
-            s_16, scale_16 = hpu.logn_percentiles_to_pars(1, 0.5, 3, 0.6)
-            rv = lognorm(s=s_16, scale=scale_16)
-        else:
-            s, scale = hpu.logn_percentiles_to_pars(1, 0.7, 3, 0.86)
-            rv = lognorm(s=s, scale=scale)
-        axes[0].bar(years+offset - width/3, 1-rv.cdf(years), color=colors[gi], lw=2, label=glabels[gi], width=width)
+        sigma, scale = lognorm_params(dur_precin[gi]['par1'], dur_precin[gi]['par2'])
+        rv = lognorm(sigma, 0, scale)
+
+        axes[0].bar(years+offset - width/3, rv.pdf(years), color=colors[gi], lw=2, label=glabels[gi], width=width)
         multiplier += 1
         # Panel B: prob of dysplasia
         dysp = hppar.compute_severity(this_precinx[:], pars=cin_fns[gi])
@@ -434,7 +437,7 @@ def plot_nh_simple(sim=None):
         rv = lognorm(sigma, 0, scale)
         axes[2].plot(this_cinx, rv.pdf(this_cinx), color=colors[gi], lw=2, label=glabels[gi])
 
-        # Panel D: dysplasia
+        # Panel D: cancer
         cancer = hppar.compute_severity(this_cinx[:], pars=cancer_fns[gi])
         axes[3].plot(this_cinx, cancer, color=colors[gi], lw=2, label=gtype.upper())
 
