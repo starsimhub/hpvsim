@@ -36,8 +36,8 @@ class cum_dist(hpv.Analyzer):
 
 
     def apply(self, sim):
-        if sim.yearvec[sim.t] >= self.start_year:
-            inf_genotypes, inf_inds = (sim.people.date_exposed == sim.t).nonzero()
+        if sim.yearvec[sim.t] == self.start_year:
+            inf_genotypes, inf_inds = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()
             self.total_infections += len(inf_inds)
             if len(inf_inds):
                 infs_that_progress_bools = hpv.utils.defined(sim.people.date_cin[inf_genotypes, inf_inds])
@@ -189,17 +189,15 @@ def plot_stacked(sim=None):
     years = sim.analyzers[1].durations
 
     df = pd.DataFrame()
+    total_alive = res["total"] - res["dead"]
     df["years"] = years
-    df["prob_clearance"] = (res["cleared"]) / (res["total"]) * 100
-    df["prob_persist"] = (res["persisted"]) / (res["total"]) * 100
-    df["prob_progressed"] = (res["progressed"]) / (res["total"]) * 100
-    df["prob_cancer"] = (res["cancer"]) / (res["total"]) * 100
-    df["prob_dead"] = (res["dead"]) / (res["total"]) * 100
+    df["prob_clearance"] = (res["cleared"]) / total_alive * 100
+    df["prob_persist"] = (res["persisted"]) / total_alive * 100
+    df["prob_progressed"] = (res["progressed"]+ res["cancer"]) / total_alive * 100
 
     df2 = pd.DataFrame()
-    total_persisted_alive = res["total"] - res["dead"] - res["cleared"]
+    total_persisted_alive = res["total"] - res["dead"] - res["cleared"] -res["persisted"]
     df2["years"] = years
-    df2["prob_persist"] = (res["persisted"]) / total_persisted_alive * 100
     df2["prob_progressed"] = (res["progressed"]) / total_persisted_alive * 100
     df2["prob_cancer"] = (res["cancer"]) / total_persisted_alive * 100
 
@@ -211,36 +209,36 @@ def plot_stacked(sim=None):
     fig, axes = pl.subplots(1, 2, figsize=(11, 9))
 
     # Panel 1, all outcomes
-    bottom = np.zeros(len(df["years"]))
+    bottom = np.zeros(len(df["years"][0:10]))
     layers = [
         "prob_clearance",
         "prob_persist",
         "prob_progressed",
-        "prob_cancer",
-        "prob_dead",
     ]
-    labels = ["Cleared", "Persisted", "Progressed", "Cancer", "Dead"]
+    labels = ["Cleared", "Persistent Infection", "CIN2+"]
     for ln, layer in enumerate(layers):
         axes[0].fill_between(
-            df["years"], bottom, bottom + df[layer], color=colors[ln], label=labels[ln]
+            df["years"][0:10], bottom, bottom + df[layer][0:10], color=colors[ln], label=labels[ln]
         )
-        bottom += df[layer]
+        bottom += df[layer][0:10]
 
-    # Panel 2, conditional on beaing alive and not cleared
+    # Panel 2, conditional on being alive and not cleared
     bottom = np.zeros(len(df["years"]))
-    layers = ["prob_persist", "prob_progressed", "prob_cancer"]
-    labels = ["Persisted", "Progressed", "Cancer"]
+    layers = ["prob_progressed", "prob_cancer"]
+    labels = ["CIN2+ regression/persistence", "Cancer"]
     for ln, layer in enumerate(layers):
         axes[1].fill_between(
             df2["years"],
             bottom,
             bottom + df2[layer],
-            color=colors[ln],
+            color=colors[ln+2],
             label=labels[ln],
         )
         bottom += df2[layer]
     axes[0].legend(loc="lower right")
     axes[1].legend(loc="lower right")
+    axes[0].set_title('Infection outcomes')
+    axes[1].set_title('Pre-cancer outcomes')
     axes[0].set_xlabel("Time since infection")
     axes[1].set_xlabel("Time since infection")
     fig.tight_layout()
@@ -507,7 +505,8 @@ if __name__ == '__main__':
             }
             age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
             inf_dist = outcomes_by_year(start_year=2000)
-            sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
+            cum_dist = cum_dist(start_year=2000)
+            sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist, cum_dist])
             sim.run()
             sim.plot()
             sim.shrink()
