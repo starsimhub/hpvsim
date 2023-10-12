@@ -113,92 +113,6 @@ class outcomes_by_year(hpv.Analyzer):
                     self.results['dead'][idd] += scale[dead_inds].sum()#len(hpv.true(dead))
                     self.results['total'][idd] += scaled_total#derived_total
 
-class outcomes_by_year_v2(hpv.Analyzer):
-    def __init__(self, start_year=None, **kwargs):
-        super().__init__(**kwargs)
-        self.start_year = start_year
-        self.interval = 1
-        self.inf_durations = np.arange(0, 11, self.interval)
-        self.cin_durations = np.arange(0,31, self.interval)
-        result_keys = ['cleared', 'persisted', 'progressed', 'dead', 'total']
-        self.inf_results = {rkey: np.zeros_like(self.inf_durations) for rkey in result_keys}
-        self.cin_results = {rkey: np.zeros_like(self.cin_durations) for rkey in result_keys}
-
-    def initialize(self, sim):
-        super().initialize(sim)
-        if self.start_year is None:
-            self.start_year = sim['start']
-
-    def apply(self, sim):
-        if sim.yearvec[sim.t] == self.start_year:
-            idx = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0) & (sim.people.n_infections==1)).nonzero()  # Get people exposed on this step
-            inf_inds = idx[-1]
-            if len(inf_inds):
-                scale = sim.people.scale[inf_inds]
-                time_to_clear = (sim.people.date_clearance[idx] - sim.t)*sim['dt']
-                time_to_cancer = (sim.people.date_cancerous[idx] - sim.t)*sim['dt']
-                time_to_cin = (sim.people.date_cin[idx] - sim.t)*sim['dt']
-
-                # Count deaths. Note that there might be more people with a defined
-                # cancer death date than with a defined cancer date because this is
-                # counting all death, not just deaths resulting from infections on this
-                # time step.
-                time_to_cancer_death = (sim.people.date_dead_cancer[inf_inds] - sim.t)*sim['dt']
-                time_to_other_death = (sim.people.date_dead_other[inf_inds] - sim.t)*sim['dt']
-
-                for idd, dd in enumerate(self.inf_durations):
-
-                    dead = (time_to_cancer_death <= (dd+self.interval)) | (time_to_other_death <= (dd+self.interval))
-                    cleared = ~dead & (time_to_clear <= (dd+self.interval))
-                    persisted = ~dead & ~cleared & ~(time_to_cin <= (dd+self.interval)) # Haven't yet cleared or progressed
-                    progressed = ~dead & ~cleared & ((time_to_cin <= (dd+self.interval)) | (time_to_cancer <= (dd+self.interval)))  # USing the ~ means that we also count nans
-
-                    dead_inds = hpv.true(dead)
-                    cleared_inds = hpv.true(cleared)
-                    persisted_inds = hpv.true(persisted)
-                    progressed_inds = hpv.true(progressed)
-                    scaled_total = scale.sum()
-                    self.inf_results['cleared'][idd] += scale[cleared_inds].sum()#len(hpv.true(cleared))
-                    self.inf_results['persisted'][idd] += scale[persisted_inds].sum()#len(hpv.true(persisted_no_progression))
-                    self.inf_results['progressed'][idd] += scale[progressed_inds].sum()#len(hpv.true(persisted_with_progression))
-                    self.inf_results['dead'][idd] += scale[dead_inds].sum()#len(hpv.true(dead))
-                    self.inf_results['total'][idd] += scaled_total#derived_total
-
-            idx = ((sim.people.date_cin == sim.t) & (sim.people.sex == 0) & (sim.people.n_infections == 1)).nonzero()  # Get people progressing to CIN on this step
-            cin_inds = idx[-1]
-
-            if len(cin_inds):
-                scale = sim.people.scale[cin_inds]
-                time_to_clear = (sim.people.date_clearance[idx] - sim.t)*sim['dt']
-                time_to_cancer = (sim.people.date_cancerous[idx] - sim.t)*sim['dt']
-
-                # Count deaths. Note that there might be more people with a defined
-                # cancer death date than with a defined cancer date because this is
-                # counting all death, not just deaths resulting from infections on this
-                # time step.
-                time_to_cancer_death = (sim.people.date_dead_cancer[cin_inds] - sim.t)*sim['dt']
-                time_to_other_death = (sim.people.date_dead_other[cin_inds] - sim.t)*sim['dt']
-
-
-                for idd, dd in enumerate(self.cin_durations):
-
-                    dead = (time_to_cancer_death <= (dd + self.interval)) | (time_to_other_death <= (dd + self.interval))
-                    cleared = ~dead & (time_to_clear <= (dd + self.interval))
-                    persisted = ~dead & ~cleared & (time_to_cancer > (dd + self.interval)) | (time_to_clear > (dd + self.interval)) # Haven't yet cleared or progressed
-                    cancer = ~dead & (time_to_cancer <= (dd + self.interval))
-
-                    dead_inds = hpv.true(dead)
-                    cleared_inds = hpv.true(cleared)
-                    persisted_inds = hpv.true(persisted)
-                    cancer_inds = hpv.true(cancer)
-                    derived_total = len(dead_inds) + len(cleared_inds) + len(persisted_inds) + len(cancer_inds)
-
-                    scaled_total = scale.sum()
-                    self.cin_results['cleared'][idd] += len(cleared_inds)#scale[cleared_inds].sum()  # len(hpv.true(cleared))
-                    self.cin_results['persisted'][idd] += len(persisted_inds)#scale[persisted_inds].sum()  # len(hpv.true(persisted_no_progression))
-                    self.cin_results['progressed'][idd] += len(cancer_inds)#scale[cancer_inds].sum()  # len(hpv.true(persisted_with_progression))
-                    self.cin_results['dead'][idd] += len(dead_inds)#scale[dead_inds].sum()  # len(hpv.true(dead))
-                    self.cin_results['total'][idd] += derived_total#scaled_total  # derived_total
 
 class dwelltime_by_genotype(hpv.Analyzer):
     '''
@@ -270,26 +184,24 @@ def lognorm_params(par1, par2):
     shape = sigma
     return shape, scale
 
-def plot_nh(sim=None):
+def plot_stacked(sim=None):
+    res = sim.analyzers[1].results
+    years = sim.analyzers[1].durations
 
-    inf_res = sim.analyzers[1].inf_results
-    inf_years = sim.analyzers[1].inf_durations
+    df = pd.DataFrame()
+    df["years"] = years
+    df["prob_clearance"] = (res["cleared"]) / (res["total"]) * 100
+    df["prob_persist"] = (res["persisted"]) / (res["total"]) * 100
+    df["prob_progressed"] = (res["progressed"]) / (res["total"]) * 100
+    df["prob_cancer"] = (res["cancer"]) / (res["total"]) * 100
+    df["prob_dead"] = (res["dead"]) / (res["total"]) * 100
 
-    cin_res = sim.analyzers[1].cin_results
-    cin_years = sim.analyzers[1].cin_durations
-
-    df_inf = pd.DataFrame()
-    df_inf['years'] = inf_years
-    df_inf['prob_clearance'] = (inf_res['cleared'])/(inf_res['total']) * 100
-    df_inf['prob_persist'] = (inf_res['persisted'])/(inf_res['total']) * 100
-    df_inf['prob_progressed'] = (inf_res['progressed'])/(inf_res['total']) * 100
-    df_inf['prob_dead'] = (inf_res['dead']) / (inf_res['total']) * 100
-
-    df_cin = pd.DataFrame()
-    df_cin['years'] = cin_years
-    df_cin['prob_clearance_persist'] = (cin_res['cleared']+cin_res['persisted'])/(cin_res['total']) * 100
-    df_cin['prob_invasion'] = (cin_res['progressed'])/(cin_res['total']) * 100
-    df_cin['prob_dead'] = (cin_res['dead']) / (cin_res['total']) * 100
+    df2 = pd.DataFrame()
+    total_persisted_alive = res["total"] - res["dead"] - res["cleared"]
+    df2["years"] = years
+    df2["prob_persist"] = (res["persisted"]) / total_persisted_alive * 100
+    df2["prob_progressed"] = (res["progressed"]) / total_persisted_alive * 100
+    df2["prob_cancer"] = (res["cancer"]) / total_persisted_alive * 100
 
     ####################
     # Make figure, set fonts and colors
@@ -298,29 +210,46 @@ def plot_nh(sim=None):
     colors = sc.gridcolors(5)
     fig, axes = pl.subplots(1, 2, figsize=(11, 9))
 
-    # First INF
-    bottom = np.zeros(len(df_inf['years']))
-    layers = ['prob_clearance', 'prob_persist', 'prob_progressed', 'prob_dead']
-    labels = ['Cleared', 'Persisted', 'Progressed', 'Dead']
-    for ln,layer in enumerate(layers):
-        axes[0].fill_between(df_inf['years'], bottom, bottom+df_inf[layer], color=colors[ln], label=labels[ln])
-        bottom += df_inf[layer]
+    # Panel 1, all outcomes
+    bottom = np.zeros(len(df["years"]))
+    layers = [
+        "prob_clearance",
+        "prob_persist",
+        "prob_progressed",
+        "prob_cancer",
+        "prob_dead",
+    ]
+    labels = ["Cleared", "Persisted", "Progressed", "Cancer", "Dead"]
+    for ln, layer in enumerate(layers):
+        axes[0].fill_between(
+            df["years"], bottom, bottom + df[layer], color=colors[ln], label=labels[ln]
+        )
+        bottom += df[layer]
 
-    # Now CIN
-    bottom = np.zeros(len(df_cin['years']))
-    layers = ['prob_clearance_persist', 'prob_invasion', 'prob_dead']
-    labels = ['Regressed/Persisted', 'Invasion', 'Dead']
-    for ln,layer in enumerate(layers):
-        axes[1].fill_between(df_cin['years'], bottom, bottom+df_cin[layer], color=colors[ln], label=labels[ln])
-        bottom += df_cin[layer]
-    axes[0].legend(loc='lower right')
-    axes[1].legend(loc='lower right')
-    axes[0].set_xlabel('Time since infection')
-    axes[1].set_xlabel('Time since CIN')
+    # Panel 2, conditional on beaing alive and not cleared
+    bottom = np.zeros(len(df["years"]))
+    layers = ["prob_persist", "prob_progressed", "prob_cancer"]
+    labels = ["Persisted", "Progressed", "Cancer"]
+    for ln, layer in enumerate(layers):
+        axes[1].fill_between(
+            df2["years"],
+            bottom,
+            bottom + df2[layer],
+            color=colors[ln],
+            label=labels[ln],
+        )
+        bottom += df2[layer]
+    axes[0].legend(loc="lower right")
+    axes[1].legend(loc="lower right")
+    axes[0].set_xlabel("Time since infection")
+    axes[1].set_xlabel("Time since infection")
     fig.tight_layout()
-    fig.savefig(f'dist_infections.png')
+    fig.savefig(f"dist_infections.png")
     fig.show()
 
+    return
+
+def plot_nh(sim=None):
     # Make sims
     genotypes = ['hpv16', 'hpv18', 'hi5']
     glabels = ['HPV16', 'HPV18', 'HI5']
@@ -566,7 +495,7 @@ if __name__ == '__main__':
 
     if make_stacked:
 
-        location = 'india'
+        location = 'nigeria'
         if do_run:
             pars = {
                 'location': location,
@@ -577,7 +506,7 @@ if __name__ == '__main__':
                 'sev_dist': dict(dist='normal_pos', par1=1., par2=0.001)
             }
             age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
-            inf_dist = outcomes_by_year_v2(start_year=2000)
+            inf_dist = outcomes_by_year(start_year=2000)
             sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
             sim.run()
             sim.plot()
@@ -587,7 +516,7 @@ if __name__ == '__main__':
         else:
             sim = sc.loadobj(f'{location}.sim')
 
-
+        plot_stacked(sim)
         plot_nh(sim)
 
     print('Done.')
