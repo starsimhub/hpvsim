@@ -6,7 +6,6 @@ the baseline results.
 import numpy as np
 import sciris as sc
 import hpvsim as hpv
-import pandas as pd
 
 do_plot = 1
 do_save = 0
@@ -15,9 +14,6 @@ benchmark_filename = sc.thisdir(__file__, 'benchmark.json')
 parameters_filename = sc.thisdir(hpv.__file__, 'regression', f'pars_v{hpv.__version__}.json')
 hpv.options.set(interactive=False) # Assume not running interactively
 
-testdir = sc.thisdir(aspath=True)
-tempdir = testdir/'temp'
-tempdir.mkdir(exist_ok=True)
 
 def make_sim(use_defaults=False, do_plot=False, **kwargs):
     '''
@@ -101,12 +97,10 @@ def test_baseline():
 
     # Calculate new baseline
     new = make_sim()
-    new.to_json(tempdir/'baseline_pre_run.json')  # Check that exporting works before results have been generated
     new.run()
-    new.to_json(tempdir/'baseline_post_run.json')  # Check that exporting works before results have been generated
 
     # Compute the comparison
-    hpv.diff_sims(old, new, die=True)
+    hpv.diff_sims(old, new, full=True, die=True)
 
     return new
 

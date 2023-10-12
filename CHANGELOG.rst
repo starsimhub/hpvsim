@@ -13,6 +13,11 @@ Version 1.2.7 (2023-10-12)
 - Fixes plotting issue with tutorial
 - *Github info* PR `625 <https://github.com/amath-idm/hpvsim/pull/625>`__
 
+Version 1.2.7 (2023-09-22)
+---------------------------
+- Updates ``sim.summary`` to have more useful information
+- *Github info* PR `618 <https://github.com/amath-idm/hpvsim/pull/618>`__
+
 Version 1.2.6 (2023-09-22)
 ---------------------------
 - Fixes plotting issue with MultiSims and Jupyter notebooks
@@ -21,27 +26,27 @@ Version 1.2.6 (2023-09-22)
 
 Version 1.2.5 (2023-09-21)
 ---------------------------
-- Fixes file path when run via Jupyter.
+- Fixes file path when run via Jupyter
 - *Github info* PR `610 <https://github.com/amath-idm/hpvsim/pull/610>`__
 
 Version 1.2.4 (2023-09-19)
 ---------------------------
-- Fixes Matplotlib regression in plotting.
+- Fixes Matplotlib regression in plotting
 - *Github info* PR `609 <https://github.com/amath-idm/hpvsim/pull/609>`__
 
 Version 1.2.3 (2023-08-30)
 ---------------------------
-- Updates data loading to be much more efficient.
+- Updates data loading to be much more efficient
 - *Github info* PR `604 <https://github.com/amath-idm/hpvsim/pull/604>`__
 
 Version 1.2.2 (2023-08-11)
 ---------------------------
-- Improved tests and included ``conda`` environment specification.
+- Improved tests and included ``conda`` environment specification
 - *Github info* PR `598 <https://github.com/amath-idm/hpvsim/pull/598>`__
 
 Version 1.2.1 (2023-07-09)
 ---------------------------
-- Updated data files being used. 
+- Updated data files being used
 - *Github info* PR `586 <https://github.com/amath-idm/hpvsim/pull/586>`__
 
 Version 1.2.0 (2023-05-31)
