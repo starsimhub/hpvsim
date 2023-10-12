@@ -495,7 +495,7 @@ if __name__ == '__main__':
 
     if make_stacked:
 
-        location = 'india'
+        location = 'nigeria'
         if do_run:
             pars = {
                 'location': location,
