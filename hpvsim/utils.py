@@ -6,6 +6,7 @@ Numerical utilities for running hpvsim.
 
 import numpy as np # For numerics
 import sciris as sc # For additional utilities
+from scipy.stats import norm
 
 
 # What functions are externally visible -- note, this gets populated in each section below
@@ -198,6 +199,27 @@ def transform_prob(tp, dysp):
     '''
     # return 1-np.power(1-tp, ((dysp*100)**2))
     return 1-np.power(1-tp, 0.5*((dysp)**3)*100)
+
+
+def logn_percentiles_to_pars(x1, p1, x2, p2):
+    """
+    Find the parameters of a lognormal distribution where:
+        P(X < p1) = x1
+        P(X < p2) = x2
+    Returns in the format used by scipy, i.e. use these as
+        from scipy.stats import lognorm
+        s, scale = logn_percentiles_to_pars(1, 0.5, 5, .8)
+        rv = lognorm(s=s, scale=scale)
+        rv.mean()
+    """
+    x1 = np.log(x1)
+    x2 = np.log(x2)
+    p1ppf = norm.ppf(p1)
+    p2ppf = norm.ppf(p2)
+    s = (x2 - x1) / (p2ppf - p1ppf)
+    mean = ((x1 * p2ppf) - (x2 * p1ppf)) / (p2ppf - p1ppf)
+    scale = np.exp(mean)
+    return s, scale
 
 
 #%% Sampling and seed methods

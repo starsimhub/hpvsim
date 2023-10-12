@@ -3,6 +3,7 @@ Plot implied natural history.
 """
 import hpvsim as hpv
 import hpvsim.parameters as hppar
+import hpvsim.utils as hpu
 import pylab as pl
 import pandas as pd
 from scipy.stats import lognorm, norm
@@ -35,8 +36,8 @@ class cum_dist(hpv.Analyzer):
 
 
     def apply(self, sim):
-        if sim.yearvec[sim.t] >= self.start_year:
-            inf_genotypes, inf_inds = (sim.people.date_exposed == sim.t).nonzero()
+        if sim.yearvec[sim.t] == self.start_year:
+            inf_genotypes, inf_inds = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0)).nonzero()
             self.total_infections += len(inf_inds)
             if len(inf_inds):
                 infs_that_progress_bools = hpv.utils.defined(sim.people.date_cin[inf_genotypes, inf_inds])
@@ -53,6 +54,65 @@ class cum_dist(hpv.Analyzer):
                 self.dur_to_clearance += dur_to_clearance.tolist()
                 self.dur_to_cin += dur_to_cin.tolist()
                 self.dur_to_cancer += dur_to_cancer.tolist()
+
+
+class outcomes_by_year(hpv.Analyzer):
+    def __init__(self, start_year=None, **kwargs):
+        super().__init__(**kwargs)
+        self.start_year = start_year
+        self.interval = 1
+        self.durations = np.arange(0,31, self.interval)
+        result_keys = ['cleared', 'persisted', 'progressed', 'cancer', 'dead', 'total']
+        self.results = {rkey: np.zeros_like(self.durations) for rkey in result_keys}
+
+    def initialize(self, sim):
+        super().initialize(sim)
+        if self.start_year is None:
+            self.start_year = sim['start']
+
+    def apply(self, sim):
+        if sim.yearvec[sim.t] == self.start_year:
+            idx = ((sim.people.date_exposed == sim.t) & (sim.people.sex==0) & (sim.people.n_infections==1)).nonzero()  # Get people exposed on this step
+            inf_inds = idx[-1]
+            if len(inf_inds):
+                scale = sim.people.scale[inf_inds]
+                time_to_clear = (sim.people.date_clearance[idx] - sim.t)*sim['dt']
+                time_to_cancer = (sim.people.date_cancerous[idx] - sim.t)*sim['dt']
+                time_to_cin = (sim.people.date_cin[idx] - sim.t)*sim['dt']
+
+                # Count deaths. Note that there might be more people with a defined
+                # cancer death date than with a defined cancer date because this is
+                # counting all death, not just deaths resulting from infections on this
+                # time step.
+                time_to_cancer_death = (sim.people.date_dead_cancer[inf_inds] - sim.t)*sim['dt']
+                time_to_other_death = (sim.people.date_dead_other[inf_inds] - sim.t)*sim['dt']
+
+                for idd, dd in enumerate(self.durations):
+
+                    dead = (time_to_cancer_death <= (dd+self.interval)) | (time_to_other_death <= (dd+self.interval))
+                    cleared = ~dead & (time_to_clear <= (dd+self.interval))
+                    persisted = ~dead & ~cleared & ~(time_to_cin <= (dd+self.interval)) # Haven't yet cleared or progressed
+                    progressed = ~dead & ~cleared & (time_to_cin <= (dd+self.interval)) & ((time_to_clear>(dd+self.interval)) | (time_to_cancer > (dd+self.interval)))  # USing the ~ means that we also count nans
+                    cancer = ~dead & (time_to_cancer <= (dd+self.interval))
+
+                    dead_inds = hpv.true(dead)
+                    cleared_inds = hpv.true(cleared)
+                    persisted_inds = hpv.true(persisted)
+                    progressed_inds = hpv.true(progressed)
+                    cancer_inds = hpv.true(cancer)
+                    derived_total = len(cleared_inds) + len(persisted_inds) + len(progressed_inds) + len(cancer_inds) + len(dead_inds)
+
+                    if derived_total != len(inf_inds):
+                        errormsg = "Something is wrong!"
+                        raise ValueError(errormsg)
+                    scaled_total = scale.sum()
+                    self.results['cleared'][idd] += scale[cleared_inds].sum()#len(hpv.true(cleared))
+                    self.results['persisted'][idd] += scale[persisted_inds].sum()#len(hpv.true(persisted_no_progression))
+                    self.results['progressed'][idd] += scale[progressed_inds].sum()#len(hpv.true(persisted_with_progression))
+                    self.results['cancer'][idd] += scale[cancer_inds].sum()#len(hpv.true(cancer))
+                    self.results['dead'][idd] += scale[dead_inds].sum()#len(hpv.true(dead))
+                    self.results['total'][idd] += scaled_total#derived_total
+
 
 class dwelltime_by_genotype(hpv.Analyzer):
     '''
@@ -106,10 +166,9 @@ class dwelltime_by_genotype(hpv.Analyzer):
             self.median_age_causal[gtype] = np.quantile(self.age_causal[gtype], 0.5)
 
 
-def set_font(size=None, font='Libertinus Sans'):
+def set_font(size=None):
     ''' Set a custom font '''
-    sc.fonts(add=sc.thisdir(aspath=True) / 'assets' / 'LibertinusSans-Regular.otf')
-    sc.options(font=font, fontsize=size)
+    sc.options(fontsize=size)
     return
 
 def lognorm_params(par1, par2):
@@ -125,54 +184,70 @@ def lognorm_params(par1, par2):
     shape = sigma
     return shape, scale
 
-def plot_nh(sim=None):
-
-    cum_dist = sim.analyzers[1]
-    durs_to_cancer, counts_to_cancer = np.unique([ math.ceil(elem) for elem in cum_dist.dur_to_cancer], return_counts=True)
-    durs_to_cin, counts_to_cin = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_cin], return_counts=True)
-    durs_to_clearance, counts_to_clearance = np.unique([math.ceil(elem) for elem in cum_dist.dur_to_clearance], return_counts=True)
+def plot_stacked(sim=None):
+    res = sim.analyzers[1].results
+    years = sim.analyzers[1].durations
 
     df = pd.DataFrame()
-    df['years'] = np.arange(0,30)
-    durs = np.zeros(30)
-    durs_subset = durs_to_clearance[durs_to_clearance<30]
-    durs[[int(elem) for elem in durs_subset]] = counts_to_clearance[:len(durs_subset)]
-    df['n_cleared'] = durs
-    df['prob_clearance'] = 100*np.cumsum(df['n_cleared'])/cum_dist.total_infections
+    total_alive = res["total"] - res["dead"]
+    df["years"] = years
+    df["prob_clearance"] = (res["cleared"]) / total_alive * 100
+    df["prob_persist"] = (res["persisted"]) / total_alive * 100
+    df["prob_progressed"] = (res["progressed"]+ res["cancer"]) / total_alive * 100
 
-    durs_subset = durs_to_cin[durs_to_cin <30]
-    durs[[int(elem) for elem in durs_subset]] = counts_to_cin[:len(durs_subset)]
-    df['n_cin'] = durs
-    df['prob_cin'] = 100 * np.cumsum(df['n_cin']) / cum_dist.total_infections
-
-    durs_subset = durs_to_cancer[durs_to_cancer <30]
-    durs[[int(elem) for elem in durs_subset]] = counts_to_cancer[:len(durs_subset)]
-    df['n_cancer'] = durs
-    df['prob_cancer'] = 100 * np.cumsum(df['n_cancer']) / cum_dist.total_infections
-
+    df2 = pd.DataFrame()
+    total_persisted_alive = res["total"] - res["dead"] - res["cleared"] -res["persisted"]
+    df2["years"] = years
+    df2["prob_progressed"] = (res["progressed"]) / total_persisted_alive * 100
+    df2["prob_cancer"] = (res["cancer"]) / total_persisted_alive * 100
 
     ####################
     # Make figure, set fonts and colors
     ####################
     set_font(size=16)
-    colors = sc.gridcolors(4)
-    fig, ax = pl.subplots(figsize=(11, 9))
-    ax.fill_between(df['years'], np.zeros(len(df['years'])), df['prob_clearance'], color=colors[0], label='Cleared')
-    ax.fill_between(df['years'], df['prob_clearance'], 100 - df['prob_cin'], color=colors[1], label='Persisted')
-    ax.fill_between(df['years'], 100 - df['prob_cin'], 100 - df['prob_cancer'], color=colors[2], label='CIN')
-    ax.fill_between(df['years'], 100 - df['prob_cancer'], 100 * np.ones(len(df['years'])), color=colors[3],
-                    label='Cancer')
-    data_years = np.arange(0,6, 0.5)
-    cleared = [0, 58, 68, 71, 78, 81, 83, 84, 84.5, 85, 85.6, 86]
-    progressed = [100, 99, 97, 96, 96, 95, 94, 93, 92, 91.5, 91.5, 91]
-    ax.scatter(data_years, cleared, color=colors[0])
-    ax.scatter(data_years, progressed, color=colors[2])
-    ax.legend()
-    ax.set_xlabel('Time since infection')
+    colors = sc.gridcolors(5)
+    fig, axes = pl.subplots(1, 2, figsize=(11, 9))
+
+    # Panel 1, all outcomes
+    bottom = np.zeros(len(df["years"][0:10]))
+    layers = [
+        "prob_clearance",
+        "prob_persist",
+        "prob_progressed",
+    ]
+    labels = ["Cleared", "Persistent Infection", "CIN2+"]
+    for ln, layer in enumerate(layers):
+        axes[0].fill_between(
+            df["years"][0:10], bottom, bottom + df[layer][0:10], color=colors[ln], label=labels[ln]
+        )
+        bottom += df[layer][0:10]
+
+    # Panel 2, conditional on being alive and not cleared
+    bottom = np.zeros(len(df["years"]))
+    layers = ["prob_progressed", "prob_cancer"]
+    labels = ["CIN2+ regression/persistence", "Cancer"]
+    for ln, layer in enumerate(layers):
+        axes[1].fill_between(
+            df2["years"],
+            bottom,
+            bottom + df2[layer],
+            color=colors[ln+2],
+            label=labels[ln],
+        )
+        bottom += df2[layer]
+    axes[0].legend(loc="lower right")
+    axes[1].legend(loc="lower right")
+    axes[0].set_title('Infection outcomes')
+    axes[1].set_title('Pre-cancer outcomes')
+    axes[0].set_xlabel("Time since infection")
+    axes[1].set_xlabel("Time since infection")
     fig.tight_layout()
-    fig.savefig(f'dist_infections.png')
+    fig.savefig(f"dist_infections.png")
     fig.show()
 
+    return
+
+def plot_nh(sim=None):
     # Make sims
     genotypes = ['hpv16', 'hpv18', 'hi5']
     glabels = ['HPV16', 'HPV18', 'HI5']
@@ -202,16 +277,21 @@ def plot_nh(sim=None):
     ####################
     dt = 0.25
     this_precinx = np.arange(dt, 15+dt, dt)
+    years = np.arange(1, 16, 1)
     this_cinx = np.arange(dt, 30+dt, dt)
     n_samples = 10
+
+    width = .3
+    multiplier = 0
+
     # Durations and severity of dysplasia
     for gi, gtype in enumerate(genotypes):
-
+        offset = width * multiplier
         # Panel A: durations of infection
         sigma, scale = lognorm_params(dur_precin[gi]['par1'], dur_precin[gi]['par2'])
         rv = lognorm(sigma, 0, scale)
-        axes[0].plot(this_precinx, rv.pdf(this_precinx), color=colors[gi], lw=2, label=glabels[gi])
-
+        axes[0].bar(years+offset-width/3, rv.pdf(years), color=colors[gi], lw=2, label=glabels[gi], width=width)
+        multiplier += 1
         # Panel B: prob of dysplasia
         dysp = hppar.compute_severity(this_precinx[:], pars=cin_fns[gi])
         axes[1].plot(this_precinx, dysp, color=colors[gi], lw=2, label=gtype.upper())
@@ -294,25 +374,148 @@ def plot_nh(sim=None):
     return
 
 
+def plot_nh_simple(sim=None):
+    # Make sims
+    genotypes = ['hpv16', 'hpv18', 'hi5']
+    glabels = ['HPV16', 'HPV18', 'HI5']
+
+    dur_cin = sc.autolist()
+    cancer_fns = sc.autolist()
+    cin_fns = sc.autolist()
+    dur_precin = sc.autolist()
+    for gi, genotype in enumerate(genotypes):
+        dur_precin += sim['genotype_pars'][genotype]['dur_precin']
+        dur_cin += sim['genotype_pars'][genotype]['dur_cin']
+        cancer_fns += sim['genotype_pars'][genotype]['cancer_fn']
+        cin_fns += sim['genotype_pars'][genotype]['cin_fn']
+
+
+    ####################
+    # Make figure, set fonts and colors
+    ####################
+    set_font(size=12)
+    colors = sc.gridcolors(len(genotypes))
+    fig, axes = pl.subplots(2, 2, figsize=(11, 9))
+    axes = axes.flatten()
+    cmap = pl.cm.Oranges([0.25, 0.5, 0.75, 1])
+
+    ####################
+    # Make plots
+    ####################
+    dt = 0.25
+    this_precinx = np.arange(dt, 15+dt, dt)
+    years = np.arange(1,16,1)
+    this_cinx = np.arange(dt, 30+dt, dt)
+    n_samples = 10
+
+    width = .2
+    multiplier=0
+
+    # Durations and severity of dysplasia
+    for gi, gtype in enumerate(genotypes):
+        offset = width * multiplier
+
+        # Panel A: durations of infection
+        # axes[0].set_ylim([0,1])
+        if gi == 0:
+            s_16, scale_16 = hpu.logn_percentiles_to_pars(1, 0.5, 3, 0.6)
+            rv = lognorm(s=s_16, scale=scale_16)
+        else:
+            s, scale = hpu.logn_percentiles_to_pars(1, 0.7, 3, 0.86)
+            rv = lognorm(s=s, scale=scale)
+        axes[0].bar(years+offset - width/3, 1-rv.cdf(years), color=colors[gi], lw=2, label=glabels[gi], width=width)
+        multiplier += 1
+        # Panel B: prob of dysplasia
+        dysp = hppar.compute_severity(this_precinx[:], pars=cin_fns[gi])
+        axes[1].plot(this_precinx, dysp, color=colors[gi], lw=2, label=gtype.upper())
+
+        # Panel C: durations of CIN
+        sigma, scale = lognorm_params(dur_cin[gi]['par1'], dur_cin[gi]['par2'])
+        rv = lognorm(sigma, 0, scale)
+        axes[2].plot(this_cinx, rv.pdf(this_cinx), color=colors[gi], lw=2, label=glabels[gi])
+
+        # Panel D: dysplasia
+        cancer = hppar.compute_severity(this_cinx[:], pars=cancer_fns[gi])
+        axes[3].plot(this_cinx, cancer, color=colors[gi], lw=2, label=gtype.upper())
+
+
+    axes[0].set_ylabel("")
+    axes[0].grid()
+    axes[0].set_xlabel("Duration of infection (years)")
+    axes[0].set_title("Probability of persistance")
+    axes[0].legend(frameon=False)
+
+    axes[1].set_ylabel("Probability of CIN")
+    axes[1].set_xlabel("Duration of infection (years)")
+    axes[1].set_title("Infection duration to progression\nfunction")
+    axes[1].set_ylim([0,1])
+    axes[1].grid()
+
+    axes[2].set_ylabel("")
+    axes[2].grid()
+    axes[2].set_xlabel("Duration of CIN (years)")
+    axes[2].set_title("Distribution of\n CIN duration")
+    axes[2].legend(frameon=False)
+
+    axes[3].set_ylim([0,1])
+    axes[3].grid()
+    # axes[2].set_ylabel("Probability of transformation")
+    axes[3].set_xlabel("Duration of CIN (years)")
+    axes[3].set_title("Probability of cancer\n within X years")
+
+    fig.tight_layout()
+    fig.savefig(f'nathx_simple.png')
+    fig.show()
+    return
+
 # %% Run as a script
 if __name__ == '__main__':
 
-    location = 'nigeria'
+    make_simple = False
+    make_stacked = True
+    do_run = True
 
-    age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
-    inf_dist = cum_dist(start_year=2000)
-    pars = {
-        'location': location,
-        'start': 1970,
-        'end': 2020,
-        'ms_agent_ratio': 100,
-        'n_agents': 50e3,
-        'sev_dist': dict(dist='normal_pos', par1=1.25, par2=0.2)
-    }
-    sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist])
+    if make_simple:
+        sim = hpv.Sim()
+        sim.initialize()
+        plot_nh_simple(sim)
 
-    sim.run()
-    sim.plot()
-    plot_nh(sim)
+    # sim.pars['genotype_pars']['hpv16']['cin_fn']['x_infl']=0
+    # sim.pars['genotype_pars']['hpv16']['cin_fn']['k'] = 0.2
+    #
+    # sim.pars['genotype_pars']['hpv18']['cin_fn']['x_infl']=0
+    # sim.pars['genotype_pars']['hpv18']['cin_fn']['k'] = 0.2
+    # sim.pars['genotype_pars']['hpv18']['cin_fn']['y_max'] = 0.9
+    #
+    # sim.pars['genotype_pars']['hi5']['cin_fn']['x_infl']=0
+    # sim.pars['genotype_pars']['hi5']['cin_fn']['k'] = 0.2
+    # sim.pars['genotype_pars']['hi5']['cin_fn']['y_max'] = 0.85
+
+    if make_stacked:
+
+        location = 'nigeria'
+        if do_run:
+            pars = {
+                'location': location,
+                'start': 1970,
+                'end': 2020,
+                'ms_agent_ratio': 100,
+                'n_agents': 50e3,
+                'sev_dist': dict(dist='normal_pos', par1=1., par2=0.001)
+            }
+            age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
+            inf_dist = outcomes_by_year(start_year=2000)
+            cum_dist = cum_dist(start_year=2000)
+            sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist, cum_dist])
+            sim.run()
+            sim.plot()
+            sim.shrink()
+            sc.saveobj(f'{location}.sim', sim)
+
+        else:
+            sim = sc.loadobj(f'{location}.sim')
+
+        plot_stacked(sim)
+        plot_nh(sim)
 
     print('Done.')

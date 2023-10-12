@@ -208,23 +208,25 @@ class People(hpb.BasePeople):
 
         # Determine how long before precancerous cell changes
         dur_precin = hpu.sample(**gpars['dur_precin'], size=len(inds))*(1-sev_imm) # Sample from distribution
+        self.dur_precin[g, inds] = dur_precin
         self.dur_infection[g, inds] = dur_precin
+
+        # Probability of progressing
         cin_probs = hppar.compute_severity(dur_precin, rel_sev=self.rel_sev[inds], pars=gpars['cin_fn'])
         cin_bools = hpu.binomial_arr(cin_probs)
         cin_inds = inds[cin_bools]
         nocin_inds = inds[~cin_bools]
 
+        # Duration of CIN
         age_mod = np.ones(len(cin_inds))
         age_mod[self.age[cin_inds] >= self.pars['age_risk']['age']] = self.pars['age_risk']['risk']
-        sev_imm = self.sev_imm[g, cin_inds]
-        self.dur_cin[g, cin_inds] = hpu.sample(**gpars['dur_cin'], size=len(cin_inds))* age_mod# * (1 - sev_imm)
-        self.dur_precin[g, inds] = dur_precin
+        self.dur_cin[g, cin_inds] = hpu.sample(**gpars['dur_cin'], size=len(cin_inds))* age_mod
         self.dur_infection[g, cin_inds] += self.dur_cin[g, cin_inds]
 
         # Set date of clearance for those who don't develop precancer
         self.date_clearance[g, nocin_inds] = self.t + sc.randround(self.dur_precin[g, nocin_inds]/dt)
 
-        # Set date of onset of precancer and eventual severity outcomes for those who develop precancer
+        # Set date of onset of precancer for those who develop precancer
         self.date_cin[g, cin_inds] = self.t + sc.randround(self.dur_precin[g, cin_inds]/dt)
 
         # Set infection severity and outcomes
@@ -303,10 +305,12 @@ class People(hpb.BasePeople):
                 is_cancer = np.append(is_cancer, np.full(len(new_inds), fill_value=True))
                 new_dur_precin = extra_dur_precin[:, 1:][extra_cancer_bools]
                 new_dur_cin = extra_dur_cin[:, 1:][extra_cancer_bools]
+                new_dur_infection = new_dur_precin + new_dur_cin
                 self.dur_precin[g, new_inds] = new_dur_precin
                 self.dur_cin[g, new_inds] = new_dur_cin
-                self.dur_infection[g, new_inds] += new_dur_cin
+                self.dur_infection[g, new_inds] = new_dur_infection
                 self.date_infectious[g, new_inds] = self.t
+                self.date_cin[g, new_inds] = self.t + sc.randround(new_dur_precin / dt)
                 dur_cin = np.append(dur_cin, new_dur_cin)
 
             # Finally, create an array for storing the transformation probabilities.
@@ -314,22 +318,20 @@ class People(hpb.BasePeople):
             cancer_prob_arr = np.zeros(len(inds))
             cancer_prob_arr[is_cancer] = 1  # Make sure inds that got assigned cancer above dont get stochastically missed
 
-
         # Determine who goes to cancer
         is_cancer = hpu.binomial_arr(cancer_prob_arr)
         cancer_inds = inds[is_cancer]
         no_cancer_inds = inds[~is_cancer]  # Indices of those who eventually heal lesion/clear infection
 
         # Set date of clearance for those who don't go to cancer
-        time_to_clear = dur_cin[~is_cancer]
+        dur_inf = self.dur_infection[g, inds]
+        time_to_clear = dur_inf[~is_cancer]
         self.date_clearance[g, no_cancer_inds] = np.fmax(self.date_clearance[g, no_cancer_inds],
                                                          self.date_exposed[g, no_cancer_inds] +
                                                          sc.randround(time_to_clear / dt))
 
-        # Set dates for those who go to cancer. Transformation is assumed to occur at
-        # the end of episomal infection, while cancer is assumed to begin once severity
-        # exceeds the cancer cutoff, which may mean that it begins as soon as transformation
-        # happens, if severity is already above the threshold.
+        # Set dates for those who go to cancer.
+        # Set date of onset of precancer and eventual severity outcomes for those who develop precancer
         dur_cin_transformed = dur_cin[is_cancer] # Duration of episomal infection for those who transform
         self.date_cancerous[g, cancer_inds] = self.date_cin[g, cancer_inds] + sc.randround(dur_cin_transformed/dt)
         self.dur_infection[g, cancer_inds] += self.dur_cin[g, cancer_inds]
@@ -729,8 +731,10 @@ class People(hpb.BasePeople):
         # Count reinfections and remove any previous dates
         self.genotype_flows['reinfections'][g]  += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
         self.flows['reinfections']              += self.scale_flows((~np.isnan(self.date_clearance[g, inds])).nonzero()[-1])
+        self.n_infections[g,inds] += 1
         for key in ['date_clearance']:
             self[key][g, inds] = np.nan
+
 
         # Count reactivations and adjust latency status
         if layer == 'reactivation':
@@ -771,6 +775,7 @@ class People(hpb.BasePeople):
         # Compute infection clearance for males
         if len(m_inds)>0:
             dur_infection = hpu.sample(**self.pars['dur_infection_male'], size=len(m_inds))
+            self.dur_infection[g, m_inds] = dur_infection
             self.date_clearance[g, m_inds] = self.date_infectious[g, m_inds] + np.ceil(dur_infection/dt)  # Date they clear HPV infection (interpreted as the timestep on which they recover)
 
         return self.scale_flows(inds) # For incrementing counters
