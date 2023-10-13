@@ -405,7 +405,7 @@ class BaseSim(ParsObj):
         '''
         Get the actual results objects, not other things stored in sim.results.
 
-        If which is 'main', return only the main results keys. If 'genotype', return
+        If which is 'total', return only the main results keys. If 'genotype', return
         only genotype keys. If 'all', return all keys.
 
         '''
@@ -568,7 +568,7 @@ class BaseSim(ParsObj):
 
         # Handle keys
         if keys is None:
-            keys = ['results', 'pars', 'summary']
+            keys = ['results', 'pars', 'summary', 'short_summary']
         keys = sc.promotetolist(keys)
 
         # Convert to JSON-compatible format
@@ -588,6 +588,11 @@ class BaseSim(ParsObj):
                     d['summary'] = dict(sc.dcp(self.summary))
                 else:
                     d['summary'] = 'Summary not available (Sim has not yet been run)'
+            elif key == 'short_summary':
+                if self.results_ready:
+                    d['short_summary'] = dict(sc.dcp(self.short_summary))
+                else:
+                    d['short_summary'] = 'Full summary not available (Sim has not yet been run)'
             else: # pragma: no cover
                 try:
                     d[key] = sc.sanitizejson(getattr(self, key))
@@ -612,7 +617,7 @@ class BaseSim(ParsObj):
         '''
         resdict = self.export_results(for_json=False)
         resdict = {k:v for k,v in resdict.items() if v.ndim == 1}
-        df = pd.DataFrame.from_dict(resdict)
+        df = sc.dataframe.from_dict(resdict)
         df['year'] = self.res_yearvec
         new_columns = ['t','year'] + df.columns[1:-1].tolist() # Get column order
         df = df.reindex(columns=new_columns) # Reorder so 't' and 'date' are first
@@ -641,7 +646,7 @@ class BaseSim(ParsObj):
         # Export parameters
         pars = {str(k):sc.dcp(v) for k,v in self.pars.items() if k not in skip_pars}
         pars['immunity_map'] = {str(k):v for k,v in pars['immunity_map'].items()}
-        par_df = pd.DataFrame.from_dict(sc.flattendict(pars, sep='_'), orient='index', columns=['Value'])
+        par_df = sc.dataframe.from_dict(sc.flattendict(pars, sep='_'), orient='index', columns=['Value'])
         par_df.index.name = 'Parameter'
 
         # Convert to spreadsheet
@@ -777,7 +782,7 @@ class BaseSim(ParsObj):
         n_ia = len(ia_list) # Number of interventions/analyzers
 
         if label == 'summary': # Print a summary of the interventions
-            df = pd.DataFrame(columns=['ind', 'label', 'type'])
+            df = sc.dataframe(columns=['ind', 'label', 'type'])
             for ind,ia_obj in enumerate(ia_list):
                 df = df.append(dict(ind=ind, label=str(ia_obj.label), type=type(ia_obj)), ignore_index=True)
             print(f'Summary of {which}:')
@@ -1508,7 +1513,7 @@ class BasePeople(FlexPretty):
 
     def to_df(self):
         ''' Convert to a Pandas dataframe '''
-        df = pd.DataFrame.from_dict({key:self[key] for key in self.keys()})
+        df = sc.dataframe.from_dict({key:self[key] for key in self.keys()})
         return df
 
     def to_arr(self):

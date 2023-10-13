@@ -1,3 +1,7 @@
+# This ensures SCIRIS_NUM_THREADS is utilized
+import sciris as sc
+
+# Import HPVsim
 from .version import __version__, __versiondate__, __license__
 from .settings      import *
 from .defaults      import *
@@ -30,5 +34,4 @@ if not data.check_downloaded():
         print(errormsg)
 
 # Set the root directory for the codebase
-import pathlib
-rootdir = pathlib.Path(__file__).parent
+rootdir = sc.thispath(__file__).parent
