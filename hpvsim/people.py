@@ -220,8 +220,9 @@ class People(hpb.BasePeople):
         # Duration of CIN
         age_mod = np.ones(len(cin_inds))
         age_mod[self.age[cin_inds] >= self.pars['age_risk']['age']] = self.pars['age_risk']['risk']
-        self.dur_cin[g, cin_inds] = hpu.sample(**gpars['dur_cin'], size=len(cin_inds))* age_mod
-        self.dur_infection[g, cin_inds] += self.dur_cin[g, cin_inds]
+        dur_cin = hpu.sample(**gpars['dur_cin'], size=len(cin_inds))* age_mod
+        self.dur_cin[g, cin_inds] = dur_cin
+        self.dur_infection[g, cin_inds] += dur_cin
 
         # Set date of clearance for those who don't develop precancer
         self.date_clearance[g, nocin_inds] = self.t + sc.randround(self.dur_precin[g, nocin_inds]/dt)
