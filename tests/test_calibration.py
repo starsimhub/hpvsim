@@ -19,9 +19,12 @@ def estimator(actual, predicted):
     ''' Custom estimator to use for bounded target data'''
     actuals = []
     for i in actual:
-        i_list = [idx for idx in i.split(',')]
-        i_list[0] = float(i_list[0].replace('[', ''))
-        i_list[1] = float(i_list[1].replace(']', ''))
+        if isinstance(i, (int, float, np.generic)):
+            i_list = [i,i]
+        else:
+            i_list = [idx for idx in i.split(',')]
+            i_list[0] = float(i_list[0].replace('[', ''))
+            i_list[1] = float(i_list[1].replace(']', ''))
         actuals.append(i_list)
     gofs = np.zeros(len(predicted))
     for iv, val in enumerate(predicted):
@@ -137,7 +140,8 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    # sim, calib = test_calibration()
+    sim, calib = test_calibration()
 
     sc.toc(T)
     print('Done.')
+# %%
