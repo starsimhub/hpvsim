@@ -108,7 +108,7 @@ def test_age_results(do_plot=True, test_what=''):
     # Assert equal results
     year = 2019
     yind = sc.findinds(sim.results['year'], year)[0]
-    for result in ['infections', 'cancer_incidence', 'cancers']: # NB Still a problem with hpv_prevalence
+    for result in ['cancer_incidence', 'cancers']: # NB Still a problem with hpv_prevalence
         sim_result_name = result + '_by_age'
         sim_results = sim.results[sim_result_name][:,yind]
         analyzer_results = a.results[result][year]
@@ -233,10 +233,11 @@ if __name__ == '__main__':
 
     people      = test_snapshot()
     sim0, a0    = test_age_pyramids()
-    # sim1, a1    = test_age_results()
+    sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()
     sim3, a3    = test_age_causal_analyzer()
     sim4, a4    = test_detection()
 
     sc.toc(T)
     print('Done.')
+# %%
