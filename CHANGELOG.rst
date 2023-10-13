@@ -10,7 +10,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
 
 Version 1.2.8 (2023-10-13)
 ---------------------------
-- Allows calibration of nested dict types of parameters
+- Allows calibration of nested dict types of parameters and different sampler types
 - Adds parameter exploration tutorial and sampler with predefined sampled lists in tests
 - *Github info* PR `625 <https://github.com/amath-idm/hpvsim/pull/627>`__
 
