@@ -329,7 +329,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='lognormal', par1=par1_16, par2=par2_16)  # Duration of infection prior to precancer
-    pars.hpv16.cin_fn           = dict(form='logf2', k=0.2, x_infl=0, ttc=20)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv16.cin_fn           = dict(form='logf2', k=0.3, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
     pars.hpv16.dur_cin          = dict(dist='lognormal', par1=6, par2=20) # Duration of episomal infection prior to cancer
     pars.hpv16.cancer_fn        = dict(method='cin_integral', ld50=30, **pars.hpv16.cin_fn) # Function mapping duration of cin to probability of cancer
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
@@ -338,7 +338,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin       = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
     pars.hpv18.dur_cin          = dict(dist='lognormal', par1=5, par2=20) # Duration of infection prior to cancer
-    pars.hpv18.cin_fn           = dict(form='logf2', k=0.2, x_infl=0, ttc=20, y_max=0.9)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv18.cin_fn           = dict(form='logf2', k=0.25, x_infl=0, ttc=50, y_max=1)  # Function mapping duration of infection to probability of developing cin
     pars.hpv18.cancer_fn        = dict(method='cin_integral', ld50=30, **pars.hpv18.cin_fn)  # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
@@ -347,7 +347,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hi5 = sc.objdict()
     pars.hi5.dur_precin         = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
     pars.hi5.dur_cin            = dict(dist='lognormal', par1=4.5, par2=20) # Duration of infection prior to cancer
-    pars.hi5.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=20, y_max=0.85)  # Function mapping duration of infection to probability of developing cin
+    pars.hi5.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=50, y_max=1)  # Function mapping duration of infection to probability of developing cin
     pars.hi5.cancer_fn          = dict(method='cin_integral', ld50=30, **pars.hi5.cin_fn)  # Function mapping duration of infection to severity
     pars.hi5.rel_beta           = 0.9 # placeholder
     pars.hi5.sero_prob          = 0.60 # placeholder
@@ -356,7 +356,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.ohr = sc.objdict()
     pars.ohr.dur_precin         = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
     pars.ohr.dur_cin            = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.ohr.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=20, y_max=0.85)  # Function mapping duration of infection to probability of developing cin
+    pars.ohr.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=50, y_max=1)  # Function mapping duration of infection to probability of developing cin
     pars.ohr.cancer_fn          = dict(method='cin_integral', ld50=30, **pars.ohr.cin_fn)  # Function mapping duration of infection to severity
     pars.ohr.rel_beta           = 0.9 # placeholder
     pars.ohr.sero_prob          = 0.60 # placeholder
@@ -366,7 +366,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hr = sc.objdict()
     pars.hr.dur_precin       = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
     pars.hr.dur_cin          = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
-    pars.hr.cin_fn           = dict(form='logf2', k=0.15, x_infl=10, ttc=20)  # Function mapping duration of infection to probability of developing cin
+    pars.hr.cin_fn           = dict(form='logf2', k=0.15, x_infl=10, ttc=50)  # Function mapping duration of infection to probability of developing cin
     pars.hr.cancer_fn        = dict(method='cin_integral', ld50=30, **pars.hr.cin_fn)  # Function mapping duration of infection to severity
     pars.hr.rel_beta         = 0.9 # placeholder
     pars.hr.sero_prob        = 0.60 # placeholder
@@ -375,7 +375,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.lr = sc.objdict()
     pars.lr.dur_precin          = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
     pars.lr.dur_cin             = dict(dist='lognormal', par1=4, par2=10) # Duration of infection prior to cancer
-    pars.lr.cin_fn              = dict(form='logf2', k=0.05, x_infl=10, ttc=30)  # Function mapping duration of infection to probability of developing cin
+    pars.lr.cin_fn              = dict(form='logf2', k=0.01, x_infl=0, ttc=100)  # Function mapping duration of infection to probability of developing cin
     pars.lr.cancer_fn           = dict(method='cin_integral', ld50=60, **pars.lr.cin_fn)  # Function mapping duration of infection to severity
     pars.lr.rel_beta            = 0.9 # placeholder
     pars.lr.sero_prob           = 0.60 # placeholder
@@ -662,7 +662,7 @@ def compute_severity(t, rel_sev=None, pars=None):
         if pars.get('ld50'):
             ld50 = pars.pop('ld50')
             sev_at_ld50 = compute_severity_integral(np.array([ld50]), rel_sev=None, pars=pars)[0]
-            transform_prob = 1 - 0.5**(1/(0.5*sev_at_ld50**3))
+            transform_prob = 1 - 0.5**(1/sev_at_ld50**2)
         elif pars.get('transform_prob'):
             transform_prob = pars.pop('transform_prob')
         else:
@@ -671,7 +671,8 @@ def compute_severity(t, rel_sev=None, pars=None):
             raise ValueError(errormsg)
 
         sev = compute_severity_integral(t, rel_sev=rel_sev, pars=pars)
-        cancer_probs = 1 - np.power(1 - transform_prob, 0.5 * (sev**3))
+        cancer_probs = 1 - np.power(1 - transform_prob, sev**2)
+        return cancer_probs
 
     # Proceed with severity calculations
     form = pars.pop('form')
