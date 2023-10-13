@@ -504,13 +504,13 @@ if __name__ == '__main__':
                 'sev_dist': dict(dist='normal_pos', par1=1., par2=0.001)
             }
             age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
-            inf_dist = outcomes_by_year(start_year=2000)
-            cum_dist = cum_dist(start_year=2000)
-            sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist, cum_dist])
+            outcomes_by_year = outcomes_by_year(start_year=2000)
+            # cum_dist = cum_dist(start_year=2000)
+            sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, outcomes_by_year])
             sim.run()
             sim.plot()
             sim.shrink()
-            sc.saveobj(f'{location}.sim', sim)
+            # sc.saveobj(f'{location}.sim', sim)
 
         else:
             sim = sc.loadobj(f'{location}.sim')
