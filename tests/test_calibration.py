@@ -62,7 +62,7 @@ def test_calibration(do_plot=True):
                                 'test_data/south_africa_cancer_data_2020.csv',
                             ],
                             extra_sim_result_keys=extra_sim_result_keys,
-                            total_trials=1, n_workers=1)
+                            total_trials=2, n_workers=1)
     calib.calibrate(die=True)
     calib.plot(res_to_plot=4)
 
@@ -108,94 +108,13 @@ def test_calibration(do_plot=True):
 
     return sim, calib
 
-def test_calib_range(do_plot=True):
-
-    sc.heading('Testing calibration')
-
-    pars = dict(n_agents=n_agents, start=1980, end=2020, dt=0.25, genotypes=[16,18], location='south africa')
-    pars['init_hpv_prev'] = 0.6 # Set high init_prev to generate more cancers
-
-    # Change the sim age bins so they're the same as the analyzer age bins
-    age_bin_edges = np.array([ 0., 20., 30., 40., 50., 60., 70., 80., 100])
-    pars['age_bin_edges'] = age_bin_edges
-    pars['standard_pop']  = np.array([age_bin_edges, [.4, .16, .12, .12, .09, .07, .03, .01, 0]])
-    pars['standard_pop']  = np.array([age_bin_edges, [.4, .16, .12, .12, .09, .07, .03, .01, 0]])
-
-    # Save a snapshot so we can compare people later if needed
-    sim = hpv.Sim(pars)
-
-    # Define the calibration parameters
-    calib_pars = dict(
-        beta=[0.25, 0.10, 0.30],
-        cell_imm_init=dict(par1=[0.03, 0.03, 0.02]),
-
-    )
-    genotype_pars = dict(
-        hpv16=dict(
-            sev_fn=dict(k=[0.5, 0.2, 1.0]),
-            dur_precin=dict(par1=[1, 1, 6, 0.05],
-                          par2=[1,1,2.5,0.1])
-            ),
-        hpv18=dict(
-            sev_fn=dict(k=[0.5, 0.2, 1.0]),
-        )
-    )
-
-    extra_sim_analyzers = [hpv.age_causal_infection(start_year=2000)]
-
-    def estimator(actual, predicted):
-        actuals = []
-        for i in actual:
-            i_list = [idx for idx in i.split(',')]
-            i_list[0] = float(i_list[0].replace('[', ''))
-            i_list[1] = float(i_list[1].replace(']', ''))
-            actuals.append(i_list)
-        gofs = np.zeros(len(predicted))
-        for iv, val in enumerate(predicted):
-            if val> np.max(actuals[iv]):
-                gofs[iv] = abs(np.max(actuals[iv])-val)
-            elif val < np.min(actuals[iv]):
-                gofs[iv] = abs(np.min(actuals[iv])-val)
-
-        actual_max = np.array(actuals).max()
-        if actual_max > 0:
-            gofs /= actual_max
-
-        gofs = np.mean(gofs)
-
-        return gofs
-
-
-    # Make the calibration
-    calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
-                            datafiles=[
-                                'test_data/south_africa_hpv_data.csv',
-                                'test_data/south_africa_type_distribution_cancer.csv'
-                            ],
-                            estimator=estimator,
-                            extra_sim_analyers=extra_sim_analyzers,
-                            total_trials=1, n_workers=1)
-    calib.calibrate(die=True)
-    calib.plot(res_to_plot=4)
-
-
-
-
-
-    return sim, calib
-
-
-
 
 #%% Run as a script
 if __name__ == '__main__':
 
     T = sc.tic()
 
-    # sim, calib = test_calibration()
-    sim, calib = test_calib_range()
-
-
+    sim, calib = test_calibration()
 
     sc.toc(T)
     print('Done.')
