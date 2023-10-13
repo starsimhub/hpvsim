@@ -8,6 +8,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 1.2.8 (2023-10-13)
+---------------------------
+- Allows calibration of nested dict types of parameters
+- Adds parameter exploration tutorial and sampler with predefined sampled lists in tests
+- *Github info* PR `625 <https://github.com/amath-idm/hpvsim/pull/627>`__
+
 Version 1.2.7 (2023-10-12)
 ---------------------------
 - Fixes plotting issue with tutorial
