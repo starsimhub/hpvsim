@@ -1,5 +1,5 @@
 ﻿,param_name,param_type,default_value,lower_bound,upper_bound,Notes
-0,n_agents,numeric,10000,1000,15000,Assume
+0,n_agents,numeric,10000,3000,10000,Assume
 1,total_pop,other,,,,
 2,pop_scale,numeric,68887.4653,,,
 3,ms_agent_ratio,numeric,10,10,300,Assume

@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import math
 
-# Sub-function to get parameter names, types, and base values from nested dict
 def get_all_keys(pars, prefix=''):
+    ''' Sub-function to get parameter names, types, and base values from nested dict '''
     keys = []
     for key, value in pars.items():
         new_key = prefix + str(key) if prefix else str(key)
@@ -27,8 +27,8 @@ def get_all_keys(pars, prefix=''):
             keys.append([param_name, param_type, default_value])
     return keys
 
-# Get parameter settings from a sim.pars to df
 def get_all_param_space(pars):
+    ''' Get parameter settings from a sim.pars to df'''
     param_space = pd.DataFrame(columns=["param_name", "param_type", "default_value", "lower_bound",  "upper_bound", "Notes"])
     all_keys = get_all_keys(pars)
     for key in all_keys:
@@ -37,8 +37,8 @@ def get_all_param_space(pars):
     param_space.reset_index(drop=True, inplace=True)
     return param_space
 
-# Subfunction that maps a single parameter with default, lower, and upper bound to nested dict
-def create_nested_dict(keys, default_value, lower_bound, upper_bound, n_test=None):
+def create_nested_dict_with_values(keys, default_value, lower_bound, upper_bound, n_test=None):
+    ''' Subfunction that maps a single parameter with default, lower, and upper bound to nested dict'''
     nested_dict = {}
     current_dict = nested_dict
     key_list = keys.split('/')
@@ -50,53 +50,52 @@ def create_nested_dict(keys, default_value, lower_bound, upper_bound, n_test=Non
         current_dict[last_key] = [default_value, lower_bound, upper_bound, math.floor((upper_bound - lower_bound) / (n_test-1)*1e13)/1e13]
     else:
         current_dict[last_key] = [default_value, lower_bound, upper_bound]
+    
     return nested_dict
 
-# Get list of calibration parameters
-def get_calib_list(custom_param_space, n_test=None):
-    calib_list = []
-    for _, row in custom_param_space.iterrows():
+def get_calib_parameters(param_df):    
+    ''' Read csv file and modify calibration parameters to be ready for optuna and lhs sampling'''
+    calib_pars = sc.objdict()
+    genotype_pars = sc.objdict()  
+    for _, row in param_df.iterrows():
         keys = row['param_name']
         default_value = row['default_value']
         lower_bound = row['lower_bound']
         upper_bound = row['upper_bound']
-        calib_param = create_nested_dict(keys, float(default_value), float(lower_bound), float(upper_bound), n_test)
-        calib_list.append(calib_param)
-    return calib_list
+        calib_param = create_nested_dict_with_values(keys, float(default_value), float(lower_bound), float(upper_bound))
+        calib_pars = sc.mergenested(calib_param, calib_pars)
+    if 'genotype_pars' in calib_pars:
+        genotype_pars =  calib_pars.pop('genotype_pars')
 
+    calib_space = sc.objdict(names = [name.replace("genotype_pars/", "").replace("/", "_") for name in param_df.param_name.values], 
+                        bounds = np.array([param_df.lower_bound.values.astype(float), param_df.upper_bound.values.astype(float)]).T)
+    
+    return (calib_pars, genotype_pars, calib_space)
 
-# Read user-defined param space and define a calibration space. 
-def get_calib_space(calib_file_name, filter_list):
-    custom_param_space = pd.read_csv(calib_file_name, index_col = 0)
-    custom_param_space = custom_param_space[custom_param_space['Notes'].isin(filter_list)]  # Filter parameters
-    calib_space = sc.objdict(names = [name.replace("genotype_pars/", "").replace("/", "_") for name in custom_param_space.param_name.values], 
-                            bounds = np.array([custom_param_space.lower_bound.values.astype(float), custom_param_space.upper_bound.values.astype(float)]).T)
-    return custom_param_space, calib_space
-
-# Custom estimator to use for bounded target data
 def estimator(actual, predicted):
-        actuals = []
-        for i in actual:
-            i_list = [idx for idx in i.split(',')]
-            i_list[0] = float(i_list[0].replace('[', ''))
-            i_list[1] = float(i_list[1].replace(']', ''))
-            actuals.append(i_list)
-        gofs = np.zeros(len(predicted))
-        for iv, val in enumerate(predicted):
-            if val> np.max(actuals[iv]):
-                gofs[iv] = abs(np.max(actuals[iv])-val)
-            elif val < np.min(actuals[iv]):
-                gofs[iv] = abs(np.min(actuals[iv])-val)
-        actual_max = np.array(actuals).max()
-        if actual_max > 0:
-            gofs /= actual_max
+    ''' Custom estimator to use for bounded target data'''
+    actuals = []
+    for i in actual:
+        i_list = [idx for idx in i.split(',')]
+        i_list[0] = float(i_list[0].replace('[', ''))
+        i_list[1] = float(i_list[1].replace(']', ''))
+        actuals.append(i_list)
+    gofs = np.zeros(len(predicted))
+    for iv, val in enumerate(predicted):
+        if val> np.max(actuals[iv]):
+            gofs[iv] = abs(np.max(actuals[iv])-val)
+        elif val < np.min(actuals[iv]):
+            gofs[iv] = abs(np.min(actuals[iv])-val)
+    actual_max = np.array(actuals).max()
+    if actual_max > 0:
+        gofs /= actual_max
 
-        gofs = np.mean(gofs)
+    gofs = np.mean(gofs)
 
-        return gofs
+    return gofs
 
-# Sampler using latin hypercube sampling
 def sample_lhs(total_trials, calib_space):
+    ''' Sampler using latin hypercube sampling'''
     from pyDOE import lhs
     lb = calib_space.bounds[:,0]
     ub  = calib_space.bounds[:,1]
@@ -104,39 +103,33 @@ def sample_lhs(total_trials, calib_space):
     final_sample = lb + sample*(ub - lb)
     return final_sample
 
-def run_precalib_exploration(location, datafiles, default_pars, custom_param_space, calib_space, total_trials, n_workers, name, save_results):
-    # Prepare for calibration
-    X = sample_lhs(total_trials, calib_space)
-    calib_list = get_calib_list(custom_param_space)
-    calib_pars = sc.objdict()
-    for i in range(len(calib_list)):
-        calib_pars = sc.mergenested(calib_list[i], calib_pars)
-    genotype_pars = None
-    if 'genotype_pars' in calib_pars:
-        genotype_pars = calib_pars.pop('genotype_pars')
-
-    # Use custom sampler with predefined sample sets from lhs
+def run_parameter_exploration(location, datafiles, default_pars, calib_pars, genotype_pars, calib_space, total_trials, n_workers, name, save_results):
+    ''' Run parameter exploration'''
+    # Use a custom sampler that has full list of sample sets from lhs
     search_space = {key: value for key, value in zip(calib_space['names'], calib_space['bounds'])}
+    X = sample_lhs(total_trials, calib_space)
     sampler = PredefinedSampler(search_space, samp_list = X) 
 
-    # Finally, run the model
+    # Create Calibration object
     # Due to issues in parallel computing, the sampler sometimes samples the same space. We suggest adding more total trials so that all sampled points are evaluated
-
     sim = hpv.Sim(default_pars)
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             name=name, estimator=estimator, 
                             sampler = sampler, verbose = False,
                             datafiles=datafiles, 
                             total_trials=total_trials+3*n_workers, n_workers=n_workers) 
+    
+    # Finally, calibrate the model
     calib.calibrate(die=False)
     if save_results:
         import os
         if not os.path.exists('results'):
             os.makedirs('results')
         sc.saveobj(f'results/{name}.obj', calib)
+    return calib
 
-# expand list types of outcomes
 def expand_array_column(df, array_column_name, sub_column_name):
+    ''' Expand list types of outcomes '''
     array_data = df[array_column_name]
     df[array_column_name] = df[array_column_name].apply(lambda x: sum(x**2) if 'dist' in array_column_name else sum(x))
     max_length = max(len(row) for row in array_data)
@@ -144,11 +137,10 @@ def expand_array_column(df, array_column_name, sub_column_name):
     array_df = pd.DataFrame(array_data.tolist(), columns=column_names)
     return pd.concat([df, array_df], axis=1)
 
-# Read results
-def organize_results(calib):
-    custom_param_space, calib_space  = get_calib_space('param_space_filled.csv', ['Assume'])
+def organize_results(calib, calib_space):
+    ''' Organize results'''
     result_df = calib.df
-    param_cols = [param for param in calib_space["names"] if param in result_df.columns]
+    param_cols = calib_space.names
     result_df = result_df[['index','mismatch']+param_cols]
     result_df = result_df.sort_values('index').reset_index(drop=True)
 
@@ -168,9 +160,8 @@ def organize_results(calib):
 
     return (result_df)
 
-
-# Fitting a model to identify important parameters
 def fit_model(model_name, X, Y):
+    ''' Fitting a model to identify important parameters'''
     from sklearn.preprocessing import StandardScaler
     from sklearn.inspection import permutation_importance
 
@@ -217,5 +208,3 @@ def heatmap(param_importance, outcomes, save_plot=False, sort_by=None):
     plt.show()
     if save_plot:
         plt.savefig(f'results/pre_calib.png')
-
-# %%
