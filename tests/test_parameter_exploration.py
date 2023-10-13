@@ -1,8 +1,7 @@
 #%% Imports and settings
 import sciris as sc
 import hpvsim as hpv
-import optuna as op
-from ..tests.test_sampler import PredefinedSampler
+import test_sampler
 import numpy as np
 import pandas as pd
 import math
@@ -108,7 +107,7 @@ def run_parameter_exploration(location, datafiles, default_pars, calib_pars, gen
     # Use a custom sampler that has full list of sample sets from lhs
     search_space = {key: value for key, value in zip(calib_space['names'], calib_space['bounds'])}
     X = sample_lhs(total_trials, calib_space)
-    sampler = PredefinedSampler(search_space, samp_list = X) 
+    sampler = test_sampler.PredefinedSampler(search_space, samp_list = X) 
 
     # Create Calibration object
     # Due to issues in parallel computing, the sampler sometimes samples the same space. We suggest adding more total trials so that all sampled points are evaluated
