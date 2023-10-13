@@ -2,7 +2,7 @@
 import sciris as sc
 import hpvsim as hpv
 import optuna as op
-from tests.test_sampler import PredefinedSampler
+from ..tests.test_sampler import PredefinedSampler
 import numpy as np
 import pandas as pd
 import math
