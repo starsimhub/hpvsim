@@ -169,7 +169,7 @@ class Calibration(sc.prettyobj):
         sim = sc.dcp(self.sim)
         if label: sim.label = label
 
-        new_pars = self.get_full_pars(self, sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
+        new_pars = self.get_full_pars(sim=sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
         sim.update_pars(new_pars)
         sim.initialize(reset=True, init_analyzers=False) # Necessary to reinitialize the sim here so that the initial infections get the right parameters
 
@@ -191,7 +191,7 @@ class Calibration(sc.prettyobj):
                 return output
     
     @staticmethod
-    def get_full_pars(self, sim=None, calib_pars=None, genotype_pars=None, hiv_pars=None):
+    def get_full_pars(sim=None, calib_pars=None, genotype_pars=None, hiv_pars=None):
         ''' Make a full pardict from the subset of regular sim parameters, genotype parameters, and hiv parameters used in calibration'''
         # Prepare the parameters
         new_pars = {}
@@ -297,7 +297,7 @@ class Calibration(sc.prettyobj):
 
         # Return
         if return_full:
-            all_pars = self.get_full_pars(self, sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
+            all_pars = self.get_full_pars(sim=self.sim, calib_pars=calib_pars, genotype_pars=genotype_pars, hiv_pars=hiv_pars)
             return all_pars
         else:
             return calib_pars, genotype_pars, hiv_pars
