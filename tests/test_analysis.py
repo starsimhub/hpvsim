@@ -233,7 +233,7 @@ if __name__ == '__main__':
 
     people      = test_snapshot()
     sim0, a0    = test_age_pyramids()
-    sim1, a1    = test_age_results()
+    # sim1, a1    = test_age_results()
     sim2, a2    = test_reduce_analyzers()
     sim3, a3    = test_age_causal_analyzer()
     sim4, a4    = test_detection()
