@@ -85,8 +85,8 @@ def plot_mixing(sim, dim):
     if dim == 'age':
         bins = np.linspace(0, 75, 16, dtype=int)
         bins = np.append(bins, 100)
-        df_new_pairs['x_bins'] = pd.cut(df_new_pairs['age_f'], bins)
-        df_new_pairs['y_bins'] = pd.cut(df_new_pairs['age_m'], bins)
+        df_new_pairs['x_bins'] = pd.cut(df_new_pairs['age_f'], bins, right=False)
+        df_new_pairs['y_bins'] = pd.cut(df_new_pairs['age_m'], bins, right=False)
     elif dim == 'cluster':
         df_new_pairs['x_bins'] = df_new_pairs['cluster_f'].astype('category')
         df_new_pairs['y_bins'] = df_new_pairs['cluster_m'].astype('category')
@@ -111,7 +111,7 @@ def plot_rships(sim):
     for year, people in snaps.snapshots.items():
         df = pd.DataFrame({'age':people.age[people.alive==True], 'sex':people.is_female[people.alive==True]})
         df['sex'].replace({True:'Female', False:'Male'}, inplace=True)
-        df['Age Bin'] = pd.cut(df['age'], people.age_bin_edges)
+        df['Age Bin'] = pd.cut(df['age'], people.age_bin_edges, right=False)
         df['Year'] = year
         for lk, lkey in enumerate(layer_keys):
             df[lkey] = people.n_rships[lk, people.alive==True]
