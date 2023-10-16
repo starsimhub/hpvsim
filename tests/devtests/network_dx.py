@@ -93,7 +93,7 @@ def plot_mixing(sim, dim):
 
     count_df = df_new_pairs.groupby(['rtype', 'year', 'x_bins', 'y_bins']).size().reset_index(name='count')
     def facet(data, **kwargs):
-        data = data.pivot(index='x_bins', columns='y_bins', values='count')
+        data = data.pivot(index='y_bins', columns='x_bins', values='count')
         ax = sns.heatmap(data, **kwargs)
         ax.invert_yaxis()
     g = sns.FacetGrid(count_df, col='year', row='rtype', height=4)

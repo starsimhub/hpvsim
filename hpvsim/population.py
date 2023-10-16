@@ -338,7 +338,7 @@ def create_edgelist(lno, partners, current_partners, mixing, age, is_active, is_
                 if this_weighting.sum() > 0:
                     males_nonzero = hpu.true(this_weighting)  # Remove males with 0 weights
                     this_weighting_nonzero = this_weighting[males_nonzero]
-                    f_inds = f_cl[hpu.true(age_bins_f == ab)]  # inds of participating females in this age bin
+                    f_inds = f_cl[age_bins_f == ab]  # inds of participating females in this age bin
                     if nm > len(this_weighting_nonzero):
                         #print(f'Warning, {nm} males desired but only {len(this_weighting_nonzero)} found.')
                         f_selected = f_inds[hpu.choose(nm, len(this_weighting_nonzero))] # randomly select females
