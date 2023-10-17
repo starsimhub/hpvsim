@@ -9,6 +9,7 @@ import hpvsim as hpv
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import scipy.linalg
 
 #%% Network analyzer
 
@@ -45,7 +46,7 @@ class new_pairs_snap(hpv.Analyzer):
 
 def network_demo():
     clusters = [5, 5]
-    mixing_mats = [np.ones((5,5)), np.identity(5)]
+    mixing_mats = [np.ones((5,5)), scipy.linalg.circulant([1,0.5,0.1,0.1,0.5])]
     start = 1970
     end = 2020
     pop = 2e4

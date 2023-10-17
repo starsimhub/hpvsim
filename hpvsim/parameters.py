@@ -726,10 +726,10 @@ def add_mixing(pars):
     if n_clusters > 1:
         if 'add_mixing' in pars and pars['add_mixing'] is not None: # If mixing matrix is defined, check if dimension matches n_clusters
             if pars['add_mixing'].shape != (n_clusters, n_clusters):
-                errormsg = 'Dimension of input mixing matrix does not match number of clusters'
+                errormsg = 'Dimension of input mixing matrix does not match number of clusters, please check the consistency of add_mixing and n_clusters'
                 raise ValueError(errormsg)
         else:  # if add_mixing is not supplied, assume well-mixed
-            print('Warning: input has more than 1 clusters with no mixing matrix. Well-mixed cluster is assumed')
+            print('Warning: input has n_clusters > 1 with no add_mixing matrix specified. Well-mixed cluster is assumed')
             pars['n_clusters'] = 1
             pars['cluster_rel_sizes'] = np.array([1])
     elif n_clusters == 1:
