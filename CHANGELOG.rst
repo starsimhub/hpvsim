@@ -8,10 +8,15 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 1.2.8 (2023-10-05)
+Version 1.2.9 (2023-10-17)
 ---------------------------
 - Improved network updating, adds clustering functionality
 - *Github info* PR `607 <https://github.com/amath-idm/hpvsim/pull/607>`__
+
+Version 1.2.8 (2023-10-12)
+---------------------------
+- Fixes plotting issue with tutorial
+- *Github info* PR `625 <https://github.com/amath-idm/hpvsim/pull/625>`__
 
 Version 1.2.7 (2023-09-22)
 ---------------------------
