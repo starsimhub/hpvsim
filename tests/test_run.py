@@ -196,7 +196,7 @@ def test_complex_scenarios(do_plot=do_plot, do_save=False, fig_path=None):
                 'acts': dict(m=dict(dist='neg_binomial', par1=120, par2=40),
                              c=dict(dist='neg_binomial', par1=20, par2=5),
                              ),
-                'condoms': dict(m=0, c=0.1, o=0.1),
+                'condoms': dict(m=0, c=0.1),
                 'debut': dict(f=dict(dist='normal', par1=14, par2=2),
                               m=dict(dist='normal', par1=14, par2=2))
             }
@@ -207,7 +207,7 @@ def test_complex_scenarios(do_plot=do_plot, do_save=False, fig_path=None):
                 'acts': dict(m=dict(dist='neg_binomial', par1=40, par2=10),
                              c=dict(dist='neg_binomial', par1=2, par2=1),
                              ),
-                'condoms': dict(m=0.5, c=0.9, o=0.9),
+                'condoms': dict(m=0.5, c=0.9),
                 'debut': dict(f=dict(dist='normal', par1=20, par2=2),
                               m=dict(dist='normal', par1=21, par2=2))
             }
