@@ -828,7 +828,7 @@ class Sim(hpb.BaseSim):
                     hiv_latent_inds = latent_inds[hpu.true(people.hiv[latent_inds])]
                     if len(hiv_latent_inds):
                         immune_compromise = 1 - people.art_adherence[hiv_latent_inds]
-                        mod = immune_compromise * self['hiv_pars']['rel_reactivation_prob']
+                        mod = immune_compromise * self.hivsim['hiv_pars']['rel_reactivation_prob']
                         mod[mod < 1] = 1
                         reactivation_probs[hpu.true(people.hiv[latent_inds])] *= mod
                 is_reactivated = hpu.binomial_arr(reactivation_probs)
