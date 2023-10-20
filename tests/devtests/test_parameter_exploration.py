@@ -96,6 +96,7 @@ def estimator(actual, predicted):
 def sample_lhs(total_trials, calib_space):
     ''' Sampler using latin hypercube sampling'''
     from pyDOE import lhs
+    # from SALib.sample import latin
     lb = calib_space.bounds[:,0]
     ub  = calib_space.bounds[:,1]
     sample = lhs(len(calib_space.names), total_trials)
@@ -207,3 +208,5 @@ def heatmap(param_importance, outcomes, save_plot=False, sort_by=None):
     plt.show()
     if save_plot:
         plt.savefig(f'results/pre_calib.png')
+
+# %%
