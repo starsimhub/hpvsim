@@ -12,7 +12,7 @@ Version 1.2.8 (2023-10-13)
 ---------------------------
 - Allows calibration of nested dict types of parameters, different sampler types, and gof metrics
 - Adds parameter exploration tutorial and sampler with predefined sampled lists in tests
-- *Github info* PR `625 <https://github.com/amath-idm/hpvsim/pull/627>`__
+- *Github info* PR `627 <https://github.com/amath-idm/hpvsim/pull/627>`__
 
 Version 1.2.7 (2023-10-12)
 ---------------------------
