@@ -5,6 +5,7 @@ import test_sampler
 import numpy as np
 import pandas as pd
 import math
+from SALib.sample import latin, sobol
 
 def get_all_keys(pars, prefix=''):
     ''' Sub-function to get parameter names, types, and base values from nested dict '''
@@ -68,7 +69,7 @@ def get_calib_parameters(param_df):
 
     calib_space = sc.objdict(names = [name.replace("genotype_pars/", "").replace("/", "_") for name in param_df.param_name.values], 
                         bounds = np.array([param_df.lower_bound.values.astype(float), param_df.upper_bound.values.astype(float)]).T)
-    
+    calib_space['num_vars'] = len(calib_space['names'])
     return (calib_pars, genotype_pars, calib_space)
 
 def estimator(actual, predicted):
@@ -93,21 +94,21 @@ def estimator(actual, predicted):
 
     return gofs
 
-def sample_lhs(total_trials, calib_space):
-    ''' Sampler using latin hypercube sampling'''
-    from pyDOE import lhs
-    # from SALib.sample import latin
-    lb = calib_space.bounds[:,0]
-    ub  = calib_space.bounds[:,1]
-    sample = lhs(len(calib_space.names), total_trials)
-    final_sample = lb + sample*(ub - lb)
-    return final_sample
+def get_sample(sample_method, sample_seed, calib_space, total_trials):
+    if sample_method == 'lhs':
+        return latin.sample(calib_space, total_trials, sample_seed)
+    elif sample_method == 'sobol':
+        N = round(total_trials / (2 * (1 + calib_space['num_vars'])))
+        if N < 1:
+            raise ValueError(f'total trials should be larger than {(2 * (1 + calib_space["num_vars"]))}')
+        return sobol.sample(problem=calib_space, N=N, seed=sample_seed)
 
-def run_parameter_exploration(location, datafiles, default_pars, calib_pars, genotype_pars, calib_space, total_trials, n_workers, name, save_results):
+def run_parameter_exploration(location, datafiles, default_pars, calib_pars, genotype_pars, calib_space, total_trials, n_workers, name, save_results, 
+                              sample_method='sobol', sample_seed=1234):
     ''' Run parameter exploration'''
     # Use a custom sampler that has full list of sample sets from lhs
     search_space = {key: value for key, value in zip(calib_space['names'], calib_space['bounds'])}
-    X = sample_lhs(total_trials, calib_space)
+    X = get_sample(sample_method, sample_seed, calib_space, total_trials)
     sampler = test_sampler.PredefinedSampler(search_space, samp_list = X) 
 
     # Create Calibration object
@@ -162,28 +163,36 @@ def organize_results(calib, calib_space):
 
 def fit_model(model_name, X, Y):
     ''' Fitting a model to identify important parameters'''
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.inspection import permutation_importance
 
-    if model_name=='LinearRegression':
-        from sklearn.linear_model import LinearRegression 
-        reg_model = LinearRegression()
-    elif model_name == 'RandomForest':
-        from sklearn.ensemble import RandomForestRegressor
-        reg_model = RandomForestRegressor(n_estimators=100, random_state=42)
-    elif model_name == 'XGBoost':
-        from xgboost import XGBRegressor
-        reg_model = XGBRegressor(n_estimators=100)
+    if model_name == 'sobol':
+        from SALib.analyze import sobol
+        #!! Need to check if all sobol lists were sampled and match
+        res = dict()
+        res['mismatch'] = sobol.analyze(calib_space, Y)
 
-    param_importance = pd.DataFrame(columns = Y.columns, index = X.columns)
-    scaler = StandardScaler()
-    norm_X = scaler.fit_transform(X)
-    for i in range(Y.shape[1]):  # Assuming Y is a 2D array with shape (n_samples, n_targets)
-        Y_target = Y.iloc[:,i]  # Select the i-th target variable
-        reg_model.fit(norm_X, Y_target)
-        perm_importances = permutation_importance(reg_model, norm_X, Y_target)
-        param_importance[Y.columns[i]] = perm_importances.importances_mean
-    return param_importance
+    else:
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.inspection import permutation_importance
+
+        if model_name=='LinearRegression':
+            from sklearn.linear_model import LinearRegression 
+            reg_model = LinearRegression()
+        elif model_name == 'RandomForest':
+            from sklearn.ensemble import RandomForestRegressor
+            reg_model = RandomForestRegressor(n_estimators=100, random_state=42)
+        elif model_name == 'XGBoost':
+            from xgboost import XGBRegressor
+            reg_model = XGBRegressor(n_estimators=100)
+
+        param_importance = pd.DataFrame(columns = Y.columns, index = X.columns)
+        scaler = StandardScaler()
+        norm_X = scaler.fit_transform(X)
+        for i in range(Y.shape[1]):  # Assuming Y is a 2D array with shape (n_samples, n_targets)
+            Y_target = Y.iloc[:,i]  # Select the i-th target variable
+            reg_model.fit(norm_X, Y_target)
+            perm_importances = permutation_importance(reg_model, norm_X, Y_target)
+            param_importance[Y.columns[i]] = perm_importances.importances_mean
+        return param_importance
 
 def get_interest_outcome(calib, Y, outcome_level):
     outcomes = [[] for _ in range(3)]
