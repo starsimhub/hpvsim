@@ -163,36 +163,28 @@ def organize_results(calib, calib_space):
 
 def fit_model(model_name, X, Y):
     ''' Fitting a model to identify important parameters'''
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.inspection import permutation_importance
+    
+    if model_name=='LinearRegression':
+        from sklearn.linear_model import LinearRegression 
+        reg_model = LinearRegression()
+    elif model_name == 'RandomForest':
+        from sklearn.ensemble import RandomForestRegressor
+        reg_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    elif model_name == 'XGBoost':
+        from xgboost import XGBRegressor
+        reg_model = XGBRegressor(n_estimators=100)
 
-    if model_name == 'sobol':
-        from SALib.analyze import sobol
-        #!! Need to check if all sobol lists were sampled and match
-        res = dict()
-        res['mismatch'] = sobol.analyze(calib_space, Y)
-
-    else:
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.inspection import permutation_importance
-
-        if model_name=='LinearRegression':
-            from sklearn.linear_model import LinearRegression 
-            reg_model = LinearRegression()
-        elif model_name == 'RandomForest':
-            from sklearn.ensemble import RandomForestRegressor
-            reg_model = RandomForestRegressor(n_estimators=100, random_state=42)
-        elif model_name == 'XGBoost':
-            from xgboost import XGBRegressor
-            reg_model = XGBRegressor(n_estimators=100)
-
-        param_importance = pd.DataFrame(columns = Y.columns, index = X.columns)
-        scaler = StandardScaler()
-        norm_X = scaler.fit_transform(X)
-        for i in range(Y.shape[1]):  # Assuming Y is a 2D array with shape (n_samples, n_targets)
-            Y_target = Y.iloc[:,i]  # Select the i-th target variable
-            reg_model.fit(norm_X, Y_target)
-            perm_importances = permutation_importance(reg_model, norm_X, Y_target)
-            param_importance[Y.columns[i]] = perm_importances.importances_mean
-        return param_importance
+    param_importance = pd.DataFrame(columns = Y.columns, index = X.columns)
+    scaler = StandardScaler()
+    norm_X = scaler.fit_transform(X)
+    for i in range(Y.shape[1]):  # Assuming Y is a 2D array with shape (n_samples, n_targets)
+        Y_target = Y.iloc[:,i]  # Select the i-th target variable
+        reg_model.fit(norm_X, Y_target)
+        perm_importances = permutation_importance(reg_model, norm_X, Y_target)
+        param_importance[Y.columns[i]] = perm_importances.importances_mean
+    return param_importance
 
 def get_interest_outcome(calib, Y, outcome_level):
     outcomes = [[] for _ in range(3)]
