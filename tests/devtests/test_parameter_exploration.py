@@ -163,14 +163,6 @@ def organize_results(calib, calib_space):
 
 def fit_model(model_name, X, Y):
     ''' Fitting a model to identify important parameters'''
-
-    if model_name == 'sobol':
-        from SALib.analyze import sobol
-        #!! Need to check if all sobol lists were sampled and match
-        res = dict()
-        res['mismatch'] = sobol.analyze(calib_space, Y)
-
-    else:
         from sklearn.preprocessing import StandardScaler
         from sklearn.inspection import permutation_importance
 
