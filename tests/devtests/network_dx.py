@@ -109,6 +109,7 @@ def plot_rships(sim):
     snaps = sim.get_analyzer('snapshot')
 
     dfs = []
+    years = []
     for year, people in snaps.snapshots.items():
         df = pd.DataFrame({'age':people.age[people.alive==True], 'sex':people.is_female[people.alive==True]})
         df['sex'].replace({True:'Female', False:'Male'}, inplace=True)
@@ -117,6 +118,7 @@ def plot_rships(sim):
         for lk, lkey in enumerate(layer_keys):
             df[lkey] = people.n_rships[lk, people.alive==True]
         dfs.append(df)
+        years.append(year)
     
     df = pd.concat(dfs)
     dfm = df.melt(id_vars=['Age Bin', 'sex', 'Year'], value_vars=layer_keys, var_name='Layer', value_name='n_rships')
@@ -127,6 +129,14 @@ def plot_rships(sim):
     g.fig.subplots_adjust(top=0.9)
     g.fig.suptitle(sim.label)
 
+    dfm_fem = dfm[(dfm['sex'] == 'Female') & (dfm['Year'] == years[-1])]
+    h = sns.catplot(data=dfm_fem, kind='box', x='Age Bin', y='n_rships', col='Layer', sharey=False,
+                    height=5, aspect=0.75, legend_out=False)
+    h.tick_params(axis='x', which='both', rotation=70)
+    h.set_ylabels('Number of Relationships')
+    h.fig.tight_layout()
+    h.fig.subplots_adjust(top=0.9)
+    h.fig.suptitle(sim.label)
 
 #%% Run as a script
 if __name__ == '__main__':
