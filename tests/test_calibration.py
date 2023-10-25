@@ -41,7 +41,6 @@ def test_calibration(do_plot=True):
     # Define the calibration parameters
     calib_pars = dict(
         beta=[0.25, 0.10, 0.30],
-        acts=dict(c=dict(par1=[20, 10, 50, 1])),
     )
     genotype_pars = dict(
         hpv16=dict(

@@ -1129,6 +1129,8 @@ class Sim(hpb.BaseSim):
         edges = self['age_bin_edges']
         mean_edges = edges[:-1] + np.diff(edges)/2
         age_mean = ((res/res.sum())*mean_edges).sum()
+        if res.sum()==0:
+            print(f'Zeros for {reskey}, {self.label}')
         return age_mean
         
 
