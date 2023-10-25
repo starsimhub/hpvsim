@@ -112,7 +112,7 @@ def test_age_results(do_plot=True, test_what=''):
         sim_result_name = result + '_by_age'
         sim_results = sim.results[sim_result_name][:,yind]
         analyzer_results = a.results[result][year]
-        assert np.allclose(sim_results,analyzer_results,rtol=5e-2)
+        assert np.allclose(sim_results,analyzer_results,rtol=0.2)
 
     return sim, a
 

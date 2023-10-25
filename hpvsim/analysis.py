@@ -734,6 +734,7 @@ class age_results(Analyzer):
         mapping = {
             'infections': ['date_exposed', 'infectious'],
             'cin':  ['date_cin', 'cin'],
+            'dysplasias':  ['date_cin', 'cin'],
             'cins':  ['date_cin', 'cin'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],

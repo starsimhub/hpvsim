@@ -308,6 +308,7 @@ def plot_nh(sim=None):
         axes[2].plot(this_cinx, rv.pdf(this_cinx), color=colors[gi], lw=2, label=glabels[gi])
 
         # Panel D: dysplasia
+
         cancer = hppar.compute_severity(this_cinx[:], pars=cancer_fns[gi])
         axes[3].plot(this_cinx, cancer, color=colors[gi], lw=2, label=gtype.upper())
 
@@ -474,7 +475,7 @@ def plot_nh_simple(sim=None):
 # %% Run as a script
 if __name__ == '__main__':
 
-    make_simple = False
+    make_simple = True
     make_stacked = True
     do_run = True
 
@@ -482,17 +483,6 @@ if __name__ == '__main__':
         sim = hpv.Sim()
         sim.initialize()
         plot_nh_simple(sim)
-
-    # sim.pars['genotype_pars']['hpv16']['cin_fn']['x_infl']=0
-    # sim.pars['genotype_pars']['hpv16']['cin_fn']['k'] = 0.2
-    #
-    # sim.pars['genotype_pars']['hpv18']['cin_fn']['x_infl']=0
-    # sim.pars['genotype_pars']['hpv18']['cin_fn']['k'] = 0.2
-    # sim.pars['genotype_pars']['hpv18']['cin_fn']['y_max'] = 0.9
-    #
-    # sim.pars['genotype_pars']['hi5']['cin_fn']['x_infl']=0
-    # sim.pars['genotype_pars']['hi5']['cin_fn']['k'] = 0.2
-    # sim.pars['genotype_pars']['hi5']['cin_fn']['y_max'] = 0.85
 
     if make_stacked:
 
@@ -507,13 +497,12 @@ if __name__ == '__main__':
                 'sev_dist': dict(dist='normal_pos', par1=1., par2=0.001)
             }
             age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
-            inf_dist = outcomes_by_year(start_year=2000)
-            cum_dist = cum_dist(start_year=2000)
-            sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, inf_dist, cum_dist])
+            outcomes_by_year = outcomes_by_year(start_year=2000)
+            sim = hpv.Sim(pars, analyzers=[age_causal_by_genotype, outcomes_by_year])
             sim.run()
             sim.plot()
             sim.shrink()
-            sc.saveobj(f'{location}.sim', sim)
+            # sc.saveobj(f'{location}.sim', sim)
 
         else:
             sim = sc.loadobj(f'{location}.sim')

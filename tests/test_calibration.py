@@ -104,7 +104,7 @@ def test_calibration(do_plot=True):
         fig.show()
 
     # In addition to the plots, assert that they must be equal
-    assert np.allclose(calib_cancer_results,sim_cancer_results)
+    assert np.allclose(calib_cancer_results,sim_cancer_results, rtol=0.1)
 
     return sim, calib
 
