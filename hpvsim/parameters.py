@@ -330,14 +330,14 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='lognormal', par1=par1_16, par2=par2_16)  # Duration of infection prior to precancer
     pars.hpv16.cin_fn           = dict(form='logf2', k=0.3, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
-    pars.hpv16.dur_cin          = dict(dist='lognormal', par1=6, par2=6) # Duration of episomal infection prior to cancer
+    pars.hpv16.dur_cin          = dict(dist='lognormal', par1=6, par2=20) # Duration of episomal infection prior to cancer
     pars.hpv16.cancer_fn        = dict(method='cin_integral', ld50=15, **pars.hpv16.cin_fn) # Function mapping duration of cin to probability of cancer
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
     pars.hpv18.dur_precin       = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
-    pars.hpv18.dur_cin          = dict(dist='lognormal', par1=5, par2=5) # Duration of infection prior to cancer
+    pars.hpv18.dur_cin          = dict(dist='lognormal', par1=5, par2=20) # Duration of infection prior to cancer
     pars.hpv18.cin_fn           = dict(form='logf2', k=0.25, x_infl=0, ttc=50, y_max=1)  # Function mapping duration of infection to probability of developing cin
     pars.hpv18.cancer_fn        = dict(method='cin_integral', ld50=15, **pars.hpv18.cin_fn)  # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
@@ -346,7 +346,7 @@ def get_genotype_pars(default=False, genotype=None):
     # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
     pars.hi5 = sc.objdict()
     pars.hi5.dur_precin         = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
-    pars.hi5.dur_cin            = dict(dist='lognormal', par1=4, par2=4) # Duration of infection prior to cancer
+    pars.hi5.dur_cin            = dict(dist='lognormal', par1=4, par2=20) # Duration of infection prior to cancer
     pars.hi5.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=50, y_max=1)  # Function mapping duration of infection to probability of developing cin
     pars.hi5.cancer_fn          = dict(method='cin_integral', ld50=20, **pars.hi5.cin_fn)  # Function mapping duration of infection to severity
     pars.hi5.rel_beta           = 0.9 # placeholder
