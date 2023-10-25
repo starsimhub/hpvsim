@@ -148,9 +148,6 @@ def indef_int_logf2(x, k, x_infl, ttc=25, y_max=1):
     '''
     Indefinite integral of logf2; see definition there for arguments
     '''
-    # num = np.exp(-x_infl*k)*(np.exp(k*ttc)+np.exp(x_infl*k))*((np.exp(x_infl*k)+1)*np.log(np.exp(k*x)+np.exp(x_infl*k))-k*x)
-    # denom = k*(np.exp(k*ttc)-1)
-    # return num/denom
     t1 = 1 + np.exp(k*(x_infl-ttc))
     t2 = 1 + np.exp(k*x_infl)
     integ = np.log(np.exp(k*(x_infl-x)) + 1) / k + x
