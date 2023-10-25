@@ -8,22 +8,14 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 1.2.9 (2023-10-17)
----------------------------
-- Improved network updating, adds clustering functionality
-- *Github info* PR `607 <https://github.com/amath-idm/hpvsim/pull/607>`__
-
-Version 1.2.8 (2023-10-12)
----------------------------
-- Fixes plotting issue with tutorial
-- *Github info* PR `625 <https://github.com/amath-idm/hpvsim/pull/625>`__
-
-Version 1.2.8 (2023-10-05)
+Version 1.2.8 (2023-10-31)
 ---------------------------
 - Changes the way HPV progression is modeled so that there is a probability of developing CIN based upon duration of precin and probability of cancer based upon duration of cancer (based upon Rodriguez et al. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3705579/)
 - Renames ``dur_episomal`` as ``dur_cin``
 - Removes CIN grades, severity, transformation
-- *Github info* PR `622 <https://github.com/amath-idm/hpvsim/pull/622>`__
+- Improved network updating, adds clustering functionality
+- Fixes plotting issue with tutorial
+- *Github info* PR `637 <https://github.com/amath-idm/hpvsim/pull/637>`__ 
 
 Version 1.2.7 (2023-09-22)
 ---------------------------
