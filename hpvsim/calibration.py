@@ -89,7 +89,8 @@ class Calibration(sc.prettyobj):
         if keep_db   is None: keep_db   = False
         if storage   is None: storage   = f'sqlite:///{db_name}'
         if total_trials is not None: n_trials = int(np.ceil(total_trials/n_workers))
-        self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name, keep_db=keep_db, storage=storage, rand_seed=rand_seed)
+        self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name,
+                                     keep_db=keep_db, storage=storage, rand_seed=rand_seed)
 
         # Handle other inputs
         self.label          = label
@@ -486,7 +487,7 @@ class Calibration(sc.prettyobj):
         else:
             op.logging.set_verbosity(op.logging.ERROR)
         study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
-        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None) # [tesst]
+        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None)
         return output
 
 
@@ -776,7 +777,6 @@ class Calibration(sc.prettyobj):
                         # Plot data
                         ydata = np.array(thisdatadf.value)
                         ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data')
-
                         # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(analyzer_results):
                             bins += x.tolist()
@@ -790,7 +790,7 @@ class Calibration(sc.prettyobj):
                     ax.set_xlabel('Age group')
                     ax.set_title(f'{self.result_args[resname].name}, {date}')
                     ax.legend()
-                    ax.set_xticks(x, age_labels[resname])
+                    ax.set_xticks(x, age_labels[resname], rotation=45)
                     plot_count += 1
 
             for rn, resname in enumerate(self.sim_results_keys):
@@ -822,7 +822,7 @@ class Calibration(sc.prettyobj):
                 ax.set_xlabel('Genotype')
                 ax.set_title(self.result_args[resname].name + ', ' + str(date))
                 ax.legend()
-                # ax.set_xticks(x, self.glabels)
+                ax.set_xticks(x, self.glabels)
                 plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)

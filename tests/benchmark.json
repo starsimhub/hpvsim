@@ -1,7 +1,12 @@
 {
   "time": {
+<<<<<<< HEAD
     "initialize": 0.015,
     "run": 1.948
+=======
+    "initialize": 0.014,
+    "run": 1.556
+>>>>>>> geospatial-network-test
   },
   "parameters": {
     "n_agents": 10000,
@@ -10,5 +15,9 @@
     "n_interventions": 7,
     "n_analyzers": 0
   },
+<<<<<<< HEAD
   "cpu_performance": 0.3231542657787911
+=======
+  "cpu_performance": 0.5855962093393796
+>>>>>>> geospatial-network-test
 }

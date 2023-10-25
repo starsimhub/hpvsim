@@ -24,7 +24,7 @@ from .settings import options as hpo
 class Sim(hpb.BaseSim):
 
     def __init__(self, pars=None, datafile=None, label=None,
-                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
+                 popfile=None, popdict=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
                  **kwargs):
 
         # Set attributes
@@ -35,8 +35,8 @@ class Sim(hpb.BaseSim):
         self.hiv_datafile  = hiv_datafile # The name of the HIV data file
         self.popfile       = popfile  # The population file
         self.data          = None     # The data
-        self.popdict       = people   # The population dictionary
-        self.people        = None     # Initialize these here so methods that check their length can see they're empty
+        self.popdict       = popdict  # The population dictionary
+        self.people        = people   # People object
         self.t             = None     # The current time in the simulation (during execution); outside of sim.step(), its value corresponds to next timestep to be computed
         self.results       = {}       # For storing results
         self.summary       = None     # For storing a summary of the results
@@ -527,6 +527,8 @@ class Sim(hpb.BaseSim):
         results['cin_prevalence_by_genotype'] = init_res('CIN prevalence by genotype', n_rows=ng, color=stock_colors[1])
         results['cin_prevalence_by_age'] = init_res('CIN prevalence by age', n_rows=na, color=stock_colors[1])
         results['female_hpv_prevalence_by_age'] = init_res('Female HPV prevalence by age', n_rows=na, color=stock_colors[3])
+        results['lsil_prevalence'] = init_res('HPV/CIN1 prevalence', color=stock_colors[3])
+        results['lsil_prevalence_by_age'] = init_res('HPV/CIN1 prevalence by age', n_rows=na, color=stock_colors[3])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -587,7 +589,7 @@ class Sim(hpb.BaseSim):
                 resetstr = ' (resetting people)' if reset else ' (warning: not resetting sim.people)'
             print(f'Initializing sim{resetstr} with {self["n_agents"]:0n} agents')
         if self.popfile and self.popdict is None: # If there's a popdict, we initialize it
-            self.load_population(init_people=False)
+            self.load_population(init_people=False) #TODO: no method for this
 
         # Make the people
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
@@ -1078,6 +1080,7 @@ class Sim(hpb.BaseSim):
         self.results['cin_prevalence_by_genotype'][:] = safedivide(res['n_cin_by_genotype'][:], alive_females)
         self.results['cin_prevalence_by_age'][:] = safedivide(res['n_cin_by_age'][:],
                                                                res['n_females_alive_by_age'][:])
+
         # Compute cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]
         scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
