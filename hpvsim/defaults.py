@@ -81,7 +81,6 @@ class PeopleMeta(sc.prettyobj):
             State('sex',            default_float,  np.nan), # Float
             State('debut',          default_float,  np.nan), # Float
             State('ever_partnered', bool,  False), # Whether this person has ever been partnered
-            State('sev',            default_float, np.nan, shape='n_genotypes'), # Severity of infection, taking values between 0-1
             State('rel_sev',        default_float, 1.0), # Individual relative risk for rate severe disease growth
             State('rel_sus',        default_float, 1.0), # Individual relative risk for acquiring infection (does not vary by genotype)
             State('rel_imm',        default_float, 1.0), # Individual relative level of immunity acquired from infection clearance/vaccination
@@ -91,7 +90,8 @@ class PeopleMeta(sc.prettyobj):
             State('screens',        default_int,    0),  # Number of screens given per person
             State('cin_treatments', default_int,    0),  # Number of CIN treatments given per person
             State('cancer_treatments', default_int,    0),  # Number of cancer treatments given per person
-            State('art_adherence',  default_float, 0, label='adherence on ART', color='#aaa8ff')
+            State('art_adherence',  default_float, 0, label='adherence on ART', color='#aaa8ff'),
+            State('n_infections',   default_int,    0, 'n_genotypes')
         ]
 
         ###### The following section consists of all the boolean states
@@ -116,7 +116,6 @@ class PeopleMeta(sc.prettyobj):
             # States related to the cellular changes present in the cervix.
             State('normal',         bool, True, 'n_genotypes', label='Number with no cellular changes', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
             State('episomal',       bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
-            State('transformed',    bool, False, 'n_genotypes', label='Number with transformation', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
             State('cancerous',      bool, False, 'n_genotypes', label='Number with cancer', color='#5f5cd2'),      # Allowable viral states: inactive
         ]
 
@@ -126,9 +125,6 @@ class PeopleMeta(sc.prettyobj):
             State('abnormal',   bool, False, 'n_genotypes', label='Number with abnormal cells', color='#9e1149'),  # Union of episomal, transformed, and cancerous. Allowable viral states: infectious
             State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#5f5cd2'), # Intersection of normal and inactive.
             State('precin',     bool, False, 'n_genotypes', label='Number with precin', color='#9e1149'), # Defined as those with sev < clinical_cuttoff[0]
-            State('cin1',       bool, False, 'n_genotypes', label='Number with cin1', color='#9e1149'), # Defined as those with clinical_cuttoff[0] < sev < clinical_cuttoff[1]
-            State('cin2',       bool, False, 'n_genotypes', label='Number with cin2', color='#9e1149'), # Defined as those with clinical_cuttoff[1] < sev < clinical_cuttoff[2]
-            State('cin3',       bool, False, 'n_genotypes', label='Number with cin3', color='#5f5cd2'), # Defined as those with clinical_cuttoff[2] < sev < clinical_cuttoff[3]
             State('cin',        bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#5f5cd2'), # Union of CIN1, CIN3, and CIN3
         ]
 
@@ -169,8 +165,6 @@ class PeopleMeta(sc.prettyobj):
             State('dur_infection',      default_float, np.nan, shape='n_genotypes'), # Length of time that a person has any HPV present. Defined for males and females. For females, dur_infection = dur_episomal + dur_transformed. For males, it's taken from a separate distribution
             State('dur_precin',         default_float, np.nan, shape='n_genotypes'), # Length of time that a person has HPV prior to precancerous changes
             State('dur_cin',            default_float, np.nan, shape='n_genotypes'), # Length of time that a person has precancerous changes
-            State('dur_episomal',       default_float, np.nan, shape='n_genotypes'), # Length of time that a person has episomal HPV
-            State('dur_transformed',    default_float, np.nan, shape='n_genotypes'), # Length of time that a person has transformed HPV
             State('dur_cancer',         default_float, np.nan, shape='n_genotypes'), # Duration of cancer
         ]
 
@@ -279,9 +273,6 @@ flows = [
     Flow('infections',              color='#c78f65',    label='Infections'),
     Flow('dysplasias',              color='#c1ad71',    label='Dysplasias'),
     Flow('precins',                 color='#c1ad71',    label='Pre-CINs'),
-    Flow('cin1s',                   color='#c1ad71',    label='CIN1s'),
-    Flow('cin2s',                   color='#c1981d',    label='CIN2s'),
-    Flow('cin3s',                   color='#b86113',    label='CIN3s'),
     Flow('cins',                    color='#b86113',    label='CINs'),
     Flow('cancers',                 color='#5f5cd2',    label='Cancers'),
     Flow('detected_cancers',        color='#5f5cd2',    label='Cancer detections', by_genotype=False),
@@ -296,9 +287,9 @@ genotype_flow_keys  = [flow.name for flow in flows if flow.by_genotype]
 
 # Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
-inci_keys   = ['hpv',       'cin1',     'cin2',     'cin3',     'dysplasia',      'cancer']
-inci_names  = ['HPV',       'CIN1',     'CIN2',     'CIN3',     'Dysplasia',      'Cancer']
-inci_colors = ['#c78f65',   '#c1ad71',  '#c1981d',  '#b86113',  '#c1ad71',  '#5f5cd2']
+inci_keys   = ['hpv',       'dysplasia',      'cancer']
+inci_names  = ['HPV',       'Dysplasia',      'Cancer']
+inci_colors = ['#c78f65',   '#c1ad71',  '#5f5cd2']
 
 # Demographics
 dem_keys    = ['births',    'other_deaths', 'migration']
@@ -311,8 +302,8 @@ by_sex_names   = ['infections by sex',    'deaths from other causes by sex']
 by_sex_colors  = ['#000000',              '#000000']
 
 # Results for storing type distribution by dysplasia
-type_dist_keys   = ['precin', 'cin1', 'cin2', 'cin3', 'cancerous']
-type_dist_names  = ['Pre-CIN', 'CIN1', 'CIN2', 'CIN3', 'Cancer']
+type_dist_keys   = ['precin', 'cin', 'cancerous']
+type_dist_names  = ['Pre-CIN', 'CIN2+', 'Cancer']
 
 #%% Default initial prevalence
 
@@ -328,7 +319,7 @@ default_init_prev = {
 # Define the 'overview plots', i.e. the most useful set of plots to explore different aspects of a simulation
 overview_plots = [
     'infections',
-    'dysplasias',
+    'cins',
     'cancers',
 ]
 
@@ -373,11 +364,10 @@ def get_default_plots(which='default', kind='sim', sim=None):
 
         if is_sim:
             plots = sc.objdict({
-                'HPV infections by age': 'infections_by_age',
-                'HPV prevalence': ['hpv_prevalence_by_genotype'],
-                'Pre-cancer prevalence by age': ['precin_prevalence_by_age', 'cin1_prevalence_by_age', 'cin2_prevalence_by_age', 'cin3_prevalence_by_age'],
-                'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
+                'HPV prevalence by age': ['precin_prevalence_by_age'],
+                # 'HPV prevalence': ['hpv_prevalence_by_genotype'],
                 'Cancers by age': 'cancers_by_age',
+                'Cancer incidence (per 100,000 women)': ['cancer_incidence', 'asr_cancer_incidence'],
                 'HPV type distribution': 'type_dist',
             })
 

@@ -6,6 +6,7 @@ Numerical utilities for running hpvsim.
 
 import numpy as np # For numerics
 import sciris as sc # For additional utilities
+from scipy.stats import norm
 
 
 # What functions are externally visible -- note, this gets populated in each section below
@@ -69,22 +70,22 @@ def logf1(x, k, ttc=25):
     return logf3(x, k, 0, 1, ttc=ttc)
 
 
-def get_asymptotes(k, x_infl, s, ttc=25):
+def get_asymptotes(k, x_infl, s=1, y_max=1, ttc=25):
     '''
     Get upper asymptotes for logistic functions
     '''
     term1 = (1 + np.exp(k*(x_infl-ttc)))**s # Note, this is 1 for most parameter combinations
     term2 = (1 + np.exp(k*x_infl))**s
-    u_asymp_num = term1*(1-term2)
+    u_asymp_num = y_max*term1*(1-term2)
     u_asymp_denom = term1 - term2
     u_asymp = u_asymp_num / u_asymp_denom
-    l_asymp = term1 / (term1 - term2)
+    l_asymp = y_max * term1 / (term1 - term2)
     return l_asymp, u_asymp
 
 
-def logf3(x, k, x_infl, s, ttc=25):
+def logf3(x, k, x_infl, s=1, y_max=1, ttc=25):
     '''
-    Logistic function passing through (0,0) and (ttc,1).
+    Logistic function passing through (0,0) and (ttc,y_max).
     This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
     However, since it's constrained to pass through 2 points, there are 3 free parameters remaining.
     Args:
@@ -93,13 +94,13 @@ def logf3(x, k, x_infl, s, ttc=25):
          s: asymmetry parameter, equivalent to s in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
     '''
-    l_asymp, u_asymp = get_asymptotes(k, x_infl, s, ttc)
+    l_asymp, u_asymp = get_asymptotes(k, x_infl, s=1, y_max=y_max, ttc=ttc)
     return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
 
 
-def logf2(x, k, x_infl, ttc=25):
+def logf2(x, k, x_infl, y_max=1, ttc=25):
     '''
-    Logistic function constrained to pass through (0,0) and (ttc,1).
+    Logistic function constrained to pass through (0,0) and (ttc,y_max).
     This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
     Since it's constrained to pass through 2 points, there are 3 free parameters remaining, and this verison fixes s=1
     Args:
@@ -107,7 +108,14 @@ def logf2(x, k, x_infl, ttc=25):
          x_infl: point of inflection, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
          ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
     '''
-    return logf3(x, k, x_infl, s=1, ttc=ttc)
+    return logf3(x, k, x_infl, s=1, y_max=y_max, ttc=ttc)
+
+
+def linear(x, slope, b=0):
+    '''
+    Linear function
+    '''
+    return b + slope*x
 
 
 def invlogf3(y, k, x_infl, s, ttc=25):
@@ -136,16 +144,18 @@ def invlogf1(y, k, ttc=25):
     return invlogf3(y, k, 0, 1, ttc=ttc)
 
 
-def indef_int_logf2(x, k, x_infl, ttc=25):
+def indef_int_logf2(x, k, x_infl, ttc=25, y_max=1):
     '''
     Indefinite integral of logf2; see definition there for arguments
     '''
-    num = np.exp(-x_infl*k)*(np.exp(k*ttc)+np.exp(x_infl*k))*((np.exp(x_infl*k)+1)*np.log(np.exp(k*x)+np.exp(x_infl*k))-k*x)
-    denom = k*(np.exp(k*ttc)-1)
-    return num/denom
+    t1 = 1 + np.exp(k*(x_infl-ttc))
+    t2 = 1 + np.exp(k*x_infl)
+    integ = np.log(np.exp(k*(x_infl-x)) + 1) / k + x
+    result = y_max/(t1-t2)*(1-t1*t2*integ)
+    return result
 
 
-def intlogf2(upper, k, x_infl, ttc=25):
+def intlogf2(upper, k, x_infl, ttc=25, y_max=1):
     '''
     Integral of logf2 between 0 and the limit given by upper
     '''
@@ -190,7 +200,28 @@ def transform_prob(tp, dysp):
           = 1/2 * dysp**3
     '''
     # return 1-np.power(1-tp, ((dysp*100)**2))
-    return 1-np.power(1-tp, 0.5*((dysp*100)**3))
+    return 1-np.power(1-tp, 0.5*((dysp)**3)*100)
+
+
+def logn_percentiles_to_pars(x1, p1, x2, p2):
+    """
+    Find the parameters of a lognormal distribution where:
+        P(X < p1) = x1
+        P(X < p2) = x2
+    Returns in the format used by scipy, i.e. use these as
+        from scipy.stats import lognorm
+        s, scale = logn_percentiles_to_pars(1, 0.5, 5, .8)
+        rv = lognorm(s=s, scale=scale)
+        rv.mean()
+    """
+    x1 = np.log(x1)
+    x2 = np.log(x2)
+    p1ppf = norm.ppf(p1)
+    p2ppf = norm.ppf(p2)
+    s = (x2 - x1) / (p2ppf - p1ppf)
+    mean = ((x1 * p2ppf) - (x2 * p1ppf)) / (p2ppf - p1ppf)
+    scale = np.exp(mean)
+    return s, scale
 
 
 #%% Sampling and seed methods

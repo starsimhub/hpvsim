@@ -5,6 +5,7 @@ Set the parameters for hpvsim.
 import numpy as np
 import sciris as sc
 import pandas as pd
+from scipy.stats import lognorm
 from .settings import options as hpo # For setting global options
 from . import misc as hpm
 from . import utils as hpu
@@ -53,7 +54,7 @@ def make_pars(**kwargs):
     pars['end']             = None          # End of the simulation
     pars['n_years']         = 35            # Number of years to run, if end isn't specified. Note that this includes burn-in
     pars['burnin']          = 25            # Number of years of burnin. NB, this is doesn't affect the start and end dates of the simulation, but it is possible remove these years from plots
-    pars['dt']              = 0.25           # Timestep (in years)
+    pars['dt']              = 0.25          # Timestep (in years)
     pars['dt_demog']        = 1.0           # Timestep for demographic updates (in years)
     pars['rand_seed']       = 1             # Random seed, if None, don't reset
     pars['verbose']         = hpo.verbose   # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
@@ -63,8 +64,8 @@ def make_pars(**kwargs):
     pars['hiv_pars']        = sc.objdict()  # Can be directly modified by passing in arguments listed in hiv_pars
 
     # Network parameters, generally initialized after the population has been constructed
-    pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
-                                   m=dict(dist='normal', par1=17.6, par2=1.8))
+    pars['debut']           = dict(f=dict(dist='normal', par1=17.5, par2=2.1), # Location-specific data should be used here if possible
+                                   m=dict(dist='normal', par1=19.0, par2=1.8))
     pars['cross_layer']     = 0.05  # Proportion of females who have crosslayer relationships
     pars['partners']        = None  # The number of concurrent sexual partners for each partnership type
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
@@ -75,19 +76,18 @@ def make_pars(**kwargs):
     pars['n_partner_types'] = 1  # Number of partnership types - reset below
 
     # Basic disease transmission parameters
-    pars['beta']                = 0.2   # Per-act transmission probability; absolute value, calibrated
+    pars['beta']                = 0.35  # Per-act transmission probability; absolute value, calibrated
     pars['transf2m']            = 1.0   # Relative transmissibility of receptive partners in penile-vaginal intercourse; baseline value
     pars['transm2f']            = 3.69  # Relative transmissibility of insertive partners in penile-vaginal intercourse; based on https://doi.org/10.1038/srep10986: "For vaccination types, the risk of male-to-female transmission was higher than that of female-to-male transmission"
-    pars['eff_condoms']         = 0.7   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
+    pars['eff_condoms']         = 0.5   # The efficacy of condoms; https://www.nejm.org/doi/10.1056/NEJMoa053284?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%20%200www.ncbi.nlm.nih.gov
 
     # Parameters for disease progression
     pars['hpv_control_prob']    = 0.0 # Probability that HPV is controlled latently vs. cleared
     pars['hpv_reactivation']    = 0.025 # Placeholder; unused unless hpv_control_prob>0
     pars['dur_cancer']          = dict(dist='lognormal', par1=8.0, par2=3.0)  # Duration of untreated invasive cerival cancer before death (years)
     pars['dur_infection_male']  = dict(dist='lognormal', par1=1, par2=1) # Duration of infection for men
-    pars['clinical_cutoffs']    = dict(cin1=0.33, cin2=0.676, cin3=0.8) # Parameters used to map disease severity onto cytological grades
-    pars['sev_dist']            = dict(dist='normal_pos', par1=1.0, par2=0.25) # Distribution to draw individual level severity scale factors
-    pars['age_risk']            = dict(age=30, risk=1)
+    pars['sev_dist']            = dict(dist='normal_pos', par1=1, par2=0.2) # Distribution to draw individual level severity scale factors
+    pars['age_risk']            = dict(age=30, risk=2)
 
     # Parameters used to calculate immunity
     pars['imm_init']        = dict(dist='beta_mean', par1=0.35, par2=0.025)  # beta distribution for initial level of immunity following infection clearance. Parameters are mean and variance from https://doi.org/10.1093/infdis/jiv753
@@ -126,7 +126,6 @@ def make_pars(**kwargs):
     pars['n_imm_sources']   = 1 # The number of immunity sources circulating in the population
     pars['vaccine_pars']    = dict()  # Vaccines that are being used; populated during initialization
     pars['vaccine_map']     = dict()  # Reverse mapping from number to vaccine key
-    pars['cumdysp']         = dict()
 
     # Update with any supplied parameter values and generate things that need to be generated
     pars.update(kwargs)
@@ -319,63 +318,66 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars = sc.objdict()
 
+    # Find parameters from Guanacaste cohort data
+    # Unpublished figure by Schiffman shows 50% hr hpv clear after 6 months, 70% hr hpv clear after 1 year, 86% after 3 years
+    par1 = 2.5
+    par2 = 10
+
+    # Unpublished figure by Schiffman shows 50% hpv16 clear after 1 year, 60% after 3 years
+    par1_16 = 4.5
+    par2_16 = 10
+
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hpv16.dur_episomal     = dict(dist='lognormal', par1=2, par2=5) # Duration of episomal infection prior to cancer
-    pars.hpv16.sev_fn           = dict(form='logf2', k=0.175, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv16.dur_precin       = dict(dist='lognormal', par1=par1_16, par2=par2_16)  # Duration of infection prior to precancer
+    pars.hpv16.cin_fn           = dict(form='logf2', k=0.3, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv16.dur_cin          = dict(dist='lognormal', par1=6, par2=20) # Duration of episomal infection prior to cancer
+    pars.hpv16.cancer_fn        = dict(method='cin_integral', ld50=15, **pars.hpv16.cin_fn) # Function mapping duration of cin to probability of cancer
     pars.hpv16.rel_beta         = 1.0  # Baseline relative transmissibility, other genotypes are relative to this
-    pars.hpv16.transform_prob   = 1.3e-9 # Annual rate of transformed cell invading
-    pars.hpv16.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hpv18.dur_episomal     = dict(dist='lognormal', par1=2, par2=5) # Duration of infection prior to cancer
-    pars.hpv18.sev_fn           = dict(form='logf2', k=0.15, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hpv18.dur_precin       = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
+    pars.hpv18.dur_cin          = dict(dist='lognormal', par1=5, par2=20) # Duration of infection prior to cancer
+    pars.hpv18.cin_fn           = dict(form='logf2', k=0.25, x_infl=0, ttc=50, y_max=1)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv18.cancer_fn        = dict(method='cin_integral', ld50=15, **pars.hpv18.cin_fn)  # Function mapping duration of infection to severity
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
-    pars.hpv18.transform_prob   = 1.0e-9 # Annual rate of transformed cell invading
-    pars.hpv18.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
     pars.hi5 = sc.objdict()
-    pars.hi5.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hi5.dur_episomal       = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.hi5.sev_fn             = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hi5.dur_precin         = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
+    pars.hi5.dur_cin            = dict(dist='lognormal', par1=4, par2=20) # Duration of infection prior to cancer
+    pars.hi5.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=50, y_max=1)  # Function mapping duration of infection to probability of developing cin
+    pars.hi5.cancer_fn          = dict(method='cin_integral', ld50=20, **pars.hi5.cin_fn)  # Function mapping duration of infection to severity
     pars.hi5.rel_beta           = 0.9 # placeholder
-    pars.hi5.transform_prob     = 3e-10 # Annual rate of transformed cell invading
-    pars.hi5.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hi5.sero_prob          = 0.60 # placeholder
 
     # Other high-risk: oncogenic but not covered in 9valent vaccine: 35, 39, 51, 56, 59
     pars.ohr = sc.objdict()
-    pars.ohr.dur_precin         = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.ohr.dur_episomal       = dict(dist='lognormal', par1=2, par2=6) # Duration of infection prior to cancer
-    pars.ohr.sev_fn             = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.ohr.dur_precin         = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
+    pars.ohr.dur_cin            = dict(dist='lognormal', par1=4, par2=4) # Duration of infection prior to cancer
+    pars.ohr.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=50, y_max=1)  # Function mapping duration of infection to probability of developing cin
+    pars.ohr.cancer_fn          = dict(method='cin_integral', ld50=20, **pars.ohr.cin_fn)  # Function mapping duration of infection to severity
     pars.ohr.rel_beta           = 0.9 # placeholder
-    pars.ohr.transform_prob     = 3e-10 # Annual rate of transformed cell invading
-    pars.ohr.sev_integral       = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.ohr.sero_prob          = 0.60 # placeholder
 
     # All other high-risk types: 31, 33, 35, 39, 45, 51, 52, 56, 58, 59
     # Warning: this should not be used in conjuction with hi5 or ohr
     pars.hr = sc.objdict()
-    pars.hr.dur_precin       = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.hr.dur_episomal     = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.hr.sev_fn           = dict(form='logf2', k=0.125, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.hr.dur_precin       = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
+    pars.hr.dur_cin          = dict(dist='lognormal', par1=4, par2=4) # Duration of infection prior to cancer
+    pars.hr.cin_fn           = dict(form='logf2', k=0.15, x_infl=10, ttc=50)  # Function mapping duration of infection to probability of developing cin
+    pars.hr.cancer_fn        = dict(method='cin_integral', ld50=20, **pars.hr.cin_fn)  # Function mapping duration of infection to severity
     pars.hr.rel_beta         = 0.9 # placeholder
-    pars.hr.transform_prob   = 3e-10 # Annual rate of transformed cell invading
-    pars.hr.sev_integral     = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.hr.sero_prob        = 0.60 # placeholder
 
     # Low-risk
     pars.lr = sc.objdict()
-    pars.lr.dur_precin          = dict(dist='normal_pos', par1=0.5, par2=0.25)  # Duration of infection prior to precancer
-    pars.lr.dur_episomal        = dict(dist='lognormal', par1=2, par2=4) # Duration of infection prior to cancer
-    pars.lr.sev_fn              = dict(form='logf2', k=0.0, x_infl=0, ttc=30) # Function mapping duration of infection to severity
+    pars.lr.dur_precin          = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
+    pars.lr.dur_cin             = dict(dist='lognormal', par1=0.1, par2=0.1) # Duration of infection prior to cancer
+    pars.lr.cin_fn              = dict(form='logf2', k=0.01, x_infl=0, ttc=100)  # Function mapping duration of infection to probability of developing cin
+    pars.lr.cancer_fn           = dict(method='cin_integral', ld50=60, **pars.lr.cin_fn)  # Function mapping duration of infection to severity
     pars.lr.rel_beta            = 0.9 # placeholder
-    pars.lr.transform_prob      = 0 # Annual rate of transformed cell invading
-    pars.lr.sev_integral        = 'analytic' # Type of integral used for translating severity to transformation probability. Accepts numeric, analytic, or None
     pars.lr.sero_prob           = 0.60 # placeholder
 
     return _get_from_pars(pars, default, key=genotype, defaultkey='hpv16')
@@ -637,14 +639,47 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
 
 def compute_severity(t, rel_sev=None, pars=None):
     '''
-    Process functional form and parameters into values:
+    This function is used for two types of calculation related to disease progression:
+        1. to model the probability of progressing to further disease stages
+        2. to model the 'severity' of dysplasia on a scale from 0-1, historically interpreted as
+           the persentage of the epithelium affected by dysplasia.
+    Args:
+        t: array of durations that women have been in their current health state
+        rel_sev: array of individual relative severity values
+        pars: dict with required key 'form', which dictates which subfunction will be used.
+
+    Notes:
+         If the pars dict contains the key 'cin_integral', then this function will call
+         compute_severity_integral to determine the progression probabilities.
     '''
 
     pars = sc.dcp(pars)
+
+    # Complete these next stages if cancer progression probabilities are being modeled
+    # as the cumulative severity-time of dysplasia.
+    if pars.get('method') == 'cin_integral':
+        del pars['method']
+        if pars.get('ld50'):
+            ld50 = pars.pop('ld50')
+            sev_at_ld50 = compute_severity_integral(np.array([ld50]), rel_sev=None, pars=pars)[0]
+            transform_prob = 1 - 0.5**(1/sev_at_ld50**2)
+        elif pars.get('transform_prob'):
+            transform_prob = pars.pop('transform_prob')
+        else:
+            errormsg('If using calculating cancer probabilities using the integral of the CIN function, '
+                     'must provide an LD50 or transform prob.')
+            raise ValueError(errormsg)
+
+        sev = compute_severity_integral(t, rel_sev=rel_sev, pars=pars)
+        cancer_probs = 1 - np.power(1 - transform_prob, sev**2)
+        return cancer_probs
+
+    # Proceed with severity calculations
     form = pars.pop('form')
     choices = [
         'logf2',
         'logf3',
+        'linear',
     ]
 
     # Scale t
@@ -657,6 +692,9 @@ def compute_severity(t, rel_sev=None, pars=None):
 
     elif form == 'logf3':
         output = hpu.logf3(t, **pars)
+
+    elif form == 'linear':
+        output = hpu.linear(t, **pars)
 
     elif callable(form):
         output = form(t, **pars)

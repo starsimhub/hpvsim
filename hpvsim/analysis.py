@@ -736,11 +736,9 @@ class age_results(Analyzer):
         # Handle variable names
         mapping = {
             'infections': ['date_exposed', 'infectious'],
-            'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
-            'cins':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
-            'cin1': ['date_cin1', 'cin1'],
-            'cin2': ['date_cin2', 'cin2'],
-            'cin3': ['date_cin3', 'cin3'],
+            'cin':  ['date_cin', 'cin'],
+            'dysplasias':  ['date_cin', 'cin'],
+            'cins':  ['date_cin', 'cin'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
             'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
@@ -832,7 +830,7 @@ class age_results(Analyzer):
                 if 'incidence' in rkey:
                     if 'hpv' in rkey:  # Denominator is susceptible population
                         inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
-                        denom = bin_ages(inds=inds, bins=bins)
+                        denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
                     else:  # Denominator is females at risk for cancer
                         if rdict.by_hiv:
                             inds = sc.findinds(ppl.is_female_alive & ppl[rdict.hiv_attr] * ~ppl.cancerous.any(axis=0))
@@ -1096,7 +1094,7 @@ class age_causal_infection(Analyzer):
         self.age_causal = []
         self.age_cancer = []
         self.dwelltime = dict()
-        for state in ['precin', 'cin1', 'cin2', 'cin3', 'total']:
+        for state in ['precin', 'cin', 'total']:
             self.dwelltime[state] = []
 
     def apply(self, sim):
@@ -1105,20 +1103,14 @@ class age_causal_infection(Analyzer):
             if len(cancer_inds):
                 current_age = sim.people.age[cancer_inds]
                 date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
-                date_cin1 = sim.people.date_cin1[cancer_genotypes, cancer_inds]
-                date_cin2 = sim.people.date_cin2[cancer_genotypes, cancer_inds]
-                date_cin3 = sim.people.date_cin3[cancer_genotypes, cancer_inds]
-                hpv_time = (date_cin1 - date_exposed) * sim['dt']
-                cin1_time = (date_cin2 - date_cin1) * sim['dt']
-                cin2_time = (date_cin3 - date_cin2) * sim['dt']
-                cin3_time = (sim.t - date_cin3) * sim['dt']
+                date_cin = sim.people.date_cin[cancer_genotypes, cancer_inds]
+                hpv_time = (date_cin - date_exposed) * sim['dt']
+                cin_time = (sim.t - date_cin) * sim['dt']
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()
                 self.dwelltime['precin'] += hpv_time.tolist()
-                self.dwelltime['cin1'] += cin1_time.tolist()
-                self.dwelltime['cin2'] += cin2_time.tolist()
-                self.dwelltime['cin3'] += cin3_time.tolist()
+                self.dwelltime['cin'] += cin_time.tolist()
                 self.dwelltime['total'] += total_time.tolist()
         return
 
