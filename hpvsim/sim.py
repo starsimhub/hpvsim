@@ -595,17 +595,25 @@ class Sim(hpb.BaseSim):
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
 
         # Figure out the scale factors
+        # Case 1: total pop and location both provided
         if self['total_pop'] is not None and total_pop is not None: # If no pop_scale has been provided, try to get it from the location
-            errormsg = 'You can either define total_pop explicitly or via the location, but not both'
-            raise ValueError(errormsg)
+            msg = f"Rescaling the population of the chosen location to {self['total_pop']}"
+            if self['verbose']: print(msg)
+            total_pop = self['total_pop']
+
+        # Case 2: no location provided but total pop provided
         elif total_pop is None and self['total_pop'] is not None:
             total_pop = self['total_pop']
             
+        # Case 3: neither total pop, location, nor pop scale provided
         if self['pop_scale'] is None:
             if total_pop is None:
                 self['pop_scale'] = 1.0
+
+        # Resolve cases 1 & 2 by creating the pop scal
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
+
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
 
         # Deal with HIV
