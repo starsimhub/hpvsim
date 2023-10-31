@@ -161,6 +161,7 @@ def partner_count(n_agents=None, partner_pars=None):
         p_count = hpu.sample(**ppars, size=n_agents)
         partners.append(p_count)
 
+
     return np.array(partners)
 
 
@@ -175,7 +176,7 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     debut[sex==1]       = hpu.sample(**pars['debut']['m'], size=sum(sex))
     debut[sex==0]       = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
     n_layers            = len(pars['m_partners'].keys())
-    partners            = np.full((n_layers, new_n), np.nan, dtype=hpd.default_int)
+    partners            = np.full((n_layers, new_n), 0, dtype=hpd.default_int)
     partners[:, sex==1] = partner_count(n_agents=sum(sex), partner_pars=pars['m_partners'])
     partners[:, sex==0] = partner_count(n_agents=new_n-sum(sex), partner_pars=pars['f_partners'])
     cluster             = hpu.n_multinomial(pars['cluster_rel_sizes'], new_n).astype(int)
