@@ -139,7 +139,7 @@ def make_pars(**kwargs):
 
 
 # Define which parameters need to be specified as a dictionary by layer -- define here so it's available at the module level for sim.py
-layer_pars = ['partners', 'mixing', 'acts', 'age_act_pars', 'layer_probs', 'dur_pship', 'condoms']
+layer_pars = ['f_partners', 'm_partners', 'mixing', 'acts', 'age_act_pars', 'layer_probs', 'dur_pship', 'condoms']
 
 
 def reset_layer_pars(pars, layer_keys=None, force=False):
@@ -159,7 +159,8 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     layer_defaults = {}
     # Specify defaults for random -- layer 'a' for 'all'
     layer_defaults['random'] = dict(
-        partners    = dict(a=dict(dist='poisson', par1=0.01)), # Everyone in this layer has one partner; this captures *additional* partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 partner
+        m_partners  = dict(a=dict(dist='poisson', par1=0.01)), # Everyone in this layer has one partner; this captures *additional* partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 partner
+        f_partners  = dict(a=dict(dist='poisson', par1=0.01)),
         acts        = dict(a=dict(dist='neg_binomial', par1=100,par2=50)),  # Default number of sexual acts per year for people at sexual peak
         age_act_pars = dict(a=dict(peak=35, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)), # Parameters describing changes in coital frequency over agent lifespans
         layer_probs = dict(a=1.0),  # Default proportion of the population in each layer
@@ -170,8 +171,14 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
 
     # Specify defaults for basic sexual network with marital, casual, and one-off partners
     layer_defaults['default'] = dict(
-        partners    = dict(m=dict(dist='poisson', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
-                           c=dict(dist='poisson', par1=0.2)), # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
+        m_partners = dict(
+            m=dict(dist='poisson', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
+            c=dict(dist='poisson', par1=0.2)
+        ),  # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
+        f_partners = dict(
+            m=dict(dist="poisson", par1=0.01),
+            c=dict(dist="poisson", par1=0.2),
+        ),
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts per year for people at sexual peak
                             c=dict(dist='neg_binomial', par1=50, par2=5)), # Default number of acts per year for people at sexual peak
         age_act_pars = dict(m=dict(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
