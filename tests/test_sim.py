@@ -98,11 +98,11 @@ def test_epi():
     # for vpar,vval,vrel,vwhat in zip(vary_pars, vary_vals, vary_rels, vary_what):
         if par_effect.par=='acts':
             bp = sc.dcp(sim[par_effect.par]['c'])
-            lo = {lk:{**bp, 'par1': par_effect.range[0]} for lk in ['m','c','o']}
-            hi = {lk:{**bp, 'par1': par_effect.range[1]} for lk in ['m','c','o']}
+            lo = {lk:{**bp, 'par1': par_effect.range[0]} for lk in ['m','c']}
+            hi = {lk:{**bp, 'par1': par_effect.range[1]} for lk in ['m','c']}
         elif par_effect.par=='condoms':
-            lo = {lk:par_effect.range[0] for lk in ['m','c','o']}
-            hi = {lk:par_effect.range[1] for lk in ['m','c','o']}
+            lo = {lk:par_effect.range[0] for lk in ['m','c']}
+            hi = {lk:par_effect.range[1] for lk in ['m','c']}
         elif par_effect.par=='debut':
             bp = sc.dcp(sim[par_effect.par]['f'])
             lo = {sk:{**bp, 'par1':par_effect.range[0]} for sk in ['f','m']}

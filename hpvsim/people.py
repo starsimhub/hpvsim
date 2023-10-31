@@ -364,7 +364,7 @@ class People(hpb.BasePeople):
         return n_dissolved # Return the number of dissolved partnerships by layer
 
 
-    def create_partnerships(self, tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars, pref_weight=100):
+    def create_partnerships(self, tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars):
         '''
         Create partnerships. All the hard work of creating the contacts is done by hppop.make_contacts,
         which in turn relies on hpu.create_edgelist for creating the edgelist. This method is just a light wrapper
@@ -378,9 +378,10 @@ class People(hpb.BasePeople):
         for lkey in self.layer_keys():
             pship_args = dict(
                 lno=lno, tind=tind, partners=self.partners[lno], current_partners=self.current_partners,
-                sexes=self.sex, ages=self.age, debuts=self.debut, is_female=self.is_female, is_active=self.is_active,
+                ages=self.age, debuts=self.debut, is_female=self.is_female, is_active=self.is_active,
                 mixing=mixing[lkey], layer_probs=layer_probs[lkey], cross_layer=cross_layer,
-                pref_weight=pref_weight, durations=dur_pship[lkey], acts=acts[lkey], age_act_pars=age_act_pars[lkey]
+                durations=dur_pship[lkey], acts=acts[lkey], age_act_pars=age_act_pars[lkey],
+                cluster=self.cluster, add_mixing=self.pars['add_mixing']
             )
             new_pships[lkey], current_partners, new_pship_inds, new_pship_counts = hppop.make_contacts(**pship_args)
 
@@ -592,8 +593,8 @@ class People(hpb.BasePeople):
 
         if new_births>0:
             # Generate other characteristics of the new people
-            uids, sexes, debuts, rel_sev, partners = hppop.set_static(new_n=new_births, existing_n=len(self), pars=self.pars)
-            
+            uids, sexes, debuts, rel_sev, partners, cluster = hppop.set_static(new_n=new_births, existing_n=len(self),
+                                                                           pars=self.pars)
             # Grow the arrays`
             new_inds = self._grow(new_births)
             self.uid[new_inds]          = uids
@@ -603,6 +604,7 @@ class People(hpb.BasePeople):
             self.debut[new_inds]        = debuts
             self.rel_sev[new_inds]      = rel_sev
             self.partners[:,new_inds]   = partners
+            self.cluster[new_inds]      = cluster
 
             if immunity is not None:
                 self.nab_imm[:,new_inds] = immunity

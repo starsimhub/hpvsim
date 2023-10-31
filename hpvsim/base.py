@@ -296,7 +296,8 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
                 pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
-
+            if pars.get('n_clusters'):
+                hppar.add_mixing(pars)
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 
@@ -1942,14 +1943,16 @@ class Layer(FlexDict):
 
     def __init__(self, *args, label=None, **kwargs):
         self.meta = {
-            'f':     hpd.default_int,   # Female
-            'm':     hpd.default_int,   # Male
-            'acts':  hpd.default_float, # Default transmissibility for this contact type
-            'dur':   hpd.default_float, # Duration of partnership
-            'start': hpd.default_int, # Date of partnership start
-            'end':   hpd.default_float, # Date of partnership end
-            'age_f': hpd.default_float,  # Age of female partner
-            'age_m': hpd.default_float,  # Age of male partner
+            'f':            hpd.default_int,   # Female
+            'm':            hpd.default_int,   # Male
+            'acts':         hpd.default_float, # Default transmissibility for this contact type
+            'dur':          hpd.default_float, # Duration of partnership
+            'start':        hpd.default_float, # Date of partnership start
+            'end':          hpd.default_float, # Date of partnership end
+            'age_f':        hpd.default_float, # Age of female partner
+            'age_m':        hpd.default_float, # Age of male partner
+            'cluster_f':    hpd.default_int,   # Cluster id of female partner
+            'cluster_m':    hpd.default_int    # Cluster id of male partner
         }
         self.basekey = 'f' # Assign a base key for calculating lengths and performing other operations
         self.label = label

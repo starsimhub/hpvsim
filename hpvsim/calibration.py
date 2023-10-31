@@ -90,7 +90,7 @@ class Calibration(sc.prettyobj):
         if storage   is None: storage   = f'sqlite:///{db_name}'
         if total_trials is not None: n_trials = int(np.ceil(total_trials/n_workers))
         self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name,
-                                     keep_db=keep_db, storage=storage, rand_seed=rand_seed, sampler=sampler)
+                                     keep_db=keep_db, storage=storage, rand_seed=rand_seed)
 
         # Handle other inputs
         self.label          = label
@@ -101,7 +101,6 @@ class Calibration(sc.prettyobj):
         self.extra_sim_result_keys = extra_sim_result_keys
         self.fit_args       = sc.mergedicts(fit_args)
         self.par_samplers   = sc.mergedicts(par_samplers)
-        self.estimator      = estimator
         self.die            = die
         self.verbose        = verbose
         self.calibrated     = False
@@ -130,7 +129,7 @@ class Calibration(sc.prettyobj):
                     data=sc.dcp(targ)
                 )
 
-        ar = hpa.age_results(result_args=age_result_args, estimator=estimator)
+        ar = hpa.age_results(result_args=age_result_args)
         self.sim['analyzers'] += [ar]
         if hiv_pars is not None:
             self.sim['model_hiv'] = True # if calibrating HIV parameters, make sure model is running HIV
@@ -372,8 +371,7 @@ class Calibration(sc.prettyobj):
                 model_output = sim.results[rkey][self.sim_results[rkey].timepoints[0]]
             else:
                 model_output = sim.results[rkey][:,self.sim_results[rkey].timepoints[0]]
-            # diffs = self.sim_results[rkey].data.value - model_output
-            # gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output, estimator=self.estimator)
+            diffs = self.sim_results[rkey].data.value - model_output
             gofs = hpm.compute_gof(self.sim_results[rkey].data.value, model_output)
             losses = gofs * self.sim_results[rkey].weights
             mismatch = losses.sum()
@@ -442,7 +440,13 @@ class Calibration(sc.prettyobj):
         op = import_optuna()
         if not self.run_args.keep_db:
             self.remove_db()
-        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=self.run_args.sampler)
+        if self.run_args.rand_seed is not None:
+            sampler = op.samplers.RandomSampler(self.run_args.rand_seed)
+            sampler.reseed_rng()
+            raise NotImplementedError('Implemented but does not work')
+        else:
+            sampler = None
+        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=sampler)
         return output
 
 
@@ -673,17 +677,7 @@ class Calibration(sc.prettyobj):
                             # Plot data
                             if glabel in unique_genotypes:
                                 ydata = np.array(thisdatadf[thisdatadf.genotype == glabel].value)
-                                if isinstance(ydata[0], str):
-                                    data_to_plot = np.zeros((2, len(ydata)))
-                                    for iy, idata in enumerate(ydata):
-                                        i_list = [idx for idx in idata.split(',')]
-                                        data_to_plot[0,iy] = float(i_list[0].replace('[', ''))
-                                        data_to_plot[1,iy] = float(i_list[1].replace(']', ''))
-                                    ax.scatter(x, data_to_plot[0,:], color=self.result_args[resname].color[g], s=200, marker='_',
-                                               label=f'Data - {glabel}')
-                                    ax.scatter(x, data_to_plot[1, :], color=self.result_args[resname].color[g], s=200, marker='_')
-                                else:
-                                    ax.scatter(x, ydata, color=self.result_args[resname].color[g], marker='s', s=200, label=f'Data - {glabel}')
+                                ax.scatter(x, ydata, color=self.result_args[resname].color[g], marker='s', label=f'Data - {glabel}')
 
                             # Construct a dataframe with things in the most logical order for plotting
                             for run_num, run in enumerate(analyzer_results):
@@ -698,18 +692,7 @@ class Calibration(sc.prettyobj):
                     else:
                         # Plot data
                         ydata = np.array(thisdatadf.value)
-                        if isinstance(ydata[0], str):
-                            data_to_plot = np.zeros((2, len(ydata)))
-                            for iy, idata in enumerate(ydata):
-                                i_list = [idx for idx in idata.split(',')]
-                                data_to_plot[0, iy] = float(i_list[0].replace('[', ''))
-                                data_to_plot[1, iy] = float(i_list[1].replace(']', ''))
-
-                            ax.scatter(x, data_to_plot[0,:], color=self.result_args[resname].color, marker='_', s=200, label='Data')
-                            ax.scatter(x, data_to_plot[1, :], color=self.result_args[resname].color, marker='_', s=200)
-                        else:
-                            ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data', s=200)
-
+                        ax.scatter(x, ydata, color=self.result_args[resname].color, marker='s', label='Data')
                         # Construct a dataframe with things in the most logical order for plotting
                         for run_num, run in enumerate(analyzer_results):
                             bins += x.tolist()
@@ -736,17 +719,7 @@ class Calibration(sc.prettyobj):
                 thisdatadf = self.target_data[rn+sum(dates_per_result)][self.target_data[rn + sum(dates_per_result)].name == resname]
                 ydata = np.array(thisdatadf.value)
                 x = np.arange(len(ydata))
-                if isinstance(ydata[0], str):
-                    data_to_plot = np.zeros((2, len(ydata)))
-                    for iy, idata in enumerate(ydata):
-                        i_list = [idx for idx in idata.split(',')]
-                        data_to_plot[0, iy] = float(i_list[0].replace('[', ''))
-                        data_to_plot[1, iy] = float(i_list[1].replace(']', ''))
-
-                    ax.scatter(x, data_to_plot[0, :], color=pl.cm.Reds(0.95), marker='_', label='Data', s=200)
-                    ax.scatter(x, data_to_plot[1, :], color=pl.cm.Reds(0.95), marker='_', s=200)
-                else:
-                    ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data', s=200)
+                ax.scatter(x, ydata, color=pl.cm.Reds(0.95), marker='s', label='Data')
 
                 # Construct a dataframe with things in the most logical order for plotting
                 for run_num, run in enumerate(sim_results):

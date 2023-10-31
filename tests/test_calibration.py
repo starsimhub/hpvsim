@@ -88,8 +88,8 @@ def test_calibration(do_plot=True):
                                 'test_data/south_africa_cancer_data_2020.csv',
                             ], estimator = estimator,
                             extra_sim_result_keys=extra_sim_result_keys,
-                            total_trials=2, n_workers=1)
-    calib.calibrate(die=True)
+                            total_trials=2, n_workers=1, die=True)
+    calib.calibrate()
     calib.plot(res_to_plot=4)
 
     # Make sure that rerunning the sims with the best pars from the calibration gives the same results
@@ -133,6 +133,8 @@ def test_calibration(do_plot=True):
     assert np.allclose(calib_cancer_results,sim_cancer_results, rtol=0.1)
 
     return sim, calib
+
+
 
 
 #%% Run as a script

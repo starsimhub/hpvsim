@@ -534,13 +534,12 @@ class age_results(Analyzer):
 
     '''
 
-    def __init__(self, result_args=None, estimator=None, die=False, **kwargs):
+    def __init__(self, result_args=None, die=False, **kwargs):
         super().__init__(**kwargs) # Initialize the Analyzer object
         self.mismatch       = 0 # TODO, should this be set to np.nan initially?
         self.die            = die  # Whether or not to raise an exception
         self.results        = sc.objdict() # Store the age results
         self.result_args    = result_args
-        self.estimator      = estimator # Estimator to be used for computation of GOF
         return
 
 
@@ -723,7 +722,6 @@ class age_results(Analyzer):
         attr = rname.replace('_prevalence', '')  # Strip out terms that aren't stored in the people
         if attr[0] == 'n': attr = attr[2:] # Remove n, used to identify stocks
         if attr == 'hpv': attr = 'infectious'  # People with HPV are referred to as infectious in the sim
-        if attr == 'lsil': attr = ['precin', 'cin1']
         if attr == 'cancer': attr = 'cancerous'
         return attr
 
@@ -963,7 +961,8 @@ class age_results(Analyzer):
                 res.extend(sim_res)
 
         self.result_args[key].data['model_output'] = res
-        self.result_args[key].data['gofs'] = hpm.compute_gof(resargs.data['value'].values, resargs.data['model_output'].values, estimator=self.estimator)
+        self.result_args[key].data['diffs'] = resargs.data['model_output'] - resargs.data['value']
+        self.result_args[key].data['gofs'] = hpm.compute_gof(resargs.data['value'].values, resargs.data['model_output'].values)
         self.result_args[key].data['losses'] = resargs.data['gofs'].values * resargs.weights
         self.result_args[key].mismatch = resargs.data['losses'].sum()
 
