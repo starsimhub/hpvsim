@@ -172,12 +172,12 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     # Specify defaults for basic sexual network with marital, casual, and one-off partners
     layer_defaults['default'] = dict(
         m_partners = dict(
-            m=dict(dist='poisson', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
-            c=dict(dist='poisson', par1=0.2)
+            m=dict(dist='poisson1', par1=0.01), # Everyone in this layer has one marital partner; this captures *additional* marital partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 spouse
+            c=dict(dist='poisson1', par1=0.2)
         ),  # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
         f_partners = dict(
-            m=dict(dist="poisson", par1=0.01),
-            c=dict(dist="poisson", par1=0.2),
+            m=dict(dist="poisson1", par1=0.01),
+            c=dict(dist="poisson1", par1=0.2),
         ),
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts per year for people at sexual peak
                             c=dict(dist='neg_binomial', par1=50, par2=5)), # Default number of acts per year for people at sexual peak

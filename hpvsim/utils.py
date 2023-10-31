@@ -283,6 +283,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
         'lognormal',
         'lognormal_int',
         'poisson',
+        'poisson1',
         'neg_binomial',
         'beta',
         'gamma',
@@ -299,6 +300,7 @@ def sample(dist=None, par1=None, par2=None, size=None, **kwargs):
     elif dist == 'normal_pos':        samples = np.abs(np.random.normal(loc=par1, scale=par2, size=size, **kwargs))
     elif dist == 'normal_int':        samples = np.round(np.abs(np.random.normal(loc=par1, scale=par2, size=size, **kwargs)))
     elif dist == 'poisson':           samples = n_poisson(rate=par1, n=size, **kwargs) # Use Numba version below for speed
+    elif dist == 'poisson1':          samples = n_poisson(rate=par1, n=size, **kwargs)+1 # Use Numba version below for speed
     elif dist == 'neg_binomial':      samples = n_neg_binomial(rate=par1, dispersion=par2, n=size, **kwargs) # Use custom version below
     elif dist == 'beta':              samples = np.random.beta(a=par1, b=par2, size=size, **kwargs)
     elif dist == 'gamma':             samples = np.random.gamma(shape=par1, scale=par2, size=size, **kwargs)
