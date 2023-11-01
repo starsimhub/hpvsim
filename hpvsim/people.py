@@ -630,7 +630,6 @@ class People(hpb.BasePeople):
             data_max = data_years[-1]
             age_dist_data = self.pop_age_trend[self.pop_age_trend.year == int(year)]
 
-            import traceback; traceback.print_exc(); import pdb; pdb.set_trace()
             # No migration if outside the range of the data
             if year < data_min:
                 return 0
