@@ -663,11 +663,6 @@ class People(hpb.BasePeople):
                 inds_this_age = hpu.true((self.age>=age) * (self.age<age+1) * self.alive_level0)
                 remove_probs[inds_this_age] = -rf
             migrate_inds = hpu.choose_w(remove_probs, -n_to_remove.sum())
-
-            # Debugging
-            removed_f = len(hpu.true(self.is_female[migrate_inds]))
-            removed_m = len(hpu.true(self.is_male[migrate_inds]))
-            print(f'Removed {removed_m} males, {removed_f} females')
             self.remove_people(migrate_inds, cause='emigration')  # Remove people
 
         else:
