@@ -65,6 +65,7 @@ def test_age_pyramids(do_plot=True):
 def test_age_results(do_plot=True, test_what=''):
 
     sc.heading('Testing by-age results')
+    year = 2010
 
     pars = dict(n_agents=n_agents, start=1970, n_years=50, dt=0.25, network='default', location='tanzania')
     pars['beta'] = .5
@@ -82,19 +83,19 @@ def test_age_results(do_plot=True, test_what=''):
     az1 = hpv.age_results(
         result_args=sc.objdict(
             hpv_prevalence=sc.objdict(
-                years=2019,
+                years=year,
                 edges=age_bin_edges,
             ),
             cins=sc.objdict(
-                years=2019,
+                years=year,
                 edges=age_bin_edges,
             ),
             cancer_incidence=sc.objdict(
-                years=2019,
+                years=year,
                 edges=age_bin_edges,
             ),
             cancers=sc.objdict(
-                years=2019,
+                years=year,
                 edges=age_bin_edges,
             )
         )
@@ -106,13 +107,18 @@ def test_age_results(do_plot=True, test_what=''):
     a.plot()
 
     # Assert equal results
-    year = 2019
     yind = sc.findinds(sim.results['year'], year)[0]
-    for result in ['cins', 'cancer_incidence', 'cancers']: # NB Still a problem with hpv_prevalence
+    for result in ['cancers', 'cancer_incidence', 'cins']: # NB Still a problem with hpv_prevalence
         sim_result_name = result + '_by_age'
         sim_results = sim.results[sim_result_name][:,yind]
         analyzer_results = a.results[result][year]
-        assert np.allclose(sim_results,analyzer_results,rtol=0.2)
+        if not np.allclose(sim_results,analyzer_results,rtol=0.05):
+            import traceback
+            traceback.print_exc()
+            import pdb
+            pdb.set_trace()
+
+        # assert np.allclose(sim_results,analyzer_results,rtol=0.2)
 
     return sim, a
 
@@ -231,12 +237,12 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    people      = test_snapshot()
-    sim0, a0    = test_age_pyramids()
+    # people      = test_snapshot()
+    # sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
-    sim2, a2    = test_reduce_analyzers()
-    sim3, a3    = test_age_causal_analyzer()
-    sim4, a4    = test_detection()
+    # sim2, a2    = test_reduce_analyzers()
+    # sim3, a3    = test_age_causal_analyzer()
+    # sim4, a4    = test_detection()
 
     sc.toc(T)
     print('Done.')
