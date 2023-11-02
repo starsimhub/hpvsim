@@ -105,7 +105,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         is_female = sexes == 0
 
         # Create the contacts
-        lkeys = sim['partners'].keys() # TODO: consider a more robust way to do this
+        lkeys = sim['acts'].keys() # TODO: consider a more robust way to do this
         if microstructure in ['random', 'default']:
             contacts = dict()
             current_partners = np.zeros((len(lkeys),n_agents))
@@ -158,8 +158,9 @@ def partner_count(n_agents=None, partner_pars=None):
 
     # Set the number of partners
     for lkey,ppars in partner_pars.items():
-        p_count = hpu.sample(**ppars, size=n_agents) + 1
+        p_count = hpu.sample(**ppars, size=n_agents)
         partners.append(p_count)
+
 
     return np.array(partners)
 
@@ -169,14 +170,17 @@ def set_static(new_n, existing_n=0, pars=None, sex_ratio=0.5):
     Set static population characteristics that do not change over time.
     Can be used when adding new births, in which case the existing popsize can be given.
     '''
-    uid             = np.arange(existing_n, existing_n+new_n, dtype=hpd.default_int)
-    sex             = np.random.binomial(1, sex_ratio, new_n)
-    debut           = np.full(new_n, np.nan, dtype=hpd.default_float)
-    debut[sex==1]   = hpu.sample(**pars['debut']['m'], size=sum(sex))
-    debut[sex==0]   = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
-    partners        = partner_count(n_agents=new_n, partner_pars=pars['partners'])
-    cluster         = hpu.n_multinomial(pars['cluster_rel_sizes'], new_n).astype(int)
-    rel_sev         = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
+    uid                 = np.arange(existing_n, existing_n+new_n, dtype=hpd.default_int)
+    sex                 = np.random.binomial(1, sex_ratio, new_n)
+    debut               = np.full(new_n, np.nan, dtype=hpd.default_float)
+    debut[sex==1]       = hpu.sample(**pars['debut']['m'], size=sum(sex))
+    debut[sex==0]       = hpu.sample(**pars['debut']['f'], size=new_n-sum(sex))
+    n_layers            = len(pars['m_partners'].keys())
+    partners            = np.full((n_layers, new_n), 0, dtype=hpd.default_int)
+    partners[:, sex==1] = partner_count(n_agents=sum(sex), partner_pars=pars['m_partners'])
+    partners[:, sex==0] = partner_count(n_agents=new_n-sum(sex), partner_pars=pars['f_partners'])
+    cluster             = hpu.n_multinomial(pars['cluster_rel_sizes'], new_n).astype(int)
+    rel_sev             = hpu.sample(**pars['sev_dist'], size=new_n) # Draw individual relative susceptibility factors
 
     return uid, sex, debut, rel_sev, partners, cluster
 
