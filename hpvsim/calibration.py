@@ -819,10 +819,11 @@ class Calibration(sc.prettyobj):
 
                 # Set title and labels
                 date = thisdatadf.year[0]
-                ax.set_xlabel('Genotype')
                 ax.set_title(self.result_args[resname].name + ', ' + str(date))
                 ax.legend()
-                ax.set_xticks(x, self.glabels)
+                if 'genotype_dist' in resname:
+                    ax.set_xticks(x, self.glabels)
+                    ax.set_xlabel('Genotype')
                 plot_count += 1
 
         return hppl.tidy_up(fig, do_save=do_save, fig_path=fig_path, do_show=do_show, args=all_args)

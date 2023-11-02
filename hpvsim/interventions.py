@@ -1365,7 +1365,7 @@ class tx(Product):
                     if len(eff_treat_inds):
                         tx_successful += list(eff_treat_inds)
                         people[state][g, eff_treat_inds] = False  # People who get treated have their CINs removed
-                        people['episomal'][g, eff_treat_inds] = False  # People who get treated have their CINs removed
+                        people['cin'][g, eff_treat_inds] = False  # People who get treated have their CINs removed
                         people[f'date_{state}'][g, eff_treat_inds] = np.nan
                         people[f'date_cancerous'][g, eff_treat_inds] = np.nan
                         people['date_clearance'][g, eff_treat_inds] = people.t + 1
