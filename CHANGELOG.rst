@@ -8,7 +8,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 1.2.8 (2023-10-31)
+Version 1.3.0 (2023-11-06)
 ---------------------------
 - Changes the way HPV progression is modeled so that there is a probability of developing CIN based upon duration of precin and probability of cancer based upon duration of cancer (based upon Rodriguez et al. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3705579/)
 - Renames ``dur_episomal`` as ``dur_cin``

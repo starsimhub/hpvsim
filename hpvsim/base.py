@@ -1089,7 +1089,15 @@ class BasePeople(FlexPretty):
             if arr.ndim == 1:
                 obj_set(self, k, arr[row_inds])
             elif arr.ndim == 2:
-                obj_set(self, k, arr[:, row_inds])
+                try:
+                    obj_set(self, k, arr[:, row_inds])
+                except:
+                    import traceback
+                    
+                    traceback.print_exc()
+                    import pdb
+                    
+                    pdb.set_trace()
             else:
                 errormsg = 'Can only operate on 1D or 2D arrays'
                 raise TypeError(errormsg)
@@ -1373,7 +1381,7 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with abnormal cells. Union of episomal, transformed, and cancerous
         '''
-        return (self.episomal + self.cancerous).astype(bool)
+        return (self.cin + self.cancerous).astype(bool)
 
     @property
     def latent(self):
@@ -1388,14 +1396,7 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of females with HPV whose disease severity level does not meet the threshold for detectable cell changes
         '''
-        return ((self.sex == 0) & self.infectious & ~self.episomal).astype(bool)
-
-    @property
-    def cin(self):
-        '''
-        Boolean array of females with HPV whose disease severity level meets the threshold for detectable cell changes
-        '''
-        return ((self.sex == 0) & self.infectious & self.episomal).astype(bool)
+        return ((self.sex == 0) & self.infectious & ~self.cin).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
