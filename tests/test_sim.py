@@ -44,6 +44,7 @@ def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being ru
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
+        'total_pop': 200_000,
         'start': 1970,
         'burnin': 30,
         'end': 2030,
