@@ -112,7 +112,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             lno=0
             for lkey in lkeys:
                 contacts[lkey], current_partners,_,_ = make_contacts(
-                    lno=lno, tind=0, partners=partners[lno,:], current_partners=current_partners,
+                    lno=lno, tind=0, partners=partners, current_partners=current_partners,
                     ages=ages, debuts=debuts, is_female=is_female, is_active=is_active,
                     mixing=sim['mixing'][lkey], layer_probs=sim['layer_probs'][lkey], cross_layer=sim['cross_layer'],
                     durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey],
@@ -264,7 +264,7 @@ def age_scale_acts(acts=None, age_act_pars=None, age_f=None, age_m=None, debut_f
     return scaled_acts
 
 
-def create_edgelist(lno, partners, current_partners, mixing, age, is_active, is_female,
+def create_edgelist(tind, lno, partners, current_partners, mixing, age, is_active, is_female,
                         layer_probs, cross_layer, cluster, add_mixing):
     '''
     Create partnerships for a single layer. Eligible females and males are first identified if they are sexually active,
@@ -306,6 +306,11 @@ def create_edgelist(lno, partners, current_partners, mixing, age, is_active, is_
     cross_inds              = hpu.binomial_filter(cross_layer, other_partners_inds) # Indices who have cross-layer relationships
     cross_layer_bools       = np.full(n_agents, False, dtype=bool) # Construct a boolean array indicating whether people have cross-layer relationships
     cross_layer_bools[cross_inds]  = True # Only true for the selected agents
+    if tind>0:
+        import traceback
+        traceback.print_exc()
+        import pdb
+        pdb.set_trace()
     f_eligible              = f_active & underpartnered & (~other_partners | cross_layer_bools)
     m_eligible              = m_active & underpartnered & (~other_partners | cross_layer_bools)
 
@@ -373,7 +378,7 @@ def make_contacts(lno=None, tind=None, partners=None, current_partners=None,
     '''
 
     # Create edgelist
-    f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(
+    f,m,current_partners,new_pship_inds,new_pship_counts = create_edgelist(tind,
         lno, partners, current_partners, mixing, ages, is_active, is_female,
         layer_probs, cross_layer, cluster, add_mixing)
 
