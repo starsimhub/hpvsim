@@ -14,6 +14,32 @@ n_agents = 2e3
 
 
 #%% Define the tests
+
+def estimator(actual, predicted):
+    ''' Custom estimator to use for bounded target data'''
+    actuals = []
+    for i in actual:
+        if isinstance(i, (int, float, np.generic)):
+            i_list = [i,i]
+        else:
+            i_list = [idx for idx in i.split(',')]
+            i_list[0] = float(i_list[0].replace('[', ''))
+            i_list[1] = float(i_list[1].replace(']', ''))
+        actuals.append(i_list)
+    gofs = np.zeros(len(predicted))
+    for iv, val in enumerate(predicted):
+        if val> np.max(actuals[iv]):
+            gofs[iv] = abs(np.max(actuals[iv])-val)
+        elif val < np.min(actuals[iv]):
+            gofs[iv] = abs(np.min(actuals[iv])-val)
+    actual_max = np.array(actuals).max()
+    if actual_max > 0:
+        gofs /= actual_max
+
+    gofs = np.mean(gofs)
+
+    return gofs
+
 def test_calibration(do_plot=True):
 
     sc.heading('Testing calibration')
@@ -54,13 +80,13 @@ def test_calibration(do_plot=True):
 
     # Save some extra sim results
     extra_sim_result_keys = ['cancer_incidence', 'asr_cancer_incidence']
-
+    
     # Make the calibration
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             datafiles=[
                                 'test_data/south_africa_hpv_data.csv',
                                 'test_data/south_africa_cancer_data_2020.csv',
-                            ],
+                            ], estimator = estimator,
                             extra_sim_result_keys=extra_sim_result_keys,
                             total_trials=2, n_workers=1, die=True)
     calib.calibrate()
@@ -120,3 +146,4 @@ if __name__ == '__main__':
 
     sc.toc(T)
     print('Done.')
+# %%

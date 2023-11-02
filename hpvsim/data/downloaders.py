@@ -111,27 +111,14 @@ def get_ex_data(force=None, tidy=None):
 
 def get_birth_data(start=1960, end=2020, force=None, tidy=None):
     ''' Import crude birth rates from WB '''
-    
-    if force is None: force = False
-    if tidy  is None: tidy  = True
-    
-    sc.heading('Getting World Bank birth rate data...')
+    sc.heading('Downloading World Bank birth rate data...')
+    try:
+        import wbgapi as wb
+    except Exception as E:
+        errormsg = 'Could not import wbgapi: cannot download raw data'
+        raise ModuleNotFoundError(errormsg) from E
     T = sc.timer()
-    
-    local_path = filesdir/'world_bank_birth_rates.csv'
-    if force or not os.path.exists(local_path):
-        print('Downloading World Bank birth rate data...')
-        try:
-            import wbgapi as wb
-        except Exception as E:
-            errormsg = 'Could not import wbgapi: cannot download raw data'
-            raise ModuleNotFoundError(errormsg) from E
-        birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
-        birth_rates.to_csv(local_path)
-    else:
-        print(f'Skipping {local_path}, already downloaded')
-    
-    birth_rates = pd.read_csv(local_path)
+    birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
     d = dict()
     for country in birth_rates['Country'].unique():
         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,3:]
