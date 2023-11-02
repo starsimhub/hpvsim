@@ -159,8 +159,8 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
     layer_defaults = {}
     # Specify defaults for random -- layer 'a' for 'all'
     layer_defaults['random'] = dict(
-        m_partners  = dict(a=dict(dist='poisson', par1=0.01)), # Everyone in this layer has one partner; this captures *additional* partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 partner
-        f_partners  = dict(a=dict(dist='poisson', par1=0.01)),
+        m_partners  = dict(a=dict(dist='poisson1', par1=0.01)), # Everyone in this layer has one partner; this captures *additional* partners. If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 partner
+        f_partners  = dict(a=dict(dist='poisson1', par1=0.01)),
         acts        = dict(a=dict(dist='neg_binomial', par1=100,par2=50)),  # Default number of sexual acts per year for people at sexual peak
         age_act_pars = dict(a=dict(peak=35, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)), # Parameters describing changes in coital frequency over agent lifespans
         layer_probs = dict(a=1.0),  # Default proportion of the population in each layer
