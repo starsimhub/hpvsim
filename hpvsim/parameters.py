@@ -332,8 +332,8 @@ def get_genotype_pars(default=False, genotype=None):
     par2 = 10
 
     # Unpublished figure by Schiffman shows 50% hpv16 clear after 1 year, 60% after 3 years
-    par1_16 = 4.5
-    par2_16 = 10
+    par1_16 = 3
+    par2_16 = 12
 
     pars.hpv16 = sc.objdict()
     pars.hpv16.dur_precin       = dict(dist='lognormal', par1=par1_16, par2=par2_16)  # Duration of infection prior to precancer
