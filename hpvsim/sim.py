@@ -845,6 +845,9 @@ class Sim(hpb.BaseSim):
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
 
+        # Updates after infection
+        self.people.update_states_post(t=t, year=year)
+
         # Index for results
         idx = int(t / self.resfreq)
 
@@ -1139,7 +1142,7 @@ class Sim(hpb.BaseSim):
         res = self.results[reskey][:,t]
         edges = self['age_bin_edges']
         mean_edges = edges[:-1] + np.diff(edges)/2
-        age_mean = ((res/res.sum())*mean_edges).sum()
+        age_mean = (sc.safedivide(res,res.sum())*mean_edges).sum()
         return age_mean
         
 

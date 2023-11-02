@@ -193,21 +193,21 @@ def test_states():
                     raise ValueError('States {cin, cancerous} should be mutually exclusive but are not.')
 
                 # Cellular transformation states:
-                c1 = (people.normal[g,:] | people.episomal[g,:] | people.cancerous[:,:].any(axis=0) | removed).all()
+                c1 = (people.normal[g,:] | people.cin[g,:] | people.cancerous[:,:].any(axis=0) | removed).all()
                 if not c1:
-                    raise ValueError('States {normal, episomal, cancerous} should be collectively exhaustive but are not.')
-                c2 = ~(people.normal[g,:] & people.episomal[g,:]).all()
+                    raise ValueError('States {normal, cin, cancerous} should be collectively exhaustive but are not.')
+                c2 = ~(people.normal[g,:] & people.cin[g,:]).all()
                 if not c2:
-                    raise ValueError('States {normal, episomal} should be mutually exclusive but are not.')
-                c3 = ~(people.episomal[g,:] & people.cancerous[:,:].any(axis=0)).all()
+                    raise ValueError('States {normal, cin} should be mutually exclusive but are not.')
+                c3 = ~(people.cin[g,:] & people.cancerous[:,:].any(axis=0)).all()
                 if not c3:
-                    raise ValueError('States {episomal, cancerous} should be mutually exclusive but are not.')
+                    raise ValueError('States {cin, cancerous} should be mutually exclusive but are not.')
 
                 # Check combinations of cell states & infection states:
                 sc1 = ~(people.normal[g,:] & people.infectious[g,:]).all() # No-one can be infectious without any cell changes
                 if not sc1:
                     raise ValueError('Everyone infectious should have abnormal cells, but they do not.')
-                sc2 = ~((people.episomal[g,:] ) & people.susceptible[g,:]).all() # No-one can be susceptible and have cell changes
+                sc2 = ~((people.cin[g,:] ) & people.susceptible[g,:]).all() # No-one can be susceptible and have cell changes
                 if not sc2:
                     raise ValueError('No-one susceptible should have abnormal cells.')
 
@@ -217,8 +217,7 @@ def test_states():
                 if len(sd1inds)>0:
                     sd1 = people.cancerous[:,sd1inds].any(axis=0).all()
                 if not sd1:
-                    raise ValueError('No-one susceptible should have abnormal cells.')
-
+                    raise ValueError('Anyne with abnormal cells and inactive infection should have cancer.')
 
                 checkall = np.array([
                     s1, s2, s3, s4,
