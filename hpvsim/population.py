@@ -89,7 +89,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         else:
             ages = age_data_min[age_bins] + age_data_range[age_bins]*np.random.random(n_agents) # Uniformly distribute within this age bin
 
-        uids, sexes, debuts, rel_sev, partners, cluster = set_static(n_agents, pars=sim.pars, sex_ratio=sex_ratio)
+        uids, sexes, debuts, rel_sev, partners, cluster = set_static(n_agents, pars=sim.pars, sex_ratio=sim.pars['sex_ratio'])
 
         # Store output
         popdict = {}

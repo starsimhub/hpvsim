@@ -168,7 +168,7 @@ class People(hpb.BasePeople):
             self.sex_flows['other_deaths_by_sex'][1]    = deaths_male
 
             # Add births
-            new_births = self.add_births(year=year)
+            new_births = self.add_births(year=year, sex_ratio=self.pars['sex_ratio'])
             self.demographic_flows['births'] = new_births
 
             # Check migration
@@ -572,7 +572,7 @@ class People(hpb.BasePeople):
         return other_deaths, deaths_female, deaths_male
 
 
-    def add_births(self, year=None, new_births=None, ages=0, immunity=None):
+    def add_births(self, year=None, new_births=None, ages=0, immunity=None, sex_ratio=0.5):
         '''
         Add more people to the population
 
@@ -592,7 +592,7 @@ class People(hpb.BasePeople):
         if new_births>0:
             # Generate other characteristics of the new people
             uids, sexes, debuts, rel_sev, partners, cluster = hppop.set_static(new_n=new_births, existing_n=len(self),
-                                                                           pars=self.pars)
+                                                                           pars=self.pars, sex_ratio=sex_ratio)
             # Grow the arrays`
             new_inds = self._grow(new_births)
             self.uid[new_inds]          = uids
@@ -735,7 +735,6 @@ class People(hpb.BasePeople):
         self.n_infections[g,inds] += 1
         for key in ['date_clearance']:
             self[key][g, inds] = np.nan
-
 
         # Count reactivations and adjust latency status
         if layer == 'reactivation':
