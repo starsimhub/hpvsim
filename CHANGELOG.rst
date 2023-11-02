@@ -14,6 +14,7 @@ Version 1.3.0 (2023-11-06)
 - Renames ``dur_episomal`` as ``dur_cin``
 - Removes CIN grades, severity, transformation
 - Improved network updating, adds clustering functionality
+- Exposes a parameter for specifying the sex ratio of a population
 - Fixes plotting issue with tutorial
 - *Github info* PR `637 <https://github.com/amath-idm/hpvsim/pull/637>`__ 
 
