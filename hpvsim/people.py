@@ -651,7 +651,7 @@ class People(hpb.BasePeople):
             ages_to_add = hpu.true(difference>0) # Ages where we have too few, need to apply imigration
             n_to_add = difference[ages_to_add] # Determine number of agents to add for each age
             ages_to_add_list = np.repeat(ages_to_add, n_to_add)
-            self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list), sex_ratio=self.pars['sex_ratio_imm'])
+            self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list))
 
             # Remove people
             remove_frac = n_to_remove / count_ages[ages_to_remove]
@@ -735,7 +735,6 @@ class People(hpb.BasePeople):
         self.n_infections[g,inds] += 1
         for key in ['date_clearance']:
             self[key][g, inds] = np.nan
-
 
         # Count reactivations and adjust latency status
         if layer == 'reactivation':
