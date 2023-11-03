@@ -751,7 +751,8 @@ class Sim(hpb.BaseSim):
         imm_kin_pars = self['imm_kin']
         mixing = self['mixing']
         layer_probs = self['layer_probs']
-        cross_layer = self['cross_layer']
+        f_cross_layer = self['f_cross_layer']
+        m_cross_layer = self['m_cross_layer']
         acts = self['acts']
         dur_pship = self['dur_pship']
         age_act_pars = self['age_act_pars']
@@ -767,7 +768,7 @@ class Sim(hpb.BaseSim):
         people = self.people # Shorten
         people.dissolve_partnerships(t=t) # Dissolve partnerships
         tind = self.yearvec[t] - self['start']
-        people.create_partnerships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
+        people.create_partnerships(tind, mixing, layer_probs, f_cross_layer, m_cross_layer, dur_pship, acts, age_act_pars)
 
         # Apply interventions
         for i,intervention in enumerate(self.interventions):

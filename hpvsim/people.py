@@ -367,7 +367,7 @@ class People(hpb.BasePeople):
         return n_dissolved # Return the number of dissolved partnerships by layer
 
 
-    def create_partnerships(self, tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars):
+    def create_partnerships(self, tind, mixing, layer_probs, f_cross_layer, m_cross_layer, dur_pship, acts, age_act_pars):
         '''
         Create partnerships. All the hard work of creating the contacts is done by hppop.make_contacts,
         which in turn relies on hpu.create_edgelist for creating the edgelist. This method is just a light wrapper
@@ -380,9 +380,9 @@ class People(hpb.BasePeople):
         lno=0
         for lkey in self.layer_keys():
             pship_args = dict(
-                lno=lno, tind=tind, partners=self.partners[lno], current_partners=self.current_partners,
-                ages=self.age, debuts=self.debut, is_female=self.is_female, is_active=self.is_active,
-                mixing=mixing[lkey], layer_probs=layer_probs[lkey], cross_layer=cross_layer,
+                lno=lno, tind=tind, partners=self.partners[lno], current_partners=self.current_partners, ages=self.age,
+                debuts=self.debut, is_female=self.is_female, is_active=self.is_active, mixing=mixing[lkey],
+                layer_probs=layer_probs[lkey], f_cross_layer=f_cross_layer, m_cross_layer=m_cross_layer,
                 durations=dur_pship[lkey], acts=acts[lkey], age_act_pars=age_act_pars[lkey],
                 cluster=self.cluster, add_mixing=self.pars['add_mixing']
             )
