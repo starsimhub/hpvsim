@@ -168,7 +168,7 @@ class People(hpb.BasePeople):
             self.sex_flows['other_deaths_by_sex'][1]    = deaths_male
 
             # Add births
-            new_births = self.add_births(year=year)
+            new_births = self.add_births(year=year, sex_ratio=self.pars['sex_ratio'])
             self.demographic_flows['births'] = new_births
 
             # Check migration
@@ -176,15 +176,8 @@ class People(hpb.BasePeople):
             self.demographic_flows['migration'] = migration
 
         # Perform updates that are genotype-specific
-        ng = self.pars['n_genotypes']
-        for g in range(ng):
+        for g in range(self.pars['n_genotypes']):
             self.check_clearance(g) # check for clearance (need to do this first)
-
-            for key in ['cins','cancers']:  # update flows
-                cases_by_age, cases = self.check_progress(key, g)
-                self.flows[key] += cases  # Increment flows (summed over all genotypes)
-                self.genotype_flows[key][g] = cases # Store flows by genotype
-                self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
 
         # Perform updates that are not genotype specific
         deaths_by_age, deaths = self.check_cancer_deaths()
@@ -196,7 +189,17 @@ class People(hpb.BasePeople):
 
         return
 
-    
+    def update_states_post(self, t, year=None):
+        ''' State updates at the end of the current timestep '''
+        ng = self.pars['n_genotypes']
+        for g in range(ng):
+            for key in ['cins','cancers']:  # update flows
+                cases_by_age, cases = self.check_progress(key, g)
+                self.flows[key] += cases  # Increment flows (summed over all genotypes)
+                self.genotype_flows[key][g] = cases # Store flows by genotype
+                self.age_flows[key] += cases_by_age # Increment flows by age (summed over all genotypes)
+
+
     #%% Disease progression methods
     def set_prognoses(self, inds, g, gpars, dt):
         '''
@@ -436,27 +439,25 @@ class People(hpb.BasePeople):
     def check_cin(self, genotype):
         ''' Check for new progressions to CIN '''
         # Only include infectious females who haven't already cleared CIN or progressed to cancer
-        filters = self.infectious[genotype,:]*self.is_female*~(self.date_clearance[genotype,:]<=self.t)
+        filters = self.infectious[genotype,:]*self.is_female_alive*~(self.date_clearance[genotype,:]<=self.t)
         filter_inds = filters.nonzero()[0]
         inds = self.check_inds(self.cin[genotype,:], self.date_cin[genotype,:], filter_inds=filter_inds)
         self.cin[genotype, inds] = True
-        self.episomal[genotype, inds] = True  # now episomal
+
         # Age calculations
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
         return cases_by_age, self.scale_flows(inds)
 
-
-
     def check_cancer(self, genotype):
         ''' Check for new progressions to cancer '''
-        filter_inds = self.true('episomal')
-        inds = self.check_inds(self.cancerous[genotype,:], self.date_cancerous[genotype,:], filter_inds=filter_inds)
+        not_current = hpu.ifalsei(self.cancerous[genotype,:], hpu.true(self.cin[genotype,:]))
+        has_date    = hpu.idefinedi(self.date_cancerous[genotype,:], not_current)
+        inds        = hpu.itrue(self.t >= self.date_cancerous[genotype,has_date], has_date)
 
         # Set infectious states
         self.susceptible[:, inds] = False  # No longer susceptible to any genotype
         self.infectious[:, inds] = False  # No longer counted as infectious with any genotype
         self.inactive[:,inds] = True  # If this person has any other infections from any other genotypes, set them to inactive
-
         self.date_clearance[:, inds] = np.nan  # Remove their clearance dates for all genotypes
 
         # Deal with dysplasia states and dates
@@ -467,11 +468,10 @@ class People(hpb.BasePeople):
 
         # Set the properties related to cell changes and disease severity markers
         self.cancerous[genotype, inds] = True
-        self.episomal[:, inds] = False  # No longer counted as episomal with any genotype
+        self.cin[:, inds] = False  # No longer counted as episomal with any genotype
 
         # Age results
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
-
 
         return cases_by_age, self.scale_flows(inds)
 
@@ -527,14 +527,12 @@ class People(hpb.BasePeople):
             self.inactive[genotype, cleared_inds] = False # should already be false
 
         if len(f_cleared_inds):
-            # female_cleared_inds = np.intersect1d(cleared_inds, self.f_inds) # Only give natural immunity to females
             hpimm.update_peak_immunity(self, f_cleared_inds, imm_pars=self.pars, imm_source=genotype) # update immunity
             self.date_reactivated[genotype, f_cleared_inds] = np.nan
 
         # Whether infection is controlled on not, clear all cell changes and severity markeres
-        self.episomal[genotype, f_inds] = False
+        self.cin[genotype, f_inds] = False
         self.date_cin[genotype, f_inds] = np.nan
-
         self.dur_cin[genotype, f_inds] = np.nan
         self.dur_precin[genotype, f_inds] = np.nan
         self.dur_infection[genotype, f_inds] = np.nan
@@ -574,7 +572,7 @@ class People(hpb.BasePeople):
         return other_deaths, deaths_female, deaths_male
 
 
-    def add_births(self, year=None, new_births=None, ages=0, immunity=None):
+    def add_births(self, year=None, new_births=None, ages=0, immunity=None, sex_ratio=0.5):
         '''
         Add more people to the population
 
@@ -594,7 +592,7 @@ class People(hpb.BasePeople):
         if new_births>0:
             # Generate other characteristics of the new people
             uids, sexes, debuts, rel_sev, partners, cluster = hppop.set_static(new_n=new_births, existing_n=len(self),
-                                                                           pars=self.pars)
+                                                                           pars=self.pars, sex_ratio=sex_ratio)
             # Grow the arrays`
             new_inds = self._grow(new_births)
             self.uid[new_inds]          = uids
@@ -737,7 +735,6 @@ class People(hpb.BasePeople):
         self.n_infections[g,inds] += 1
         for key in ['date_clearance']:
             self[key][g, inds] = np.nan
-
 
         # Count reactivations and adjust latency status
         if layer == 'reactivation':

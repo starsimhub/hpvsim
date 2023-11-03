@@ -108,25 +108,24 @@ class PeopleMeta(sc.prettyobj):
 
         self.viral_states = [
             # States related to whether virus is present
-            State('susceptible',    bool, True,     'n_genotypes', label='Number susceptible', color='#4d771e'),               # Allowable dysp states: no_dysp
-            State('infectious',     bool, False,    'n_genotypes', label='Number infectious',  color='#c78f65'),               # Allowable dysp states: no_dysp, cin1, cin2, cin3
-            State('inactive',       bool, False,    'n_genotypes', label='Number with inactive infection', color='#9e1149'),   # Allowable dysp states: no_dysp, cancer in at least one genotype
+            State('susceptible',    bool, True,     'n_genotypes', label='Number susceptible', color='#4d771e'),               # Allowable cell states: normal
+            State('infectious',     bool, False,    'n_genotypes', label='Number infectious',  color='#c78f65'),               # Allowable cell states: normal, cin
+            State('inactive',       bool, False,    'n_genotypes', label='Number with inactive infection', color='#9e1149'),   # Allowable cell states: normal, cancer in at least one genotype
         ]
 
         self.cell_states = [
             # States related to the cellular changes present in the cervix.
             State('normal',         bool, True, 'n_genotypes', label='Number with no cellular changes', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
-            State('episomal',       bool, False, 'n_genotypes', label='Number with episomal infection', color='#9e1149'), # Allowable viral states: susceptible, infectious, and inactive
+            State('cin',            bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#9e1149'), # Allowable viral states: infectious
             State('cancerous',      bool, False, 'n_genotypes', label='Number with cancer', color='#5f5cd2'),      # Allowable viral states: inactive
         ]
 
         self.derived_states = [
             # From the viral states, cell states, and severity markers, we derive the following additional states:
             State('infected',   bool, False, 'n_genotypes', label='Number infected', color='#c78f65'), # Union of infectious and inactive. Includes people with cancer, people with latent infections, and people with active infections
-            State('abnormal',   bool, False, 'n_genotypes', label='Number with abnormal cells', color='#9e1149'),  # Union of episomal, transformed, and cancerous. Allowable viral states: infectious
+            State('abnormal',   bool, False, 'n_genotypes', label='Number with abnormal cells', color='#9e1149'),  # Union of CIN and cancerous. Allowable viral states: infectious, inactive
             State('latent',     bool, False, 'n_genotypes', label='Number with latent infection', color='#5f5cd2'), # Intersection of normal and inactive.
-            State('precin',     bool, False, 'n_genotypes', label='Number with precin', color='#9e1149'), # Defined as those with sev < clinical_cuttoff[0]
-            State('cin',        bool, False, 'n_genotypes', label='Number with detectable dysplasia', color='#5f5cd2'), # Union of CIN1, CIN3, and CIN3
+            State('precin',     bool, False, 'n_genotypes', label='Number with precin', color='#9e1149'), # Intersection of normal and infectious
         ]
 
         # Additional intervention states

@@ -595,17 +595,25 @@ class Sim(hpb.BaseSim):
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
 
         # Figure out the scale factors
+        # Case 1: total pop and location both provided
         if self['total_pop'] is not None and total_pop is not None: # If no pop_scale has been provided, try to get it from the location
-            errormsg = 'You can either define total_pop explicitly or via the location, but not both'
-            raise ValueError(errormsg)
+            msg = f"Rescaling the population of the chosen location to {self['total_pop']}"
+            if self['verbose']: print(msg)
+            total_pop = self['total_pop']
+
+        # Case 2: no location provided but total pop provided
         elif total_pop is None and self['total_pop'] is not None:
             total_pop = self['total_pop']
             
+        # Case 3: neither total pop, location, nor pop scale provided
         if self['pop_scale'] is None:
             if total_pop is None:
                 self['pop_scale'] = 1.0
+
+        # Resolve cases 1 & 2 by creating the pop scal
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
+
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
 
         # Deal with HIV
@@ -836,6 +844,9 @@ class Sim(hpb.BaseSim):
                 is_reactivated = hpu.binomial_arr(reactivation_probs)
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
+
+        # Updates after infection
+        self.people.update_states_post(t=t, year=year)
 
         # Index for results
         idx = int(t / self.resfreq)
@@ -1131,7 +1142,7 @@ class Sim(hpb.BaseSim):
         res = self.results[reskey][:,t]
         edges = self['age_bin_edges']
         mean_edges = edges[:-1] + np.diff(edges)/2
-        age_mean = ((res/res.sum())*mean_edges).sum()
+        age_mean = (sc.safedivide(res,res.sum())*mean_edges).sum()
         return age_mean
         
 
