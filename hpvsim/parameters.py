@@ -70,8 +70,10 @@ def make_pars(**kwargs):
     pars['add_mixing']      = None  # Mixing matrix between clusters
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
-    pars['cross_layer']     = 0.05  # Proportion of agents who have concurrent cross-layer relationships
-    pars['partners']        = None  # The number of concurrent sexual partners for each partnership type
+    pars['f_cross_layer']   = 0.02  # Proportion of females who have concurrent cross-layer relationships - by layer
+    pars['m_cross_layer']   = 0.20  # Proportion of males who have concurrent cross-layer relationships - by layer
+    pars['f_partners']      = None  # Distribution of preferred number of concurrent sexual partners, females
+    pars['m_partners']      = None  # Distribution of preferred number of concurrent sexual partners, males
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
     pars['condoms']         = None  # The proportion of acts in which condoms are used for each partnership type
     pars['layer_probs']     = None  # Proportion of the population in each partnership type
