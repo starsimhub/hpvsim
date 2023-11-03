@@ -90,7 +90,7 @@ class Calibration(sc.prettyobj):
         if storage   is None: storage   = f'sqlite:///{db_name}'
         if total_trials is not None: n_trials = int(np.ceil(total_trials/n_workers))
         self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name,
-                                     keep_db=keep_db, storage=storage, rand_seed=rand_seed)
+                                     keep_db=keep_db, storage=storage, rand_seed=rand_seed, sampler=sampler)
 
         # Handle other inputs
         self.label          = label
@@ -205,10 +205,11 @@ class Calibration(sc.prettyobj):
     @staticmethod
     def update_dict_pars_from_trial(name_pars, value_pars):
         ''' Function to update parameters from nested dict to trial parameter's value '''
-        new_pars = sc.dcp(name_pars)
-        name_pars_keys = sc.flattendict(name_pars).keys()
+        new_pars = {}
+        name_pars_keys = sc.flattendict(value_pars).keys()
         for key in name_pars_keys:
             name = '_'.join(key)
+            sc.makenested(new_pars, list(key))
             sc.setnested(new_pars, list(key), value_pars[name])
         return new_pars
     
