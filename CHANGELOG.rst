@@ -13,7 +13,7 @@ Version 2.0.0 (2023-11-06)
 - Removes CIN grades, severity, episomal states, and transformation
 - Changes the way HPV progression is modeled so that there is a probability of developing CIN based upon duration of precin and probability of cancer based upon duration of cancer (based upon Rodriguez et al. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3705579/)
 - Adds support for pre-calibration explorations
-- Improvements to networks, including clustering functionality and support for different distributions for male and female partner numbers
+- Improvements to networks, including clustering functionality, support for different distributions for male and female partners and for differing concurrency rates, and changes to default partnership durations
 - Exposes a parameter for specifying the sex ratio of a population
 - Fixes plotting issue with tutorial
 - *Github info* PR `637 <https://github.com/amath-idm/hpvsim/pull/637>`__ 
