@@ -70,8 +70,8 @@ def make_pars(**kwargs):
     pars['add_mixing']      = None  # Mixing matrix between clusters
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
-    pars['f_cross_layer']   = 0.05  # Proportion of females who have concurrent cross-layer relationships - by layer
-    pars['m_cross_layer']   = 0.05  # Proportion of males who have concurrent cross-layer relationships - by layer
+    pars['f_cross_layer']   = 0.02  # Proportion of females who have concurrent cross-layer relationships - by layer
+    pars['m_cross_layer']   = 0.10  # Proportion of males who have concurrent cross-layer relationships - by layer
     pars['f_partners']      = None  # Distribution of preferred number of concurrent sexual partners, females
     pars['m_partners']      = None  # Distribution of preferred number of concurrent sexual partners, males
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
@@ -179,15 +179,15 @@ def reset_layer_pars(pars, layer_keys=None, force=False):
             c=dict(dist='poisson1', par1=0.2)
         ),  # If using a poisson distribution, par1 is roughly equal to the proportion of people with >1 casual partner at a time
         f_partners = dict(
-            m=dict(dist="poisson1", par1=0.01),
-            c=dict(dist="poisson1", par1=0.2),
+            m=dict(dist="poisson1", par1=0.001),
+            c=dict(dist='poisson', par1=1), # Defaults: {'0': 0.36, '1': 0.37, '2': 0.19, '3': 0.06, '4+':0.02}
         ),
         acts         = dict(m=dict(dist='neg_binomial', par1=80, par2=40), # Default number of acts per year for people at sexual peak
                             c=dict(dist='neg_binomial', par1=50, par2=5)), # Default number of acts per year for people at sexual peak
         age_act_pars = dict(m=dict(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1), # Parameters describing changes in coital frequency over agent lifespans
                             c=dict(peak=25, retirement=100, debut_ratio=0.5, retirement_ratio=0.1)),
-        dur_pship   = dict(m=dict(dist='normal_pos', par1=20, par2=3),
-                           c=dict(dist='normal_pos', par1=1, par2=1)),
+        dur_pship   = dict(m=dict(dist='neg_binomial', par1=80, par2=3), # This gives: mar_dur = {'0-5y': 0.015, '5-10y': 0.025, '10-20y':0.06, '20-50y':0.25, '50+':0.65}
+                           c=dict(dist='lognormal', par1=1, par2=2)), # This gives: cas_dur = {'0-3m': 0.33, '3-6m': 0.22, '6-12m': 0.2, '1-2y':0.15, '2-5y':0.1}
         condoms     = dict(m=0.01, c=0.2),  # Default proportion of acts in which condoms are used
     )
     layer_defaults['default']['mixing'], layer_defaults['default']['layer_probs'] = get_mixing('default')
