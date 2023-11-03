@@ -71,7 +71,7 @@ def make_pars(**kwargs):
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
     pars['f_cross_layer']   = 0.02  # Proportion of females who have concurrent cross-layer relationships - by layer
-    pars['m_cross_layer']   = 0.20  # Proportion of males who have concurrent cross-layer relationships - by layer
+    pars['m_cross_layer']   = 0.10  # Proportion of males who have concurrent cross-layer relationships - by layer
     pars['f_partners']      = None  # Distribution of preferred number of concurrent sexual partners, females
     pars['m_partners']      = None  # Distribution of preferred number of concurrent sexual partners, males
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
