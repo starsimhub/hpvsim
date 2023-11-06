@@ -202,18 +202,17 @@ class Calibration(sc.prettyobj):
                 raise ValueError(errormsg)
         return new_pars
     
-    @staticmethod
-    def update_dict_pars_from_trial(name_pars, value_pars):
+    def update_dict_pars_from_trial(self, name_pars, value_pars):
         ''' Function to update parameters from nested dict to trial parameter's value '''
-        new_pars = sc.dcp(name_pars)
+        # new_pars = sc.dcp(name_pars)
+        new_pars = {}
         name_pars_keys = sc.flattendict(name_pars).keys()
         for key in name_pars_keys:
             name = '_'.join(key)
             sc.setnested(new_pars, list(key), value_pars[name])
         return new_pars
     
-    @staticmethod
-    def update_dict_pars_init_and_bounds(initial_pars, par_bounds, target_pars):
+    def update_dict_pars_init_and_bounds(self, initial_pars, par_bounds, target_pars):
         ''' Function to update initial parameters and parameter bounds from a trial pars dict'''
         target_pars_keys = sc.flattendict(target_pars)
         for key, val in target_pars_keys.items():

@@ -68,7 +68,8 @@ def get_calib_parameters(param_df):
         genotype_pars =  calib_pars.pop('genotype_pars')
 
     calib_space = sc.objdict(names = [name.replace("genotype_pars/", "").replace("/", "_") for name in param_df.param_name.values], 
-                        bounds = np.array([param_df.lower_bound.values.astype(float), param_df.upper_bound.values.astype(float)]).T)
+                        bounds = np.array([param_df.lower_bound.values.astype(float), param_df.upper_bound.values.astype(float)]).T,
+                        default_value = param_df.default_value.values.astype(float))
     calib_space['num_vars'] = len(calib_space['names'])
     return (calib_pars, genotype_pars, calib_space)
 
@@ -94,14 +95,35 @@ def estimator(actual, predicted):
 
     return gofs
 
+def get_sample_one_way(total_trials, calib_space):
+    import copy
+    N_per_param = round(total_trials/calib_space['num_vars'])
+    samples = [copy.deepcopy(calib_space['default_value']) for _ in range(N_per_param * calib_space['num_vars'])]
+    count = 0
+    for param_name, param_bounds, default_value in zip(calib_space.names, calib_space.bounds, calib_space.default_value):
+        param_samples = np.linspace(param_bounds[0], param_bounds[1], N_per_param)
+        for samp in param_samples:
+            samples[count][count // N_per_param] = samp
+            count += 1
+    return np.array(samples)
+
 def get_sample(sample_method, sample_seed, calib_space, total_trials):
-    if sample_method == 'lhs':
-        return latin.sample(calib_space, total_trials, sample_seed)
-    elif sample_method == 'sobol':
-        N = round(total_trials / (2 * (1 + calib_space['num_vars'])))
-        if N < 1:
-            raise ValueError(f'total trials should be larger than {(2 * (1 + calib_space["num_vars"]))}')
-        return sobol.sample(problem=calib_space, N=N, seed=sample_seed)
+    try:
+        if sample_method == 'lhs':
+            return latin.sample(calib_space, total_trials, sample_seed)
+        elif sample_method == 'one-way':
+            sample_list = get_sample_one_way(total_trials, calib_space)
+            if len(sample_list) < 1:
+                raise ValueError(f"Total trials should be larger than {(calib_space['num_vars'])} to generate one-way sampled list")
+            return sample_list
+        elif sample_method == 'sobol':
+            N = round(total_trials / (2 * (1 + calib_space['num_vars'])))
+            if N < 1:
+                raise ValueError(f"Total trials should be larger than {(2 * (1 + calib_space['num_vars']))} to generate one-way sampled list")
+            return sobol.sample(problem=calib_space, N=N, seed=sample_seed)
+    except ValueError as e:
+      print(f"Simulation stopped due to a ValueError: {str(e)}")
+
 
 def run_parameter_exploration(location, datafiles, default_pars, calib_pars, genotype_pars, calib_space, total_trials, n_workers, name, save_results, 
                               sample_method='sobol', sample_seed=1234):
@@ -115,7 +137,7 @@ def run_parameter_exploration(location, datafiles, default_pars, calib_pars, gen
     # Due to issues in parallel computing, the sampler sometimes samples the same space. We suggest adding more total trials so that all sampled points are evaluated
     sim = hpv.Sim(default_pars)
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
-                            name=name, estimator=estimator, 
+                            name=name,
                             sampler = sampler, verbose = False,
                             datafiles=datafiles, 
                             total_trials=total_trials+3*n_workers, n_workers=n_workers) 
