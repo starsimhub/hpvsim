@@ -261,8 +261,7 @@ class People(hpb.BasePeople):
         cancer_scale = self.pars['pop_scale'] / n_extra
 
         if n_extra == 1:
-            cancer_prob_arr = hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds],
-                                                        pars=gpars['cancer_fn'])  # Calculate probability of cancer
+            cancer_prob_arr = hppar.compute_severity(dur_cin, rel_sev=self.rel_sev[inds], pars=cancer_pars)
         # Multiscale version
         elif n_extra > 1:
 
