@@ -494,7 +494,7 @@ if __name__ == '__main__':
                 'end': 2020,
                 'ms_agent_ratio': 100,
                 'n_agents': 50e3,
-                'sev_dist': dict(dist='normal_pos', par1=1., par2=0.001)
+                'sev_dist': dict(dist='normal_pos', par1=1., par2=0.1)
             }
             age_causal_by_genotype = dwelltime_by_genotype(start_year=2000)
             outcomes_by_year = outcomes_by_year(start_year=2000)
