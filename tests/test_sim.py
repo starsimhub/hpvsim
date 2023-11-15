@@ -44,7 +44,6 @@ def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being ru
     # Create and run the simulation
     pars = {
         'n_agents': 5e3,
-        'total_pop': 200_000,
         'start': 1970,
         'burnin': 30,
         'end': 2030,
@@ -55,7 +54,7 @@ def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being ru
     # Create some genotype pars
     genotype_pars = {
         16: {
-            'cin_fn': dict(form='logf2', k=0.25, x_infl=0, ttc=30)
+            'cin_fn': dict(form='logf2', k=0.25, x_infl=0, ttc=49)
         }
     }
 
@@ -407,14 +406,14 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim1 = test_sim(do_plot=do_plot, do_save=do_save)
-    s0, s1 = test_epi()
-    sim3 = test_states()
-    sim4 = test_flexible_inputs()
-    sim5 = test_result_consistency()
-    sim6 = test_location_loading()
-    sim7 = test_resuming()
+    # s0, s1 = test_epi()
+    # sim3 = test_states()
+    # sim4 = test_flexible_inputs()
+    # sim5 = test_result_consistency()
+    # sim6 = test_location_loading()
+    # sim7 = test_resuming()
 
     sc.toc(T)
     print('Done.')
