@@ -45,6 +45,7 @@ def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being ru
     pars = {
         'n_agents': 5e3,
         'start': 1970,
+        'genotypes': [16, 18, 'hi5', 'ohr'],
         'burnin': 30,
         'end': 2030,
         'ms_agent_ratio': 100

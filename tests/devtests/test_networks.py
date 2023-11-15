@@ -92,7 +92,7 @@ class rship_count(hpv.Analyzer):
         super().__init__(*args, **kwargs)
         self.n_edges = dict()
         self.n_edges_norm = dict()
-        for rtype in ['m','c','o']:
+        for rtype in ['m','c']:
             self.n_edges[rtype] = []
             self.n_edges_norm[rtype] = []
 
@@ -101,7 +101,7 @@ class rship_count(hpv.Analyzer):
         self.yearvec = sim.yearvec
 
     def apply(self, sim):
-        for rtype in ['m','c','o']:
+        for rtype in ['m','c']:
             self.n_edges[rtype].append(len(sim.people.contacts[rtype]))
             age = sim.people.age[sim.people.is_active]
             denom = ((age>14) * age<65).sum()
@@ -111,7 +111,7 @@ class rship_count(hpv.Analyzer):
     def plot(self, do_save=False, filename=None, from_when=1990):
         fig, ax = plt.subplots(2, 3, figsize=(15, 8))
         yi = sc.findinds(self.yearvec, from_when)[0]
-        for rn,rtype in enumerate(['m','c','o']):
+        for rn,rtype in enumerate(['m','c']):
             ax[0,rn].plot(self.yearvec[yi:], self.n_edges[rtype][yi:])
             ax[0,rn].set_title(f'Edges - {rtype}')
             ax[1,rn].plot(self.yearvec[yi:], self.n_edges_norm[rtype][yi:])
@@ -129,9 +129,9 @@ def test_network_time(do_plot=do_plot):
     pars = dict(n_agents=5e3,
                 start=1950,
                 end=2050,
-                dt=1.0,
-                location='india',
-                genotypes=[16,18,'hrhpv'],
+                dt=0.25,
+                location='nigeria',
+                genotypes=[16,18,'hi5','ohr'],
                 )
 
     sim = hpv.Sim(pars=pars, analyzers=rship_count())
@@ -142,14 +142,60 @@ def test_network_time(do_plot=do_plot):
 
     return sim, a
 
+def plot_degree(do_plot=True):
+
+    # Create and run the simulation
+    pars = {
+        'n_agents': 5e3,
+        'start': 1970,
+        'genotypes': [16, 18, 'hi5', 'ohr'],
+        'burnin': 30,
+        'end': 2030,
+        'ms_agent_ratio': 100
+    }
+    sim = hpv.Sim(pars=pars)
+    sim.run(verbose=0.1)
+
+    f_conds = sim.people.is_female * sim.people.alive * sim.people.level0 * sim.people.is_active
+    m_conds = sim.people.is_male * sim.people.alive * sim.people.level0 * sim.people.is_active
+    partners = {
+        'f': sim.people.n_rships[0, f_conds],
+        'm': sim.people.n_rships[0, m_conds],
+    }
+
+    if do_plot:
+        fig, axes = plt.subplots(1,2, figsize=(9, 5), layout="tight")
+        axes = axes.flatten()
+
+        bins = np.concatenate([np.arange(21),[100]])
+
+        for ai,sex in enumerate(['f', 'm']):
+            counts, bins = np.histogram(partners[sex], bins=bins)
+            total = sum(counts)
+            counts = counts/total
+
+            axes[ai].bar(bins[:-1], counts)
+            axes[ai].set_xlabel(f'Number of lifetime marital partners')
+            axes[ai].set_title(f'Distribution of marital partners, {sex}')
+            axes[ai].set_ylim([0, 0.75])
+            stats = f"Mean: {np.mean(partners[sex]):.1f}\n"
+            stats += f"Median: {np.median(partners[sex]):.1f}\n"
+            stats += f"Std: {np.std(partners[sex]):.1f}\n"
+            stats += f"%>20: {np.count_nonzero(partners[sex]>=20)/total*100:.2f}\n"
+            axes[ai].text(15, 0.5, stats)
+
+        plt.show()
+
+    return sim, partners
 
 
 # %% Run as a script
 if __name__ == '__main__':
     T = sc.tic()
 
-    sim0, a0 = test_network(do_plot=do_plot)
-    sim1, a1 = test_network_time(do_plot=do_plot)
+    # sim0, a0 = test_network(do_plot=do_plot)
+    # sim1, a1 = test_network_time(do_plot=do_plot)
+    sim2, partners = plot_degree(do_plot=do_plot)
 
     sc.toc(T)
     print('Done.')
