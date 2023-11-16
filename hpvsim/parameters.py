@@ -44,6 +44,9 @@ def make_pars(**kwargs):
     pars['rel_birth']       = 1.0       # Birth rate scale factor
     pars['rel_death']       = 1.0       # Death rate scale factor
     pars['sex_ratio']       = 0.5       # Sex ratio at birth - share of males
+    pars['age_datafile']    = None
+    pars['pop_datafile']    = None
+    pars['popage_datafile'] = None
 
     # Initialization parameters
     pars['init_hpv_prev'] = sc.dcp(hpd.default_init_prev) # Initial prevalence

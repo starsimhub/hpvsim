@@ -17,7 +17,8 @@ __all__ = ['make_people', 'make_contacts']
 
 
 def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
-                sex_ratio=0.5, dt_round_age=True, microstructure=None, **kwargs):
+                sex_ratio=0.5, dt_round_age=True, microstructure=None,
+                age_data=None, pop_trend=None, pop_age_trend=None, **kwargs):
     '''
     Make the people for the simulation.
 
@@ -59,7 +60,9 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         n_agents = int(sim['n_agents']) # Number of people
         total_pop = None
 
-        # Load age data by country if available, or use defaults.
+        # Handle data on population size by age & over time.
+        # If a country location is supplied, this will be loaded in automatically from UN projections.
+        # If a custom location is supplied, these data should be provided in datafiles read in by the pars.
         # Other demographic data like mortality and fertility are also available by
         # country, but these are loaded directly into the sim since they are not
         # stored as part of the people.
@@ -68,10 +71,10 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
             print(f'Loading location-specific data for "{location}"')
         if use_age_data:
             try:
-                age_data = hpdata.get_age_distribution(location, year=sim['start'])
-                pop_trend = hpdata.get_total_pop(location)
+                age_data = hpdata.get_age_distribution(location, year=sim['start'], age_datafile=sim['age_datafile'])
+                pop_trend = hpdata.get_total_pop(location, pop_datafile=sim['pop_datafile'])
+                pop_age_trend = hpdata.get_age_distribution_over_time(location, popage_datafile=sim['popage_datafile'])
                 total_pop = sum(age_data[:, 2])  # Return the total population
-                pop_age_trend = hpdata.get_age_distribution_over_time(location)
             except ValueError as E:
                 warnmsg = f'Could not load age data for requested location "{location}" ({str(E)})'
                 hpm.warn(warnmsg, die=True)
