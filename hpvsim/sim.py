@@ -55,12 +55,18 @@ class Sim(hpb.BaseSim):
         # Load data, including datafile that are used to create additional optional parameters
         self.load_data(datafile) # Load the data, if provided
 
-        # Update parameters
+        # Update parameters, including demographic data
         if pars is None:
             pars = dict(location=default_location)
         else:
             if not pars.get('location') or pars['location'] is None:
                 pars['location'] = default_location
+            elif pars['location'] == 'custom':
+                for demo_par in ['birth_rates', 'death_rates']:
+                    if not pars.get(demo_par) or pars[demo_par] is None:
+                        warnmsg = f'Custom location set but no birth or death rates supplied; assuming zero.'
+                        pars['birth_rates'] = 0
+                        pars['death_rates'] = 0
 
         self.update_pars(pars, **kwargs)   # Update the parameters
 
@@ -936,13 +942,13 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def run(self, do_plot=False, until=None, restore_pars=True, reset_seed=True, verbose=None):
+    def run(self, do_plot=False, until=None, restore_pars=True, reset_seed=True, verbose=None, **kwargs):
         ''' Run the model once '''
         # Initialization steps -- start the timer, initialize the sim and the seed, and check that the sim hasn't been run
         T = sc.timer()
 
         if not self.initialized:
-            self.initialize()
+            self.initialize(**kwargs)
             self._orig_pars = sc.dcp(self.pars) # Create a copy of the parameters, to restore after the run, in case they are dynamically modified
 
         if verbose is None:
