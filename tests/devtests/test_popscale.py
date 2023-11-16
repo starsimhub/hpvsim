@@ -4,9 +4,7 @@ Script for simulating a population with demographic inputs
 
 #%% Imports and settings
 import sciris as sc
-import numpy as np
 import hpvsim as hpv
-import pytest
 
 do_plot = 1
 do_run = 1
@@ -29,9 +27,9 @@ def test_scaled_sim(do_plot=False, do_run=True):
         'end': 2030,
         'ms_agent_ratio': 100,
         'location': 'india',
-        'age_datafile': '../tests/devtests/devtest_data/mah_age_data.csv',
-        'pop_datafile': '../tests/devtests/devtest_data/mah_pop_data.csv',
-        'popage_datafile': '../tests/devtests/devtest_data/mah_popage_data.csv',
+        'age_datafile': 'devtest_data/mah_age_data.csv',
+        'pop_datafile': 'devtest_data/mah_pop_data.csv',
+        'popage_datafile': 'devtest_data/mah_popage_data.csv',
     }
 
     sim = hpv.Sim(pars=pars, rand_seed=seed)
