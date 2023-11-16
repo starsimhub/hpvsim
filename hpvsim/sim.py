@@ -61,12 +61,6 @@ class Sim(hpb.BaseSim):
         else:
             if not pars.get('location') or pars['location'] is None:
                 pars['location'] = default_location
-            elif pars['location'] == 'custom':
-                for demo_par in ['birth_rates', 'death_rates']:
-                    if not pars.get(demo_par) or pars[demo_par] is None:
-                        warnmsg = f'Custom location set but no birth or death rates supplied; assuming zero.'
-                        pars['birth_rates'] = 0
-                        pars['death_rates'] = 0
 
         self.update_pars(pars, **kwargs)   # Update the parameters
 

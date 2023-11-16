@@ -295,8 +295,7 @@ class BaseSim(ParsObj):
                 hppar.reset_layer_pars(pars, force=False)
             if pars.get('location'):
                 location = pars['location']
-                if location != 'custom':
-                    pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
+                pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
             if pars.get('n_clusters'):
                 hppar.add_mixing(pars)
             # Call update_pars() for ParsObj
