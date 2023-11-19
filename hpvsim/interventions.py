@@ -1294,8 +1294,10 @@ class dx(Product):
         for state in self.states:
             # First check if this is a genotype specific intervention or not
             if len(np.unique(self.df.genotype)) == 1 and np.unique(self.df.genotype)[0]== 'all':
-                # test is not genotype specific, so test results must be True for all genotypes
-                theseinds = hpu.true(people[state][:, inds].all())
+                if state == 'susceptible':
+                    theseinds = hpu.true(people[state][:, inds].all()) # Must be susceptibile for all genotypes
+                else:
+                    theseinds = hpu.true(people[state][:, inds].any()) # Only need to be truly inf/cin/cancerous for one genotype
                 # Filter the dataframe to extract test results for people in this state
                 df_filter = (self.df.state == state)  # filter by state
                 thisdf = self.df[df_filter]  # apply filter to get the results for this state & genotype
