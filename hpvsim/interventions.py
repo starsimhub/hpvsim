@@ -1292,18 +1292,34 @@ class dx(Product):
         people = sim.people
 
         for state in self.states:
-            for g,genotype in sim['genotype_map'].items():
-
-                theseinds = hpu.true(people[state][g, inds])
-
+            # First check if this is a genotype specific intervention or not
+            if len(np.unique(self.df.genotype)) == 1 and np.unique(self.df.genotype)[0]== 'all':
+                if state == 'susceptible':
+                    theseinds = hpu.true(people[state][:, inds].all(axis=0)) # Must be susceptibile for all genotypes
+                else:
+                    theseinds = hpu.true(people[state][:, inds].any(axis=0)) # Only need to be truly inf/cin/cancerous for one genotype
                 # Filter the dataframe to extract test results for people in this state
-                df_filter = (self.df.state == state) # filter by state
-                if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype) # also filter by genotype, if this test is by genotype
-                thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
-                probs = [thisdf[thisdf.result==result].probability.values[0] for result in self.hierarchy] # Pull out the result probabilities in the order specified by the result hierarchy
+                df_filter = (self.df.state == state)  # filter by state
+                thisdf = self.df[df_filter]  # apply filter to get the results for this state & genotype
+                probs = [thisdf[thisdf.result == result].probability.values[0] for result in
+                         self.hierarchy]  # Pull out the result probabilities in the order specified by the result hierarchy
                 # Sort people into one of the possible result states and then update their overall results (aggregating over genotypes)
-                this_gtype_results = hpu.n_multinomial(probs, len(theseinds))
-                results[theseinds] = np.minimum(this_gtype_results, results[theseinds])
+                this_result = hpu.n_multinomial(probs, len(theseinds))
+                results[theseinds] = np.minimum(this_result, results[theseinds])
+
+            else:
+                for g,genotype in sim['genotype_map'].items():
+
+                    theseinds = hpu.true(people[state][g, inds])
+
+                    # Filter the dataframe to extract test results for people in this state
+                    df_filter = (self.df.state == state) # filter by state
+                    if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype) # also filter by genotype, if this test is by genotype
+                    thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
+                    probs = [thisdf[thisdf.result==result].probability.values[0] for result in self.hierarchy] # Pull out the result probabilities in the order specified by the result hierarchy
+                    # Sort people into one of the possible result states and then update their overall results (aggregating over genotypes)
+                    this_gtype_results = hpu.n_multinomial(probs, len(theseinds))
+                    results[theseinds] = np.minimum(this_gtype_results, results[theseinds])
 
         if return_format=='dict':
             output = {self.hierarchy[i]:inds[results==i] for i in range(len(self.hierarchy))}
