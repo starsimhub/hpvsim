@@ -332,14 +332,7 @@ class Calibration(sc.prettyobj):
         pars_flatten = sc.flattendict(pardict)
         for key, val in pars_flatten.items():
             sampler_key = '_'.join(key)
-            try:
-                low, high = val[1], val[2]
-            except:
-                import traceback;
-                traceback.print_exc();
-                import pdb;
-                pdb.set_trace()
-
+            low, high = val[1], val[2]
             step = val[3] if len(val) > 3 else None
 
             if key in self.par_samplers:  # If a custom sampler is used, get it now (Not working properly for now)
