@@ -16,7 +16,7 @@ Version 2.0.0 (2023-11-29)
 - Improvements to networks, including clustering functionality, support for different distributions for male and female partners and for differing concurrency rates, and changes to default partnership durations
 - Exposes a parameter for specifying the sex ratio of a population
 - Fixes plotting issue with tutorial
-- *Github info* PR `637 <https://github.com/amath-idm/hpvsim/pull/637>`__ 
+- *Github info* PR `643 <https://github.com/amath-idm/hpvsim/pull/643>`__ 
 
 Version 1.2.7 (2023-09-22)
 ---------------------------
