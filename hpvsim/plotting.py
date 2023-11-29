@@ -157,7 +157,8 @@ def handle_to_plot(kind, to_plot, n_cols, sim, check_ready=True):
     # If not specified or specified as another string, load defaults
     if to_plot is None or isinstance(to_plot, str):
         to_plot = hpd.get_default_plots(which=to_plot, kind=kind, sim=sim)
-        n_cols=2
+        if n_cols is None:
+            n_cols = 2
 
     # If it's a dictionary, translate it to a list but store the names
     names = None
@@ -785,15 +786,13 @@ def plot_heatmap(sweep, xx, yy, x=None, y=None, xi=None, yi=None, to_plot=None, 
         fig = pl.figure(**args.fig)
         gs = fig.add_gridspec(n_rows, n_cols_true, width_ratios=width_ratios)
         pl.subplots_adjust(**args.axis)
-        pn, coln = 0, 0
+        pn = 0 # Plot number
 
         for rn in range(n_rows):
             for cn in range(0,n_cols*2,2): # Increment by two columns each time
 
                 # Deal with precision
                 zscale = zscales[pn]
-                precision = zscale/10
-                rounding_factor = -int(np.log10(precision))
 
                 res_to_plot = to_plot[pn]
                 z = np.array(sweep.resdf[res_to_plot]) / zscale
@@ -833,51 +832,6 @@ def plot_heatmap(sweep, xx, yy, x=None, y=None, xi=None, yi=None, to_plot=None, 
 
     return tidy_up(fig=fig, figs=None, do_save=do_save, fig_path=fig_path, do_show=do_show, args=args)
 
-
-# def plot_compare(df, log_scale=True, fig_args=None, axis_args=None, style_args=None, grid=False,
-#                  commaticks=True, setylim=True, color=None, label=None, fig=None,
-#                  do_save=None, do_show=None, fig_path=None, **kwargs):
-#     ''' Plot a MultiSim comparison -- see MultiSim.plot_compare() for documentation '''
-
-#     # Handle inputs
-#     sep_figs = False
-#     fig_args  = sc.mergedicts({'figsize':(8,8)}, fig_args)
-#     axis_args = sc.mergedicts({'left': 0.16, 'bottom': 0.05, 'right': 0.98, 'top': 0.98, 'wspace': 0.50, 'hspace': 0.10}, axis_args)
-#     args = handle_args(fig_args=fig_args, axis_args=axis_args, style_args=style_args, **kwargs)
-
-#     # Map from results into different categories
-#     mapping = {
-#         'cum': 'Cumulative counts',
-#         'new': 'New counts',
-#         'n': 'Number in state',
-#         'r': 'R_eff',
-#         }
-#     category = []
-#     for v in df.index.values:
-#         v_type = v.split('_')[0]
-#         if v_type in mapping:
-#             category.append(v_type)
-#         else:
-#             category.append('other')
-#     df['category'] = category
-
-#     # Plot
-#     with cvo.with_style(args.style):
-#         fig, figs = create_figs(args, sep_figs=False, fig=fig)
-#         for i,m in enumerate(mapping):
-#             not_r_eff = m != 'r'
-#             if not_r_eff:
-#                 ax = fig.add_subplot(2, 2, i+1)
-#             else:
-#                 ax = fig.add_subplot(8, 2, 10)
-#             dfm = df[df['category'] == m]
-#             logx = not_r_eff and log_scale
-#             dfm.plot(ax=ax, kind='barh', logx=logx, legend=False)
-#             if not(not_r_eff):
-#                 ax.legend(loc='upper left', bbox_to_anchor=(0,-0.3))
-#             ax.grid(True)
-
-#     return tidy_up(fig, figs, sep_figs, do_save, fig_path, do_show, args)
 
 
 #%% Other plotting functions
