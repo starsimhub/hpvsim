@@ -8,10 +8,16 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 1.2.7 (2023-10-12)
+Version 2.0.0 (2023-11-29)
 ---------------------------
+- Simplifies natural history model by compressing CIN grades
+- Changes the way HPV progression is modeled so that there is a probability of developing CIN based upon duration of precin and probability of cancer based upon duration of cancer (based upon Rodriguez et al. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3705579/)
+- Adds support for pre-calibration explorations
+- Improvements to networks, including clustering functionality, support for different distributions for male and female partners and for differing concurrency rates, and changes to default partnership durations
+- Exposes a parameter for specifying the sex ratio of a population
 - Fixes plotting issue with tutorial
-- *Github info* PR `625 <https://github.com/amath-idm/hpvsim/pull/625>`__
+- Updates filtering for tests that are not genotype-specific
+- *Github info* PR `643 <https://github.com/amath-idm/hpvsim/pull/643>`__ 
 
 Version 1.2.7 (2023-09-22)
 ---------------------------
