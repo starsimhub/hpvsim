@@ -331,17 +331,8 @@ def get_genotype_pars(default=False, genotype=None):
 
     pars = sc.objdict()
 
-    # Find parameters from Guanacaste cohort data
-    # Unpublished figure by Schiffman shows 50% hr hpv clear after 6 months, 70% hr hpv clear after 1 year, 86% after 3 years
-    par1 = 2.5
-    par2 = 9
-
-    # Unpublished figure by Schiffman shows 50% hpv16 clear after 1 year, 60% after 3 years
-    par1_16 = 3
-    par2_16 = 9
-
     pars.hpv16 = sc.objdict()
-    pars.hpv16.dur_precin       = dict(dist='lognormal', par1=par1_16, par2=par2_16)  # Duration of infection prior to precancer
+    pars.hpv16.dur_precin       = dict(dist='lognormal', par1=3, par2=9)  # Duration of infection prior to precancer, chosen so that ~50% clear after 1 year (Schiffman et al)
     pars.hpv16.cin_fn           = dict(form='logf2', k=0.3, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
     pars.hpv16.dur_cin          = dict(dist='lognormal', par1=5, par2=20) # Duration of episomal infection prior to cancer
     pars.hpv16.cancer_fn        = dict(method='cin_integral', transform_prob=2e-3) # Function mapping duration of cin to probability of cancer
@@ -349,7 +340,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv16.sero_prob        = 0.75 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
     pars.hpv18 = sc.objdict()
-    pars.hpv18.dur_precin       = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
+    pars.hpv18.dur_precin       = dict(dist='lognormal', par1=2.5, par2=9)  # Duration of infection prior to precancer, chosen so that ~50% clear after 6m (Schiffman et al)
     pars.hpv18.dur_cin          = dict(dist='lognormal', par1=5, par2=20) # Duration of infection prior to cancer
     pars.hpv18.cin_fn           = dict(form='logf2', k=0.25, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
     pars.hpv18.cancer_fn        = dict(method='cin_integral', transform_prob=2e-3)  # Function mapping duration of infection to severity
@@ -358,7 +349,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
     pars.hi5 = sc.objdict()
-    pars.hi5.dur_precin         = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
+    pars.hi5.dur_precin         = dict(dist='lognormal', par1=2.5, par2=9)  # Duration of infection prior to precancer
     pars.hi5.dur_cin            = dict(dist='lognormal', par1=4.5, par2=20) # Duration of infection prior to cancer
     pars.hi5.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
     pars.hi5.cancer_fn          = dict(method='cin_integral', transform_prob=1.5e-3)  # Function mapping duration of infection to severity
@@ -367,7 +358,7 @@ def get_genotype_pars(default=False, genotype=None):
 
     # Other high-risk: oncogenic but not covered in 9valent vaccine: 35, 39, 51, 56, 59
     pars.ohr = sc.objdict()
-    pars.ohr.dur_precin         = dict(dist='lognormal', par1=par1, par2=par2)  # Duration of infection prior to precancer
+    pars.ohr.dur_precin         = dict(dist='lognormal', par1=2.5, par2=9)  # Duration of infection prior to precancer
     pars.ohr.dur_cin            = dict(dist='lognormal', par1=4.5, par2=20) # Duration of infection prior to cancer
     pars.ohr.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
     pars.ohr.cancer_fn          = dict(method='cin_integral', transform_prob=1.5e-3)  # Function mapping duration of infection to severity
