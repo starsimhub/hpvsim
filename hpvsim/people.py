@@ -342,7 +342,7 @@ class People(hpb.BasePeople):
         # Set date of onset of precancer and eventual severity outcomes for those who develop precancer
         dur_cin_transformed = dur_cin[is_cancer] # Duration of episomal infection for those who transform
         self.date_cancerous[g, cancer_inds] = self.date_cin[g, cancer_inds] + sc.randround(dur_cin_transformed/dt)
-        self.dur_infection[g, cancer_inds] += self.dur_cin[g, cancer_inds]
+        self.dur_infection[g, cancer_inds] = self.dur_precin[g, cancer_inds] + self.dur_cin[g, cancer_inds]
         dur_cancer = hpu.sample(**self.pars['dur_cancer'], size=len(cancer_inds))
         self.date_dead_cancer[cancer_inds] = self.date_cancerous[g, cancer_inds] + sc.randround(dur_cancer / dt)
         self.dur_cancer[g, cancer_inds] = dur_cancer

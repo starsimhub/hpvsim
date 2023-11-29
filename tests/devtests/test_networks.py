@@ -32,6 +32,8 @@ def test_network(do_plot=True):
         timepoints=['1990', '2000', '2010', '2020'],
     )
 
+    hpv.sample()
+
     sim = hpv.Sim(
         pars,
         analyzers=[snap]

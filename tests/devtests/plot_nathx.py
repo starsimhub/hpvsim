@@ -451,21 +451,22 @@ def plot_nh_simple(sim=None):
 
     axes[1].set_ylabel("Probability of CIN")
     axes[1].set_xlabel("Duration of infection (years)")
-    axes[1].set_title("Infection duration to progression\nfunction")
+    axes[1].set_title("Probability that an infection of at least\nX years will lead to high-grade lesions")
     axes[1].set_ylim([0,1])
     axes[1].grid()
 
     axes[2].set_ylabel("")
     axes[2].grid()
-    axes[2].set_xlabel("Duration of CIN (years)")
-    axes[2].set_title("Distribution of\n CIN duration")
+    axes[2].set_xlabel("Duration of high-grade lesions (years)")
+    axes[2].set_title("Distribution of high-grade lesion duration")
     axes[2].legend(frameon=False)
 
     axes[3].set_ylim([0,1])
     axes[3].grid()
     # axes[2].set_ylabel("Probability of transformation")
     axes[3].set_xlabel("Duration of CIN (years)")
-    axes[3].set_title("Probability of cancer\n within X years")
+    axes[3].set_title("Probability that a high-grade lesion of at least\nX years will eventuate in cancer")
+    # axes[3].set_title("Probability of cancer\n within X years")
 
     fig.tight_layout()
     fig.savefig(f'nathx_simple.png')
@@ -476,7 +477,7 @@ def plot_nh_simple(sim=None):
 if __name__ == '__main__':
 
     make_simple = True
-    make_stacked = True
+    make_stacked = False
     do_run = True
 
     if make_simple:
