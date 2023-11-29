@@ -1089,15 +1089,7 @@ class BasePeople(FlexPretty):
             if arr.ndim == 1:
                 obj_set(self, k, arr[row_inds])
             elif arr.ndim == 2:
-                try:
-                    obj_set(self, k, arr[:, row_inds])
-                except:
-                    import traceback
-                    
-                    traceback.print_exc()
-                    import pdb
-                    
-                    pdb.set_trace()
+                obj_set(self, k, arr[:, row_inds])
             else:
                 errormsg = 'Can only operate on 1D or 2D arrays'
                 raise TypeError(errormsg)
