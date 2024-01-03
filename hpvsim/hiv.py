@@ -311,9 +311,12 @@ class HIVsim(hpb.ParsObj):
             dt = people.pars['dt']
             for g in range(people.pars['n_genotypes']):
                 gpars = people.pars['genotype_pars'][g]
-                hpv_inds = hpu.itruei((people.is_female & people.episomal[g, :]), hiv_inds)  # Women with HIV who have episomal HPV
-                if len(hpv_inds):  # Reevaluate these women's severity markers and determine whether they will develop cellular changes
-                    people.set_severity(hpv_inds, g, gpars, dt, set_sev=False)
+                hpv_inds = hpu.itruei((people.is_female & people.precin[g, :]), hiv_inds)  # Women with HIV who have pre-CIN and were not going to progress to CIN
+                cin_inds = hpu.itruei((people.is_female & people.cin[g, :] & (np.isnan(people.date_cancerous[g,:]))), hiv_inds)  # Women with HIV who have CIN and were not going to progress to cancer
+                if len(hpv_inds):  # Reevaluate these women's risk of developing CIN
+                    people.set_prognoses(hpv_inds, g, gpars, dt)
+                if len(cin_inds):  # Reevaluate these women's risk of developing cancer
+                    people.set_severity(cin_inds, g, gpars, dt)
 
         return
 

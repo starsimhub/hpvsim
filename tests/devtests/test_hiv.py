@@ -24,10 +24,6 @@ def test_hiv():
     ''' Basic test to show that it runs '''
     sc.heading('Testing hiv')
 
-    partners = dict(m=dict(dist='poisson', par1=0.1),
-                    c=dict(dist='poisson', par1=0.5),
-                    o=dict(dist='poisson', par1=0.0),
-                    )
 
     pars = {
         'n_agents': n_agents,
@@ -36,8 +32,6 @@ def test_hiv():
         'start': start,
         'end': 2020,
         'ms_agent_ratio': ms_agent_ratio,
-        'partners': partners,
-        'cross_layer': 0.1  # Proportion of females who have crosslayer relationships
     }
 
     sim = hpv.Sim(
@@ -220,8 +214,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
     sim0 = test_hiv()
-    test_hiv_epi()
-    scens0 = test_impact_on_cancer()
-    sim1, calib = test_calibration_hiv()
+    # test_hiv_epi()
+    # scens0 = test_impact_on_cancer()
+    # sim1, calib = test_calibration_hiv()
     sc.toc(T)
     print('Done.')
