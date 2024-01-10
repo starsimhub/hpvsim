@@ -311,11 +311,13 @@ class HIVsim(hpb.ParsObj):
             dt = people.pars['dt']
             for g in range(people.pars['n_genotypes']):
                 gpars = people.pars['genotype_pars'][g]
-                hpv_inds = hpu.itruei((people.is_female & people.precin[g, :]), hiv_inds)  # Women with HIV who have pre-CIN and were not going to progress to CIN
+                hpv_inds = hpu.itruei((people.is_female & people.precin[g, :] & (np.isnan(people.date_cin[g,:]))), hiv_inds)  # Women with HIV who have pre-CIN and were not going to progress to CIN
+                hpv_cin_inds = hpu.itruei((people.is_female & people.precin[g, :] & ~np.isnan(people.date_cin[g,:]) & (np.isnan(people.date_cancerous[g,:]))), hiv_inds)  # Women with HIV who have PRECIN and were going to develop CIN but not going to progress to cancer
                 cin_inds = hpu.itruei((people.is_female & people.cin[g, :] & (np.isnan(people.date_cancerous[g,:]))), hiv_inds)  # Women with HIV who have CIN and were not going to progress to cancer
                 if len(hpv_inds):  # Reevaluate these women's risk of developing CIN
                     people.set_prognoses(hpv_inds, g, gpars, dt)
-                if len(cin_inds):  # Reevaluate these women's risk of developing cancer
+                cin_reevaluate_inds = np.concatenate((hpv_cin_inds, cin_inds))
+                if len(cin_reevaluate_inds):  # Reevaluate these women's risk of developing cancer
                     people.set_severity(cin_inds, g, gpars, dt)
 
         return
