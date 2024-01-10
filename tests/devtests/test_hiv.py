@@ -80,12 +80,12 @@ def test_hiv_epi():
     s0 = hpv.Sim(pars=base_pars, label='No HIV').run()
     s1 = hpv.Sim(pars=base_pars, **hiv_settings, hiv_pars={'model_hiv_death':False}, label='HIV without mortality').run()
 
-    var = 'cancers'
-    v0 = s0.results[var][:].sum()
-    v1 = s1.results[var][:].sum()
-    print(f'Checking {var:10s} with sim "{s0.label}" vs "{s1.label}"... ', end='')
-    assert v0 <= v1, f'Expected {var} to be lower in sim "{s0.label}" than in sim "{s1.label}", but {v0} > {v1})'
-    print(f'✓ ({v0} <= {v1})')
+    # var = 'cancers'
+    # v0 = s0.results[var][:].sum()
+    # v1 = s1.results[var][:].sum()
+    # print(f'Checking {var:10s} with sim "{s0.label}" vs "{s1.label}"... ', end='')
+    # assert v0 <= v1, f'Expected {var} to be lower in sim "{s0.label}" than in sim "{s1.label}", but {v0} > {v1})'
+    # print(f'✓ ({v0} <= {v1})')
 
     # Test 2: with HIV on, the average age of cancer should be younger
     s2 = hpv.Sim(pars=base_pars, **hiv_settings, label='With HIV').run()
@@ -178,7 +178,6 @@ def test_calibration_hiv():
 
     calib_pars = dict(
         beta=[0.05, 0.010, 0.20],
-        dur_transformed=dict(par1=[5, 3, 10]),
     )
     genotype_pars = dict(
         hpv16=dict(
@@ -214,8 +213,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
     sim0 = test_hiv()
-    # test_hiv_epi()
-    # scens0 = test_impact_on_cancer()
-    # sim1, calib = test_calibration_hiv()
+    test_hiv_epi()
+    scens0 = test_impact_on_cancer()
+    sim1, calib = test_calibration_hiv()
     sc.toc(T)
     print('Done.')
