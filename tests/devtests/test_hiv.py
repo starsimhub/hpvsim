@@ -68,9 +68,10 @@ def test_hiv_epi():
 
     # Define baseline parameters and initialize sim
     base_pars = dict(
+        location='south africa',
         n_agents=5e3,
         n_years=30,
-        dt=0.5,
+        dt=0.25,
         verbose=0,
         analyzers=hpv.age_causal_infection()
     )
@@ -78,14 +79,14 @@ def test_hiv_epi():
 
     # Test 1: if HIV mortality is zero, then cancer incidence should be higher with HIV on
     s0 = hpv.Sim(pars=base_pars, label='No HIV').run()
-    s1 = hpv.Sim(pars=base_pars, **hiv_settings, hiv_pars={'model_hiv_death':False}, label='HIV without mortality').run()
+    s1 = hpv.Sim(pars=base_pars, **hiv_settings, hiv_pars={'model_hiv_death':False,}, label='HIV without mortality').run()
 
-    # var = 'cancers'
-    # v0 = s0.results[var][:].sum()
-    # v1 = s1.results[var][:].sum()
-    # print(f'Checking {var:10s} with sim "{s0.label}" vs "{s1.label}"... ', end='')
-    # assert v0 <= v1, f'Expected {var} to be lower in sim "{s0.label}" than in sim "{s1.label}", but {v0} > {v1})'
-    # print(f'✓ ({v0} <= {v1})')
+    var = 'cancers'
+    v0 = s0.results[var][:].sum()
+    v1 = s1.results[var][:].sum()
+    print(f'Checking {var:10s} with sim "{s0.label}" vs "{s1.label}"... ', end='')
+    assert v0 <= v1, f'Expected {var} to be lower in sim "{s0.label}" than in sim "{s1.label}", but {v0} > {v1})'
+    print(f'✓ ({v0} <= {v1})')
 
     # Test 2: with HIV on, the average age of cancer should be younger
     s2 = hpv.Sim(pars=base_pars, **hiv_settings, label='With HIV').run()
@@ -101,7 +102,7 @@ def test_hiv_epi():
         'rel_sev': {'lt200': 1, 'gt200': 1},
         'rel_imm': {'lt200': 1, 'gt200': 1},
         }
-    s3 = hpv.Sim(pars=base_pars, **hiv_settings, label='HIV without HPV impact').run()
+    s3 = hpv.Sim(pars=base_pars, **hiv_settings, hiv_pars=hiv_pars, label='HIV without HPV impact').run()
 
     var = 'cancers'
     v0 = s0.results[var][:].sum()
