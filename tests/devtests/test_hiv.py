@@ -181,16 +181,16 @@ def test_calibration_hiv():
     )
     genotype_pars = dict(
         hpv16=dict(
-            sev_fn=dict(k=[0.5, 0.2, 1.0],)
+            cancer_fn=dict(ld50=[20, 15, 30, 0.5]),
         ),
         hpv18=dict(
-            sev_fn=dict(k=[0.5, 0.2, 1.0],)
+            cancer_fn=dict(ld50=[20, 15, 30, 0.5]),
         )
     )
 
     hiv_pars = dict(
         rel_sus= dict(
-            lt200=dict(value=[3, 2,4])
+            lt200=[3, 2,4]
         )
     )
 
