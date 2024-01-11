@@ -1426,7 +1426,7 @@ class vx(Product):
         ''' Apply the vaccine to the requested people indices. '''
         inds = inds[people.alive[inds]]  # Skip anyone that is dead
         if self.imm_init is not None:
-            people.peak_imm[self.imm_source, inds] = hpu.sample(**self.imm_init, size=len(inds))
+            people.peak_imm[self.imm_source, inds] = hpu.sample(**self.imm_init, size=len(inds))* people.rel_imm[inds]
         elif self.imm_boost is not None:
             people.peak_imm[self.imm_source, inds] *= self.imm_boost
         people.t_imm_event[self.imm_source, inds] = people.t
