@@ -730,6 +730,7 @@ class age_results(Analyzer):
         attr = rname.replace('_incidence', '')  # Name of the actual state
         if attr == 'hpv': attr = 'infections'  # HPV is referred to as infections in the sim
         if attr == 'cancer': attr = 'cancers'  # cancer is referred to as cancers in the sim
+        if attr == 'cancer_by_age': attr = 'cancers'  # cancer is referred to as cancers in the sim
         if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
         mapping = {

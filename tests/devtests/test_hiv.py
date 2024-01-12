@@ -201,6 +201,7 @@ def test_calibration_hiv():
                                 '../test_data/south_africa_hpv_data.csv',
                                 '../test_data/south_africa_cancer_data_2020.csv',
                                 '../test_data/south_africa_cancer_data_hiv_2020.csv',
+                                '../test_data/south_africa_cancer_incidence_by_age_with_hiv.csv',
                             ],
                             total_trials=3, n_workers=1)
     calib.calibrate(die=True)
@@ -213,9 +214,9 @@ if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
-    sim0 = test_hiv()
-    test_hiv_epi()
-    scens0 = test_impact_on_cancer()
+    # sim0 = test_hiv()
+    # test_hiv_epi()
+    # scens0 = test_impact_on_cancer()
     sim1, calib = test_calibration_hiv()
     sc.toc(T)
     print('Done.')
