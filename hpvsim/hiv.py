@@ -233,16 +233,15 @@ class HIVsim(hpb.ParsObj):
             art_success_inds = filter_inds[hpu.true(people.art[filter_inds] & ~people.art_failure[filter_inds])]
             art_failure_inds = filter_inds[hpu.true(people.art[filter_inds] & people.art_failure[filter_inds])]
             not_art_inds = filter_inds[hpu.false(people.art[filter_inds])]
-
             cd4_decline_inds = np.concatenate((art_failure_inds, not_art_inds))
 
-            # First take care of people not on ART
+            # First take care of people unsuccessfully on ART or not on ART (CD4 will decline)
             cd4_remaining_inds = hpu.itrue(((people.t - people.date_hiv[cd4_decline_inds]) * dt) < people.dur_hiv[cd4_decline_inds], cd4_decline_inds)
             frac_prognosis = 100*((people.t - people.date_hiv[cd4_remaining_inds]) * dt) / people.dur_hiv[cd4_remaining_inds]
             cd4_change = self.cd4_decline_diff[frac_prognosis.astype(hpd.default_int)]
             people.cd4[cd4_remaining_inds] += cd4_change
 
-            # Now take care of people successfully on ART
+            # Now take care of people successfully on ART (CD4 reconstitutes)
             mpy = 12
             months_on_ART = (people.t - people.date_art[art_success_inds]) * mpy
             cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
