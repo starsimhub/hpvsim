@@ -151,7 +151,7 @@ class HIVsim(hpb.ParsObj):
     def set_hiv_prognoses(self, people, inds, year=None, incident=True):
         ''' Set HIV outcomes '''
 
-        art_cov = self['art_adherence']  # Shorten
+        art_cov = self['art_coverage']  # Shorten
         shape = self['hiv_pars']['time_to_hiv_death_shape']
         dt = people.pars['dt']
 
@@ -233,7 +233,8 @@ class HIVsim(hpb.ParsObj):
             mpy = 12
             months_on_ART = (people.t - people.date_art[art_inds]) * mpy
             cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
-            people.cd4[art_inds] += cd4_change
+            if cd4_change > 0:
+                people.cd4[art_inds] += cd4_change
 
         return
 
@@ -394,7 +395,7 @@ class HIVsim(hpb.ParsObj):
         '''
 
         if hiv_datafile is None and art_datafile is None:
-            hiv_incidence_rates, art_adherence = None, None
+            hiv_incidence_rates, art_coverage = None, None
 
         else:
 
@@ -424,18 +425,18 @@ class HIVsim(hpb.ParsObj):
                     )
 
             # Now compute ART adherence over time/age
-            art_adherence = dict()
+            art_coverage = dict()
             years = df_art['Year'].values
             for i, year in enumerate(years):
-                art_adherence[year] = df_art.iloc[i]['ART Coverage']
+                art_coverage[year] = df_art.iloc[i]['ART Coverage']
 
-        return hiv_incidence_rates, art_adherence
+        return hiv_incidence_rates, art_coverage
 
 
     def load_data(self, hiv_datafile=None, art_datafile=None):
         ''' Load any data files that are used to create additional parameters, if provided '''
         hiv_data = sc.objdict()
-        hiv_data.infection_rates, hiv_data.art_adherence = self.get_hiv_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        hiv_data.infection_rates, hiv_data.art_coverage = self.get_hiv_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return hiv_data
 
 
