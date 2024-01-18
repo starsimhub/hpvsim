@@ -88,6 +88,7 @@ class HIVsim(hpb.ParsObj):
         hiv_states = [
             hpd.State('hiv', bool, False),
             hpd.State('art', bool, False),
+            hpd.State('art_failure', bool, False),
         ]
         people.meta.other_stock_states  += hiv_states
         people.meta.durs                += [hpd.State('dur_hiv',    hpd.default_float,  np.nan)]
@@ -151,34 +152,43 @@ class HIVsim(hpb.ParsObj):
     def set_hiv_prognoses(self, people, inds, year=None, incident=True):
         ''' Set HIV outcomes '''
 
-        art_cov = self['art_coverage']  # Shorten
+        art_coverage = self['art_coverage']  # Shorten
         shape = self['hiv_pars']['time_to_hiv_death_shape']
         dt = people.pars['dt']
 
         # Extract index of current year
-        all_years = np.array(list(art_cov.keys()))
+        all_years = np.array(list(art_coverage.keys()))
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
 
-        # Apply ART coverage by age to people
-        art_covs = art_cov[nearest_year]
-        art_probs = np.zeros(len(people), dtype=hpd.default_float)
-        art_probs[inds] = art_covs
+        # Apply ART coverage
+        art_cov = art_coverage[nearest_year]
+        cur_n = np.sum(people.art & people.alive)
+        desired_n = sc.randround(art_cov * np.sum(people.hiv & people.alive))
+        num_art = (desired_n - cur_n)
+        num_art = np.maximum(num_art, 0)
+        num_art = np.minimum(num_art, len(inds))
 
-        # Get indices of people who are on ART
-        art_bools = hpu.binomial_arr(art_probs)
-        art_inds = hpu.true(art_bools)
-        people.art[art_inds] = True
-        people.date_art[art_inds] = people.t
+        art_inds = np.empty(0)
+        assign_dur_inds = np.empty(0)
 
-        # Get indices of people who are on ART who will not be virologically suppressed
-        art_failure_prob = self['hiv_pars']['art_failure_prob']
-        art_failure_probs = np.full(len(art_inds), fill_value=art_failure_prob, dtype=hpd.default_float)
-        art_failure_bools = hpu.binomial_arr(art_failure_probs)
-        art_failure_inds = art_inds[art_failure_bools]
+        if num_art > 0:
 
-        # Get indices of those to assign durations for -- TODO, why not everyone?
-        assign_dur_inds = art_failure_inds # Assign death to those not with ART failure
+            # Sample number of people to get on ART to reach current coverage
+            art_inds = hpu.choose(inds, num_art)
+
+            people.art[art_inds] = True
+            people.date_art[art_inds] = people.t
+
+            # Get indices of people who are on ART who will not be virologically suppressed
+            art_failure_prob = self['hiv_pars']['art_failure_prob']
+            art_failure_probs = np.full(len(art_inds), fill_value=art_failure_prob, dtype=hpd.default_float)
+            art_failure_bools = hpu.binomial_arr(art_failure_probs)
+            art_failure_inds = art_inds[art_failure_bools]
+            people.art_failure[art_failure_inds] = True
+
+            # Get indices of those to assign durations for -- TODO, why not everyone?
+            assign_dur_inds = art_failure_inds # Assign death to those not with ART failure
 
         if incident: # Additionally, assign death to those who never go on ART
             no_art_inds = np.setdiff1d(inds, art_inds)
@@ -220,21 +230,24 @@ class HIVsim(hpb.ParsObj):
         dt = people.pars['dt']
         filter_inds = people.true('hiv')
         if len(filter_inds):
-            art_inds = filter_inds[hpu.true(people.art[filter_inds])]
+            art_success_inds = filter_inds[hpu.true(people.art[filter_inds] & ~people.art_failure[filter_inds])]
+            art_failure_inds = filter_inds[hpu.true(people.art[filter_inds] & people.art_failure[filter_inds])]
             not_art_inds = filter_inds[hpu.false(people.art[filter_inds])]
 
+            cd4_decline_inds = np.concatenate((art_failure_inds, not_art_inds))
+
             # First take care of people not on ART
-            cd4_remaining_inds = hpu.itrue(((people.t - people.date_hiv[not_art_inds]) * dt) < people.dur_hiv[not_art_inds], not_art_inds)
+            cd4_remaining_inds = hpu.itrue(((people.t - people.date_hiv[cd4_decline_inds]) * dt) < people.dur_hiv[cd4_decline_inds], cd4_decline_inds)
             frac_prognosis = 100*((people.t - people.date_hiv[cd4_remaining_inds]) * dt) / people.dur_hiv[cd4_remaining_inds]
             cd4_change = self.cd4_decline_diff[frac_prognosis.astype(hpd.default_int)]
             people.cd4[cd4_remaining_inds] += cd4_change
 
-            # Now take care of people on ART
+            # Now take care of people successfully on ART
             mpy = 12
-            months_on_ART = (people.t - people.date_art[art_inds]) * mpy
+            months_on_ART = (people.t - people.date_art[art_success_inds]) * mpy
             cd4_change = self['hiv_pars']['cd4_reconstitution'](months_on_ART)
-            if cd4_change > 0:
-                people.cd4[art_inds] += cd4_change
+            cd4_change[cd4_change < 0] = 0
+            people.cd4[art_success_inds] += cd4_change
 
         return
 
