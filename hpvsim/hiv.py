@@ -175,8 +175,8 @@ class HIVsim(hpb.ParsObj):
 
         if num_art > 0:
 
-            art_probs = num_art * people.scale[inds] / people.scale_flows(inds)** 2
-            art_inds =inds[hpu.true(hpu.binomial_arr(art_probs))]
+            art_probs = num_art * people.scale[inds] / np.sum(people.scale[inds]** 2)
+            art_inds = inds[hpu.true(hpu.binomial_arr(art_probs))]
             n_art = people.scale_flows(art_inds)
             # Sample number of agents to get on ART to reach current coverage
 
