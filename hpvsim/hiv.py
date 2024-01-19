@@ -479,7 +479,7 @@ class HIVsim(hpb.ParsObj):
         self.results['hiv_prevalence'][:] = res['n_hiv'][:]/ simres['n_alive'][:]
         self.results['hpv_prevalence_by_age_with_hiv'][:] = safedivide(res['n_hpv_by_age_with_hiv'][:], ng*res['n_hiv_by_age'][:])
         self.results['hpv_prevalence_by_age_no_hiv'][:] = safedivide(res['n_hpv_by_age_no_hiv'][:], ng*no_hiv_by_age)
-        self.results['art_coverage'][:] = safedivide(res['n_art'][:],(simres['n_alive'][:] - res['n_hiv'][:]))
+        self.results['art_coverage'][:] = safedivide(res['n_art'][:],res['n_hiv'][:])
 
         # Compute cancer incidence
         scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
