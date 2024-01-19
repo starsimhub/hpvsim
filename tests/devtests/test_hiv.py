@@ -9,7 +9,7 @@ import numpy as np
 
 do_plot = 0
 do_save = 0
-debug = 1
+debug = 0
 
 n_agents = [50e3,500][debug] # Swap between sizes
 start = [1950,1990][debug]

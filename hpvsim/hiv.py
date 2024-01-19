@@ -161,21 +161,25 @@ class HIVsim(hpb.ParsObj):
         year_ind = sc.findnearest(all_years, year)
         nearest_year = all_years[year_ind]
 
-        # Apply ART coverage
+        # Apply ART coverage (being careful of level 0 and level 1 people!)
         art_cov = art_coverage[nearest_year]
-        cur_n = np.sum(people.art & people.alive)
-        desired_n = sc.randround(art_cov * np.sum(people.hiv & people.alive))
+        cur_n = people.scale_flows(hpu.true(people.art & people.alive))
+        desired_n = sc.randround(art_cov * people.scale_flows(hpu.true(people.hiv & people.alive)))
+        # Scaled number of people to get on ART (not equal to n_agents, will need to scale back)
         num_art = (desired_n - cur_n)
         num_art = np.maximum(num_art, 0)
-        num_art = np.minimum(num_art, len(inds))
+        num_art = np.minimum(num_art, people.scale_flows(inds))
 
         art_inds = np.empty(0)
         assign_dur_inds = np.empty(0)
 
         if num_art > 0:
 
-            # Sample number of people to get on ART to reach current coverage
-            art_inds = hpu.choose(inds, num_art)
+            art_probs = num_art * people.scale[inds] / people.scale_flows(inds)** 2
+            art_inds =inds[hpu.true(hpu.binomial_arr(art_probs))]
+            n_art = people.scale_flows(art_inds)
+            # Sample number of agents to get on ART to reach current coverage
+
 
             people.art[art_inds] = True
             people.date_art[art_inds] = people.t
