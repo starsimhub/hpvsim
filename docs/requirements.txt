@@ -8,3 +8,4 @@ pandoc
 pypandoc
 optuna
 seaborn
+sphinxcontrib-jquery
