@@ -149,66 +149,71 @@ class HIVsim(hpb.ParsObj):
 
     # %% HIV methods
 
-    def set_hiv_prognoses(self, people, inds, year=None, incident=True):
+    def set_hiv_prognoses(self, people, inds, year=None):
         ''' Set HIV outcomes '''
 
         art_coverage = self['art_coverage']  # Shorten
         shape = self['hiv_pars']['time_to_hiv_death_shape']
         dt = people.pars['dt']
 
-        # Extract index of current year
-        all_years = np.array(list(art_coverage.keys()))
-        year_ind = sc.findnearest(all_years, year)
-        nearest_year = round(all_years[year_ind])
+        t = people.t
+        update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt))  # Ensure it's an integer not smaller than 1
+        if t % update_freq == 0:
+            no_art_inds = hpu.true(people.hiv * ~people.art)
+            all_inds = np.concatenate((inds, no_art_inds))
+        else:
+            all_inds = sc.dcp(inds)
 
-        # Apply ART coverage (being careful of level 0 and level 1 people!)
-        art_cov = art_coverage[nearest_year]
-        art_inds = np.empty(0)
-        assign_dur_inds = np.empty(0)
-        for sk in ['f', 'm']:
-            art_year_sex = art_cov[sk]
-            age_bins = art_year_sex[:, 0]
-            this_art_cov = art_year_sex[:, 1]
-            mf_inds = people.is_female if sk == 'f' else people.is_male
-            mf_inds *= people.alive  # Only include people alive
-            mf_art_inds = mf_inds * people.art
-            mf_hiv_inds = mf_inds * people.hiv
-            age_art_inds = np.digitize(people.age[mf_art_inds], age_bins)
-            age_hiv_inds = np.digitize(people.age[mf_hiv_inds], age_bins)
-            cur_n_age_bin = np.zeros(len(age_bins))
-            cur_n_age_bin[age_art_inds] = people.scale_flows(hpu.true(mf_art_inds))
-            desired_n_age_bin = np.zeros(len(age_bins))
-            desired_n_age_bin[age_hiv_inds] = sc.randround(this_art_cov[age_hiv_inds] * people.scale_flows(hpu.true(mf_hiv_inds)))
-            num_art_age_bin = desired_n_age_bin - cur_n_age_bin
-            if np.sum(num_art_age_bin) > 0:
-                inds_age = np.digitize(people.age[inds], age_bins)
-                age_bins_to_fill = np.where(num_art_age_bin>0)[0]
-                for age_bin in age_bins_to_fill:
-                    eligible_inds = inds[np.where(inds_age==age_bin)]
-                    if len(eligible_inds):
+        if len(all_inds):
+            # Extract index of current year
+            all_years = np.array(list(art_coverage.keys()))
+            year_ind = sc.findnearest(all_years, year)
+            nearest_year = round(all_years[year_ind])
 
-                        art_probs = num_art_age_bin[age_bin] * people.scale[eligible_inds] / np.sum(people.scale[eligible_inds] ** 2)
-                        art_inds = eligible_inds[hpu.true(hpu.binomial_arr(art_probs))]
-                        # Sample number of agents to get on ART to reach current coverage
+            # Apply ART coverage (being careful of level 0 and level 1 people!)
+            art_cov = art_coverage[nearest_year]
+            art_inds = np.empty(0)
+            assign_dur_inds = np.empty(0)
+            for sk in ['f', 'm']:
+                art_year_sex = art_cov[sk]
+                age_bins = art_year_sex[:, 0]
+                this_art_cov = art_year_sex[:, 1]
+                mf_inds = people.is_female if sk == 'f' else people.is_male
+                mf_inds *= people.alive  # Only include people alive
+                mf_art_inds = mf_inds * people.art
+                mf_hiv_inds = mf_inds * people.hiv
+                age_art_inds = np.digitize(people.age[mf_art_inds], age_bins)
+                age_hiv_inds = np.digitize(people.age[mf_hiv_inds], age_bins)
+                cur_n_age_bin = np.zeros(len(age_bins))
+                cur_n_age_bin[age_art_inds] = people.scale_flows(hpu.true(mf_art_inds))
+                desired_n_age_bin = np.zeros(len(age_bins))
+                desired_n_age_bin[age_hiv_inds] = sc.randround(this_art_cov[age_hiv_inds] * people.scale_flows(hpu.true(mf_hiv_inds)))
+                num_art_age_bin = desired_n_age_bin - cur_n_age_bin
+                if np.sum(num_art_age_bin) > 0:
+                    inds_age = np.digitize(people.age[all_inds], age_bins)
+                    age_bins_to_fill = np.where(num_art_age_bin>0)[0]
+                    for age_bin in age_bins_to_fill:
+                        eligible_inds = all_inds[np.where(inds_age==age_bin)]
+                        if len(eligible_inds):
+                            art_probs = num_art_age_bin[age_bin] * people.scale[eligible_inds] / np.sum(people.scale[eligible_inds] ** 2)
+                            art_inds = eligible_inds[hpu.true(hpu.binomial_arr(art_probs))]
+                            people.art[art_inds] = True
+                            people.date_art[art_inds] = people.t
 
-                        people.art[art_inds] = True
-                        people.date_art[art_inds] = people.t
+                            # Get indices of people who are on ART who will not be virologically suppressed
+                            art_failure_prob = self['hiv_pars']['art_failure_prob']
+                            art_failure_probs = np.full(len(art_inds), fill_value=art_failure_prob, dtype=hpd.default_float)
+                            art_failure_bools = hpu.binomial_arr(art_failure_probs)
+                            art_failure_inds = art_inds[art_failure_bools]
+                            people.art_failure[art_failure_inds] = True
 
-                        # Get indices of people who are on ART who will not be virologically suppressed
-                        art_failure_prob = self['hiv_pars']['art_failure_prob']
-                        art_failure_probs = np.full(len(art_inds), fill_value=art_failure_prob, dtype=hpd.default_float)
-                        art_failure_bools = hpu.binomial_arr(art_failure_probs)
-                        art_failure_inds = art_inds[art_failure_bools]
-                        people.art_failure[art_failure_inds] = True
+                            # Get indices of those to assign durations for -- TODO, why not everyone?
+                            assign_dur_inds = art_failure_inds  # Assign death to those not with ART failure
 
-                        # Get indices of those to assign durations for -- TODO, why not everyone?
-                        assign_dur_inds = art_failure_inds  # Assign death to those not with ART failure
-
-        if incident: # Additionally, assign death to those who never go on ART
             no_art_inds = np.setdiff1d(inds, art_inds)
             assign_dur_inds = np.array(assign_dur_inds.tolist() + no_art_inds.tolist())
 
-            if len(assign_dur_inds)>0:
+            if len(assign_dur_inds) > 0:
                 scale = self['hiv_pars']['time_to_hiv_death_scale'](people.age[assign_dur_inds])
                 scale = np.maximum(scale, 0)
                 time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(assign_dur_inds))
@@ -269,19 +274,9 @@ class HIVsim(hpb.ParsObj):
         '''
         Wrapper method that checks for new HIV infections, updates prognoses, etc.
         '''
-        # Pull out anyone with prevalent infection who is not on ART, check if they get on today
-        t = people.t
-        dt = people.pars['dt']
-
-        update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt)) # Ensure it's an integer not smaller than 1
-        if t % update_freq == 0:
-            no_art_inds = hpu.true(people.hiv * ~people.art)
-            if len(no_art_inds):
-                self.set_hiv_prognoses(people, no_art_inds, year=year, incident=False)
 
         new_infection_inds = self.new_hiv_infections(people, year) # Newly acquired HIV infections
-        if len(new_infection_inds):
-            self.set_hiv_prognoses(people, new_infection_inds, year=year)  # Set ART adherence for those with HIV
+        self.set_hiv_prognoses(people, new_infection_inds, year=year)  # Set ART adherence for those with HIV
 
         self.check_hiv_death(people)
         self.update_cd4(people)
