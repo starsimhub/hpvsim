@@ -15,7 +15,7 @@ n_agents = [50e3,500][debug] # Swap between sizes
 start = [1950,1990][debug]
 ms_agent_ratio = [100,10][debug]
 hiv_datafile = '../test_data/hiv_incidence_south_africa.csv'
-art_datafile = '../test_data/art_coverage_south_africa.csv'
+art_datafile = ['../test_data/south_africa_art_coverage_by_age_males.csv', '../test_data/south_africa_art_coverage_by_age_females.csv']
 
 
 #%% Define the tests

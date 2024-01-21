@@ -159,40 +159,50 @@ class HIVsim(hpb.ParsObj):
         # Extract index of current year
         all_years = np.array(list(art_coverage.keys()))
         year_ind = sc.findnearest(all_years, year)
-        nearest_year = all_years[year_ind]
+        nearest_year = round(all_years[year_ind])
 
         # Apply ART coverage (being careful of level 0 and level 1 people!)
         art_cov = art_coverage[nearest_year]
-        cur_n = people.scale_flows(hpu.true(people.art & people.alive))
-        desired_n = sc.randround(art_cov * people.scale_flows(hpu.true(people.hiv & people.alive)))
-        # Scaled number of people to get on ART (not equal to n_agents, will need to scale back)
-        num_art = (desired_n - cur_n)
-        num_art = np.maximum(num_art, 0)
-        num_art = np.minimum(num_art, people.scale_flows(inds))
-
         art_inds = np.empty(0)
         assign_dur_inds = np.empty(0)
+        for sk in ['f', 'm']:
+            art_year_sex = art_cov[sk]
+            age_bins = art_year_sex[:, 0]
+            this_art_cov = art_year_sex[:, 1]
+            mf_inds = people.is_female if sk == 'f' else people.is_male
+            mf_inds *= people.alive  # Only include people alive
+            mf_art_inds = mf_inds * people.art
+            mf_hiv_inds = mf_inds * people.hiv
+            age_art_inds = np.digitize(people.age[mf_art_inds], age_bins)
+            age_hiv_inds = np.digitize(people.age[mf_hiv_inds], age_bins)
+            cur_n_age_bin = np.zeros(len(age_bins))
+            cur_n_age_bin[age_art_inds] = people.scale_flows(hpu.true(mf_art_inds))
+            desired_n_age_bin = np.zeros(len(age_bins))
+            desired_n_age_bin[age_hiv_inds] = sc.randround(this_art_cov[age_hiv_inds] * people.scale_flows(hpu.true(mf_hiv_inds)))
+            num_art_age_bin = desired_n_age_bin - cur_n_age_bin
+            if np.sum(num_art_age_bin) > 0:
+                inds_age = np.digitize(people.age[inds], age_bins)
+                age_bins_to_fill = np.where(num_art_age_bin>0)[0]
+                for age_bin in age_bins_to_fill:
+                    eligible_inds = inds[np.where(inds_age==age_bin)]
+                    if len(eligible_inds):
 
-        if num_art > 0:
+                        art_probs = num_art_age_bin[age_bin] * people.scale[eligible_inds] / np.sum(people.scale[eligible_inds] ** 2)
+                        art_inds = eligible_inds[hpu.true(hpu.binomial_arr(art_probs))]
+                        # Sample number of agents to get on ART to reach current coverage
 
-            art_probs = num_art * people.scale[inds] / np.sum(people.scale[inds]** 2)
-            art_inds = inds[hpu.true(hpu.binomial_arr(art_probs))]
-            n_art = people.scale_flows(art_inds)
-            # Sample number of agents to get on ART to reach current coverage
+                        people.art[art_inds] = True
+                        people.date_art[art_inds] = people.t
 
+                        # Get indices of people who are on ART who will not be virologically suppressed
+                        art_failure_prob = self['hiv_pars']['art_failure_prob']
+                        art_failure_probs = np.full(len(art_inds), fill_value=art_failure_prob, dtype=hpd.default_float)
+                        art_failure_bools = hpu.binomial_arr(art_failure_probs)
+                        art_failure_inds = art_inds[art_failure_bools]
+                        people.art_failure[art_failure_inds] = True
 
-            people.art[art_inds] = True
-            people.date_art[art_inds] = people.t
-
-            # Get indices of people who are on ART who will not be virologically suppressed
-            art_failure_prob = self['hiv_pars']['art_failure_prob']
-            art_failure_probs = np.full(len(art_inds), fill_value=art_failure_prob, dtype=hpd.default_float)
-            art_failure_bools = hpu.binomial_arr(art_failure_probs)
-            art_failure_inds = art_inds[art_failure_bools]
-            people.art_failure[art_failure_inds] = True
-
-            # Get indices of those to assign durations for -- TODO, why not everyone?
-            assign_dur_inds = art_failure_inds # Assign death to those not with ART failure
+                        # Get indices of those to assign durations for -- TODO, why not everyone?
+                        assign_dur_inds = art_failure_inds  # Assign death to those not with ART failure
 
         if incident: # Additionally, assign death to those who never go on ART
             no_art_inds = np.setdiff1d(inds, art_inds)
@@ -417,7 +427,14 @@ class HIVsim(hpb.ParsObj):
 
             # Load data
             df_inc = pd.read_csv(hiv_datafile)  # HIV incidence
-            df_art = pd.read_csv(art_datafile)  # ART coverage
+            dfs_art = []
+            if isinstance(art_datafile, list):
+                for art_data in art_datafile:
+                    df_art = pd.read_csv(art_data)  # ART coverage
+                    dfs_art.append(df_art)
+            else:
+                df_art = pd.read_csv(art_datafile)  # ART coverage
+                dfs_art.append(df_art)
 
             # Process HIV and ART data
             sex_keys = ['Male', 'Female']
@@ -441,10 +458,30 @@ class HIVsim(hpb.ParsObj):
                     )
 
             # Now compute ART adherence over time/age
+            art_dfs = []
+            for id, df in enumerate(dfs_art):
+                if 'females' in art_datafile[id]:
+                    sex = 'f'
+                else:
+                    sex = 'm'
+                df = df.set_index('age')
+                df = df.melt(ignore_index=False).reset_index()
+                df['Sex'] = sex
+                df.columns = ['Age', 'Year', 'ART', 'Sex']
+                art_dfs.append(df)
+
+            art_df = pd.concat(art_dfs)
             art_coverage = dict()
-            years = df_art['Year'].values
-            for i, year in enumerate(years):
-                art_coverage[year] = df_art.iloc[i]['ART Coverage']
+
+            years = df['Year'].unique().astype(float)
+
+            for year in years:
+                year = round(year)
+                art_coverage[year] = dict()
+                for sk in sex_keys:
+                    sk_out = sex_key_map[sk]
+                    art_coverage[year][sk_out] = np.array(art_df[(art_df['Year'] == str(year)) & (art_df['Sex'] == sk_out)][['Age', 'ART']],
+                                     dtype=hpd.default_float)
 
         return hiv_incidence_rates, art_coverage
 
