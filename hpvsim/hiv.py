@@ -182,15 +182,15 @@ class HIVsim(hpb.ParsObj):
                 mf_inds *= people.alive  # Only include people alive
                 mf_art_inds = mf_inds * people.art
                 mf_hiv_inds = mf_inds * people.hiv
-                age_art_inds = np.digitize(people.age[mf_art_inds], age_bins)
-                age_hiv_inds = np.digitize(people.age[mf_hiv_inds], age_bins)
+                age_art_inds = np.digitize(people.age[mf_art_inds], age_bins)-1
+                age_hiv_inds = np.digitize(people.age[mf_hiv_inds], age_bins)-1
                 cur_n_age_bin = np.zeros(len(age_bins))
                 cur_n_age_bin[age_art_inds] = people.scale_flows(hpu.true(mf_art_inds))
                 desired_n_age_bin = np.zeros(len(age_bins))
                 desired_n_age_bin[age_hiv_inds] = sc.randround(this_art_cov[age_hiv_inds] * people.scale_flows(hpu.true(mf_hiv_inds)))
                 num_art_age_bin = desired_n_age_bin - cur_n_age_bin
                 if np.sum(num_art_age_bin) > 0:
-                    inds_age = np.digitize(people.age[all_inds], age_bins)
+                    inds_age = np.digitize(people.age[all_inds], age_bins)-1
                     age_bins_to_fill = np.where(num_art_age_bin>0)[0]
                     for age_bin in age_bins_to_fill:
                         eligible_inds = all_inds[np.where(inds_age==age_bin)]
