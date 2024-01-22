@@ -118,6 +118,8 @@ class HIVsim(hpb.ParsObj):
         results['n_hiv'] = init_res('Number living with HIV', color=stock_colors[0])
         results['n_hiv_by_age'] = init_res('Number living with HIV by age', n_rows=na, color=stock_colors[0])
         results['hiv_prevalence'] = init_res('HIV prevalence', color=stock_colors[0])
+        results['female_hiv_prevalence'] = init_res('Female HIV prevalence', color=stock_colors[1])
+        results['male_hiv_prevalence'] = init_res('Male HIV prevalence', color=stock_colors[2])
         results['hiv_prevalence_by_age'] = init_res('HIV prevalence by age', n_rows=na, color=stock_colors[0])
         results['hiv_deaths'] = init_res('New HIV deaths')
         results['hiv_deaths_by_age'] = init_res('New HIV deaths by age', n_rows=na, color=stock_colors[0])
@@ -138,6 +140,7 @@ class HIVsim(hpb.ParsObj):
         results['n_females_with_hiv_alive_by_age'] = init_res('Number females with HIV alive by age', n_rows=na)
         results['n_females_no_hiv_alive_by_age'] = init_res('Number females without HIV alive by age', n_rows=na)
         results['n_females_with_hiv_alive'] = init_res('Number females with HIV alive')
+        results['n_males_with_hiv_alive'] = init_res('Number males with HIV alive')
         results['n_females_no_hiv_alive'] = init_res('Number females without HIV alive')
         results['n_art'] = init_res('Number on ART')
         results['art_coverage'] = init_res('ART coverage')
@@ -156,13 +159,14 @@ class HIVsim(hpb.ParsObj):
         shape = self['hiv_pars']['time_to_hiv_death_shape']
         dt = people.pars['dt']
 
-        t = people.t
-        update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt))  # Ensure it's an integer not smaller than 1
-        if t % update_freq == 0:
-            no_art_inds = hpu.true(people.hiv * ~people.art)
-            all_inds = np.concatenate((inds, no_art_inds))
-        else:
-            all_inds = sc.dcp(inds)
+        no_art_inds = hpu.true(people.hiv * ~people.art)
+        all_inds = np.concatenate((inds, no_art_inds))
+        # t = people.t
+        # update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt))  # Ensure it's an integer not smaller than 1
+        # if t % update_freq == 0:
+        #
+        # else:
+        #     all_inds = sc.dcp(inds)
 
         if len(all_inds):
             # Extract index of current year
@@ -397,6 +401,9 @@ class HIVsim(hpb.ParsObj):
             self.results['n_females_no_hiv_alive'][idx] = people.scale_flows(alive_female_no_hiv_inds)
             self.results['n_females_no_hiv_alive_by_age'][:, idx] = np.histogram(people.age[alive_female_no_hiv_inds], bins=people.age_bin_edges,
                  weights=people.scale[alive_female_no_hiv_inds])[0]
+
+            alive_male_hiv_inds = hpu.true(people.alive*people.is_male*people.hiv)
+            self.results['n_males_with_hiv_alive'][idx] = people.scale_flows(alive_male_hiv_inds)
         return
 
 
@@ -507,12 +514,17 @@ class HIVsim(hpb.ParsObj):
                 answer[:, fill_inds] = num[:, fill_inds] / denom[fill_inds]
             return answer
 
+        alive_females = simres['n_alive_by_sex'][0, :]
+        alive_males = simres['n_alive_by_sex'][1, :]
+
         ng = sim.pars['n_genotypes']
         no_hiv_by_age = simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]
         self.results['hiv_prevalence_by_age'][:] = safedivide(res['n_hiv_by_age'][:], simres['n_alive_by_age'][:])
         self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], (simres['n_alive'][:] - res['n_hiv'][:]))
         self.results['hiv_incidence_by_age'][:] = sc.safedivide(res['hiv_infections_by_age'][:], (simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]))
-        self.results['hiv_prevalence'][:] = res['n_hiv'][:]/ simres['n_alive'][:]
+        self.results['hiv_prevalence'][:] = (res['n_females_with_hiv_alive'][:] + res['n_males_with_hiv_alive'][:])/ simres['n_alive'][:]
+        self.results['female_hiv_prevalence'][:] = res['n_females_with_hiv_alive'][:] / alive_females
+        self.results['male_hiv_prevalence'][:] = res['n_males_with_hiv_alive'][:] / alive_males
         self.results['hpv_prevalence_by_age_with_hiv'][:] = safedivide(res['n_hpv_by_age_with_hiv'][:], ng*res['n_hiv_by_age'][:])
         self.results['hpv_prevalence_by_age_no_hiv'][:] = safedivide(res['n_hpv_by_age_no_hiv'][:], ng*no_hiv_by_age)
         self.results['art_coverage'][:] = safedivide(res['n_art'][:],res['n_hiv'][:])
