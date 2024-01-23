@@ -72,7 +72,7 @@ def test_hiv():
     sim.plot()
     sim.plot(to_plot=to_plot)
 
-    rsa_df = pd.read_csv('../test_data/data/RSA_data.csv').set_index('Unnamed: 0').T
+    rsa_df = pd.read_csv('../test_data/RSA_data.csv').set_index('Unnamed: 0').T
 
     simres = sim.results
     years = simres['year']
