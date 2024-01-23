@@ -641,6 +641,7 @@ class age_results(Analyzer):
                                 range(len(rdict.bins) - 1)]
             rdict.age_labels.append(f'{int(rdict.bins[-1])}+')
 
+
             # Construct timepoints
             if not rdict.get('timepoints') or rdict.timepoints is None:
                 rdict.timepoints = []
@@ -732,12 +733,10 @@ class age_results(Analyzer):
         if attr == 'cancer_mortality': attr = 'cancer_deaths'
         # Handle variable names
         mapping = {
-            'infections': ['date_infectious', 'infectious'],
-            'cin':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
-            'cins':  ['date_cin1', 'cin'], # Not a typo - the date the get a CIN is the same as the date they get a CIN1
-            'cin1': ['date_cin1', 'cin1'],
-            'cin2': ['date_cin2', 'cin2'],
-            'cin3': ['date_cin3', 'cin3'],
+            'infections': ['date_exposed', 'infectious'],
+            'cin':  ['date_cin', 'cin'],
+            'dysplasias':  ['date_cin', 'cin'],
+            'cins':  ['date_cin', 'cin'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
             'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
@@ -780,7 +779,6 @@ class age_results(Analyzer):
 
                 # Figure out if it's a flow
                 if rdict.result_type == 'flow':
-
                     if not rdict.by_genotype:  # Results across all genotypes
                         if rkey == 'detected_cancer_deaths':
                             inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl['detected_cancer'])).nonzero()[-1]
@@ -801,6 +799,9 @@ class age_results(Analyzer):
                     if not rdict.by_genotype:
                         if rdict.by_hiv:
                             inds = (ppl[rdict.attr].any(axis=0) * ppl[rdict.hiv_attr]).nonzero()[-1]
+                        elif isinstance(rdict.attr, list):
+                            inds = (ppl[rdict.attr[0]].any(axis=0) + ppl[rdict.attr[1]].any(axis=0)).nonzero()[-1]
+                            inds = np.unique(inds)
                         else:
                             inds = ppl[rdict.attr].any(axis=0).nonzero()[-1]
                         self.results[rkey][date] = bin_ages(inds, bins)
@@ -820,12 +821,13 @@ class age_results(Analyzer):
                         else:
                             denom = bin_ages(inds=ppl.alive, bins=bins)
                     else:  # Denominator is females
-                        denom = bin_ages(inds=ppl.f_inds, bins=bins)
+                        denom = bin_ages(inds=ppl.is_female_alive, bins=bins)
                     if rdict.by_genotype: denom = denom[None, :]
                     self.results[rkey][date] = self.results[rkey][date] / (denom)
 
                 if 'incidence' in rkey:
                     if 'hpv' in rkey:  # Denominator is susceptible population
+                        inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
                         denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
                     else:  # Denominator is females at risk for cancer
                         if rdict.by_hiv:
@@ -947,6 +949,7 @@ class age_results(Analyzer):
         res = []
         resargs = self.result_args[key]
         results = self.results[key]
+
         for name, group in resargs.data.groupby(['genotype', 'year']):
             genotype = name[0]
             year = name[1]
@@ -1090,7 +1093,7 @@ class age_causal_infection(Analyzer):
         self.age_causal = []
         self.age_cancer = []
         self.dwelltime = dict()
-        for state in ['precin', 'cin1', 'cin2', 'cin3', 'total']:
+        for state in ['precin', 'cin', 'total']:
             self.dwelltime[state] = []
 
     def apply(self, sim):
@@ -1099,20 +1102,14 @@ class age_causal_infection(Analyzer):
             if len(cancer_inds):
                 current_age = sim.people.age[cancer_inds]
                 date_exposed = sim.people.date_exposed[cancer_genotypes, cancer_inds]
-                date_cin1 = sim.people.date_cin1[cancer_genotypes, cancer_inds]
-                date_cin2 = sim.people.date_cin2[cancer_genotypes, cancer_inds]
-                date_cin3 = sim.people.date_cin3[cancer_genotypes, cancer_inds]
-                hpv_time = (date_cin1 - date_exposed) * sim['dt']
-                cin1_time = (date_cin2 - date_cin1) * sim['dt']
-                cin2_time = (date_cin3 - date_cin2) * sim['dt']
-                cin3_time = (sim.t - date_cin3) * sim['dt']
+                date_cin = sim.people.date_cin[cancer_genotypes, cancer_inds]
+                hpv_time = (date_cin - date_exposed) * sim['dt']
+                cin_time = (sim.t - date_cin) * sim['dt']
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
                 self.age_cancer += current_age.tolist()
                 self.dwelltime['precin'] += hpv_time.tolist()
-                self.dwelltime['cin1'] += cin1_time.tolist()
-                self.dwelltime['cin2'] += cin2_time.tolist()
-                self.dwelltime['cin3'] += cin3_time.tolist()
+                self.dwelltime['cin'] += cin_time.tolist()
                 self.dwelltime['total'] += total_time.tolist()
         return
 

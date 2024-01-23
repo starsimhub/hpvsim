@@ -24,7 +24,7 @@ from .settings import options as hpo
 class Sim(hpb.BaseSim):
 
     def __init__(self, pars=None, datafile=None, label=None,
-                 popfile=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
+                 popfile=None, popdict=None, people=None, version=None, hiv_datafile=None, art_datafile=None,
                  **kwargs):
 
         # Set attributes
@@ -35,8 +35,8 @@ class Sim(hpb.BaseSim):
         self.hiv_datafile  = hiv_datafile # The name of the HIV data file
         self.popfile       = popfile  # The population file
         self.data          = None     # The data
-        self.popdict       = people   # The population dictionary
-        self.people        = None     # Initialize these here so methods that check their length can see they're empty
+        self.popdict       = popdict  # The population dictionary
+        self.people        = people   # People object
         self.t             = None     # The current time in the simulation (during execution); outside of sim.step(), its value corresponds to next timestep to be computed
         self.results       = {}       # For storing results
         self.summary       = None     # For storing a summary of the results
@@ -55,7 +55,7 @@ class Sim(hpb.BaseSim):
         # Load data, including datafile that are used to create additional optional parameters
         self.load_data(datafile) # Load the data, if provided
 
-        # Update parameters
+        # Update parameters, including demographic data
         if pars is None:
             pars = dict(location=default_location)
         else:
@@ -384,20 +384,6 @@ class Sim(hpb.BaseSim):
         # Set the number of immunity sources
         self['n_imm_sources'] = len(self['genotypes'])
 
-        # Do any precomputations for the genotype transformation functions
-        t_step = self['dt']
-        t_sequence = np.arange(0, upper_dysp_lim, t_step)
-        cumdysp = dict()
-        for g in range(self['n_genotypes']):
-            sev_fn = self['genotype_pars'][g]['sev_fn']
-            sev_integral = self['genotype_pars'][g]['sev_integral']
-            if sev_integral=='numeric':
-                glabel = self['genotype_map'][g]
-                dysp_arr = hppar.compute_severity(t_sequence, rel_sev=None, pars=sev_fn)
-                cumdysp[glabel] = np.cumsum(dysp_arr) * t_step
-
-        self['cumdysp'] = cumdysp  # Store
-
         return
 
 
@@ -465,11 +451,8 @@ class Sim(hpb.BaseSim):
         results['n_infectious_by_age']             = init_res('Number infectious by age', n_rows=na, color=stock.color)
         results['n_females_infectious_by_age']     = init_res('Number of females infectious by age', n_rows=na, color=stock.color)
         results['n_susceptible_by_age']            = init_res('Number susceptible by age', n_rows=na, color=stock.color)
-        results['n_transformed_by_age']            = init_res('Number transformed by age', n_rows=na, color=stock.color)
         results['n_precin_by_age']                 = init_res('Number Pre-CIN by age', n_rows=na, color=stock.color)
-        results['n_cin1_by_age']                   = init_res('Number CIN1 by age', n_rows=na, color=stock.color)
-        results['n_cin2_by_age']                   = init_res('Number CIN2 by age', n_rows=na, color=stock.color)
-        results['n_cin3_by_age']                   = init_res('Number CIN3 by age', n_rows=na, color=stock.color)
+        results['n_cin_by_age']                    = init_res('Number CIN by age', n_rows=na, color=stock.color)
 
         # Create incidence and prevalence results
         for var,name,color in zip(hpd.inci_keys, hpd.inci_names, hpd.inci_colors):
@@ -540,16 +523,12 @@ class Sim(hpb.BaseSim):
         results['precin_prevalence'] = init_res('Pre-CIN prevalence', color=stock_colors[0])
         results['precin_prevalence_by_genotype'] = init_res('Pre-CIN prevalence by genotype', n_rows=ng, color=stock_colors[0])
         results['precin_prevalence_by_age'] = init_res('Pre-CIN prevalence by age', n_rows=na, color=stock_colors[0])
-        results['cin1_prevalence'] = init_res('CIN1 prevalence', color=stock_colors[1])
-        results['cin1_prevalence_by_genotype'] = init_res('CIN1 prevalence by genotype', n_rows=ng, color=stock_colors[1])
-        results['cin1_prevalence_by_age'] = init_res('CIN1 prevalence by age', n_rows=na, color=stock_colors[1])
-        results['cin2_prevalence'] = init_res('CIN2 prevalence', color=stock_colors[2])
-        results['cin2_prevalence_by_genotype'] = init_res('CIN2 prevalence by genotype', n_rows=ng, color=stock_colors[2])
-        results['cin2_prevalence_by_age'] = init_res('CIN2 prevalence by age', n_rows=na, color=stock_colors[2])
-        results['cin3_prevalence'] = init_res('CIN3 prevalence', color=stock_colors[3])
-        results['cin3_prevalence_by_genotype'] = init_res('CIN3 prevalence', n_rows=ng, color=stock_colors[3])
-        results['cin3_prevalence_by_age'] = init_res('CIN3 prevalence by age', n_rows=na, color=stock_colors[3])
+        results['cin_prevalence'] = init_res('CIN prevalence', color=stock_colors[1])
+        results['cin_prevalence_by_genotype'] = init_res('CIN prevalence by genotype', n_rows=ng, color=stock_colors[1])
+        results['cin_prevalence_by_age'] = init_res('CIN prevalence by age', n_rows=na, color=stock_colors[1])
         results['female_hpv_prevalence_by_age'] = init_res('Female HPV prevalence by age', n_rows=na, color=stock_colors[3])
+        results['lsil_prevalence'] = init_res('HPV/CIN1 prevalence', color=stock_colors[3])
+        results['lsil_prevalence_by_age'] = init_res('HPV/CIN1 prevalence by age', n_rows=na, color=stock_colors[3])
 
         # Time vector
         results['year'] = self.res_yearvec
@@ -610,23 +589,31 @@ class Sim(hpb.BaseSim):
                 resetstr = ' (resetting people)' if reset else ' (warning: not resetting sim.people)'
             print(f'Initializing sim{resetstr} with {self["n_agents"]:0n} agents')
         if self.popfile and self.popdict is None: # If there's a popdict, we initialize it
-            self.load_population(init_people=False)
+            self.load_population(init_people=False) #TODO: no method for this
 
         # Make the people
         self.people, total_pop = hppop.make_people(self, reset=reset, verbose=verbose, microstructure=self['network'], **kwargs)
 
         # Figure out the scale factors
+        # Case 1: total pop and location both provided
         if self['total_pop'] is not None and total_pop is not None: # If no pop_scale has been provided, try to get it from the location
-            errormsg = 'You can either define total_pop explicitly or via the location, but not both'
-            raise ValueError(errormsg)
+            msg = f"Rescaling the population of the chosen location to {self['total_pop']}"
+            if self['verbose']: print(msg)
+            total_pop = self['total_pop']
+
+        # Case 2: no location provided but total pop provided
         elif total_pop is None and self['total_pop'] is not None:
             total_pop = self['total_pop']
             
+        # Case 3: neither total pop, location, nor pop scale provided
         if self['pop_scale'] is None:
             if total_pop is None:
                 self['pop_scale'] = 1.0
+
+        # Resolve cases 1 & 2 by creating the pop scal
             else:
                 self['pop_scale'] = total_pop/self['n_agents']
+
         self['ms_agent_ratio'] = int(self['ms_agent_ratio'])
 
         # Deal with HIV
@@ -764,7 +751,8 @@ class Sim(hpb.BaseSim):
         imm_kin_pars = self['imm_kin']
         mixing = self['mixing']
         layer_probs = self['layer_probs']
-        cross_layer = self['cross_layer']
+        f_cross_layer = self['f_cross_layer']
+        m_cross_layer = self['m_cross_layer']
         acts = self['acts']
         dur_pship = self['dur_pship']
         age_act_pars = self['age_act_pars']
@@ -780,7 +768,7 @@ class Sim(hpb.BaseSim):
         people = self.people # Shorten
         people.dissolve_partnerships(t=t) # Dissolve partnerships
         tind = self.yearvec[t] - self['start']
-        people.create_partnerships(tind, mixing, layer_probs, cross_layer, dur_pship, acts, age_act_pars)
+        people.create_partnerships(tind, mixing, layer_probs, f_cross_layer, m_cross_layer, dur_pship, acts, age_act_pars)
 
         # Apply interventions
         for i,intervention in enumerate(self.interventions):
@@ -843,19 +831,23 @@ class Sim(hpb.BaseSim):
         for g in range(ng):
             latent_inds = hpu.true(people.latent[g,:])
             if len(latent_inds):
+                sev_imm = people.sev_imm[g, latent_inds]
                 reactivation_probs = np.full_like(latent_inds, self['hpv_reactivation'] * dt, dtype=hpd.default_float)
-
-                # if self['model_hiv']:
-                #     # determine if any of these inds have HIV and adjust their probs
-                #     hiv_latent_inds = latent_inds[hpu.true(people.hiv[latent_inds])]
-                #     if len(hiv_latent_inds):
-                #         immune_compromise = 1 - people.art_adherence[hiv_latent_inds]
-                #         mod = immune_compromise * self['hiv_pars']['reactivation_prob']
-                #         mod[mod < 1] = 1
-                #         reactivation_probs[hpu.true(people.hiv[latent_inds])] *= mod
+                reactivation_probs *= (1 - sev_imm)
+                if self['model_hiv']:
+                    # determine if any of these inds have HIV and adjust their probs
+                    hiv_latent_inds = latent_inds[hpu.true(people.hiv[latent_inds])]
+                    if len(hiv_latent_inds):
+                        immune_compromise = 1 - people.art_adherence[hiv_latent_inds]
+                        mod = immune_compromise * self.hivsim['hiv_pars']['rel_reactivation_prob']
+                        mod[mod < 1] = 1
+                        reactivation_probs[hpu.true(people.hiv[latent_inds])] *= mod
                 is_reactivated = hpu.binomial_arr(reactivation_probs)
                 reactivated_inds = latent_inds[is_reactivated]
                 people.infect(inds=reactivated_inds, g=g, layer='reactivation')
+
+        # Updates after infection
+        self.people.update_states_post(t=t, year=year)
 
         # Index for results
         idx = int(t / self.resfreq)
@@ -884,19 +876,14 @@ class Sim(hpb.BaseSim):
             infinds = hpu.true(people['infectious'])
             f_infinds = np.intersect1d(f_inds, infinds)
             susinds = hpu.true(people['susceptible'])
-            transformedinds = hpu.true(people['transformed'])
             precininds = hpu.true(people['precin'])
-            cin1inds = hpu.true(people['cin1'])
-            cin2inds = hpu.true(people['cin2'])
-            cin3inds = hpu.true(people['cin3'])
+            cininds = hpu.true(people['cin'])
+
             self.results['n_females_infectious_by_age'][:, idx] = np.histogram(people.age[f_infinds], bins=people.age_bin_edges, weights=people.scale[f_infinds])[0]
             self.results['n_infectious_by_age'][:, idx]  = np.histogram(people.age[infinds], bins=people.age_bin_edges, weights=people.scale[infinds])[0]
             self.results['n_susceptible_by_age'][:, idx] = np.histogram(people.age[susinds], bins=people.age_bin_edges, weights=people.scale[susinds])[0]
-            self.results['n_transformed_by_age'][:, idx] = np.histogram(people.age[transformedinds], bins=people.age_bin_edges, weights=people.scale[transformedinds])[0]
             self.results['n_precin_by_age'][:, idx] = np.histogram(people.age[precininds], bins=people.age_bin_edges, weights=people.scale[precininds])[0]
-            self.results['n_cin1_by_age'][:, idx] = np.histogram(people.age[cin1inds], bins=people.age_bin_edges, weights=people.scale[cin1inds])[0]
-            self.results['n_cin2_by_age'][:, idx] = np.histogram(people.age[cin2inds], bins=people.age_bin_edges, weights=people.scale[cin2inds])[0]
-            self.results['n_cin3_by_age'][:, idx] = np.histogram(people.age[cin3inds], bins=people.age_bin_edges, weights=people.scale[cin3inds])[0]
+            self.results['n_cin_by_age'][:, idx] = np.histogram(people.age[cininds], bins=people.age_bin_edges, weights=people.scale[cininds])[0]
 
             # Create total stocks
             for key in self.people.meta.genotype_stock_keys:
@@ -949,13 +936,13 @@ class Sim(hpb.BaseSim):
         return
 
 
-    def run(self, do_plot=False, until=None, restore_pars=True, reset_seed=True, verbose=None):
+    def run(self, do_plot=False, until=None, restore_pars=True, reset_seed=True, verbose=None, **kwargs):
         ''' Run the model once '''
         # Initialization steps -- start the timer, initialize the sim and the seed, and check that the sim hasn't been run
         T = sc.timer()
 
         if not self.initialized:
-            self.initialize()
+            self.initialize(**kwargs)
             self._orig_pars = sc.dcp(self.pars) # Create a copy of the parameters, to restore after the run, in case they are dynamically modified
 
         if verbose is None:
@@ -1087,7 +1074,7 @@ class Sim(hpb.BaseSim):
         ng = self.pars['n_genotypes']
         self.results['hpv_incidence'][:]                = safedivide(res['infections'][:], ng*res['n_susceptible'][:])
         self.results['hpv_incidence_by_genotype'][:]    = safedivide(res['infections_by_genotype'][:], res['n_susceptible_by_genotype'][:])
-        self.results['hpv_incidence_by_age'][:]         = safedivide(res['infections_by_age'][:], ng*res['n_susceptible_by_age'][:])
+        self.results['hpv_incidence_by_age'][:]         = safedivide(res['infections_by_age'][:], res['n_susceptible_by_age'][:])
         self.results['hpv_prevalence'][:]               = safedivide(res['n_infectious'][:], ng*res['n_alive'][:])
         self.results['hpv_prevalence_by_genotype'][:]   = safedivide(res['n_infectious_by_genotype'][:], res['n_alive'][:])
         self.results['hpv_prevalence_by_age'][:]        = safedivide(res['n_infectious_by_age'][:], res['n_alive_by_age'][:])
@@ -1101,18 +1088,11 @@ class Sim(hpb.BaseSim):
         self.results['precin_prevalence_by_genotype'][:] = safedivide(res['n_precin_by_genotype'][:], alive_females)
         self.results['precin_prevalence_by_age'][:] = safedivide(res['n_precin_by_age'][:],
                                                                res['n_females_alive_by_age'][:])
-        self.results['cin1_prevalence'][:] = safedivide(res['n_cin1'][:], ng*alive_females)
-        self.results['cin1_prevalence_by_genotype'][:] = safedivide(res['n_cin1_by_genotype'][:], alive_females)
-        self.results['cin1_prevalence_by_age'][:] = safedivide(res['n_cin1_by_age'][:],
+        self.results['cin_prevalence'][:] = safedivide(res['n_cin'][:], ng*alive_females)
+        self.results['cin_prevalence_by_genotype'][:] = safedivide(res['n_cin_by_genotype'][:], alive_females)
+        self.results['cin_prevalence_by_age'][:] = safedivide(res['n_cin_by_age'][:],
                                                                res['n_females_alive_by_age'][:])
-        self.results['cin2_prevalence'][:] = safedivide(res['n_cin2'][:], ng*alive_females)
-        self.results['cin2_prevalence_by_genotype'][:] = safedivide(res['n_cin2_by_genotype'][:], alive_females)
-        self.results['cin2_prevalence_by_age'][:] = safedivide(res['n_cin2_by_age'][:],
-                                                               res['n_females_alive_by_age'][:])
-        self.results['cin3_prevalence'][:] = safedivide(res['n_cin3'][:], ng*alive_females)
-        self.results['cin3_prevalence_by_genotype'][:] = safedivide(res['n_cin3_by_genotype'][:], alive_females)
-        self.results['cin3_prevalence_by_age'][:] = safedivide(res['n_cin3_by_age'][:],
-                                                               res['n_females_alive_by_age'][:])
+
         # Compute cancer incidence.
         at_risk_females = alive_females - res['n_cancerous'][:]
         scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women
@@ -1163,7 +1143,7 @@ class Sim(hpb.BaseSim):
         res = self.results[reskey][:,t]
         edges = self['age_bin_edges']
         mean_edges = edges[:-1] + np.diff(edges)/2
-        age_mean = ((res/res.sum())*mean_edges).sum()
+        age_mean = (sc.safedivide(res,res.sum())*mean_edges).sum()
         return age_mean
         
 

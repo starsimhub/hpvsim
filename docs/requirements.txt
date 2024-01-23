@@ -8,7 +8,5 @@ pandoc
 pypandoc
 optuna
 seaborn
-myst-parser
+sphinxcontrib-jquery
 readthedocs-sphinx-search
-jupyterlab
-linkify-it-py

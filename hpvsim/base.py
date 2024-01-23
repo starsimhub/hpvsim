@@ -296,7 +296,8 @@ class BaseSim(ParsObj):
             if pars.get('location'):
                 location = pars['location']
                 pars['birth_rates'], pars['death_rates'] = hppar.get_births_deaths(location=location) # Set birth and death rates
-
+            if pars.get('n_clusters'):
+                hppar.add_mixing(pars)
             # Call update_pars() for ParsObj
             super().update_pars(pars=pars, create=create)
 
@@ -1372,7 +1373,7 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of everyone with abnormal cells. Union of episomal, transformed, and cancerous
         '''
-        return (self.episomal + self.transformed + self.cancerous).astype(bool)
+        return (self.cin + self.cancerous).astype(bool)
 
     @property
     def latent(self):
@@ -1387,36 +1388,7 @@ class BasePeople(FlexPretty):
         '''
         Boolean array of females with HPV whose disease severity level does not meet the threshold for detectable cell changes
         '''
-        return ((self.sex == 0) & self.infectious & (np.isnan(self.sev) | (self.sev==0))).astype(bool)
-
-    @property
-    def cin1(self):
-        '''
-        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN1-level cell changes
-        '''
-        return ((self.sex == 0) * (self.sev > 0) * (self.sev < self.pars['clinical_cutoffs']['cin1'])).astype(bool)
-
-    @property
-    def cin2(self):
-        '''
-        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN2-level cell changes
-        '''
-        return ((self.sex == 0) * (self.sev >= self.pars['clinical_cutoffs']['cin1']) * (
-                 self.sev < self.pars['clinical_cutoffs']['cin2'])).astype(bool)
-
-    @property
-    def cin3(self):
-        '''
-        Boolean array of females with HPV whose disease severity level lies within the thresholds for CIN3-level cell changes
-        '''
-        return ((self.sex == 0) * (self.sev >= self.pars['clinical_cutoffs']['cin2'])).astype(bool)
-
-    @property
-    def cin(self):
-        '''
-        Boolean array of females with HPV whose disease severity level meets the threshold for detectable cell changes
-        '''
-        return (self.sev>0).astype(bool)
+        return ((self.sex == 0) & self.infectious & ~self.cin).astype(bool)
 
     def true(self, key):
         ''' Return indices matching the condition '''
@@ -1964,14 +1936,16 @@ class Layer(FlexDict):
 
     def __init__(self, *args, label=None, **kwargs):
         self.meta = {
-            'f':     hpd.default_int,   # Female
-            'm':     hpd.default_int,   # Male
-            'acts':  hpd.default_float, # Default transmissibility for this contact type
-            'dur':   hpd.default_float, # Duration of partnership
-            'start': hpd.default_int, # Date of partnership start
-            'end':   hpd.default_float, # Date of partnership end
-            'age_f': hpd.default_float,  # Age of female partner
-            'age_m': hpd.default_float,  # Age of male partner
+            'f':            hpd.default_int,   # Female
+            'm':            hpd.default_int,   # Male
+            'acts':         hpd.default_float, # Default transmissibility for this contact type
+            'dur':          hpd.default_float, # Duration of partnership
+            'start':        hpd.default_float, # Date of partnership start
+            'end':          hpd.default_float, # Date of partnership end
+            'age_f':        hpd.default_float, # Age of female partner
+            'age_m':        hpd.default_float, # Age of male partner
+            'cluster_f':    hpd.default_int,   # Cluster id of female partner
+            'cluster_m':    hpd.default_int    # Cluster id of male partner
         }
         self.basekey = 'f' # Assign a base key for calculating lengths and performing other operations
         self.label = label

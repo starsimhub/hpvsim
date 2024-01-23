@@ -146,7 +146,7 @@ def map_entries(json, location, df=None, wb=False):
     return entries
 
 
-def get_age_distribution(location=None, year=None, total_pop_file=None):
+def get_age_distribution(location=None, year=None, total_pop_file=None, age_datafile=None):
     '''
     Load age distribution for a given country or countries.
 
@@ -160,21 +160,25 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
     '''
 
     # Load the raw data
-    try:
-        df = load_file(files.age_dist)
-    except Exception as E:
-        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
-        raise ValueError(errormsg) from E
+    if age_datafile is None:
+        try:
+            df = load_file(files.age_dist)
+        except Exception as E:
+            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            raise ValueError(errormsg) from E
 
-    # Handle year
-    if year is None:
-        warnmsg = 'No year provided for the initial population age distribution, using 2000 by default'
-        hpm.warn(warnmsg)
-        year = 2000
+        # Handle year
+        if year is None:
+            warnmsg = 'No year provided for the initial population age distribution, using 2000 by default'
+            hpm.warn(warnmsg)
+            year = 2000
 
-    # Extract the age distribution for the given location and year
-    full_df = map_entries(df, location)[location]
-    raw_df = full_df[full_df["Time"] == year]
+        # Extract the age distribution for the given location and year
+        full_df = map_entries(df, location)[location]
+        raw_df = full_df[full_df["Time"] == year]
+
+    else:
+        raw_df = pd.read_csv(age_datafile)
 
     # Pull out the data
     result = np.array([raw_df["AgeGrpStart"],raw_df["AgeGrpStart"]+1,raw_df["PopTotal"]*1e3]).T # Data are stored in thousands
@@ -191,7 +195,7 @@ def get_age_distribution(location=None, year=None, total_pop_file=None):
     return result
 
 
-def get_age_distribution_over_time(location=None):
+def get_age_distribution_over_time(location=None, popage_datafile=None):
     '''
     Load age distribution for a given country or countries over time.
 
@@ -203,22 +207,23 @@ def get_age_distribution_over_time(location=None):
     '''
 
     # Load the raw data
-    try:
-        df = load_file(files.age_dist)
-    except Exception as E:
-        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
-        raise ValueError(errormsg) from E
+    if popage_datafile is None:
+        try:
+            df = load_file(files.age_dist)
+        except Exception as E:
+            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            raise ValueError(errormsg) from E
+        full_df = map_entries(df, location)[location]
+    else:
+        full_df = pd.read_csv(popage_datafile)
 
-
-    # Extract the age distribution for the given location and year
-    full_df = map_entries(df, location)[location]
     result = full_df.rename(columns={'Time':'year', 'AgeGrpStart': 'age'})
     result['PopTotal'] *= 1e3 # reported as per 1,000
 
     return result
 
 
-def get_total_pop(location=None):
+def get_total_pop(location=None, pop_datafile=None):
     '''
     Load total population for a given country or countries.
 
@@ -230,15 +235,20 @@ def get_total_pop(location=None):
     '''
 
     # Load the raw data
-    try:
-        df = load_file(files.age_dist)
-    except Exception as E:
-        errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
-        raise ValueError(errormsg) from E
+    if pop_datafile is None:
+        try:
+            df = load_file(files.age_dist)
+        except Exception as E:
+            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            raise ValueError(errormsg) from E
 
-    # Extract the age distribution for the given location and year
-    full_df = map_entries(df, location)[location]
-    dd = full_df.groupby("Time").sum(numeric_only=True)["PopTotal"]
+        # Extract the age distribution for the given location and year
+        full_df = map_entries(df, location)[location]
+        dd = full_df.groupby("Time").sum(numeric_only=True)["PopTotal"]
+
+    else:
+        dd = pd.read_csv(pop_datafile)
+
     dd = dd * 1e3
     df = sc.dataframe(dd).reset_index().rename(columns={'Time':'year', 'PopTotal':'pop_size'})
     return df
