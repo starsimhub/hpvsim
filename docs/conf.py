@@ -55,26 +55,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',  # Add a link to the Python source code for classes, functions etc.
     'nbsphinx',
-    'IPython.sphinxext.ipython_console_highlighting',  # Temporary fix for https://github.com/spatialaudio/nbsphinx/issues/687
     'sphinx_search.extension', # search across multiple docsets in domain
-    'myst_parser', # source files written in MD or RST
-]
-
-myst_enable_extensions = [
-    "amsmath",
-    "attrs_inline",
-    "colon_fence",
-    "deflist",
-    "dollarmath",
-    "fieldlist",
-    "html_admonition",
-    "html_image",
-    "linkify",
-    "replacements",
-    "smartquotes",
-    "strikethrough",
-    "substitution",
-    "tasklist",
 ]
 
 autodoc_default_options = {
@@ -100,7 +81,7 @@ templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-source_suffix = ['.rst', '.md']
+source_suffix = ['.rst']
 master_doc = 'index'
 
 # General information about the project.
@@ -120,7 +101,7 @@ release = hpv.__version__
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'README.md']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # suppress warnings for multiple possible Python references in the namespace
 # suppress_warnings = ['ref.python']
