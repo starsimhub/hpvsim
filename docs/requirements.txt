@@ -9,3 +9,4 @@ pypandoc
 optuna
 seaborn
 sphinxcontrib-jquery
+readthedocs-sphinx-search

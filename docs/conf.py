@@ -55,7 +55,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',  # Add a link to the Python source code for classes, functions etc.
     'nbsphinx',
-    'IPython.sphinxext.ipython_console_highlighting'  # Temporary fix for https://github.com/spatialaudio/nbsphinx/issues/687
+    'sphinx_search.extension', # search across multiple docsets in domain
 ]
 
 autodoc_default_options = {
@@ -81,7 +81,7 @@ templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-source_suffix = '.rst'
+source_suffix = ['.rst']
 master_doc = 'index'
 
 # General information about the project.
@@ -131,7 +131,10 @@ html_favicon = "images/favicon.ico"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
+
 html_static_path = ['_static']
+
+html_css_files = ['theme_overrides.css']
 
 html_context = {
     'rtd_url': 'https://docs.idmod.org/projects/hpvsim/en/latest',
@@ -158,6 +161,21 @@ html_show_sphinx = False
 # contain a <link> tag referring to it.  The value of this option must be the
 # base URL from which the finished HTML is served.
 html_use_opensearch = 'docs.idmod.org/projects/hpvsim/en/latest'
+
+# -- RTD Sphinx search for searching across the entire domain, default child -------------
+
+if os.environ.get('READTHEDOCS') == 'True':
+
+    search_project_parent = "institute-for-disease-modeling-idm"
+    search_project = os.environ["READTHEDOCS_PROJECT"]
+    search_version = os.environ["READTHEDOCS_VERSION"]
+
+    rtd_sphinx_search_default_filter = f"subprojects:{search_project}/{search_version}"
+
+    rtd_sphinx_search_filters = {
+        "Search this project": f"project:{search_project}/{search_version}",
+        "Search all IDM docs": f"subprojects:{search_project_parent}/{search_version}",
+    }
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'HPVsim'
