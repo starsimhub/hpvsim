@@ -6,10 +6,12 @@ Tests for single simulations
 import sciris as sc
 import hpvsim as hpv
 import numpy as np
+import pandas as pd
+import matplotlib.pylab as pl
 
 do_plot = 0
 do_save = 0
-debug = 1
+debug = 0
 
 n_agents = [50e3,500][debug] # Swap between sizes
 start = [1950,1990][debug]
@@ -32,6 +34,7 @@ def test_hiv():
         'start': start,
         'end': 2020,
         'ms_agent_ratio': ms_agent_ratio,
+        # 'hiv_pars' : {'model_hiv_death': False}
     }
 
     sim = hpv.Sim(
@@ -41,25 +44,72 @@ def test_hiv():
     )
     sim.run()
     to_plot = {
-        'ART Coverage': [
-            'art_coverage',
+        'HIV prevalence': [
+            'hiv_prevalence',
+            'female_hiv_prevalence',
+            'male_hiv_prevalence'
         ],
-        'HPV prevalence by HIV status': [
-            'hpv_prevalence_by_age_with_hiv',
-            'hpv_prevalence_by_age_no_hiv'
+        'HIV infections': [
+            'hiv_infections'
         ],
-        'Age standardized cancer incidence (per 100,000 women)': [
-            'asr_cancer_incidence',
-            'cancer_incidence_with_hiv',
-            'cancer_incidence_no_hiv',
-        ],
-        'Cancers by age and HIV status': [
-            'cancers_by_age_with_hiv',
-            'cancers_by_age_no_hiv'
+        'Total pop': [
+            'n_alive'
         ]
+        # 'HPV prevalence by HIV status': [
+        #     'hpv_prevalence_by_age_with_hiv',
+        #     'hpv_prevalence_by_age_no_hiv'
+        # ],
+        # 'Age standardized cancer incidence (per 100,000 women)': [
+        #     'asr_cancer_incidence',
+        #     'cancer_incidence_with_hiv',
+        #     'cancer_incidence_no_hiv',
+        # ],
+        # 'Cancers by age and HIV status': [
+        #     'cancers_by_age_with_hiv',
+        #     'cancers_by_age_no_hiv'
+        # ]
     }
     sim.plot()
     sim.plot(to_plot=to_plot)
+
+    rsa_df = pd.read_csv('../test_data/data/RSA_data.csv').set_index('Unnamed: 0').T
+
+    simres = sim.results
+    years = simres['year']
+    year_ind = sc.findinds(years, 1985)[0]
+
+    fig, ax = pl.subplots()
+    ax.plot(years[year_ind:], simres['female_hiv_prevalence'][year_ind:], label='Females, HPVsim')
+    ax.plot(years[year_ind:], simres['male_hiv_prevalence'][year_ind:], label='Males, HPVsim')
+    ax.scatter(years[year_ind:], rsa_df['female_hiv_prevalence'], label='Females, Thembisa')
+    ax.scatter(years[year_ind:], rsa_df['male_hiv_prevalence'], label='Males, Thembisa')
+    ax.set_title('HIV prevalence (no HIV mortality)')
+    ax.legend()
+    fig.show()
+
+    fig, ax = pl.subplots()
+    ax.plot(years[year_ind:], simres['hiv_infections'][year_ind:], label='HPVsim')
+    ax.scatter(years[year_ind:], rsa_df['hiv_infections'], label='Thembisa')
+    ax.set_title('HIV infections (no HIV mortality)')
+    ax.legend()
+    fig.show()
+
+    fig, ax = pl.subplots()
+    ax.plot(years[year_ind:], simres['n_alive'][year_ind:], label='HPVsim')
+    ax.scatter(years[year_ind:], rsa_df['n_alive'], label='Thembisa')
+    ax.set_title('Total population')
+    ax.legend()
+    fig.show()
+
+    fig, ax = pl.subplots()
+    ax.plot(years[year_ind:], simres['art_coverage'][year_ind:], label='HPVsim')
+    ax.scatter(years[year_ind:], rsa_df['art_coverage'], label='Thembisa')
+    ax.set_title('ART coverage')
+    ax.legend()
+    fig.show()
+
+
+
     return sim
 
 
@@ -215,8 +265,8 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
     sim0 = test_hiv()
-    test_hiv_epi()
-    scens0 = test_impact_on_cancer()
-    sim1, calib = test_calibration_hiv()
+    # test_hiv_epi()
+    # scens0 = test_impact_on_cancer()
+    # sim1, calib = test_calibration_hiv()
     sc.toc(T)
     print('Done.')
