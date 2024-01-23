@@ -32,7 +32,7 @@ def test_hiv():
         'location': 'south africa',
         'model_hiv': True,
         'start': start,
-        'end': 2020,
+        'end': 2030,
         'ms_agent_ratio': ms_agent_ratio,
         # 'hiv_pars' : {'model_hiv_death': False}
     }
