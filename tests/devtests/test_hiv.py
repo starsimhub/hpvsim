@@ -34,7 +34,7 @@ def test_hiv():
         'start': start,
         'end': 2030,
         'ms_agent_ratio': ms_agent_ratio,
-        # 'hiv_pars' : {'model_hiv_death': False}
+        'hiv_pars' : {'model_hiv_death': False}
     }
 
     sim = hpv.Sim(
