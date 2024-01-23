@@ -136,8 +136,6 @@ html_static_path = ['_static']
 
 html_css_files = ['theme_overrides.css']
 
-html_js_files = ['show_block_by_os.js'] 
-
 html_context = {
     'rtd_url': 'https://docs.idmod.org/projects/hpvsim/en/latest',
     'theme_vcs_pageview_mode': 'edit'
