@@ -159,7 +159,7 @@ class HIVsim(hpb.ParsObj):
         shape = self['hiv_pars']['time_to_hiv_death_shape']
         dt = people.pars['dt']
 
-        no_art_inds = hpu.true(people.hiv * ~people.art)
+        no_art_inds = hpu.true(people.hiv * ~people.art * people.alive)
         all_inds = np.concatenate((inds, no_art_inds))
         # t = people.t
         # update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt))  # Ensure it's an integer not smaller than 1
@@ -380,10 +380,12 @@ class HIVsim(hpb.ParsObj):
         # Stocks only get accumulated every nth time step, where n is the result frequency
         if people.t % self.resfreq == self.resfreq - 1:
 
-            self.results['n_hiv'][idx] = people.count('hiv')
-            hivinds = hpu.true(people['hiv'])
+
+            hivinds = hpu.true(people['hiv']* people.alive)
+            self.results['n_hiv'][idx] = people.scale_flows(hivinds)
             self.results['n_hiv_by_age'][:, idx] = np.histogram(people.age[hivinds], bins=people.age_bin_edges, weights=people.scale[hivinds])[0]
-            self.results['n_art'][idx] = people.count('art')
+            artinds = hpu.true(people.art*people.alive)
+            self.results['n_art'][idx] = people.scale_flows(artinds)
 
             # Pull out those with HPV and HIV+
             hpvhivinds = hpu.true((people['hiv']) & people['infectious'])
@@ -453,6 +455,7 @@ class HIVsim(hpb.ParsObj):
                     sk_out = sex_key_map[sk]
                     hiv_incidence_rates[year][sk_out] = np.concatenate(
                         [
+                            np.array([[9, 0]]),
                             np.array(df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']],
                                      dtype=hpd.default_float),
                             np.array([[150, 0]])  # Add another entry so that all older age groups are covered

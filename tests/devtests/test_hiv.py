@@ -43,34 +43,34 @@ def test_hiv():
         art_datafile=art_datafile
     )
     sim.run()
-    to_plot = {
-        'HIV prevalence': [
-            'hiv_prevalence',
-            'female_hiv_prevalence',
-            'male_hiv_prevalence'
-        ],
-        'HIV infections': [
-            'hiv_infections'
-        ],
-        'Total pop': [
-            'n_alive'
-        ]
-        # 'HPV prevalence by HIV status': [
-        #     'hpv_prevalence_by_age_with_hiv',
-        #     'hpv_prevalence_by_age_no_hiv'
-        # ],
-        # 'Age standardized cancer incidence (per 100,000 women)': [
-        #     'asr_cancer_incidence',
-        #     'cancer_incidence_with_hiv',
-        #     'cancer_incidence_no_hiv',
-        # ],
-        # 'Cancers by age and HIV status': [
-        #     'cancers_by_age_with_hiv',
-        #     'cancers_by_age_no_hiv'
-        # ]
-    }
-    sim.plot()
-    sim.plot(to_plot=to_plot)
+    # to_plot = {
+    #     'HIV prevalence': [
+    #         'hiv_prevalence',
+    #         'female_hiv_prevalence',
+    #         'male_hiv_prevalence'
+    #     ],
+    #     'HIV infections': [
+    #         'hiv_infections'
+    #     ],
+    #     'Total pop': [
+    #         'n_alive'
+    #     ]
+    #     # 'HPV prevalence by HIV status': [
+    #     #     'hpv_prevalence_by_age_with_hiv',
+    #     #     'hpv_prevalence_by_age_no_hiv'
+    #     # ],
+    #     # 'Age standardized cancer incidence (per 100,000 women)': [
+    #     #     'asr_cancer_incidence',
+    #     #     'cancer_incidence_with_hiv',
+    #     #     'cancer_incidence_no_hiv',
+    #     # ],
+    #     # 'Cancers by age and HIV status': [
+    #     #     'cancers_by_age_with_hiv',
+    #     #     'cancers_by_age_no_hiv'
+    #     # ]
+    # }
+    # sim.plot()
+    # sim.plot(to_plot=to_plot)
 
     rsa_df = pd.read_csv('../test_data/RSA_data.csv').set_index('Unnamed: 0').T
 
@@ -106,6 +106,36 @@ def test_hiv():
     ax.scatter(years[year_ind:], rsa_df['art_coverage'], label='Thembisa')
     ax.set_title('ART coverage')
     ax.legend()
+    fig.show()
+
+    import seaborn as sns
+
+    # New infections by age
+    fig, ax = pl.subplots()
+
+    sim_data = pd.DataFrame(simres['hiv_infections_by_age'][:, year_ind:].T,
+                            index=pd.Index(years[year_ind:], name='Year'), columns=sim.pars['age_bin_edges'][:-1])
+    sdm = pd.melt(sim_data.reset_index(), id_vars=['Year'], var_name='Age', value_name='HIV Infections')
+    sdm['AgeBin'] = pd.cut(sdm['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right =False)
+    sdm['Source'] = 'HPVsim'
+
+    hiv = pd.read_csv(hiv_datafile)
+    hiv['AgeBin'] = pd.cut(hiv['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right=False)
+    x = hiv.groupby(['Year', 'AgeBin'])['Incidence'].mean().reset_index()  # .unstack('AgeBin')
+
+    pop_data = pd.DataFrame(simres['n_alive_by_age'][:, year_ind:].T, index=years[year_ind:],
+                            columns=sim.pars['age_bin_edges'][:-1])
+    x['HIV Infections'] = x['Incidence'] * pop_data.stack().values  # worst code ever, should do by index!
+    x['Source'] = 'Thembisa'
+
+    cols = ['Year', 'AgeBin', 'HIV Infections', 'Source']
+    byage = pd.concat([sdm[cols], x[cols]], ignore_index=True)
+
+    sns.lineplot(data=byage, x='Year', y='HIV Infections', hue='AgeBin', style='Source', palette='Set1', ax=ax)
+
+    ax.set_title('HIV infections by age (no HIV mortality)')
+    ax.legend(bbox_to_anchor=(1.05, 1), ncol=2)
+    fig.tight_layout()
     fig.show()
 
 
