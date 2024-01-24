@@ -33,7 +33,6 @@ def test_hiv():
         'model_hiv': True,
         'start': start,
         'end': 2030,
-        # 'rand_seed': 3,
         'ms_agent_ratio': ms_agent_ratio,
         'hiv_pars' : {'model_hiv_death': False,
                       'rel_imm': { 'lt200': 1,'gt200': 1},
@@ -115,34 +114,76 @@ def test_hiv():
 
     import seaborn as sns
 
-    # New infections by age
-    fig, ax = pl.subplots()
+    # # New infections by age
+    # fig, ax = pl.subplots()
+    #
+    # sim_data = pd.DataFrame(simres['hiv_infections_by_age'][:, year_ind:].T,
+    #                         index=pd.Index(years[year_ind:], name='Year'), columns=sim.pars['age_bin_edges'][:-1])
+    # sdm = pd.melt(sim_data.reset_index(), id_vars=['Year'], var_name='Age', value_name='HIV Infections')
+    # sdm['AgeBin'] = pd.cut(sdm['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right =False)
+    # sdm['Source'] = 'HPVsim'
+    #
+    # hiv = pd.read_csv(hiv_datafile[0])
+    # hiv['AgeBin'] = pd.cut(hiv['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right=False)
+    # x = hiv.groupby(['Year', 'AgeBin'])['Incidence'].mean().reset_index()  # .unstack('AgeBin')
+    #
+    # pop_data = pd.DataFrame((simres['n_alive_by_age'][:, year_ind:] - simres['n_hiv_by_age'][:, year_ind:]).T, index=years[year_ind:],
+    #                         columns=sim.pars['age_bin_edges'][:-1])
+    # x['HIV Infections'] = x['Incidence'] * pop_data.stack().values  # worst code ever, should do by index!
+    # x['Source'] = 'Thembisa'
+    #
+    # cols = ['Year', 'AgeBin', 'HIV Infections', 'Source']
+    # byage = pd.concat([sdm[cols], x[cols]], ignore_index=True)
+    #
+    # sns.lineplot(data=byage, x='Year', y='HIV Infections', hue='AgeBin', style='Source', palette='Set1', ax=ax)
+    #
+    # ax.set_title('HIV infections by age (no HIV mortality)')
+    # ax.legend(bbox_to_anchor=(1.05, 1), ncol=2)
+    # fig.tight_layout()
+    # fig.show()
 
-    sim_data = pd.DataFrame(simres['hiv_infections_by_age'][:, year_ind:].T,
-                            index=pd.Index(years[year_ind:], name='Year'), columns=sim.pars['age_bin_edges'][:-1])
-    sdm = pd.melt(sim_data.reset_index(), id_vars=['Year'], var_name='Age', value_name='HIV Infections')
-    sdm['AgeBin'] = pd.cut(sdm['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right =False)
-    sdm['Source'] = 'HPVsim'
 
+    # New infections by age and sex
+    fig, axes = pl.subplots(1, 2, figsize=(12, 8))
+    sdms = []
+    for sex in ['female', 'male']:
+        sim_data = pd.DataFrame(simres[f'{sex}_hiv_infections_by_age'][:, year_ind:].T,
+                                index=pd.Index(years[year_ind:], name='Year'), columns=sim.pars['age_bin_edges'][:-1])
+        sdm = pd.melt(sim_data.reset_index(), id_vars=['Year'], var_name='Age', value_name='HIV Infections')
+        sdm['AgeBin'] = pd.cut(sdm['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right=False)
+        sdm['Sex'] = 'f' if sex == 'female' else 'm'
+        sdm['Source'] = 'HPVsim'
+        sdms.append(sdm)
+    sdm = pd.concat(sdms)
     hiv = pd.read_csv(hiv_datafile[0])
     hiv['AgeBin'] = pd.cut(hiv['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right=False)
-    x = hiv.groupby(['Year', 'AgeBin'])['Incidence'].mean().reset_index()  # .unstack('AgeBin')
-
-    pop_data = pd.DataFrame((simres['n_alive_by_age'][:, year_ind:] - simres['n_hiv_by_age'][:, year_ind:]).T, index=years[year_ind:],
-                            columns=sim.pars['age_bin_edges'][:-1])
-    x['HIV Infections'] = x['Incidence'] * pop_data.stack().values  # worst code ever, should do by index!
+    x = hiv.groupby(['Year', 'AgeBin', 'Sex'])['Incidence'].mean().reset_index().sort_values(
+        by=['Sex', 'AgeBin']).reset_index()
+    hiv_infections = []
+    for sex in ['females', 'males']:
+        pop_data = pd.DataFrame((simres[f'n_{sex}_no_hiv_alive_by_age'][:, year_ind:]).T, index=years[year_ind:],
+                                columns=sim.pars['age_bin_edges'][:-1])
+        pop_data = pop_data.melt(ignore_index=False)
+        sex_label = 'f' if sex == 'females' else 'm'
+        hiv_infections_this_sex = x[x['Sex'] == sex_label]['Incidence'].values * pop_data['value'].values
+        hiv_infections += list(hiv_infections_this_sex)
+    x['HIV Infections'] = hiv_infections
     x['Source'] = 'Thembisa'
-
-    cols = ['Year', 'AgeBin', 'HIV Infections', 'Source']
+    cols = ['Year', 'AgeBin', 'Sex', 'HIV Infections', 'Source']
     byage = pd.concat([sdm[cols], x[cols]], ignore_index=True)
 
-    sns.lineplot(data=byage, x='Year', y='HIV Infections', hue='AgeBin', style='Source', palette='Set1', ax=ax)
+    for i_s, sex in enumerate(['f', 'm']):
+        ax = axes[i_s]
+        byage_to_plot = byage[byage['Sex'] == sex]
+        sns.lineplot(data=byage_to_plot, x='Year', y='HIV Infections', hue='AgeBin', style='Source', palette='Set1',
+                     ax=ax)
+        sex_label = 'Female' if sex == 'f' else 'Male'
+        ax.set_title(f'{sex_label} HIV infections')
 
-    ax.set_title('HIV infections by age (no HIV mortality)')
-    ax.legend(bbox_to_anchor=(1.05, 1), ncol=2)
+    axes[0].get_legend().remove()
+    axes[1].legend(bbox_to_anchor=(1.05, 1), ncol=1)
     fig.tight_layout()
     fig.show()
-
 
 
     return sim
