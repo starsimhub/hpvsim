@@ -565,18 +565,19 @@ class People(hpb.BasePeople):
         death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
 
         # take out HIV mortality here if applicable
-        if self.pars['hiv_pars'] is not None and 'mortality_rates' in self.pars['hiv_pars'].keys():
-            hiv_mort = self.pars['hiv_pars']['mortality_rates']
-            all_years = np.array(list(hiv_mort.keys()))
-            base_year = all_years[0]
-            age_bins = hiv_mort[base_year]['m'][:, 0]
-            age_inds = np.digitize(self.age, age_bins) - 1
-            year_ind = sc.findnearest(all_years, year)
-            nearest_year = all_years[year_ind]
-            hiv_mx_f = hiv_mort[nearest_year]['f'][:, 1] * self.pars['dt_demog']
-            hiv_mx_m = hiv_mort[nearest_year]['m'][:, 1] * self.pars['dt_demog']
-            death_probs[self.is_female] -= hiv_mx_f[age_inds[self.is_female]]
-            death_probs[self.is_male] -= hiv_mx_m[age_inds[self.is_male]]
+        if self.pars['hiv_pars'] is not None:
+            if 'mortality_rates' in self.pars['hiv_pars'].keys():
+                hiv_mort = self.pars['hiv_pars']['mortality_rates']
+                all_years = np.array(list(hiv_mort.keys()))
+                base_year = all_years[0]
+                age_bins = hiv_mort[base_year]['m'][:, 0]
+                age_inds = np.digitize(self.age, age_bins) - 1
+                year_ind = sc.findnearest(all_years, year)
+                nearest_year = all_years[year_ind]
+                hiv_mx_f = hiv_mort[nearest_year]['f'][:, 1] * self.pars['dt_demog']
+                hiv_mx_m = hiv_mort[nearest_year]['m'][:, 1] * self.pars['dt_demog']
+                death_probs[self.is_female] -= hiv_mx_f[age_inds[self.is_female]]
+                death_probs[self.is_male] -= hiv_mx_m[age_inds[self.is_male]]
 
         death_probs[self.age > 100] = 1  # Just remove anyone >100
         death_probs[~self.alive] = 0
