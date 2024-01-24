@@ -311,7 +311,7 @@ class HIVsim(hpb.ParsObj):
             hiv_rates = hiv_year_sex[:, 1] * dt
             mf_inds = people.is_female if sk == 'f' else people.is_male
             mf_inds *= people.alive  # Only include people alive
-            age_inds = np.digitize(people.age[mf_inds], age_bins)
+            age_inds = np.digitize(people.age[mf_inds], age_bins)-1
             hiv_probs[mf_inds] = hiv_rates[age_inds]
         hiv_probs[people.hiv] = 0  # not at risk if already infected
 
