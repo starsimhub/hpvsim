@@ -80,20 +80,36 @@ for y,year in enumerate(hiv_years):
 res.inc = sc.dataframe(years=hiv_years, incidence=inc)
 
 # Compute prevalence
-mort = 0.03
+mort = 0.055 # Mortality in the absence of ART (estimate)
 prev_zero_mort = np.zeros(len(hiv_years))
 prev_with_mort = np.zeros(len(hiv_years))
+prev_with_art  = np.zeros(len(hiv_years))
 cum_inc = np.cumsum(res.inc.incidence.values)
 inci_with_mort = res.inc.incidence.values.copy()
+inci_with_art  = res.inc.incidence.values.copy()
 for y,year in enumerate(hiv_years):
     total_pop = age_dists[year][:,2].sum()
     prev_zero_mort[y] = cum_inc[y]/total_pop
+    
     inci_with_mort[:y] *= 1-mort
     prev_with_mort[y] = inci_with_mort[:y+1].sum()/total_pop
     
-res.prev = sc.dataframe(years=hiv_years, prev_zero_mort=prev_zero_mort, prev_with_mort=prev_with_mort)
+    if year < 2000:
+        art_cov = 0
+    else:
+        art_cov = cov[y-(art_start-hiv_start)]
+    inci_with_art[:y] *= 1-(mort*(1-art_cov))
+    prev_with_art[y] = inci_with_art[:y+1].sum()/total_pop
+    
+res.prev = sc.dataframe(
+    years=hiv_years,
+    prev_zero_mort=prev_zero_mort,
+    prev_with_mort=prev_with_mort,
+    prev_with_art=prev_with_art,
+)
 
 
+#%%
 sc.heading('Plotting...')
 
 sc.options(dpi=150)
@@ -116,6 +132,7 @@ pl.title('HIV incidence')
 pl.subplot(1,3,3)
 pl.plot(res.prev.years.values, res.prev.prev_zero_mort.values, label='Computed by age (with zero mortality)', **kw)
 pl.plot(res.prev.years.values, res.prev.prev_with_mort.values, label=f'Computed by age (with {mort*100}% mortality)', **kw)
+pl.plot(res.prev.years.values, res.prev.prev_with_art.values, label=f'Computed by age (with ART-adjusted mortality)', **kw)
 pl.plot(data_years, d.data.hiv_prevalence.values, label='Overall "data"', **kw)
 pl.legend()
 pl.title('HIV prevalence')
