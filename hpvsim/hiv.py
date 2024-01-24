@@ -62,7 +62,7 @@ class HIVsim(hpb.ParsObj):
         y = np.linspace(0,1,101)
         cd4_decline = self['hiv_pars']['cd4_trajectory'](y)
         self.cd4_decline_diff = np.diff(cd4_decline)
-        sim.pars['hiv_pars'] = sc.mergedicts(sim.pars['hiv_pars'], self.pars)
+        sim.pars['hiv_pars']['mortality_rates'] = self.pars['mortality_rates']
         return
 
 

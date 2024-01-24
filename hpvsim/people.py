@@ -565,7 +565,7 @@ class People(hpb.BasePeople):
         death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
 
         # take out HIV mortality here if applicable
-        if self.pars['hiv_pars']['mortality_rates'] is not None:
+        if 'mortality_rates' in self.pars['hiv_pars'].keys():
             hiv_mort = self.pars['hiv_pars']['mortality_rates']
             all_years = np.array(list(hiv_mort.keys()))
             base_year = all_years[0]
