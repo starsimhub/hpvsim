@@ -33,6 +33,7 @@ def test_hiv():
         'model_hiv': True,
         'start': start,
         'end': 2030,
+        'rand_seed': 3,
         'ms_agent_ratio': ms_agent_ratio,
         'hiv_pars' : {'model_hiv_death': False}
     }
@@ -123,7 +124,7 @@ def test_hiv():
     hiv['AgeBin'] = pd.cut(hiv['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right=False)
     x = hiv.groupby(['Year', 'AgeBin'])['Incidence'].mean().reset_index()  # .unstack('AgeBin')
 
-    pop_data = pd.DataFrame(simres['n_alive_by_age'][:, year_ind:].T, index=years[year_ind:],
+    pop_data = pd.DataFrame((simres['n_alive_by_age'][:, year_ind:] - simres['n_hiv_by_age'][:, year_ind:]).T, index=years[year_ind:],
                             columns=sim.pars['age_bin_edges'][:-1])
     x['HIV Infections'] = x['Incidence'] * pop_data.stack().values  # worst code ever, should do by index!
     x['Source'] = 'Thembisa'
