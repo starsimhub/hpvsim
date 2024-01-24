@@ -563,10 +563,24 @@ class People(hpb.BasePeople):
 
         death_probs[self.is_female] = mx_f[age_inds[self.is_female]]
         death_probs[self.is_male] = mx_m[age_inds[self.is_male]]
-        death_probs[self.age>100] = 1 # Just remove anyone >100
-        death_probs[~self.alive] = 0
-        death_probs *= self.pars['rel_death'] # Adjust overall death probabilities
 
+        # take out HIV mortality here if applicable
+        if self.pars['hiv_pars']['mortality_rates'] is not None:
+            hiv_mort = self.pars['hiv_pars']['mortality_rates']
+            all_years = np.array(list(hiv_mort.keys()))
+            base_year = all_years[0]
+            age_bins = hiv_mort[base_year]['m'][:, 0]
+            age_inds = np.digitize(self.age, age_bins) - 1
+            year_ind = sc.findnearest(all_years, year)
+            nearest_year = all_years[year_ind]
+            hiv_mx_f = hiv_mort[nearest_year]['f'][:, 1] * self.pars['dt_demog']
+            hiv_mx_m = hiv_mort[nearest_year]['m'][:, 1] * self.pars['dt_demog']
+            death_probs[self.is_female] -= hiv_mx_f[age_inds[self.is_female]]
+            death_probs[self.is_male] -= hiv_mx_m[age_inds[self.is_male]]
+
+        death_probs[self.age > 100] = 1  # Just remove anyone >100
+        death_probs[~self.alive] = 0
+        death_probs *= self.pars['rel_death']  # Adjust overall death probabilities
         # Get indices of people who die of other causes
         death_inds = hpu.true(hpu.binomial_arr(death_probs))
         deaths_female = self.scale_flows(hpu.true(self.is_female[death_inds]))

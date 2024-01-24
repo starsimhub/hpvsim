@@ -62,7 +62,7 @@ class HIVsim(hpb.ParsObj):
         y = np.linspace(0,1,101)
         cd4_decline = self['hiv_pars']['cd4_trajectory'](y)
         self.cd4_decline_diff = np.diff(cd4_decline)
-
+        sim.pars['hiv_pars'] = sc.mergedicts(sim.pars['hiv_pars'], self.pars)
         return
 
 
@@ -425,42 +425,73 @@ class HIVsim(hpb.ParsObj):
         '''
 
         if hiv_datafile is None and art_datafile is None:
-            hiv_incidence_rates, art_coverage = None, None
+            hiv_incidence_rates, hiv_mortality, art_coverage = None, None, None
 
         else:
 
+            hiv_datafile = sc.promotetolist(hiv_datafile)
+            art_datafile = sc.promotetolist(art_datafile)
+
+            hiv_incidence_rates = dict()
+
             # Load data
-            df_inc = pd.read_csv(hiv_datafile)  # HIV incidence
+            dfs_hiv = []
+            for hiv_data in hiv_datafile:
+                df_hiv = pd.read_csv(hiv_data)
+                dfs_hiv.append(df_hiv)
+            # df_inc = pd.read_csv(hiv_datafile)  # HIV incidence
             dfs_art = []
-            if isinstance(art_datafile, list):
-                for art_data in art_datafile:
-                    df_art = pd.read_csv(art_data)  # ART coverage
-                    dfs_art.append(df_art)
-            else:
-                df_art = pd.read_csv(art_datafile)  # ART coverage
+            for art_data in art_datafile:
+                df_art = pd.read_csv(art_data)  # ART coverage
                 dfs_art.append(df_art)
 
             # Process HIV and ART data
             sex_keys = ['Male', 'Female']
             sex_key_map = {'Male': 'm', 'Female': 'f'}
 
-            ## Start with incidence file
-            years = df_inc['Year'].unique()
-            hiv_incidence_rates = dict()
+            hiv_mortality_dfs = []
+            for id, df in enumerate(dfs_hiv):
+                if 'mortality' in hiv_datafile[id]:
+                    if 'female' in hiv_datafile[id]:
+                        sex = 'f'
+                    else:
+                        sex = 'm'
+                    df = df.set_index('age')
+                    df = df.melt(ignore_index=False).reset_index()
+                    df['Sex'] = sex
+                    df.columns = ['Age', 'Year', 'Mortality', 'Sex']
+                    hiv_mortality_dfs.append(df)
+                else:
 
-            # Processing
+                    ## Start with incidence file
+                    years = df['Year'].unique()
+
+                    # Processing
+                    for year in years:
+                        hiv_incidence_rates[year] = dict()
+                        for sk in sex_keys:
+                            sk_out = sex_key_map[sk]
+                            hiv_incidence_rates[year][sk_out] = np.concatenate(
+                                [
+                                    np.array([[9, 0]]),
+                                    np.array(df[(df['Year'] == year) & (df['Sex'] == sk_out)][['Age', 'Incidence']],
+                                             dtype=hpd.default_float),
+                                    np.array([[150, 0]])  # Add another entry so that all older age groups are covered
+                                ]
+                            )
+            hiv_mortality_df = pd.concat(hiv_mortality_dfs)
+            hiv_mortality = dict()
+
+            years = hiv_mortality_df['Year'].unique().astype(float)
+
             for year in years:
-                hiv_incidence_rates[year] = dict()
+                year = round(year)
+                hiv_mortality[year] = dict()
                 for sk in sex_keys:
                     sk_out = sex_key_map[sk]
-                    hiv_incidence_rates[year][sk_out] = np.concatenate(
-                        [
-                            np.array([[9, 0]]),
-                            np.array(df_inc[(df_inc['Year'] == year) & (df_inc['Sex'] == sk_out)][['Age', 'Incidence']],
-                                     dtype=hpd.default_float),
-                            np.array([[150, 0]])  # Add another entry so that all older age groups are covered
-                        ]
-                    )
+                    hiv_mortality[year][sk_out] = np.array(
+                        hiv_mortality_df[(hiv_mortality_df['Year'] == str(year)) & (hiv_mortality_df['Sex'] == sk_out)][['Age', 'Mortality']],
+                        dtype=hpd.default_float)
 
             # Now compute ART adherence over time/age
             art_dfs = []
@@ -478,7 +509,7 @@ class HIVsim(hpb.ParsObj):
             art_df = pd.concat(art_dfs)
             art_coverage = dict()
 
-            years = df['Year'].unique().astype(float)
+            years = art_df['Year'].unique().astype(float)
 
             for year in years:
                 year = round(year)
@@ -488,13 +519,13 @@ class HIVsim(hpb.ParsObj):
                     art_coverage[year][sk_out] = np.array(art_df[(art_df['Year'] == str(year)) & (art_df['Sex'] == sk_out)][['Age', 'ART']],
                                      dtype=hpd.default_float)
 
-        return hiv_incidence_rates, art_coverage
+        return hiv_incidence_rates, hiv_mortality, art_coverage
 
 
     def load_data(self, hiv_datafile=None, art_datafile=None):
         ''' Load any data files that are used to create additional parameters, if provided '''
         hiv_data = sc.objdict()
-        hiv_data.infection_rates, hiv_data.art_coverage = self.get_hiv_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
+        hiv_data.infection_rates, hiv_data.mortality_rates, hiv_data.art_coverage = self.get_hiv_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
         return hiv_data
 
 

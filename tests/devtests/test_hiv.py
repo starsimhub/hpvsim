@@ -16,7 +16,7 @@ debug = 0
 n_agents = [50e3,500][debug] # Swap between sizes
 start = [1950,1990][debug]
 ms_agent_ratio = [100,10][debug]
-hiv_datafile = '../test_data/hiv_incidence_south_africa.csv'
+hiv_datafile = ['../test_data/hiv_incidence_south_africa.csv', '../test_data/south_africa_female_hiv_mortality.csv', '../test_data/south_africa_male_hiv_mortality.csv']
 art_datafile = ['../test_data/south_africa_art_coverage_by_age_males.csv', '../test_data/south_africa_art_coverage_by_age_females.csv']
 
 
@@ -33,9 +33,13 @@ def test_hiv():
         'model_hiv': True,
         'start': start,
         'end': 2030,
-        'rand_seed': 3,
+        # 'rand_seed': 3,
         'ms_agent_ratio': ms_agent_ratio,
-        'hiv_pars' : {'model_hiv_death': False}
+        'hiv_pars' : {'model_hiv_death': False,
+                      'rel_imm': { 'lt200': 1,'gt200': 1},
+                      'rel_sus': {'lt200': 1, 'gt200': 1},
+                      'rel_sev': {'lt200': 1, 'gt200': 1}
+                      }
     }
 
     sim = hpv.Sim(
@@ -120,7 +124,7 @@ def test_hiv():
     sdm['AgeBin'] = pd.cut(sdm['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right =False)
     sdm['Source'] = 'HPVsim'
 
-    hiv = pd.read_csv(hiv_datafile)
+    hiv = pd.read_csv(hiv_datafile[0])
     hiv['AgeBin'] = pd.cut(hiv['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right=False)
     x = hiv.groupby(['Year', 'AgeBin'])['Incidence'].mean().reset_index()  # .unstack('AgeBin')
 
