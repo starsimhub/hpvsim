@@ -123,6 +123,8 @@ class HIVsim(hpb.ParsObj):
         results['female_hiv_prevalence'] = init_res('Female HIV prevalence', color=stock_colors[1])
         results['male_hiv_prevalence'] = init_res('Male HIV prevalence', color=stock_colors[2])
         results['hiv_prevalence_by_age'] = init_res('HIV prevalence by age', n_rows=na, color=stock_colors[0])
+        results['female_hiv_prevalence_by_age'] = init_res('Female HIV prevalence by age', n_rows=na, color=stock_colors[1])
+        results['male_hiv_prevalence_by_age'] = init_res('Male HIV prevalence by age', n_rows=na, color=stock_colors[2])
         results['hiv_deaths'] = init_res('New HIV deaths')
         results['hiv_deaths_by_age'] = init_res('New HIV deaths by age', n_rows=na, color=stock_colors[0])
         results['hiv_incidence'] = init_res('HIV incidence', color=stock_colors[0])
@@ -572,9 +574,10 @@ class HIVsim(hpb.ParsObj):
         ng = sim.pars['n_genotypes']
         no_hiv_by_age = simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]
         self.results['hiv_prevalence_by_age'][:] = safedivide(res['n_hiv_by_age'][:], simres['n_alive_by_age'][:])
+        self.results['female_hiv_prevalence_by_age'][:] = safedivide(res['n_females_with_hiv_alive_by_age'][:], (res['n_females_with_hiv_alive_by_age'][:] + res['n_females_no_hiv_alive_by_age'][:]))
         self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], (simres['n_alive'][:] - res['n_hiv'][:]))
         self.results['hiv_incidence_by_age'][:] = sc.safedivide(res['hiv_infections_by_age'][:], (simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]))
-        self.results['hiv_prevalence'][:] = (res['n_females_with_hiv_alive'][:] + res['n_males_with_hiv_alive'][:])/ simres['n_alive'][:]
+        self.results['hiv_prevalence'][:] = (res['n_hiv'][:])/ simres['n_alive'][:]
         self.results['female_hiv_prevalence'][:] = res['n_females_with_hiv_alive'][:] / alive_females
         self.results['male_hiv_prevalence'][:] = res['n_males_with_hiv_alive'][:] / alive_males
         self.results['hpv_prevalence_by_age_with_hiv'][:] = safedivide(res['n_hpv_by_age_with_hiv'][:], ng*res['n_hiv_by_age'][:])

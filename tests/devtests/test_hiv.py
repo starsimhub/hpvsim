@@ -26,13 +26,17 @@ def test_hiv():
     ''' Basic test to show that it runs '''
     sc.heading('Testing hiv')
 
+    fig_string = 'No HIV mort'
 
     pars = {
         'n_agents': n_agents,
         'location': 'south africa',
         'model_hiv': True,
         'start': start,
+        # 'beta': 0,
+        # 'dur_cancer': dict(dist='lognormal', par1=60.0, par2=3.0),
         'end': 2030,
+        # 'use_migration': False,
         'ms_agent_ratio': ms_agent_ratio,
         'hiv_pars' : {'model_hiv_death': False,
                       'rel_imm': { 'lt200': 1,'gt200': 1},
@@ -49,9 +53,9 @@ def test_hiv():
     sim.run()
     # to_plot = {
     #     'HIV prevalence': [
-    #         'hiv_prevalence',
-    #         'female_hiv_prevalence',
-    #         'male_hiv_prevalence'
+    #         'hiv_prevalence_by_age',
+    #         'female_hiv_prevalence_by_age',
+    #         'male_hiv_prevalence_by_age'
     #     ],
     #     'HIV infections': [
     #         'hiv_infections'
@@ -82,65 +86,103 @@ def test_hiv():
     years = simres['year']
     year_ind = sc.findinds(years, 1985)[0]
 
-    fig, ax = pl.subplots()
+    fig, axes = pl.subplots(3, 1, figsize=(12, 12))
+    ax = axes[0]
+    ax.plot(years[year_ind:], simres['n_females_with_hiv_alive'][year_ind:], label='HPVsim, females 10+')
+    ax.plot(years[year_ind:], simres['n_males_with_hiv_alive'][year_ind:], label='HPVsim, males 10+')
+    ax.scatter(years[year_ind:], rsa_df['n_females_with_hiv_alive'], label='Thembisa, females 15+')
+    ax.scatter(years[year_ind:], rsa_df['n_males_with_hiv_alive'], label='Thembisa, males 15+')
+    ax.set_title(f'Prevalent HIV infections 10+ {fig_string}')
+
+    ax = axes[1]
+    female_denom = np.sum(simres['n_females_alive_by_age'][2:, year_ind:], axis=0)
+    male_denom = np.sum(
+        (simres['n_males_with_hiv_alive_by_age'][2:, year_ind:] + simres['n_males_no_hiv_alive_by_age'][2:, year_ind:]),
+        axis=0)
+    ax.plot(years[year_ind:-1], female_denom[:-1], label='Females alive 10+, HPVsim')
+    ax.plot(years[year_ind:-1], male_denom[:-1], label='Males alive 10+, HPVsim')
+    ax.scatter(years[year_ind:-1], rsa_df['female_pop'][:-1], label='Females alive 10+, Thembisa')
+    ax.scatter(years[year_ind:-1], rsa_df['male_pop'][:-1], label='Males alive 10+, Thembisa')
+    ax.set_title(f'Alive, 10+ {fig_string}')
+
+    ax = axes[2]
     ax.plot(years[year_ind:], simres['female_hiv_prevalence'][year_ind:], label='Females, HPVsim')
     ax.plot(years[year_ind:], simres['male_hiv_prevalence'][year_ind:], label='Males, HPVsim')
     ax.scatter(years[year_ind:], rsa_df['female_hiv_prevalence'], label='Females, Thembisa')
     ax.scatter(years[year_ind:], rsa_df['male_hiv_prevalence'], label='Males, Thembisa')
-    ax.set_title('HIV prevalence (no HIV mortality)')
+    ax.set_title(f'HIV prevalence 10+ {fig_string}')
     ax.legend()
     fig.show()
+
 
     fig, ax = pl.subplots()
     ax.plot(years[year_ind:], simres['hiv_infections'][year_ind:], label='HPVsim')
     ax.scatter(years[year_ind:], rsa_df['hiv_infections'], label='Thembisa')
-    ax.set_title('HIV infections (no HIV mortality)')
+    ax.set_title(f'New HIV infections {fig_string}')
+    ax.legend()
+    fig.show()
+
+    fig, ax = pl.subplots()
+    ax.plot(years[year_ind:], simres['n_females_with_hiv_alive'][year_ind:], label='HPVsim, females 10+')
+    ax.plot(years[year_ind:], simres['n_males_with_hiv_alive'][year_ind:], label='HPVsim, males 10+')
+    ax.scatter(years[year_ind:], rsa_df['n_females_with_hiv_alive'], label='Thembisa, females 15+')
+    ax.scatter(years[year_ind:], rsa_df['n_males_with_hiv_alive'], label='Thembisa, males 15+')
+    ax.set_title(f'Prevalent HIV infections {fig_string}')
     ax.legend()
     fig.show()
 
     fig, ax = pl.subplots()
     ax.plot(years[year_ind:], simres['n_alive'][year_ind:], label='HPVsim')
     ax.scatter(years[year_ind:], rsa_df['n_alive'], label='Thembisa')
-    ax.set_title('Total population')
+    ax.set_title(f'Total population {fig_string}')
     ax.legend()
     fig.show()
 
     fig, ax = pl.subplots()
     ax.plot(years[year_ind:], simres['art_coverage'][year_ind:], label='HPVsim')
     ax.scatter(years[year_ind:], rsa_df['art_coverage'], label='Thembisa')
-    ax.set_title('ART coverage')
+    ax.set_title(f'ART coverage {fig_string}')
     ax.legend()
     fig.show()
 
     import seaborn as sns
 
-    # # New infections by age
-    # fig, ax = pl.subplots()
-    #
-    # sim_data = pd.DataFrame(simres['hiv_infections_by_age'][:, year_ind:].T,
-    #                         index=pd.Index(years[year_ind:], name='Year'), columns=sim.pars['age_bin_edges'][:-1])
-    # sdm = pd.melt(sim_data.reset_index(), id_vars=['Year'], var_name='Age', value_name='HIV Infections')
-    # sdm['AgeBin'] = pd.cut(sdm['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right =False)
-    # sdm['Source'] = 'HPVsim'
-    #
-    # hiv = pd.read_csv(hiv_datafile[0])
-    # hiv['AgeBin'] = pd.cut(hiv['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right=False)
-    # x = hiv.groupby(['Year', 'AgeBin'])['Incidence'].mean().reset_index()  # .unstack('AgeBin')
-    #
-    # pop_data = pd.DataFrame((simres['n_alive_by_age'][:, year_ind:] - simres['n_hiv_by_age'][:, year_ind:]).T, index=years[year_ind:],
-    #                         columns=sim.pars['age_bin_edges'][:-1])
-    # x['HIV Infections'] = x['Incidence'] * pop_data.stack().values  # worst code ever, should do by index!
-    # x['Source'] = 'Thembisa'
-    #
-    # cols = ['Year', 'AgeBin', 'HIV Infections', 'Source']
-    # byage = pd.concat([sdm[cols], x[cols]], ignore_index=True)
-    #
-    # sns.lineplot(data=byage, x='Year', y='HIV Infections', hue='AgeBin', style='Source', palette='Set1', ax=ax)
-    #
-    # ax.set_title('HIV infections by age (no HIV mortality)')
-    # ax.legend(bbox_to_anchor=(1.05, 1), ncol=2)
-    # fig.tight_layout()
-    # fig.show()
+    # Prevalence by age
+    fig, ax = pl.subplots()
+
+    sim_data = pd.DataFrame(simres['hiv_prevalence_by_age'][:, year_ind:].T,
+                            index=pd.Index(years[year_ind:], name='Year'), columns=sim.pars['age_bin_edges'][:-1])
+    sdm = pd.melt(sim_data.reset_index(), id_vars=['Year'], var_name='Age', value_name='HIV Prevalence')
+    sdm['AgeBin'] = pd.cut(sdm['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right =False)
+    sdm['Source'] = 'HPVsim'
+
+    cols = ['Year', 'AgeBin', 'HIV Prevalence', 'Source']
+    byage = pd.concat([sdm[cols]], ignore_index=True)
+
+    sns.lineplot(data=byage, x='Year', y='HIV Prevalence', hue='AgeBin', palette='Set1', ax=ax)
+
+    ax.set_title(f'HIV prevalence by age {fig_string}')
+    ax.legend(bbox_to_anchor=(1.05, 1), ncol=1)
+    fig.tight_layout()
+    fig.show()
+
+    fig, ax = pl.subplots()
+
+    sim_data = pd.DataFrame(simres['female_hiv_prevalence_by_age'][:, year_ind:].T,
+                            index=pd.Index(years[year_ind:], name='Year'), columns=sim.pars['age_bin_edges'][:-1])
+    sdm = pd.melt(sim_data.reset_index(), id_vars=['Year'], var_name='Age', value_name='HIV Prevalence')
+    sdm['AgeBin'] = pd.cut(sdm['Age'], bins=sim.pars['age_bin_edges'], include_lowest=True, right =False)
+    sdm['Source'] = 'HPVsim'
+
+    cols = ['Year', 'AgeBin', 'HIV Prevalence', 'Source']
+    byage = pd.concat([sdm[cols]], ignore_index=True)
+
+    sns.lineplot(data=byage, x='Year', y='HIV Prevalence', hue='AgeBin', palette='Set1', ax=ax)
+
+    ax.set_title(f'Female HIV prevalence by age {fig_string}')
+    ax.legend(bbox_to_anchor=(1.05, 1), ncol=1)
+    fig.tight_layout()
+    fig.show()
 
 
     # New infections by age and sex
@@ -178,10 +220,11 @@ def test_hiv():
         sns.lineplot(data=byage_to_plot, x='Year', y='HIV Infections', hue='AgeBin', style='Source', palette='Set1',
                      ax=ax)
         sex_label = 'Female' if sex == 'f' else 'Male'
-        ax.set_title(f'{sex_label} HIV infections')
+        ax.set_title(f'{sex_label}')
 
     axes[0].get_legend().remove()
     axes[1].legend(bbox_to_anchor=(1.05, 1), ncol=1)
+    fig.suptitle(f'HIV infections {fig_string}')
     fig.tight_layout()
     fig.show()
 
