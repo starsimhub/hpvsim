@@ -568,8 +568,9 @@ class HIVsim(hpb.ParsObj):
                 answer[:, fill_inds] = num[:, fill_inds] / denom[fill_inds]
             return answer
 
-        alive_females = simres['n_alive_by_sex'][0, :]
-        alive_males = simres['n_alive_by_sex'][1, :]
+
+        alive_females = np.sum(simres['n_females_alive_by_age'][2:, :], axis=0)
+        alive_males = np.sum((res['n_males_with_hiv_alive_by_age'][2:, :]+res['n_males_no_hiv_alive_by_age'][2:, :]), axis=0)
 
         ng = sim.pars['n_genotypes']
         no_hiv_by_age = simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]
