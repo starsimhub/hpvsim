@@ -642,6 +642,16 @@ class People(hpb.BasePeople):
         size correct.
         """
 
+        def safedivide(num, denom):
+            ''' Define a variation on sc.safedivide that respects shape of numerator '''
+            answer = np.zeros_like(num)
+            fill_inds = (denom != 0).nonzero()
+            if len(num.shape) == len(denom.shape):
+                answer[fill_inds] = num[fill_inds] / denom[fill_inds]
+            else:
+                answer[:, fill_inds] = num[:, fill_inds] / denom[fill_inds]
+            return answer
+
         if self.pars['use_migration'] and self.pop_trend is not None:
 
             # Pull things out
@@ -692,8 +702,8 @@ class People(hpb.BasePeople):
                         sex_attr = self.is_female
                     hivinds = hpu.true(self.hiv * self.alive * sex_attr)
                     aliveinds = hpu.true(self.alive * sex_attr)
-                    hiv_prevalence = np.histogram(self.age[hivinds], bins=np.arange(0, max(ages_to_add)+1), weights=self.scale[hivinds])[0]/\
-                                     np.histogram(self.age[aliveinds], bins=np.arange(0, max(ages_to_add)+1),weights=self.scale[aliveinds])[0]
+                    hiv_prevalence = safedivide(np.histogram(self.age[hivinds], bins=np.arange(0, max(ages_to_add)+1), weights=self.scale[hivinds])[0],
+                                     np.histogram(self.age[aliveinds], bins=np.arange(0, max(ages_to_add)+1),weights=self.scale[aliveinds])[0])
                     self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list), sex_ratio=sex_ratio, hiv_prevalence=hiv_prevalence)
                 else:
                     self.add_births(new_births=len(ages_to_add_list), ages=np.array(ages_to_add_list), sex_ratio=sex_ratio)
