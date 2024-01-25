@@ -127,6 +127,10 @@ class HIVsim(hpb.ParsObj):
         results['male_hiv_prevalence_by_age'] = init_res('Male HIV prevalence by age', n_rows=na, color=stock_colors[2])
         results['hiv_deaths'] = init_res('New HIV deaths')
         results['hiv_deaths_by_age'] = init_res('New HIV deaths by age', n_rows=na, color=stock_colors[0])
+        results['hiv_mortality'] = init_res('HIV mortality rate')
+        results['hiv_mortality_by_age'] = init_res('HIV mortality rate by age', n_rows=na, color=stock_colors[0])
+        results['excess_hiv_mortality'] = init_res('Excess HIV mortality rate')
+        results['excess_hiv_mortality_by_age'] = init_res('Excess HIV mortality rate by age', n_rows=na, color=stock_colors[0])
         results['hiv_incidence'] = init_res('HIV incidence', color=stock_colors[0])
         results['hiv_incidence_by_age'] = init_res('HIV incidence by age', n_rows=na, color=stock_colors[0])
         results['n_hpv_by_age_with_hiv'] = init_res('Number HPV infections by age among HIV+', n_rows=na, color=stock_colors[0])
@@ -168,12 +172,6 @@ class HIVsim(hpb.ParsObj):
 
         no_art_inds = hpu.true(people.hiv * ~people.art * people.alive)
         all_inds = np.concatenate((inds, no_art_inds))
-        # t = people.t
-        # update_freq = max(1, int(self['hiv_pars']['dt_art'] / dt))  # Ensure it's an integer not smaller than 1
-        # if t % update_freq == 0:
-        #
-        # else:
-        #     all_inds = sc.dcp(inds)
 
         if len(all_inds):
             # Extract index of current year
@@ -183,8 +181,8 @@ class HIVsim(hpb.ParsObj):
 
             # Apply ART coverage (being careful of level 0 and level 1 people!)
             art_cov = art_coverage[nearest_year]
-            art_inds = np.empty(0)
-            assign_dur_inds = np.empty(0)
+            art_inds = []
+            assign_dur_inds = []
             for sk in ['f', 'm']:
                 art_year_sex = art_cov[sk]
                 age_bins = art_year_sex[:, 0]
@@ -207,29 +205,32 @@ class HIVsim(hpb.ParsObj):
                         eligible_inds = all_inds[np.where(inds_age==age_bin)]
                         if len(eligible_inds):
                             art_probs = num_art_age_bin[age_bin] * people.scale[eligible_inds] / np.sum(people.scale[eligible_inds] ** 2)
-                            art_inds = eligible_inds[hpu.true(hpu.binomial_arr(art_probs))]
-                            people.art[art_inds] = True
-                            people.date_art[art_inds] = people.t
+                            art_inds_this_age = eligible_inds[hpu.true(hpu.binomial_arr(art_probs))]
+                            art_inds += list(art_inds_this_age)
+                            people.art[art_inds_this_age] = True
+                            people.date_art[art_inds_this_age] = people.t
+                            people.date_dead_hiv[art_inds_this_age] = np.nan
 
                             # Get indices of people who are on ART who will not be virologically suppressed
                             art_failure_prob = self['hiv_pars']['art_failure_prob']
-                            art_failure_probs = np.full(len(art_inds), fill_value=art_failure_prob, dtype=hpd.default_float)
+                            art_failure_probs = np.full(len(art_inds_this_age), fill_value=art_failure_prob, dtype=hpd.default_float)
                             art_failure_bools = hpu.binomial_arr(art_failure_probs)
-                            art_failure_inds = art_inds[art_failure_bools]
+                            art_failure_inds = art_inds_this_age[art_failure_bools]
                             people.art_failure[art_failure_inds] = True
 
-                            # Get indices of those to assign durations for -- TODO, why not everyone?
-                            assign_dur_inds = art_failure_inds  # Assign death to those not with ART failure
+                            # Get indices of those to assign time to HIV death
+                            assign_dur_inds += list(art_failure_inds)   # Assign death to those with ART failure
 
             no_art_inds = np.setdiff1d(inds, art_inds)
-            assign_dur_inds = np.array(assign_dur_inds.tolist() + no_art_inds.tolist())
+            assign_dur_inds = np.array(assign_dur_inds + no_art_inds.tolist())
+
 
             if len(assign_dur_inds) > 0:
-                scale = self['hiv_pars']['time_to_hiv_death_scale'](people.age[assign_dur_inds])
-                scale = np.maximum(scale, 0)
-                time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(assign_dur_inds))
-                people.dur_hiv[assign_dur_inds] = time_to_hiv_death
                 if self['hiv_pars']['model_hiv_death']:
+                    scale = self['hiv_pars']['time_to_hiv_death_scale'](people.age[assign_dur_inds])
+                    scale = np.maximum(scale, 0)
+                    time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(assign_dur_inds))
+                    people.dur_hiv[assign_dur_inds] = time_to_hiv_death
                     people.date_dead_hiv[assign_dur_inds] = people.t + sc.randround(time_to_hiv_death / dt)
 
         return
@@ -584,6 +585,10 @@ class HIVsim(hpb.ParsObj):
         self.results['hpv_prevalence_by_age_with_hiv'][:] = safedivide(res['n_hpv_by_age_with_hiv'][:], ng*res['n_hiv_by_age'][:])
         self.results['hpv_prevalence_by_age_no_hiv'][:] = safedivide(res['n_hpv_by_age_no_hiv'][:], ng*no_hiv_by_age)
         self.results['art_coverage'][:] = safedivide(res['n_art'][:],res['n_hiv'][:])
+        self.results['excess_hiv_mortality'][:] = safedivide(res['hiv_deaths'][:], simres['n_alive'][:])
+        self.results['excess_hiv_mortality_by_age'][:] = safedivide(res['hiv_deaths_by_age'][:], simres['n_alive_by_age'][:])
+        self.results['hiv_mortality'][:] = safedivide(res['hiv_deaths'][:], res['n_hiv'][:])
+        self.results['hiv_mortality_by_age'][:] = safedivide(res['hiv_deaths_by_age'][:], res['n_hiv_by_age'][:])
 
         # Compute cancer incidence
         scale_factor = 1e5  # Cancer incidence are displayed as rates per 100k women

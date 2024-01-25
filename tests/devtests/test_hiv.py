@@ -26,7 +26,7 @@ def test_hiv():
     ''' Basic test to show that it runs '''
     sc.heading('Testing hiv')
 
-    fig_string = 'no hpv, no hiv mort'
+    fig_string = 'no hpv, hiv mort'
 
     pars = {
         'n_agents': n_agents,
@@ -38,12 +38,12 @@ def test_hiv():
         'end': 2030,
         # 'use_migration': False,
         'ms_agent_ratio': ms_agent_ratio,
-        'hiv_pars' : {
-            'model_hiv_death': False,
-                      'rel_imm': { 'lt200': 1,'gt200': 1},
-                      'rel_sus': {'lt200': 1, 'gt200': 1},
-                      'rel_sev': {'lt200': 1, 'gt200': 1}
-                      }
+        # 'hiv_pars' : {
+        #     'model_hiv_death': False,
+        #               'rel_imm': { 'lt200': 1,'gt200': 1},
+        #               'rel_sus': {'lt200': 1, 'gt200': 1},
+        #               'rel_sev': {'lt200': 1, 'gt200': 1}
+        #               }
     }
 
     sim = hpv.Sim(
@@ -89,10 +89,25 @@ def test_hiv():
     year_ind = sc.findinds(years, 1985)[0]
 
     fig, ax = pl.subplots()
-    ax.plot(years[year_ind:], simres['migration'][year_ind:], label='HPVsim')
-    ax.axhline(y=0)
-    ax.set_title(f'Migrations {fig_string}')
+    ax.plot(years[year_ind:], simres['hiv_mortality'][year_ind:], label='HIV mortality')
+    ax.plot(years[year_ind:], simres['excess_hiv_mortality'][year_ind:], label='Excess HIV mortality')
+    ax.set_title(f'HIV mortality {fig_string}')
     ax.legend()
+    fig.show()
+
+    # ## TEST SPACE ###
+    hiv_mortality_df = simres['hiv_mortality_by_age'][:,year_ind:]
+    fig, axes = pl.subplots(1, 2)
+    for ia, age in enumerate(sim.pars['age_bin_edges'][:-1]):
+        if ia < 10:
+            ax = axes[0]
+        else:
+            ax = axes[1]
+        ax.plot(years[year_ind:], hiv_mortality_df[ia,:], label=age)
+    for ax in axes:
+        ax.legend()
+    fig.suptitle(f'HIV mortality by age {fig_string}')
+    fig.tight_layout()
     fig.show()
 
     fig, axes = pl.subplots(3, 1, figsize=(12, 12))
