@@ -26,19 +26,20 @@ def test_hiv():
     ''' Basic test to show that it runs '''
     sc.heading('Testing hiv')
 
-    fig_string = 'No HIV mort'
+    fig_string = 'no hpv, no hiv mort'
 
     pars = {
         'n_agents': n_agents,
         'location': 'south africa',
         'model_hiv': True,
         'start': start,
-        # 'beta': 0,
+        'beta': 0,
         # 'dur_cancer': dict(dist='lognormal', par1=60.0, par2=3.0),
         'end': 2030,
         # 'use_migration': False,
         'ms_agent_ratio': ms_agent_ratio,
-        'hiv_pars' : {'model_hiv_death': False,
+        'hiv_pars' : {
+            'model_hiv_death': False,
                       'rel_imm': { 'lt200': 1,'gt200': 1},
                       'rel_sus': {'lt200': 1, 'gt200': 1},
                       'rel_sev': {'lt200': 1, 'gt200': 1}
@@ -80,11 +81,19 @@ def test_hiv():
     # sim.plot()
     # sim.plot(to_plot=to_plot)
 
+
     rsa_df = pd.read_csv('../test_data/RSA_data.csv').set_index('Unnamed: 0').T
 
     simres = sim.results
     years = simres['year']
     year_ind = sc.findinds(years, 1985)[0]
+
+    fig, ax = pl.subplots()
+    ax.plot(years[year_ind:], simres['migration'][year_ind:], label='HPVsim')
+    ax.axhline(y=0)
+    ax.set_title(f'Migrations {fig_string}')
+    ax.legend()
+    fig.show()
 
     fig, axes = pl.subplots(3, 1, figsize=(12, 12))
     ax = axes[0]
@@ -228,7 +237,22 @@ def test_hiv():
     fig.tight_layout()
     fig.show()
 
-
+    # ## TEST SPACE ###
+    # test_df = self.pop_age_trend[(self.pop_age_trend.year >= 2010) & (self.pop_age_trend.year <= 2020)]
+    # import matplotlib.pylab as pl
+    # fig, axes = pl.subplots(1, 2)
+    # for year in np.unique(test_df['year'].values):
+    #     subset_df = test_df[test_df['year'] == year]
+    #     axes[0].plot(subset_df['age'], subset_df['male'], label=year)
+    #     axes[1].plot(subset_df['age'], subset_df['female'])
+    # axes[0].set_title('Male')
+    # axes[1].set_title('Female')
+    # axes[0].set_xlabel('Age')
+    # axes[0].set_ylabel('Pop size')
+    # axes[1].set_xlabel('Age')
+    # axes[0].legend()
+    # fig.tight_layout()
+    # fig.show()
     return sim
 
 

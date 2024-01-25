@@ -92,6 +92,13 @@ def get_age_data(force=None, tidy=None):
     kw = dict(label='age', file_stem=age_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
     return get_UN_data(**kw)
 
+def get_age_sex_data(force=None, tidy=None):
+    ''' Import population sizes by age from UNPD '''
+    columns = ["Location", "Time", "AgeGrpStart", "PopMale", "PopFemale"]
+    outfile = 'populations_by_sex.obj'
+    kw = dict(label='age', file_stem=age_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    return get_UN_data(**kw)
+
 
 def get_death_data(force=None, tidy=None):
     ''' Import age-specific death rates and population distributions from UNPD '''
@@ -231,6 +238,8 @@ def remove_data(verbose=True, **kwargs):
 
 
 if __name__ == '__main__':
+
+    get_age_sex_data()
     
     ans = input('Are you sure you want to remove and redownload data? y/[n] ')
     if ans == 'y':
