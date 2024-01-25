@@ -26,7 +26,7 @@ def test_hiv():
     ''' Basic test to show that it runs '''
     sc.heading('Testing hiv')
 
-    fig_string = 'no hpv, hiv mort'
+    fig_string = 'no hpv, hiv mort, no art failure'
 
     pars = {
         'n_agents': n_agents,
@@ -38,12 +38,13 @@ def test_hiv():
         'end': 2030,
         # 'use_migration': False,
         'ms_agent_ratio': ms_agent_ratio,
-        # 'hiv_pars' : {
-        #     'model_hiv_death': False,
-        #               'rel_imm': { 'lt200': 1,'gt200': 1},
-        #               'rel_sus': {'lt200': 1, 'gt200': 1},
-        #               'rel_sev': {'lt200': 1, 'gt200': 1}
-        #               }
+        'hiv_pars' : {
+            # 'model_hiv_death': False,
+            'art_failure_prob': 0.0,
+                      # 'rel_imm': { 'lt200': 1,'gt200': 1},
+                      # 'rel_sus': {'lt200': 1, 'gt200': 1},
+                      # 'rel_sev': {'lt200': 1, 'gt200': 1}
+                      }
     }
 
     sim = hpv.Sim(
