@@ -6,7 +6,7 @@ Please see the `tutorials` subfolder.
 
 ## Everything else
 
-This folder includes source code for building the docs. Users are unlikely to need to do this themselves. Instead, view the HPVsim docs at https://docs.idmod.org/projects/hpvsim/.
+This folder includes source code for building the docs. Users are unlikely to need to do this themselves. Instead, view the HPVsim docs at https://docs.hpvsim.org.
 
 To build the docs, follow these steps:
 

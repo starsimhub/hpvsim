@@ -1,12 +1,14 @@
-pytest
-sphinx-rtd-theme
-sphinxcontrib-napoleon
-sphinx
-ipykernel
-nbsphinx
 pandoc
 pypandoc
+sphinx
+sphinx-autodoc-typehints
+pydata-sphinx-theme
+sphinx-design
+readthedocs-sphinx-search
+ipykernel # For tutorials
+nbsphinx # For tutorials
+plantweb
+ipykernel
+nbsphinx
 optuna
 seaborn
-sphinxcontrib-jquery
-readthedocs-sphinx-search

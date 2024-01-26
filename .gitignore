@@ -1,7 +1,6 @@
 # HPVsim-generated files
 *.obj
 files/
-modules.rst
 
 # Other files
 .idea
@@ -82,8 +81,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
-docs/modules.rst
-docs/hpvsim*.rst
+docs/api/_autosummary
 
 # PyBuilder
 target/
