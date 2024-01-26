@@ -627,7 +627,7 @@ class People(hpb.BasePeople):
             if immunity is not None:
                 self.nab_imm[:,new_inds] = immunity
 
-            if hiv_prevalence is not None:
+            if hiv_prevalence is not None and len(hiv_prevalence):
                 hiv_probs = hiv_prevalence[ages - 1]
                 hiv_bools = hpu.binomial_arr(hiv_probs)
                 self.hiv[new_inds] = hiv_bools
