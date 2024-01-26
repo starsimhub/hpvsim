@@ -134,6 +134,8 @@ class Calibration(sc.prettyobj):
         if hiv_pars is not None:
             self.sim['model_hiv'] = True # if calibrating HIV parameters, make sure model is running HIV
         self.sim.initialize()
+        if self.sim['model_hiv']:
+            self.sim.results = sc.mergedicts(self.sim.results, self.sim.hivsim.results)
         for rkey in sim_results.keys():
             sim_results[rkey].timepoints = sim.get_t(sim_results[rkey].data.year.unique()[0], return_date_format='str')[0]//sim.resfreq
             if 'weights' not in sim_results[rkey].data.columns:
