@@ -358,6 +358,48 @@ class HIVsim(hpb.ParsObj):
         return
 
 
+    def calculate_stocks(self, people):
+        idx = int(people.t / self.resfreq)
+        hivinds = hpu.true(people['hiv'] * people.alive)
+        self.results['n_hiv'][idx] = people.scale_flows(hivinds)
+        self.results['n_hiv_by_age'][:, idx] = \
+        np.histogram(people.age[hivinds], bins=people.age_bin_edges, weights=people.scale[hivinds])[0]
+        artinds = hpu.true(people.art * people.alive)
+        self.results['n_art'][idx] = people.scale_flows(artinds)
+
+        # Pull out those with HPV and HIV+
+        hpvhivinds = hpu.true((people['hiv']) & people['infectious'])
+        self.results['n_hpv_by_age_with_hiv'][:, idx] = \
+        np.histogram(people.age[hpvhivinds], bins=people.age_bin_edges, weights=people.scale[hpvhivinds])[0]
+
+        # Pull out those with HPV and HIV-
+        hpvnohivinds = hpu.true(~(people['hiv']) & people['infectious'])
+        self.results['n_hpv_by_age_no_hiv'][:, idx] = \
+        np.histogram(people.age[hpvnohivinds], bins=people.age_bin_edges, weights=people.scale[hpvnohivinds])[0]
+
+        alive_female_hiv_inds = hpu.true(people.alive * people.is_female * people.hiv)
+        self.results['n_females_with_hiv_alive'][idx] = people.scale_flows(alive_female_hiv_inds)
+        self.results['n_females_with_hiv_alive_by_age'][:, idx] = \
+        np.histogram(people.age[alive_female_hiv_inds], bins=people.age_bin_edges,
+                     weights=people.scale[alive_female_hiv_inds])[0]
+        alive_female_no_hiv_inds = hpu.true(people.alive * people.is_female * ~people.hiv)
+        self.results['n_females_no_hiv_alive'][idx] = people.scale_flows(alive_female_no_hiv_inds)
+        self.results['n_females_no_hiv_alive_by_age'][:, idx] = \
+        np.histogram(people.age[alive_female_no_hiv_inds], bins=people.age_bin_edges,
+                     weights=people.scale[alive_female_no_hiv_inds])[0]
+
+        alive_male_hiv_inds = hpu.true(people.alive * people.is_male * people.hiv)
+        self.results['n_males_with_hiv_alive'][idx] = people.scale_flows(alive_male_hiv_inds)
+        self.results['n_males_with_hiv_alive_by_age'][:, idx] = \
+            np.histogram(people.age[alive_male_hiv_inds], bins=people.age_bin_edges,
+                         weights=people.scale[alive_male_hiv_inds])[0]
+        alive_male_no_hiv_inds = hpu.true(people.alive * people.is_male * ~people.hiv)
+        self.results['n_males_no_hiv_alive'][idx] = people.scale_flows(alive_male_no_hiv_inds)
+        self.results['n_males_no_hiv_alive_by_age'][:, idx] = \
+            np.histogram(people.age[alive_male_no_hiv_inds], bins=people.age_bin_edges,
+                         weights=people.scale[alive_male_no_hiv_inds])[0]
+
+
     def update_hiv_results(self, people, hiv_inds):
         ''' Update the HIV results '''
 
@@ -391,41 +433,8 @@ class HIVsim(hpb.ParsObj):
         #### Calculate stocks
         # Stocks only get accumulated every nth time step, where n is the result frequency
         if people.t % self.resfreq == self.resfreq - 1:
+            self.calculate_stocks(people)
 
-
-            hivinds = hpu.true(people['hiv']* people.alive)
-            self.results['n_hiv'][idx] = people.scale_flows(hivinds)
-            self.results['n_hiv_by_age'][:, idx] = np.histogram(people.age[hivinds], bins=people.age_bin_edges, weights=people.scale[hivinds])[0]
-            artinds = hpu.true(people.art*people.alive)
-            self.results['n_art'][idx] = people.scale_flows(artinds)
-
-            # Pull out those with HPV and HIV+
-            hpvhivinds = hpu.true((people['hiv']) & people['infectious'])
-            self.results['n_hpv_by_age_with_hiv'][:, idx] = np.histogram(people.age[hpvhivinds], bins=people.age_bin_edges, weights=people.scale[hpvhivinds])[0]
-
-            # Pull out those with HPV and HIV-
-            hpvnohivinds = hpu.true(~(people['hiv']) & people['infectious'])
-            self.results['n_hpv_by_age_no_hiv'][:, idx] = np.histogram(people.age[hpvnohivinds], bins=people.age_bin_edges, weights=people.scale[hpvnohivinds])[0]
-
-            alive_female_hiv_inds = hpu.true(people.alive*people.is_female*people.hiv)
-            self.results['n_females_with_hiv_alive'][idx] = people.scale_flows(alive_female_hiv_inds)
-            self.results['n_females_with_hiv_alive_by_age'][:, idx] = np.histogram(people.age[alive_female_hiv_inds], bins=people.age_bin_edges,
-                 weights=people.scale[alive_female_hiv_inds])[0]
-            alive_female_no_hiv_inds = hpu.true(people.alive * people.is_female * ~people.hiv)
-            self.results['n_females_no_hiv_alive'][idx] = people.scale_flows(alive_female_no_hiv_inds)
-            self.results['n_females_no_hiv_alive_by_age'][:, idx] = np.histogram(people.age[alive_female_no_hiv_inds], bins=people.age_bin_edges,
-                 weights=people.scale[alive_female_no_hiv_inds])[0]
-
-            alive_male_hiv_inds = hpu.true(people.alive*people.is_male*people.hiv)
-            self.results['n_males_with_hiv_alive'][idx] = people.scale_flows(alive_male_hiv_inds)
-            self.results['n_males_with_hiv_alive_by_age'][:, idx] = \
-            np.histogram(people.age[alive_male_hiv_inds], bins=people.age_bin_edges,
-                         weights=people.scale[alive_male_hiv_inds])[0]
-            alive_male_no_hiv_inds = hpu.true(people.alive * people.is_male * ~people.hiv)
-            self.results['n_males_no_hiv_alive'][idx] = people.scale_flows(alive_male_no_hiv_inds)
-            self.results['n_males_no_hiv_alive_by_age'][:, idx] = \
-            np.histogram(people.age[alive_male_no_hiv_inds], bins=people.age_bin_edges,
-                         weights=people.scale[alive_male_no_hiv_inds])[0]
         return
 
 
@@ -569,46 +578,7 @@ class HIVsim(hpb.ParsObj):
 
         # Compute stocks for final day of sim:
         if sim.people.t % self.resfreq == self.resfreq - 1:
-            people = sim.people
-            idx = int(people.t / self.resfreq)
-            hivinds = hpu.true(people['hiv'] * people.alive)
-            self.results['n_hiv'][idx] = people.scale_flows(hivinds)
-            self.results['n_hiv_by_age'][:, idx] = \
-            np.histogram(people.age[hivinds], bins=people.age_bin_edges, weights=people.scale[hivinds])[0]
-            artinds = hpu.true(people.art * people.alive)
-            self.results['n_art'][idx] = people.scale_flows(artinds)
-
-            # Pull out those with HPV and HIV+
-            hpvhivinds = hpu.true((people['hiv']) & people['infectious'])
-            self.results['n_hpv_by_age_with_hiv'][:, idx] = \
-            np.histogram(people.age[hpvhivinds], bins=people.age_bin_edges, weights=people.scale[hpvhivinds])[0]
-
-            # Pull out those with HPV and HIV-
-            hpvnohivinds = hpu.true(~(people['hiv']) & people['infectious'])
-            self.results['n_hpv_by_age_no_hiv'][:, idx] = \
-            np.histogram(people.age[hpvnohivinds], bins=people.age_bin_edges, weights=people.scale[hpvnohivinds])[0]
-
-            alive_female_hiv_inds = hpu.true(people.alive * people.is_female * people.hiv)
-            self.results['n_females_with_hiv_alive'][idx] = people.scale_flows(alive_female_hiv_inds)
-            self.results['n_females_with_hiv_alive_by_age'][:, idx] = \
-            np.histogram(people.age[alive_female_hiv_inds], bins=people.age_bin_edges,
-                         weights=people.scale[alive_female_hiv_inds])[0]
-            alive_female_no_hiv_inds = hpu.true(people.alive * people.is_female * ~people.hiv)
-            self.results['n_females_no_hiv_alive'][idx] = people.scale_flows(alive_female_no_hiv_inds)
-            self.results['n_females_no_hiv_alive_by_age'][:, idx] = \
-            np.histogram(people.age[alive_female_no_hiv_inds], bins=people.age_bin_edges,
-                         weights=people.scale[alive_female_no_hiv_inds])[0]
-
-            alive_male_hiv_inds = hpu.true(people.alive * people.is_male * people.hiv)
-            self.results['n_males_with_hiv_alive'][idx] = people.scale_flows(alive_male_hiv_inds)
-            self.results['n_males_with_hiv_alive_by_age'][:, idx] = \
-                np.histogram(people.age[alive_male_hiv_inds], bins=people.age_bin_edges,
-                             weights=people.scale[alive_male_hiv_inds])[0]
-            alive_male_no_hiv_inds = hpu.true(people.alive * people.is_male * ~people.hiv)
-            self.results['n_males_no_hiv_alive'][idx] = people.scale_flows(alive_male_no_hiv_inds)
-            self.results['n_males_no_hiv_alive_by_age'][:, idx] = \
-                np.histogram(people.age[alive_male_no_hiv_inds], bins=people.age_bin_edges,
-                             weights=people.scale[alive_male_no_hiv_inds])[0]
+            self.calculate_stocks(sim.people)
 
         alive_females = np.sum(simres['n_females_alive_by_age'][2:, :], axis=0)
         alive_males = np.sum((res['n_males_with_hiv_alive_by_age'][2:, :]+res['n_males_no_hiv_alive_by_age'][2:, :]), axis=0)
