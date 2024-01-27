@@ -379,12 +379,12 @@ class HIVsim(hpb.ParsObj):
             hiv_bools = people.hiv[cancer_today_inds]
             cancer_today_hiv_pos_inds = cancer_today_inds[hiv_bools]
             cancer_today_hiv_neg_inds = cancer_today_inds[~hiv_bools]
-            self.results['cancers_with_hiv'][idx] = people.scale_flows(cancer_today_hiv_pos_inds)
-            self.results['cancers_no_hiv'][idx] = people.scale_flows(cancer_today_hiv_neg_inds)
-            self.results['cancers_by_age_with_hiv'][:, idx] = \
+            self.results['cancers_with_hiv'][idx] += people.scale_flows(cancer_today_hiv_pos_inds)
+            self.results['cancers_no_hiv'][idx] += people.scale_flows(cancer_today_hiv_neg_inds)
+            self.results['cancers_by_age_with_hiv'][:, idx] += \
             np.histogram(people.age[cancer_today_hiv_pos_inds], bins=people.age_bin_edges,
                          weights=people.scale[cancer_today_hiv_pos_inds])[0]
-            self.results['cancers_by_age_no_hiv'][:, idx] = \
+            self.results['cancers_by_age_no_hiv'][:, idx] += \
             np.histogram(people.age[cancer_today_hiv_neg_inds], bins=people.age_bin_edges,
                          weights=people.scale[cancer_today_hiv_neg_inds])[0]
 
