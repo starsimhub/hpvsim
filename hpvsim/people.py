@@ -477,6 +477,20 @@ class People(hpb.BasePeople):
         # Age results
         cases_by_age = np.histogram(self.age[inds], bins=self.age_bin_edges, weights=self.scale[inds])[0]
 
+        if self.pars['model_hiv']:
+            idx = int(self.t / self.hivsim.resfreq)
+            hiv_bools = self.hiv[inds]
+            hiv_pos_inds = inds[hiv_bools]
+            hiv_neg_inds = inds[~hiv_bools]
+            self.hivsim.results['cancers_with_hiv'][idx] += self.scale_flows(hiv_pos_inds)
+            self.hivsim.results['cancers_no_hiv'][idx] += self.scale_flows(hiv_neg_inds)
+            self.hivsim.results['cancers_by_age_with_hiv'][:, idx] += \
+                np.histogram(self.age[hiv_pos_inds], bins=self.age_bin_edges,
+                             weights=self.scale[hiv_pos_inds])[0]
+            self.hivsim.results['cancers_by_age_no_hiv'][:, idx] += \
+                np.histogram(self.age[hiv_neg_inds], bins=self.age_bin_edges,
+                             weights=self.scale[hiv_neg_inds])[0]
+
         return cases_by_age, self.scale_flows(inds)
 
 

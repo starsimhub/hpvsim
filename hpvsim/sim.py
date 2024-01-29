@@ -622,6 +622,7 @@ class Sim(hpb.BaseSim):
 
         # Finish initialization
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
+        self.people.hivsim = self.hivsim
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])

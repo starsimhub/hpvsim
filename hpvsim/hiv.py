@@ -139,8 +139,8 @@ class HIVsim(hpb.ParsObj):
         results['hpv_prevalence_by_age_no_hiv'] = init_res('HPV prevalence by age among HIV-', n_rows=na, color=stock_colors[1])
         results['cancers_by_age_with_hiv'] = init_res('Cancers by age among HIV+', n_rows=na, color=stock_colors[0])
         results['cancers_by_age_no_hiv'] = init_res('Cancers by age among HIV-', n_rows=na, color=stock_colors[1])
-        results['cancers_with_hiv'] = init_res('Cancers among HIV+', color=stock_colors[0])
-        results['cancers_no_hiv'] = init_res('Cancers among HIV-', color=stock_colors[1])
+        results['cancers_with_hiv'] = init_res('Cancers among HIV+', color=stock_colors[1])
+        results['cancers_no_hiv'] = init_res('Cancers among HIV-', color=stock_colors[2])
         results['cancer_incidence_with_hiv'] = init_res('Cancer incidence among HIV+', color=stock_colors[0])
         results['cancer_incidence_no_hiv'] = init_res('Cancer incidence among HIV-', color=stock_colors[1])
         results['cancer_incidence_by_age_with_hiv'] = init_res('Cancer incidence by age among HIV+', n_rows=na, color=stock_colors[0])
@@ -358,21 +358,6 @@ class HIVsim(hpb.ParsObj):
 
         self.results['female_hiv_infections_by_age'][:, idx] += np.histogram(people.age[female_hiv_inds], bins=people.age_bin_edges, weights=people.scale[female_hiv_inds])[0]
         self.results['male_hiv_infections_by_age'][:, idx] += np.histogram(people.age[male_hiv_inds], bins=people.age_bin_edges, weights=people.scale[male_hiv_inds])[0]
-
-        # Pull out those with cancer and HIV+
-        cancer_today_inds = hpu.true(people.date_cancerous == people.t)
-        if len(cancer_today_inds):
-            hiv_bools = people.hiv[cancer_today_inds]
-            cancer_today_hiv_pos_inds = cancer_today_inds[hiv_bools]
-            cancer_today_hiv_neg_inds = cancer_today_inds[~hiv_bools]
-            self.results['cancers_with_hiv'][idx] += people.scale_flows(cancer_today_hiv_pos_inds)
-            self.results['cancers_no_hiv'][idx] += people.scale_flows(cancer_today_hiv_neg_inds)
-            self.results['cancers_by_age_with_hiv'][:, idx] += \
-            np.histogram(people.age[cancer_today_hiv_pos_inds], bins=people.age_bin_edges,
-                         weights=people.scale[cancer_today_hiv_pos_inds])[0]
-            self.results['cancers_by_age_no_hiv'][:, idx] += \
-            np.histogram(people.age[cancer_today_hiv_neg_inds], bins=people.age_bin_edges,
-                         weights=people.scale[cancer_today_hiv_neg_inds])[0]
 
         #### Calculate stocks
         # Stocks only get accumulated every nth time step, where n is the result frequency
