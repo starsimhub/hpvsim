@@ -49,6 +49,7 @@ class HIVsim(hpb.ParsObj):
             'model_hiv_death': True, # whether or not to model HIV mortality. Typically only set to False for testing purposes
             'time_to_hiv_death_shape': 2, # shape parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
             'time_to_hiv_death_scale': lambda a: 21.182 - 0.2717*a, # scale parameter for weibull distribution, based on https://royalsocietypublishing.org/action/downloadSupplement?doi=10.1098%2Frsif.2013.0613&file=rsif20130613supp1.pdf
+            'hiv_death_adj': 1,
             'cd4_start': dict(dist='normal', par1=594, par2=20),
             'cd4_trajectory': lambda f: (24.363 - 16.672*f)**2, # based on https://docs.idmod.org/projects/emod-hiv/en/latest/hiv-model-healthcare-systems.html?highlight=art#art-s-impact-on-cd4-count
             'cd4_reconstitution': lambda m: 15.584*m - 0.2113*m**2, # growth in CD4 count following ART initiation
@@ -170,8 +171,9 @@ class HIVsim(hpb.ParsObj):
         dt = people.pars['dt']
         if self['hiv_pars']['model_hiv_death']:
             scale = self['hiv_pars']['time_to_hiv_death_scale'](people.age[inds])
+            adjust = self['hiv_pars']['hiv_death_adj']
             scale = np.maximum(scale, 0)
-            time_to_hiv_death = weibull_min.rvs(c=shape, scale=scale, size=len(inds))
+            time_to_hiv_death = adjust*weibull_min.rvs(c=shape, scale=scale, size=len(inds))
             people.dur_hiv[inds] = time_to_hiv_death
             people.date_dead_hiv[inds] = people.t + sc.randround(time_to_hiv_death / dt)
 
