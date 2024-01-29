@@ -581,7 +581,7 @@ class HIVsim(hpb.ParsObj):
                             people.art[art_inds_this_age] = True
                             people.date_art[art_inds_this_age] = people.t
 
-                            # print(f'{year}: I want {num_art_age_bin[age_bin]} more {age_bin}yo, put {people.scale_flows(art_inds_this_age)} on')
+                            print(f'{year}: I want {num_art_age_bin[age_bin]} more {age_bin}yo, put {people.scale_flows(art_inds_this_age)} on')
 
                             # Get indices of people who are on ART who will not be virologically suppressed
                             art_failure_prob = self['hiv_pars']['art_failure_prob']
