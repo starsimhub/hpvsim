@@ -521,12 +521,15 @@ class HIVsim(hpb.ParsObj):
         alive_females_15 = np.sum(simres['n_females_alive_by_age'][3:, :], axis=0)
         alive_males = np.sum((res['n_males_with_hiv_alive_by_age'][2:, :]+res['n_males_no_hiv_alive_by_age'][2:, :]), axis=0)
         hiv_alive_females_15 = np.sum(res['n_females_with_hiv_alive_by_age'][3:, :], axis=0)
+        incident_hiv_15 = np.sum(res['hiv_infections_by_age'][3:, :], axis=0)
+        susceptibile_hiv_15 = np.sum(simres['n_females_alive_by_age'][3:, :], axis=0) - np.sum(res['n_females_with_hiv_alive_by_age'][3:, :], axis=0)
 
         ng = sim.pars['n_genotypes']
         no_hiv_by_age = simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]
         self.results['hiv_prevalence_by_age'][:] = safedivide(res['n_hiv_by_age'][:], simres['n_alive_by_age'][:])
         self.results['female_hiv_prevalence_by_age'][:] = safedivide(res['n_females_with_hiv_alive_by_age'][:], (res['n_females_with_hiv_alive_by_age'][:] + res['n_females_no_hiv_alive_by_age'][:]))
-        self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], (simres['n_alive'][:] - res['n_hiv'][:]))
+        # self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], (simres['n_alive'][:] - res['n_hiv'][:]))
+        self.results['hiv_incidence'][:] = sc.safedivide(incident_hiv_15, susceptibile_hiv_15)
         self.results['hiv_incidence_by_age'][:] = sc.safedivide(res['hiv_infections_by_age'][:], (simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]))
         self.results['hiv_prevalence'][:] = safedivide(res['n_hiv'][:], simres['n_alive'][:])
         self.results['female_hiv_prevalence'][:] = safedivide(hiv_alive_females_15, alive_females_15)
