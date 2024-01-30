@@ -525,7 +525,7 @@ class HIVsim(hpb.ParsObj):
         no_hiv_by_age = simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]
         self.results['hiv_prevalence_by_age'][:] = safedivide(res['n_hiv_by_age'][:], simres['n_alive_by_age'][:])
         self.results['female_hiv_prevalence_by_age'][:] = safedivide(res['n_females_with_hiv_alive_by_age'][:], (res['n_females_with_hiv_alive_by_age'][:] + res['n_females_no_hiv_alive_by_age'][:]))
-        self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], (simres['n_alive'][:] - res['n_hiv'][:]))
+        self.results['hiv_incidence'][:] = sc.safedivide(res['hiv_infections'][:], ((alive_females+alive_males) - res['n_hiv'][:]))
         self.results['hiv_incidence_by_age'][:] = sc.safedivide(res['hiv_infections_by_age'][:], (simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]))
         self.results['hiv_prevalence'][:] = safedivide(res['n_hiv'][:], simres['n_alive'][:])
         self.results['female_hiv_prevalence'][:] = safedivide(res['n_females_with_hiv_alive'][:] , alive_females)
