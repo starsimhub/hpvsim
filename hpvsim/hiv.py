@@ -518,8 +518,8 @@ class HIVsim(hpb.ParsObj):
         if sim.people.t % self.resfreq == self.resfreq - 1:
             self.calculate_stocks(sim.people)
 
-        alive_females = np.sum(simres['n_females_alive_by_age'][2:, :], axis=0)
-        alive_males = np.sum((res['n_males_with_hiv_alive_by_age'][2:, :]+res['n_males_no_hiv_alive_by_age'][2:, :]), axis=0)
+        alive_females = np.sum(simres['n_females_alive_by_age'][3:, :], axis=0)
+        alive_males = np.sum((res['n_males_with_hiv_alive_by_age'][3:, :]+res['n_males_no_hiv_alive_by_age'][3:, :]), axis=0)
 
         ng = sim.pars['n_genotypes']
         no_hiv_by_age = simres['n_alive_by_age'][:] - res['n_hiv_by_age'][:]
