@@ -1,6 +1,6 @@
-================
-|hpv_s| overview
-================
+========
+Overview
+========
 
 .. include:: ../README.rst
    :start-line: 3

@@ -1,17 +1,17 @@
-=====================
-|hpv_l| documentation
-=====================
+====================
+HPVsim documentation
+====================
 
-|hpv_s| is a stochastic agent-based simulator, written in Python, for exploring and analyzing human papillomavirus (HPV) transmission. 
+HPVsim is a stochastic agent-based simulator, written in Python, for exploring and analyzing human papillomavirus (HPV) transmission. 
 
 
 Full contents
 =============
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 3
 
    overview
    tutorials
    whats-new
-   modules
+   api/index
