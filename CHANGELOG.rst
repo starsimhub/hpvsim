@@ -8,6 +8,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+
+Version 2.0.1 (2024-02-14)
+---------------------------
+- Adds in relative transmissibility attribute to people that can be modified by vaccination or treatment
+- *Github info* PR `643 <https://github.com/amath-idm/hpvsim/pull/658>`__
+
 Version 2.0.0 (2023-11-29)
 ---------------------------
 - Simplifies natural history model by compressing CIN grades
