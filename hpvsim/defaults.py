@@ -84,6 +84,7 @@ class PeopleMeta(sc.prettyobj):
             State('ever_partnered', bool,  False), # Whether this person has ever been partnered
             State('rel_sev',        default_float, 1.0), # Individual relative risk for rate severe disease growth
             State('rel_sus',        default_float, 1.0), # Individual relative risk for acquiring infection (does not vary by genotype)
+            State('rel_trans',      default_float, 1.0), # Individual relative risk for transmitting infection (does not vary by genotype)
             State('rel_imm',        default_float, 1.0), # Individual relative level of immunity acquired from infection clearance/vaccination
             State('doses',          default_int,    0),  # Number of doses of the prophylactic vaccine given per person
             State('txvx_doses',     default_int,    0),  # Number of doses of the therapeutic vaccine given per person
