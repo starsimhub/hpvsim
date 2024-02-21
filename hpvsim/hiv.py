@@ -21,18 +21,15 @@ class HIVsim(hpb.ParsObj):
         Initialization
         '''
 
-        # Define some basic settings and attributes
-        self.cd4states = ['lt200', 'gt200'] # code names for HIV states
-        self.cd4statesfull = ['CD4<200', '200<CD4<500'] # full names for HIV states
-        self.cd4_lb = [0, 200] # Lower bound for CD4 states
-        self.cd4_ub = [200, 500] # Lower bound for CD4 states
-        self.ncd4 = len(self.cd4states)
-
         # Load in the parameters from provided datafiles
         pars = self.load_data(hiv_datafile=hiv_datafile, art_datafile=art_datafile)
 
         # Define default parameters, can be overwritten by hiv_pars
         pars['hiv_pars'] = {
+            'cd4states': ['lt200', 'gt200'],  # code names for HIV states
+            'cd4statesfull': ['CD4<200', '200<CD4<500'],  # full names for HIV states
+            'cd4_lb': [0, 200],  # Lower bound for CD4 states
+            'cd4_ub': [200, 500],  # Lower bound for CD4 states
             'rel_sus': { # Increased risk of acquiring HPV
                 'lt200': 2.2,
                 'gt200': 2.2,
@@ -56,6 +53,7 @@ class HIVsim(hpb.ParsObj):
             'art_failure_prob': 0.0, # Percentage of people on ART who will fail treatment
             'dt_art' : 1.0  # Timestep for art updates (in years)
         }
+        self.ncd4 = len(pars['hiv_pars']['cd4states'])
 
         self.update_pars(old_pars=pars, new_pars=hiv_pars, create=True)
         self.init_results(sim)
@@ -277,8 +275,8 @@ class HIVsim(hpb.ParsObj):
 
         hiv_inds = sc.autolist()
 
-        for sn, cd4state in enumerate(self.cd4states):
-            inds = sc.findinds((people.cd4 >= self.cd4_lb[sn]) & (people.cd4 < self.cd4_ub[sn]))
+        for sn, cd4state in enumerate(self['hiv_pars']['cd4states']):
+            inds = sc.findinds((people.cd4 >= self['hiv_pars']['cd4_lb'][sn]) & (people.cd4 < self['hiv_pars']['cd4_ub'][sn]))
             hiv_inds += list(inds)
             if len(inds):
                 for ir, rel_par in enumerate(['rel_sus', 'rel_sev', 'rel_imm']):
