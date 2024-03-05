@@ -1168,25 +1168,23 @@ class cancer_detection(Analyzer):
 
 class daly_computation(Analyzer):
     """
-    Analyzer for feeding into costing/health economic analysis.
-    Produces a dataframe by year storing:
-        - Cases/deaths: number of new cancer cases and cancer deaths
-        - Average age of new cases, average age of deaths, average age of noncancer death
+    Analyzer for computing DALYs.
     """
 
     def __init__(self, start=2020, life_expectancy=80, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.start = start
-        self.si = None
-        self.df = None
+        self.si = None  # Start index - calculated upon initialization based on sim time vector
+        self.df = None  # Results datafram
         self.disability_weights = sc.objdict(
-            weights=[0.54, 0.049, 0.451, 0.288],
+            weights=[0.54, 0.049, 0.451, 0.288],    # Need to add source. Corresponds to stages of cancer
             time_fraction=[0.1, 0.5, 0.3, 0.1],
         )
-        self.life_expectancy = life_expectancy
+        self.life_expectancy = life_expectancy  # Should typically use country-specific values
         return
 
     def av_dw(self):
+        """ Method do compute the average disability weight over duration of cancer """
         dw = self.disability_weights
         len_dw = len(dw.weights)
         return sum([dw.weights[i]*dw.time_fraction[i] for i in range(len_dw)])
