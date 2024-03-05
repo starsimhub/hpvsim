@@ -1166,7 +1166,7 @@ class cancer_detection(Analyzer):
         return new_detections, new_treatments
 
 
-class daly_computation(hpv.Analyzer):
+class daly_computation(Analyzer):
     """
     Analyzer for feeding into costing/health economic analysis.
     Produces a dataframe by year storing:
