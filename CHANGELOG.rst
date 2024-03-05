@@ -9,6 +9,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 2.0.2 (2024-03-05)
+---------------------------
+- Modifies DALY analyzer to output YLLL, YLD and DALYs
+- *Github info* PR `659 <https://github.com/amath-idm/hpvsim/pull/659>`__
+
 Version 2.0.1 (2024-02-14)
 ---------------------------
 - Adds in relative transmissibility attribute to people that can be modified by vaccination or treatment
