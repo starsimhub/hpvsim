@@ -1198,7 +1198,7 @@ class daly_computation(Analyzer):
 
     @staticmethod
     def av_age(arr, sim):
-        if len(hpv.true(arr)): return np.mean(sim.people.age[hpv.true(arr)])
+        if len(hpu.true(arr)): return np.mean(sim.people.age[hpu.true(arr)])
         else: return np.nan
 
     def apply(self, sim):
