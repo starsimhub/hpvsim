@@ -17,7 +17,7 @@ from .settings import options as hpo # For setting global options
 
 
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection',
-           'cancer_detection', 'daly_computation', 'analyzer_map']
+           'cancer_detection', 'dalys', 'analyzer_map']
 
 
 class Analyzer(sc.prettyobj):
@@ -1166,65 +1166,59 @@ class cancer_detection(Analyzer):
         return new_detections, new_treatments
 
 
-class daly_computation(Analyzer):
+class dalys(Analyzer):
     """
     Analyzer for computing DALYs.
     """
 
-    def __init__(self, start=2020, life_expectancy=80, *args, **kwargs):
+    def __init__(self, start=None, life_expectancy=84, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.start = start
         self.si = None  # Start index - calculated upon initialization based on sim time vector
-        self.df = None  # Results datafram
+        self.df = None  # Results dataframe
         self.disability_weights = sc.objdict(
-            weights=[0.54, 0.049, 0.451, 0.288],    # Need to add source. Corresponds to stages of cancer
-            time_fraction=[0.1, 0.5, 0.3, 0.1],
+            weights=[0.288, 0.049, 0.451, 0.54],    # From GBD2017 - see Table A2.1 https://www.thelancet.com/cms/10.1016/S2214-109X(20)30022-X/attachment/0f63cf98-5eb9-48eb-af4f-6abe8fdff544/mmc1.pdf
+            time_fraction=[0.05, 0.85, 0.09, 0.01],     # Estimates based on durations
         )
         self.life_expectancy = life_expectancy  # Should typically use country-specific values
         return
 
-    def av_dw(self):
-        """ Method do compute the average disability weight over duration of cancer """
+    @property
+    def av_disutility(self):
+        """ The average disability weight over duration of cancer """
         dw = self.disability_weights
         len_dw = len(dw.weights)
         return sum([dw.weights[i]*dw.time_fraction[i] for i in range(len_dw)])
 
     def initialize(self, sim):
         super().initialize(sim)
-        columns = ['av_age_cancers', 'av_age_cancer_deaths', 'av_age_other_deaths']
-        self.si = sc.findinds(sim.res_yearvec,self.start)[0]
-        self.df = pd.DataFrame(0.0, index=pd.Index(sim.res_yearvec[self.si:], name='year'), columns=columns)
+        if self.start is None: self.start=sim['start']
+        self.si = sc.findfirst(sim.res_yearvec, self.start)
+        self.npts = len(sim.res_yearvec[self.si:])
+        self.yll = np.zeros(self.npts)
+        self.yld = np.zeros(self.npts)
+        self.dalys = np.zeros(self.npts)
         return
 
-    @staticmethod
-    def av_age(arr, sim):
-        if len(hpu.true(arr)): return np.mean(sim.people.age[hpu.true(arr)])
-        else: return np.nan
-
     def apply(self, sim):
+
         if sim.yearvec[sim.t] >= self.start:
             ppl = sim.people
             li = np.floor(sim.yearvec[sim.t])
-            lt = (sim.t-1)
 
-            # Age outputs
-            self.df.loc[li].av_age_other_deaths = self.av_age(ppl.date_dead_other == lt, sim)
-            self.df.loc[li].av_age_cancer_deaths = self.av_age(ppl.date_dead_cancer == lt, sim)
-            self.df.loc[li].av_age_cancers = self.av_age(ppl.date_cancerous == lt, sim)
+            # Get people with cancer and add up all their YLL and YLD now (incidence-based DALYs)
+            new_cancers = ppl.date_cancerous == sim.t
+            new_cancer_inds = hpu.true(new_cancers)
+            if len(new_cancer_inds):
+                self.yld[li] += ppl.scale[new_cancer_inds] * ppl.dur_cancer[new_cancers] * self.av_disutility
+                age_death = (ppl.age[new_cancer_inds]+ppl.dur_cancer[new_cancers])
+                years_left = np.maximum(0, self.life_expectancy - age_death)
+                self.yll[li] += ppl.scale[new_cancer_inds]*years_left.sum()
+
         return
 
     def finalize(self, sim):
-        # Add in results that are already generated (NB, these have all been scaled already)
-        self.df['cancers'] = sim.results['cancers'][self.si:]
-        self.df['cancer_deaths'] = sim.results['cancer_deaths'][self.si:]
-        self.df['other_deaths'] = sim.results['other_deaths'][self.si:]
-        self.df['cancer_years'] = self.df['av_age_cancer_deaths'] - self.df['av_age_cancers']
-
-        # Actually compute DALYs
-        self.df['yld'] = self.av_dw() * self.df['cancer_years'] * self.df['cancers']
-        self.df['yll'] = (self.life_expectancy - self.df['av_age_cancer_deaths']) * self.df['cancer_deaths']
-        self.df['dalys'] = self.df['yld'] + self.df['yll']
-
+        self.dalys = self.yll + self.yld
         return
 
 
@@ -1236,6 +1230,6 @@ analyzer_map = {
     'age_results': age_results,
     'age_causal_infection': age_causal_infection,
     'cancer_detection': cancer_detection,
-    'daly_computation': daly_computation,
+    'dalys': dalys,
 }
 
