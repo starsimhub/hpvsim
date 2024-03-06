@@ -1195,6 +1195,7 @@ class dalys(Analyzer):
         if self.start is None: self.start=sim['start']
         self.si = sc.findfirst(sim.res_yearvec, self.start)
         self.npts = len(sim.res_yearvec[self.si:])
+        self.years = sim.res_yearvec[self.si:]
         self.yll = np.zeros(self.npts)
         self.yld = np.zeros(self.npts)
         self.dalys = np.zeros(self.npts)
@@ -1205,15 +1206,16 @@ class dalys(Analyzer):
         if sim.yearvec[sim.t] >= self.start:
             ppl = sim.people
             li = np.floor(sim.yearvec[sim.t])
+            idx = sc.findfirst(self.years, li)
 
-            # Get people with cancer and add up all their YLL and YLD now (incidence-based DALYs)
+            # Get new people with cancer and add up all their YLL and YLD now (incidence-based DALYs)
             new_cancers = ppl.date_cancerous == sim.t
             new_cancer_inds = hpu.true(new_cancers)
             if len(new_cancer_inds):
-                self.yld[li] += ppl.scale[new_cancer_inds] * ppl.dur_cancer[new_cancers] * self.av_disutility
+                self.yld[idx] += sum(ppl.scale[new_cancer_inds] * ppl.dur_cancer[new_cancers] * self.av_disutility)
                 age_death = (ppl.age[new_cancer_inds]+ppl.dur_cancer[new_cancers])
                 years_left = np.maximum(0, self.life_expectancy - age_death)
-                self.yll[li] += ppl.scale[new_cancer_inds]*years_left.sum()
+                self.yll[idx] += sum(ppl.scale[new_cancer_inds]*years_left)
 
         return
 

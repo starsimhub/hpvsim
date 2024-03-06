@@ -236,6 +236,8 @@ def test_dalys():
     dalys = hpv.dalys(start=2000)
     sim = hpv.Sim(analyzers=dalys)
     sim.run()
+    a = sim.get_analyzer(hpv.dalys)
+    return sim, a
 
 
 #%% Run as a script
