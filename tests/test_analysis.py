@@ -232,17 +232,26 @@ def test_detection():
     return sim, a
 
 
+def test_dalys():
+    dalys = hpv.dalys(start=2000)
+    sim = hpv.Sim(analyzers=dalys)
+    sim.run()
+    a = sim.get_analyzer(hpv.dalys)
+    return sim, a
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
     T = sc.tic()
 
-    # people      = test_snapshot()
-    # sim0, a0    = test_age_pyramids()
+    people      = test_snapshot()
+    sim0, a0    = test_age_pyramids()
     sim1, a1    = test_age_results()
-    # sim2, a2    = test_reduce_analyzers()
-    # sim3, a3    = test_age_causal_analyzer()
-    # sim4, a4    = test_detection()
+    sim2, a2    = test_reduce_analyzers()
+    sim3, a3    = test_age_causal_analyzer()
+    sim4, a4    = test_detection()
+    sim5, a5    = test_dalys()
 
     sc.toc(T)
     print('Done.')
