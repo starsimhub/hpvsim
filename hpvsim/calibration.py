@@ -332,20 +332,16 @@ class Calibration(sc.prettyobj):
         '''
         pars = sc.dcp(pardict)
         pars_flatten = sc.flattendict(pardict)
-        for key, val in pars_flatten.items():
-            sampler_key = '_'.join(key)
+        for key_tuple, val in pars_flatten.items():
+            sampler_key = '_'.join(key_tuple)
             low, high = val[1], val[2]
             step = val[3] if len(val) > 3 else None
 
-            if key in self.par_samplers:  # If a custom sampler is used, get it now (Not working properly for now)
-                try:
-                    sampler_fn = getattr(trial, self.par_samplers[key])
-                except Exception as E:
-                    errormsg = 'The requested sampler function is not found: ensure it is a valid attribute of an Optuna Trial object'
-                    raise AttributeError(errormsg) from E
+            value = trial.suggest_float(sampler_key, low, high, step=step)
+            if len(key_tuple) > 1: # See https://github.com/sciris/sciris/issues/630
+                sc.setnested(pars, key_tuple, value)
             else:
-                sampler_fn = trial.suggest_float
-            sc.setnested(pars, list(key), sampler_fn(sampler_key, low, high, step=step))
+                pars[sampler_key] = value
         return pars
 
     def run_trial(self, trial, save=True):
