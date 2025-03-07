@@ -19,9 +19,9 @@ import sciris as sc
 from hpvsim.data import loaders as ld
 
 # Set parameters
-data_version = '1.3' # Data version
+data_version = '1.4' # Data version
 data_file = f'hpvsim_data_v{data_version}.zip'
-quick_url = f'https://github.com/amath-idm/hpvsim_data/blob/main/{data_file}?raw=true'
+quick_url = f'https://github.com/hpvsim/hpvsim_data/blob/main/{data_file}?raw=true'
 age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
 death_stem = 'WPP2022_Life_Table_Abridged_Medium_'
 base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/'
@@ -145,6 +145,7 @@ def parallel_downloader(which, **kwargs):
     ''' Function for use with a parallel download function '''
     if which in ['age', 'ages']:
         get_age_data(**kwargs)
+        get_age_sex_data(**kwargs)
     if which in ['birth', 'births']:
         get_birth_data(**kwargs)
     if which in ['death', 'deaths']:
