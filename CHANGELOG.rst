@@ -16,6 +16,7 @@ Version 2.2.0 (2025-03-07)
 - Fixes assignment of HIV mortality based upon ART coverage
 - Removes HIV-mortality from background mortality
 - Small fix to enable calibration to HIV-stratified data
+- Adds a more robust data downloading method and renamed ``get_data()`` to ``download_data()``
 - *Github info* PR `652 <https://github.com/amath-idm/hpvsim/pull/652>`__
 
 Version 2.0.1 (2024-02-14)
