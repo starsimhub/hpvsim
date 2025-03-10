@@ -24,6 +24,8 @@ files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
 files.life_expectancy = 'ex.obj'
 
+download_tip = 'Please run hpv.download_data() first.'
+
 # Cache data as a dict
 cache = dict()
 
@@ -165,7 +167,7 @@ def get_age_distribution(location=None, year=None, total_pop_file=None, age_data
         try:
             df = load_file(files.age_dist)
         except Exception as E:
-            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            errormsg = f'Could not locate datafile with population sizes by country. {download_tip}'
             raise ValueError(errormsg) from E
 
         # Handle year
@@ -212,7 +214,7 @@ def get_age_distribution_over_time(location=None, popage_datafile=None):
         try:
             df = load_file(files.age_dist_sex)
         except Exception as E:
-            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            errormsg = f'Could not locate datafile with population sizes over time. {download_tip}'
             raise ValueError(errormsg) from E
         full_df = map_entries(df, location)[location]
     else:
@@ -220,7 +222,7 @@ def get_age_distribution_over_time(location=None, popage_datafile=None):
 
     result = full_df.rename(columns={'Time':'year', 'AgeGrpStart': 'age', 'PopMale': 'male', 'PopFemale': 'female'})
     result['male'] *= 1e3 # reported as per 1,000
-    result['female'] *= 1e3  # reported as per 1,000
+    result['female'] *= 1e3 # reported as per 1,000
 
     return result
 
@@ -241,7 +243,7 @@ def get_total_pop(location=None, pop_datafile=None):
         try:
             df = load_file(files.age_dist)
         except Exception as E:
-            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            errormsg = f'Could not locate datafile with total population sizes by country. {download_tip}'
             raise ValueError(errormsg) from E
 
         # Extract the age distribution for the given location and year
@@ -272,7 +274,7 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     try:
         df = load_file(files.death)
     except Exception as E:
-        errormsg = 'Could not locate datafile with age-specific death rates by country. Please run data/get_data.py first.'
+        errormsg = f'Could not locate datafile with age-specific death rates by country. {download_tip}'
         raise ValueError(errormsg) from E
 
     raw_df = map_entries(df, location)[location]
@@ -306,7 +308,7 @@ def get_life_expectancy(location=None, by_sex=True, overall=False):
         location (str or list): name of the country or countries to load the age distribution for
         by_sex (bool): whether to rates by sex
         overall (bool): whether to load total rate
-        
+
     Returns:
         life_expectancy (dict): life expectancy by age and sex
     '''
@@ -314,7 +316,7 @@ def get_life_expectancy(location=None, by_sex=True, overall=False):
     try:
         df = load_file(files.life_expectancy)
     except Exception as E:
-        errormsg = 'Could not locate datafile with age-specific life expectancy by country. Please run data/get_data.py first.'
+        errormsg = f'Could not locate datafile with age-specific life expectancy by country. {download_tip}'
         raise ValueError(errormsg) from E
 
     raw_df = map_entries(df, location)[location]
@@ -354,7 +356,7 @@ def get_birth_rates(location=None):
     try:
         birth_rate_data = load_file(files.birth)
     except Exception as E:
-        errormsg = 'Could not locate datafile with birth rates by country. Please run data/get_data.py first.'
+        errormsg = f'Could not locate datafile with birth rates by country. {download_tip}'
         raise ValueError(errormsg) from E
 
     standardized = map_entries(birth_rate_data, location, wb=True)
