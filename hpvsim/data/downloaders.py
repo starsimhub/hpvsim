@@ -28,7 +28,7 @@ base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standar
 years = ['1950-2021', '2022-2100']
 
 
-__all__ = ['get_data', 'quick_download', 'check_downloaded', 'remove_data']
+__all__ = ['download_data', 'quick_download', 'check_downloaded', 'remove_data']
 
 
 # Define here to optionally be overwritten
@@ -78,7 +78,7 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
     df = pd.concat(dfs)
     dd = sc.objdict({l:d for l,d in df.groupby('Location')})
     assert dd[0][columns[-1]].dtype != object, "Last column should be numeric type, not mixed or string type"
-        
+
     sc.save(filesdir/outfile, dd)
     T.toc(f'Done with {label}')
 
@@ -116,7 +116,7 @@ def get_ex_data(force=None, tidy=None):
     return get_UN_data(**kw)
 
 
-def get_birth_data(start=1960, end=2020, force=None, tidy=None):
+def get_birth_data(start=1960, end=2020, force=None):
     ''' Import crude birth rates from WB '''
     sc.heading('Downloading World Bank birth rate data...')
     try:
@@ -132,11 +132,7 @@ def get_birth_data(start=1960, end=2020, force=None, tidy=None):
         d[country] = d[country].astype(float) # Loaded as an object otherwise!
     d['years'] = np.arange(start, end)
     sc.save(filesdir/'birth_rates.obj', d)
-    
-    if tidy:
-        print(f'Removing {local_path}')
-        sc.rmpath(local_path, die=False)
-            
+
     T.toc(label='Done with birth data')
     return d
 
@@ -155,9 +151,9 @@ def parallel_downloader(which, **kwargs):
     return
 
 
-def get_data(serial=False, **kwargs):
+def download_data(serial=False, **kwargs):
     ''' Download data in parallel '''
-    sc.heading('Downloading HPVsim data, please be patient...')
+    sc.heading('Downloading HPVsim data manually, please be patient...')
     T = sc.timer()
 
     if len(sys.argv) > 1:
@@ -241,9 +237,9 @@ def remove_data(verbose=True, **kwargs):
 if __name__ == '__main__':
 
     get_age_sex_data()
-    
+
     ans = input('Are you sure you want to remove and redownload data? y/[n] ')
     if ans == 'y':
         remove_data()
-        get_data()
+        download_data()
         check_downloaded()
