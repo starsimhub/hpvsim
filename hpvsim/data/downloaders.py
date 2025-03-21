@@ -211,7 +211,8 @@ def check_downloaded(verbose=1, check_version=True):
     # Do file checks
     exists = dict()
     for key,fn in ld.files.items():
-        exists[key] = os.path.exists(fn)
+        if key != 'metadata':
+            exists[key] = os.path.exists(fn)
         if verbose>1:
             print(f'HPVsim data: checking {fn}: {exists[key]}')
     ok = all(list(exists.values()))
@@ -222,7 +223,11 @@ def check_downloaded(verbose=1, check_version=True):
 
     # Do version check (if files exist)
     if ok and check_version:
-        metadata = sc.loadjson(ld.files.metadata)
+        try:
+            metadata = sc.loadjson(ld.files.metadata)
+        except Exception as E:
+            print(f'Warning: metadata not available; not checking version:\n{E}')
+            return ok
         match = metadata['version'] == data_version
         if verbose:
             if not match and verbose:

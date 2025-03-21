@@ -22,7 +22,6 @@ files.age_dist = 'populations.obj'
 files.age_dist_sex = 'populations_by_sex.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
-files.life_expectancy = 'ex.obj'
 
 download_tip = 'Please run hpv.download_data() first.'
 
