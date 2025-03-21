@@ -134,14 +134,6 @@ def get_death_data(**kw):
     return get_UN_data(**kw)
 
 
-def get_ex_data(**kw):
-    ''' Download age-specific life expectancy and population distributions from UNPD '''
-    columns = ["Location", "Time", "Sex", "AgeGrpStart", "ex"]
-    outfile = 'ex.obj'
-    kw = kw | dict(label='ex', file_stem=death_stem, outfile=outfile, columns=columns)
-    return get_UN_data(**kw)
-
-
 def get_birth_data(**kw):
     ''' Download crude birth rates UNPD '''
     columns = ["Location", "Time", "CBR"]
@@ -149,34 +141,6 @@ def get_birth_data(**kw):
     years = [''] # Unlike other data sources, this does not have a year range
     kw = kw | dict(label='birth', years=years, file_stem=indicators_stem, outfile=outfile, columns=columns)
     return get_UN_data(**kw)
-
-
-# def get_birth_data(start=1960, end=2020, force=None, tidy=None, verbose=True):
-#     ''' Import crude birth rates from WB '''
-#     if verbose:
-#         print('Downloading World Bank birth rate data...')
-#     try:
-#         import wbgapi as wb
-#     except Exception as E:
-#         errormsg = 'Could not import wbgapi: cannot download raw data'
-#         raise ModuleNotFoundError(errormsg) from E
-#     T = sc.timer()
-#     birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
-#     d = dict()
-#     for country in birth_rates['Country'].unique():
-#         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,3:]
-#         d[country] = d[country].astype(float) # Loaded as an object otherwise!
-#     d['years'] = np.arange(start, end)
-
-#     path = filesdir/'birth_rates.obj'
-#     if force or not os.path.exists(path):
-#         sc.save(path, d)
-#     elif verbose:
-#         print(f'Skipping {path}, already downloaded')
-
-#     if verbose:
-#         T.toc(label='Done with birth data')
-#     return d
 
 
 def downloader(which, **kwargs):
@@ -189,8 +153,6 @@ def downloader(which, **kwargs):
         get_birth_data(**kwargs)
     if which in ['death', 'deaths']:
         get_death_data(**kwargs)
-    if which in ['life_expectancy', 'ex']:
-        get_ex_data(**kwargs)
     return
 
 
@@ -208,7 +170,7 @@ def download_data(serial=False, **kwargs):
         which = 'all'
 
     if which == 'all':
-        which = ['age', 'birth', 'death', 'life_expectancy']
+        which = ['age', 'birth', 'death']
 
     # Actually download
     if serial:
