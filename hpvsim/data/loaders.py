@@ -8,7 +8,7 @@ import pandas as pd
 import sciris as sc
 import unicodedata
 import re
-from .. import misc as hpm
+
 
 __all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_age_distribution_over_time', 'get_total_pop', 'get_death_rates',
            'get_birth_rates', 'get_life_expectancy']
@@ -172,6 +172,7 @@ def get_age_distribution(location=None, year=None, total_pop_file=None, age_data
 
         # Handle year
         if year is None:
+            from .. import misc as hpm # Not needed except for this warning
             warnmsg = 'No year provided for the initial population age distribution, using 2000 by default'
             hpm.warn(warnmsg)
             year = 2000

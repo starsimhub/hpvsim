@@ -16,14 +16,14 @@ import sys
 import numpy as np
 import pandas as pd
 import sciris as sc
-from hpvsim.data import loaders as ld
+ld = sc.importbypath(sc.thispath(__file__) / 'loaders.py') # To avoid circular HPVsim import
 
 # Set parameters
 data_version = '1.4' # Data version
 data_file = f'hpvsim_data_v{data_version}.zip'
 quick_url = f'https://github.com/hpvsim/hpvsim_data/blob/main/{data_file}?raw=true'
 
-base_url = 'https://population.un.org/wpp/assets/Excel%20Files/1_Indicators%20(Standard)/CSV_FILES/'
+base_url = 'https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/'
 indicators_stem = 'WPP2024_Demographic_Indicators_Medium'
 age_stem = 'WPP2024_Population1JanuaryBySingleAgeSex_Medium_'
 death_stem = 'WPP2024_Life_Table_Abridged_Medium_'
@@ -61,28 +61,31 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
     if tidy  is None: tidy  = True
 
     if verbose:
-        print(f'Downloading {label} data...')
+        print(f'Downloading {label} data...\n')
     T = sc.timer()
     dfs = []
 
     # Download data if it's not already in the directory
     for year_pair in years:
-        url = f'{base_url}{file_stem}{years}{ext}'
-        local_base = filesdir/f'{file_stem}{years}'
+        url = f'{base_url}{file_stem}{year_pair}{ext}'
+        local_base = filesdir/f'{file_stem}{year_pair}'
         local_zip = f'{local_base}{ext}'
         if force or not os.path.exists(local_zip):
-            print(f'\nDownloading from {url}, this may take a while...')
-            sc.download(url, filename=local_zip)
+            if verbose:
+                sc.printgreen(f'Downloading {url}...')
+            sc.download(url, filename=local_zip, verbose=False)
         else:
-            print(f'Skipping {local_zip}, already downloaded')
+            if verbose:
+                print(f'Skipping {local_zip}, already downloaded')
 
         # Extract the parts used in the model and save
         df = pd.read_csv(local_zip, usecols=columns)
         dfs.append(df)
         if tidy:
-            print(f'Removing {local_base}')
-            sc.rmpath(local_zip, die=False)
-        T.toctic(label=f'  Done with {label} for {years}')
+            sc.rmpath(local_zip, die=False, verbose=verbose)
+        if verbose:
+            T.toctic(label=f'  Done with "{label}" for {year_pair}')
+            print()
 
     # Parse by location
     df = pd.concat(dfs)
@@ -91,7 +94,8 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
 
     sc.save(filesdir/outfile, dd)
     if verbose:
-        T.toc(f'Done with {label}')
+        if verbose:
+            T.toc(f'Done with {label}')
 
     return dd
 
@@ -156,8 +160,9 @@ def get_birth_data(start=1960, end=2020, force=None, tidy=None, verbose=True):
     return d
 
 
-def parallel_downloader(which, **kwargs):
+def downloader(which, **kwargs):
     ''' Function for use with a parallel download function '''
+    sc.heading(f'Working on {which}')
     if which in ['age', 'ages']:
         get_age_data(**kwargs)
         get_age_sex_data(**kwargs)
@@ -187,7 +192,11 @@ def download_data(serial=False, **kwargs):
         which = ['age', 'birth', 'death', 'life_expectancy']
 
     # Actually download
-    sc.parallelize(parallel_downloader, which, kwargs=kwargs, serial=serial)
+    if serial:
+        for key in which:
+            downloader(key, **kwargs)
+    else:
+        sc.parallelize(downloader, which, kwargs=kwargs)
     T.toc('Done downloading data for HPVsim')
 
     return
@@ -244,21 +253,19 @@ def check_downloaded(verbose=1, check_version=True):
     return ok
 
 
-def remove_data(verbose=True, **kwargs):
+def remove_data(verbose=True, die=False, **kwargs):
     ''' Remove downloaded data; arguments passed to sc.rmpath() '''
     if verbose: sc.heading('Removing HPVsim data files')
     for key,fn in ld.files.items():
-        sc.rmpath(fn, verbose=verbose, **kwargs)
+        sc.rmpath(fn, verbose=verbose, die=die, **kwargs)
     if verbose: print('Data files removed.')
     return
 
 
 if __name__ == '__main__':
 
-    get_age_sex_data()
-
     ans = input('Are you sure you want to remove and redownload data? y/[n] ')
     if ans == 'y':
         remove_data()
-        download_data()
+        download_data(serial=True) # TEMP
         check_downloaded()
