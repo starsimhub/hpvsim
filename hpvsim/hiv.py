@@ -404,7 +404,7 @@ class HIVsim(hpb.ParsObj):
                 if len(
                     cin_reevaluate_inds
                 ):  # Reevaluate these women's risk of developing cancer
-                    people.set_severity(cin_inds, g, gpars, dt)
+                    people.set_severity(cin_reevaluate_inds, g, gpars, dt)
 
         return
 
