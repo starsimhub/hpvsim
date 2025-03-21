@@ -13,7 +13,6 @@ Running this file as a script will remove and then re-download all data.
 
 import os
 import sys
-import numpy as np
 import pandas as pd
 import sciris as sc
 ld = sc.importbypath(sc.thispath(__file__) / 'loaders.py') # To avoid circular HPVsim import
@@ -55,8 +54,9 @@ def set_filesdir(path):
     return
 
 
-def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None, tidy=None, verbose=True):
-    ''' Download data from UN Population Division '''
+def get_UN_data(label='', file_stem=None, outfile=None, years=years, excludes=[':', '('],
+                columns=None, force=None, tidy=None, verbose=True):
+    ''' Download data from UN Population Division; remove entries with ":" or "(" in the name (not true countries) '''
     if force is None: force = False
     if tidy  is None: tidy  = True
 
@@ -89,13 +89,23 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
 
     # Parse by location
     df = pd.concat(dfs)
-    dd = sc.objdict({l:d for l,d in df.groupby('Location')})
+    dd = {l:d for l,d in df.groupby('Location')}
+
+    # Filter to exclude certain names
+    if excludes is not None:
+        excludes = sc.tolist(excludes)
+        for ex in excludes:
+            dd = {k:v for k,v in dd.items() if ex not in k}
+
+    # Convert to objdict and double check
+    dd = sc.objdict(dd)
     assert dd[0][columns[-1]].dtype != object, "Last column should be numeric type, not mixed or string type"
 
     sc.save(filesdir/outfile, dd)
     if verbose:
         if verbose:
-            T.toc(f'Done with {label}')
+            T.toc(doprint=False)
+            print(f'Done with {label}: {T.sum():n}')
 
     return dd
 
@@ -132,32 +142,41 @@ def get_ex_data(**kw):
     return get_UN_data(**kw)
 
 
-def get_birth_data(start=1960, end=2020, force=None, tidy=None, verbose=True):
-    ''' Import crude birth rates from WB '''
-    if verbose:
-        print('Downloading World Bank birth rate data...')
-    try:
-        import wbgapi as wb
-    except Exception as E:
-        errormsg = 'Could not import wbgapi: cannot download raw data'
-        raise ModuleNotFoundError(errormsg) from E
-    T = sc.timer()
-    birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
-    d = dict()
-    for country in birth_rates['Country'].unique():
-        d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,3:]
-        d[country] = d[country].astype(float) # Loaded as an object otherwise!
-    d['years'] = np.arange(start, end)
+def get_birth_data(**kw):
+    ''' Download crude birth rates UNPD '''
+    columns = ["Location", "Time", "CBR"]
+    outfile = 'birth_rates.obj'
+    years = [''] # Unlike other data sources, this does not have a year range
+    kw = kw | dict(label='birth', years=years, file_stem=indicators_stem, outfile=outfile, columns=columns)
+    return get_UN_data(**kw)
 
-    path = filesdir/'birth_rates.obj'
-    if force or not os.path.exists(path):
-        sc.save(path, d)
-    elif verbose:
-        print(f'Skipping {path}, already downloaded')
 
-    if verbose:
-        T.toc(label='Done with birth data')
-    return d
+# def get_birth_data(start=1960, end=2020, force=None, tidy=None, verbose=True):
+#     ''' Import crude birth rates from WB '''
+#     if verbose:
+#         print('Downloading World Bank birth rate data...')
+#     try:
+#         import wbgapi as wb
+#     except Exception as E:
+#         errormsg = 'Could not import wbgapi: cannot download raw data'
+#         raise ModuleNotFoundError(errormsg) from E
+#     T = sc.timer()
+#     birth_rates = wb.data.DataFrame('SP.DYN.CBRT.IN', time=range(start,end), labels=True, skipAggs=True).reset_index()
+#     d = dict()
+#     for country in birth_rates['Country'].unique():
+#         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,3:]
+#         d[country] = d[country].astype(float) # Loaded as an object otherwise!
+#     d['years'] = np.arange(start, end)
+
+#     path = filesdir/'birth_rates.obj'
+#     if force or not os.path.exists(path):
+#         sc.save(path, d)
+#     elif verbose:
+#         print(f'Skipping {path}, already downloaded')
+
+#     if verbose:
+#         T.toc(label='Done with birth data')
+#     return d
 
 
 def downloader(which, **kwargs):
