@@ -22,17 +22,29 @@ from hpvsim.data import loaders as ld
 data_version = '1.4' # Data version
 data_file = f'hpvsim_data_v{data_version}.zip'
 quick_url = f'https://github.com/hpvsim/hpvsim_data/blob/main/{data_file}?raw=true'
-age_stem = 'WPP2022_Population1JanuaryBySingleAgeSex_Medium_'
-death_stem = 'WPP2022_Life_Table_Abridged_Medium_'
-base_url = 'https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/'
-years = ['1950-2021', '2022-2100']
 
+base_url = 'https://population.un.org/wpp/assets/Excel%20Files/1_Indicators%20(Standard)/CSV_FILES/'
+indicators_stem = 'WPP2024_Demographic_Indicators_Medium'
+age_stem = 'WPP2024_Population1JanuaryBySingleAgeSex_Medium_'
+death_stem = 'WPP2024_Life_Table_Abridged_Medium_'
+years = ['1950-2023', '2024-2100']
+ext = '.csv.gz'
 
 __all__ = ['download_data', 'quick_download', 'check_downloaded', 'remove_data']
 
 
 # Define here to optionally be overwritten
 filesdir = ld.filesdir
+
+def make_paths():
+    """ Create all file paths and download URLs """
+    paths = sc.autolist()
+    paths += indicators_stem + ext
+    for stem in [age_stem, death_stem]:
+        for year_pair in years:
+            paths += stem + year_pair + ext
+    out = sc.odict({p:base_url+p for p in paths})
+    return out
 
 def set_filesdir(path):
     ''' Used to change the file folder '''
@@ -43,36 +55,34 @@ def set_filesdir(path):
     return
 
 
-def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None, tidy=None):
+def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None, tidy=None, verbose=True):
     ''' Download data from UN Population Division '''
     if force is None: force = False
     if tidy  is None: tidy  = True
 
-    sc.heading(f'Getting {label} data...')
+    if verbose:
+        print(f'Downloading {label} data...')
     T = sc.timer()
     dfs = []
 
     # Download data if it's not already in the directory
-    for year in years:
-        url = f'{base_url}{file_stem}{year}.zip'
-        local_base = filesdir/f'{file_stem}{year}'
-        local_zip = f'{local_base}.zip'
-        local_csv = f'{local_base}.csv'
-        if force or not os.path.exists(local_csv):
+    for year_pair in years:
+        url = f'{base_url}{file_stem}{years}{ext}'
+        local_base = filesdir/f'{file_stem}{years}'
+        local_zip = f'{local_base}{ext}'
+        if force or not os.path.exists(local_zip):
             print(f'\nDownloading from {url}, this may take a while...')
             sc.download(url, filename=local_zip)
-            sc.unzip(local_zip, outfolder=filesdir)
         else:
-            print(f'Skipping {local_csv}, already downloaded')
+            print(f'Skipping {local_zip}, already downloaded')
 
         # Extract the parts used in the model and save
-        df = pd.read_csv(local_csv, usecols=columns)
+        df = pd.read_csv(local_zip, usecols=columns)
         dfs.append(df)
         if tidy:
             print(f'Removing {local_base}')
             sc.rmpath(local_zip, die=False)
-            sc.rmpath(local_csv, die=False)
-        T.toctic(label=f'  Done with {label} for {year}')
+        T.toctic(label=f'  Done with {label} for {years}')
 
     # Parse by location
     df = pd.concat(dfs)
@@ -80,45 +90,48 @@ def get_UN_data(label='', file_stem=None, outfile=None, columns=None, force=None
     assert dd[0][columns[-1]].dtype != object, "Last column should be numeric type, not mixed or string type"
 
     sc.save(filesdir/outfile, dd)
-    T.toc(f'Done with {label}')
+    if verbose:
+        T.toc(f'Done with {label}')
 
     return dd
 
 
-def get_age_data(force=None, tidy=None):
-    ''' Import population sizes by age from UNPD '''
+def get_age_data(**kw):
+    ''' Download population sizes by age from UNPD '''
     columns = ["Location", "Time", "AgeGrpStart", "PopTotal"]
     outfile = 'populations.obj'
-    kw = dict(label='age', file_stem=age_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    kw = kw | dict(label='age', file_stem=age_stem, outfile=outfile, columns=columns)
     return get_UN_data(**kw)
 
-def get_age_sex_data(force=None, tidy=None):
-    ''' Import population sizes by age from UNPD '''
+
+def get_age_sex_data(**kw):
+    ''' Download population sizes by age from UNPD '''
     columns = ["Location", "Time", "AgeGrpStart", "PopMale", "PopFemale"]
     outfile = 'populations_by_sex.obj'
-    kw = dict(label='age', file_stem=age_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    kw = kw | dict(label='age', file_stem=age_stem, outfile=outfile, columns=columns)
     return get_UN_data(**kw)
 
 
-def get_death_data(force=None, tidy=None):
-    ''' Import age-specific death rates and population distributions from UNPD '''
+def get_death_data(**kw):
+    ''' Download age-specific death rates and population distributions from UNPD '''
     columns = ["Location", "Time", "Sex", "AgeGrpStart", "mx"]
     outfile = 'mx.obj'
-    kw = dict(label='death', file_stem=death_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    kw = kw | dict(label='death', file_stem=death_stem, outfile=outfile, columns=columns)
     return get_UN_data(**kw)
 
 
-def get_ex_data(force=None, tidy=None):
-    ''' Import age-specific life expectancy and population distributions from UNPD '''
+def get_ex_data(**kw):
+    ''' Download age-specific life expectancy and population distributions from UNPD '''
     columns = ["Location", "Time", "Sex", "AgeGrpStart", "ex"]
     outfile = 'ex.obj'
-    kw = dict(label='ex', file_stem=death_stem, outfile=outfile, columns=columns, force=force, tidy=tidy)
+    kw = kw | dict(label='ex', file_stem=death_stem, outfile=outfile, columns=columns)
     return get_UN_data(**kw)
 
 
-def get_birth_data(start=1960, end=2020, force=None):
+def get_birth_data(start=1960, end=2020, force=None, tidy=None, verbose=True):
     ''' Import crude birth rates from WB '''
-    sc.heading('Downloading World Bank birth rate data...')
+    if verbose:
+        print('Downloading World Bank birth rate data...')
     try:
         import wbgapi as wb
     except Exception as E:
@@ -131,9 +144,15 @@ def get_birth_data(start=1960, end=2020, force=None):
         d[country] = birth_rates.loc[(birth_rates['Country']==country)].values[0,3:]
         d[country] = d[country].astype(float) # Loaded as an object otherwise!
     d['years'] = np.arange(start, end)
-    sc.save(filesdir/'birth_rates.obj', d)
 
-    T.toc(label='Done with birth data')
+    path = filesdir/'birth_rates.obj'
+    if force or not os.path.exists(path):
+        sc.save(path, d)
+    elif verbose:
+        print(f'Skipping {path}, already downloaded')
+
+    if verbose:
+        T.toc(label='Done with birth data')
     return d
 
 

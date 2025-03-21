@@ -31,6 +31,7 @@ if not data.check_downloaded():
     except Exception as E1:
         try:
             print(f'Quick download failed ({str(E1)}), trying manual download ...')
+            data.download_data(serial=True)
         except:
             errormsg = f"Warning: couldn't download data:\n\n{sc.traceback()}\nProceeding anyway..."
             print(errormsg)
