@@ -334,7 +334,7 @@ class BaseSim(ParsObj):
             t (int or str): the time point in the simulation cloesst to the requested date
 
         **Examples**::
-        
+
             sim.get_t('2015-03-01') # Get the closest timepoint to the specified date
             sim.get_t(3) # Will return 3
             sim.get_t('2015') # Can use strings
@@ -362,7 +362,10 @@ class BaseSim(ParsObj):
             # try to interpret it as a float, otherwise raise an error
             else:
                 try:
-                    tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
+                    if not sc.isnumber(date): # TODO: remove once https://github.com/sciris/sciris/issues/644 is fixed
+                        tp_raw  = sc.datetoyear(date) # Get the 'raw' timepoint, not rounded to the nearest timestep
+                    else:
+                        tp_raw = date
                 except:
                     try:
                         tp_raw  = float(date) # This must be float, not int, otherwise some attempts to get t will fail
@@ -913,7 +916,7 @@ class BasePeople(FlexPretty):
 
     def __init__(self, pars):
         ''' Initialize essential attributes used for filtering '''
-        
+
         # Set meta attribute here, because BasePeople methods expect it to exist
         self.meta = hpd.PeopleMeta()  # Store list of keys and dtypes
         self.meta.validate()
@@ -932,7 +935,7 @@ class BasePeople(FlexPretty):
         self._n = self.pars['n_agents']  # Number of agents (initial)
         self._s = self._n # Underlying array sizes
         self._inds = None # No filtering indices
-        
+
         return
 
 
@@ -953,8 +956,8 @@ class BasePeople(FlexPretty):
         except Exception as E:
             print(f'Warning: could not get length of People (could not get self.{base_key}: {E})')
             return 0
-    
-    
+
+
     def _len_arrays(self):
         ''' Length of underlying arrays '''
         return len(self._data[base_key])
@@ -1054,7 +1057,7 @@ class BasePeople(FlexPretty):
         Increase the number of agents stored
 
         Automatically reallocate underlying arrays if required
-        
+
         Args:
             n (int): Number of new agents to add
         """
@@ -1080,12 +1083,12 @@ class BasePeople(FlexPretty):
         """
         for k in self.keys():
             arr = self._data[k]
-            
+
             if self._inds is not None:
                 row_inds = self._inds
             else:
                 row_inds = slice(None, self._n)
-                
+
             if arr.ndim == 1:
                 obj_set(self, k, arr[row_inds])
             elif arr.ndim == 2:
@@ -1094,7 +1097,7 @@ class BasePeople(FlexPretty):
                 errormsg = 'Can only operate on 1D or 2D arrays'
                 raise TypeError(errormsg)
         return
-    
+
 
     def filter_inds(self, inds):
         """
@@ -1110,27 +1113,27 @@ class BasePeople(FlexPretty):
         # Create a new People object with the same properties as the original
         filtered = object.__new__(self.__class__) # Create a new People instance
         filtered.__dict__ = {k:v for k,v in self.__dict__.items()} # Copy pointers to the arrays in People
-        
+
         if inds is None: # Reset filtering
             filtered._inds = None
         elif filtered._inds is None: # Not yet filtered: use the indices directly
             filtered._inds = inds
         else: # Already filtered: map them back onto the original People indices
             filtered._inds = filtered._inds[inds]
-        
+
         # Apply new indices
         filtered._map_arrays()
-        
+
         return filtered
-    
-    
+
+
     def filter(self, criteria):
         '''
         Store indices to allow for easy filtering of the People object.
-        
+
         Args:
             criteria (array): a boolean array for the filtering critria
-        
+
         Returns:
             A filtered People object, which works just like a normal People object
             except only operates on a subset of indices.
@@ -1145,8 +1148,8 @@ class BasePeople(FlexPretty):
             errormsg = f'"criteria" must be boolean array matching either current filter length ({len(self)}) or else the total number of agents ({self._len_arrays()}), not {len(criteria)}'
             raise ValueError(errormsg)
         return self.filter_inds(new_inds)
-    
-    
+
+
     def unfilter(self):
         """
         Set main simulation attributes to be views of the underlying data
@@ -1216,7 +1219,7 @@ class BasePeople(FlexPretty):
         newpeople.set('uid', np.arange(len(newpeople)))
 
         return newpeople
-    
+
 
     def addtoself(self, people2):
         ''' Combine two people arrays, avoiding dcp '''
@@ -1338,7 +1341,7 @@ class BasePeople(FlexPretty):
     def alive_inds(self):
         ''' Indices of everyone alive '''
         return self.true('alive')
-    
+
     @property
     def alive_level0(self):
         ''' Indices of everyone alive who is a level 0 agent '''
@@ -1353,7 +1356,7 @@ class BasePeople(FlexPretty):
     def n_alive(self):
         ''' Number of people alive '''
         return len(self.alive_inds)
-    
+
     @property
     def n_alive_level0(self):
         ''' Number of people alive '''
@@ -1422,7 +1425,7 @@ class BasePeople(FlexPretty):
         else:
             out = len(inds)
         return out
-    
+
     def count_any(self, key, weighted=True):
         ''' Count the number of people for a given key for a 2D array if any value matches '''
         inds = self[key].sum(axis=0).nonzero()[0]
