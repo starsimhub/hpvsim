@@ -57,7 +57,7 @@ def load_file(path):
     return obj
 
 
-def get_country_aliases(wb=False):
+def get_country_aliases():
     ''' Define aliases for countries with odd names in the data '''
     country_mappings = {
        'Bolivia':        'Bolivia (Plurinational State of)',
@@ -90,18 +90,10 @@ def get_country_aliases(wb=False):
        'Vietnam':        'Viet Nam',
         }
 
-    # Slightly different aliases for WB data
-    if wb:
-        for key,val in country_mappings.items():
-            if val == 'Democratic Republic of the Congo':
-                country_mappings[key] = 'Congo, Dem. Rep.'
-            if val in ["Cote d'Ivoire", "Cote dIvoire", "Côte d'Ivoire"]:
-                country_mappings[key] = "Cote d'Ivoire"
-
     return country_mappings # Convert to lowercase
 
 
-def map_entries(json, location, df=None, wb=False):
+def map_entries(json, location, df=None):
     '''
     Find a match between the JSON file and the provided location(s).
 
@@ -125,7 +117,7 @@ def map_entries(json, location, df=None, wb=False):
         location = sc.promotetolist(location)
 
     # Define a mapping for common mistakes
-    mapping = get_country_aliases(wb=wb)
+    mapping = get_country_aliases()
     mapping = {key.lower(): val.lower() for key, val in mapping.items()}
 
     entries = {}
@@ -144,6 +136,10 @@ def map_entries(json, location, df=None, wb=False):
             else:
                 errormsg = f'Location "{loc}" not recognized ({str(E)})'
             raise ValueError(errormsg)
+
+    # If a single entry, just return it
+    if len(entries) == 1:
+        entries = entries[loc]
 
     return entries
 
@@ -177,7 +173,7 @@ def get_age_distribution(location=None, year=None, total_pop_file=None, age_data
             year = 2000
 
         # Extract the age distribution for the given location and year
-        full_df = map_entries(df, location)[location]
+        full_df = map_entries(df, location)
         raw_df = full_df[full_df["Time"] == year]
 
     else:
@@ -216,7 +212,7 @@ def get_age_distribution_over_time(location=None, popage_datafile=None):
         except Exception as E:
             errormsg = f'Could not locate datafile with population sizes over time. {download_tip}'
             raise ValueError(errormsg) from E
-        full_df = map_entries(df, location)[location]
+        full_df = map_entries(df, location)
     else:
         full_df = pd.read_csv(popage_datafile)
 
@@ -247,7 +243,7 @@ def get_total_pop(location=None, pop_datafile=None):
             raise ValueError(errormsg) from E
 
         # Extract the age distribution for the given location and year
-        full_df = map_entries(df, location)[location]
+        full_df = map_entries(df, location)
         dd = full_df.groupby("Time").sum(numeric_only=True)["PopTotal"]
 
     else:
@@ -277,7 +273,7 @@ def get_death_rates(location=None, by_sex=True, overall=False):
         errormsg = f'Could not locate datafile with age-specific death rates by country. {download_tip}'
         raise ValueError(errormsg) from E
 
-    raw_df = map_entries(df, location)[location]
+    raw_df = map_entries(df, location)
 
     sex_keys = []
     if by_sex: sex_keys += ['Male', 'Female']
@@ -317,9 +313,7 @@ def get_birth_rates(location=None):
         errormsg = f'Could not locate datafile with birth rates by country. {download_tip}'
         raise ValueError(errormsg) from E
 
-    standardized = map_entries(birth_rate_data, location, wb=True)
-    birth_rates, years = standardized[location], birth_rate_data['years']
-    birth_rates, inds = sc.sanitize(birth_rates, returninds=True)
-    years = years[inds]
-    return np.array([years, birth_rates])
+    raw_df = map_entries(birth_rate_data, location)
+    df = sc.dataframe(raw_df).reset_index().rename(columns={'Time':'year', 'CBR':'cbr'})
+    return df
 

@@ -764,12 +764,12 @@ class People(hpb.BasePeople):
         ), "Must set either year or n_births, not both"
 
         if new_births is None:
-            years = self.pars["birth_rates"][0]
-            rates = self.pars["birth_rates"][1]
+            years = self.pars['birth_rates']['year']
+            rates = self.pars['birth_rates']['cbr']
             this_birth_rate = (
-                self.pars["rel_birth"]
+                self.pars['rel_birth']
                 * np.interp(year, years, rates)
-                * self.pars["dt_demog"]
+                * self.pars['dt_demog']
                 / 1e3
             )
             new_births = sc.randround(
