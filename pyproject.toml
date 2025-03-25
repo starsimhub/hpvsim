@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hpvsim"
+dynamic = ["version"]
+description = "HPVsim: Human Papillomavirus Simulator"
+readme = "README.rst"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+keywords = ["HPV", "human papillomavirus", "cervical cancer", "agent-based model", "disease modeling", "simulation"]
+
+authors = [
+  { name = "Robyn Stuart" },
+  { name = "Jamie Cohen" },
+  { name = "Cliff Kerr" },
+  { name = "Romesh Abeysuriya" },
+  { name = "Mariah Boudreau" },
+  { name = "Daniel Klein" },
+  { name = "Hao Hu" }
+]
+
+maintainers = [
+  { name = "HPVsim Team", email = "info@hpvsim.org" }
+]
+
+classifiers = [
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Development Status :: 5 - Production/Stable",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12"
+]
+
+dependencies = [
+    'numpy',
+    'scipy',
+    'pandas>=2.0.0', 
+    'sciris>=3.0.0',
+    'matplotlib',
+    'seaborn',
+    'optuna',
+]
+
+[project.urls]
+"Website" = "https://hpvsim.org"
+"Source" = "https://github.com/starsimhub/hpvsim/"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hpvsim*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "hpvsim.version.__version__"}
