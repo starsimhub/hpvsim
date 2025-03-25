@@ -15,7 +15,7 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 # -- Project information -----------------------------------------------------
 
 project = 'HPVsim'
-copyright = f'2020 - {sc.now().year}, Bill & Melinda Gates Foundation. All rights reserved.\nThese docs were built for HPVsim version {hpv.__version__}.\n'
+copyright = f'2020 - {sc.now().year}, Gates Foundation. All rights reserved.\nThese docs were built for HPVsim version {hpv.__version__}.\n'
 author = 'Institute for Disease Modeling'
 
 # The short X.Y version
@@ -83,11 +83,13 @@ html_theme_options = {
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
     "secondary_sidebar_items": ["navbar-side"],
     "header_links_before_dropdown": 5,
+    "footer_start": ["copyright", "footer_start"],
+    "footer_end": ["theme-version", "footer_end"],
 }
 html_sidebars = {
     "**": ["sidebar-nav-bs", "page-toc"],
 }
-html_logo = "images/IDM_white.png"
+html_logo = "images/idm-logo-transparent.png"
 html_favicon = "images/favicon.ico"
 html_static_path = ['_static']
 html_baseurl = "https://docs.idmod.org/projects/hpvsim/en/latest"

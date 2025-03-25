@@ -624,7 +624,7 @@ def compute_severity(t, rel_sev=None, pars=None):
     This function is used for two types of calculation related to disease progression:
         1. to model the probability of progressing to further disease stages
         2. to model the 'severity' of dysplasia on a scale from 0-1, historically interpreted as
-           the persentage of the epithelium affected by dysplasia.
+           the percentage of the epithelium affected by dysplasia.
     Args:
         t: array of durations that women have been in their current health state
         rel_sev: array of individual relative severity values

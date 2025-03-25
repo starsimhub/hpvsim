@@ -19,6 +19,11 @@ Version 2.1.0 (2025-03-25)
 - Adds a more robust data downloading method and renamed ``get_data()`` to ``download_data()``; updated data version to 1.4
 - *Github info* PR `652 <https://github.com/amath-idm/hpvsim/pull/652>`__
 
+Version 2.0.2 (2024-03-05)
+---------------------------
+- Modifies DALY analyzer to output YLLL, YLD and DALYs
+- *Github info* PR `659 <https://github.com/amath-idm/hpvsim/pull/659>`__
+
 Version 2.0.1 (2024-02-14)
 ---------------------------
 - Adds in relative transmissibility attribute to people that can be modified by vaccination or treatment
