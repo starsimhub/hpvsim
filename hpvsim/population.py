@@ -76,7 +76,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 pop_age_trend = hpdata.get_age_distribution_over_time(location, popage_datafile=sim['popage_datafile'])
                 total_pop = sum(age_data[:, 2])  # Return the total population
             except ValueError as E:
-                warnmsg = f'Could not load age data for requested location "{location}" ({str(E)})'
+                warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}); using default'
                 hpm.warn(warnmsg, die=True)
 
         # Set ages, rounding to nearest timestep if requested

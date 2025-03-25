@@ -8,10 +8,10 @@ import pandas as pd
 import sciris as sc
 import unicodedata
 import re
-from .. import misc as hpm
+
 
 __all__ = ['get_country_aliases', 'map_entries', 'get_age_distribution', 'get_age_distribution_over_time', 'get_total_pop', 'get_death_rates',
-           'get_birth_rates', 'get_life_expectancy']
+           'get_birth_rates']
 
 
 thisdir = sc.thispath(__file__)
@@ -19,9 +19,11 @@ filesdir = thisdir / 'files'
 files = sc.objdict()
 files.metadata = 'metadata.json'
 files.age_dist = 'populations.obj'
+files.age_dist_sex = 'populations_by_sex.obj'
 files.birth = 'birth_rates.obj'
 files.death = 'mx.obj'
-files.life_expectancy = 'ex.obj'
+
+download_tip = 'Please run hpv.download_data() first.'
 
 # Cache data as a dict
 cache = dict()
@@ -55,7 +57,7 @@ def load_file(path):
     return obj
 
 
-def get_country_aliases(wb=False):
+def get_country_aliases():
     ''' Define aliases for countries with odd names in the data '''
     country_mappings = {
        'Bolivia':        'Bolivia (Plurinational State of)',
@@ -88,18 +90,10 @@ def get_country_aliases(wb=False):
        'Vietnam':        'Viet Nam',
         }
 
-    # Slightly different aliases for WB data
-    if wb:
-        for key,val in country_mappings.items():
-            if val == 'Democratic Republic of the Congo':
-                country_mappings[key] = 'Congo, Dem. Rep.'
-            if val in ["Cote d'Ivoire", "Cote dIvoire", "Côte d'Ivoire"]:
-                country_mappings[key] = "Cote d'Ivoire"
-
     return country_mappings # Convert to lowercase
 
 
-def map_entries(json, location, df=None, wb=False):
+def map_entries(json, location, df=None):
     '''
     Find a match between the JSON file and the provided location(s).
 
@@ -123,7 +117,7 @@ def map_entries(json, location, df=None, wb=False):
         location = sc.promotetolist(location)
 
     # Define a mapping for common mistakes
-    mapping = get_country_aliases(wb=wb)
+    mapping = get_country_aliases()
     mapping = {key.lower(): val.lower() for key, val in mapping.items()}
 
     entries = {}
@@ -142,6 +136,10 @@ def map_entries(json, location, df=None, wb=False):
             else:
                 errormsg = f'Location "{loc}" not recognized ({str(E)})'
             raise ValueError(errormsg)
+
+    # If a single entry, just return it
+    if len(entries) == 1:
+        entries = entries[loc]
 
     return entries
 
@@ -164,17 +162,18 @@ def get_age_distribution(location=None, year=None, total_pop_file=None, age_data
         try:
             df = load_file(files.age_dist)
         except Exception as E:
-            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            errormsg = f'Could not locate datafile with population sizes by country. {download_tip}'
             raise ValueError(errormsg) from E
 
         # Handle year
         if year is None:
+            from .. import misc as hpm # Not needed except for this warning
             warnmsg = 'No year provided for the initial population age distribution, using 2000 by default'
             hpm.warn(warnmsg)
             year = 2000
 
         # Extract the age distribution for the given location and year
-        full_df = map_entries(df, location)[location]
+        full_df = map_entries(df, location)
         raw_df = full_df[full_df["Time"] == year]
 
     else:
@@ -209,16 +208,17 @@ def get_age_distribution_over_time(location=None, popage_datafile=None):
     # Load the raw data
     if popage_datafile is None:
         try:
-            df = load_file(files.age_dist)
+            df = load_file(files.age_dist_sex)
         except Exception as E:
-            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            errormsg = f'Could not locate datafile with population sizes over time. {download_tip}'
             raise ValueError(errormsg) from E
-        full_df = map_entries(df, location)[location]
+        full_df = map_entries(df, location)
     else:
         full_df = pd.read_csv(popage_datafile)
 
-    result = full_df.rename(columns={'Time':'year', 'AgeGrpStart': 'age'})
-    result['PopTotal'] *= 1e3 # reported as per 1,000
+    result = full_df.rename(columns={'Time':'year', 'AgeGrpStart': 'age', 'PopMale': 'male', 'PopFemale': 'female'})
+    result['male'] *= 1e3 # reported as per 1,000
+    result['female'] *= 1e3 # reported as per 1,000
 
     return result
 
@@ -239,11 +239,11 @@ def get_total_pop(location=None, pop_datafile=None):
         try:
             df = load_file(files.age_dist)
         except Exception as E:
-            errormsg = 'Could not locate datafile with population sizes by country. Please run data/get_data.py first.'
+            errormsg = f'Could not locate datafile with total population sizes by country. {download_tip}'
             raise ValueError(errormsg) from E
 
         # Extract the age distribution for the given location and year
-        full_df = map_entries(df, location)[location]
+        full_df = map_entries(df, location)
         dd = full_df.groupby("Time").sum(numeric_only=True)["PopTotal"]
 
     else:
@@ -270,10 +270,10 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     try:
         df = load_file(files.death)
     except Exception as E:
-        errormsg = 'Could not locate datafile with age-specific death rates by country. Please run data/get_data.py first.'
+        errormsg = f'Could not locate datafile with age-specific death rates by country. {download_tip}'
         raise ValueError(errormsg) from E
 
-    raw_df = map_entries(df, location)[location]
+    raw_df = map_entries(df, location)
 
     sex_keys = []
     if by_sex: sex_keys += ['Male', 'Female']
@@ -296,48 +296,6 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     return result
 
 
-def get_life_expectancy(location=None, by_sex=True, overall=False):
-    '''
-    Load life expectancy by age for a given country or countries.
-
-    Args:
-        location (str or list): name of the country or countries to load the age distribution for
-        by_sex (bool): whether to rates by sex
-        overall (bool): whether to load total rate
-        
-    Returns:
-        life_expectancy (dict): life expectancy by age and sex
-    '''
-    # Load the raw data
-    try:
-        df = load_file(files.life_expectancy)
-    except Exception as E:
-        errormsg = 'Could not locate datafile with age-specific life expectancy by country. Please run data/get_data.py first.'
-        raise ValueError(errormsg) from E
-
-    raw_df = map_entries(df, location)[location]
-
-    sex_keys = []
-    if by_sex: sex_keys += ['Male', 'Female']
-    if overall: sex_keys += ['Both sexes']
-    sex_key_map = {'Male': 'm', 'Female': 'f', 'Both sexes': 'tot'}
-
-    # max_age = 99
-    # age_groups = raw_df['AgeGrpStart'].unique()
-    years = raw_df['Time'].unique()
-    result = dict()
-
-    # Processing
-    for year in years:
-        result[year] = dict()
-        for sk in sex_keys:
-            sk_out = sex_key_map[sk]
-            result[year][sk_out] = np.array(raw_df[(raw_df['Time']==year) & (raw_df['Sex']== sk)][['AgeGrpStart','ex']])
-            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
-
-    return result
-
-
 def get_birth_rates(location=None):
     '''
     Load crude birth rates for a given country
@@ -352,12 +310,10 @@ def get_birth_rates(location=None):
     try:
         birth_rate_data = load_file(files.birth)
     except Exception as E:
-        errormsg = 'Could not locate datafile with birth rates by country. Please run data/get_data.py first.'
+        errormsg = f'Could not locate datafile with birth rates by country. {download_tip}'
         raise ValueError(errormsg) from E
 
-    standardized = map_entries(birth_rate_data, location, wb=True)
-    birth_rates, years = standardized[location], birth_rate_data['years']
-    birth_rates, inds = sc.sanitize(birth_rates, returninds=True)
-    years = years[inds]
-    return np.array([years, birth_rates])
+    raw_df = map_entries(birth_rate_data, location)
+    df = sc.dataframe(raw_df).reset_index().rename(columns={'Time':'year', 'CBR':'cbr'})
+    return df
 

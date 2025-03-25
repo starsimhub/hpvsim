@@ -75,7 +75,7 @@ class Calibration(sc.prettyobj):
 
     '''
 
-    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_result_keys=None, 
+    def __init__(self, sim, datafiles, calib_pars=None, genotype_pars=None, hiv_pars=None, fit_args=None, extra_sim_result_keys=None,
                  par_samplers=None, n_trials=None, n_workers=None, total_trials=None, name=None, db_name=None, estimator=None,
                  keep_db=None, storage=None, rand_seed=None, sampler=None, label=None, die=False, verbose=True):
 
@@ -134,6 +134,8 @@ class Calibration(sc.prettyobj):
         if hiv_pars is not None:
             self.sim['model_hiv'] = True # if calibrating HIV parameters, make sure model is running HIV
         self.sim.initialize()
+        if self.sim['model_hiv']:
+            self.sim.results = sc.mergedicts(self.sim.results, self.sim.hivsim.results)
         for rkey in sim_results.keys():
             sim_results[rkey].timepoints = sim.get_t(sim_results[rkey].data.year.unique()[0], return_date_format='str')[0]//sim.resfreq
             if 'weights' not in sim_results[rkey].data.columns:
@@ -188,20 +190,24 @@ class Calibration(sc.prettyobj):
                 hpm.warn(warnmsg)
                 output = None if return_sim else np.inf
                 return output
-            
+
     @staticmethod
     def update_dict_pars(name_pars, value_pars):
         ''' Function to update parameters from nested dict to nested dict's value '''
         new_pars = sc.dcp(name_pars)
         target_pars_flatten = sc.flattendict(value_pars)
         for key, val in target_pars_flatten.items():
-            try: 
-                sc.setnested(new_pars, list(key), val)
-            except Exception as e:
+            try:
+                if len(list(key))>1: # TODO: remove once https://github.com/sciris/sciris/issues/645 is fixed
+                    sc.makenested(new_pars, list(key))
+                    sc.setnested(new_pars, list(key), val)
+                else:
+                    new_pars[key[0]] = val
+            except Exception as E:
                 errormsg = f"Parameter {'_'.join(key)} is not part of the sim, nor is a custom function specified to use them"
-                raise ValueError(errormsg)
+                raise ValueError(errormsg) from E
         return new_pars
-    
+
     def update_dict_pars_from_trial(self, name_pars, value_pars):
         ''' Function to update parameters from nested dict to trial parameter's value '''
         # new_pars = sc.dcp(name_pars)
@@ -209,9 +215,13 @@ class Calibration(sc.prettyobj):
         name_pars_keys = sc.flattendict(name_pars).keys()
         for key in name_pars_keys:
             name = '_'.join(key)
-            sc.setnested(new_pars, list(key), value_pars[name])
+            if len(list(key))>1: # TODO: remove once https://github.com/sciris/sciris/issues/645 is fixed
+                sc.makenested(new_pars, list(key))
+                sc.setnested(new_pars, list(key), value_pars[name])
+            else:
+                new_pars[key[0]] = value_pars[name]
         return new_pars
-    
+
     def update_dict_pars_init_and_bounds(self, initial_pars, par_bounds, target_pars):
         ''' Function to update initial parameters and parameter bounds from a trial pars dict'''
         target_pars_keys = sc.flattendict(target_pars)
@@ -220,12 +230,12 @@ class Calibration(sc.prettyobj):
             initial_pars[name] = val[0]
             par_bounds[name] = np.array([val[1], val[2]])
         return initial_pars, par_bounds
-       
-    
+
+
     def get_full_pars(self, sim=None, calib_pars=None, genotype_pars=None, hiv_pars=None):
         ''' Make a full pardict from the subset of regular sim parameters, genotype parameters, and hiv parameters used in calibration'''
         # Prepare the parameters
-        new_pars = {}     
+        new_pars = {}
 
         if genotype_pars is not None:
             new_pars['genotype_pars'] = self.update_dict_pars(sim['genotype_pars'], genotype_pars)
@@ -236,13 +246,17 @@ class Calibration(sc.prettyobj):
         if calib_pars is not None:
             calib_pars_flatten = sc.flattendict(calib_pars)
             for key, val in calib_pars_flatten.items():
-                if key[0] in sim.pars and key[0] not in new_pars:
-                    new_pars[key[0]] = sc.dcp(sim.pars[key[0]])
+                key0 = key[0]
+                if key0 in sim.pars and key0 not in new_pars:
+                    new_pars[key0] = sc.dcp(sim.pars[key0])
                 try:
-                    sc.setnested(new_pars, list(key), val) # only update on keys that have values in sim.pars. If this line makes error, raise error errormsg 
-                except Exception as e:
+                    if len(key) == 1: # TODO: remove once https://github.com/sciris/sciris/issues/645 is fixed
+                        new_pars[key0] = val
+                    else:
+                        sc.setnested(new_pars, list(key), val) # only update on keys that have values in sim.pars. If this line makes error, raise error errormsg
+                except Exception as E:
                     errormsg = f"Parameter {'_'.join(key)} is not part of the sim, nor is a custom function specified to use them"
-                    raise ValueError(errormsg)       
+                    raise ValueError(errormsg)    from E
         return new_pars
 
     def trial_pars_to_sim_pars(self, trial_pars=None, which_pars=None, return_full=True):
@@ -254,7 +268,7 @@ class Calibration(sc.prettyobj):
             return_full (bool): whether to return a unified par dict ready for use in a sim, or the sim pars and genotype pars separately
 
         **Example**::
-        
+
             sim = hpv.Sim(genotypes=[16, 18])
             calib_pars = dict(beta=[0.05, 0.010, 0.20],hpv_control_prob=[.9, 0.5, 1])
             genotype_pars = dict(hpv16=dict(prog_time=[3, 3, 10]))
@@ -330,20 +344,16 @@ class Calibration(sc.prettyobj):
         '''
         pars = sc.dcp(pardict)
         pars_flatten = sc.flattendict(pardict)
-        for key, val in pars_flatten.items():
-            sampler_key = '_'.join(key)
+        for key_tuple, val in pars_flatten.items():
+            sampler_key = '_'.join(key_tuple)
             low, high = val[1], val[2]
             step = val[3] if len(val) > 3 else None
 
-            if key in self.par_samplers:  # If a custom sampler is used, get it now (Not working properly for now)
-                try:
-                    sampler_fn = getattr(trial, self.par_samplers[key])
-                except Exception as E:
-                    errormsg = 'The requested sampler function is not found: ensure it is a valid attribute of an Optuna Trial object'
-                    raise AttributeError(errormsg) from E
+            value = trial.suggest_float(sampler_key, low, high, step=step)
+            if len(key_tuple) > 1: # See https://github.com/sciris/sciris/issues/630
+                sc.setnested(pars, key_tuple, value)
             else:
-                sampler_fn = trial.suggest_float
-            sc.setnested(pars, list(key), sampler_fn(sampler_key, low, high, step=step))
+                pars[sampler_key] = value
         return pars
 
     def run_trial(self, trial, save=True):

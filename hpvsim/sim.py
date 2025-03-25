@@ -622,6 +622,7 @@ class Sim(hpb.BaseSim):
 
         # Finish initialization
         self.people.initialize(sim_pars=self.pars) # Fully initialize the people
+        self.people.hivsim = self.hivsim
         self.reset_layer_pars(force=False) # Ensure that layer keys match the loaded population
         if init_states:
             init_hpv_prev = sc.dcp(self['init_hpv_prev'])
@@ -1175,6 +1176,9 @@ class Sim(hpb.BaseSim):
         s['mean cancer incidence (per 100k)'] = self.results['cancer_incidence'].mean()
         s['mean age of infection (years)'] = self.compute_age_mean('infections_by_age', t=t)
         s['mean age of cancer (years)'] = self.compute_age_mean('cancers_by_age', t=t)
+        s['mean age of cancer death (years)'] = self.compute_age_mean('cancer_deaths_by_age', t=t)
+        if self['model_hiv']:
+            s['mean age of hiv mortality (years)'] = self.compute_age_mean('hiv_deaths_by_age', t=t)
         
         summary = sc.objdict()
         for key in self.result_keys('total'):

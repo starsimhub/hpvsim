@@ -28,10 +28,13 @@ from . import data
 if not data.check_downloaded():
     try:
         data.quick_download(init=True)
-    except:
-        import sciris as sc
-        errormsg = f"Warning: couldn't download data:\n\n{sc.traceback()}\nProceeding anyway..."
-        print(errormsg)
+    except Exception as E1:
+        try:
+            print(f'Quick download failed ({str(E1)}), trying manual download ...')
+            data.download_data(serial=True)
+        except:
+            errormsg = f"Warning: couldn't download data:\n\n{sc.traceback()}\nProceeding anyway..."
+            print(errormsg)
 
 # Set the root directory for the codebase
 rootdir = sc.thispath(__file__).parent

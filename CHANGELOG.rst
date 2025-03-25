@@ -8,6 +8,16 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 2.1.0 (2025-03-25)
+---------------------------
+- Updates how HPV prognoses are re-evaluated for WLWH
+- Fixes CD4 reconstitution trajectory so that it plateaus before quadratic starts decreasing
+- Fixes ART coverage so that it's now by age, sex, and time
+- Fixes assignment of HIV mortality based upon ART coverage
+- Removes HIV-mortality from background mortality
+- Small fix to enable calibration to HIV-stratified data
+- Adds a more robust data downloading method and renamed ``get_data()`` to ``download_data()``; updated data version to 1.4
+- *Github info* PR `652 <https://github.com/amath-idm/hpvsim/pull/652>`__
 
 Version 2.0.2 (2024-03-05)
 ---------------------------
