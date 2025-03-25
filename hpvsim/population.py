@@ -70,14 +70,14 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         if sim['verbose']:
             print(f'Loading location-specific data for "{location}"')
         if use_age_data:
-            # try:
-            age_data = hpdata.get_age_distribution(location, year=sim['start'], age_datafile=sim['age_datafile'])
-            pop_trend = hpdata.get_total_pop(location, pop_datafile=sim['pop_datafile'])
-            pop_age_trend = hpdata.get_age_distribution_over_time(location, popage_datafile=sim['popage_datafile'])
-            total_pop = sum(age_data[:, 2])  # Return the total population
-            # except ValueError as E:
-            #     warnmsg = f'Could not load age data for requested location "{location}" ({str(E)})'
-            #     hpm.warn(warnmsg, die=True)
+            try:
+                age_data = hpdata.get_age_distribution(location, year=sim['start'], age_datafile=sim['age_datafile'])
+                pop_trend = hpdata.get_total_pop(location, pop_datafile=sim['pop_datafile'])
+                pop_age_trend = hpdata.get_age_distribution_over_time(location, popage_datafile=sim['popage_datafile'])
+                total_pop = sum(age_data[:, 2])  # Return the total population
+            except ValueError as E:
+                warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}); using default'
+                hpm.warn(warnmsg, die=True)
 
         # Set ages, rounding to nearest timestep if requested
         age_data_min   = age_data[:,0]
