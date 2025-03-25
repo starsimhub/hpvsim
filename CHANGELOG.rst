@@ -8,7 +8,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
-Version 2.1.0 (2025-03-07)
+Version 2.1.0 (2025-03-25)
 ---------------------------
 - Updates how HPV prognoses are re-evaluated for WLWH
 - Fixes CD4 reconstitution trajectory so that it plateaus before quadratic starts decreasing
