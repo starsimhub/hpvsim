@@ -17,6 +17,7 @@ class HPV(sti.BaseSTI):
         super().__init__(name=f"{name}{genotype}")
 
         self.define_pars(
+            unit="month",
             init_prev=ss.bernoulli(p=0.2),
             beta=0.1,
             beta_m2f=1,
