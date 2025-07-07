@@ -8,10 +8,13 @@ import sciris as sc
 import stisim as sti
 import hpvsim as hpv
 
-__all__ = ["HPV"]
+__all__ = ["HPV", "HPV16", "HPV18"]
 
 
 class HPV(sti.BaseSTI):
+    """
+    Base class for a single genotype of HPV
+    """
 
     def __init__(self, name="hpv", genotype="16", pars=None, **kwargs):
         super().__init__(name=f"{name}{genotype}")
@@ -30,62 +33,35 @@ class HPV(sti.BaseSTI):
             init_imm=hpv.beta(a=2, b=2),
             init_cell_imm=hpv.beta(a=2, b=2),
             rel_beta=1,
-            dur_precin=None,
-            dur_cin=None,
-            cin_prob=ss.bernoulli(p=0.5),  # placeholder, gets reset
-            cancer_prob=ss.bernoulli(p=0.5),  # placeholder, gets reset
-            cin_fn=None,
-            transform_prob=None,
+            dur_precin=None,    # Set for individual genotypes by derived classes
+            dur_cin=None,       # Set for individual genotypes by derived classes
+            cin_fn=None,        # Set for individual genotypes by derived classes
+            transform_prob=None,  # Set for individual genotypes by derived classes
+            cin_prob=ss.bernoulli(p=0),     # placeholder, gets reset
+            cancer_prob=ss.bernoulli(p=0),  # placeholder, gets reset
         )
-
-        genotype_pars = self.get_genotype_pars(genotype)
-        pars = sc.mergedicts(genotype_pars, pars)
         self.update_pars(pars, **kwargs)
         self.define_states(
             # States
-            ss.State("latent", default=False, label="latent"),
-            ss.State("precin", default=False, label="precin"),
-            ss.State("cin", default=False, label="cin"),
-            ss.State("cancerous", default=False, label="cancerous"),
+            ss.State("latent", label="latent"),
+            ss.State("precin", label="precin"),
+            ss.State("cin", label="cin"),
+            ss.State("cancerous", label="cancerous"),
+
             # Duration and timestep of states
-            ss.FloatArr("dur_precin", default=0, label="duration of precin"),
-            ss.FloatArr("dur_cin", default=0, label="duration of cin"),
-            ss.FloatArr("dur_cancer", default=0, label="duration of cancer"),
-            ss.FloatArr("ti_cancer", default=np.nan, label="time of cancer"),
-            ss.FloatArr(
-                "ti_cancer_death", default=np.nan, label="time of cancer mortality"
-            ),
-            ss.FloatArr("ti_cin", default=np.nan, label="time of cin"),
-            ss.FloatArr("ti_clearance", default=np.nan, label="time of clearance"),
+            ss.FloatArr("dur_precin", label="Duration of precin"),
+            ss.FloatArr("dur_cin", label="Duration of cin"),
+            ss.FloatArr("dur_cancer", label="Duration of cancer"),
+            ss.FloatArr("ti_cancer", label="Timestep of cancer"),
+            ss.FloatArr("ti_cancer_death", label="Timestep of cancer death"),
+            ss.FloatArr("ti_cin", label="Timestep of CIN"),
+            ss.FloatArr("ti_clearance", label="Timestep of clearance"),
+
             # Immunity states
             ss.FloatArr("rel_sev", default=1, label="relative severity"),
             ss.FloatArr("sus_imm", default=0, label="immunity to infection"),
             ss.FloatArr("sev_imm", default=0, label="immunity to severe disease"),
         )
-
-    def get_genotype_pars(self, genotype):
-        """
-        Get genotype-specific parameters
-        """
-        if genotype == "16":
-            pars = sc.objdict(
-                rel_beta=1.0,
-                dur_precin=ss.lognorm_ex(ss.dur(3, "year"), ss.dur(9, "year")),
-                dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
-                cin_fn=dict(k=0.3, x_infl=0, y_max=0.5, ttc=50),
-                transform_prob=2e-3,
-            )
-        elif genotype == "18":
-            pars = sc.objdict(
-                beta=0.75,
-                dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
-                dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
-                cin_fn=dict(k=0.35, x_infl=0, y_max=0.5, ttc=50),
-                transform_prob=2e-3,
-            )
-        else:
-            raise ValueError(f"Genotype {genotype} not recognized")
-        return pars
 
     def init_results(self):
         super().init_results()
@@ -94,11 +70,6 @@ class HPV(sti.BaseSTI):
             ss.Result("cancers", label="Cancers"),
             ss.Result("cancer_incidence", label="Cancer incidence", scale=False),
             ss.Result("cancer_deaths", label="Cancer deaths"),
-            ss.Result("prevalence_15_24", label="Prevalence 15-24", scale=False),
-            ss.Result("prevalence_25_34", label="Prevalence 25-34", scale=False),
-            ss.Result("prevalence_35_44", label="Prevalence 35-44", scale=False),
-            ss.Result("prevalence_45_54", label="Prevalence 45-54", scale=False),
-            ss.Result("prevalence_55_64", label="Prevalence 55-64", scale=False),
         ]
         self.define_results(*results)
         return
@@ -256,16 +227,6 @@ class HPV(sti.BaseSTI):
         self.results["prevalence"][ti] = cond_prob(
             (self.infectious & self.sim.people.female), women
         )
-        for age in ages:
-            age_group = (
-                (self.sim.people.female)
-                & (self.sim.people.age >= age)
-                & (self.sim.people.age < age + 10)
-            )
-            infectious_age = self.infectious & age_group
-            self.results[f"prevalence_{age}_{age+9}"][ti] = cond_prob(
-                infectious_age, age_group
-            )
 
         # Calculate cancer incidence
         scale_factor = 1e5
@@ -276,3 +237,34 @@ class HPV(sti.BaseSTI):
         denominator = np.count_nonzero(sus_pop) / scale_factor
         self.results["cancer_incidence"][ti] = sc.safedivide(new_cancers, denominator)
         return
+
+
+class HPV16(HPV):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__(genotype="16")
+        self.define_pars(
+            rel_beta=1.0,
+            dur_precin=ss.lognorm_ex(ss.dur(3, "year"), ss.dur(9, "year")),
+            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
+            cin_fn=dict(k=0.3, x_infl=0, y_max=0.5, ttc=50),
+            transform_prob=2e-3,
+        )
+        self.update_pars(pars, **kwargs)
+        return
+
+
+class HPV18(HPV):
+    def __init__(self, pars=None, **kwargs):
+        super().__init__(genotype="18")
+        self.define_pars(
+            beta=0.75,
+            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
+            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
+            cin_fn=dict(k=0.35, x_infl=0, y_max=0.5, ttc=50),
+            transform_prob=2e-3,
+        )
+        self.update_pars(pars, **kwargs)
+        return
+
+
+
