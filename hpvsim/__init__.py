@@ -6,6 +6,7 @@ from .distributions import *
 from .interventions import *
 from .analyzers import *
 from .utils import *
+from .sim import *
 
 # Assign the root folder
 import sciris as sc

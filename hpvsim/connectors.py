@@ -1,43 +1,24 @@
 """
-Super connector for HPV simulation connecting immunity and results tracking across genotypes circulating in sim
+Connector for HPVsim which unites results and attributes across genotypes
 """
 
 import starsim as ss
 import sciris as sc
 import numpy as np
 
-__all__ = ["hpv_hiv_connector", "genotype_connector"]
+__all__ = ["hpv", "hpv_hiv_connector"]
 
 
-class hpv_hiv_connector(ss.Connector):
-    def __init__(self, hpv=None, hiv=None, pars=None, **kwargs):
-        super().__init__()
-        if not isinstance(hpv, ss.Connector):
-            print("We are expecting the HPV superconnector here")
-            self.hpv = hpv
-        else:
-            self.hpv = hpv
-        self.hiv = hiv
-        self.define_pars(
-            rel_sus_hpv=lambda cd4: [2.2 if i < 200 else 1.5 for i in cd4],
-            rel_sev_hpv=lambda cd4: [2.2 if i < 200 else 1.5 for i in cd4],
-        )
-        self.update_pars(pars, **kwargs)
-
-    def step(self):
-        hiv_inds = self.hiv.infected.true()
-        self.hpv.rel_sev[hiv_inds] = self.pars.rel_sev_hpv(self.hiv.cd4[hiv_inds])
-        self.hpv.rel_sus[hiv_inds] = self.pars.rel_sus_hpv(self.hiv.cd4[hiv_inds])
-        return
-
-
-class genotype_connector(ss.Connector):
+class hpv(ss.Connector):
 
     def __init__(self, genotypes, pars=None, **kwargs):
         super().__init__()
         self.genotypes = sc.promotetolist(genotypes)
-        self.define_pars(cross_imm_med=0.3, cross_imm_high=0.5, cross_immunity=None)
-
+        self.define_pars(
+            cross_imm_med=0.3,
+            cross_imm_high=0.5,
+            cross_immunity=None,
+        )
         self.update_pars(pars, **kwargs)
 
         if self.pars.cross_immunity is None:
@@ -90,22 +71,22 @@ class genotype_connector(ss.Connector):
         for genotype in self.genotypes:
             results.append(
                 ss.Result(
-                    f"cancer_share_{genotype}",
-                    label=f"Cancer distribution {genotype}",
+                    f"cancer_share_{genotype.name}",
+                    label=f"Cancer distribution {genotype.name}",
                     scale=False,
                 )
             )
             results.append(
                 ss.Result(
-                    f"cin_share_{genotype}",
-                    label=f"CIN share {genotype}",
+                    f"cin_share_{genotype.name}",
+                    label=f"CIN share {genotype.name}",
                     scale=False,
                 )
             )
             results.append(
                 ss.Result(
-                    f"precin_share_{genotype}",
-                    label=f"Pre-CIN share {genotype}",
+                    f"precin_share_{genotype.name}",
+                    label=f"Pre-CIN share {genotype.name}",
                     scale=False,
                 )
             )
@@ -116,7 +97,6 @@ class genotype_connector(ss.Connector):
     def update_results(self):
         super().update_results()
         ti = self.ti
-        ng = len(self.genotypes)
         women = self.sim.people.female.uids
         ages = [15, 25, 35, 45, 55]
         cancer_ages = [20, 35, 50, 65]
@@ -129,23 +109,23 @@ class genotype_connector(ss.Connector):
         self.cin[:] = False
         self.cancerous[:] = False
 
-        for module in self.modules:
-            new_cancers = np.array((module.ti_cancer == ti).uids).tolist()
-            self.n_precin[:] += module.precin[:]
-            self.n_cin[:] += module.cin[:]
-            self.n_cancerous[:] += module.cancerous[:]
+        for gtype in self.genotypes:
+            new_cancers = np.array((gtype.ti_cancer == ti).uids).tolist()
+            self.n_precin[:] += gtype.precin[:]
+            self.n_cin[:] += gtype.cin[:]
+            self.n_cancerous[:] += gtype.cancerous[:]
 
         # Calculate the share of each genotype in CIN and Cancer
-        for i, module in enumerate(self.modules):
-            self.results[f"precin_share_{self.genotypes[i]}"][ti] = sc.safedivide(
-                module.precin.true().sum(), self.n_precin.sum()
+        for i, gtype in enumerate(self.genotypes):
+            self.results[f"precin_share_{gtype.name}"][ti] = sc.safedivide(
+                gtype.precin.true().sum(), self.n_precin.sum()
             )
 
-            self.results[f"cin_share_{self.genotypes[i]}"][ti] = sc.safedivide(
-                module.cin.true().sum(), self.n_cin.sum()
+            self.results[f"cin_share_{gtype.name}"][ti] = sc.safedivide(
+                gtype.cin.true().sum(), self.n_cin.sum()
             )
-            self.results[f"cancer_share_{self.genotypes[i]}"][ti] = sc.safedivide(
-                module.cancerous.true().sum(), self.n_cancerous.sum()
+            self.results[f"cancer_share_{gtype.name}"][ti] = sc.safedivide(
+                gtype.cancerous.true().sum(), self.n_cancerous.sum()
             )
 
         new_cancers = ss.uids(list(set(new_cancers)))
@@ -164,7 +144,7 @@ class genotype_connector(ss.Connector):
             len(new_cancers), denominator
         )
 
-        age_group = age_group = (
+        age_group = (
             (self.sim.people.female)
             & (self.sim.people.age >= 18)
             & (self.sim.people.age < 50)
@@ -224,8 +204,6 @@ class genotype_connector(ss.Connector):
     def init_post(self):
         """Initialize the values of the states; the last step of initialization"""
         super().init_post()
-        self.modules = [self.sim.diseases[genotype] for genotype in self.genotypes]
-
         return
 
     def step(self):
@@ -236,32 +214,32 @@ class genotype_connector(ss.Connector):
         for i, genotype in enumerate(self.genotypes):
             for other_genotype in self.genotypes:
                 self.sus_imm[:] += (
-                    cross_immunity[genotype][other_genotype]
-                    * self.modules[i].sus_imm[:]
+                    cross_immunity[genotype.name][other_genotype.name]
+                    * self.genotypes[i].sus_imm[:]
                 )
                 self.sev_imm[:] += (
-                    cross_immunity[genotype][other_genotype]
-                    * self.modules[i].sev_imm[:]
+                    cross_immunity[genotype.name][other_genotype.name]
+                    * self.genotypes[i].sev_imm[:]
                 )
             self.sev_imm[:] *= self.rel_sev[:]
             self.sus_imm[:] *= self.rel_sus[:]
-            self.modules[i].rel_sev[:] = 1 - np.minimum(
+            self.genotypes[i].rel_sev[:] = 1 - np.minimum(
                 self.sev_imm, np.ones_like(self.sev_imm)
             )
-            self.modules[i].rel_sus[:] = 1 - np.minimum(
+            self.genotypes[i].rel_sus[:] = 1 - np.minimum(
                 self.sus_imm, np.ones_like(self.sus_imm)
             )
 
         ti = self.ti
-        for module in self.modules:
-            other_modules = [m for m in self.modules if m != module]
+        for gtype in self.genotypes:  # TODO, fix
+            other_gtypes = [g for g in self.genotypes if g != gtype]
             # find women who became cancerous today
-            cancerous_today = (module.ti_cancer == ti).uids
+            cancerous_today = (gtype.ti_cancer == ti).uids
             if len(cancerous_today):
-                for other_module in other_modules:
-                    cancerous_future = (other_module.ti_cancer > ti).uids
+                for other_gtype in other_gtypes:
+                    cancerous_future = (other_gtype.ti_cancer > ti).uids
                     remove_uids = cancerous_today.intersect(cancerous_future)
-                    other_module.ti_cancer[remove_uids] = np.nan
+                    other_gtype.ti_cancer[remove_uids] = np.nan
         return
 
     def get_cross_immunity(self):
@@ -319,10 +297,33 @@ class genotype_connector(ss.Connector):
 
         genotype_pars = dict()
         for genotype in genotypes:
-            genotype_pars[genotype] = dict()
+            genotype_pars[genotype.name] = dict()
             for other_genotype in genotypes:
-                genotype_pars[genotype][other_genotype] = default_pars[genotype][
-                    other_genotype
+                genotype_pars[genotype.name][other_genotype.name] = default_pars[genotype.name][
+                    other_genotype.name
                 ]
 
         return genotype_pars
+
+
+class hpv_hiv_connector(ss.Connector):
+    def __init__(self, hpv=None, hiv=None, pars=None, **kwargs):
+        super().__init__()
+        if not isinstance(hpv, ss.Connector):
+            print("We are expecting the HPV superconnector here")
+            self.hpv = hpv
+        else:
+            self.hpv = hpv
+        self.hiv = hiv
+        self.define_pars(
+            rel_sus_hpv=lambda cd4: [2.2 if i < 200 else 1.5 for i in cd4],
+            rel_sev_hpv=lambda cd4: [2.2 if i < 200 else 1.5 for i in cd4],
+        )
+        self.update_pars(pars, **kwargs)
+
+    def step(self):
+        hiv_inds = self.hiv.infected.true()
+        self.hpv.rel_sev[hiv_inds] = self.pars.rel_sev_hpv(self.hiv.cd4[hiv_inds])
+        self.hpv.rel_sus[hiv_inds] = self.pars.rel_sus_hpv(self.hiv.cd4[hiv_inds])
+        return
+

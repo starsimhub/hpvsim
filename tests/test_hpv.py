@@ -13,65 +13,9 @@ import matplotlib.pyplot as pl
 import os
 
 
-def get_demographics():
-    pregnancy_pars = {
-        "fertility_rate": pd.read_csv(
-            os.path.join(hpv.root, "tests", "test_data", "asfr_zim.csv")
-        ),
-        "unit": "month",
-        "dt": 1,
-    }
-    pregnancy = ss.Pregnancy(pars=pregnancy_pars)
-    death_rates = {
-        "death_rate": pd.read_csv(
-            os.path.join(hpv.root, "tests", "test_data", "deaths_zim.csv")
-        )
-    }
-    death = ss.Deaths(death_rates)
-
-    dem = [pregnancy, death]
-    return dem
-
-
 def test_hpv(debug=True):
-    n_agents = [5e4, 1e3][debug]
-    start = [1970, 2000][debug]
-    stop = 2025
-    total_pop = {1970: 5.203e6, 1980: 7.05e6, 1990: 9980999, 2000: 11.83e6}[start]
-    ppl = ss.People(
-        n_agents,
-    )
-    hpv_pars = dict(
-        beta=dict(structuredsexual=[1, 1], maternal=[0, 0]),
-    )
-    hpv16 = hpv.HPV(genotype="16", pars=hpv_pars)
-    hpv18 = hpv.HPV(genotype="18", pars=hpv_pars)
-    maternal = ss.MaternalNet(unit="month")
-    structuredsexual = sti.FastStructuredSexual(unit="month")
-    nets = ss.ndict(structuredsexual, maternal)
-    dis = [hpv16, hpv18]
-    con = [hpv.genotype_connector(genotypes=["hpv16", "hpv18"])]
-    an = []
 
-    dem = get_demographics()
-
-    # Make sim
-    sim_args = dict(
-        unit="month",
-        dt=1,
-        start=ss.date(start),
-        stop=ss.date(stop),
-        people=ppl,
-        total_pop=total_pop,
-        diseases=dis,
-        networks=nets,
-        demographics=dem,
-        connectors=con,
-        analyzers=an,
-    )
-
-    # RUN
-    sim = ss.Sim(**sim_args)
+    sim = hpv.Sim()
     sim.run()
 
     fig, axes = pl.subplots(nrows=3, figsize=(12, 7))
@@ -90,8 +34,8 @@ def test_hpv(debug=True):
         i += 1
     for to_plot in to_plot_total:
         ax = axes[i]
-        y = sim.results.genotype_connector[to_plot].values[15 * 12 :]
-        x = sim.results.genotype_connector["timevec"][15 * 12 :]
+        y = sim.results.hpv[to_plot].values[15 * 12 :]
+        x = sim.results.hpv["timevec"][15 * 12 :]
         ax.plot(x, y)
         ax.set_title(to_plot)
         ax.set_ylim(bottom=0)
@@ -104,7 +48,7 @@ def test_hpv(debug=True):
     ages = [15, 25, 35, 45, 55]
     for i, age in enumerate(ages):
         resname = f"prevalence_{age}_{age+9}"
-        y = sim.results.genotype_connector[resname].values
+        y = sim.results.hpv[resname].values
         axes[0].bar(i, y[-1])
 
     axes[0].set_xticks(range(len(ages)))
@@ -124,29 +68,7 @@ def test_hpv(debug=True):
 
 
 def test_screening(debug=False):
-    n_agents = [1e4, 1e3][debug]
-    start = 1990
-    stop = 2030
-    total_pop = {1970: 5.203e6, 1980: 7.05e6, 1990: 9980999, 2000: 11.83e6}[start]
-    ppl = ss.People(
-        n_agents,
-    )
-    hpv_pars = dict(
-        beta=dict(structuredsexual=[1, 1], maternal=[0, 0]),
-    )
-    hpv16 = hpv.HPV(genotype="16", pars=hpv_pars)
-    hpv18 = hpv.HPV(genotype="18", pars=hpv_pars)
-    maternal = ss.MaternalNet(unit="month")
-    structuredsexual = sti.FastStructuredSexual(
-        unit="month",
-    )
-    nets = ss.ndict(structuredsexual, maternal)
-    dis = [hpv16, hpv18]
-    super_connector = hpv.genotype_connector(genotypes=["hpv16", "hpv18"])
-    con = [super_connector]
-    an = []
 
-    dem = get_demographics()
     treat_eligible = lambda sim: sim.interventions["screen"].screen_results["positive"]
 
     scenarios = {
@@ -168,31 +90,12 @@ def test_screening(debug=False):
     }
     sims = []
     for scen_label, scen_int in scenarios.items():
-
-        # Make sim
-        sim_args = dict(
-            unit="month",
-            dt=1,
-            start=ss.date(start),
-            stop=ss.date(stop),
-            people=ppl,
-            total_pop=total_pop,
-            diseases=dis,
-            networks=nets,
-            demographics=dem,
-            connectors=con,
-            analyzers=an,
-            interventions=scen_int,
-            label=scen_label,
-        )
-
-        # RUN
-        sim = ss.Sim(**sim_args)
+        sim = hpv.Sim(interventions=scen_int, label=scen_label)
         sims.append(sim)
 
     ss.parallel(sims)
 
-    return
+    return sims
 
 
 def make_hiv(hiv_pars=None):
@@ -215,51 +118,10 @@ def make_hiv(hiv_pars=None):
 
 
 def test_hiv_hpv(debug=False):
-    n_agents = [1e4, 1e3][debug]
-    start = 1970
-    stop = 2030
-    total_pop = {1970: 5.203e6, 1980: 7.05e6, 1990: 9980999, 2000: 11.83e6}[start]
-    ppl = ss.People(
-        n_agents,
-    )
-    hpv_pars = dict(
-        beta=dict(structuredsexual=[1, 1], maternal=[0, 0]),
-    )
-    hpv16 = hpv.HPV(genotype="16", pars=hpv_pars)
-    hpv18 = hpv.HPV(genotype="18", pars=hpv_pars)
     hiv = make_hiv()
-    maternal = ss.MaternalNet(unit="month")
-    structuredsexual = sti.FastStructuredSexual(
-        unit="month",
-        dt=3,
-    )
-    nets = ss.ndict(structuredsexual, maternal)
-
-    dis = [hpv16, hpv18, hiv]
-    hpv_super_connector = hpv.genotype_connector(genotypes=["hpv16", "hpv18"])
-    con = [hpv_super_connector, hpv.hpv_hiv_connector(hiv=hiv, hpv=hpv_super_connector)]
-    hpv_hiv_analyzer = hpv.hiv_hpv_results(hiv=hiv, hpv=hpv_super_connector)
-    an = [hpv_hiv_analyzer]
-
-    dem = get_demographics()
 
     # Make sim
-    sim_args = dict(
-        unit="month",
-        dt=3,
-        start=ss.date(start),
-        stop=ss.date(stop),
-        people=ppl,
-        total_pop=total_pop,
-        diseases=dis,
-        networks=nets,
-        demographics=dem,
-        connectors=con,
-        analyzers=an,
-    )
-
-    # RUN
-    sim = ss.Sim(**sim_args)
+    sim = hpv.Sim(diseases=hiv, connectors=con, analyzers=an)
     sim.run()
 
     colors = sc.gridcolors(2)
@@ -296,8 +158,8 @@ if __name__ == "__main__":
 
     T = sc.tic()
     test_hpv()
-    test_hiv_hpv()
-    test_screening()
+    # test_hiv_hpv()
+    # test_screening()
 
     sc.toc(T)
     print("Done.")

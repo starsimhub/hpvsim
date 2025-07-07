@@ -8,6 +8,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 3.0.0 (2025-08-01)
+---------------------------
+- Refactors HPVsim to use the Starsim architecture
+- *Github info* pending
+
+
 Version 2.1.0 (2025-03-25)
 ---------------------------
 - Updates how HPV prognoses are re-evaluated for WLWH
