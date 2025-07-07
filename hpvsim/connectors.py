@@ -204,8 +204,6 @@ class hpv(ss.Connector):
     def init_post(self):
         """Initialize the values of the states; the last step of initialization"""
         super().init_post()
-        self.modules = [self.sim.diseases[genotype] for genotype in self.genotypes]
-
         return
 
     def step(self):
@@ -216,11 +214,11 @@ class hpv(ss.Connector):
         for i, genotype in enumerate(self.genotypes):
             for other_genotype in self.genotypes:
                 self.sus_imm[:] += (
-                    cross_immunity[genotype][other_genotype]
+                    cross_immunity[genotype.name][other_genotype.name]
                     * self.modules[i].sus_imm[:]
                 )
                 self.sev_imm[:] += (
-                    cross_immunity[genotype][other_genotype]
+                    cross_immunity[genotype.name][other_genotype.name]
                     * self.modules[i].sev_imm[:]
                 )
             self.sev_imm[:] *= self.rel_sev[:]
@@ -233,7 +231,7 @@ class hpv(ss.Connector):
             )
 
         ti = self.ti
-        for module in self.modules:
+        for module in self.modules:  # TODO, fix
             other_modules = [m for m in self.modules if m != module]
             # find women who became cancerous today
             cancerous_today = (module.ti_cancer == ti).uids
