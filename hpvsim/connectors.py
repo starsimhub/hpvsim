@@ -1,43 +1,24 @@
 """
-Super connector for HPV simulation connecting immunity and results tracking across genotypes circulating in sim
+Connector for HPVsim which unites results and attributes across genotypes
 """
 
 import starsim as ss
 import sciris as sc
 import numpy as np
 
-__all__ = ["hpv_hiv_connector", "genotype_connector"]
+__all__ = ["hpv", "hpv_hiv_connector"]
 
 
-class hpv_hiv_connector(ss.Connector):
-    def __init__(self, hpv=None, hiv=None, pars=None, **kwargs):
-        super().__init__()
-        if not isinstance(hpv, ss.Connector):
-            print("We are expecting the HPV superconnector here")
-            self.hpv = hpv
-        else:
-            self.hpv = hpv
-        self.hiv = hiv
-        self.define_pars(
-            rel_sus_hpv=lambda cd4: [2.2 if i < 200 else 1.5 for i in cd4],
-            rel_sev_hpv=lambda cd4: [2.2 if i < 200 else 1.5 for i in cd4],
-        )
-        self.update_pars(pars, **kwargs)
-
-    def step(self):
-        hiv_inds = self.hiv.infected.true()
-        self.hpv.rel_sev[hiv_inds] = self.pars.rel_sev_hpv(self.hiv.cd4[hiv_inds])
-        self.hpv.rel_sus[hiv_inds] = self.pars.rel_sus_hpv(self.hiv.cd4[hiv_inds])
-        return
-
-
-class genotype_connector(ss.Connector):
+class hpv(ss.Connector):
 
     def __init__(self, genotypes, pars=None, **kwargs):
         super().__init__()
         self.genotypes = sc.promotetolist(genotypes)
-        self.define_pars(cross_imm_med=0.3, cross_imm_high=0.5, cross_immunity=None)
-
+        self.define_pars(
+            cross_imm_med=0.3,
+            cross_imm_high=0.5,
+            cross_immunity=None,
+        )
         self.update_pars(pars, **kwargs)
 
         if self.pars.cross_immunity is None:
@@ -116,7 +97,6 @@ class genotype_connector(ss.Connector):
     def update_results(self):
         super().update_results()
         ti = self.ti
-        ng = len(self.genotypes)
         women = self.sim.people.female.uids
         ages = [15, 25, 35, 45, 55]
         cancer_ages = [20, 35, 50, 65]
@@ -164,7 +144,7 @@ class genotype_connector(ss.Connector):
             len(new_cancers), denominator
         )
 
-        age_group = age_group = (
+        age_group = (
             (self.sim.people.female)
             & (self.sim.people.age >= 18)
             & (self.sim.people.age < 50)
@@ -326,3 +306,26 @@ class genotype_connector(ss.Connector):
                 ]
 
         return genotype_pars
+
+
+class hpv_hiv_connector(ss.Connector):
+    def __init__(self, hpv=None, hiv=None, pars=None, **kwargs):
+        super().__init__()
+        if not isinstance(hpv, ss.Connector):
+            print("We are expecting the HPV superconnector here")
+            self.hpv = hpv
+        else:
+            self.hpv = hpv
+        self.hiv = hiv
+        self.define_pars(
+            rel_sus_hpv=lambda cd4: [2.2 if i < 200 else 1.5 for i in cd4],
+            rel_sev_hpv=lambda cd4: [2.2 if i < 200 else 1.5 for i in cd4],
+        )
+        self.update_pars(pars, **kwargs)
+
+    def step(self):
+        hiv_inds = self.hiv.infected.true()
+        self.hpv.rel_sev[hiv_inds] = self.pars.rel_sev_hpv(self.hiv.cd4[hiv_inds])
+        self.hpv.rel_sus[hiv_inds] = self.pars.rel_sus_hpv(self.hiv.cd4[hiv_inds])
+        return
+

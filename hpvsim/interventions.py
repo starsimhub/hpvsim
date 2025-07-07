@@ -10,7 +10,7 @@ __all__ = ["screen", "treat"]  # , "vaccinate"]
 
 __all__ += ['RoutineDelivery', 'CampaignDelivery']
 
-class RoutineDelivery(Intervention):
+class RoutineDelivery(ss.Intervention):
     """
     Base class for any intervention that uses routine delivery; handles interpolation of input years.
     """
@@ -75,7 +75,7 @@ class RoutineDelivery(Intervention):
         return
 
 
-class CampaignDelivery(Intervention):
+class CampaignDelivery(ss.Intervention):
     """
     Base class for any intervention that uses campaign delivery; handles interpolation of input years.
     """
@@ -108,7 +108,7 @@ class CampaignDelivery(Intervention):
 __all__ += ['BaseTest', 'BaseScreening', 'routine_screening', 'campaign_screening', 'BaseTriage', 'routine_triage',
             'campaign_triage']
 
-class BaseTest(Intervention):
+class BaseTest(ss.Intervention):
     """
     Base class for screening and triage.
 
@@ -256,7 +256,7 @@ class campaign_triage(BaseTriage, CampaignDelivery):
 
 __all__ += ['BaseTreatment', 'treat_num']
 
-class BaseTreatment(Intervention):
+class BaseTreatment(ss.Intervention):
     """
     Base treatment class.
 
@@ -357,7 +357,7 @@ class treat_num(BaseTreatment):
 
 __all__ += ['BaseVaccination', 'routine_vx', 'campaign_vx']
 
-class BaseVaccination(Intervention):
+class BaseVaccination(ss.Intervention):
     """
     Base vaccination class for determining who will receive a vaccine.
 
