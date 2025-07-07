@@ -8,7 +8,7 @@ import sciris as sc
 import stisim as sti
 import hpvsim as hpv
 
-__all__ = ["HPV", "HPV16", "HPV18", "Hi5", "OHR"]
+__all__ = ["HPV", "HPV16", "HPV18"]
 
 
 class HPV(sti.BaseSTI):
