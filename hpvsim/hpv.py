@@ -70,7 +70,6 @@ class HPV(sti.BaseSTI):
             ss.Result("cancers", label="Cancers"),
             ss.Result("cancer_incidence", label="Cancer incidence", scale=False),
             ss.Result("cancer_deaths", label="Cancer deaths"),
-            ss.Result("prevalence", label="Prevalence", scale=False),
         ]
         self.define_results(*results)
         return
