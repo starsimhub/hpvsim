@@ -70,7 +70,7 @@ class HPV(sti.BaseSTI):
             ss.Result("cancers", label="Cancers"),
             ss.Result("cancer_incidence", label="Cancer incidence", scale=False),
             ss.Result("cancer_deaths", label="Cancer deaths"),
-            ss.Results("prevalence", label="Prevalence", scale=False),
+            ss.Result("prevalence", label="Prevalence", scale=False),
         ]
         self.define_results(*results)
         return
@@ -228,16 +228,6 @@ class HPV(sti.BaseSTI):
         self.results["prevalence"][ti] = cond_prob(
             (self.infectious & self.sim.people.female), women
         )
-        for age in ages:
-            age_group = (
-                (self.sim.people.female)
-                & (self.sim.people.age >= age)
-                & (self.sim.people.age < age + 10)
-            )
-            infectious_age = self.infectious & age_group
-            self.results[f"prevalence_{age}_{age+9}"][ti] = cond_prob(
-                infectious_age, age_group
-            )
 
         # Calculate cancer incidence
         scale_factor = 1e5
