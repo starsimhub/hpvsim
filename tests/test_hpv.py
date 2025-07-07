@@ -34,8 +34,8 @@ def test_hpv(debug=True):
         i += 1
     for to_plot in to_plot_total:
         ax = axes[i]
-        y = sim.results.total[to_plot].values[15 * 12 :]
-        x = sim.results.total["timevec"][15 * 12 :]
+        y = sim.results.hpv[to_plot].values[15 * 12 :]
+        x = sim.results.hpv["timevec"][15 * 12 :]
         ax.plot(x, y)
         ax.set_title(to_plot)
         ax.set_ylim(bottom=0)
@@ -48,7 +48,7 @@ def test_hpv(debug=True):
     ages = [15, 25, 35, 45, 55]
     for i, age in enumerate(ages):
         resname = f"prevalence_{age}_{age+9}"
-        y = sim.results.genotype_connector[resname].values
+        y = sim.results.hpv[resname].values
         axes[0].bar(i, y[-1])
 
     axes[0].set_xticks(range(len(ages)))
