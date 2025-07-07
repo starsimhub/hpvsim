@@ -301,8 +301,8 @@ class hpv(ss.Connector):
         for genotype in genotypes:
             genotype_pars[genotype] = dict()
             for other_genotype in genotypes:
-                genotype_pars[genotype][other_genotype] = default_pars[genotype][
-                    other_genotype
+                genotype_pars[genotype][other_genotype] = default_pars[genotype.name][
+                    other_genotype.name
                 ]
 
         return genotype_pars
