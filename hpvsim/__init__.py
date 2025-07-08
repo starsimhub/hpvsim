@@ -1,6 +1,7 @@
 from .version import __version__, __versiondate__, __license__
 
 from .hpv import *
+from .parameters import *
 from .connectors import *
 from .distributions import *
 from .interventions import *

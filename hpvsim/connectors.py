@@ -11,7 +11,7 @@ __all__ = ["hpv", "hpv_hiv_connector"]
 
 class hpv(ss.Connector):
 
-    def __init__(self, genotypes, pars=None, **kwargs):
+    def __init__(self, genotypes, imm_pars=None, **kwargs):
         super().__init__()
         self.genotypes = sc.promotetolist(genotypes)
         self.define_pars(
@@ -19,7 +19,7 @@ class hpv(ss.Connector):
             cross_imm_high=0.5,
             cross_immunity=None,
         )
-        self.update_pars(pars, **kwargs)
+        self.update_pars(imm_pars, **kwargs)
 
         if self.pars.cross_immunity is None:
             cross_immunity = self.get_cross_immunity()
