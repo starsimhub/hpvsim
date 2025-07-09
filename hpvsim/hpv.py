@@ -8,39 +8,22 @@ import sciris as sc
 import stisim as sti
 import hpvsim as hpv
 
-__all__ = ["HPV", "HPV16", "HPV18"]
+__all__ = ["make_hpv", "HPVType", "get_genotype_choices"]
 
 
-class HPV(sti.BaseSTI):
+class HPVType(sti.BaseSTI):
     """
     Base class for a single genotype of HPV
     """
 
-    def __init__(self, name="hpv", genotype="16", pars=None, **kwargs):
-        super().__init__(name=f"{name}{genotype}")
+    def __init__(self, pars=None, genotype=None, **kwargs):
+        super().__init__(name=genotype)
 
-        self.define_pars(
-            unit="month",
-            init_prev=ss.bernoulli(p=0.2),
-            beta=0.1,
-            beta_m2f=1,
-            rel_beta_f2m=0.27,
-            beta_m2c=0,
-            eff_condom=0.5,
-            dur_cancer=ss.lognorm_ex(ss.dur(8, "year"), ss.dur(3, "year")),
-            dur_infection_male=ss.lognorm_ex(ss.dur(1, "year"), ss.dur(1, "year")),
-            sero_prob=ss.bernoulli(p=0.75),
-            init_imm=hpv.beta(a=2, b=2),
-            init_cell_imm=hpv.beta(a=2, b=2),
-            rel_beta=1,
-            dur_precin=None,    # Set for individual genotypes by derived classes
-            dur_cin=None,       # Set for individual genotypes by derived classes
-            cin_fn=None,        # Set for individual genotypes by derived classes
-            transform_prob=None,  # Set for individual genotypes by derived classes
-            cin_prob=ss.bernoulli(p=0),     # placeholder, gets reset
-            cancer_prob=ss.bernoulli(p=0),  # placeholder, gets reset
-        )
+        # Handle parameters
+        default_pars = hpv.HPVPars(genotype=genotype)
+        self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
+
         self.define_states(
             # States
             ss.State("latent", label="latent"),
@@ -62,6 +45,8 @@ class HPV(sti.BaseSTI):
             ss.FloatArr("sus_imm", default=0, label="immunity to infection"),
             ss.FloatArr("sev_imm", default=0, label="immunity to severe disease"),
         )
+
+        return
 
     def init_results(self):
         super().init_results()
@@ -129,8 +114,8 @@ class HPV(sti.BaseSTI):
         Update immunity states
         """
         sero_converted = self.pars.sero_prob.filter(uids)
-        self.sus_imm[sero_converted] = self.pars.init_imm.rvs(sero_converted)
-        self.sev_imm[sero_converted] = self.pars.init_cell_imm.rvs(sero_converted)
+        self.sus_imm[sero_converted] = self.pars.init_imm
+        self.sev_imm[sero_converted] = self.pars.init_cell_imm
         return
 
     def update_infection(self):
@@ -204,7 +189,8 @@ class HPV(sti.BaseSTI):
         sev = hpv.compute_severity_integral(
             dur_cin, rel_sev=self.rel_sev[uids], pars=self.pars.cin_fn
         )
-        cancer_probs = 1 - np.power(1 - self.pars.transform_prob, sev**2)
+        tp = self.pars.cancer_fn.transform_prob
+        cancer_probs = 1 - np.power(1 - tp, sev**2)
         return cancer_probs
 
     def get_cin_prob(self, uids):
@@ -239,32 +225,40 @@ class HPV(sti.BaseSTI):
         return
 
 
-class HPV16(HPV):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__(genotype="16")
-        self.define_pars(
-            rel_beta=1.0,
-            dur_precin=ss.lognorm_ex(ss.dur(3, "year"), ss.dur(9, "year")),
-            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
-            cin_fn=dict(k=0.3, x_infl=0, y_max=0.5, ttc=50),
-            transform_prob=2e-3,
-        )
-        self.update_pars(pars, **kwargs)
-        return
+def get_genotype_choices():
+    """
+    Define valid genotype names
+    """
+    # List of choices available
+    choices = {
+        'hpv16':    ['hpv16', '16'],
+        'hpv18':    ['hpv18', '18'],
+        'hi5':      ['hi5hpv', 'hi5hpv', 'cross-protective'],
+        'ohr':      ['ohrhpv', 'non-cross-protective'],
+        'hr':       ['allhr', 'allhrhpv', 'hrhpv', 'oncogenic', 'hr10', 'hi10'],
+        'lo':       ['lohpv'],
+    }
+    mapping = {name: key for key,synonyms in choices.items() for name in synonyms} # Flip from key:value to value:key
+    return choices, mapping
 
 
-class HPV18(HPV):
-    def __init__(self, pars=None, **kwargs):
-        super().__init__(genotype="18")
-        self.define_pars(
-            beta=0.75,
-            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
-            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
-            cin_fn=dict(k=0.35, x_infl=0, y_max=0.5, ttc=50),
-            transform_prob=2e-3,
-        )
-        self.update_pars(pars, **kwargs)
-        return
+def make_hpv(genotype=None, hpv_pars=None, **kwargs):
+    """
+    Factory function to create HPV modules based on provided genotypes and parameters.
+    If genotypes are not provided, defaults to HPV16
+    """
+    if genotype is None: genotype = 16  # Assign default
 
+    # Define the options for genotypes
+    g_options, g_mapping = get_genotype_choices()
+    if sc.isnumber(genotype): genotype = f'hpv{genotype}'  # Convert e.g. 16 to hpv16
+    if sc.checktype(genotype, str):
+        if genotype not in g_options.keys():
+            errormsg = f'Genotype {genotype} is not one of the inbuilt options.'
+            raise ValueError(errormsg)
 
+        else:
+            hpv_pars = sc.mergedicts(hpv.make_genotype_pars(genotype), hpv_pars)
+            hpv_module = HPVType(genotype=genotype, pars=hpv_pars, name=genotype, **kwargs)
 
+    return hpv_module
