@@ -12,28 +12,35 @@ do_plot = 1
 do_save = 0
 
 
-#%% Define the tests
+# % Define the tests
 
 def test_microsim():
     sc.heading('Minimal sim test')
 
     # Define baseline parameters and initialize sim
     pars = {
-        'n_agents': 500,  # CK: values smaller than this fail
+        'n_agents': 500,
         'start': 2020,
         'stop': 2025,
+        'beta_m2f': 0.05
     }
     sim = hpv.Sim(**pars)
     sim.run()
     return sim
 
 
-def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being run via pytest, turn off
-    sc.heading('Basic sim test')
+def test_sim_options():
+    sc.heading('Test equivalency of different ways of specifying sim parameters')
 
-    # Settings
-    seed = 1
-    verbose = 0.1
+    # Option 1: flat par dict with a mixture of pars that belong in different modules
+    pars = dict(
+        start=2020,  # Sim par
+        beta_m2f=0.05,  # HPV genotype par, applied to all genotypes
+        prop_f0=0.45,
+        hpv16=dict(dur_cin=4),  # HPV genotype-specific pars
+        hpv18=dict(dur_cin=4),  # HPV genotype-specific pars
+        cell_imm=4
+    )
 
     # Create and run the simulation
     sim_pars = {
@@ -42,9 +49,7 @@ def test_sim(do_plot=False, do_save=False, do_run=True, **kwargs): # If being ru
         'end': 2030,
     }
     genotypes = [16, 18, 'hi5', 'ohr']
-    hpv_pars = {
-        'dur_cancer': 10,
-    }
+    hpv_pars = {'dur_cancer': 10}
     genotype_pars = {
         16: {
             'cin_fn': dict(form='logf2', k=0.25, x_infl=0, ttc=49)

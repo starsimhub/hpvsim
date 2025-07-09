@@ -2,10 +2,11 @@
 Set parameters
 """
 import numpy as np
+import sciris as sc
 import starsim as ss
 
 
-__all__ = ['SimPars', 'make_sim_pars', 'HPVPars', 'make_hpv_pars', 'NetworkPars', 'make_network_pars', 'ImmPars', 'make_imm_pars']
+__all__ = ['SimPars', 'make_sim_pars', 'HPVPars', 'make_hpv_pars', 'make_genotype_pars', 'NetworkPars', 'make_network_pars', 'ImmPars', 'make_imm_pars']
 
 
 class SimPars(ss.SimPars):
@@ -43,6 +44,12 @@ class SimPars(ss.SimPars):
         # Disease parameters
         self.genotypes = [16, 18]  # HPV genotypes to include in the simulation; can be a list of integers or strings
 
+        # Misc other parameters and settings
+        # World Standard Population, used to calculate age-standardised rates (ASR) of incidence
+        self.age_bin_edges = np.array([0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75, 80, 85, 100]),
+        self.standard_pop_weights = np.array([.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005, 0]),
+        self.standard_pop = np.array([self.age_bin_edges, self.standard_pop_weights])
+
         # Update with any supplied parameter values and generate things that need to be generated
         self.update(kwargs)
         return
@@ -53,7 +60,7 @@ class HPVPars(ss.Pars):
     Subclass of Starsim's SimPars with defaults for HPV simulations. Refer to
     Starsim's SimPars for more information on the parameters.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, genotype=None, **kwargs):
 
         # Initialize the parent class
         super().__init__()
@@ -62,7 +69,7 @@ class HPVPars(ss.Pars):
         self.init_prev = ss.bernoulli(p=0.2)
 
         # Transmission parameters
-        self.beta = None  # Constructed by the STI class using the m2f and f2m parameters
+        self.beta = 0  # Constructed by the STI class using the m2f and f2m parameters
         self.beta_m2f = 1
         self.rel_beta_f2m = 0.27
         self.beta_m2c = 0
@@ -84,11 +91,41 @@ class HPVPars(ss.Pars):
         self.cin_prob = ss.bernoulli(p=0)     # placeholder, gets reset
         self.cancer_prob = ss.bernoulli(p=0)  # placeholder, gets reset
 
-        self.include_care = False  # Temporary...
+        # Update the values above with genotype values
+        if genotype is not None:
+            gen_kwargs = make_genotype_pars(genotype)
+            self.update(gen_kwargs)
+
+        self.include_care = False  # Turn off default STI module behavior of storing care outcomes (TODO reconsider)
 
         # Update with any supplied parameter values
         self.update(kwargs)
         return
+
+
+def make_genotype_pars(gkey=None):
+    genotype_pars = sc.objdict(
+        hpv16=dict(
+            rel_beta=1.0,
+            dur_precin=ss.lognorm_ex(ss.dur(3, "year"), ss.dur(9, "year")),
+            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
+            cin_fn=sc.objdict(k=0.3, x_infl=0, y_max=0.5, ttc=50),
+            cancer_fn=sc.objdict(method='cin_integral', transform_prob=2e-3)  # Map CIN duration to cancer probability
+        ),
+        hpv18=dict(
+            rel_beta=0.75,
+            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
+            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
+            cin_fn=sc.objdict(k=0.35, x_infl=0, y_max=0.5, ttc=50),
+            cancer_fn=sc.objdict(method='cin_integral', transform_prob=2e-3)  # Map CIN duration to cancer probability
+        ),
+    )
+    if gkey is None:
+        return genotype_pars
+    else:
+        if gkey not in genotype_pars:
+            raise ValueError(f"Unknown genotype key: {gkey}. Available keys are {list(genotype_pars.keys())}.")
+        return genotype_pars[gkey]
 
 
 class NetworkPars(ss.Pars):
