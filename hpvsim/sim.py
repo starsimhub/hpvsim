@@ -23,7 +23,6 @@ class Sim(ss.Sim):
         # Inputs and defaults
         self.location = location
         self.datafolder = datafolder
-        self.genotypes = genotypes  # Genotypes to use in the simulation, if provided
         self.hpv_pars = None    # Parameters for the HPV modules - processed later
         self.nw_pars = None     # Parameters for the networks - processed later
         self.imm_pars = None    # Parameters for cross-immunity, used in the HPV connector
@@ -34,16 +33,18 @@ class Sim(ss.Sim):
         self.standard_pop_weights = np.array([.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005, 0]),
         self.standard_pop = np.array([self.age_bin_edges, self.standard_pop_weights])
 
-        # Separate the parameters - sim pars are processed now, module pars later
-        pars = self.separate_pars(pars, sim_pars, hpv_pars, nw_pars, imm_pars, **kwargs)
+        # Call the constructor of the parent class WITHOUT pars or module args
+        super().__init__(pars=None, label=label)
 
-        # Call the constructor of the parent class WITHOUT pars, which need to be processed first
-        super().__init__(pars=pars, label=label, people=people, demographics=demographics, diseases=diseases, networks=networks,
-                         interventions=interventions, analyzers=analyzers, connectors=connectors, copy_inputs=True)
+        # Separate the parameters, storing sim pars now and saving module pars to process in init
+        sim_kwargs = dict(label=label, people=people, demographics=demographics, diseases=diseases, networks=networks,
+                    interventions=interventions, analyzers=analyzers, connectors=connectors)
+        sim_kwargs = {key: val for key, val in sim_kwargs.items() if val is not None}
+        self.pars = self.separate_pars(pars, sim_pars, hpv_pars, nw_pars, imm_pars, sim_kwargs, **kwargs)
 
         return
 
-    def separate_pars(self, pars=None, sim_pars=None, hpv_pars=None, nw_pars=None, imm_pars=None, **kwargs):
+    def separate_pars(self, pars=None, sim_pars=None, hpv_pars=None, nw_pars=None, imm_pars=None, sim_kwargs=None, **kwargs):
         """
         Create a nested dict of parameters that get passed to Sim constructor and the component modules
         Prioritization:
@@ -51,7 +52,7 @@ class Sim(ss.Sim):
             - If any key appears in both pars and kwargs, the value from kwargs will be used.
         """
         # Marge in pars and kwargs
-        all_pars = sc.mergedicts(pars, sim_pars, hpv_pars, nw_pars, imm_pars, kwargs)
+        all_pars = sc.mergedicts(pars, sim_pars, hpv_pars, nw_pars, imm_pars, sim_kwargs, kwargs)
 
         # Deal with sim pars
         default_sim_pars = hpv.make_sim_pars()  # Make default parameters using values from parameters.py
@@ -84,9 +85,6 @@ class Sim(ss.Sim):
         """
         Perform all initializations for the sim
         """
-        ss.set_seed(self.pars.rand_seed)
-        self.pars.validate()  # Validate parameters
-
         # Process the genotypes and HPV connector
         genotypes, hpv_connector = self.process_genotypes()
         self.pars['diseases'] += genotypes
@@ -101,15 +99,23 @@ class Sim(ss.Sim):
         If genotypes are provided, they will be used; otherwise, default to HPV16 and HPV18.
         """
         # Genotypes may be provided in various forms; process them here
-        if sc.checktype(self.genotypes, list, (str, int)):
-            genotypes = [hpv.make_hpv(genotype=gtype, hpv_pars=self.hpv_pars) for gtype in self.genotypes]
+        self.pars['genotypes'] = sc.tolist(self.pars['genotypes'])  # Make shorter
+        genotypes = sc.autolist()
+        for gtype in self.pars['genotypes']:
+            if sc.checktype(gtype, (str, int)):
+                genotypes += hpv.make_hpv(genotype=gtype, hpv_pars=self.hpv_pars)
+            elif isinstance(gtype, hpv.HPV):
+                genotypes += gtype
+            else:
+                raise ValueError(f"Invalid genotype type: {type(gtype)}. Must be str, int, or hpv.HPV.")
+
         hpv_connector = hpv.hpv(genotypes=genotypes, imm_pars=self.imm_pars)
         return genotypes, hpv_connector
 
     def process_location(self):
         """ Process the location to create people and demographics if not provided. """
 
-        # TODO: Add support for more locations
+        # TODO: Do this better
         if self.location in ['kenya', 'india']:
             dflocation = self.location.replace(" ", "_")
             total_pop = {

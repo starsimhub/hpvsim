@@ -15,6 +15,9 @@ class SimPars(ss.SimPars):
     """
     def __init__(self, **kwargs):
 
+        # Initialize the parent class
+        super().__init__()
+
         # General parameters
         self.label   = ''  # The label of the simulation
         self.verbose = ss.options.verbose  # Whether or not to display information during the run -- options are 0 (silent), 0.1 (some; default), 1 (default), 2 (everything)
@@ -37,6 +40,9 @@ class SimPars(ss.SimPars):
         self.death_rate = 15
         self.use_aging  = True  # True if demographics, false otherwise
 
+        # Disease parameters
+        self.genotypes = [16, 18]  # HPV genotypes to include in the simulation; can be a list of integers or strings
+
         # Update with any supplied parameter values and generate things that need to be generated
         self.update(kwargs)
         return
@@ -48,6 +54,9 @@ class HPVPars(ss.Pars):
     Starsim's SimPars for more information on the parameters.
     """
     def __init__(self, **kwargs):
+
+        # Initialize the parent class
+        super().__init__()
 
         # Initial conditions
         self.init_prev = ss.bernoulli(p=0.2)
@@ -74,6 +83,8 @@ class HPVPars(ss.Pars):
         self.cancer_fn = None       # Set for individual genotypes by derived classes
         self.cin_prob = ss.bernoulli(p=0)     # placeholder, gets reset
         self.cancer_prob = ss.bernoulli(p=0)  # placeholder, gets reset
+
+        self.include_care = False  # Temporary...
 
         # Update with any supplied parameter values
         self.update(kwargs)
