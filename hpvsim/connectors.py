@@ -5,22 +5,23 @@ Connector for HPVsim which unites results and attributes across genotypes
 import starsim as ss
 import sciris as sc
 import numpy as np
+import hpvsim as hpv
 
-__all__ = ["hpv", "hpv_hiv_connector"]
+__all__ = ["HPV", "hpv_hiv_connector"]
 
 
-class hpv(ss.Connector):
+class HPV(ss.Connector):
 
     def __init__(self, genotypes, pars=None, **kwargs):
         super().__init__()
         self.genotypes = sc.promotetolist(genotypes)
-        self.define_pars(
-            cross_imm_med=0.3,
-            cross_imm_high=0.5,
-            cross_immunity=None,
-        )
+
+        # Handle parameters
+        default_pars = hpv.ImmPars()
+        self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
 
+        # Construct cross-immunity
         if self.pars.cross_immunity is None:
             cross_immunity = self.get_cross_immunity()
             self.pars.cross_immunity = cross_immunity
