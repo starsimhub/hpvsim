@@ -37,22 +37,23 @@ def test_sim_options():
         beta_m2f=0.05,  # HPV genotype par, applied to all genotypes
         dur_cancer=10,
         # prop_f0=0.45,
-        hpv16=dict(dur_cin=4),  # HPV genotype-specific pars
-        hpv18=dict(dur_cin=5),  # HPV genotype-specific pars
         cross_imm_med=0.7
     )
+    pars['16'] = dict(dur_cin=4)  # HPV genotype-specific pars
+    pars['18'] = dict(dur_cin=5)  # HPV genotype-specific pars
+
     sim = hpv.Sim(pars)
-    sim.init()
+    sim.run()
     assert sim.pars.hpv16.beta_m2f == pars['beta_m2f']
-    assert sim.pars.hpv16.dur_cin.pars['mean'] == pars['hpv16']['dur_cin']
+    assert sim.pars.hpv16.dur_cin.pars['mean'] == pars['16']['dur_cin']
 
     # Option 2: pars in separate dictionaries
     sim_pars = dict(start=2020)
     hpv_pars = dict(beta_m2f=0.05, hpv16=dict(dur_cin=4))
     sim = hpv.Sim(sim_pars=sim_pars, hpv_pars=hpv_pars)
     sim.init()
-    assert sim.pars.hpv16.beta_m2f == pars['beta_m2f']
-    assert sim.pars.hpv16.dur_cin.pars['mean'] == pars['hpv16']['dur_cin']
+    assert sim.pars.hpv16.beta_m2f == hpv_pars['beta_m2f']
+    assert sim.pars.hpv16.dur_cin.pars['mean'] == hpv_pars['hpv16']['dur_cin']
 
     # Option 3: construct from scratch
     hpv16 = hpv.HPVType(genotype='hpv16', beta_m2f=0.05, dur_cin=4)
@@ -60,11 +61,10 @@ def test_sim_options():
     hpv_connector = hpv.HPV(genotypes=[hpv16, hpv18])
     sim = hpv.Sim(genotypes=[hpv16, hpv18], connectors=hpv_connector)
     sim.init()
-    assert sim.pars.hpv16.beta_m2f == pars['beta_m2f']
-    assert sim.pars.hpv16.dur_cin.pars['mean'] == pars['hpv16']['dur_cin']
+    assert sim.pars.hpv16.beta_m2f == hpv16.pars['beta_m2f']
+    assert sim.pars.hpv16.dur_cin.pars['mean'] == hpv16.pars['dur_cin'].pars['mean']
 
-
-    return
+    return sim
 
 
 #%% Run as a script
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim0 = test_microsim()
-    sim1 = test_sim_options()
+    sim = test_sim_options()
 
     sc.toc(T)
     print('Done.')

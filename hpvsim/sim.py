@@ -140,6 +140,7 @@ class Sim(ss.Sim):
                     errormsg = f'Genotype {gtype} is not one of the inbuilt options.'
                     raise ValueError(errormsg)
 
+                # See if any parameters have been provided for this genotype
                 this_gtype_pars = {}
                 if gtype in genotype_pars.keys():
                     this_gtype_pars = genotype_pars[gtype]
