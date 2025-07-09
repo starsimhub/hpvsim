@@ -8,16 +8,16 @@ import sciris as sc
 import stisim as sti
 import hpvsim as hpv
 
-__all__ = ["make_hpv", "HPV"]
+__all__ = ["make_hpv", "HPVType", "get_genotype_choices"]
 
 
-class HPV(sti.BaseSTI):
+class HPVType(sti.BaseSTI):
     """
     Base class for a single genotype of HPV
     """
 
-    def __init__(self, name=None, pars=None, genotype=None, **kwargs):
-        super().__init__(name=name)
+    def __init__(self, pars=None, genotype=None, **kwargs):
+        super().__init__(name=genotype)
 
         # Handle parameters
         default_pars = hpv.HPVPars(genotype=genotype)
@@ -251,7 +251,7 @@ def make_hpv(genotype=None, hpv_pars=None, **kwargs):
 
     # Define the options for genotypes
     g_options, g_mapping = get_genotype_choices()
-    if sc.isnumber(genotype): genotype = f'hpv{genotype}' # Convert e.g. 16 to hpv16
+    if sc.isnumber(genotype): genotype = f'hpv{genotype}'  # Convert e.g. 16 to hpv16
     if sc.checktype(genotype, str):
         if genotype not in g_options.keys():
             errormsg = f'Genotype {genotype} is not one of the inbuilt options.'
@@ -259,6 +259,6 @@ def make_hpv(genotype=None, hpv_pars=None, **kwargs):
 
         else:
             hpv_pars = sc.mergedicts(hpv.make_genotype_pars(genotype), hpv_pars)
-            hpv_module = HPV(pars=hpv_pars, name=genotype, **kwargs)
+            hpv_module = HPVType(genotype=genotype, pars=hpv_pars, name=genotype, **kwargs)
 
     return hpv_module
