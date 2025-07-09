@@ -22,14 +22,9 @@ def test_microsim():
         'n_agents': 500,  # CK: values smaller than this fail
         'start': 2020,
         'stop': 2025,
-        'genotypes': [16, 18],
-        'beta_m2f': 0.05,  # Transmission rate
     }
     sim = hpv.Sim(**pars)
     sim.run()
-    # sim.summarize()
-    # sim.brief()
-
     return sim
 
 

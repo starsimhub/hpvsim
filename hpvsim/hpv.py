@@ -19,7 +19,9 @@ class HPV(sti.BaseSTI):
     def __init__(self, name=None, pars=None, **kwargs):
         super().__init__(name=name)
 
-        self.pars = hpv.make_hpv_pars()
+        # Handle parameters
+        default_pars = hpv.HPVPars()
+        self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
 
         self.define_states(
