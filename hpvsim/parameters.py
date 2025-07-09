@@ -103,6 +103,12 @@ class HPVPars(ss.Pars):
         return
 
 
+class GenotypePars(ss.Pars):
+    def __init__(self, **kwargs):
+        super().__init__()
+        return
+
+
 def make_genotype_pars(gkey=None):
     genotype_pars = sc.objdict(
         hpv16=dict(
@@ -136,6 +142,10 @@ class NetworkPars(ss.Pars):
 
 class ImmPars(ss.Pars):
     def __init__(self, **kwargs):
+        super().__init__()
+        self.cross_imm_med = 0.3
+        self.cross_imm_high = 0.5
+        self.cross_immunity = None
         self.update(kwargs)
         return
 
@@ -157,4 +167,4 @@ def make_network_pars(**kwargs):
 
 def make_imm_pars(**kwargs):
     """ Shortcut for making a new instance of NetworkPars """
-    return NetworkPars(**kwargs)
+    return ImmPars(**kwargs)

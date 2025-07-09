@@ -16,7 +16,7 @@ __all__ = ["Sim"]
 class Sim(ss.Sim):
     """Custom simulation class for HPV module, inheriting from starsim.Sim."""
     def __init__(self, pars=None, sim_pars=None, hpv_pars=None, nw_pars=None, imm_pars=None,
-                 genotypes=None, datafolder=None, location=None,
+                 datafolder=None, location=None,
                  label=None, people=None, demographics=None, diseases=None, networks=None,
                  interventions=None, analyzers=None, connectors=None, **kwargs):
 
@@ -30,12 +30,14 @@ class Sim(ss.Sim):
 
         # Call the constructor of the parent class WITHOUT pars or module args
         super().__init__(pars=None, label=label)
+        self.pars = hpv.make_sim_pars()  # Make default parameters using values from parameters.py
 
         # Separate the parameters, storing sim pars now and saving module pars to process in init
         sim_kwargs = dict(label=label, people=people, demographics=demographics, diseases=diseases, networks=networks,
                     interventions=interventions, analyzers=analyzers, connectors=connectors)
         sim_kwargs = {key: val for key, val in sim_kwargs.items() if val is not None}
-        self.pars = self.separate_pars(pars, sim_pars, hpv_pars, nw_pars, imm_pars, sim_kwargs, **kwargs)
+        updated_pars = self.separate_pars(pars, sim_pars, hpv_pars, nw_pars, imm_pars, sim_kwargs, **kwargs)
+        self.pars.update(updated_pars)
 
         return
 
@@ -50,25 +52,38 @@ class Sim(ss.Sim):
         all_pars = sc.mergedicts(pars, sim_pars, hpv_pars, nw_pars, imm_pars, sim_kwargs, kwargs)
 
         # Deal with sim pars
-        default_sim_pars = hpv.make_sim_pars()  # Make default parameters using values from parameters.py
-        user_sim_pars = {k: v for k, v in all_pars.items() if k in default_sim_pars.keys()}
-        sim_pars = sc.mergedicts(default_sim_pars, user_sim_pars, sim_pars, _copy=True)
+        user_sim_pars = {k: v for k, v in all_pars.items() if k in self.pars.keys()}
+        for k in user_sim_pars: all_pars.pop(k)
+        sim_pars = sc.mergedicts(user_sim_pars, sim_pars, _copy=True)  # Don't merge with defaults, those are set above
+        if sim_pars.get('start'): sim_pars['start'] = ss.date(sim_pars['start'])
+        if sim_pars.get('stop'): sim_pars['stop'] = ss.date(sim_pars['stop'])
 
-        # Deal with HPV pars - here we don't merge in defaults, because we do that
-        # during process_genotypes so we get the genotype information.
+        # Deal with HPV pars. Don't merge in defaults yet, this is done
+        # during process_genotypes to get the genotype information.
         default_hpv_pars = hpv.make_hpv_pars()
-        user_hpv_pars = {k: v for k, v in all_pars.items() if k in default_hpv_pars.keys()}
+        user_hpv_pars = {}
+        for k, v in all_pars.items():
+            if k in default_hpv_pars.keys(): user_hpv_pars[k] = v  # Just set
+            if sc.checktype(v, dict):  # See whether it contains HPV pars
+                user_hpv_pars[k] = {gk: gv for gk, gv in v.items() if gk in default_hpv_pars}
+        for k in user_hpv_pars: all_pars.pop(k)
         hpv_pars = sc.mergedicts(user_hpv_pars, hpv_pars, _copy=True)
 
         # Deal with network pars
         default_nw_pars = hpv.make_network_pars()
         user_nw_pars = {k: v for k, v in all_pars.items() if k in default_nw_pars.keys()}
+        for k in user_nw_pars: all_pars.pop(k)
         nw_pars = sc.mergedicts(default_nw_pars, user_nw_pars, nw_pars, _copy=True)
 
         # Deal with immunity pars
         default_imm_pars = hpv.make_imm_pars()
         user_imm_pars = {k: v for k, v in all_pars.items() if k in default_imm_pars.keys()}
+        for k in user_imm_pars: all_pars.pop(k)
         imm_pars = sc.mergedicts(default_imm_pars, user_imm_pars, imm_pars, _copy=True)
+
+        # Raise an exception if there are any leftover pars
+        if all_pars:
+            raise ValueError(f'Unrecognized parameters: {all_pars.keys()}. Refer to parameters.py for parameters.')
 
         # Store the parameters for the modules - thse will be fed into the modules during init
         self.hpv_pars = hpv_pars    # Parameters for the HPV modules
@@ -84,7 +99,7 @@ class Sim(ss.Sim):
         # Process the genotypes and HPV connector
         genotypes, hpv_connector = self.process_genotypes()
         self.pars['diseases'] += genotypes
-        self.pars['connectors'] += hpv_connector
+        if hpv_connector is not None: self.pars['connectors'] += hpv_connector
 
         super().init(force=force, **kwargs)  # Call the parent init method
         return self
@@ -97,15 +112,57 @@ class Sim(ss.Sim):
         # Genotypes may be provided in various forms; process them here
         self.pars['genotypes'] = sc.tolist(self.pars['genotypes'])  # Make shorter
         genotypes = sc.autolist()
+
+        # Get the definitive dict of parameters that can be used to construct an HPV module
+        # Sort the self.hpv_pars dict into things that can be used for all genotypes, and things that
+        # vary by genotype.
+        default_hpv_pars = hpv.make_hpv_pars()
+        hpv_main_pars = {k: v for k, v in self.hpv_pars.items() if k in default_hpv_pars}
+        remaining_pars = {k: v for k, v in self.hpv_pars.items() if k not in default_hpv_pars}
+
+        # Check that the remaining parameters are keyed by genotype, remapping them if needed
+        g_options, g_mapping = hpv.get_genotype_choices()
+        genotype_pars = {}
+        for gparname, gpardict in remaining_pars.items():
+            if gparname not in g_mapping.keys():
+                raise ValueError(f'Parameters for genotype {gparname} were provided, but this is not an inbuilt genotype')
+            else:
+                genotype_pars[g_mapping[gparname]] = gpardict
+
+        # Construct or interpret the genotypes from the pars
         for gtype in self.pars['genotypes']:
-            if sc.checktype(gtype, (str, int)):
-                genotypes += hpv.make_hpv(genotype=gtype, hpv_pars=self.hpv_pars)
-            elif isinstance(gtype, hpv.HPV):
+
+            if sc.isnumber(gtype): gtype = f'hpv{gtype}'  # Convert e.g. 16 to hpv16
+
+            # If it's a string, convert to a module
+            if sc.checktype(gtype, str):
+                if gtype not in g_options.keys():
+                    errormsg = f'Genotype {gtype} is not one of the inbuilt options.'
+                    raise ValueError(errormsg)
+
+                this_gtype_pars = {}
+                if gtype in genotype_pars.keys():
+                    this_gtype_pars = genotype_pars[gtype]
+                hpv_pars = sc.mergedicts(hpv_main_pars, this_gtype_pars)
+                genotypes += hpv.make_hpv(genotype=gtype, hpv_pars=hpv_pars)
+
+            elif isinstance(gtype, hpv.HPVType):
                 genotypes += gtype
             else:
                 raise ValueError(f"Invalid genotype type: {type(gtype)}. Must be str, int, or hpv.HPV.")
 
-        hpv_connector = hpv.hpv(genotypes=genotypes, imm_pars=self.imm_pars)
+        # See if there's a connector added, and add one if not
+        # TODO, improve this
+        if isinstance(self.pars['connectors'], hpv.HPV): hpv_connector = None
+        elif sc.isiterable(self.pars['connectors']):
+            hpv_con = [c for c in self.pars['connectors'] if isinstance(c, hpv.HPV)]
+            if not hpv_con:
+                hpv_connector = hpv.HPV(genotypes=genotypes, pars=self.imm_pars)
+            else:
+                hpv_connector = None
+        elif self.pars['connectors'] is None:
+            hpv_connector = hpv.HPV(genotypes=genotypes, pars=self.imm_pars)
+
         return genotypes, hpv_connector
 
     def process_location(self):
