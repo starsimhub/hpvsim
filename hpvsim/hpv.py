@@ -16,11 +16,11 @@ class HPV(sti.BaseSTI):
     Base class for a single genotype of HPV
     """
 
-    def __init__(self, name=None, pars=None, **kwargs):
+    def __init__(self, name=None, pars=None, genotype=None, **kwargs):
         super().__init__(name=name)
 
         # Handle parameters
-        default_pars = hpv.HPVPars()
+        default_pars = hpv.HPVPars(genotype=genotype)
         self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
 
@@ -114,8 +114,8 @@ class HPV(sti.BaseSTI):
         Update immunity states
         """
         sero_converted = self.pars.sero_prob.filter(uids)
-        self.sus_imm[sero_converted] = self.pars.init_imm.rvs(sero_converted)
-        self.sev_imm[sero_converted] = self.pars.init_cell_imm.rvs(sero_converted)
+        self.sus_imm[sero_converted] = self.pars.init_imm
+        self.sev_imm[sero_converted] = self.pars.init_cell_imm
         return
 
     def update_infection(self):
@@ -189,7 +189,8 @@ class HPV(sti.BaseSTI):
         sev = hpv.compute_severity_integral(
             dur_cin, rel_sev=self.rel_sev[uids], pars=self.pars.cin_fn
         )
-        cancer_probs = 1 - np.power(1 - self.pars.transform_prob, sev**2)
+        tp = self.pars.cancer_fn.transform_prob
+        cancer_probs = 1 - np.power(1 - tp, sev**2)
         return cancer_probs
 
     def get_cin_prob(self, uids):
@@ -222,31 +223,6 @@ class HPV(sti.BaseSTI):
         denominator = np.count_nonzero(sus_pop) / scale_factor
         self.results["cancer_incidence"][ti] = sc.safedivide(new_cancers, denominator)
         return
-
-
-def make_genotype_pars(gkey=None):
-    genotype_pars = sc.objdict(
-        hpv16=dict(
-            rel_beta=1.0,
-            dur_precin=ss.lognorm_ex(ss.dur(3, "year"), ss.dur(9, "year")),
-            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
-            cin_fn=dict(k=0.3, x_infl=0, y_max=0.5, ttc=50),
-            cancer_fn=dict(method='cin_integral', transform_prob=2e-3) # Function mapping duration of cin to probability of cancer
-        ),
-        hpv18=dict(
-            beta=0.75,
-            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
-            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
-            cin_fn=dict(k=0.35, x_infl=0, y_max=0.5, ttc=50),
-            cancer_fn=dict(method='cin_integral', transform_prob=2e-3) # Function mapping duration of cin to probability of cancer
-        ),
-    )
-    if gkey is None:
-        return genotype_pars
-    else:
-        if gkey not in genotype_pars:
-            raise ValueError(f"Unknown genotype key: {gkey}. Available keys are {list(genotype_pars.keys())}.")
-        return genotype_pars[gkey]
 
 
 def get_genotype_choices():
@@ -282,7 +258,7 @@ def make_hpv(genotype=None, hpv_pars=None, **kwargs):
             raise ValueError(errormsg)
 
         else:
-            hpv_pars = sc.mergedicts(make_genotype_pars(genotype), hpv_pars)
+            hpv_pars = sc.mergedicts(hpv.make_genotype_pars(genotype), hpv_pars)
             hpv_module = HPV(pars=hpv_pars, name=genotype, **kwargs)
 
     return hpv_module

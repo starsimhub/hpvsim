@@ -28,11 +28,6 @@ class Sim(ss.Sim):
         self.imm_pars = None    # Parameters for cross-immunity, used in the HPV connector
         self.pars = None        # Parameters for the simulation - processed later
 
-        # World Standard Population, used to calculate age-standardised rates (ASR) of incidence
-        self.age_bin_edges = np.array([0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75, 80, 85, 100]),
-        self.standard_pop_weights = np.array([.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005, 0]),
-        self.standard_pop = np.array([self.age_bin_edges, self.standard_pop_weights])
-
         # Call the constructor of the parent class WITHOUT pars or module args
         super().__init__(pars=None, label=label)
 
@@ -59,10 +54,11 @@ class Sim(ss.Sim):
         user_sim_pars = {k: v for k, v in all_pars.items() if k in default_sim_pars.keys()}
         sim_pars = sc.mergedicts(default_sim_pars, user_sim_pars, sim_pars, _copy=True)
 
-        # Deal with HPV pars
+        # Deal with HPV pars - here we don't merge in defaults, because we do that
+        # during process_genotypes so we get the genotype information.
         default_hpv_pars = hpv.make_hpv_pars()
         user_hpv_pars = {k: v for k, v in all_pars.items() if k in default_hpv_pars.keys()}
-        hpv_pars = sc.mergedicts(default_hpv_pars, user_hpv_pars, hpv_pars, _copy=True)
+        hpv_pars = sc.mergedicts(user_hpv_pars, hpv_pars, _copy=True)
 
         # Deal with network pars
         default_nw_pars = hpv.make_network_pars()
