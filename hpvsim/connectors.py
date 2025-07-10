@@ -3,6 +3,7 @@ Connector for HPVsim which unites results and attributes across genotypes
 """
 
 import starsim as ss
+import stisim as sti
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
@@ -10,11 +11,11 @@ import hpvsim as hpv
 __all__ = ["HPV", "hpv_hiv_connector"]
 
 
-class HPV(ss.Connector):
+class HPV(hpv.HPVType):
 
-    def __init__(self, genotypes, pars=None, **kwargs):
-        super().__init__()
-        self.genotypes = sc.promotetolist(genotypes)
+    def __init__(self, pars=None, **kwargs):
+        super().__init__(name='hpv')
+        self.pars = None  # Wipe pars
 
         # Handle parameters
         default_pars = hpv.ImmPars()
@@ -26,49 +27,15 @@ class HPV(ss.Connector):
             cross_immunity = self.get_cross_immunity()
             self.pars.cross_immunity = cross_immunity
 
-        self.define_states(
-            ss.FloatArr("sus_imm", default=0, label="Immunity to infection"),
-            ss.FloatArr("sev_imm", default=0, label="Immunity to severe disease"),
-            ss.FloatArr("rel_sev", default=1, label="Relative severity"),
-            ss.FloatArr("rel_sus", default=1, label="Relative susceptibility"),
-            ss.FloatArr("n_precin", default=0, label="number precin"),
-            ss.FloatArr("n_cin", default=0, label="number cin"),
-            ss.FloatArr("n_cancerous", default=0, label="number cancerous"),
-            ss.State("precin", default=False, label="precin"),
-            ss.State("cin", default=False, label="cin"),
-            ss.State("cancerous", default=False, label="cancerous"),
-        )
+        # Define states. These will be additional to the ones defined by the genotypes
+        self.define_states()
 
         return
 
     def init_results(self):
         super().init_results()
 
-        results = [
-            ss.Result("infections", label="HPV infections"),
-            ss.Result("cins", label="CINs"),
-            ss.Result("cancers", label="cancers"),
-            ss.Result("cancer_incidence", label="Cancer incidence", scale=False),
-            ss.Result("prevalence", label="Prevalence", scale=False),
-            ss.Result("n_hpv_18_49", label="HPV 18-49", scale=True),
-            ss.Result("n_pop_18_49", label="Population 18-49", scale=True),
-            ss.Result(
-                "hpv_prevalence_18_49", label="HPV prevalence 18-49", scale=False
-            ),
-            ss.Result("prevalence_15_24", label="Prevalence 15-24", scale=False),
-            ss.Result("prevalence_25_34", label="Prevalence 25-34", scale=False),
-            ss.Result("prevalence_35_44", label="Prevalence 35-44", scale=False),
-            ss.Result("prevalence_45_54", label="Prevalence 45-54", scale=False),
-            ss.Result("prevalence_55_64", label="Prevalence 55-64", scale=False),
-            ss.Result("cancers_20_34", label="Cancers 20-34", scale=True),
-            ss.Result("cancers_35_49", label="Cancers 35-49", scale=True),
-            ss.Result("cancers_50_64", label="Cancers 50-64", scale=True),
-            ss.Result("cancers_65_79", label="Cancers 65-79", scale=True),
-            ss.Result("sus_20_34", label="Sus pop 20-34", scale=True),
-            ss.Result("sus_35_49", label="Sus pop 35-49", scale=True),
-            ss.Result("sus_50_64", label="Sus pop 50-64", scale=True),
-            ss.Result("sus_65_79", label="Sus pop 65-79", scale=True),
-        ]
+        results = sc.autolist()
         for genotype in self.genotypes:
             results.append(
                 ss.Result(
