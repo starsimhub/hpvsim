@@ -92,7 +92,7 @@ class HPVType(sti.BaseSTI):
         # Set the duration of precin and determine who will progress to CIN
         self.nti_precin[f_uids] = self.pars.dur_precin.rvs(f_uids)  # * self.sev_imm[uids]  # Duration in timesteps
         self.dur_precin[f_uids] = self.nti_precin[f_uids] * self.t.dt_year  # Duration of infection in years
-        cin_probs = self.get_cin_prob(f_uids)  # Function determining CIN prob is based on timesteps, not duration - ??
+        cin_probs = self.get_cin_prob(f_uids)  # Function determining CIN prob is based on duration in years
 
         self.pars.cin_prob.set(cin_probs)
         cin, no_cin = self.pars.cin_prob.split(f_uids)
