@@ -32,9 +32,12 @@ class HPVType(sti.BaseSTI):
             ss.State("cancerous", label="cancerous"),
 
             # Duration and timestep of states
-            ss.FloatArr("dur_precin", label="Duration of precin"),
-            ss.FloatArr("dur_cin", label="Duration of cin"),
-            ss.FloatArr("dur_cancer", label="Duration of cancer"),
+            ss.FloatArr("dur_precin", label="Duration of infection without HSIL (years)"),
+            ss.FloatArr("dur_cin", label="Duration of HSIL (years)"),
+            ss.FloatArr("dur_cancer", label="Duration of cancer (years)"),
+            ss.FloatArr("nti_precin", label="Number of timesteps spent with infection without HSIL"),
+            ss.FloatArr("nti_cin", label="Number of timesteps spent with HSIL"),
+            ss.FloatArr("nti_cancer", label="Number of timesteps spent with cancer"),
             ss.FloatArr("ti_cancer", label="Timestep of cancer"),
             ss.FloatArr("ti_cancer_death", label="Timestep of cancer death"),
             ss.FloatArr("ti_cin", label="Timestep of CIN"),
@@ -72,50 +75,78 @@ class HPVType(sti.BaseSTI):
         """
         Set the prognoses for people infected with HPV
         """
+        self.wipe_dates(uids)  # Wipe any previous dates
 
         # First separate out men and women
-        m_uids = uids.intersect(self.sim.people.male.uids)
-        f_uids = uids.intersect(self.sim.people.female.uids)
-        self.infectious[uids] = True
+        m_uids = uids & self.sim.people.male
+        f_uids = uids & self.sim.people.female
+        self.ti_infected[uids] = self.ti
+        self.infected[uids] = True
         self.precin[f_uids] = True
         self.susceptible[uids] = False
 
         # Deal with men first
-        dur_inf_male = self.pars.dur_infection_male.rvs(m_uids)
-        self.ti_clearance[m_uids] = self.ti + dur_inf_male
+        timesteps_infected_m = self.pars.dur_infection_male.rvs(m_uids)
+        self.ti_clearance[m_uids] = self.ti + timesteps_infected_m
 
         # Set the duration of precin and determine who will progress to CIN
-        dur_precin = self.pars.dur_precin.rvs(f_uids)  # * self.sev_imm[uids]
-        self.dur_precin[f_uids] = dur_precin
-        cin_probs = self.get_cin_prob(f_uids)
+        self.nti_precin[f_uids] = self.pars.dur_precin.rvs(f_uids)  # * self.sev_imm[uids]  # Duration in timesteps
+        self.dur_precin[f_uids] = self.nti_precin[f_uids] * self.t.dt_year  # Duration of infection in years
+        cin_probs = self.get_cin_prob(f_uids)  # Function determining CIN prob is based on timesteps, not duration - ??
 
         self.pars.cin_prob.set(cin_probs)
         cin, no_cin = self.pars.cin_prob.split(f_uids)
-        self.ti_cin[cin] = self.ti + self.dur_precin[cin]
-        self.ti_clearance[no_cin] = self.ti + self.dur_precin[no_cin]
+        self.ti_cin[cin] = self.ti + self.nti_precin[cin]
+        self.ti_clearance[no_cin] = self.ti + self.nti_precin[no_cin]
 
         # Set the duration of CIN and determine who will progress to cancer
-        dur_cin = self.pars.dur_cin.rvs(cin)  # * self.sev_imm[cin]
-        self.dur_cin[cin] = dur_cin
+        self.nti_cin[cin] = self.pars.dur_cin.rvs(cin)  # * self.sev_imm[cin]
+        self.dur_cin[cin] = self.nti_cin[cin] * self.t.dt_year  # Duration of HSIL in years
         cancer_probs = self.get_cancer_prob(cin)
         self.pars.cancer_prob.set(cancer_probs)
         cancer, no_cancer = self.pars.cancer_prob.split(cin)
-        self.ti_cancer[cancer] = self.ti + self.dur_cin[cancer]
-        self.ti_clearance[no_cancer] = self.ti + self.dur_cin[no_cancer]
+        self.ti_cancer[cancer] = self.ti + self.nti_cin[cancer]
+        self.ti_clearance[no_cancer] = self.ti + self.nti_cin[no_cancer]
 
         # Set duration of cancer and time of cancer mortality
-        dur_cancer = self.pars.dur_cancer.rvs(cancer)
-        self.dur_cancer[cancer] = dur_cancer
-        self.ti_cancer_death[cancer] = self.ti + dur_cancer
+        self.nti_cancer[cancer] = self.pars.dur_cancer.rvs(cancer)
+        self.dur_cancer[cancer] = self.nti_cancer[cancer] * self.t.dt_year  # Duration of cancer in years
+        self.ti_cancer_death[cancer] = self.ti + self.nti_cancer[cancer]
         return
 
-    def update_immunity(self, uids):
+    def set_immunity(self, uids):
         """
-        Update immunity states
+        Set immunity levels for those who've just cleared
         """
         sero_converted = self.pars.sero_prob.filter(uids)
-        self.sus_imm[sero_converted] = self.pars.init_imm
-        self.sev_imm[sero_converted] = self.pars.init_cell_imm
+        init_imm = self.pars.init_imm.rvs(sero_converted)
+        init_cell_imm = self.pars.init_cell_imm.rvs(sero_converted)
+        self.sus_imm[sero_converted] = init_imm
+        self.sev_imm[sero_converted] = init_cell_imm
+        return
+
+    def clear_infection(self, uids):
+        self.susceptible[uids] = True
+        self.infected[uids] = False
+        self.precin[uids] = False
+        self.cin[uids] = False
+        self.ti_clearance[uids] = self.ti
+        return
+
+    def wipe_dates(self, uids):
+        """
+        Clear all previous dates, times, and durations, except for ti_infected.
+        This is called when a person gets infected or treated.
+        """
+        self.ti_cin[uids] = np.nan
+        self.ti_cancer[uids] = np.nan
+        self.ti_clearance[uids] = np.nan
+        self.nti_precin[uids] = np.nan
+        self.nti_cin[uids] = np.nan
+        self.nti_cancer[uids] = np.nan
+        self.dur_precin[uids] = np.nan
+        self.dur_cin[uids] = np.nan
+        self.dur_cancer[uids] = np.nan
         return
 
     def update_infection(self):
@@ -125,70 +156,52 @@ class HPVType(sti.BaseSTI):
         ti = self.ti
 
         # Find men who clear infection
-        new_clearance = (
-            self.infectious & self.sim.people.male & (self.ti_clearance <= ti)
-        ).uids
-        if len(new_clearance):
-            self.infectious[new_clearance] = False
-            self.susceptible[new_clearance] = True
-            self.ti_clearance[new_clearance] = ti
-            self.update_immunity(new_clearance)
+        new_clearance = self.infected & self.sim.people.male & (self.ti_clearance <= ti)
+        if new_clearance.any():
+            self.clear_infection(new_clearance)
 
-        # Find women who clear infection
-        new_clearance = (self.precin & (self.ti_clearance <= ti)).uids
-        if len(new_clearance):
-            self.precin[new_clearance] = False
-            self.infectious[new_clearance] = False
-            self.susceptible[new_clearance] = True
-            self.ti_clearance[new_clearance] = ti
-            self.update_immunity(new_clearance)
+        # Find women without HSIL who clear infection
+        new_clearance = self.precin & (self.ti_clearance <= ti)
+        if new_clearance.any():
+            self.clear_infection(new_clearance)
+            self.set_immunity(new_clearance)
 
         # Find those who progress to CIN
-        new_progression = (self.precin & (self.ti_cin <= ti)).uids
-        if len(new_progression):
+        new_progression = self.precin & (self.ti_cin <= ti)
+        if new_progression.any():
             self.precin[new_progression] = False
             self.cin[new_progression] = True
             self.ti_cin[new_progression] = ti
-            self.results.cins[ti] += len(new_progression)
 
         # Find those who clear CIN
-        new_clearance = (self.cin & (self.ti_clearance <= ti)).uids
-        if len(new_clearance):
-            self.cin[new_clearance] = False
-            self.precin[new_clearance] = False
-            self.infectious[new_clearance] = False
-            self.susceptible[new_clearance] = True
-            self.ti_clearance[new_clearance] = ti
-            self.update_immunity(new_clearance)
+        new_clearance = self.cin & (self.ti_clearance <= ti)
+        if new_clearance.any():
+            self.clear_infection(new_clearance)
+            self.set_immunity(new_clearance)
 
         # Find those who progress to cancer
-        new_cancers = (self.cin & (self.ti_cancer <= ti)).uids
-        if len(new_cancers):
+        new_cancers = self.cin & (self.ti_cancer <= ti)
+        if new_cancers.any():
             self.cin[new_cancers] = False
-            self.infectious[new_cancers] = False
+            self.infected[new_cancers] = False
             self.cancerous[new_cancers] = True
             self.ti_cancer[new_cancers] = ti
-            self.results.cancers[ti] += len(new_cancers)
 
         # Find those who die of cancer
-        new_deaths = (self.cancerous & (self.ti_cancer_death <= ti)).uids
-        if len(new_deaths):
+        new_deaths = self.cancerous & (self.ti_cancer_death <= ti)
+        if new_deaths.any():
             self.cancerous[new_deaths] = False
             self.ti_cancer_death[new_deaths] = ti
             self.sim.people.request_death(new_deaths)
-            self.results.cancer_deaths[ti] += len(new_deaths)
 
         return
 
     def get_cancer_prob(self, uids):
         """
         Get the probability of progressing to cancer
-
         """
         dur_cin = self.dur_cin[uids]
-        sev = hpv.compute_severity_integral(
-            dur_cin, rel_sev=self.rel_sev[uids], pars=self.pars.cin_fn
-        )
+        sev = hpv.compute_severity_integral(dur_cin, rel_sev=self.rel_sev[uids], pars=self.pars.cin_fn)
         tp = self.pars.cancer_fn.transform_prob
         cancer_probs = 1 - np.power(1 - tp, sev**2)
         return cancer_probs
@@ -211,7 +224,7 @@ class HPVType(sti.BaseSTI):
             return sc.safedivide(n_num, n_denom)
 
         self.results["prevalence"][ti] = cond_prob(
-            (self.infectious & self.sim.people.female), women
+            (self.infected & self.sim.people.female), women
         )
 
         # Calculate cancer incidence
