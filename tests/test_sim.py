@@ -84,11 +84,11 @@ def test_epi():
             return
 
     par_effects = [
-        ParEffects('beta',          [0.01, 0.99],   ['infections']),
+        ParEffects('beta',          [0.01, 0.99],   ['new_infections']),
         # ParEffects('condoms',       [0.90, 0.10],   ['infections']),
         # ParEffects('acts',          [1, 200],       ['infections']),
         # ParEffects('debut',         [25, 15],       ['infections']),
-        ParEffects('init_prev',     [0.1, 0.8],     ['infections']),
+        ParEffects('init_prev',     [0.1, 0.8],     ['new_infections']),
     ]
 
     # Loop over each of the above parameters and make sure they affect the epi dynamics in the expected ways
