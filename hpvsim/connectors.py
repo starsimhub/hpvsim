@@ -27,10 +27,10 @@ class HPV(ss.Connector):
             self.pars.cross_immunity = cross_immunity
 
         self.define_states(
-            ss.FloatArr("sus_imm", default=0, label="immunity to infection"),
-            ss.FloatArr("sev_imm", default=0, label="immunity to severe disease"),
-            ss.FloatArr("rel_sev", default=1, label="relative severity"),
-            ss.FloatArr("rel_sus", default=1, label="relative susceptibility"),
+            ss.FloatArr("sus_imm", default=0, label="Immunity to infection"),
+            ss.FloatArr("sev_imm", default=0, label="Immunity to severe disease"),
+            ss.FloatArr("rel_sev", default=1, label="Relative severity"),
+            ss.FloatArr("rel_sus", default=1, label="Relative susceptibility"),
             ss.FloatArr("n_precin", default=0, label="number precin"),
             ss.FloatArr("n_cin", default=0, label="number cin"),
             ss.FloatArr("n_cancerous", default=0, label="number cancerous"),
