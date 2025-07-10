@@ -4,6 +4,7 @@ Set parameters
 import numpy as np
 import sciris as sc
 import starsim as ss
+import hpvsim as hpv
 
 
 __all__ = ['SimPars', 'make_sim_pars', 'HPVPars', 'make_hpv_pars', 'make_genotype_pars', 'NetworkPars', 'make_network_pars', 'ImmPars', 'make_imm_pars']
@@ -32,7 +33,7 @@ class SimPars(ss.SimPars):
         self.unit      = 'month'    # The time unit to use; options are 'year' (default), 'day', 'week', 'month', or 'none'
         self.start     = ss.date(1990)  # Start of the simulation
         self.stop      = ss.date(2030)  # End of the simulation
-        self.dur       = None   # Duration of time to run, if stop isn't specified (default 50 steps of self.unit)
+        self.dur       = None   # Duration of time to run, if stop isn't specified
         self.dt        = 3      # Timestep (in units of self.unit)
         self.rand_seed = 1      # Random seed; if None, don't reset
 
@@ -46,8 +47,8 @@ class SimPars(ss.SimPars):
 
         # Misc other parameters and settings
         # World Standard Population, used to calculate age-standardised rates (ASR) of incidence
-        self.age_bin_edges = np.array([0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75, 80, 85, 100]),
-        self.standard_pop_weights = np.array([.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005, 0]),
+        self.age_bin_edges = np.array([0,   5,  10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75, 80, 85, 100])
+        self.standard_pop_weights = np.array([.12, .10, .09, .09, .08, .08, .06, .06, .06, .06, .05, .04, .04, .03, .02, .01, 0.005, 0.005, 0])
         self.standard_pop = np.array([self.age_bin_edges, self.standard_pop_weights])
 
         # Update with any supplied parameter values and generate things that need to be generated
@@ -66,7 +67,7 @@ class HPVPars(ss.Pars):
         super().__init__()
 
         # Initial conditions
-        self.init_prev = ss.bernoulli(p=0.2)
+        self.init_prev = ss.bernoulli(p=0.05)
 
         # Transmission parameters
         self.beta = 0  # Constructed by the STI class using the m2f and f2m parameters
@@ -78,9 +79,8 @@ class HPVPars(ss.Pars):
         # Disease progression parameters
         self.dur_cancer = ss.lognorm_ex(ss.dur(8, "year"), ss.dur(3, "year"))
         self.dur_infection_male = ss.lognorm_ex(ss.dur(1, "year"), ss.dur(1, "year"))
-        self.sero_prob = ss.bernoulli(p=0.75)
-        self.init_imm = 1
-        self.init_cell_imm = 1
+        self.init_imm = hpv.beta_mean(par1=0.35, par2=0.025)
+        self.init_cell_imm = hpv.beta_mean(par1=0.25, par2=0.025)
 
         # Genotype-specific parameters
         self.rel_beta = 1
@@ -90,6 +90,7 @@ class HPVPars(ss.Pars):
         self.cancer_fn = None       # Set for individual genotypes by derived classes
         self.cin_prob = ss.bernoulli(p=0)     # placeholder, gets reset
         self.cancer_prob = ss.bernoulli(p=0)  # placeholder, gets reset
+        self.sero_prob = ss.bernoulli(p=0.0)
 
         # Update the values above with genotype values
         if genotype is not None:
@@ -115,15 +116,33 @@ def make_genotype_pars(gkey=None):
             rel_beta=1.0,
             dur_precin=ss.lognorm_ex(ss.dur(3, "year"), ss.dur(9, "year")),
             dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
-            cin_fn=sc.objdict(k=0.3, x_infl=0, y_max=0.5, ttc=50),
-            cancer_fn=sc.objdict(method='cin_integral', transform_prob=2e-3)  # Map CIN duration to cancer probability
+            cin_fn=sc.objdict(k=0.3, ttc=50),
+            cancer_fn=sc.objdict(method='cin_integral', transform_prob=2e-3), # Map CIN duration to cancer probability
+            sero_prob = ss.bernoulli(p=0.75),
         ),
         hpv18=dict(
             rel_beta=0.75,
             dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
             dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
-            cin_fn=sc.objdict(k=0.35, x_infl=0, y_max=0.5, ttc=50),
-            cancer_fn=sc.objdict(method='cin_integral', transform_prob=2e-3)  # Map CIN duration to cancer probability
+            cin_fn=sc.objdict(k=0.25, ttc=50),
+            cancer_fn=sc.objdict(method='cin_integral', transform_prob=2e-3),  # Map CIN duration to cancer probability
+            sero_prob = ss.bernoulli(p=0.56),
+        ),
+        hi5=dict(
+            rel_beta=0.9,
+            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
+            dur_cin=ss.lognorm_ex(ss.dur(4.5, "year"), ss.dur(20, "year")),
+            cin_fn=sc.objdict(k=0.2, ttc=50),
+            cancer_fn=sc.objdict(method='cin_integral', transform_prob=1.5e-3),  # Map CIN duration to cancer probability
+            sero_prob = ss.bernoulli(p=0.6),
+        ),
+        ohr=dict(
+            rel_beta=0.9,
+            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
+            dur_cin=ss.lognorm_ex(ss.dur(4.5, "year"), ss.dur(20, "year")),
+            cin_fn=sc.objdict(k=0.2, ttc=50),
+            cancer_fn=sc.objdict(method='cin_integral', transform_prob=1.5e-3),  # Map CIN duration to cancer probability
+            sero_prob = ss.bernoulli(p=0.6),
         ),
     )
     if gkey is None:
