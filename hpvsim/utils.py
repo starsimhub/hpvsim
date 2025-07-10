@@ -33,7 +33,7 @@ def logf3(x, k, x_infl, s=1, y_max=1, ttc=25):
     )
 
 
-def logf2(x, k, x_infl, y_max=1, ttc=25):
+def logf2(x, k, x_infl=0, y_max=1, ttc=25):
     """
     Logistic function constrained to pass through (0,0) and (ttc,y_max).
     This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
@@ -57,7 +57,7 @@ def indef_int_logf2(x, k, x_infl, ttc=25, y_max=1):
     return result
 
 
-def intlogf2(upper, k, x_infl, ttc=25, y_max=1):
+def intlogf2(upper, k, x_infl=0, ttc=25, y_max=1):
     """
     Integral of logf2 between 0 and the limit given by upper
     """

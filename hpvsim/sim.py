@@ -50,6 +50,7 @@ class Sim(ss.Sim):
         """
         # Marge in pars and kwargs
         all_pars = sc.mergedicts(pars, sim_pars, hpv_pars, nw_pars, imm_pars, sim_kwargs, kwargs)
+        all_pars = self.remap_pars(all_pars)  # Remap any v2 parameters to v3 names
 
         # Deal with sim pars
         user_sim_pars = {k: v for k, v in all_pars.items() if k in self.pars.keys()}
@@ -91,6 +92,21 @@ class Sim(ss.Sim):
         self.imm_pars = imm_pars    # Parameters for cross-immunity, used in the HPV connector
 
         return sim_pars
+
+    @staticmethod
+    def remap_pars(pars):
+        """
+        Remap any v2 parameters to v3 names, for backwards compatibility.
+        """
+        if 'start_year' in pars:
+            pars['start'] = pars.pop('start_year')
+        if 'end_year' in pars:
+            pars['stop'] = pars.pop('end_year')
+        if 'seed' in pars:
+            pars['rand_seed'] = pars.pop('seed')
+        if 'beta' in pars and sc.isnumber(pars['beta']):
+            pars['beta_m2f'] = pars.pop('beta')
+        return pars
 
     def init(self, force=False, **kwargs):
         """
@@ -140,6 +156,7 @@ class Sim(ss.Sim):
                     errormsg = f'Genotype {gtype} is not one of the inbuilt options.'
                     raise ValueError(errormsg)
 
+                # See if any parameters have been provided for this genotype
                 this_gtype_pars = {}
                 if gtype in genotype_pars.keys():
                     this_gtype_pars = genotype_pars[gtype]
