@@ -25,12 +25,9 @@ class HPV(ss.Connector, hpv.Genotype):
         self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
 
+        # Genotypes
         self.genotypes = genotypes
-
-        # # Construct cross-immunity
-        # if self.pars.cross_immunity is None:
-        #     cross_immunity = self.get_cross_immunity()
-        #     self.pars.cross_immunity = cross_immunity
+        self.gkeys = self.genotypes.keys() if self.genotypes else []
 
         # Define the states that are shared across genotypes
         self.define_states(
@@ -45,6 +42,20 @@ class HPV(ss.Connector, hpv.Genotype):
             ss.FloatArr("ti_cancer_death", label="Timestep of cancer death"),
         )
         return
+
+    def init_pre(self, sim):
+        """
+        Initialize the HPV connector prior to simulation.
+        This will set up the genotypes and their states.
+        """
+        super().init_pre(sim)
+        if self.pars.imm_matrix is None:
+            self.pars.imm_matrix = hpv.make_immunity_matrix(self.gkeys, self.pars.cross_imm_med, self.pars.cross_imm_high)
+        return
+
+    def validate_beta(self, run_checks=False):
+        """ Skip this method for the HPV connector, as it does not have a beta parameter. """
+        pass
 
     def init_results(self):
         """ Initialize results for the HPV connector. """
@@ -74,7 +85,7 @@ class HPV(ss.Connector, hpv.Genotype):
         Update states prior to transmission
         """
         for genotype in self.genotypes.values():
-            genotype._step_states()
+            genotype._step_state()
         return
 
     def step_states(self):
@@ -97,28 +108,41 @@ class HPV(ss.Connector, hpv.Genotype):
             self.ti_cancer[:] = np.fmin(self.ti_cancer[:], genotype.ti_cancer[:])
             self.ti_cancer_death[:] = np.fmin(self.ti_cancer_death[:], genotype.ti_cancer_death[:])
             self.nti_cancer[:] = np.fmin(self.nti_cancer[:], genotype.nti_cancer[:])
-            later_cancers = genotype.ti_cancer[:] > self.ti_cancer[:]
+            later_cancers = genotype.ti_cancer > self.ti_cancer  # Find later cancer dates
             self.ti_cancer[later_cancers] = np.nan  # Wipe later cancer dates
             self.ti_cancer_death[later_cancers] = np.nan  # Wipe later cancer death dates
 
             # For infections and CINs, we take the maximum across genotypes
             # This is because an individual can be infected with multiple genotypes, and we want to
             # track the most recent infection time
-            self.ti_infected[:] = np.fmax(self.ti_infection[:], genotype.ti_infection[:])
-            self.ti_precin[:] = np.fmax(self.ti_precin[:], genotype.ti_precin[:])
+            self.ti_infected[:] = np.fmax(self.ti_infected[:], genotype.ti_infected[:])
             self.ti_cin[:] = np.fmax(self.ti_cin[:], genotype.ti_cin[:])
 
         return
-
-    def update_immunity(self):
-
-        pass
 
     def step(self):
         """ Update the cross-immunity and relative susceptibility and severity """
         self.step_genotype_states()  # Update states for each genotype
         self.step_states()  # Update the connector states based on genotypes
         self.update_immunity()
+        return
+
+    def update_immunity(self):
+        """ For each individual, set the immunity based on their genotype states """
+        sus_imm_arr = np.array([genotype.own_sus_imm for genotype in self.genotypes.values()])
+        sev_imm_arr = np.array([genotype.own_sev_imm for genotype in self.genotypes.values()])
+
+        # Set the susceptibility and severity immunity based on the genotypes
+        sus_imm = np.dot(self.pars.imm_matrix, sus_imm_arr)
+        sev_imm = np.dot(self.pars.imm_matrix, sev_imm_arr)
+
+        for gname, genotype in self.genotypes.items():
+            # Set the susceptibility and severity immunity for each genotype
+            gidx = self.gkeys.index(gname)
+            # Clip array to be between existing value and 1
+            genotype.sus_imm[gidx, :] = np.clip(sus_imm[gidx, :], genotype.sus_imm[:], 1.0)
+            genotype.sev_imm[gidx, :] = np.clip(sev_imm[gidx, :], genotype.sev_imm[:], 1.0)
+
         return
 
     def infect(self):
