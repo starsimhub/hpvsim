@@ -23,10 +23,10 @@ class Genotype(sti.BaseSTI):
         default_pars = hpv.HPVPars(genotype=genotype)
         self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
-        self.define_states()
+        self.add_states()
         return
 
-    def define_states(self):
+    def add_states(self):
         states = [
             # States
             ss.State("precin", label="HPV without HSIL"),
@@ -54,7 +54,7 @@ class Genotype(sti.BaseSTI):
             ss.FloatArr("sus_imm", default=0, label="Immunity to infection"),
             ss.FloatArr("sev_imm", default=0, label="Immunity to severe disease"),
         ]
-        super().define_states(*states)
+        self.define_states(*states)
         return
 
     # Derived states
@@ -276,7 +276,7 @@ class Genotype(sti.BaseSTI):
         return
 
 
-class HPV(ss.Connector, hpv.Genotype):
+class HPV(ss.Connector, Genotype):
 
     def __init__(self, pars=None, genotypes=None, **kwargs):
         """
@@ -289,7 +289,6 @@ class HPV(ss.Connector, hpv.Genotype):
         default_pars = hpv.ImmPars()
         self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
-        self.define_states()
 
         # Genotypes - TODO, should there be some processing of genotypes?
         self.genotypes = ss.ndict(genotypes)
@@ -298,7 +297,7 @@ class HPV(ss.Connector, hpv.Genotype):
 
         return
 
-    def define_states(self):
+    def add_states(self):
         states = [
             ss.State("susceptible", label="susceptible", default=True),
             ss.State("infected", label="infected"),
@@ -311,7 +310,7 @@ class HPV(ss.Connector, hpv.Genotype):
             ss.FloatArr("ti_cin", label="Timestep of CIN"),
             ss.FloatArr("ti_cancer_death", label="Timestep of cancer death"),
         ]
-        super().define_states(*states)
+        self.define_states(*states)
         return
 
     def init_pre(self, sim):
