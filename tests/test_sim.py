@@ -37,7 +37,7 @@ def test_sim_options():
     pars['18'] = dict(dur_cin=5)  # HPV genotype-specific pars
 
     sim = hpv.Sim(pars)
-    sim.run()
+    sim.init()
     assert sim.pars.hpv16.beta_m2f == pars['beta_m2f']
     assert sim.pars.hpv16.dur_cin.pars['mean'] == pars['16']['dur_cin']
 
@@ -50,8 +50,8 @@ def test_sim_options():
     assert sim.pars.hpv16.dur_cin.pars['mean'] == hpv_pars['hpv16']['dur_cin']
 
     # Option 3: construct from scratch
-    hpv16 = hpv.HPVType(genotype='hpv16', beta_m2f=0.05, dur_cin=4)
-    hpv18 = hpv.HPVType(genotype='hpv18', beta_m2f=0.05, dur_cin=5)
+    hpv16 = hpv.Genotype(genotype='hpv16', beta_m2f=0.05, dur_cin=4)
+    hpv18 = hpv.Genotype(genotype='hpv18', beta_m2f=0.05, dur_cin=5)
     hpv_connector = hpv.HPV(genotypes=[hpv16, hpv18])
     sim = hpv.Sim(genotypes=[hpv16, hpv18], connectors=hpv_connector)
     sim.init()

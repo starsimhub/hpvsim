@@ -26,7 +26,7 @@ class HPV(ss.Connector, hpv.Genotype):
         self.update_pars(pars, **kwargs)
 
         # Genotypes
-        self.genotypes = genotypes
+        self.genotypes = ss.ndict(genotypes)
         self.gkeys = self.genotypes.keys() if self.genotypes else []
 
         # Define the states that are shared across genotypes
