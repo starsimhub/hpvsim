@@ -181,11 +181,11 @@ class Sim(ss.Sim):
         elif sc.isiterable(self.pars['connectors']):
             hpv_con = [c for c in self.pars['connectors'] if isinstance(c, hpv.HPV)]
             if not hpv_con:
-                hpv_connector = hpv.HPV(genotypes=genotypes, pars=self.imm_pars)
+                hpv_connector = hpv.HPV(genotypes=self.genotypes, pars=self.imm_pars)
             else:
                 hpv_connector = None
         elif self.pars['connectors'] is None:
-            hpv_connector = hpv.HPV(genotypes=genotypes, pars=self.imm_pars)
+            hpv_connector = hpv.HPV(genotypes=self.genotypes, pars=self.imm_pars)
 
         return genotypes, hpv_connector
 

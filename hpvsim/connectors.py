@@ -11,7 +11,7 @@ import hpvsim as hpv
 __all__ = ["HPV", "hpv_hiv_connector"]
 
 
-class HPV(ss.Connector):
+class HPV(ss.Connector, hpv.Genotype):
 
     def __init__(self, pars=None, genotypes=None, **kwargs):
         """
