@@ -92,6 +92,10 @@ class HPVPars(ss.Pars):
         self.cancer_prob = ss.bernoulli(p=0)  # placeholder, gets reset
         self.sero_prob = ss.bernoulli(p=0.0)
 
+        # Latency parameters
+        self.p_control = ss.bernoulli(p=0.0)  # Probability of controlling HPV infection
+        self.p_reactivate = ss.bernoulli(p=0.005)  # Per-timestep probability of reactivating; unused unless p_control>0
+
         # Update the values above with genotype values
         if genotype is not None:
             gen_kwargs = make_genotype_pars(genotype)
@@ -162,9 +166,12 @@ class NetworkPars(ss.Pars):
 class ImmPars(ss.Pars):
     def __init__(self, **kwargs):
         super().__init__()
-        self.cross_imm_med = 0.3
-        self.cross_imm_high = 0.5
-        self.imm_matrix = None
+        self.cross_imm_sus_med = 0.3
+        self.cross_imm_sus_high = 0.5
+        self.cross_imm_sev_med = 0.5
+        self.cross_imm_sev_high = 0.7
+        self.sus_imm_matrix = None
+        self.sev_imm_matrix = None
 
         # Remove / overwrite default values that are not relevant for HPV connector
         # TODO reconsider
