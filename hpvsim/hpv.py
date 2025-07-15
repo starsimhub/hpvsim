@@ -45,8 +45,10 @@ class Genotype(sti.BaseSTI):
 
             # Immunity states
             ss.FloatArr("rel_sev", default=1, label="relative severity"),
-            ss.FloatArr("sus_imm", default=0, label="immunity to infection"),
-            ss.FloatArr("sev_imm", default=0, label="immunity to severe disease"),
+            ss.FloatArr("own_sus_imm", default=0, label="Self-immunity to infection"),
+            ss.FloatArr("own_sev_imm", default=0, label="Self-immunity to severe disease"),
+            ss.FloatArr("sus_imm", default=0, label="Immunity to infection"),
+            ss.FloatArr("sev_imm", default=0, label="Immunity to severe disease"),
         )
 
         return
@@ -114,10 +116,10 @@ class Genotype(sti.BaseSTI):
         B-cell immunity and prevents re-infection.
         """
         sero_converted = self.pars.sero_prob.filter(uids)
-        init_imm = self.pars.init_imm.rvs(sero_converted)
-        init_cell_imm = self.pars.init_cell_imm.rvs(uids)
-        self.sus_imm[sero_converted] = init_imm
-        self.sev_imm[uids] = init_cell_imm
+        inf_imm = self.pars.inf_imm.rvs(sero_converted)
+        cell_imm = self.pars.cell_imm.rvs(uids)
+        self.own_sus_imm[sero_converted] = np.maximum(self.own_sus_imm[sero_converted], inf_imm)
+        self.own_sev_imm[uids] = np.maximum(self.own_sev_imm[uids], cell_imm)
         return
 
     def clear_infection(self, uids):
@@ -148,11 +150,11 @@ class Genotype(sti.BaseSTI):
     def step_state(self):
         pass
 
-    def _step_states(self):
+    def _step_state(self):
         """
         Logic that would normally be called at each time step to update the states of the HPV module.
         Using a different method name because we don't want this to be called automatically by the simulation step.
-        Instead it gets called by the HPV connector
+        Instead, it gets called by the HPV connector
         """
         ti = self.ti
 
