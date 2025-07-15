@@ -131,6 +131,7 @@ def test_states():
     class check_states(ss.Analyzer):
 
         def __init__(self):
+            super().__init__()
             self.okay = True
             return
 
@@ -203,7 +204,7 @@ def test_states():
 
     sim = hpv.Sim(pars=base_pars, analyzers=check_states())
     sim.run()
-    a = sim.get_analyzer()
+    a = sim.analyzers[0]
     assert a.okay
 
     return sim
