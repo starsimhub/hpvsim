@@ -14,7 +14,9 @@ __all__ = ["Sim"]
 
 
 class Sim(ss.Sim):
-    """Custom simulation class for HPV module, inheriting from starsim.Sim."""
+    """
+    Custom simulation class for HPV module, inheriting from starsim.Sim
+    """
     def __init__(self, pars=None, sim_pars=None, hpv_pars=None, nw_pars=None, imm_pars=None,
                  datafolder=None, location=None,
                  label=None, people=None, demographics=None, diseases=None, networks=None,
@@ -27,6 +29,7 @@ class Sim(ss.Sim):
         self.nw_pars = None     # Parameters for the networks - processed later
         self.imm_pars = None    # Parameters for cross-immunity, used in the HPV connector
         self.pars = None        # Parameters for the simulation - processed later
+        self.genotypes = ss.ndict()   # Set during init, after processing the genotypes and diseases
 
         # Call the constructor of the parent class WITHOUT pars or module args
         super().__init__(pars=None, label=label)
@@ -118,6 +121,7 @@ class Sim(ss.Sim):
         if hpv_connector is not None: self.pars['connectors'] += hpv_connector
 
         super().init(force=force, **kwargs)  # Call the parent init method
+
         return self
 
     def process_genotypes(self):
@@ -126,7 +130,7 @@ class Sim(ss.Sim):
         If genotypes are provided, they will be used; otherwise, default to HPV16 and HPV18.
         """
         # Genotypes may be provided in various forms; process them here
-        self.pars['genotypes'] = sc.tolist(self.pars['genotypes'])  # Make shorter
+        self.pars['genotypes'] = sc.tolist(self.pars['genotypes'])  # Ensure it's a list
         genotypes = sc.autolist()
 
         # Get the definitive dict of parameters that can be used to construct an HPV module
@@ -163,10 +167,13 @@ class Sim(ss.Sim):
                 hpv_pars = sc.mergedicts(hpv_main_pars, this_gtype_pars)
                 genotypes += hpv.make_hpv(genotype=gtype, hpv_pars=hpv_pars)
 
-            elif isinstance(gtype, hpv.HPVType):
+            elif isinstance(gtype, hpv.Genotype):
                 genotypes += gtype
             else:
                 raise ValueError(f"Invalid genotype type: {type(gtype)}. Must be str, int, or hpv.HPV.")
+
+        # Store genotypes
+        self.genotypes = ss.ndict(genotypes)
 
         # See if there's a connector added, and add one if not
         # TODO, improve this
