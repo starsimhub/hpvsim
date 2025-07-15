@@ -28,12 +28,16 @@ class Genotype(sti.BaseSTI):
 
     def add_states(self):
         states = [
-            # States
+            # Mutually exclusive & collectively exhaustive viral infection states
+            # - Susceptible, added by the Infection base class
+            # - Infectious, a derived state defined as infected & ~inactive
+            # - Inactive, added below, includes latent infections and those with cancer
+            ss.State("inactive", label="Inactive"),
+
+            # Dysplasia states
             ss.State("precin", label="HPV without HSIL"),
             ss.State("cin", label="HPV with HSIL"),
             ss.State("cancerous", label="Cancerous"),
-            ss.State("infectious", label="Infectious"),
-            ss.State("latent", label="Latent"),
 
             # Duration and timestep of states
             ss.FloatArr("dur_precin", label="Duration of infection without HSIL (years)"),
@@ -59,11 +63,18 @@ class Genotype(sti.BaseSTI):
 
     # Derived states
     @property
-    def inactive(self):
+    def infectious(self):
         """
         Inactive infections include people with cancer and people with latent infections
         """
-        return self.infected & ~self.infectious
+        return self.infected & ~self.inactive
+
+    @property
+    def latent(self):
+        """
+        Latent infections are those that are inactive but not cleared
+        """
+        return self.inactive & ~self.cancerous
 
     @property
     def abnormal(self):
@@ -144,17 +155,16 @@ class Genotype(sti.BaseSTI):
         """ Set infection states for new or reactivated infections """
         self.susceptible[uids] = False
         self.infected[uids] = True
-        self.infectious[uids] = True
-        self.latent[uids] = False
+        self.inactive[uids] = False
         self.precin[uids] = True
         self.cin[uids] = False
         return
 
     def clear_infection(self, uids):
+        """ Clear the infection for the given uids. """
         self.susceptible[uids] = True
         self.infected[uids] = False
-        self.infectious[uids] = False
-        self.latent[uids] = False
+        self.inactive[uids] = False
         self.precin[uids] = False
         self.cin[uids] = False
         self.ti_clearance[uids] = self.ti
@@ -208,7 +218,7 @@ class Genotype(sti.BaseSTI):
             if self.pars.p_control.pars.p > 0:
                 controlled, cleared = self.pars.p_control.split(new_undetectables)
                 self.susceptible[controlled] = False  # They are still infected
-                self.infectious[controlled] = False  # They are not infectious
+                self.inactive[controlled] = True  # They are not infectious
                 self.latent[controlled] = True
                 self.ti_clearance[controlled] = np.nan
             else:
@@ -221,7 +231,7 @@ class Genotype(sti.BaseSTI):
         new_cancers = self.cin & (self.ti_cancer <= ti)
         if new_cancers.any():
             self.cin[new_cancers] = False
-            self.infectious[new_cancers] = False
+            self.inactive[new_cancers] = True
             self.cancerous[new_cancers] = True
             self.ti_cancer[new_cancers] = ti
 
