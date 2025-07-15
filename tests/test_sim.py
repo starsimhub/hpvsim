@@ -151,7 +151,7 @@ def test_states():
                     errormsg = (f'States {{susceptible, infectious, inactive}} should be collectively exhaustive '
                                 f'but are not for genotype {gtype.genotype}.')
                     raise ValueError(errormsg)
-                s2 = ~(gtype.susceptible & people.infected).any()
+                s2 = ~(gtype.susceptible & gtype.infected).any()
                 if not s2:
                     errormsg = (f'States {{susceptible, infected}} should be mutually exclusive '
                                 f'but are not for genotype {gtype.genotype}.')
