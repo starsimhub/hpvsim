@@ -31,7 +31,7 @@ def test_sim_options():
         beta_m2f=0.05,  # HPV genotype par, applied to all genotypes
         dur_cancer=10,
         # prop_f0=0.45,
-        cross_imm_med=0.7,
+        cross_imm_sus_med=0.7,
         genotypes=[16, 18],  # HPV genotype list
     )
     pars['16'] = dict(dur_cin=4)  # HPV genotype-specific pars
@@ -210,7 +210,7 @@ def test_states():
 
 
 def test_result_consistency():
-    """ Check that results by genotype sum to the correct totals """
+    sc.heading('Check that results by genotype sum to the correct totals ')
 
     # Create sim
     n_agents = 1e3
@@ -253,6 +253,7 @@ if __name__ == '__main__':
     sim = test_sim_options()
     s0, s1 = test_epi()
     sim3 = test_states()
+    sim4 = test_result_consistency()
 
     sc.toc(T)
     print('Done.')
