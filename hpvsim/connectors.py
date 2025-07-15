@@ -11,7 +11,7 @@ import hpvsim as hpv
 __all__ = ["HPV", "hpv_hiv_connector"]
 
 
-class HPV(ss.Connector):
+class HPV(ss.Connector, hpv.Genotype):
 
     def __init__(self, pars=None, genotypes=None, **kwargs):
         """
@@ -47,7 +47,8 @@ class HPV(ss.Connector):
         return
 
     def init_results(self):
-        hpv.Genotype.init_results(self)
+        """ Initialize results for the HPV connector. """
+        hpv.Genotype.init_results(self)  # Call the parent class's init_results
         results = sc.autolist()
         for gname in self.sim.genotypes.keys():
             results += ss.Result(f"cancer_share_{gname}", label=f"Cancer share {gname}", scale=False)
@@ -98,50 +99,13 @@ class HPV(ss.Connector):
         return
 
     def update_immunity(self):
-        """
-        Update the relative susceptibility and severity of each genotype based on cross-immunity.
-        TODO, refactor/remove
-        """
-        cross_immunity = self.pars.cross_immunity
-        self.sus_imm[:] = 0
-        self.sev_imm[:] = 0
-        for i, genotype in enumerate(self.genotypes):
-            for other_genotype in self.genotypes:
-                self.sus_imm[:] += (
-                    cross_immunity[genotype.name][other_genotype.name]
-                    * self.genotypes[i].sus_imm[:]
-                )
-                self.sev_imm[:] += (
-                    cross_immunity[genotype.name][other_genotype.name]
-                    * self.genotypes[i].sev_imm[:]
-                )
-            self.sev_imm[:] *= self.rel_sev[:]
-            self.sus_imm[:] *= self.rel_sus[:]
-            self.genotypes[i].rel_sev[:] = 1 - np.minimum(
-                self.sev_imm, np.ones_like(self.sev_imm)
-            )
-            self.genotypes[i].rel_sus[:] = 1 - np.minimum(
-                self.sus_imm, np.ones_like(self.sus_imm)
-            )
-
-        ti = self.ti
-        for gtype in self.genotypes:  # TODO, fix
-            other_gtypes = [g for g in self.genotypes if g != gtype]
-            # find women who became cancerous today
-            cancerous_today = (gtype.ti_cancer == ti).uids
-            if len(cancerous_today):
-                for other_gtype in other_gtypes:
-                    cancerous_future = (other_gtype.ti_cancer > ti).uids
-                    remove_uids = cancerous_today.intersect(cancerous_future)
-                    other_gtype.ti_cancer[remove_uids] = np.nan
-        return
+        pass
 
     def step(self):
         """ Update the cross-immunity and relative susceptibility and severity """
-        self.step_genotype_states()
-        self.step_states()
-        self.update_states()
-        # self.update_immunity()
+        self.step_genotype_states()  # Update states for each genotype
+        self.step_states()  # Update the connector states based on genotypes
+        # self.update_immunity()  # Not working yet
 
         return
 
