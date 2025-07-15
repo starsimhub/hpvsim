@@ -11,171 +11,85 @@ import hpvsim as hpv
 __all__ = ["HPV", "hpv_hiv_connector"]
 
 
-class HPV(hpv.HPVType):
+class HPV(ss.Connector):
 
-    def __init__(self, pars=None, **kwargs):
-        super().__init__(name='hpv')
-        self.pars = None  # Wipe pars
+    def __init__(self, pars=None, genotypes=None, **kwargs):
+        """
+        Class to unite the immunity and infection status across all HPV genotypes.
+        """
+        super().__init__(name='hpv')  # This will call Genotype.__init__ due to MRO
 
         # Handle parameters
+        self.pars = ss.Pars()  # Wipe the Genotype's pars, since this is a connector
         default_pars = hpv.ImmPars()
         self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
 
-        # Construct cross-immunity
-        if self.pars.cross_immunity is None:
-            cross_immunity = self.get_cross_immunity()
-            self.pars.cross_immunity = cross_immunity
+        self.genotypes = genotypes
 
-        # Define states. These will be additional to the ones defined by the genotypes
-        self.define_states()
+        # # Construct cross-immunity
+        # if self.pars.cross_immunity is None:
+        #     cross_immunity = self.get_cross_immunity()
+        #     self.pars.cross_immunity = cross_immunity
 
+        # Define the states that are shared across genotypes
+        self.define_states(
+            ss.State("susceptible", label="susceptible", default=True),
+            ss.State("infected", label="infected"),
+            ss.State("latent", label="latent"),
+            ss.State("precin", label="precin"),
+            ss.State("cin", label="CIN"),
+            ss.State("cancerous", label="cancerous"),
+            ss.FloatArr("nti_cancer", label="Number of timesteps spent with cancer"),
+            ss.FloatArr("ti_cancer", label="Timestep of cancer"),
+            ss.FloatArr("ti_cancer_death", label="Timestep of cancer death"),
+        )
         return
 
     def init_results(self):
-        super().init_results()
-
+        hpv.Genotype.init_results(self)
         results = sc.autolist()
-        for genotype in self.genotypes:
-            results.append(
-                ss.Result(
-                    f"cancer_share_{genotype.name}",
-                    label=f"Cancer distribution {genotype.name}",
-                    scale=False,
-                )
-            )
-            results.append(
-                ss.Result(
-                    f"cin_share_{genotype.name}",
-                    label=f"CIN share {genotype.name}",
-                    scale=False,
-                )
-            )
-            results.append(
-                ss.Result(
-                    f"precin_share_{genotype.name}",
-                    label=f"Pre-CIN share {genotype.name}",
-                    scale=False,
-                )
-            )
-
+        for gname in self.sim.genotypes.keys():
+            results += ss.Result(f"cancer_share_{gname}", label=f"Cancer share {gname}", scale=False)
         self.define_results(*results)
+
+        # genotypes = self.sim.genotypes
+        # base_genotype = genotypes[0] if genotypes else None
+        # results = sc.autolist([sc.dcp(r) for r in base_genotype.results.values() if isinstance(r, ss.Result)])
+
         return
 
     def update_results(self):
-        super().update_results()
-        ti = self.ti
-        women = self.sim.people.female.uids
-        ages = [15, 25, 35, 45, 55]
-        cancer_ages = [20, 35, 50, 65]
-
-        new_cancers = []
-        self.n_precin[:] = 0
-        self.n_cin[:] = 0
-        self.n_cancerous[:] = 0
-        self.precin[:] = False
-        self.cin[:] = False
-        self.cancerous[:] = False
-
-        for gtype in self.genotypes:
-            new_cancers = np.array((gtype.ti_cancer == ti).uids).tolist()
-            self.n_precin[:] += gtype.precin[:]
-            self.n_cin[:] += gtype.cin[:]
-            self.n_cancerous[:] += gtype.cancerous[:]
-
-        # Calculate the share of each genotype in CIN and Cancer
-        for i, gtype in enumerate(self.genotypes):
-            self.results[f"precin_share_{gtype.name}"][ti] = sc.safedivide(
-                gtype.precin.true().sum(), self.n_precin.sum()
-            )
-
-            self.results[f"cin_share_{gtype.name}"][ti] = sc.safedivide(
-                gtype.cin.true().sum(), self.n_cin.sum()
-            )
-            self.results[f"cancer_share_{gtype.name}"][ti] = sc.safedivide(
-                gtype.cancerous.true().sum(), self.n_cancerous.sum()
-            )
-
-        new_cancers = ss.uids(list(set(new_cancers)))
-        precin_uids = self.get_precin_uids()
-        cin_uids = self.get_cin_uids()
-        cancerous_uids = self.get_cancerous_uids()
-        self.precin[precin_uids] = True
-        self.cin[cin_uids] = True
-        self.cancerous[cancerous_uids] = True
-
-        # Calculate cancer incidence
-        scale_factor = 1e5
-        sus_pop = np.setdiff1d(women, self.cancerous.true())
-        denominator = len(sus_pop) / scale_factor
-        self.results["cancer_incidence"][ti] = sc.safedivide(
-            len(new_cancers), denominator
-        )
-
-        age_group = (
-            (self.sim.people.female)
-            & (self.sim.people.age >= 18)
-            & (self.sim.people.age < 50)
-        ).uids
-        infectious_age = self.precin.true().intersect(age_group)
-        self.results["n_hpv_18_49"][ti] = len(infectious_age)
-        self.results["n_pop_18_49"][ti] = len(age_group)
-        self.results[f"hpv_prevalence_18_49"][ti] = sc.safedivide(
-            len(infectious_age), len(age_group)
-        )
-
-        for age in ages:
-            age_group = (
-                (self.sim.people.female)
-                & (self.sim.people.age >= age)
-                & (self.sim.people.age < age + 10)
-            ).uids
-            infectious_age = self.precin.true().intersect(age_group)
-            self.results[f"prevalence_{age}_{age+9}"][ti] = sc.safedivide(
-                len(infectious_age), len(age_group)
-            )
-
-        for age in cancer_ages:
-            age_group = (
-                (self.sim.people.female)
-                & (self.sim.people.age >= age)
-                & (self.sim.people.age < age + 15)
-            ).uids
-            cancer_ages = new_cancers.intersect(age_group)
-            sus_pop_ages = sus_pop.intersect(age_group)
-            self.results[f"cancers_{age}_{age+14}"][ti] = len(cancer_ages)
-            self.results[f"sus_{age}_{age+14}"][ti] = len(sus_pop_ages)
-
+        hpv.Genotype.update_results(self)
         return
 
-    def get_precin_uids(self):
-        uids = self.n_precin.true()
-        if len(uids):
-            return uids
-        else:
-            return ss.uids([])
-
-    def get_cin_uids(self):
-        uids = self.n_cin.true()
-        if len(uids):
-            return uids
-        else:
-            return ss.uids([])
-
-    def get_cancerous_uids(self):
-        uids = self.n_cancerous.true()
-        if len(uids):
-            return uids
-        else:
-            return ss.uids([])
-
-    def init_post(self):
-        """Initialize the values of the states; the last step of initialization"""
-        super().init_post()
+    def reset_states(self, uids=None):
+        if uids is None:
+            uids = self.sim.people.alive
+        self.susceptible[uids] = True
+        self.infected[uids] = False
+        self.latent[uids] = False
+        self.precin[uids] = False
+        self.cin[uids] = False
         return
 
-    def step(self):
+    def update_states(self):
+        """
+        Check agents' disease status across all genotypes and update their states accordingly.
+        """
+        self.reset_states()  # Clear states
+        for genotype in self.sim.genotypes.values():
+            self.susceptible[:] &= genotype.susceptible[:]
+            self.infected[:] |= genotype.infected[:]
+            self.latent[:] |= genotype.latent[:]
+            self.precin[:] |= genotype.precin[:]
+            self.cin[:] |= genotype.cin[:]
+            self.ti_cancer[:] = np.minimum(self.ti_cancer[:], genotype.ti_cancer[:])
+            self.ti_cancer_death[:] = np.minimum(self.ti_cancer_death[:], genotype.ti_cancer_death[:])
+            self.nti_cancer[:] = np.minimum(self.nti_cancer[:], genotype.nti_cancer[:])
+        return
 
+    def update_immunity(self):
         cross_immunity = self.pars.cross_immunity
         self.sus_imm[:] = 0
         self.sev_imm[:] = 0
@@ -210,68 +124,13 @@ class HPV(hpv.HPVType):
                     other_gtype.ti_cancer[remove_uids] = np.nan
         return
 
-    def get_cross_immunity(self):
-        """
-        Get the cross immunity between each genotype in a sim
-        """
-        cross_imm_med = self.pars.cross_imm_med
-        cross_imm_high = self.pars.cross_imm_high
-        own_imm_hr = 0.9
-        genotypes = self.genotypes
+    def step(self):
+        """ Update the cross-immunity and relative susceptibility and severity """
 
-        default_pars = dict(
-            # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
-            hpv16=dict(
-                hpv16=1.0,  # Default for own-immunity
-                hpv18=cross_imm_high,
-                hi5=cross_imm_med,
-                ohr=cross_imm_med,
-                hr=cross_imm_med,
-                lr=cross_imm_med,
-            ),
-            hpv18=dict(
-                hpv16=cross_imm_high,
-                hpv18=1.0,  # Default for own-immunity
-                hi5=cross_imm_med,
-                ohr=cross_imm_med,
-                hr=cross_imm_med,
-                lr=cross_imm_med,
-            ),
-            hi5=dict(
-                hpv16=cross_imm_med,
-                hpv18=cross_imm_med,
-                hi5=own_imm_hr,
-                ohr=cross_imm_med,
-                hr=cross_imm_med,
-                lr=cross_imm_med,
-            ),
-            ohr=dict(
-                hpv16=cross_imm_med,
-                hpv18=cross_imm_med,
-                hi5=cross_imm_med,
-                ohr=own_imm_hr,
-                hr=cross_imm_med,
-                lr=cross_imm_med,
-            ),
-            lr=dict(
-                hpv16=cross_imm_med,
-                hpv18=cross_imm_med,
-                hi5=cross_imm_med,
-                ohr=cross_imm_med,
-                hr=cross_imm_med,
-                lr=own_imm_hr,
-            ),
-        )
+        self.update_states()
+        # self.update_immunity()
 
-        genotype_pars = dict()
-        for genotype in genotypes:
-            genotype_pars[genotype.name] = dict()
-            for other_genotype in genotypes:
-                genotype_pars[genotype.name][other_genotype.name] = default_pars[genotype.name][
-                    other_genotype.name
-                ]
-
-        return genotype_pars
+        return
 
 
 class hpv_hiv_connector(ss.Connector):
