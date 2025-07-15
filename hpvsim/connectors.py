@@ -73,7 +73,15 @@ class HPV(ss.Connector):
         self.cin[uids] = False
         return
 
-    def update_states(self):
+    def step_genotype_states(self):
+        """
+        Update states prior to transmission
+        """
+        for genotype in self.genotypes.values():
+            genotype._step_states()
+        return
+
+    def step_states(self):
         """
         Check agents' disease status across all genotypes and update their states accordingly.
         """
@@ -90,6 +98,10 @@ class HPV(ss.Connector):
         return
 
     def update_immunity(self):
+        """
+        Update the relative susceptibility and severity of each genotype based on cross-immunity.
+        TODO, refactor/remove
+        """
         cross_immunity = self.pars.cross_immunity
         self.sus_imm[:] = 0
         self.sev_imm[:] = 0
@@ -126,7 +138,8 @@ class HPV(ss.Connector):
 
     def step(self):
         """ Update the cross-immunity and relative susceptibility and severity """
-
+        self.step_genotype_states()
+        self.step_states()
         self.update_states()
         # self.update_immunity()
 

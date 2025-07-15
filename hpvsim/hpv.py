@@ -62,15 +62,6 @@ class Genotype(sti.BaseSTI):
         self.define_results(*results)
         return
 
-    def step_state(self):
-        """
-        Update states prior to transmission
-        """
-        self.rel_sus[:] = 1
-        self.rel_sev[:] = 1
-        self.update_infection()
-        return
-
     def set_prognoses(self, uids, sources=None):
         """
         Set the prognoses for people infected with HPV
@@ -150,9 +141,14 @@ class Genotype(sti.BaseSTI):
         self.dur_cancer[uids] = np.nan
         return
 
-    def update_infection(self):
+    def step_state(self):
+        pass
+
+    def _step_states(self):
         """
-        Update infection states
+        Logic that would normally be called at each time step to update the states of the HPV module.
+        Using a different method name because we don't want this to be called automatically by the simulation step.
+        Instead it gets called by the HPV connector
         """
         ti = self.ti
 
