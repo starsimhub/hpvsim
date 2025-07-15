@@ -6,6 +6,7 @@ Tests for single simulations
 import sciris as sc
 import numpy as np
 import hpvsim as hpv
+import starsim as ss
 import pytest
 
 do_plot = 1
@@ -30,7 +31,7 @@ def test_sim_options():
         beta_m2f=0.05,  # HPV genotype par, applied to all genotypes
         dur_cancer=10,
         # prop_f0=0.45,
-        cross_imm_med=0.7,
+        cross_imm_sus_med=0.7,
         genotypes=[16, 18],  # HPV genotype list
     )
     pars['16'] = dict(dur_cin=4)  # HPV genotype-specific pars
@@ -121,6 +122,127 @@ def test_epi():
     return s0, s1
 
 
+def test_states():
+    sc.heading('Test states')
+
+    # Define baseline parameters and initialize sim
+    base_pars = dict(start=2020, dt=6, beta=0.05)
+
+    class check_states(ss.Analyzer):
+
+        def __init__(self):
+            super().__init__()
+            self.okay = True
+            return
+
+        def step(self):
+            """
+            Checks states that should be mutually exlusive and collectively exhaustive
+            """
+            hpvc = self.sim.connectors.hpv  # HPV connector
+            gtypes = hpvc.genotypes.values()
+
+            for gtype in gtypes:
+
+                # Infection states: people must be exactly one of susceptible/infectious/inactive
+                s1 = (gtype.susceptible | gtype.infectious | gtype.inactive).all()
+                if not s1:
+                    errormsg = (f'States {{susceptible, infectious, inactive}} should be collectively exhaustive '
+                                f'but are not for genotype {gtype.genotype}.')
+                    raise ValueError(errormsg)
+                s2 = ~(gtype.susceptible & gtype.infected).any()
+                if not s2:
+                    errormsg = (f'States {{susceptible, infected}} should be mutually exclusive '
+                                f'but are not for genotype {gtype.genotype}.')
+                    raise ValueError(errormsg)
+                s3 = ~(gtype.susceptible & gtype.inactive).any()
+                if not s3:
+                    errormsg = (f'States {{susceptible, inactive}} should be mutually exclusive '
+                                f'but are not for genotype {gtype.genotype}.')
+                    raise ValueError(errormsg)
+                s4 = ~(gtype.infectious & gtype.inactive).any()
+                if not s4:
+                    raise ValueError('States {infectious, inactive} should be mutually exclusive but are not.')
+
+                # Dysplasia states:
+                #   - people *without active infection* should not be in any dysplasia state (test d0)
+                #   - people *with active infection* should be in exactly one dysplasia state (test d1)
+                #   - people should either have no cellular changes (normal) or be in a dysplasia state (tests d2-d6)
+                d0 = (~((~gtype.infectious) & gtype.cin)).any()
+                if not d0:
+                    raise ValueError('People without active infection should not have detectable cell changes')
+                d1 = (gtype.susceptible | gtype.precin | gtype.cin | gtype.cancerous | gtype.dead_cancer).all()
+                if not d1:
+                    errormsg = (f'States {{precin, cin, cancerous, dead_cancer}} should be collectively exhaustive '
+                                f'but are not for genotype {gtype.name}.')
+                    raise ValueError(errormsg)
+                d2 = ~(gtype.precin & gtype.cin).all()
+                if not d2:
+                    raise ValueError('States {precin, cin} should be mutually exclusive but are not.')
+                d3 = ~(gtype.cin & gtype.cancerous).all()
+                if not d3:
+                    raise ValueError('States {cin, cancerous} should be mutually exclusive but are not.')
+
+                # If there's anyone with abnormal cells & inactive infection, they must have cancer
+                sd1inds = (gtype.abnormal & gtype.inactive).uids
+                sd1 = True
+                if len(sd1inds) > 0:
+                    hpvc.cancerous[sd1inds].any()
+                if not sd1:
+                    raise ValueError('Anyne with abnormal cells and inactive infection should have cancer.')
+
+                checkall = np.array([
+                    s1, s2, s3, s4,
+                    d0, d1, d2, d3,
+                    sd1
+                ])
+                if not checkall.all():
+                    self.okay = False
+
+            return
+
+    sim = hpv.Sim(pars=base_pars, analyzers=check_states())
+    sim.run()
+    a = sim.analyzers[0]
+    assert a.okay
+
+    return sim
+
+
+def test_result_consistency():
+    sc.heading('Check that results by genotype sum to the correct totals ')
+
+    # Create sim
+    n_agents = 1e3
+    sim = hpv.Sim(n_agents=n_agents, stop=2030, dt=6, label='test_results')
+    sim.run()
+
+    # Check results by genotype sum up to the correct totals
+    res_to_check = ['new_infections', 'n_infected', 'n_cin', 'n_cancerous']
+    for res in res_to_check:
+        gresults = np.array([gtype.results[res][:] for gtype in sim.genotypes.values()])
+        print(f"Checking {res} ... ")
+        by_gen = gresults.sum(axis=0)
+        total = sim.results.hpv[res][:]
+        assert (total <= by_gen).all(), f'{res} by genotype should be exceed total, but {by_gen}<{total}'
+        print(f"✓ ({total.sum():.2f} < {by_gen.sum():.2f})")
+
+    # Check that males don't have CINs or cancers
+    males = sim.people.male
+    males_with_cin = (males & sim.people.hpv.ti_cin.notnan).uids
+    males_with_cancer = (males & sim.people.hpv.ti_cancer.notnan).uids
+    assert len(males_with_cin) == 0, 'Should not have males with CINs'
+    assert len(males_with_cancer) == 0, 'Should not have males with cancerss'
+    print(f"✓ (No males with CINs or cancers)")
+
+    # # Check that people younger than debut don't have HPV
+    # virgin_inds = (sim.people.is_virgin).nonzero()[-1]
+    # virgins_with_hpv = (~np.isnan(sim.people.date_infectious[:,virgin_inds])).nonzero()[-1]
+    # assert len(virgins_with_hpv)==0
+
+    return sim
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -130,6 +252,8 @@ if __name__ == '__main__':
     sim0 = test_microsim()
     sim = test_sim_options()
     s0, s1 = test_epi()
+    sim3 = test_states()
+    sim4 = test_result_consistency()
 
     sc.toc(T)
     print('Done.')

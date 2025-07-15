@@ -8,7 +8,7 @@ import sciris as sc
 import stisim as sti
 import hpvsim as hpv
 
-__all__ = ["make_hpv", "Genotype", "get_genotype_choices"]
+__all__ = ["make_hpv", "Genotype", "HPV", "get_genotype_choices"]
 
 
 class Genotype(sti.BaseSTI):
@@ -27,12 +27,18 @@ class Genotype(sti.BaseSTI):
         return
 
     def add_states(self):
-        self.define_states(
-            # States
-            ss.State("latent", label="latent"),
-            ss.State("precin", label="precin"),
-            ss.State("cin", label="cin"),
-            ss.State("cancerous", label="cancerous"),
+        states = [
+            # Mutually exclusive & collectively exhaustive viral infection states
+            # - Susceptible, added by the Infection base class
+            # - Infectious, a derived state defined as infected & ~inactive
+            # - Inactive, added below, includes latent infections and those with cancer
+            ss.State("inactive", label="Inactive"),
+
+            # Dysplasia states
+            ss.State("precin", label="HPV without HSIL"),
+            ss.State("cin", label="HPV with HSIL"),
+            ss.State("cancerous", label="Cancerous"),
+            ss.State("dead_cancer", label="Died of cancer"),
 
             # Duration and timestep of states
             ss.FloatArr("dur_precin", label="Duration of infection without HSIL (years)"),
@@ -41,10 +47,10 @@ class Genotype(sti.BaseSTI):
             ss.FloatArr("nti_precin", label="Number of timesteps spent with infection without HSIL"),
             ss.FloatArr("nti_cin", label="Number of timesteps spent with HSIL"),
             ss.FloatArr("nti_cancer", label="Number of timesteps spent with cancer"),
+            ss.FloatArr("ti_cin", label="Timestep of CIN"),
             ss.FloatArr("ti_cancer", label="Timestep of cancer"),
             ss.FloatArr("ti_cancer_death", label="Timestep of cancer death"),
-            ss.FloatArr("ti_cin", label="Timestep of CIN"),
-            ss.FloatArr("ti_clearance", label="Timestep of clearance"),
+            ss.FloatArr("ti_clearance", label="Timestep of clearance / control"),
 
             # Immunity states
             ss.FloatArr("rel_sev", default=1, label="relative severity"),
@@ -52,11 +58,35 @@ class Genotype(sti.BaseSTI):
             ss.FloatArr("own_sev_imm", default=0, label="Self-immunity to severe disease"),
             ss.FloatArr("sus_imm", default=0, label="Immunity to infection"),
             ss.FloatArr("sev_imm", default=0, label="Immunity to severe disease"),
-        )
+        ]
+        self.define_states(*states)
         return
 
+    # Derived states
+    @property
+    def infectious(self):
+        """
+        Inactive infections include people with cancer and people with latent infections
+        """
+        return self.infected & ~self.inactive
+
+    @property
+    def latent(self):
+        """
+        Latent infections are those that are inactive but not cleared
+        """
+        return self.inactive & ~self.cancerous
+
+    @property
+    def abnormal(self):
+        """
+        Boolean array of everyone with abnormal cells. Includes women with CIN and cancer
+        """
+        return self.cin | self.cancerous
+
     def init_results(self):
-        super().init_results()
+        """ Initialize results for the HPV genotype."""
+        super().init_results()  # Adds all the age/sex results from BaseSTI
         results = [
             ss.Result("new_cins", label="CINs"),
             ss.Result("new_cancers", label="Cancers"),
@@ -66,7 +96,7 @@ class Genotype(sti.BaseSTI):
         self.define_results(*results)
         return
 
-    def set_prognoses(self, uids, sources=None):
+    def set_prognoses(self, uids, sources=None, record_ti_infected=True):
         """
         Set the prognoses for people infected with HPV
         """
@@ -75,17 +105,15 @@ class Genotype(sti.BaseSTI):
         # First separate out men and women
         m_uids = uids & self.sim.people.male
         f_uids = uids & self.sim.people.female
-        self.ti_infected[uids] = self.ti
-        self.infected[uids] = True
-        self.precin[f_uids] = True
-        self.susceptible[uids] = False
+        if record_ti_infected: self.ti_infected[uids] = self.ti
+        self.set_infection(uids)  # Set the infection state for all uids
 
         # Deal with men first
         timesteps_infected_m = self.pars.dur_infection_male.rvs(m_uids)
         self.ti_clearance[m_uids] = self.ti + timesteps_infected_m
 
         # Set the duration of precin and determine who will progress to CIN
-        self.nti_precin[f_uids] = self.pars.dur_precin.rvs(f_uids)  # * self.sev_imm[uids]  # Duration in timesteps
+        self.nti_precin[f_uids] = self.pars.dur_precin.rvs(f_uids) * (1 - self.sev_imm[f_uids])  # Duration in timesteps
         self.dur_precin[f_uids] = self.nti_precin[f_uids] * self.t.dt_year  # Duration of infection in years
         cin_probs = self.get_cin_prob(f_uids)  # Function determining CIN prob is based on duration in years
 
@@ -124,10 +152,20 @@ class Genotype(sti.BaseSTI):
         self.own_sev_imm[uids] = np.maximum(self.own_sev_imm[uids], cell_imm)
         return
 
+    def set_infection(self, uids):
+        """ Set infection states for new or reactivated infections """
+        self.susceptible[uids] = False
+        self.infected[uids] = True
+        self.inactive[uids] = False
+        self.precin[uids] = True
+        self.cin[uids] = False
+        return
+
     def clear_infection(self, uids):
+        """ Clear the infection for the given uids. """
         self.susceptible[uids] = True
         self.infected[uids] = False
-        self.latent[uids] = False
+        self.inactive[uids] = False
         self.precin[uids] = False
         self.cin[uids] = False
         self.ti_clearance[uids] = self.ti
@@ -165,12 +203,6 @@ class Genotype(sti.BaseSTI):
         if new_clearance.any():
             self.clear_infection(new_clearance)
 
-        # Find women without HSIL who clear infection
-        new_clearance = self.precin & (self.ti_clearance <= ti)
-        if new_clearance.any():
-            self.clear_infection(new_clearance)
-            self.set_immunity(new_clearance)
-
         # Find those who progress to CIN
         new_progression = self.precin & (self.ti_cin <= ti)
         if new_progression.any():
@@ -178,23 +210,40 @@ class Genotype(sti.BaseSTI):
             self.cin[new_progression] = True
             self.ti_cin[new_progression] = ti
 
-        # Find those who clear CIN
-        new_clearance = self.cin & (self.ti_clearance <= ti)
-        if new_clearance.any():
-            self.clear_infection(new_clearance)
-            self.set_immunity(new_clearance)
+        # Find women who clear or control infection
+        new_undetectables = self.infected & (self.ti_clearance <= ti)
+        if new_undetectables.any():
+            # Check if we're modeling latency
+            if self.pars.p_control.pars.p > 0:
+                controlled, cleared = self.pars.p_control.split(new_undetectables)
+                self.susceptible[controlled] = False  # They are still infected
+                self.inactive[controlled] = True  # They are not infectious
+                self.latent[controlled] = True
+                self.ti_clearance[controlled] = np.nan
+            else:
+                cleared = new_undetectables
+
+            self.clear_infection(cleared)
+            self.set_immunity(cleared)
 
         # Find those who progress to cancer
         new_cancers = self.cin & (self.ti_cancer <= ti)
         if new_cancers.any():
             self.cin[new_cancers] = False
-            self.infected[new_cancers] = False
+            self.inactive[new_cancers] = True
             self.cancerous[new_cancers] = True
             self.ti_cancer[new_cancers] = ti
+
+        # Check if we're modeling latency and need to capture reactivation
+        if self.pars.p_control.pars.p > 0:
+            reactivated = self.pars.p_reactivate.filter(self.latent)
+            if reactivated.any():
+                self.set_prognoses(reactivated, record_ti_infected=False)  # Reactivate the infection
 
         # Find those who die of cancer
         new_deaths = self.cancerous & (self.ti_cancer_death <= ti)
         if new_deaths.any():
+            self.dead_cancer[new_deaths] = True
             self.cancerous[new_deaths] = False
             self.ti_cancer_death[new_deaths] = ti
             self.sim.people.request_death(new_deaths)
@@ -235,6 +284,159 @@ class Genotype(sti.BaseSTI):
         res.cancer_incidence[ti] = sc.safedivide(res.new_cancers[ti], denominator)
 
         return
+
+
+class HPV(ss.Connector, Genotype):
+
+    def __init__(self, pars=None, genotypes=None, **kwargs):
+        """
+        Class to unite the immunity and infection status across all HPV genotypes.
+        """
+        super().__init__(name='hpv')  # This will call Genotype.__init__ due to MRO
+
+        # Handle parameters
+        self.pars = ss.Pars()  # Wipe the Genotype's pars, since this is a connector
+        default_pars = hpv.ImmPars()
+        self.define_pars(**default_pars)
+        self.update_pars(pars, **kwargs)
+
+        # Genotypes - TODO, should there be some processing of genotypes?
+        self.genotypes = ss.ndict(genotypes)
+        self.gkeys = self.genotypes.keys() if self.genotypes else []
+        self.n_genotypes = len(self.gkeys)
+
+        return
+
+    def add_states(self):
+        states = [
+            ss.State("susceptible", label="susceptible", default=True),
+            ss.State("infected", label="infected"),
+            ss.State("inactive", label="inactive"),
+            ss.State("precin", label="precin"),
+            ss.State("cin", label="CIN"),
+            ss.State("cancerous", label="cancerous"),
+            ss.State("dead_cancer", label="Died from cancer"),
+            ss.FloatArr("nti_cancer", label="Number of timesteps spent with cancer"),
+            ss.FloatArr("ti_cancer", label="Timestep of cancer"),
+            ss.FloatArr("ti_cin", label="Timestep of CIN"),
+            ss.FloatArr("ti_cancer_death", label="Timestep of cancer death"),
+        ]
+        self.define_states(*states)
+        return
+
+    def init_pre(self, sim):
+        """
+        Initialize the HPV connector prior to simulation.
+        This will set up the genotypes and their states.
+        """
+        super().init_pre(sim)
+        p = self.pars  # Short alias for parameters
+        if p.sus_imm_matrix is None:
+            p.sus_imm_matrix = hpv.make_immunity_matrix(self.gkeys, p.cross_imm_sus_med, p.cross_imm_sus_high)
+        if p.sev_imm_matrix is None:
+            p.sev_imm_matrix = hpv.make_immunity_matrix(self.gkeys, p.cross_imm_sev_med, p.cross_imm_sev_high)
+        return
+
+    def init_results(self):
+        """ Initialize results for the HPV connector. """
+        hpv.Genotype.init_results(self)  # Call the parent class's init_results
+        results = sc.autolist()
+        for gname in self.genotypes.keys():
+            results += ss.Result(f"cancer_share_{gname}", label=f"Cancer share {gname}", scale=False)
+        self.define_results(*results)
+        return
+
+    def update_results(self):
+        hpv.Genotype.update_results(self)
+        return
+
+    def reset_states(self, uids=None):
+        if uids is None:
+            uids = self.sim.people.alive
+        self.susceptible[uids] = True
+        self.infected[uids] = False
+        self.inactive[uids] = False
+        self.precin[uids] = False
+        self.cin[uids] = False
+        self.cancerous[uids] = False
+        return
+
+    def step_genotype_states(self):
+        """
+        Update states prior to transmission
+        """
+        for genotype in self.genotypes.values():
+            genotype._step_state()
+        return
+
+    def step_states(self):
+        """
+        Check agents' disease status across all genotypes and update their states accordingly.
+        """
+        self.reset_states()  # Clear states
+
+        for genotype in self.genotypes.values():
+            self.susceptible[:] &= genotype.susceptible[:]
+            self.infected[:] |= genotype.infected[:]
+            self.inactive[:] |= genotype.inactive[:]
+            self.precin[:] |= genotype.precin[:]
+            self.cin[:] |= genotype.cin[:]
+            self.cancerous[:] |= genotype.cancerous[:]
+
+            # For cancers, we take the minimum across genotypes. It's possible that
+            # an individual has multiple genotypes, but we want to track the earliest
+            # cancer diagnosis and the earliest cancer death time.
+            # We will also need to wipte any later dates
+            self.ti_cancer[:] = np.fmin(self.ti_cancer[:], genotype.ti_cancer[:])
+            self.ti_cancer_death[:] = np.fmin(self.ti_cancer_death[:], genotype.ti_cancer_death[:])
+            self.nti_cancer[:] = np.fmin(self.nti_cancer[:], genotype.nti_cancer[:])
+            later_cancers = genotype.ti_cancer > self.ti_cancer  # Find later cancer dates
+            self.ti_cancer[later_cancers] = np.nan  # Wipe later cancer dates
+            self.ti_cancer_death[later_cancers] = np.nan  # Wipe later cancer death dates
+
+            # For infections and CINs, we take the maximum across genotypes
+            # This is because an individual can be infected with multiple genotypes, and we want to
+            # track the most recent infection time
+            self.ti_infected[:] = np.fmax(self.ti_infected[:], genotype.ti_infected[:])
+            self.ti_cin[:] = np.fmax(self.ti_cin[:], genotype.ti_cin[:])
+
+        return
+
+    def step(self):
+        """ Update the cross-immunity and relative susceptibility and severity """
+        self.step_genotype_states()  # Update states for each genotype
+        self.step_states()  # Update the connector states based on genotypes
+        self.update_immunity()
+        return
+
+    def update_immunity(self):
+        """
+        Update overall sus_imm and sev_imm for each genotype by combining across all genotypes.
+        """
+        sus_imm_arr = np.array([genotype.own_sus_imm for genotype in self.genotypes.values()])
+        sev_imm_arr = np.array([genotype.own_sev_imm for genotype in self.genotypes.values()])
+
+        # Set the susceptibility and severity immunity based on the genotypes
+        sus_imm = np.dot(self.pars.sus_imm_matrix, sus_imm_arr)
+        sev_imm = np.dot(self.pars.sev_imm_matrix, sev_imm_arr)
+
+        for gname, genotype in self.genotypes.items():
+            # Set the susceptibility and severity immunity for each genotype
+            gidx = self.gkeys.index(gname)
+            # Clip array to be between existing value and 1
+            genotype.sus_imm[:] = np.clip(sus_imm[gidx, :], genotype.sus_imm[:], 1.0)
+            genotype.sev_imm[:] = np.clip(sev_imm[gidx, :], genotype.sev_imm[:], 1.0)
+
+        return
+
+    # Methods to skip
+    def infect(self):
+        """ Don't allow HPV infections through this connector """
+        pass
+
+    def validate_beta(self, run_checks=False):
+        """ Skip this method for the HPV connector, as it does not have a beta parameter. """
+        pass
 
 
 def get_genotype_choices():
