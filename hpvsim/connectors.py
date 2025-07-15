@@ -128,7 +128,9 @@ class HPV(ss.Connector, hpv.Genotype):
         return
 
     def update_immunity(self):
-        """ For each individual, set the immunity based on their genotype states """
+        """
+        Update overall sus_imm and sev_imm for each genotype by combining across all genotypes.
+        """
         sus_imm_arr = np.array([genotype.own_sus_imm for genotype in self.genotypes.values()])
         sev_imm_arr = np.array([genotype.own_sev_imm for genotype in self.genotypes.values()])
 
