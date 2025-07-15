@@ -165,6 +165,18 @@ class ImmPars(ss.Pars):
         self.cross_imm_med = 0.3
         self.cross_imm_high = 0.5
         self.cross_immunity = None
+
+        # Remove / overwrite default values that are not relevant for HPV connector
+        # TODO reconsider
+        self.include_care = False
+        self.log = False
+        self.beta = 0
+        self.beta_m2f = 0
+        self.rel_beta_f2m = 0
+        self.beta_m2c = 0
+        self.beta_m2m = 0
+        self.init_prev = None
+
         self.update(kwargs)
         return
 
