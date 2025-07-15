@@ -50,14 +50,9 @@ class HPV(ss.Connector, hpv.Genotype):
         """ Initialize results for the HPV connector. """
         hpv.Genotype.init_results(self)  # Call the parent class's init_results
         results = sc.autolist()
-        for gname in self.sim.genotypes.keys():
+        for gname in self.genotypes.keys():
             results += ss.Result(f"cancer_share_{gname}", label=f"Cancer share {gname}", scale=False)
         self.define_results(*results)
-
-        # genotypes = self.sim.genotypes
-        # base_genotype = genotypes[0] if genotypes else None
-        # results = sc.autolist([sc.dcp(r) for r in base_genotype.results.values() if isinstance(r, ss.Result)])
-
         return
 
     def update_results(self):
@@ -87,7 +82,8 @@ class HPV(ss.Connector, hpv.Genotype):
         Check agents' disease status across all genotypes and update their states accordingly.
         """
         self.reset_states()  # Clear states
-        for genotype in self.sim.genotypes.values():
+
+        for genotype in self.genotypes.values():
             self.susceptible[:] &= genotype.susceptible[:]
             self.infected[:] |= genotype.infected[:]
             self.latent[:] |= genotype.latent[:]
@@ -98,9 +94,9 @@ class HPV(ss.Connector, hpv.Genotype):
             # an individual has multiple genotypes, but we want to track the earliest
             # cancer diagnosis and the earliest cancer death time.
             # We will also need to wipte any later dates
-            self.ti_cancer[:] = np.minimum(self.ti_cancer[:], genotype.ti_cancer[:])
-            self.ti_cancer_death[:] = np.minimum(self.ti_cancer_death[:], genotype.ti_cancer_death[:])
-            self.nti_cancer[:] = np.minimum(self.nti_cancer[:], genotype.nti_cancer[:])
+            self.ti_cancer[:] = np.fmin(self.ti_cancer[:], genotype.ti_cancer[:])
+            self.ti_cancer_death[:] = np.fmin(self.ti_cancer_death[:], genotype.ti_cancer_death[:])
+            self.nti_cancer[:] = np.fmin(self.nti_cancer[:], genotype.nti_cancer[:])
             later_cancers = genotype.ti_cancer[:] > self.ti_cancer[:]
             self.ti_cancer[later_cancers] = np.nan  # Wipe later cancer dates
             self.ti_cancer_death[later_cancers] = np.nan  # Wipe later cancer death dates
@@ -108,23 +104,26 @@ class HPV(ss.Connector, hpv.Genotype):
             # For infections and CINs, we take the maximum across genotypes
             # This is because an individual can be infected with multiple genotypes, and we want to
             # track the most recent infection time
-            self.ti_infected[:] = np.maximum(self.ti_infection[:], genotype.ti_infection[:])
-            self.ti_precin[:] = np.maximum(self.ti_precin[:], genotype.ti_precin[:])
-            self.ti_cin[:] = np.maximum(self.ti_cin[:], genotype.ti_cin[:])
+            self.ti_infected[:] = np.fmax(self.ti_infection[:], genotype.ti_infection[:])
+            self.ti_precin[:] = np.fmax(self.ti_precin[:], genotype.ti_precin[:])
+            self.ti_cin[:] = np.fmax(self.ti_cin[:], genotype.ti_cin[:])
 
         return
 
     def update_immunity(self):
+
         pass
 
     def step(self):
         """ Update the cross-immunity and relative susceptibility and severity """
         self.step_genotype_states()  # Update states for each genotype
         self.step_states()  # Update the connector states based on genotypes
-        # self.update_immunity()  # Not working yet
-
+        self.update_immunity()
         return
 
+    def infect(self):
+        """ Don't allow HPV infections through this connector """
+        pass
 
 class hpv_hiv_connector(ss.Connector):
     def __init__(self, hpv=None, hiv=None, pars=None, **kwargs):
