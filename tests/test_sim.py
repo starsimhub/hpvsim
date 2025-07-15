@@ -139,7 +139,6 @@ def test_states():
             """
             Checks states that should be mutually exlusive and collectively exhaustive
             """
-            people = self.sim.people
             hpvc = self.sim.connectors.hpv  # HPV connector
             gtypes = hpvc.genotypes.values()
 
@@ -172,10 +171,10 @@ def test_states():
                 d0 = (~((~gtype.infectious) & gtype.cin)).any()
                 if not d0:
                     raise ValueError('People without active infection should not have detectable cell changes')
-                d1 = (gtype.precin | gtype.cin | gtype.cancerous).all()
+                d1 = (gtype.susceptible | gtype.precin | gtype.cin | gtype.cancerous | gtype.dead_cancer).all()
                 if not d1:
-                    errormsg = (f'States {{precin, cin, cancerous}} should be collectively exhaustive '
-                                f'but are not for genotype {gtype.genotype}.')
+                    errormsg = (f'States {{precin, cin, cancerous, dead_cancer}} should be collectively exhaustive '
+                                f'but are not for genotype {gtype.name}.')
                     raise ValueError(errormsg)
                 d2 = ~(gtype.precin & gtype.cin).all()
                 if not d2:
@@ -210,15 +209,49 @@ def test_states():
     return sim
 
 
+def test_result_consistency():
+    """ Check that results by genotype sum to the correct totals """
+
+    # Create sim
+    n_agents = 1e3
+    sim = hpv.Sim(n_agents=n_agents, stop=2030, dt=6, label='test_results')
+    sim.run()
+
+    # Check results by genotype sum up to the correct totals
+    res_to_check = ['new_infections', 'n_infected', 'n_cin', 'n_cancerous']
+    for res in res_to_check:
+        gresults = np.array([gtype.results[res][:] for gtype in sim.genotypes.values()])
+        print(f"Checking {res} ... ")
+        by_gen = gresults.sum(axis=0)
+        total = sim.results.hpv[res][:]
+        assert (total <= by_gen).all(), f'{res} by genotype should be exceed total, but {by_gen}<{total}'
+        print(f"✓ ({total.sum():.2f} < {by_gen.sum():.2f})")
+
+    # Check that males don't have CINs or cancers
+    males = sim.people.male
+    males_with_cin = (males & sim.people.hpv.ti_cin.notnan).uids
+    males_with_cancer = (males & sim.people.hpv.ti_cancer.notnan).uids
+    assert len(males_with_cin) == 0, 'Should not have males with CINs'
+    assert len(males_with_cancer) == 0, 'Should not have males with cancerss'
+    print(f"✓ (No males with CINs or cancers)")
+
+    # # Check that people younger than debut don't have HPV
+    # virgin_inds = (sim.people.is_virgin).nonzero()[-1]
+    # virgins_with_hpv = (~np.isnan(sim.people.date_infectious[:,virgin_inds])).nonzero()[-1]
+    # assert len(virgins_with_hpv)==0
+
+    return sim
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
-    # sim = test_sim_options()
-    # s0, s1 = test_epi()
+    sim0 = test_microsim()
+    sim = test_sim_options()
+    s0, s1 = test_epi()
     sim3 = test_states()
 
     sc.toc(T)

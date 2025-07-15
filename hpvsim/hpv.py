@@ -38,6 +38,7 @@ class Genotype(sti.BaseSTI):
             ss.State("precin", label="HPV without HSIL"),
             ss.State("cin", label="HPV with HSIL"),
             ss.State("cancerous", label="Cancerous"),
+            ss.State("dead_cancer", label="Died of cancer"),
 
             # Duration and timestep of states
             ss.FloatArr("dur_precin", label="Duration of infection without HSIL (years)"),
@@ -210,9 +211,7 @@ class Genotype(sti.BaseSTI):
             self.ti_cin[new_progression] = ti
 
         # Find women who clear or control infection
-        new_undetectables = (self.precin & (self.ti_clearance <= ti) |
-                             self.cin & (self.ti_clearance <= ti))
-
+        new_undetectables = self.infected & (self.ti_clearance <= ti)
         if new_undetectables.any():
             # Check if we're modeling latency
             if self.pars.p_control.pars.p > 0:
@@ -244,6 +243,7 @@ class Genotype(sti.BaseSTI):
         # Find those who die of cancer
         new_deaths = self.cancerous & (self.ti_cancer_death <= ti)
         if new_deaths.any():
+            self.dead_cancer[new_deaths] = True
             self.cancerous[new_deaths] = False
             self.ti_cancer_death[new_deaths] = ti
             self.sim.people.request_death(new_deaths)
@@ -315,6 +315,7 @@ class HPV(ss.Connector, Genotype):
             ss.State("precin", label="precin"),
             ss.State("cin", label="CIN"),
             ss.State("cancerous", label="cancerous"),
+            ss.State("dead_cancer", label="Died from cancer"),
             ss.FloatArr("nti_cancer", label="Number of timesteps spent with cancer"),
             ss.FloatArr("ti_cancer", label="Timestep of cancer"),
             ss.FloatArr("ti_cin", label="Timestep of CIN"),
@@ -354,9 +355,10 @@ class HPV(ss.Connector, Genotype):
             uids = self.sim.people.alive
         self.susceptible[uids] = True
         self.infected[uids] = False
-        self.latent[uids] = False
+        self.inactive[uids] = False
         self.precin[uids] = False
         self.cin[uids] = False
+        self.cancerous[uids] = False
         return
 
     def step_genotype_states(self):
@@ -379,6 +381,7 @@ class HPV(ss.Connector, Genotype):
             self.inactive[:] |= genotype.inactive[:]
             self.precin[:] |= genotype.precin[:]
             self.cin[:] |= genotype.cin[:]
+            self.cancerous[:] |= genotype.cancerous[:]
 
             # For cancers, we take the minimum across genotypes. It's possible that
             # an individual has multiple genotypes, but we want to track the earliest
