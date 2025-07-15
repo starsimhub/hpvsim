@@ -107,13 +107,17 @@ class Genotype(sti.BaseSTI):
 
     def set_immunity(self, uids):
         """
-        Set immunity levels for those who've just cleared
+        Set immunity levels for those who've just cleared an infection or CIN.
+        Everyone gets sev_imm, which is intended to represent T-cell immunity
+        and shortens the duration of subsequent infections.
+        Sero-converted individuals get sus_imm, which is intended to represent
+        B-cell immunity and prevents re-infection.
         """
         sero_converted = self.pars.sero_prob.filter(uids)
         init_imm = self.pars.init_imm.rvs(sero_converted)
-        init_cell_imm = self.pars.init_cell_imm.rvs(sero_converted)
+        init_cell_imm = self.pars.init_cell_imm.rvs(uids)
         self.sus_imm[sero_converted] = init_imm
-        self.sev_imm[sero_converted] = init_cell_imm
+        self.sev_imm[uids] = init_cell_imm
         return
 
     def clear_infection(self, uids):
