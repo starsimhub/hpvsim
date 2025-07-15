@@ -112,7 +112,7 @@ class Genotype(sti.BaseSTI):
         self.ti_clearance[m_uids] = self.ti + timesteps_infected_m
 
         # Set the duration of precin and determine who will progress to CIN
-        self.nti_precin[f_uids] = self.pars.dur_precin.rvs(f_uids) * (1 - self.sev_imm[uids])  # Duration in timesteps
+        self.nti_precin[f_uids] = self.pars.dur_precin.rvs(f_uids) * (1 - self.sev_imm[f_uids])  # Duration in timesteps
         self.dur_precin[f_uids] = self.nti_precin[f_uids] * self.t.dt_year  # Duration of infection in years
         cin_probs = self.get_cin_prob(f_uids)  # Function determining CIN prob is based on duration in years
 
