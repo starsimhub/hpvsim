@@ -128,8 +128,8 @@ if __name__ == '__main__':
     T = sc.tic()
 
     sim0 = test_microsim()
-    # sim = test_sim_options()
-    # s0, s1 = test_epi()
+    sim = test_sim_options()
+    s0, s1 = test_epi()
 
     sc.toc(T)
     print('Done.')
