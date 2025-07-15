@@ -93,9 +93,25 @@ class HPV(ss.Connector, hpv.Genotype):
             self.latent[:] |= genotype.latent[:]
             self.precin[:] |= genotype.precin[:]
             self.cin[:] |= genotype.cin[:]
+
+            # For cancers, we take the minimum across genotypes. It's possible that
+            # an individual has multiple genotypes, but we want to track the earliest
+            # cancer diagnosis and the earliest cancer death time.
+            # We will also need to wipte any later dates
             self.ti_cancer[:] = np.minimum(self.ti_cancer[:], genotype.ti_cancer[:])
             self.ti_cancer_death[:] = np.minimum(self.ti_cancer_death[:], genotype.ti_cancer_death[:])
             self.nti_cancer[:] = np.minimum(self.nti_cancer[:], genotype.nti_cancer[:])
+            later_cancers = genotype.ti_cancer[:] > self.ti_cancer[:]
+            self.ti_cancer[later_cancers] = np.nan  # Wipe later cancer dates
+            self.ti_cancer_death[later_cancers] = np.nan  # Wipe later cancer death dates
+
+            # For infections and CINs, we take the maximum across genotypes
+            # This is because an individual can be infected with multiple genotypes, and we want to
+            # track the most recent infection time
+            self.ti_infected[:] = np.maximum(self.ti_infection[:], genotype.ti_infection[:])
+            self.ti_precin[:] = np.maximum(self.ti_precin[:], genotype.ti_precin[:])
+            self.ti_cin[:] = np.maximum(self.ti_cin[:], genotype.ti_cin[:])
+
         return
 
     def update_immunity(self):
