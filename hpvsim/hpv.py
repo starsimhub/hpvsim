@@ -311,7 +311,7 @@ class HPV(ss.Connector, Genotype):
         states = [
             ss.State("susceptible", label="susceptible", default=True),
             ss.State("infected", label="infected"),
-            ss.State("latent", label="latent"),
+            ss.State("inactive", label="inactive"),
             ss.State("precin", label="precin"),
             ss.State("cin", label="CIN"),
             ss.State("cancerous", label="cancerous"),
@@ -376,7 +376,7 @@ class HPV(ss.Connector, Genotype):
         for genotype in self.genotypes.values():
             self.susceptible[:] &= genotype.susceptible[:]
             self.infected[:] |= genotype.infected[:]
-            self.latent[:] |= genotype.latent[:]
+            self.inactive[:] |= genotype.inactive[:]
             self.precin[:] |= genotype.precin[:]
             self.cin[:] |= genotype.cin[:]
 
