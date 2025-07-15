@@ -28,7 +28,9 @@ class HPV(ss.Connector, hpv.Genotype):
         # Genotypes
         self.genotypes = ss.ndict(genotypes)
         self.gkeys = self.genotypes.keys() if self.genotypes else []
+        return
 
+    def add_states(self):
         # Define the states that are shared across genotypes
         self.define_states(
             ss.State("susceptible", label="susceptible", default=True),
@@ -39,6 +41,7 @@ class HPV(ss.Connector, hpv.Genotype):
             ss.State("cancerous", label="cancerous"),
             ss.FloatArr("nti_cancer", label="Number of timesteps spent with cancer"),
             ss.FloatArr("ti_cancer", label="Timestep of cancer"),
+            ss.FloatArr("ti_cin", label="Timestep of CIN"),
             ss.FloatArr("ti_cancer_death", label="Timestep of cancer death"),
         )
         return

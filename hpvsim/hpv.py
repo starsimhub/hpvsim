@@ -23,7 +23,10 @@ class Genotype(sti.BaseSTI):
         default_pars = hpv.HPVPars(genotype=genotype)
         self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
+        self.add_states()
+        return
 
+    def add_states(self):
         self.define_states(
             # States
             ss.State("latent", label="latent"),
@@ -50,7 +53,6 @@ class Genotype(sti.BaseSTI):
             ss.FloatArr("sus_imm", default=0, label="Immunity to infection"),
             ss.FloatArr("sev_imm", default=0, label="Immunity to severe disease"),
         )
-
         return
 
     def init_results(self):
