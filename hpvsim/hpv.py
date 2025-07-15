@@ -52,7 +52,7 @@ class Genotype(sti.BaseSTI):
         return
 
     def init_results(self):
-        sti.BaseSTI.init_results(self)
+        super().init_results()
         results = [
             ss.Result("new_cins", label="CINs"),
             ss.Result("new_cancers", label="Cancers"),
@@ -224,7 +224,7 @@ class Genotype(sti.BaseSTI):
         scale_factor = 1e5
         sus_pop = (ppl.age >= 15) & f & (~self.cancerous)
         denominator = np.count_nonzero(sus_pop) / scale_factor
-        res[ti] = sc.safedivide(res.new_cancers[ti], denominator)
+        res.cancer_incidence[ti] = sc.safedivide(res.new_cancers[ti], denominator)
 
         return
 
