@@ -7,7 +7,7 @@ import starsim as ss
 import hpvsim as hpv
 
 
-__all__ = ['SimPars', 'make_sim_pars', 'HPVPars', 'make_hpv_pars', 'make_genotype_pars', 'NetworkPars', 'make_network_pars', 'ImmPars', 'make_imm_pars']
+__all__ = ['SimPars', 'make_sim_pars', 'HPVPars', 'make_hpv_pars', 'make_genotype_pars', 'NetworkPars', 'make_network_pars', 'ImmPars', 'make_imm_pars', 'make_immunity_matrix']
 
 
 class SimPars(ss.SimPars):
@@ -79,8 +79,8 @@ class HPVPars(ss.Pars):
         # Disease progression parameters
         self.dur_cancer = ss.lognorm_ex(ss.dur(8, "year"), ss.dur(3, "year"))
         self.dur_infection_male = ss.lognorm_ex(ss.dur(1, "year"), ss.dur(1, "year"))
-        self.init_imm = hpv.beta_mean(par1=0.35, par2=0.025)
-        self.init_cell_imm = hpv.beta_mean(par1=0.25, par2=0.025)
+        self.inf_imm = hpv.beta_mean(par1=0.35, par2=0.025)  # nAB-like immunity to reinfection with this genotype
+        self.cell_imm = hpv.beta_mean(par1=0.25, par2=0.025)  # T-cell-like immunity following reinfection
 
         # Genotype-specific parameters
         self.rel_beta = 1
@@ -164,7 +164,14 @@ class ImmPars(ss.Pars):
         super().__init__()
         self.cross_imm_med = 0.3
         self.cross_imm_high = 0.5
-        self.cross_immunity = None
+        self.imm_matrix = None
+
+        # Remove / overwrite default values that are not relevant for HPV connector
+        # TODO reconsider
+        self.include_care = False
+        self.log = False
+        self.init_prev = None
+
         self.update(kwargs)
         return
 
@@ -187,3 +194,64 @@ def make_network_pars(**kwargs):
 def make_imm_pars(**kwargs):
     """ Shortcut for making a new instance of NetworkPars """
     return ImmPars(**kwargs)
+
+
+def make_immunity_matrix(gnames=None, cross_imm_med=0.3, cross_imm_high=0.5, as_matrix=True):
+    """
+    Create a cross-immunity function based on the provided parameters.
+    """
+    imm_dict = dict(
+        # All values based roughly on https://academic.oup.com/jnci/article/112/10/1030/5753954 or assumptions
+        hpv16=dict(
+            hpv16=1.0,  # Default for own-immunity
+            hpv18=cross_imm_high,
+            hi5=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+        hpv18=dict(
+            hpv16=cross_imm_high,
+            hpv18=1.0,  # Default for own-immunity
+            hi5=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+        hi5=dict(
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hi5=1,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+        ohr=dict(
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hi5=cross_imm_med,
+            ohr=1,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+        lr=dict(
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hi5=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=1,
+        ),
+    )
+
+    if gnames is not None:
+        # If gnames is provided, filter the default_pars to only include those genotypes
+        imm_dict = {g: {h: imm_dict[g][h] for h in gnames} for g in gnames}
+
+    if as_matrix:
+        # Convert the dictionary to a matrix format
+        keys = imm_dict.keys()
+        return np.array([[imm_dict[row][col] for col in keys] for row in keys])
+    else:
+        # Return the dictionary format
+        return imm_dict
