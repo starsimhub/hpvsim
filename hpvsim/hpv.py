@@ -52,7 +52,7 @@ class Genotype(sti.BaseSTI):
         return
 
     def init_results(self):
-        super().init_results()
+        sti.BaseSTI.init_results(self)
         results = [
             ss.Result("new_cins", label="CINs"),
             ss.Result("new_cancers", label="Cancers"),
