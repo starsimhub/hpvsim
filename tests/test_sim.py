@@ -140,8 +140,8 @@ def test_states():
             Checks states that should be mutually exlusive and collectively exhaustive
             """
             people = self.sim.people
-            gtypes = self.sim.hpv.genotypes.values()
-            hpvc = self.sim.hpv  # HPV connector
+            hpvc = self.sim.connectors.hpv  # HPV connector
+            gtypes = hpvc.genotypes.values()
 
             for gtype in gtypes:
 
