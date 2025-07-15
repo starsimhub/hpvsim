@@ -16,14 +16,7 @@ do_save = 0
 
 def test_microsim():
     sc.heading('Minimal sim test')
-
-    # Define baseline parameters and initialize sim
-    pars = {
-        # 'n_agents': 500,
-        # 'start': 2020,
-        # 'stop': 2025,
-    }
-    sim = hpv.Sim(**pars)
+    sim = hpv.Sim()
     sim.run()
     return sim
 
@@ -37,13 +30,14 @@ def test_sim_options():
         beta_m2f=0.05,  # HPV genotype par, applied to all genotypes
         dur_cancer=10,
         # prop_f0=0.45,
-        cross_imm_med=0.7
+        cross_imm_med=0.7,
+        genotypes=[16, 18],  # HPV genotype list
     )
     pars['16'] = dict(dur_cin=4)  # HPV genotype-specific pars
     pars['18'] = dict(dur_cin=5)  # HPV genotype-specific pars
 
     sim = hpv.Sim(pars)
-    sim.run()
+    sim.init()
     assert sim.pars.hpv16.beta_m2f == pars['beta_m2f']
     assert sim.pars.hpv16.dur_cin.pars['mean'] == pars['16']['dur_cin']
 
@@ -56,8 +50,8 @@ def test_sim_options():
     assert sim.pars.hpv16.dur_cin.pars['mean'] == hpv_pars['hpv16']['dur_cin']
 
     # Option 3: construct from scratch
-    hpv16 = hpv.HPVType(genotype='hpv16', beta_m2f=0.05, dur_cin=4)
-    hpv18 = hpv.HPVType(genotype='hpv18', beta_m2f=0.05, dur_cin=5)
+    hpv16 = hpv.Genotype(genotype='hpv16', beta_m2f=0.05, dur_cin=4)
+    hpv18 = hpv.Genotype(genotype='hpv18', beta_m2f=0.05, dur_cin=5)
     hpv_connector = hpv.HPV(genotypes=[hpv16, hpv18])
     sim = hpv.Sim(genotypes=[hpv16, hpv18], connectors=hpv_connector)
     sim.init()

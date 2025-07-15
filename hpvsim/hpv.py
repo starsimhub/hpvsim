@@ -8,10 +8,10 @@ import sciris as sc
 import stisim as sti
 import hpvsim as hpv
 
-__all__ = ["make_hpv", "HPVType", "get_genotype_choices"]
+__all__ = ["make_hpv", "Genotype", "get_genotype_choices"]
 
 
-class HPVType(sti.BaseSTI):
+class Genotype(sti.BaseSTI):
     """
     Base class for a single genotype of HPV
     """
@@ -23,7 +23,10 @@ class HPVType(sti.BaseSTI):
         default_pars = hpv.HPVPars(genotype=genotype)
         self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
+        self.add_states()
+        return
 
+    def add_states(self):
         self.define_states(
             # States
             ss.State("latent", label="latent"),
@@ -45,30 +48,22 @@ class HPVType(sti.BaseSTI):
 
             # Immunity states
             ss.FloatArr("rel_sev", default=1, label="relative severity"),
-            ss.FloatArr("sus_imm", default=0, label="immunity to infection"),
-            ss.FloatArr("sev_imm", default=0, label="immunity to severe disease"),
+            ss.FloatArr("own_sus_imm", default=0, label="Self-immunity to infection"),
+            ss.FloatArr("own_sev_imm", default=0, label="Self-immunity to severe disease"),
+            ss.FloatArr("sus_imm", default=0, label="Immunity to infection"),
+            ss.FloatArr("sev_imm", default=0, label="Immunity to severe disease"),
         )
-
         return
 
     def init_results(self):
         super().init_results()
         results = [
-            ss.Result("cins", label="CINs"),
-            ss.Result("cancers", label="Cancers"),
+            ss.Result("new_cins", label="CINs"),
+            ss.Result("new_cancers", label="Cancers"),
             ss.Result("cancer_incidence", label="Cancer incidence", scale=False),
             ss.Result("cancer_deaths", label="Cancer deaths"),
         ]
         self.define_results(*results)
-        return
-
-    def step_state(self):
-        """
-        Update states prior to transmission
-        """
-        self.rel_sus[:] = 1
-        self.rel_sev[:] = 1
-        self.update_infection()
         return
 
     def set_prognoses(self, uids, sources=None):
@@ -116,18 +111,23 @@ class HPVType(sti.BaseSTI):
 
     def set_immunity(self, uids):
         """
-        Set immunity levels for those who've just cleared
+        Set immunity levels for those who've just cleared an infection or CIN.
+        Everyone gets sev_imm, which is intended to represent T-cell immunity
+        and shortens the duration of subsequent infections.
+        Sero-converted individuals get sus_imm, which is intended to represent
+        B-cell immunity and prevents re-infection.
         """
         sero_converted = self.pars.sero_prob.filter(uids)
-        init_imm = self.pars.init_imm.rvs(sero_converted)
-        init_cell_imm = self.pars.init_cell_imm.rvs(sero_converted)
-        self.sus_imm[sero_converted] = init_imm
-        self.sev_imm[sero_converted] = init_cell_imm
+        inf_imm = self.pars.inf_imm.rvs(sero_converted)
+        cell_imm = self.pars.cell_imm.rvs(uids)
+        self.own_sus_imm[sero_converted] = np.maximum(self.own_sus_imm[sero_converted], inf_imm)
+        self.own_sev_imm[uids] = np.maximum(self.own_sev_imm[uids], cell_imm)
         return
 
     def clear_infection(self, uids):
         self.susceptible[uids] = True
         self.infected[uids] = False
+        self.latent[uids] = False
         self.precin[uids] = False
         self.cin[uids] = False
         self.ti_clearance[uids] = self.ti
@@ -149,9 +149,14 @@ class HPVType(sti.BaseSTI):
         self.dur_cancer[uids] = np.nan
         return
 
-    def update_infection(self):
+    def step_state(self):
+        pass
+
+    def _step_state(self):
         """
-        Update infection states
+        Logic that would normally be called at each time step to update the states of the HPV module.
+        Using a different method name because we don't want this to be called automatically by the simulation step.
+        Instead, it gets called by the HPV connector
         """
         ti = self.ti
 
@@ -214,27 +219,21 @@ class HPVType(sti.BaseSTI):
 
     def update_results(self):
         super().update_results()
+        res = self.results
         ti = self.ti
-        women = (self.sim.people.age >= 15) & self.sim.people.female
-        ages = [15, 25, 35, 45, 55]
+        ppl = self.sim.people
+        f = ppl.female
 
-        def cond_prob(num, denom):
-            n_num = np.count_nonzero(num & denom)
-            n_denom = np.count_nonzero(denom)
-            return sc.safedivide(n_num, n_denom)
-
-        self.results["prevalence"][ti] = cond_prob(
-            (self.infected & self.sim.people.female), women
-        )
+        # Incident CINs and cancers
+        res.new_cins[ti] = np.count_nonzero(np.round(self.ti_cin) == ti)
+        res.new_cancers[ti] = np.count_nonzero(np.round(self.ti_cancer) == ti)
 
         # Calculate cancer incidence
         scale_factor = 1e5
-        new_cancers = self.results.cancers[ti]
-        sus_pop = (
-            (self.sim.people.age >= 15) & (self.sim.people.female) & (~self.cancerous)
-        )
+        sus_pop = (ppl.age >= 15) & f & (~self.cancerous)
         denominator = np.count_nonzero(sus_pop) / scale_factor
-        self.results["cancer_incidence"][ti] = sc.safedivide(new_cancers, denominator)
+        res.cancer_incidence[ti] = sc.safedivide(res.new_cancers[ti], denominator)
+
         return
 
 
@@ -272,6 +271,6 @@ def make_hpv(genotype=None, hpv_pars=None, **kwargs):
 
         else:
             hpv_pars = sc.mergedicts(hpv.make_genotype_pars(genotype), hpv_pars)
-            hpv_module = HPVType(genotype=genotype, pars=hpv_pars, name=genotype, **kwargs)
+            hpv_module = Genotype(genotype=genotype, pars=hpv_pars, name=genotype, **kwargs)
 
     return hpv_module
