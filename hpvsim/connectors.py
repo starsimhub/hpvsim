@@ -140,14 +140,15 @@ class HPV(ss.Connector, hpv.Genotype):
             # Set the susceptibility and severity immunity for each genotype
             gidx = self.gkeys.index(gname)
             # Clip array to be between existing value and 1
-            genotype.sus_imm[gidx, :] = np.clip(sus_imm[gidx, :], genotype.sus_imm[:], 1.0)
-            genotype.sev_imm[gidx, :] = np.clip(sev_imm[gidx, :], genotype.sev_imm[:], 1.0)
+            genotype.sus_imm[:] = np.clip(sus_imm[gidx, :], genotype.sus_imm[:], 1.0)
+            genotype.sev_imm[:] = np.clip(sev_imm[gidx, :], genotype.sev_imm[:], 1.0)
 
         return
 
     def infect(self):
         """ Don't allow HPV infections through this connector """
         pass
+
 
 class hpv_hiv_connector(ss.Connector):
     def __init__(self, hpv=None, hiv=None, pars=None, **kwargs):
