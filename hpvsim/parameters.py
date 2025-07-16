@@ -4,6 +4,7 @@ Set parameters
 import numpy as np
 import sciris as sc
 import starsim as ss
+import stisim as sti
 import hpvsim as hpv
 
 
@@ -159,6 +160,7 @@ def make_genotype_pars(gkey=None):
 
 class NetworkPars(ss.Pars):
     def __init__(self, **kwargs):
+        super().__init__()
         self.update(kwargs)
         return
 
