@@ -203,7 +203,7 @@ class Sim(ss.Sim):
 
         else:
             # If no networks are provided, create them based on the network parameters
-            networks = ss.dict(sti.StructuredSexual(pars=self.nw_pars))
+            networks = ss.ndict(sti.StructuredSexual(pars=self.nw_pars))
         return networks
 
     def process_location(self):
