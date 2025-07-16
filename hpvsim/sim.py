@@ -120,6 +120,9 @@ class Sim(ss.Sim):
         self.pars['diseases'] += genotypes
         if hpv_connector is not None: self.pars['connectors'] += hpv_connector
 
+        # Process the network
+        self.pars['networks'] = self.process_network()
+
         super().init(force=force, **kwargs)  # Call the parent init method
 
         return self
@@ -188,6 +191,20 @@ class Sim(ss.Sim):
             hpv_connector = hpv.HPV(genotypes=self.genotypes, pars=self.imm_pars)
 
         return genotypes, hpv_connector
+
+    def process_network(self):
+        """
+        Process the network parameters to create a network module.
+        If networks are provided, they will be used; otherwise, use default network (usual case)
+        """
+        if len(self.pars['networks']):
+            # If networks are provided, use them directly
+            networks = self.pars['networks']
+
+        else:
+            # If no networks are provided, create them based on the network parameters
+            networks = ss.ndict(sti.StructuredSexual(pars=self.nw_pars))
+        return networks
 
     def process_location(self):
         """ Process the location to create people and demographics if not provided. """
