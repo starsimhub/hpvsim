@@ -147,7 +147,7 @@ def make_genotype_pars(gkey=None):
             dur_cin=ss.lognorm_ex(ss.dur(4.5, "year"), ss.dur(20, "year")),
             cin_fn=sc.objdict(k=0.2, ttc=50),
             cancer_fn=sc.objdict(method='cin_integral', transform_prob=1.5e-3),  # Map CIN duration to cancer probability
-            sero_prob = ss.bernoulli(p=0.6),
+            sero_prob=ss.bernoulli(p=0.6),
         ),
     )
     if gkey is None:
@@ -161,6 +161,86 @@ def make_genotype_pars(gkey=None):
 class NetworkPars(ss.Pars):
     def __init__(self, **kwargs):
         super().__init__()
+        self.f_age_group_bins = dict(  # For separating women into age groups: teens, young women, adult women
+            teens=(0, 20),
+            young=(20, 25),
+            adult=(25, np.inf),
+        )
+
+        # Age of sexual debut
+        self.debut = ss.lognorm_ex(20, 3)
+        self.debut_pars_f = [20, 3]
+        self.debut_pars_m = [21, 3]
+
+        # Risk groups
+        self.p_lo_risk = ss.bernoulli(p=0)
+        self.p_hi_risk = ss.bernoulli(p=0)
+        self.prop_f0 = 0.85
+        self.prop_m0 = 0.8
+        self.prop_f2 = 0.01
+        self.prop_m2 = 0.02
+
+        # Age difference preferences
+        self.age_diff_pars = dict(
+            teens=[(7, 3), (6, 3), (5, 1)],  # (mu,stdev) for levels 0, 1, 2
+            young=[(8, 3), (7, 3), (5, 2)],
+            adult=[(8, 3), (7, 3), (5, 2)],
+        )
+
+        # Concurrency preferences
+        self.concurrency_dist = ss.poisson(lam=1)
+        self.f0_conc = 0.0001
+        self.f1_conc = 0.01
+        self.f2_conc = 0.1
+        self.m0_conc = 0.0001
+        self.m1_conc = 0.2
+        self.m2_conc = 0.5
+
+        # Relationship initiation, stability, and duration
+        self.p_pair_form = ss.bernoulli(p=0.5)  # Probability of a (stable) pair forming between two matched people
+        self.match_dist = ss.bernoulli(p=0)  # Placeholder value replaced by risk-group stratified values below
+        self.p_matched_stable = [0.9, 0.5, 0]  # Probability of a stable pair forming between matched people (otherwise casual)
+        self.p_mismatched_casual = [0.5, 0.5, 0.5]  # Probability of a casual pair forming between mismatched people (otherwise instantanous)
+
+        # Durations of stable and casual relationships
+        self.stable_dur_pars = dict(
+            teens=[
+                # (mu,stdev) for levels 0, 1, 2
+                [ss.dur(100, 'year'),  ss.dur(1, 'year')],
+                [ss.dur(8, 'year'),  ss.dur(2, 'year')],
+                [ss.dur(1e-4, 'month'), ss.dur(1e-4, 'month')]
+            ],
+            young=[
+                [ss.dur(100, 'year'),  ss.dur(1, 'year')],
+                [ss.dur(10, 'year'),  ss.dur(3, 'year')],
+                [ss.dur(1e-4, 'month'), ss.dur(1e-4, 'month')]
+            ],
+            adult=[
+                [ss.dur(100, 'year'),  ss.dur(1, 'year')],
+                [ss.dur(12, 'year'),  ss.dur(3, 'year')],
+                [ss.dur(1e-4, 'month'), ss.dur(1e-4, 'month')]
+            ],
+        )
+        self.casual_dur_pars = dict(
+            teens=[[ss.dur(1, 'year'), ss.dur(3, 'year')]]*3,
+            young=[[ss.dur(1, 'year'), ss.dur(3, 'year')]]*3,
+            adult=[[ss.dur(1, 'year'), ss.dur(3, 'year')]]*3,
+        )
+
+        # Acts
+        self.acts = ss.lognorm_ex(ss.peryear(80), ss.peryear(30))  # Coital acts/year
+
+        # Sex work parameters
+        self.fsw_shares = ss.bernoulli(p=0.05)
+        self.client_shares = ss.bernoulli(p=0.12)
+        self.sw_seeking_rate = ss.rate(1, 'month')  # Monthly rate at which clients seek FSWs (1 new SW partner / month)
+        self.sw_seeking_dist=ss.bernoulli(p=0.5)  # Placeholder value replaced by dt-adjusted sw_seeking_rate
+        self.sw_beta = 1
+        self.sw_intensity = ss.random()  # At each time step, FSW may work with varying intensity
+
+        # Distributions derived from parameters above - don't adjust
+        self.age_diffs = ss.normal()
+        self.dur_dist = ss.lognorm_ex()
         self.update(kwargs)
         return
 

@@ -30,7 +30,7 @@ def test_sim_options():
         start=2020,  # Sim par
         beta_m2f=0.05,  # HPV genotype par, applied to all genotypes
         dur_cancer=10,
-        # prop_f0=0.45,
+        prop_f0=0.45,
         cross_imm_sus_med=0.7,
         genotypes=[16, 18],  # HPV genotype list
     )
@@ -45,7 +45,8 @@ def test_sim_options():
     # Option 2: pars in separate dictionaries
     sim_pars = dict(start=2020)
     hpv_pars = dict(beta_m2f=0.05, hpv16=dict(dur_cin=4))
-    sim = hpv.Sim(sim_pars=sim_pars, hpv_pars=hpv_pars)
+    nw_pars = dict(prop_f0=0.45)
+    sim = hpv.Sim(sim_pars=sim_pars, hpv_pars=hpv_pars, nw_pars=nw_pars)
     sim.init()
     assert sim.pars.hpv16.beta_m2f == hpv_pars['beta_m2f']
     assert sim.pars.hpv16.dur_cin.pars['mean'] == hpv_pars['hpv16']['dur_cin']
