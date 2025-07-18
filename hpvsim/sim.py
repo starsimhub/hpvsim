@@ -109,6 +109,8 @@ class Sim(ss.Sim):
             pars['rand_seed'] = pars.pop('seed')
         if 'beta' in pars and sc.isnumber(pars['beta']):
             pars['beta_m2f'] = pars.pop('beta')
+        if 'location' in pars:
+            pars['demographics'] = pars.pop('location')
         return pars
 
     def init(self, force=False, **kwargs):
@@ -122,6 +124,11 @@ class Sim(ss.Sim):
 
         # Process the network
         self.pars['networks'] = self.process_network()
+
+        # Process the demographics
+        demographics, people = self.process_demographics()
+        self.pars['demographics'] += demographics
+        self.pars['people'] = people
 
         super().init(force=force, **kwargs)  # Call the parent init method
 
@@ -206,28 +213,33 @@ class Sim(ss.Sim):
             networks = ss.ndict(sti.StructuredSexual(pars=self.nw_pars))
         return networks
 
-    def process_location(self):
+    def process_demographics(self):
         """ Process the location to create people and demographics if not provided. """
+        demographics = None
+        people = None
 
-        # TODO: Do this better
-        if self.location in ['kenya', 'india']:
-            dflocation = self.location.replace(" ", "_")
-            total_pop = {
-                'kenya': {2020: 52.2e6}[self.pars.start],
-                'india': {2020: 1.4e9}[self.pars.start]
-            }[dflocation]
-            ppl = ss.People(
-                self.pars.n_agents,
-                age_data=pd.read_csv(f"{self.datafolder}/{dflocation}_age.csv", index_col="age")["value"]
-            )
-            fertility_data = pd.read_csv(f"{self.datafolder}/{dflocation}_asfr.csv")
-            pregnancy = ss.Pregnancy(unit='month', fertility_rate=fertility_data)
-            death_data = pd.read_csv(f"{self.datafolder}/{dflocation}_deaths.csv")
-            death = ss.Deaths(unit='year', death_rate=death_data, rate_units=1)
-            self.pars['demographics'] = [pregnancy, death]
-            self.pars['people'] = ppl
+        # If it's a string, do lots of work
+        if sc.checktype(self.pars['demographics'], str):
+            location = self.pars.pop('demographics')
+            self.pars['demographics'] = ss.ndict()
+            print('TODO')
+            # total_pop = {
+            #     'kenya': {2020: 52.2e6}[self.pars.start],
+            #     'india': {2020: 1.4e9}[self.pars.start]
+            # }[self.pars['demographics']]
+            # ppl = ss.People(
+            #     self.pars.n_agents,
+            #     age_data=pd.read_csv(f"{self.datafolder}/{dflocation}_age.csv", index_col="age")["value"]
+            # )
+            # fertility_data = pd.read_csv(f"{self.datafolder}/{dflocation}_asfr.csv")
+            # pregnancy = ss.Pregnancy(unit='month', fertility_rate=fertility_data)
+            # death_data = pd.read_csv(f"{self.datafolder}/{dflocation}_deaths.csv")
+            # death = ss.Deaths(unit='year', death_rate=death_data, rate_units=1)
+            # self.pars['demographics'] = [pregnancy, death]
+            # self.pars['people'] = ppl
 
         else:
-            raise ValueError(f"Location {self.location} not supported")
+            demographics = self.pars['demographics']
+            people = self.pars['people']
 
-        return
+        return demographics, people

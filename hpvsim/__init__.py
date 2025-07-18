@@ -21,6 +21,20 @@ print(__license__)
 # Double-check key requirements -- should match setup.py
 sc.require(
     ["starsim>=2.2.0", "sciris>=3.1.6", "pandas>=2.0.0", "stisim", "scipy"],
-    message=f"The following dependencies for vagisim {__version__} were not met: <MISSING>.",
+    message=f"The following dependencies for HPVsim {__version__} were not met: <MISSING>.",
 )
 del sc  # Clean up namespace
+
+# Import data and check
+from . import data
+if not data.check_downloaded():
+    try:
+        data.quick_download(init=True)
+    except Exception as E1:
+        try:
+            print(f'Quick download failed ({str(E1)}), trying manual download ...')
+            data.download_data(serial=True)
+        except:
+            errormsg = f"Warning: couldn't download data:\n\n{sc.traceback()}\nProceeding anyway..."
+            print(errormsg)
+
