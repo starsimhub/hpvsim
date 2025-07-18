@@ -1,4 +1,8 @@
 import numpy as np
+import sciris as sc
+
+
+__all__ = ["logf2", "compute_cancer_prob"]
 
 
 def get_asymptotes(k, x_infl, s=1, y_max=1, ttc=25):
@@ -84,6 +88,40 @@ def compute_severity_integral(t, rel_sev=None, pars=None):
     """
     if rel_sev is not None:
         t = rel_sev * t
-
     output = intlogf2(t, **pars)
     return output
+
+
+def compute_cancer_prob(t, rel_sev=None, pars=None):
+    """
+    Args:
+        t: array of durations that women have been in their current health state
+        rel_sev: array of individual relative severity values
+    """
+
+    pars = sc.dcp(pars)
+
+    # Complete these next stages if cancer progression probabilities are being modeled
+    # as the cumulative severity-time of dysplasia.
+    if pars.get('method') == 'cin_integral':
+        del pars['method']
+        if pars.get('ld50'):
+            ld50 = pars.pop('ld50')
+            if pars.get('transform_prob'):
+                _ = pars.pop('transform_prob')
+            sev_at_ld50 = intlogf2(np.array([ld50]), pars=pars)[0]
+            transform_prob = 1 - 0.5**(1/sev_at_ld50**2)
+        elif pars.get('transform_prob'):
+            transform_prob = pars.pop('transform_prob')
+        else:
+            errormsg = ('If using calculating cancer probabilities using the integral of the CIN function, must provide'
+                        ' an LD50 or transform prob.')
+            raise ValueError(errormsg)
+
+        sev = compute_severity_integral(t, rel_sev=rel_sev, pars=pars)
+        cancer_probs = 1 - np.power(1 - transform_prob, sev**2)
+        return cancer_probs
+    else:
+        error_msg = f"Unknown method for computing cancer probabilities: {pars.get('method')}"
+        raise ValueError(error_msg)
+        return
