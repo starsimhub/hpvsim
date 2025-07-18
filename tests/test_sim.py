@@ -31,6 +31,7 @@ def test_sim_options():
         beta_m2f=0.05,  # HPV genotype par, applied to all genotypes
         dur_cancer=10,
         prop_f0=0.45,
+        location='india',
         cross_imm_sus_med=0.7,
         genotypes=[16, 18],  # HPV genotype list
     )
@@ -250,11 +251,11 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    sim0 = test_microsim()
+    # sim0 = test_microsim()
     sim = test_sim_options()
-    s0, s1 = test_epi()
-    sim3 = test_states()
-    sim4 = test_result_consistency()
+    # s0, s1 = test_epi()
+    # sim3 = test_states()
+    # sim4 = test_result_consistency()
 
     sc.toc(T)
     print('Done.')
