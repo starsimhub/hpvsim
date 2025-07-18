@@ -44,7 +44,7 @@ class SimPars(ss.SimPars):
         self.use_aging  = True  # True if demographics, false otherwise
 
         # Disease parameters
-        self.genotypes = [16, 18]  # HPV genotypes to include in the simulation; can be a list of integers or strings
+        self.genotypes = [16, 18, 'hi5', 'ohr']  # HPV genotypes to include in the simulation; can be a list of integers or strings
 
         # Misc other parameters and settings
         # World Standard Population, used to calculate age-standardised rates (ASR) of incidence
