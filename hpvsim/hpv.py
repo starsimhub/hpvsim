@@ -255,9 +255,11 @@ class Genotype(sti.BaseSTI):
         Get the probability of progressing to cancer
         """
         dur_cin = self.dur_cin[uids]
-        sev = hpv.compute_severity_integral(dur_cin, rel_sev=self.rel_sev[uids], pars=self.pars.cin_fn)
-        tp = self.pars.cancer_fn.transform_prob
-        cancer_probs = 1 - np.power(1 - tp, sev**2)
+        if self.pars.cancer_fn.get("method") == "cin_integral":
+            cancer_pars = sc.mergedicts(self.pars.cancer_fn, self.pars.cin_fn)
+        else:
+            cancer_pars = self.pars.cancer_fn
+        cancer_probs = hpv.compute_cancer_prob(dur_cin, rel_sev=self.rel_sev[uids], pars=cancer_pars)
         return cancer_probs
 
     def get_cin_prob(self, uids):
