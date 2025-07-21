@@ -60,8 +60,8 @@ class Sim(ss.Sim):
         user_sim_pars = {k: v for k, v in all_pars.items() if k in self.pars.keys()}
         for k in user_sim_pars: all_pars.pop(k)
         sim_pars = sc.mergedicts(user_sim_pars, sim_pars, _copy=True)  # Don't merge with defaults, those are set above
-        if sim_pars.get('start'): sim_pars['start'] = ss.date(sim_pars['start'])
-        if sim_pars.get('stop'): sim_pars['stop'] = ss.date(sim_pars['stop'])
+        # if sim_pars.get('start'): sim_pars['start'] = ss.date(sim_pars['start'])
+        # if sim_pars.get('stop'): sim_pars['stop'] = ss.date(sim_pars['stop'])
 
         # Deal with HPV pars. Don't merge in defaults yet, this is done
         # during process_genotypes to get the genotype information.
