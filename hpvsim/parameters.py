@@ -31,20 +31,21 @@ class SimPars(ss.SimPars):
         self.pop_scale = None  # How much to scale the population
 
         # Simulation parameters
-        self.unit      = 'month'    # The time unit to use; options are 'year' (default), 'day', 'week', 'month', or 'none'
-        self.start     = ss.date(1990)  # Start of the simulation
-        self.stop      = ss.date(2030)  # End of the simulation
+        self.unit      = 'year'    # The time unit to use; options are 'year' (default), 'day', 'week', 'month', or 'none'
+        self.start     = 1990  # Start of the simulation
+        self.stop      = 2030  # End of the simulation
         self.dur       = None   # Duration of time to run, if stop isn't specified
-        self.dt        = 3      # Timestep (in units of self.unit)
+        self.dt        = 0.25      # Timestep (in units of self.unit)
         self.rand_seed = 1      # Random seed; if None, don't reset
+        self.verbose = 1/4
 
         # Demographic parameters
-        self.birth_rate = 20
-        self.death_rate = 15
+        self.birth_rate = None
+        self.death_rate = None
         self.use_aging  = True  # True if demographics, false otherwise
 
         # Disease parameters
-        self.genotypes = [16, 18]  # HPV genotypes to include in the simulation; can be a list of integers or strings
+        self.genotypes = [16, 18, 'hi5', 'ohr']  # HPV genotypes to include in the simulation; can be a list of integers or strings
 
         # Misc other parameters and settings
         # World Standard Population, used to calculate age-standardised rates (ASR) of incidence

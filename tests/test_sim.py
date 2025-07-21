@@ -17,7 +17,7 @@ do_save = 0
 
 def test_microsim():
     sc.heading('Minimal sim test')
-    sim = hpv.Sim()
+    sim = hpv.Sim(location='nigeria')
     sim.run()
     return sim
 
@@ -31,6 +31,7 @@ def test_sim_options():
         beta_m2f=0.05,  # HPV genotype par, applied to all genotypes
         dur_cancer=10,
         prop_f0=0.45,
+        location='india',
         cross_imm_sus_med=0.7,
         genotypes=[16, 18],  # HPV genotype list
     )
