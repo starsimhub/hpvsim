@@ -144,7 +144,7 @@ def map_entries(json, location, df=None):
     return entries
 
 
-def get_age_distribution(location=None, year=None, total_pop_file=None, age_datafile=None):
+def get_age_distribution(location=None, year=None, age_datafile=None):
     '''
     Load age distribution for a given country or countries.
 
@@ -179,19 +179,11 @@ def get_age_distribution(location=None, year=None, total_pop_file=None, age_data
     else:
         raw_df = pd.read_csv(age_datafile)
 
-    # Pull out the data
-    result = np.array([raw_df["AgeGrpStart"],raw_df["AgeGrpStart"]+1,raw_df["PopTotal"]*1e3]).T # Data are stored in thousands
+    # Remap column names
+    raw_df = raw_df.rename(columns={'Time': 'year', 'AgeGrpStart': 'age', 'PopTotal': 'value'})
+    raw_df = raw_df[['year', 'age', 'value']]
 
-    # Optinally save total population sizes for calibration/plotting purposes
-    if total_pop_file is not None:
-        dd = full_df.groupby("Time").sum()["PopTotal"]
-        dd = dd * 1e3
-        dd = dd.astype(int)
-        dd = dd.rename("n_alive")
-        dd = dd.rename_axis("year")
-        dd.to_csv(total_pop_file)
-
-    return result
+    return raw_df
 
 
 def get_age_distribution_over_time(location=None, popage_datafile=None):
@@ -277,23 +269,12 @@ def get_death_rates(location=None, by_sex=True, overall=False):
 
     sex_keys = []
     if by_sex: sex_keys += ['Male', 'Female']
-    if overall: sex_keys += ['Both sexes']
-    sex_key_map = {'Male': 'm', 'Female': 'f', 'Both sexes': 'tot'}
+    if overall: sex_keys += ['Total']
 
-    # max_age = 99
-    # age_groups = raw_df['AgeGrpStart'].unique()
-    years = raw_df['Time'].unique()
-    result = dict()
+    # Only use these rows
+    df = raw_df.loc[raw_df.Sex.isin(sex_keys)]
 
-    # Processing
-    for year in years:
-        result[year] = dict()
-        for sk in sex_keys:
-            sk_out = sex_key_map[sk]
-            result[year][sk_out] = np.array(raw_df[(raw_df['Time']==year) & (raw_df['Sex']== sk)][['AgeGrpStart','mx']])
-            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
-
-    return result
+    return df
 
 
 def get_birth_rates(location=None):

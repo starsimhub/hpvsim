@@ -8,6 +8,7 @@ import pandas as pd
 import hpvsim as hpv
 import stisim as sti
 import numpy as np
+from .data import loaders as hpdata
 
 
 __all__ = ["Sim"]
@@ -59,8 +60,8 @@ class Sim(ss.Sim):
         user_sim_pars = {k: v for k, v in all_pars.items() if k in self.pars.keys()}
         for k in user_sim_pars: all_pars.pop(k)
         sim_pars = sc.mergedicts(user_sim_pars, sim_pars, _copy=True)  # Don't merge with defaults, those are set above
-        if sim_pars.get('start'): sim_pars['start'] = ss.date(sim_pars['start'])
-        if sim_pars.get('stop'): sim_pars['stop'] = ss.date(sim_pars['stop'])
+        # if sim_pars.get('start'): sim_pars['start'] = ss.date(sim_pars['start'])
+        # if sim_pars.get('stop'): sim_pars['stop'] = ss.date(sim_pars['stop'])
 
         # Deal with HPV pars. Don't merge in defaults yet, this is done
         # during process_genotypes to get the genotype information.
@@ -109,6 +110,8 @@ class Sim(ss.Sim):
             pars['rand_seed'] = pars.pop('seed')
         if 'beta' in pars and sc.isnumber(pars['beta']):
             pars['beta_m2f'] = pars.pop('beta')
+        if 'location' in pars:
+            pars['demographics'] = pars.pop('location')
         return pars
 
     def init(self, force=False, **kwargs):
@@ -122,6 +125,12 @@ class Sim(ss.Sim):
 
         # Process the network
         self.pars['networks'] = self.process_network()
+
+        # Process the demographics
+        demographics, people, total_pop = self.process_demographics()
+        self.pars['demographics'] += demographics
+        self.pars['people'] = people
+        self.pars['total_pop'] = total_pop
 
         super().init(force=force, **kwargs)  # Call the parent init method
 
@@ -206,28 +215,60 @@ class Sim(ss.Sim):
             networks = ss.ndict(sti.StructuredSexual(pars=self.nw_pars))
         return networks
 
-    def process_location(self):
+    def process_demographics(self):
         """ Process the location to create people and demographics if not provided. """
 
-        # TODO: Do this better
-        if self.location in ['kenya', 'india']:
-            dflocation = self.location.replace(" ", "_")
-            total_pop = {
-                'kenya': {2020: 52.2e6}[self.pars.start],
-                'india': {2020: 1.4e9}[self.pars.start]
-            }[dflocation]
-            ppl = ss.People(
-                self.pars.n_agents,
-                age_data=pd.read_csv(f"{self.datafolder}/{dflocation}_age.csv", index_col="age")["value"]
-            )
-            fertility_data = pd.read_csv(f"{self.datafolder}/{dflocation}_asfr.csv")
-            pregnancy = ss.Pregnancy(unit='month', fertility_rate=fertility_data)
-            death_data = pd.read_csv(f"{self.datafolder}/{dflocation}_deaths.csv")
-            death = ss.Deaths(unit='year', death_rate=death_data, rate_units=1)
-            self.pars['demographics'] = [pregnancy, death]
-            self.pars['people'] = ppl
+        # If it's a string, do lots of work
+        if sc.checktype(self.pars['demographics'], str):
+            location = self.pars.pop('demographics')
+            self.pars['demographics'] = ss.ndict()
+            birth_rates, death_rates = self.get_births_deaths(location)
+
+            # Create modules for births and deaths
+            births = ss.Births(birth_rate=birth_rates, metadata=dict(data_cols=dict(year='year', value='cbr')))
+            deaths = ss.Deaths(death_rate=death_rates)
+
+            try:
+                age_data = hpdata.get_age_distribution(location, year=self.pars.year)
+                pop_trend = hpdata.get_total_pop(location)
+                pop_age_trend = hpdata.get_age_distribution_over_time(location)
+                total_pop = int(age_data.value.sum())*1e3
+            except ValueError as E:
+                warnmsg = f'Could not load age data for requested location "{location}" ({str(E)}); using default'
+                raise ValueError(warnmsg) from E
+
+            people = ss.People(self.pars.n_agents, age_data=age_data)
+            demographics = [births, deaths]
 
         else:
-            raise ValueError(f"Location {self.location} not supported")
+            demographics = self.pars['demographics']
+            people = self.pars['people']
+            total_pop = self.pars['total_pop']
 
-        return
+        return demographics, people, total_pop
+
+    @staticmethod
+    def get_births_deaths(location, verbose=1, by_sex=True, overall=False):
+        '''
+        Get mortality and fertility data by location if provided
+
+        Args:
+            location (str):  location
+            verbose (bool):  whether to print progress
+            by_sex   (bool): whether to get sex-specific death rates (default true)
+            overall  (bool): whether to get overall values ie not disaggregated by sex (default false)
+
+        Returns:
+            lx (dict): dictionary keyed by sex, storing arrays of lx - the number of people who survive to age x
+            birth_rates (arr): array of crude birth rates by year
+        '''
+
+        if verbose:
+            print(f'Loading location-specific demographic data for "{location}"')
+        try:
+            death_rates = hpdata.get_death_rates(location=location, by_sex=by_sex, overall=overall)
+            birth_rates = hpdata.get_birth_rates(location=location)
+            return birth_rates, death_rates
+        except ValueError as E:
+            warnmsg = f'Could not load demographic data for requested location "{location}" ({str(E)})'
+            print(warnmsg)
