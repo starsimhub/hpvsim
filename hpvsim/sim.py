@@ -229,7 +229,7 @@ class Sim(ss.Sim):
             deaths = ss.Deaths(death_rate=death_rates)
 
             try:
-                age_data = hpdata.get_age_distribution(location, year=self.pars.start.year)
+                age_data = hpdata.get_age_distribution(location, year=self.pars.year)
                 pop_trend = hpdata.get_total_pop(location)
                 pop_age_trend = hpdata.get_age_distribution_over_time(location)
                 total_pop = int(age_data.value.sum())*1e3
