@@ -17,7 +17,7 @@ do_save = 0
 
 def test_microsim():
     sc.heading('Minimal sim test')
-    sim = hpv.Sim()
+    sim = hpv.Sim(location='nigeria')
     sim.run()
     return sim
 
@@ -251,11 +251,11 @@ if __name__ == '__main__':
     # Start timing and optionally enable interactive plotting
     T = sc.tic()
 
-    # sim0 = test_microsim()
+    sim0 = test_microsim()
     sim = test_sim_options()
-    # s0, s1 = test_epi()
-    # sim3 = test_states()
-    # sim4 = test_result_consistency()
+    s0, s1 = test_epi()
+    sim3 = test_states()
+    sim4 = test_result_consistency()
 
     sc.toc(T)
     print('Done.')
