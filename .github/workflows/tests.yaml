@@ -1,5 +1,7 @@
 name: HPVsim CI tests
 on:
+  workflow_call:
+  workflow_dispatch:
   pull_request:
   schedule:
     - cron: "0 0 * * *"
@@ -23,6 +25,8 @@ jobs:
           architecture: x64
       - name: Install HPVsim
         run:  pip install -e .
+      - name: Import HPVsim and download data on first load
+        run: python -c "import hpvsim"
       - name: Install tests
         working-directory: ./tests
         run: pip install -r requirements.txt
