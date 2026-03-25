@@ -204,16 +204,18 @@ Release sign-off requires replicating a minimum set of published and in-progress
 
 For the initial v3.0 release, focus on these milestones in order:
 
-1. **Milestone 1** (Core engine) — foundation everything else depends on
-2. **Milestone 2** (Interventions) — needed for any policy analysis
-3. **Milestone 3** (Analyzers) — needed for calibration and validation
-4. **Milestone 4** (Calibration) — needed to fit to real-world data
-5. **Milestone 8** (Testing) — ongoing, in parallel with above
+1. **Milestone 8** (Testing) — first priority; set up CI, regression baselines, and test scaffolding so that tests pass at every subsequent stage
+2. **Milestone 1** (Core engine) — foundation everything else depends on
+3. **Milestone 2** (Interventions) — needed for any policy analysis
+4. **Milestone 3** (Analyzers) — needed for calibration and validation
+5. **Milestone 4** (Calibration) — needed to fit to real-world data
 6. **Milestone 5** (Multi-sim) — needed for uncertainty quantification
 7. **Milestone 6** (HIV) — needed for sub-Saharan Africa analyses
 8. **Milestone 7** (Plotting) — quality of life
 9. **Milestone 9** (Documentation) — ongoing, in parallel
 10. **Milestone 10** (Infrastructure) — as needed
+
+**Note:** Testing is continuous — each milestone should include tests for the features it adds, and regression baselines should be updated accordingly. Tests must pass before merging any PR into `rc3`.
 
 ## Key files reference
 
