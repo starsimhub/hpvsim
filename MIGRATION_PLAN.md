@@ -6,6 +6,34 @@ HPVsim v3.0 is a ground-up reimplementation of HPVsim on the [Starsim](https://s
 
 This document tracks the work needed to bring HPVsim v3.0 (on the `rc3` branch) to **feature parity** with HPVsim v2.x (`hpvsim_orig`).
 
+### Validation criteria
+
+Validation does **not** require identical numerical output. Results are considered equivalent if uncertainty intervals overlap across multiple seeds. The goal is epidemiologically equivalent behavior, not bit-for-bit reproducibility.
+
+### Scope decisions (agreed 2026-03-25)
+
+- **Therapeutic vaccination (txvx):** Keep — will be ported.
+- **EventSchedule:** Deprecated — will not be ported.
+- **Custom `settings.py`:** Replaced by `ss.options` — will not be ported.
+- **Waning immunity:** Dropped — never used in any published analysis; can revisit in a future release if needed.
+- **v2.x incidence-based HIV module:** Dropped — v3.0 will use STIsim's transmission-based HIV model exclusively.
+- **Network:** Use STIsim's `StructuredSexual` for v3.0. Porting HPVsim's custom network is a nice-to-have for future comparison but not in scope for this release.
+- **Multiscale modeling:** Low priority — Cliff to investigate but not blocking release.
+
+### RACI
+
+| Role | Person(s) |
+|---|---|
+| **Responsible** (doing the migration work) | Ryan |
+| **Accountable** (owns the release decision) | Robyn, Jamie |
+| **Consulted** (domain expertise, review) | Darcy, WHI |
+| **Informed** (stakeholders, downstream users) | Quantium, external users |
+
+- **PR reviews on `rc3`:** Robyn
+- **Scientific validation:** TBC, likely Ryan
+- **External team contact (Quantium, IARC):** Robyn
+- **External collaborator involvement:** Will involve Quantium/IARC in validation once time estimates are finalized
+
 ### Architecture mapping
 
 | HPVsim v2.x (original) | HPVsim v3.0 (Starsim-based) |
@@ -44,8 +72,7 @@ Ensure the core simulation loop produces epidemiologically valid results matchin
 | 1.4 | Add additional genotypes | Low | Add `hr` (all high-risk composite) and `lo` (low-risk) genotype parameter sets, with appropriate cross-immunity entries. Currently only hpv16, hpv18, hi5, ohr are defined. |
 | 1.5 | Validate natural history against v2.x | High | Run both versions with identical parameters and compare: HPV prevalence by age, CIN prevalence, cancer incidence, clearance rates. Document any intentional divergences. |
 | 1.6 | Resolve TODOs in disease model | Medium | Address the 9 existing TODOs in `hpv.py`, `sim.py`, `parameters.py` (connector selection logic, parameter processing, etc.). |
-| 1.7 | Implement waning immunity | Medium | v2.x has explicit waning functions (`exp_decay`, `linear_decay`) in `immunity.py`. Currently rc3 immunity is set-and-forget. Add configurable waning. |
-| 1.8 | Sex-specific initial prevalence | Low | v2.x seeds initial infections differently by sex. Ensure rc3 handles this correctly. |
+| 1.7 | Sex-specific initial prevalence | Low | v2.x seeds initial infections differently by sex. Ensure rc3 handles this correctly. |
 
 ### Milestone 2: Interventions — products and delivery
 
@@ -58,8 +85,7 @@ Build the full intervention product system and delivery mechanisms.
 | 2.3 | Implement treat_delay intervention | Medium | Port `treat_delay` from v2.x — treatment with a specified delay post-diagnosis, as opposed to `treat_num` (capacity-limited). |
 | 2.4 | Implement radiation treatment | Medium | Port `radiation` intervention from v2.x for cancer treatment. |
 | 2.5 | Complete triage workflow | High | The triage classes exist as skeletons. Implement the full screen → triage → treat cascade, where triage results feed into treatment eligibility. |
-| 2.6 | Implement EventSchedule | Low | Port the `EventSchedule` class for ad-hoc event scheduling at specific timepoints. |
-| 2.7 | Implement dynamic_pars | Low | Port `dynamic_pars` to allow parameter changes during simulation (e.g., changing condom use over time). |
+| 2.6 | Implement dynamic_pars | Low | Port `dynamic_pars` to allow parameter changes during simulation (e.g., changing condom use over time). |
 | 2.8 | Add intervention results tracking | Medium | Track detailed intervention outcomes: number screened, number positive, number treated, number vaccinated, doses administered — by age and year. |
 | 2.9 | Validate interventions against v2.x | High | Run identical screening + vaccination scenarios in both versions and compare outcomes. |
 
@@ -101,15 +127,15 @@ Port the infrastructure for running and comparing multiple simulations.
 
 ### Milestone 6: HIV integration
 
-Build comprehensive HPV-HIV co-infection modeling.
+Build HPV-HIV co-infection modeling using STIsim's transmission-based HIV model (v2.x's incidence-based HIV module is dropped).
 
 | # | Issue | Priority | Description |
 |---|---|---|---|
-| 6.1 | Integrate with STIsim HIV module | High | Replace the stub `hpv_hiv_connector` with full integration using STIsim's HIV module. Map CD4 count to HPV susceptibility and severity multipliers. |
+| 6.1 | Integrate with STIsim HIV module | High | Replace the stub `hpv_hiv_connector` with full integration using STIsim's HIV transmission model. Map CD4 count to HPV susceptibility and severity multipliers. |
 | 6.2 | Port CD4-stratified effects | High | v2.x has detailed CD4-dependent effects on HPV progression (accelerated CIN progression at low CD4, altered clearance rates). Port these. |
 | 6.3 | Port ART effects on HPV | Medium | Model how ART (and CD4 reconstitution) affects HPV natural history — partial immune restoration should slow HPV progression. |
 | 6.4 | Add HIV-stratified results | Medium | Add results stratified by HIV status (HPV prevalence in HIV+ vs HIV- women, by age group). The `hiv_hpv_results` analyzer is a start but needs expansion. |
-| 6.5 | Validate HPV-HIV against v2.x | High | Run both versions with HIV enabled and compare: HPV prevalence by HIV status, cancer incidence in WLHIV vs general population. |
+| 6.5 | Validate HPV-HIV integration | High | Compare HPV prevalence by HIV status, cancer incidence in WLHIV vs general population against published data. |
 
 ### Milestone 7: Plotting and visualization
 
@@ -154,10 +180,25 @@ Expand test coverage to match v2.x robustness.
 |---|---|---|---|
 | 10.1 | Split data files for faster loading | Medium | Issue #12 — current data loading is slow due to monolithic files. |
 | 10.2 | Fix automatic download failures | High | Issue #30 — data downloads fail in some environments. |
-| 10.3 | Add settings/options module | Low | v2.x has a rich `settings.py` with plot styling, precision control, etc. Determine what to port vs. rely on Starsim's `ss.options`. |
+| 10.3 | Ensure `ss.options` covers HPVsim needs | Low | Verify that `ss.options` provides sufficient configuration for HPVsim (plot styling, precision, etc.). Add any HPV-specific options as needed. |
 | 10.4 | Improve save/load | Low | Ensure sim saving and loading works correctly with the new architecture. |
 
 ---
+
+## Scientific validation
+
+Release sign-off requires replicating a minimum set of published and in-progress analyses with v3.0 and confirming overlapping uncertainty intervals.
+
+### Minimum validation set
+
+| # | Analysis | Rationale |
+|---|---|---|
+| 1 | Stuart et al. (2024), *Inferring the natural history of HPV from global cancer registries*, Sci Rep | Multi-country calibration — validates core engine + calibration |
+| 2 | Stuart et al. (2026), *The role of HPV single-dose vaccination in GAVI-supported countries*, Vaccine | Validates vaccination interventions at scale |
+| 3 | HPV Faster Kenya (ongoing) | Real-world ongoing use |
+| 4 | Quantium team's models (IPG pilot) | External validation by non-core team |
+| 5 | HPV elimination in Rwanda (under review, IARC collab) | Tests active partnerships |
+| 6 | HPV Nigeria infant vaccine model (under review) | Tests infant vaccination scenarios |
 
 ## Priority ordering
 
