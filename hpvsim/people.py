@@ -208,6 +208,11 @@ class People(hpb.BasePeople):
                 self.age_flows[
                     key
                 ] += cases_by_age  # Increment flows by age (summed over all genotypes)
+                # dysplasias tracks CIN transitions (same events as cins)
+                if key == "cins":
+                    self.flows["dysplasias"] += cases
+                    self.genotype_flows["dysplasias"][g] = cases
+                    self.age_flows["dysplasias"] += cases_by_age
 
     # %% Disease progression methods
     def set_prognoses(self, inds, g, gpars, dt):
@@ -1062,6 +1067,14 @@ class People(hpb.BasePeople):
         # Only women can progress beyond infection.
         f_inds = hpu.itruei(self.is_female, inds)
         m_inds = hpu.itruei(self.is_male, inds)
+
+        # Count new precin cases (females entering the precin state)
+        if layer != "seed_infection" and layer != "reactivation" and len(f_inds) > 0:
+            self.flows["precins"] += self.scale_flows(f_inds)
+            self.genotype_flows["precins"][g] += self.scale_flows(f_inds)
+            self.age_flows["precins"] += np.histogram(
+                self.age[f_inds], bins=self.age_bin_edges, weights=self.scale[f_inds]
+            )[0]
 
         # Compute disease progression for females
         if len(f_inds) > 0:
