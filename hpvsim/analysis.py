@@ -1159,7 +1159,7 @@ class cancer_detection(Analyzer):
 
         if len(cancer_inds) > 0:
 
-            detection_probs = np.full(len(cancer_inds), self.symp_prob / self.dt, dtype=hpd.default_float)  # Initialize probabilities of cancer detection
+            detection_probs = np.full(len(cancer_inds), 1 - (1 - self.symp_prob) ** self.dt, dtype=hpd.default_float)  # Convert annual detection probability to per-timestep
             detection_probs[sim.people.detected_cancer[cancer_inds]] = 0
             is_detected = hpu.binomial_arr(detection_probs)
             is_detected_inds = cancer_inds[is_detected]
