@@ -4,21 +4,28 @@
 
 HPVsim v3.0 is a ground-up reimplementation of HPVsim on the [Starsim](https://starsim.org/) agent-based modeling framework. The original HPVsim (v2.x, ~16,000 LOC) used a fully custom architecture. The new version inherits from Starsim's `ss.Sim`, `ss.Infection`, `ss.Connector`, `ss.Intervention`, and `ss.Analyzer` classes, and leverages STIsim's `StructuredSexual` network.
 
-This document tracks the work needed to bring HPVsim v3.0 (on the `rc3` branch) to **feature parity** with HPVsim v2.x (`hpvsim_orig`).
+This document tracks the work needed to bring HPVsim v3.0 (on the `rc3` branch) to **feature parity** with HPVsim v2.x (on the `main` branch).
 
 ### Validation criteria
 
 Validation does **not** require identical numerical output. Results are considered equivalent if uncertainty intervals overlap across multiple seeds. The goal is epidemiologically equivalent behavior, not bit-for-bit reproducibility.
 
-### Scope decisions (agreed 2026-03-25)
+### Key decisions (agreed 2026-03-25, updated 2026-03-26)
 
-- **Therapeutic vaccination (txvx):** Keep — will be ported.
+- **MVP scope:** Core engine (Milestone 1) + Interventions (Milestone 2). Analyzers, calibration, MultiSim, HIV, plotting are post-MVP.
+- **Exception:** `age_results` analyzer promoted to MVP — required for age-stratified validation.
+- **Products:** Use Starsim's native `ss.Dx`/`ss.Treatment`/`ss.simple_vx` classes, adapting v2's CSV data.
+- **Therapeutic vaccination (txvx):** Keep — will be ported in Milestone 2.
 - **EventSchedule:** Deprecated — will not be ported.
 - **Custom `settings.py`:** Replaced by `ss.options` — will not be ported.
 - **Waning immunity:** Dropped — never used in any published analysis; can revisit in a future release if needed.
-- **v2.x incidence-based HIV module:** Dropped — v3.0 will use STIsim's transmission-based HIV model exclusively.
-- **Network:** Use STIsim's `StructuredSexual` for v3.0. Porting HPVsim's custom network is a nice-to-have for future comparison but not in scope for this release.
-- **Multiscale modeling:** Low priority — Cliff to investigate but not blocking release.
+- **v2.x incidence-based HIV module:** Dropped — v3.0 will use STIsim's transmission-based HIV model exclusively (post-MVP).
+- **Network:** Use STIsim's `StructuredSexual` for v3.0. Porting HPVsim's custom network is out of scope.
+- **Population scaling & migration:** Deferred to post-MVP.
+- **Multiscale modeling:** Low priority — not blocking release.
+- **Testing strategy:** Generate all v2 baseline outputs upfront. Each milestone includes its own tests validated against those baselines.
+- **Branch strategy:** Tag current `main` as `v2.1.0`, merge `main` into `rc3`, then merge `rc3` → `main` when ready.
+- **Timeline:** No hard deadline. Agile/incremental — each milestone produces a functioning, reviewable increment.
 
 ### RACI
 
@@ -46,142 +53,161 @@ Validation does **not** require identical numerical output. Results are consider
 | Custom `Analyzer` base | `ss.Analyzer` subclass |
 | `HIVsim` class in `hiv.py` | `hpv_hiv_connector(ss.Connector)` + STIsim HIV |
 | `immunity.py` module | Cross-immunity via `HPV` connector's `update_immunity()` |
-| `calibration.py` | Starsim calibration (to be integrated) |
+| Custom product classes (dx, tx, vx) | Starsim native `ss.Dx`, `ss.Treatment`, `ss.simple_vx` |
+| `calibration.py` | Starsim `ss.Calibration` with Optuna |
 | `run.py` (MultiSim, Scenarios, Sweep) | Starsim `ss.MultiSim`, `ss.parallel()` |
 | `plotting.py` / `analysis.py` | To be rebuilt using Starsim patterns |
 
 ### Current state of rc3
 
-The `rc3` branch has a working core (~2,075 LOC across 10 modules):
-- **Working**: Basic disease model (4 genotypes), cross-immunity, sexual network, demographics, simplified screening/treatment, vaccination (routine + campaign), HPV-HIV connector stub
-- **Missing/incomplete**: Products system, therapeutic vaccination, advanced screening/triage workflows, analyzers, calibration, plotting, MultiSim/Scenarios, full HIV integration, population scaling, migration, most tests
+The `rc3` branch has a working core (~2,655 LOC across 10 modules):
+- **Working**: Basic disease model (4 genotypes), cross-immunity, sexual network, demographics, HPV-HIV connector stub
+- **Partially working**: Vaccination (skeleton), screening/treatment (two parallel systems needing reconciliation)
+- **Missing/incomplete**: Product system integration, therapeutic vaccination, advanced screening/triage workflows, analyzers (only `hiv_hpv_results`), calibration, plotting, MultiSim/Scenarios, full HIV integration, population scaling, migration
+
+### Known issues on rc3
+
+- `interventions.py` has two parallel intervention systems that need reconciliation (System A: v2-ported skeleton, System B: newer `screen`/`treat` classes)
+- `test_hpv.py` has broken references (undefined `super_connector`, `con`, `an`)
+- `test_calibration.py` uses outdated API names
+- `__all__` only exports System B classes
 
 ---
 
 ## Milestones
 
-### Milestone 1: Core simulation engine
+### Milestone 0: Foundation
 
-Ensure the core simulation loop produces epidemiologically valid results matching v2.x behavior.
-
-| # | Issue | Priority | Description |
+| # | Task | Description | Acceptance criteria |
 |---|---|---|---|
-| 1.1 | Fix dt-dependent results | High | Changing `dt` should not change results (bug #13). Ensure all duration sampling and probability calculations are dt-invariant. |
-| 1.2 | Add population scaling | High | Implement `pop_scale` / `total_pop` so a small agent population can represent a larger real population. Results should be scaled appropriately. |
-| 1.3 | Add migration | Medium | Population sizes should match data over time. Port the age-specific migration logic from v2.x `people.py:check_migration()`. |
-| 1.4 | Add additional genotypes | Low | Add `hr` (all high-risk composite) and `lo` (low-risk) genotype parameter sets, with appropriate cross-immunity entries. Currently only hpv16, hpv18, hi5, ohr are defined. |
-| 1.5 | Validate natural history against v2.x | High | Run both versions with identical parameters and compare: HPV prevalence by age, CIN prevalence, cancer incidence, clearance rates. Document any intentional divergences. |
-| 1.6 | Resolve TODOs in disease model | Medium | Address the 9 existing TODOs in `hpv.py`, `sim.py`, `parameters.py` (connector selection logic, parameter processing, etc.). |
-| 1.7 | Sex-specific initial prevalence | Low | v2.x seeds initial infections differently by sex. Ensure rc3 handles this correctly. |
+| 0.1 | Merge main into rc3 | Merge `main` into `rc3` to ensure rc3 has all recent fixes, data updates, and infrastructure from main. Resolve any merge conflicts. | Merge completes cleanly. Existing rc3 tests still pass. |
+| 0.2 | Tag v2 release | Tag current `main` as `v2.1.0` for reference. | Tag exists on GitHub. |
+| 0.3 | Generate v2 baseline outputs | Write `tests/generate_v2_baselines.py` on `main`. Run v2 across scenarios (natural history, vaccination, screening/treatment, genotype distribution), 3 locations, seeds 0-4, years 1990-2060. Save as JSON/pickle. | Script produces baseline files with metadata. Cancer incidence in plausible range (5-50 per 100k for SSA). |
+| 0.4 | Build v2-v3 comparison utility | Write `tests/compare_baselines.py`. Load v2 baselines + v3 results, compute stats (mean, 95% CI), check overlapping error bars. | Works with synthetic test data. |
+| 0.5 | Stabilize rc3 test suite | Fix broken tests in `test_hpv.py`, `test_calibration.py`. Ensure `test_sim.py` passes. Mark unfixable tests as skip. | `pytest tests/test_sim.py` passes. All other test failures fixed or explicitly skipped. |
+| 0.6 | Reconcile dual intervention systems | Keep System A (v2-ported skeleton matching Starsim patterns). Remove/refactor System B (`screen`/`treat`). | Single coherent class hierarchy. All classes inherit from `ss.Intervention`. |
+| 0.7 | Set up CI | Configure GitHub Actions on `rc3`: run `pytest tests/` on push/PR. | CI runs and reports on PRs. |
 
-### Milestone 2: Interventions — products and delivery
+### Milestone 1: Core Engine (MVP Part 1)
 
-Build the full intervention product system and delivery mechanisms.
-
-| # | Issue | Priority | Description |
+| # | Task | Description | Acceptance criteria |
 |---|---|---|---|
-| 2.1 | Implement product base classes (dx, tx, vx) | High | Port the product system from v2.x `interventions.py`. Products encapsulate diagnostic sensitivity/specificity, treatment efficacy by disease state, and vaccine genotype coverage. CSV product files already exist in `data/`. |
-| 2.2 | Implement therapeutic vaccination (txvx) | High | Port `BaseTxVx`, `routine_txvx`, `campaign_txvx`, `linked_txvx` from v2.x. Therapeutic vaccines target infected individuals and modify disease progression. |
-| 2.3 | Implement treat_delay intervention | Medium | Port `treat_delay` from v2.x — treatment with a specified delay post-diagnosis, as opposed to `treat_num` (capacity-limited). |
-| 2.4 | Implement radiation treatment | Medium | Port `radiation` intervention from v2.x for cancer treatment. |
-| 2.5 | Complete triage workflow | High | The triage classes exist as skeletons. Implement the full screen → triage → treat cascade, where triage results feed into treatment eligibility. |
-| 2.6 | Implement dynamic_pars | Low | Port `dynamic_pars` to allow parameter changes during simulation (e.g., changing condom use over time). |
-| 2.8 | Add intervention results tracking | Medium | Track detailed intervention outcomes: number screened, number positive, number treated, number vaccinated, doses administered — by age and year. |
-| 2.9 | Validate interventions against v2.x | High | Run identical screening + vaccination scenarios in both versions and compare outcomes. |
+| 1.1 | Validate natural history | Create `tests/test_natural_history.py`. Run v3 with same params/seeds/locations as v2 baselines. Compare infections, HPV prevalence, CINs, cancers, cancer incidence, deaths. | For 2+ locations, v3 cancer incidence has overlapping 95% CIs with v2 (5 seeds each). |
+| 1.2 | Verify immunity dynamics | Verify rc3's simpler immunity (no waning) produces comparable results to v2. Check post-clearance immunity boost, cross-immunity, vaccine-induced immunity. | Tests verify (a) immunity increases after clearance, (b) cross-immunity reduces susceptibility, (c) results match v2 baselines. |
+| 1.3 | Align result keys | Audit v2 vs v3 result keys. Add missing critical keys: per-genotype prevalence, cross-genotype totals, cancer_share_<genotype>. | v3 results contain all keys needed for baseline comparison. `test_result_consistency` passes. |
+| 1.4 | Port `age_results` analyzer | Implement as `ss.Analyzer` subclass. Compute age-stratified HPV prevalence, cancer incidence, n_infected, n_cin, n_cancerous by year and age bin. | Produces age-stratified outputs. Prevalence shows expected age pattern. |
+| 1.5 | Validate age-stratified outputs | Run v3 with `age_results`, compare to v2 baselines. | Age-stratified cancer incidence (10-year bins) has overlapping CIs for 2+ locations. |
+| 1.6 | Parameter backward compatibility | Verify `remap_pars()` covers common v2 names (`n_years`, `burnin`, `ms_agent_ratio`, `network`, `init_hpv_prev`). | Common v2 parameter names silently remapped. `test_sim_options` passes. |
+| 1.7 | Resolve core TODOs | Address the 9 existing TODOs in `hpv.py`, `sim.py`, `parameters.py`. | No remaining TODOs that block MVP. |
 
-### Milestone 3: Analyzers and results
+### Milestone 2: Interventions (MVP Part 2)
 
-Port the analysis toolkit for post-simulation data extraction.
-
-| # | Issue | Priority | Description |
+| # | Task | Description | Acceptance criteria |
 |---|---|---|---|
-| 3.1 | Implement age_results analyzer | High | Port `age_results` from v2.x — stratifies any result by age group and genotype. This is critical for calibration (comparing model output to age-stratified data). |
-| 3.2 | Implement age_pyramid analyzer | Medium | Port `age_pyramid` — captures population age/sex distribution at specified timepoints. |
-| 3.3 | Implement snapshot analyzer | Medium | Port `snapshot` — stores a copy of the People object at specified timepoints for detailed inspection. |
-| 3.4 | Implement age_causal_infection analyzer | Medium | Port `age_causal_infection` — tracks the age at which causal (cancer-causing) infections were acquired. |
-| 3.5 | Implement DALYs analyzer | Medium | Port `dalys` — computes disability-adjusted life years (YLL + YLD). |
-| 3.6 | Add cancer incidence results | High | Ensure age-standardized cancer incidence rate (ASR) is computed correctly. The standard population weights are already in `SimPars`. |
-| 3.7 | Add type distribution results | Medium | Track the genotype distribution of cancers (what fraction of cancers are caused by each genotype). |
+| 2.1 | Adapt product CSVs to Starsim format | Create adapter functions mapping v2 CSV format → `ss.Dx` DataFrames. Create factory functions: `default_dx('via')`, `default_tx('ablation')`, `default_vx('bivalent')`. | `hpv.default_dx('via')` returns `ss.Dx` instance. Unit tests pass. |
+| 2.2 | Implement vaccination | Complete `routine_vx` + `campaign_vx`. Set `sus_imm` on genotype modules based on vaccine `rel_imm`. Age eligibility, multi-dose support. | `routine_vx(prob=0.8, start_year=2025, product='bivalent')` reduces cancer incidence vs baseline. |
+| 2.3 | Validate vaccination | Compare v3 vaccination scenarios to v2 baselines. | Cancer reduction (% 2025-2060) has overlapping CIs. |
+| 2.4 | Implement screening pipeline | Complete `BaseScreening.check_eligibility()`. Implement `routine_screening` + `campaign_screening` with `ss.Dx` products. Store outcomes for downstream triage. | `routine_screening(product='hpv', prob=0.2, start_year=2025)` produces positive/negative outcomes. |
+| 2.5 | Implement triage | Complete `BaseTriage`, `routine_triage`, `campaign_triage`. Chain from positive screens via eligibility lambda. | Can chain screening → triage (e.g., HPV → VIA). |
+| 2.6 | Implement treatment | Complete `BaseTreatment` and `treat_num`. Treatment clears infection via `genotype.ti_clearance`. | `treat_num` with ablation clears CIN in treated agents. |
+| 2.7 | Validate screening/treatment | Run 2+ WHO algorithms (VIA → ablation, HPV → ablation) against v2 baselines. | Screening-driven cancer reduction has overlapping CIs. |
+| 2.8 | Implement therapeutic vaccination | Port `routine_txvx`, `campaign_txvx`, `linked_txvx`. Composite: treatment + vaccination. | `routine_txvx` applies both treatment and immunity boost. |
+| 2.9 | Intervention results tracking | Track: screened, positive, treated, vaccinated, doses — by age and year. | Intervention result keys populated and nonzero. |
+
+### Milestone 3: Analyzers and Results
+
+| # | Task | Description |
+|---|---|---|
+| 3.1 | Port `snapshot` analyzer | Store People state at timepoints. |
+| 3.2 | Port `age_pyramid` analyzer | Age/sex population distribution with data overlay. |
+| 3.3 | Port `age_causal_infection` analyzer | Track genotype causing each cancer. |
+| 3.4 | Port `cancer_detection` analyzer | Detection rates by stage. |
+| 3.5 | Port `dalys` analyzer | Disability-adjusted life years (YLL + YLD). |
+| 3.6 | Add type distribution results | Genotype distribution of cancers. |
 
 ### Milestone 4: Calibration
 
-Port the calibration framework for fitting model parameters to data.
+| # | Task | Description |
+|---|---|---|
+| 4.1 | Integrate with Starsim calibration | Use `ss.Calibration` with Optuna. Port calibration targets: cancer incidence by age, HPV prevalence by age. |
+| 4.2 | Implement goodness-of-fit | Port `compute_gof()` and likelihood functions. Support fitting to cancer incidence, HPV prevalence, genotype distribution. |
+| 4.3 | Write calibration guide | Document how to calibrate v3.0 to a new location (issue #11). |
 
-| # | Issue | Priority | Description |
-|---|---|---|---|
-| 4.1 | Port Calibration class | High | Adapt the Optuna-based `Calibration` class from v2.x to work with the Starsim architecture. Should support parallel trials and genotype-specific parameter fitting. |
-| 4.2 | Implement goodness-of-fit computation | High | Port `compute_gof()` and the likelihood/fitting functions. Support fitting to: cancer incidence by age, HPV prevalence by age, genotype distribution, CIN prevalence. |
-| 4.3 | Write calibration guide | Medium | Document how to calibrate HPVsim v3.0 to a new location (issue #11). |
-| 4.4 | Port pre-calibration exploration | Low | v2.0 added support for parameter sweeps before calibration to identify reasonable ranges. |
+### Milestone 5: MultiSim, Scenarios, and Sweeps
 
-### Milestone 5: Multi-sim, scenarios, and sweeps
+| # | Task | Description |
+|---|---|---|
+| 5.1 | Integrate with Starsim MultiSim | Ensure `ss.MultiSim` works with HPVsim. Test multiple seeds, result combination, statistics. |
+| 5.2 | Port Scenarios class | Parameter sweeps and intervention comparisons. |
+| 5.3 | Port Sweep class | Systematic parameter variation. |
 
-Port the infrastructure for running and comparing multiple simulations.
+### Milestone 6: Additional Interventions
 
-| # | Issue | Priority | Description |
-|---|---|---|---|
-| 5.1 | Integrate with Starsim MultiSim | High | Ensure `ss.MultiSim` works correctly with HPVsim sims. Test running multiple seeds, combining results, and computing statistics (median, quantiles). |
-| 5.2 | Port Scenarios class | Medium | Adapt the `Scenarios` class for running parameter sweeps and intervention comparisons. |
-| 5.3 | Port Sweep class | Low | Adapt the `Sweep` class for systematic parameter variation. |
-| 5.4 | Ensure parallel execution works | Medium | Verify that `ss.parallel()` works with HPVsim sims, including proper random seed handling. |
+| # | Task | Description |
+|---|---|---|
+| 6.1 | Implement `treat_delay` | Treatment with a delay post-diagnosis. |
+| 6.2 | Implement `radiation` | Cancer treatment product. |
+| 6.3 | Implement `dynamic_pars` | Runtime parameter changes. |
 
-### Milestone 6: HIV integration
+### Milestone 7: Population Dynamics
 
-Build HPV-HIV co-infection modeling using STIsim's transmission-based HIV model (v2.x's incidence-based HIV module is dropped).
+| # | Task | Description |
+|---|---|---|
+| 7.1 | Population scaling | Implement `pop_scale` / `total_pop` for representing larger populations. |
+| 7.2 | Migration | Port age-specific migration logic from v2.x. |
 
-| # | Issue | Priority | Description |
-|---|---|---|---|
-| 6.1 | Integrate with STIsim HIV module | High | Replace the stub `hpv_hiv_connector` with full integration using STIsim's HIV transmission model. Map CD4 count to HPV susceptibility and severity multipliers. |
-| 6.2 | Port CD4-stratified effects | High | v2.x has detailed CD4-dependent effects on HPV progression (accelerated CIN progression at low CD4, altered clearance rates). Port these. |
-| 6.3 | Port ART effects on HPV | Medium | Model how ART (and CD4 reconstitution) affects HPV natural history — partial immune restoration should slow HPV progression. |
-| 6.4 | Add HIV-stratified results | Medium | Add results stratified by HIV status (HPV prevalence in HIV+ vs HIV- women, by age group). The `hiv_hpv_results` analyzer is a start but needs expansion. |
-| 6.5 | Validate HPV-HIV integration | High | Compare HPV prevalence by HIV status, cancer incidence in WLHIV vs general population against published data. |
+### Milestone 8: HIV Integration
 
-### Milestone 7: Plotting and visualization
+| # | Task | Description |
+|---|---|---|
+| 8.1 | Integrate with STIsim HIV | Replace stub `hpv_hiv_connector` with full integration. Map CD4 → HPV susceptibility/severity. |
+| 8.2 | Port CD4-stratified effects | Accelerated CIN progression at low CD4, altered clearance rates. |
+| 8.3 | Port ART effects on HPV | Partial immune restoration slowing HPV progression. |
+| 8.4 | HIV-stratified results | HPV prevalence in HIV+ vs HIV- by age group. |
+| 8.5 | Validate HPV-HIV integration | Compare against published data. |
 
-Build plotting functions for standard result views.
+### Milestone 9: Plotting
 
-| # | Issue | Priority | Description |
-|---|---|---|---|
-| 7.1 | Implement sim.plot() for HPV | Medium | Override or extend `ss.Sim.plot()` to show HPV-specific results: prevalence, incidence, cancer cases by genotype. |
-| 7.2 | Implement plot by age group | Medium | Plot results stratified by age group (requires age_results analyzer). |
-| 7.3 | Implement plot by genotype | Medium | Plot results broken down by HPV genotype. |
-| 7.4 | Implement intervention plots | Low | Visualize intervention coverage and impact over time. |
-| 7.5 | Implement calibration plots | Medium | Plot calibration results: data vs model fit, parameter distributions, convergence. |
+| # | Task | Description |
+|---|---|---|
+| 9.1 | Implement `sim.plot()` for HPV | Override/extend `ss.Sim.plot()` for HPV-specific results. |
+| 9.2 | Plot by age group | Requires `age_results` analyzer. |
+| 9.3 | Plot by genotype | Genotype breakdown. |
+| 9.4 | Intervention plots | Coverage and impact over time. |
+| 9.5 | Calibration plots | Data vs model fit, parameter distributions. |
 
-### Milestone 8: Testing
+### Milestone 10: Documentation and Examples
 
-Expand test coverage to match v2.x robustness.
+| # | Task | Description |
+|---|---|---|
+| 10.1 | Switch docs to MkDocs/Quarto | Issue #32. |
+| 10.2 | Write migration guide (v2 → v3) | API changes, parameter remapping, script conversion. |
+| 10.3 | Update tutorials | All tutorials to v3.0 API. |
+| 10.4 | Add workflow examples | Screening, calibration, multi-country, vaccination impact. |
 
-| # | Issue | Priority | Description |
-|---|---|---|---|
-| 8.1 | Add intervention tests | High | Test all intervention types: screening, triage, treatment, vaccination (routine + campaign), therapeutic vaccination. |
-| 8.2 | Add calibration tests | High | Test calibration workflow end-to-end. |
-| 8.3 | Add MultiSim/Scenario tests | Medium | Test multi-sim running, scenario comparisons, result aggregation. |
-| 8.4 | Add analyzer tests | Medium | Test all analyzer classes produce correct output. |
-| 8.5 | Add regression/baseline tests | High | Port baseline tests from v2.x — run a standard sim and compare results to stored baselines to catch unintended changes. |
-| 8.6 | Add network tests | Medium | Test that the StructuredSexual network produces expected partnership patterns (age-mixing, concurrency, duration). |
-| 8.7 | Add HIV integration tests | Medium | Test HPV-HIV co-infection scenarios. |
-| 8.8 | Add population dynamics tests | Medium | Test births, deaths, migration, population scaling. |
+### Milestone 11: Infrastructure
 
-### Milestone 9: Documentation and examples
+| # | Task | Description |
+|---|---|---|
+| 11.1 | Split data files | Issue #12 — faster loading. |
+| 11.2 | Fix download failures | Issue #30. |
+| 11.3 | Improve save/load | Correct serialization with new architecture. |
 
-| # | Issue | Priority | Description |
-|---|---|---|---|
-| 9.1 | Switch docs from Sphinx to MkDocs/Quarto | Medium | Issue #32 — modernize documentation build system. |
-| 9.2 | Write migration guide (v2 → v3) | High | Document API changes, parameter remapping, and how to convert v2.x scripts. |
-| 9.3 | Update tutorials | Medium | Update all tutorials to use v3.0 API. |
-| 9.4 | Add examples for common workflows | Medium | Screening algorithms (t05 exists), calibration, multi-country comparison, HPV-HIV, vaccination impact. |
-| 9.5 | Generate API reference | Low | Auto-generate API docs from docstrings. |
+### Milestone 12: Release
 
-### Milestone 10: Data and infrastructure
+- Final integration testing across all milestones
+- Merge `rc3` → `main`
+- Publish v3.0.0 release
 
-| # | Issue | Priority | Description |
-|---|---|---|---|
-| 10.1 | Split data files for faster loading | Medium | Issue #12 — current data loading is slow due to monolithic files. |
-| 10.2 | Fix automatic download failures | High | Issue #30 — data downloads fail in some environments. |
-| 10.3 | Ensure `ss.options` covers HPVsim needs | Low | Verify that `ss.options` provides sufficient configuration for HPVsim (plot styling, precision, etc.). Add any HPV-specific options as needed. |
-| 10.4 | Improve save/load | Low | Ensure sim saving and loading works correctly with the new architecture. |
+---
+
+## Risks
+
+1. **MRO fragility**: `HPV(ss.Connector, Genotype)` uses multiple inheritance. `super().__init__()` follows Python's MRO — fragile if Starsim's class hierarchy changes. Add explicit MRO test.
+2. **Product system adaptation**: v2's products operate on 2D `[n_genotypes, n_agents]` arrays. v3's per-genotype-module architecture is different. May need a thin HPV-specific `Dx` subclass.
+3. **Performance**: v2 vectorizes across genotypes in one pass. v3 loops over genotype modules sequentially. Benchmark early.
+4. **Parameter drift**: Different architecture → different RNG call order → different trajectories even with same parameters. "Overlapping CIs" criterion handles this, but recalibration may be needed.
+5. **Starsim/STIsim version coupling**: Actively developed dependencies. Pin versions during development.
 
 ---
 
@@ -200,42 +226,28 @@ Release sign-off requires replicating a minimum set of published and in-progress
 | 5 | HPV elimination in Rwanda (under review, IARC collab) | Tests active partnerships |
 | 6 | HPV Nigeria infant vaccine model (under review) | Tests infant vaccination scenarios |
 
-## Priority ordering
-
-For the initial v3.0 release, focus on these milestones in order:
-
-1. **Milestone 8** (Testing) — first priority; set up CI, regression baselines, and test scaffolding so that tests pass at every subsequent stage
-2. **Milestone 1** (Core engine) — foundation everything else depends on
-3. **Milestone 2** (Interventions) — needed for any policy analysis
-4. **Milestone 3** (Analyzers) — needed for calibration and validation
-5. **Milestone 4** (Calibration) — needed to fit to real-world data
-6. **Milestone 5** (Multi-sim) — needed for uncertainty quantification
-7. **Milestone 6** (HIV) — needed for sub-Saharan Africa analyses
-8. **Milestone 7** (Plotting) — quality of life
-9. **Milestone 9** (Documentation) — ongoing, in parallel
-10. **Milestone 10** (Infrastructure) — as needed
-
-**Note:** Testing is continuous — each milestone should include tests for the features it adds, and regression baselines should be updated accordingly. Tests must pass before merging any PR into `rc3`.
+---
 
 ## Key files reference
 
-### HPVsim v3.0 (rc3 branch) — `/Users/robynstuart/gf/hpvsim/`
-- `hpvsim/hpv.py` — Genotype and HPV connector classes
-- `hpvsim/sim.py` — Sim class with genotype/network/demographics processing
-- `hpvsim/parameters.py` — SimPars, HPVPars, NetworkPars, ImmPars
-- `hpvsim/interventions.py` — screen, treat, vaccination, delivery classes
+### HPVsim v3.0 (rc3 branch)
+- `hpvsim/hpv.py` — Core disease model: Genotype + HPV connector, immunity, state progression
+- `hpvsim/sim.py` — Sim wrapper: parameter separation, module processing, backward compat
+- `hpvsim/parameters.py` — All defaults: SimPars, HPVPars, NetworkPars, ImmPars
+- `hpvsim/interventions.py` — All interventions (dual system needing reconciliation)
+- `hpvsim/analyzers.py` — Currently minimal (needs `age_results` for MVP)
 - `hpvsim/connectors.py` — HPV-HIV connector stub
-- `hpvsim/analyzers.py` — HIV-HPV results analyzer
 - `hpvsim/utils.py` — logf2, compute_cancer_prob, etc.
 - `hpvsim/distributions.py` — beta_mean distribution
-- `hpvsim/data/` — product CSVs, data loaders, downloaders
+- `hpvsim/data/products_*.csv` — Product definitions (already on rc3)
+- `hpvsim/data/loaders.py` — Age distribution, death rates, birth rates
 
-### HPVsim v2.x (original) — reference at `hpvsim_orig/`
+### HPVsim v2.x (main branch, to be tagged v2.1.0)
 - `hpvsim/sim.py` (1,395 LOC) — Full simulation logic
 - `hpvsim/people.py` (1,212 LOC) — Population and disease progression
-- `hpvsim/interventions.py` (1,549 LOC) — Complete intervention system
+- `hpvsim/interventions.py` (1,549 LOC) — Complete intervention system with products
 - `hpvsim/immunity.py` (301 LOC) — Immunity and waning
-- `hpvsim/hiv.py` (896 LOC) — Full HIV model
+- `hpvsim/hiv.py` (896 LOC) — Full HIV model (dropping)
 - `hpvsim/calibration.py` (783 LOC) — Calibration framework
 - `hpvsim/analysis.py` (1,209 LOC) — Analyzers
 - `hpvsim/run.py` (1,883 LOC) — MultiSim, Scenarios, Sweep
