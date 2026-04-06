@@ -401,6 +401,39 @@ def test_resuming():
     return s1
 
 
+def test_dt():
+    sc.heading('Test that changing dt does not significantly change results (issue #13)')
+
+    # Run simulations with different dt values and multiple seeds
+    dts = [0.25, 0.5, 1.0]
+    n_seeds = 5
+    base_pars = dict(n_agents=5e3, n_years=30, genotypes=[16, 18], burnin=10, verbose=0)
+
+    results = {dt: [] for dt in dts}
+    for dt in dts:
+        for seed in range(n_seeds):
+            sim = hpv.Sim(pars=base_pars, dt=dt, rand_seed=seed)
+            sim.run()
+            results[dt].append(sim.results['cancer_incidence'][-1])
+
+    # Cancer incidence should have overlapping confidence intervals across dt values
+    ref_mean = np.mean(results[0.25])
+    ref_std = np.std(results[0.25])
+    for dt in dts:
+        dt_mean = np.mean(results[dt])
+        dt_std = np.std(results[dt])
+        # Check that means are within 2 standard deviations of the reference
+        combined_se = np.sqrt(ref_std**2 + dt_std**2)  # Combined standard error
+        diff = abs(dt_mean - ref_mean)
+        print(f'dt={dt}: cancer_incidence={dt_mean:.2f}±{dt_std:.2f}, diff from ref={diff:.2f}, threshold={3*combined_se:.2f}')
+        assert diff < 3 * combined_se, (
+            f'Cancer incidence at dt={dt} ({dt_mean:.2f}±{dt_std:.2f}) differs too much from '
+            f'dt=0.25 ({ref_mean:.2f}±{ref_std:.2f}): diff={diff:.2f} > 3*SE={3*combined_se:.2f}'
+        )
+
+    return results
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -415,6 +448,7 @@ if __name__ == '__main__':
     sim5 = test_result_consistency()
     sim6 = test_location_loading()
     sim7 = test_resuming()
+    dt_results = test_dt()
 
     sc.toc(T)
     print('Done.')

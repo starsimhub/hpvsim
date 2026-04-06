@@ -458,6 +458,16 @@ class People(hpb.BasePeople):
         # Initialize
         new_pships = dict()
 
+        # Scale annual participation rates to per-timestep probabilities so that
+        # partnership formation rates are consistent regardless of dt (issue #13)
+        dt = self.dt
+        scaled_layer_probs = {lkey: lp.copy() for lkey, lp in layer_probs.items()}
+        for lp in scaled_layer_probs.values():
+            lp[1, :] = 1 - (1 - lp[1, :]) ** dt  # Female participation
+            lp[2, :] = 1 - (1 - lp[2, :]) ** dt  # Male participation
+        scaled_f_cross = 1 - (1 - f_cross_layer) ** dt
+        scaled_m_cross = 1 - (1 - m_cross_layer) ** dt
+
         # Loop over layers
         lno = 0
         for lkey in self.layer_keys():
@@ -471,9 +481,9 @@ class People(hpb.BasePeople):
                 is_female=self.is_female,
                 is_active=self.is_active,
                 mixing=mixing[lkey],
-                layer_probs=layer_probs[lkey],
-                f_cross_layer=f_cross_layer,
-                m_cross_layer=m_cross_layer,
+                layer_probs=scaled_layer_probs[lkey],
+                f_cross_layer=scaled_f_cross,
+                m_cross_layer=scaled_m_cross,
                 durations=dur_pship[lkey],
                 acts=acts[lkey],
                 age_act_pars=age_act_pars[lkey],
