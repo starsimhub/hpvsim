@@ -16,7 +16,6 @@ if rerun:
         genotypes=[16, 18],  # Include the two genotypes of greatest general interest
         verbose=0,
         rel_init_prev=4.0,
-        use_multiscale=True,
     )
 
     debug = 0
@@ -50,8 +49,8 @@ if rerun:
                     seed=r,
                     time=sim.time,
                     n_agents=len(sim.people),
-                    infs=sim.results.total_infections.values.sum(),
-                    deaths=sim.results.total_cancer_deaths.values.sum(),
+                    infs=sim.results.infections.values.sum(),
+                    deaths=sim.results.cancer_deaths.values.sum(),
                 )
                 data.append(row)
                 print(f"Time: {sim.time:0.2f} s")

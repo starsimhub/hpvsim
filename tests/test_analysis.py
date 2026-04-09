@@ -40,6 +40,7 @@ def test_age_pyramids(do_plot=True):
     pars = dict(n_agents=n_agents, start=2000, n_years=30, dt=0.5)
 
     # Loop over countries and their population sizes in the year 2000
+    analyzers = []
     for country in ['south_africa', 'australia']:
 
         age_pyr = hpv.age_pyramid(
@@ -54,10 +55,27 @@ def test_age_pyramids(do_plot=True):
 
         sim.run()
         a = sim.get_analyzer()
+        analyzers.append(a)
 
         # Check plot()
         if do_plot:
             fig = a.plot(percentages=True)
+
+    # Test reduce with quantiles (default)
+    reduced = hpv.age_pyramid.reduce(analyzers)
+    for date in reduced.dates:
+        for sk in ['f', 'm']:
+            assert hasattr(reduced.age_pyramids[date][sk], 'best')
+            assert hasattr(reduced.age_pyramids[date][sk], 'low')
+            assert hasattr(reduced.age_pyramids[date][sk], 'high')
+            assert np.all(reduced.age_pyramids[date][sk].low <= reduced.age_pyramids[date][sk].high)
+
+    # Test reduce with use_mean=True
+    reduced_mean = hpv.age_pyramid.reduce(analyzers, use_mean=True, bounds=1)
+    for date in reduced_mean.dates:
+        for sk in ['f', 'm']:
+            spread = reduced_mean.age_pyramids[date][sk].high - reduced_mean.age_pyramids[date][sk].low
+            assert np.all(spread >= 0)
 
     return sim, a
 
@@ -120,6 +138,24 @@ def test_age_results(do_plot=True, test_what=''):
 
         # assert np.allclose(sim_results,analyzer_results,rtol=0.2)
 
+    # Test compute_mismatch with a datafile-based analyzer
+    az_fit = hpv.age_results(
+        result_args=sc.objdict(
+            cancer_incidence=sc.objdict(
+                datafile='test_data/kenya_cancer_incidence.csv',
+                compute_fit=True,
+            ),
+        )
+    )
+    pars_fit = dict(n_agents=n_agents, start=2000, n_years=25, dt=0.5, location='kenya', verbose=0)
+    sim_fit = hpv.Sim(pars_fit, analyzers=[az_fit])
+    sim_fit.run()
+    a_fit = sim_fit.get_analyzer('age_results')
+    mismatch = a_fit.compute_mismatch('cancer_incidence')
+    assert np.isfinite(mismatch)
+    assert mismatch >= 0
+    assert 'model_output' in a_fit.result_args['cancer_incidence'].data.columns
+
     return sim, a
 
 
@@ -165,8 +201,18 @@ def test_reduce_analyzers():
         age_res = sim.get_analyzer('age_results')
         age_results.append(age_res)
 
-    # reduced_analyzer = hpv.age_pyramid.reduce(age_pyramids)
+    reduced_pyramid = hpv.age_pyramid.reduce(age_pyramids)
     reduced_analyzer = hpv.age_results.reduce(age_results)
+
+    # Also test reduce with use_mean=True
+    reduced_mean = hpv.age_results.reduce(age_results, use_mean=True, bounds=2)
+    for reskey in reduced_mean.results.keys():
+        for year in reduced_mean.results[reskey].keys():
+            if year == 'bins':
+                continue
+            assert hasattr(reduced_mean.results[reskey][year], 'best')
+            assert hasattr(reduced_mean.results[reskey][year], 'low')
+            assert hasattr(reduced_mean.results[reskey][year], 'high')
 
     return sim, reduced_analyzer
 
@@ -220,6 +266,50 @@ def test_dalys():
     return sim, a
 
 
+def test_snapshot_get():
+    """Test snapshot get method with various argument types."""
+    sim = hpv.Sim(n_agents=500, n_years=5, start=2015, dt=0.5, verbose=0,
+                  analyzers=hpv.snapshot(['2016', '2018']))
+    sim.run()
+    snap = sim.get_analyzer()
+
+    # Get by index
+    p0 = snap.snapshots[0]
+    assert p0 is not None
+
+    # Get latest
+    p1 = snap.get()
+    assert p1 is not None
+
+
+def test_multiple_age_results():
+    """Test age_results with multiple result types and years."""
+    edges = np.array([0., 20., 40., 60., 80., 100.])
+    az = hpv.age_results(
+        result_args=sc.objdict(
+            cancers=sc.objdict(years=[2020, 2030], edges=edges),
+            hpv_prevalence=sc.objdict(years=2020, edges=edges),
+        )
+    )
+    sim = hpv.Sim(n_agents=2e3, start=2000, n_years=35, dt=0.5,
+                  genotypes=[16, 18], verbose=0, analyzers=[az])
+    sim.run()
+    a = sim.get_analyzer('age_results')
+    assert 'cancers' in a.results
+    assert 2020 in a.results['cancers']
+
+
+def test_dalys_results():
+    """Test that DALYs analyzer produces reasonable outputs."""
+    dalys = hpv.dalys(start=2000)
+    sim = hpv.Sim(n_agents=2e3, n_years=20, start=2000, verbose=0, analyzers=dalys)
+    sim.run()
+    a = sim.get_analyzer(hpv.dalys)
+    assert hasattr(a, 'dalys')
+    assert hasattr(a, 'yll')
+    assert hasattr(a, 'yld')
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -232,6 +322,9 @@ if __name__ == '__main__':
     sim3, a3    = test_age_causal_analyzer()
     sim4, a4    = test_detection()
     sim5, a5    = test_dalys()
+    test_snapshot_get()
+    test_multiple_age_results()
+    test_dalys_results()
 
     sc.toc(T)
     print('Done.')
