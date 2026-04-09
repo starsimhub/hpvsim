@@ -964,21 +964,22 @@ class People(hpb.BasePeople):
         Args:
             inds (array): list of people to make naive
         """
-        for key in self.meta.states:
-            if key in ["susceptible"]:
-                self[key][:, inds] = True
-            elif key in ["other_dead"]:
-                self[key][inds] = False
+        for state in self.meta.alive_states + self.meta.stock_states:
+            if state.shape:
+                self[state.name][:, inds] = state.fill_value
             else:
-                self[key][:, inds] = False
+                self[state.name][inds] = state.fill_value
 
         # Reset immunity
-        for key in self.meta.imm_states:
-            self[key][:, inds] = 0
+        for state in self.meta.imm_states:
+            self[state.name][:, inds] = 0
 
         # Reset dates
-        for key in self.meta.dates + self.meta.durs:
-            self[key][:, inds] = np.nan
+        for state in self.meta.dates + self.meta.durs:
+            if state.shape:
+                self[state.name][:, inds] = np.nan
+            else:
+                self[state.name][inds] = np.nan
 
         return
 
@@ -1191,10 +1192,12 @@ class People(hpb.BasePeople):
 
             intro = f"\nThis is the story of {uid}, a {p.age:.0f} year old {sex}."
             intro += f"\n{uid} became sexually active at age {p.debut:.0f}."
-            if not p.susceptible:
-                if ~np.isnan(p.date_infectious):
+            if not np.all(p.susceptible):
+                dates_inf = p.date_infectious
+                if np.any(~np.isnan(dates_inf)):
+                    earliest = np.nanmin(dates_inf)
                     print(
-                        f"{intro}\n{uid} contracted HPV on timestep {p.date_infectious} of the simulation."
+                        f"{intro}\n{uid} contracted HPV on timestep {earliest:.0f} of the simulation."
                     )
                 else:
                     print(f"{intro}\n{uid} did not contract HPV during the simulation.")
@@ -1219,13 +1222,14 @@ class People(hpb.BasePeople):
             events = []
 
             dates = {
-                "date_HPV_clearance": "HPV cleared",
+                "date_clearance": "HPV cleared",
             }
 
             for attribute, message in dates.items():
                 date = getattr(p, attribute)
-                if not np.isnan(date):
-                    events.append((date, message))
+                if np.any(~np.isnan(date)):
+                    earliest = np.nanmin(date)
+                    events.append((earliest, message))
 
             if len(events):
                 for timestep, event in sorted(events, key=lambda x: x[0]):
