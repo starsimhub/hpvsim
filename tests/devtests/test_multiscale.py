@@ -27,10 +27,10 @@ pars = dict(
 )
 
 loop_pars = [
-    sc.objdict(n_agents=large_pop, use_multiscale=0),
-    sc.objdict(n_agents=large_pop, use_multiscale=1),
-    sc.objdict(n_agents=small_pop, use_multiscale=0),
-    sc.objdict(n_agents=small_pop, use_multiscale=1),
+    sc.objdict(n_agents=large_pop, ms_agent_ratio=1),
+    sc.objdict(n_agents=large_pop, ms_agent_ratio=10),
+    sc.objdict(n_agents=small_pop, ms_agent_ratio=1),
+    sc.objdict(n_agents=small_pop, ms_agent_ratio=10),
     ]
 
 
@@ -48,7 +48,7 @@ class multitest(hpv.Analyzer):
             self.res[k + '_people'] = np.zeros(sim.npts)
         self.age = sc.objdict()
         self.agebins = np.arange(0,101,10)
-        self.multiscale = sim['use_multiscale']
+        self.multiscale = sim['ms_agent_ratio'] > 1
         self.n_agents = sim['n_agents']
         return
     
@@ -170,7 +170,7 @@ msims = sc.autolist()
 for p in loop_pars:
     sims = sc.autolist()
     for r in range(repeats):
-        label = ['default', 'multiscale'][p.use_multiscale]
+        label = 'multiscale' if p.ms_agent_ratio > 1 else 'default'
         label += f'{r}'
         simpars = dict(**p, rand_seed=r+offset, label=label, analyzers=multitest())
         sim = hpv.Sim(pars, **simpars)

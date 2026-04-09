@@ -22,7 +22,7 @@ msim = hpv.parallel(sims)
 msim.plot()
 
 #%% Plot sims
-for key in ['n_alive', 'n_total_infected', 'total_hpv_prevalence']:
+for key in ['n_alive', 'n_infected', 'hpv_prevalence']:
 
     fig = pl.figure()
     dtcols = sc.vectocolor(-pl.log(dts))

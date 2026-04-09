@@ -438,9 +438,12 @@ class Calibration(sc.prettyobj):
             print('Could not delete study, skipping...')
             print(str(E))
         if os.path.exists(self.run_args.db_name):
-            os.remove(self.run_args.db_name)
-            if self.verbose:
-                print(f'Removed existing calibration {self.run_args.db_name}')
+            try:
+                os.remove(self.run_args.db_name)
+                if self.verbose:
+                    print(f'Removed existing calibration {self.run_args.db_name}')
+            except PermissionError:
+                print(f'Could not remove {self.run_args.db_name} (file in use), skipping...')
         return
 
 
