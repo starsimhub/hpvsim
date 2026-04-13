@@ -8,6 +8,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+Version 2.2.0 (2026-04-13)
+---------------------------
+- Fixes minor output bugs (e.g. ``dysplasias`` and ``cins`` counts)
+- Converted all probabilities to annual values so simulations can be run with arbitrary timesteps
+- Added tooling to compare outputs with future releases (v3)
+
 Version 2.1.0 (2025-03-25)
 ---------------------------
 - Updates how HPV prognoses are re-evaluated for WLWH
