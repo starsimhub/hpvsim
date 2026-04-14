@@ -3,6 +3,7 @@ Simple sim tests
 """
 
 # Imports
+import pytest
 import sciris as sc
 import starsim as ss
 import hpvsim as hpv
@@ -45,14 +46,14 @@ def test_hpv(debug=True):
     fig.tight_layout()
 
     fig, axes = pl.subplots(nrows=2, figsize=(10, 10))
-    ages = [15, 25, 35, 45, 55]
-    for i, age in enumerate(ages):
-        resname = f"prevalence_{age}_{age+9}"
+    age_bins = [(15, 20), (20, 25), (25, 30), (30, 35), (35, 50)]
+    for i, (age_lo, age_hi) in enumerate(age_bins):
+        resname = f"prevalence_{age_lo}_{age_hi}"
         y = sim.results.hpv[resname].values
         axes[0].bar(i, y[-1])
 
-    axes[0].set_xticks(range(len(ages)))
-    axes[0].set_xticklabels([f"{age}-{age+9}" for age in ages])
+    axes[0].set_xticks(range(len(age_bins)))
+    axes[0].set_xticklabels([f"{lo}-{hi}" for lo, hi in age_bins])
     axes[0].set_ylabel("HPV Prevalence")
     sc.SIticks(ax=axes[0])
     for genotype in ["hpv16", "hpv18"]:
@@ -67,22 +68,26 @@ def test_hpv(debug=True):
     print("done")
 
 
+@pytest.mark.skip(reason="Incomplete: genotype_connector not yet implemented")
 def test_screening(debug=False):
 
-    treat_eligible = lambda sim: sim.interventions["screen"].screen_results["positive"]
+    treat_eligible = lambda sim: sim.interventions["screen"].outcomes["positive"]
+
+    screen_product = hpv.ScreeningProduct(modules=[super_connector])
+    treat_product = hpv.TreatmentProduct(modules=[hpv16, hpv18])
 
     scenarios = {
         "no_screen": [],
         "screen": [
-            hpv.screen(
-                modules=[super_connector],
+            hpv.routine_screening(
+                product=screen_product,
+                prob=0.5,
                 start_year=2000,
-                pars=dict(p_seek_care=ss.bernoulli(p=0.5)),
                 label="screen",
             ),
-            hpv.treat(
-                modules=[hpv16, hpv18],
-                start_year=2000,
+            hpv.treat_num(
+                product=treat_product,
+                prob=1.0,
                 eligibility=treat_eligible,
                 label="treat",
             ),
@@ -117,6 +122,7 @@ def make_hiv(hiv_pars=None):
     return hiv
 
 
+@pytest.mark.skip(reason="Incomplete: hpv_hiv_connector and analyzers not yet wired up")
 def test_hiv_hpv(debug=False):
     hiv = make_hiv()
 

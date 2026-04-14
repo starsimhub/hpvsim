@@ -3,7 +3,7 @@ import sciris as sc
 import numpy as np
 
 
-__all__ = ["screen", "treat"]  # , "vaccinate"]
+__all__ = []
 
 
 # %% Template classes for routine and campaign delivery
@@ -103,6 +103,89 @@ class CampaignDelivery(ss.Intervention):
         return
 
 
+# %% Products
+
+__all__ += ['ScreeningProduct', 'TreatmentProduct']
+
+
+class ScreeningProduct(ss.Product):
+    """
+    Screening product with per-state sensitivity for HPV detection.
+
+    Administers a screening test and classifies agents as positive or negative
+    based on their disease state and the test's sensitivity for each state.
+
+    Args:
+         sensitivity (dict) : mapping of disease state names to ss.bernoulli distributions
+         modules     (list) : disease modules whose states will be checked
+         kwargs      (dict) : passed to ss.Product
+    """
+    def __init__(self, sensitivity=None, modules=None, **kwargs):
+        super().__init__(**kwargs)
+        self.sensitivity = sensitivity if sensitivity is not None else dict(
+            precin=ss.bernoulli(p=0.45),
+            cin=ss.bernoulli(p=0.95),
+            cancerous=ss.bernoulli(p=0.99),
+        )
+        self.modules = sc.promotetolist(modules)
+        self.hierarchy = ['positive', 'negative']
+
+    def administer(self, uids):
+        """Apply screening test with state-specific sensitivity across disease modules."""
+        test_pos = []
+        for state, sens in self.sensitivity.items():
+            for module in self.modules:
+                screen_pos = sens.filter(uids.intersect(getattr(module, state).uids))
+                test_pos += screen_pos.tolist()
+        test_pos = list(set(test_pos))
+        return dict(
+            positive=ss.uids(test_pos),
+            negative=ss.uids(np.setdiff1d(uids, test_pos)),
+        )
+
+
+class TreatmentProduct(ss.Product):
+    """
+    Treatment product with per-state efficacy that triggers disease clearance.
+
+    Administers treatment and determines success based on the agent's disease
+    state and treatment efficacy. Successful treatment triggers clearance by
+    setting ti_clearance on the disease module.
+
+    Args:
+         efficacy (dict) : mapping of disease state names to ss.bernoulli distributions
+         modules  (list) : disease modules to treat
+         kwargs   (dict) : passed to ss.Product
+    """
+    def __init__(self, efficacy=None, modules=None, **kwargs):
+        super().__init__(**kwargs)
+        self.efficacy = efficacy if efficacy is not None else dict(
+            susceptible=ss.bernoulli(p=0),
+            precin=ss.bernoulli(p=0),
+            cin=ss.bernoulli(p=0.81),
+            cancerous=ss.bernoulli(p=0),
+        )
+        self.modules = sc.promotetolist(modules)
+        self.hierarchy = ['successful', 'unsuccessful']
+
+    def administer(self, uids):
+        """Apply treatment with state-specific efficacy across disease modules."""
+        treated = []
+        for state, eff in self.efficacy.items():
+            for module in self.modules:
+                state_uids = getattr(module, state).uids
+                treated_effectively = eff.filter(uids.intersect(state_uids))
+                if len(treated_effectively):
+                    module.ti_clearance[treated_effectively] = self.sim.ti
+                treated += treated_effectively.tolist()
+        treated = list(set(treated))
+        untreated = [u for u in uids.tolist() if u not in treated]
+        return dict(
+            successful=ss.uids(treated),
+            unsuccessful=ss.uids(untreated),
+        )
+
+
 # %% Screening and triage
 
 __all__ += ['BaseTest', 'BaseScreening', 'routine_screening', 'campaign_screening', 'BaseTriage', 'routine_triage',
@@ -119,9 +202,8 @@ class BaseTest(ss.Intervention):
          kwargs         (dict)          : passed to Intervention()
     """
 
-    def __init__(self, product=None, prob=None, eligibility=None, **kwargs):
+    def __init__(self, product=None, eligibility=None, **kwargs):
         super().__init__(**kwargs)
-        self.prob = sc.promotetoarray(prob)
         self.eligibility = eligibility
         self._parse_product(product)
         self.screened = ss.BoolArr('screened')
@@ -131,6 +213,7 @@ class BaseTest(ss.Intervention):
 
     def init_pre(self, sim):
         super().init_pre(sim)
+        self.product.init_pre(sim)
         self.outcomes = {k: np.array([], dtype=int) for k in self.product.hierarchy}
         return
 
@@ -157,21 +240,58 @@ class BaseScreening(BaseTest):
     Base class for screening.
 
     Args:
-        kwargs (dict): passed to BaseTest
+         screen_age      (list)          : [min, max] age range for screening eligibility
+         screen_interval (int/float/dur) : minimum interval between screenings in timesteps (e.g. ss.dur(5, 'years'))
+         kwargs          (dict)          : passed to BaseTest
     """
+    def __init__(self, screen_age=None, screen_interval=None, **kwargs):
+        super().__init__(**kwargs)
+        self.screen_age = screen_age if screen_age is not None else [30, 50]
+        self.screen_interval = screen_interval
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('n_screened', dtype=int, label='Number screened'),
+            ss.Result('n_dx', dtype=int, label='Number diagnosed'),
+        )
+        return
+
     def check_eligibility(self):
         """
-        Check eligibility
+        Check eligibility based on sex, age range, and re-screening interval.
         """
-        raise NotImplementedError
+        sim = self.sim
+        people = sim.people
+
+        # Filter to females in age range
+        in_age_range = (people.age >= self.screen_age[0]) & (people.age <= self.screen_age[1])
+        conditions = people.female & in_age_range
+
+        # Check screening interval
+        unscreened = np.isnan(self.ti_screened).astype(bool)
+        if self.screen_interval is not None:
+            interval = self.screen_interval.values if hasattr(self.screen_interval, 'values') else self.screen_interval
+            due_for_rescreen = (sim.ti - self.ti_screened) >= interval
+            screen_eligible = unscreened | due_for_rescreen
+        else:
+            screen_eligible = unscreened
+        conditions = conditions & screen_eligible
+
+        # Apply optional additional eligibility criteria
+        if self.eligibility is not None:
+            other_eligible = sc.promotetoarray(self.eligibility(sim))
+            conditions = conditions & other_eligible
+
+        return ss.uids(conditions)
 
     def step(self):
         """
-        Perform screening by finding who's eligible, finding who accepts, and applying the product.
+        Perform screening by finding who's eligible, filtering by coverage, and applying the product.
         """
         sim = self.sim
         accept_uids = ss.uids()
-        if sim.ti in self.timepoints: # TODO: change to self.ti
+        if sim.ti in self.timepoints:
             accept_uids = self.deliver()
             self.screened[accept_uids] = True
             self.screens[accept_uids] += 1
@@ -262,7 +382,7 @@ class BaseTreatment(ss.Intervention):
 
     Args:
          product        (str/Product)   : the treatment product to use
-         prob           (float/arr)     : probability of treatment aong those eligible
+         prob           (float/arr)     : probability of treatment among those eligible
          eligibility    (inds/callable) : indices OR callable that returns inds
          kwargs         (dict)          : passed to Intervention()
     """
@@ -276,8 +396,22 @@ class BaseTreatment(ss.Intervention):
 
     def init_pre(self, sim):
         super().init_pre(sim)
-        self.outcomes = {k: np.array([], dtype=int) for k in ['unsuccessful', 'successful']} # Store outcomes on each timestep
+        self.product.init_pre(sim)
+        self.outcomes = {k: np.array([], dtype=int) for k in self.product.hierarchy}
         return
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('n_treated', dtype=int, label='Number treated'),
+        )
+        return
+
+    def check_eligibility(self):
+        """Return UIDs of agents eligible for treatment."""
+        if self.eligibility is not None:
+            return ss.uids(sc.promotetoarray(self.eligibility(self.sim)))
+        return ss.uids()
 
     def get_accept_inds(self):
         """
@@ -306,6 +440,7 @@ class BaseTreatment(ss.Intervention):
         treat_uids = treat_candidates.intersect(still_eligible)
         if len(treat_uids):
             self.outcomes = self.product.administer(treat_uids)
+        self.results['n_treated'][self.sim.ti] = len(treat_uids)
         return treat_uids
 
 
@@ -378,6 +513,11 @@ class BaseVaccination(ss.Intervention):
         self.coverage_dist = ss.bernoulli(p=0)  # Placeholder
         return
 
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self.product.init_pre(sim)
+        return
+
     def step(self):
         """
         Deliver the diagnostics by finding who's eligible, finding who accepts, and applying the product.
@@ -419,201 +559,3 @@ class campaign_vx(BaseVaccination, CampaignDelivery):
     pass
 
 
-class screen(ss.Intervention):
-    """
-    Screning intervention to detect pre-cancerous lesions
-    """
-
-    def __init__(
-        self,
-        *args,
-        start_year=None,
-        pars=None,
-        eligibility=None,
-        modules=None,
-        **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-        self.modules = sc.promotetolist(modules)
-        self.screen_results = None
-
-        self.define_pars(
-            unit="month",
-            # Screening effects
-            start_year=start_year,  # Day to start screening
-            stop_year=None,  # Day to stop screening
-            p_seek_care=ss.bernoulli(p=0.9),  # Distribution of care-seeking behavior
-            screen_age=[30, 50],  # Age range for screening
-            screen_interval=ss.dur(5, "years"),  # Interval between screenings
-            screen_sensitivity=dict(
-                # susceptible=ss.bernoulli(p=0.05),
-                precin=ss.bernoulli(p=0.45),
-                cin=ss.bernoulli(p=0.95),
-                cancerous=ss.bernoulli(p=0.99),
-            ),
-        ),
-        self.update_pars(pars, **kwargs)
-        self.eligibility = eligibility
-
-        self.define_states(
-            ss.FloatArr("ti_screened"),
-        )
-
-        return
-
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        if self.pars.stop_year is None:
-            self.pars.stop_year = sim.t.npts - 1
-        else:
-            ti = sc.findfirst(sim.t.yearvec, self.pars.stop_year)
-            self.pars.stop_year = ti
-
-        if self.pars.start_year:
-            ti = sc.findfirst(sim.t.yearvec, self.pars.start_year)
-            self.pars.start_year = ti
-
-        return
-
-    def init_results(self):
-        super().init_results()
-        results = [
-            ss.Result("new_screens", dtype=int, label="New screens administered"),
-            ss.Result("new_screened", dtype=int, label="New people screened"),
-        ]
-        self.define_results(*results)
-        return
-
-    def check_eligibility(self):
-        adult_females = self.sim.people.female
-        in_age_range = (self.sim.people.age >= self.pars.screen_age[0]) & (
-            self.sim.people.age <= self.pars.screen_age[1]
-        )
-        conditions = adult_females & in_age_range
-        unscreened = np.isnan(self.ti_screened).astype(bool)
-
-        screened_in_interval_range = (
-            self.sim.ti - self.ti_screened
-        ) >= self.pars.screen_interval.values
-        screen_eligible = unscreened | screened_in_interval_range
-        conditions = conditions & screen_eligible
-        if self.eligibility is not None:
-            other_eligible = sc.promotetoarray(self.eligibility(self.sim))
-            conditions = other_eligible & conditions
-        return ss.uids(conditions)
-
-    def step(self):
-        modules = self.modules
-        if self.pars.stop_year >= self.ti >= self.pars.start_year:
-            # Identify eligible agents for treatment
-            eligible_inds = self.check_eligibility()
-            seeks_care = self.pars.p_seek_care.filter(eligible_inds)
-            if len(seeks_care):
-                self.ti_screened[seeks_care] = self.ti
-                self.results["new_screens"][self.ti] += len(seeks_care)
-                self.results["new_screened"][self.ti] += len(seeks_care)
-                test_pos_inds = []
-                for state, sens in self.pars.screen_sensitivity.items():
-                    for module in modules:
-                        screen_pos = sens.filter(
-                            seeks_care.intersect(getattr(module, state).uids)
-                        )
-                        test_pos_inds += screen_pos.tolist()
-                test_pos_inds = list(set(test_pos_inds))
-                self.screen_results = dict(
-                    positive=ss.uids(test_pos_inds),
-                    negative=np.setdiff1d(seeks_care, test_pos_inds),
-                )
-
-        return
-
-
-class treat(ss.Intervention):
-    """
-    Treatment intervention to treat detected pre-cancerous lesions
-    """
-
-    def __init__(
-        self,
-        *args,
-        start_year=None,
-        pars=None,
-        eligibility=None,
-        modules=None,
-        **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-        self.modules = sc.promotetolist(modules)
-
-        self.define_pars(
-            unit="month",
-            # Treatment effects
-            start_year=start_year,  # Day to start treatment
-            stop_year=None,  # Day to stop treatment
-            p_seek_care=ss.bernoulli(p=0.9),  # Distribution of care-seeking behavior
-            treat_efficacy=dict(
-                susceptible=ss.bernoulli(p=0),
-                precin=ss.bernoulli(p=0),
-                cin=ss.bernoulli(p=0.81),
-                cancerous=ss.bernoulli(p=0),
-            ),
-        ),
-        self.update_pars(pars, **kwargs)
-        self.eligibility = eligibility
-
-        self.define_states(
-            ss.FloatArr("ti_treated"),
-        )
-
-        return
-
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        if self.pars.stop_year is None:
-            self.pars.stop_year = sim.t.npts - 1
-        else:
-            ti = sc.findfirst(sim.t.yearvec, self.pars.stop_year)
-            self.pars.stop_year = ti
-
-        if self.pars.start_year:
-            ti = sc.findfirst(sim.t.yearvec, self.pars.start_year)
-            self.pars.start_year = ti
-
-        return
-
-    def init_results(self):
-        super().init_results()
-        results = [
-            ss.Result("new_treatments", dtype=int, label="New treatments administered"),
-        ]
-        self.define_results(*results)
-        return
-
-    def check_eligibility(self):
-        if self.eligibility is not None:
-            conditions = sc.promotetoarray(self.eligibility(self.sim))
-            return ss.uids(conditions)
-        else:
-            return ss.uids([])
-
-    def step(self):
-        modules = self.modules
-        if self.pars.stop_year >= self.ti >= self.pars.start_year:
-            # Identify eligible agents for treatment
-            eligible_inds = self.check_eligibility()
-            seeks_care = self.pars.p_seek_care.filter(eligible_inds)
-            if len(seeks_care):
-                self.ti_treated[seeks_care] = self.ti
-                self.results["new_treatments"][self.ti] += len(seeks_care)
-                treated_inds = []
-                for state, efficacy in self.pars.treat_efficacy.items():
-                    for module in modules:
-                        treated_effectively = efficacy.filter(
-                            seeks_care.intersect(getattr(module, state).uids)
-                        )
-                        if len(treated_effectively):
-                            module.ti_clearance[treated_effectively] = self.ti
-                        treated_inds += treated_effectively.tolist()
-                treated_inds = list(set(treated_inds))
-
-        return
