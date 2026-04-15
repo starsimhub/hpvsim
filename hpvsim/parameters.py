@@ -31,7 +31,7 @@ class SimPars(ss.SimPars):
         self.pop_scale = None  # How much to scale the population
 
         # Simulation parameters
-        self.unit      = 'year'    # The time unit to use; options are 'year' (default), 'day', 'week', 'month', or 'none'
+        self.unit      = 'years'    # The time unit to use; options are 'years' (default), 'day', 'week', 'months', or 'none'
         self.start     = 1990  # Start of the simulation
         self.stop      = 2030  # End of the simulation
         self.dur       = None   # Duration of time to run, if stop isn't specified
@@ -79,8 +79,8 @@ class HPVPars(ss.Pars):
         self.eff_condom = 0.5
 
         # Disease progression parameters
-        self.dur_cancer = ss.lognorm_ex(ss.dur(8, "year"), ss.dur(3, "year"))
-        self.dur_infection_male = ss.lognorm_ex(ss.dur(1, "year"), ss.dur(1, "year"))
+        self.dur_cancer = ss.lognorm_ex(ss.dur(8, "years"), ss.dur(3, "years"))
+        self.dur_infection_male = ss.lognorm_ex(ss.dur(1, "years"), ss.dur(1, "years"))
         self.inf_imm = hpv.beta_mean(par1=0.35, par2=0.025)  # nAB-like immunity to reinfection with this genotype
         self.cell_imm = hpv.beta_mean(par1=0.25, par2=0.025)  # T-cell-like immunity following reinfection
 
@@ -120,32 +120,32 @@ def make_genotype_pars(gkey=None):
     genotype_pars = sc.objdict(
         hpv16=dict(
             rel_beta=1.0,
-            dur_precin=ss.lognorm_ex(ss.dur(3, "year"), ss.dur(9, "year")),
-            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
+            dur_precin=ss.lognorm_ex(ss.dur(3, "years"), ss.dur(9, "years")),
+            dur_cin=ss.lognorm_ex(ss.dur(5, "years"), ss.dur(20, "years")),
             cin_fn=sc.objdict(k=0.3, ttc=50),
             cancer_fn=sc.objdict(method='cin_integral', transform_prob=2e-3), # Map CIN duration to cancer probability
             sero_prob = ss.bernoulli(p=0.75),
         ),
         hpv18=dict(
             rel_beta=0.75,
-            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
-            dur_cin=ss.lognorm_ex(ss.dur(5, "year"), ss.dur(20, "year")),
+            dur_precin=ss.lognorm_ex(ss.dur(2.5, "years"), ss.dur(9, "years")),
+            dur_cin=ss.lognorm_ex(ss.dur(5, "years"), ss.dur(20, "years")),
             cin_fn=sc.objdict(k=0.25, ttc=50),
             cancer_fn=sc.objdict(method='cin_integral', transform_prob=2e-3),  # Map CIN duration to cancer probability
             sero_prob = ss.bernoulli(p=0.56),
         ),
         hi5=dict(
             rel_beta=0.9,
-            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
-            dur_cin=ss.lognorm_ex(ss.dur(4.5, "year"), ss.dur(20, "year")),
+            dur_precin=ss.lognorm_ex(ss.dur(2.5, "years"), ss.dur(9, "years")),
+            dur_cin=ss.lognorm_ex(ss.dur(4.5, "years"), ss.dur(20, "years")),
             cin_fn=sc.objdict(k=0.2, ttc=50),
             cancer_fn=sc.objdict(method='cin_integral', transform_prob=1.5e-3),  # Map CIN duration to cancer probability
             sero_prob = ss.bernoulli(p=0.6),
         ),
         ohr=dict(
             rel_beta=0.9,
-            dur_precin=ss.lognorm_ex(ss.dur(2.5, "year"), ss.dur(9, "year")),
-            dur_cin=ss.lognorm_ex(ss.dur(4.5, "year"), ss.dur(20, "year")),
+            dur_precin=ss.lognorm_ex(ss.dur(2.5, "years"), ss.dur(9, "years")),
+            dur_cin=ss.lognorm_ex(ss.dur(4.5, "years"), ss.dur(20, "years")),
             cin_fn=sc.objdict(k=0.2, ttc=50),
             cancer_fn=sc.objdict(method='cin_integral', transform_prob=1.5e-3),  # Map CIN duration to cancer probability
             sero_prob=ss.bernoulli(p=0.6),
@@ -207,25 +207,25 @@ class NetworkPars(ss.Pars):
         self.stable_dur_pars = dict(
             teens=[
                 # (mu,stdev) for levels 0, 1, 2
-                [ss.dur(100, 'year'),  ss.dur(1, 'year')],
-                [ss.dur(8, 'year'),  ss.dur(2, 'year')],
-                [ss.dur(1e-4, 'month'), ss.dur(1e-4, 'month')]
+                [ss.dur(100, 'years'),  ss.dur(1, 'years')],
+                [ss.dur(8, 'years'),  ss.dur(2, 'years')],
+                [ss.dur(1e-4, 'months'), ss.dur(1e-4, 'months')]
             ],
             young=[
-                [ss.dur(100, 'year'),  ss.dur(1, 'year')],
-                [ss.dur(10, 'year'),  ss.dur(3, 'year')],
-                [ss.dur(1e-4, 'month'), ss.dur(1e-4, 'month')]
+                [ss.dur(100, 'years'),  ss.dur(1, 'years')],
+                [ss.dur(10, 'years'),  ss.dur(3, 'years')],
+                [ss.dur(1e-4, 'months'), ss.dur(1e-4, 'months')]
             ],
             adult=[
-                [ss.dur(100, 'year'),  ss.dur(1, 'year')],
-                [ss.dur(12, 'year'),  ss.dur(3, 'year')],
-                [ss.dur(1e-4, 'month'), ss.dur(1e-4, 'month')]
+                [ss.dur(100, 'years'),  ss.dur(1, 'years')],
+                [ss.dur(12, 'years'),  ss.dur(3, 'years')],
+                [ss.dur(1e-4, 'months'), ss.dur(1e-4, 'months')]
             ],
         )
         self.casual_dur_pars = dict(
-            teens=[[ss.dur(1, 'year'), ss.dur(3, 'year')]]*3,
-            young=[[ss.dur(1, 'year'), ss.dur(3, 'year')]]*3,
-            adult=[[ss.dur(1, 'year'), ss.dur(3, 'year')]]*3,
+            teens=[[ss.dur(1, 'years'), ss.dur(3, 'years')]]*3,
+            young=[[ss.dur(1, 'years'), ss.dur(3, 'years')]]*3,
+            adult=[[ss.dur(1, 'years'), ss.dur(3, 'years')]]*3,
         )
 
         # Acts
@@ -234,7 +234,7 @@ class NetworkPars(ss.Pars):
         # Sex work parameters
         self.fsw_shares = ss.bernoulli(p=0.05)
         self.client_shares = ss.bernoulli(p=0.12)
-        self.sw_seeking_rate = ss.rate(1, 'month')  # Monthly rate at which clients seek FSWs (1 new SW partner / month)
+        self.sw_seeking_rate = ss.rate(1, 'months')  # Monthly rate at which clients seek FSWs (1 new SW partner / month)
         self.sw_seeking_dist=ss.bernoulli(p=0.5)  # Placeholder value replaced by dt-adjusted sw_seeking_rate
         self.sw_beta = 1
         self.sw_intensity = ss.random()  # At each time step, FSW may work with varying intensity
