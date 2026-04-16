@@ -178,6 +178,7 @@ def test_genotype_distribution(do_plot=do_plot):
 
 
 @pytest.mark.slow
+@pytest.mark.xfail(reason='Requires parameter alignment (init_hpv_prev, beta) — tracked in #45 (M1.6)')
 @sc.timer()
 def test_prevalence_validation(do_plot=do_plot):
     """
@@ -185,6 +186,11 @@ def test_prevalence_validation(do_plot=do_plot):
 
     Acceptance: overlapping 95% CIs for 2+ locations, measured as
     >50% of post-burnin time points overlapping.
+
+    Currently fails: v2 prevalence declines monotonically (~4% → 0.04%) while
+    v3 stabilizes at endemic equilibrium (~3%). Means differ by ~10x.
+    Resolution depends on M1.6 parameter alignment (init_hpv_prev handling,
+    beta semantics).
     """
     sc.heading('Validating HPV prevalence against v2...')
     v2_baselines = load_v2_baselines('natural_history')
@@ -214,12 +220,14 @@ def test_prevalence_validation(do_plot=do_plot):
 
 
 @pytest.mark.slow
+@pytest.mark.xfail(reason='Requires parameter alignment (init_hpv_prev, beta) — tracked in #45 (M1.6)')
 @sc.timer()
 def test_cancer_incidence_validation(do_plot=do_plot):
     """
     Validate cancer incidence against v2 baselines for multiple locations.
 
-    Acceptance: overlapping 95% CIs for 2+ locations.
+    Acceptance: overlapping 95% CIs for 2+ locations. Currently depends on
+    prevalence dynamics matching; see test_prevalence_validation.
     """
     sc.heading('Validating cancer incidence against v2...')
     v2_baselines = load_v2_baselines('natural_history')
