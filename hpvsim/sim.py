@@ -36,12 +36,26 @@ class Sim(ss.Sim):
         super().__init__(pars=None, label=label)
         self.pars = hpv.make_sim_pars()  # Make default parameters using values from parameters.py
 
-        # Separate the parameters, storing sim pars now and saving module pars to process in init
-        sim_kwargs = dict(label=label, people=people, demographics=demographics, diseases=diseases, networks=networks,
-                    interventions=interventions, analyzers=analyzers, connectors=connectors)
+        # Separate the parameters, storing sim pars now and saving module pars for construction below
+        sim_kwargs = dict(label=label, location=location, people=people, demographics=demographics, diseases=diseases,
+                    networks=networks, interventions=interventions, analyzers=analyzers, connectors=connectors)
         sim_kwargs = {key: val for key, val in sim_kwargs.items() if val is not None}
         updated_pars = self.separate_pars(pars, sim_pars, hpv_pars, nw_pars, imm_pars, sim_kwargs, **kwargs)
         self.pars.update(updated_pars)
+
+        # Build HPV-specific modules and register them on self.pars so super().init() picks them up.
+        # Follows the FPsim pattern of constructing modules here rather than in init().
+        genotypes, hpv_connector = self.process_genotypes()
+        self.pars['diseases'] += genotypes
+        if hpv_connector is not None:
+            self.pars['connectors'] += hpv_connector
+
+        self.pars['networks'] = self.process_network()
+
+        demographics, people, total_pop = self.process_demographics()
+        self.pars['demographics'] += demographics
+        self.pars['people'] = people
+        self.pars['total_pop'] = total_pop
 
         return
 
@@ -113,28 +127,6 @@ class Sim(ss.Sim):
         if 'location' in pars:
             pars['demographics'] = pars.pop('location')
         return pars
-
-    def init(self, force=False, **kwargs):
-        """
-        Perform all initializations for the sim
-        """
-        # Process the genotypes and HPV connector
-        genotypes, hpv_connector = self.process_genotypes()
-        self.pars['diseases'] += genotypes
-        if hpv_connector is not None: self.pars['connectors'] += hpv_connector
-
-        # Process the network
-        self.pars['networks'] = self.process_network()
-
-        # Process the demographics
-        demographics, people, total_pop = self.process_demographics()
-        self.pars['demographics'] += demographics
-        self.pars['people'] = people
-        self.pars['total_pop'] = total_pop
-
-        super().init(force=force, **kwargs)  # Call the parent init method
-
-        return self
 
     def process_genotypes(self):
         """
@@ -224,9 +216,12 @@ class Sim(ss.Sim):
             self.pars['demographics'] = ss.ndict()
             birth_rates, death_rates = self.get_births_deaths(location)
 
-            # Create modules for births and deaths
-            births = ss.Births(birth_rate=birth_rates, metadata=dict(data_cols=dict(year='year', value='cbr')))
-            deaths = ss.Deaths(death_rate=death_rates)
+            # Normalize to starsim conventions: Births wants Year/CBR columns
+            birth_rates = birth_rates.rename(columns={'year': 'Year', 'cbr': 'CBR'})
+
+            # rate_units=1 because death rate data are raw rates (mx), not per-1000
+            births = ss.Births(birth_rate=birth_rates)
+            deaths = ss.Deaths(death_rate=death_rates, rate_units=1)
 
             try:
                 age_data = hpdata.get_age_distribution(location, year=self.pars.start)
