@@ -2,12 +2,16 @@ name,genotype,rel_imm
 txvx1,hpv16,1
 txvx1,hpv18,1
 txvx1,hi5,0.5
+txvx1,hpv45,0.5
+txvx1,hi4,0.5
 txvx1,ohr,0.5
 txvx1,hr,0.5
 txvx1,lr,0.3
 txvx2,hpv16,1
 txvx2,hpv18,1
 txvx2,hi5,0.5
+txvx2,hpv45,0.5
+txvx2,hi4,0.5
 txvx2,ohr,0.5
 txvx2,hr,0.5
 txvx2,lr,0.3

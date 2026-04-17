@@ -131,7 +131,6 @@ class PeopleMeta(sc.prettyobj):
 
         # Additional intervention states
         self.intv_states = [
-            State('detected_cancer',    bool,   False, label='Number with detected cancer'), # Whether the person's cancer has been detected
             State('screened',           bool,   False, label='Number screened'), # Whether the person has been screened (how does this change over time?)
             State('cin_treated',        bool,   False, label='Number treated for precancerous lesions'), # Whether the person has been treated for CINs
             State('cancer_treated',     bool,   False, label='Number treated for cancer'), # Whether the person has been treated for cancer
@@ -272,13 +271,9 @@ class Flow():
 
 flows = [
     Flow('infections',              color='#c78f65',    label='Infections'),
-    Flow('dysplasias',              color='#c1ad71',    label='Dysplasias'),
-    Flow('precins',                 color='#c1ad71',    label='Pre-CINs'),
     Flow('cins',                    color='#b86113',    label='CINs'),
     Flow('cancers',                 color='#5f5cd2',    label='Cancers'),
-    Flow('detected_cancers',        color='#5f5cd2',    label='Cancer detections', by_genotype=False),
     Flow('cancer_deaths',           color='#000000',    label='Cancer deaths', by_genotype=False),
-    Flow('detected_cancer_deaths',  color='#000000',    label='Detected cancer deaths', by_genotype=False),
     Flow('reinfections',            color='#732e26',    label='Reinfections'),
     Flow('reactivations',           color='#732e26',    label='Reactivations'),
 ]
@@ -288,8 +283,8 @@ genotype_flow_keys  = [flow.name for flow in flows if flow.by_genotype]
 
 # Incidence. Strong overlap with stocks, but with slightly different naming conventions
 # All are stored (1) by genotype and (2) as the total across genotypes
-inci_keys   = ['hpv',       'dysplasia',      'cancer']
-inci_names  = ['HPV',       'Dysplasia',      'Cancer']
+inci_keys   = ['hpv',       'cin',      'cancer']
+inci_names  = ['HPV',       'CIN',      'Cancer']
 inci_colors = ['#c78f65',   '#c1ad71',  '#5f5cd2']
 
 # Demographics

@@ -212,7 +212,7 @@ def check_immunity(people):
     Now suppose we have 3 people, whose immunity levels are
 
         people.nab_imm = np.array([[0.9, 0.0, 0.0],
-                               [0.0, 0.7, 0.0]])
+                                   [0.0, 0.7, 0.0]])
 
     This indicates that person 1 has a prior HPV16 infection, person 2 has a prior HPV18
     infection, and person 3 has no history of infection.

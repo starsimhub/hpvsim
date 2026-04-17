@@ -314,6 +314,8 @@ def get_birth_rates(location=None):
         raise ValueError(errormsg) from E
 
     raw_df = map_entries(birth_rate_data, location)
+    raw_df = raw_df.dropna()
     df = sc.dataframe(raw_df).reset_index().rename(columns={'Time':'year', 'CBR':'cbr'})
+
     return df
 

@@ -8,6 +8,50 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :local:
    :depth: 1
 
+
+Version 2.2.6 (2026-04-17)
+---------------------------
+- Reconcile different copies of repository
+- *Github info* PR `75 <https://github.com/starsimhub/hpvsim/pull/75>`__
+
+
+Version 2.2.5 (2025-10-27)
+---------------------------
+- Small bugfix for campaign vaccination
+- *Github info* PR `689 <https://github.com/starsimhub/hpvsim_orig/pull/689>`__
+
+
+Version 2.2.4 (2025-08-20)
+---------------------------
+- Fixes a bug in analyzer results for cancer by age and HIV status
+- *Github info* PR `687 <https://github.com/starsimhub/hpvsim_orig/pull/687>`__
+
+
+Version 2.2.3 (2025-06-27)
+---------------------------
+- Small bugfixes and changes to HIV module parameterization
+- *Github info* PR `685 <https://github.com/starsimhub/hpvsim_orig/pull/685>`__
+
+
+Version 2.2.2 (2025-06-20)
+---------------------------
+- Bugfix to allow running simulations beyond 2100
+- *Github info* PR `681 <https://github.com/starsimhub/hpvsim_orig/pull/681>`__
+
+
+Version 2.2.1 (2025-05-29)
+---------------------------
+- Bugfix for running calibrations to prevent interventions being reinitialized
+- *Github info* PR `678 <https://github.com/starsimhub/hpvsim_orig/pull/678>`__
+
+
+Version 2.2.0 (2025-05-23)
+---------------------------
+- Refresh results: ensure all main results are populated, remove cancer detection results, and fix bug with HPV prevalence calculations
+- Updates to docs
+- *Github info* PR `673 <https://github.com/starsimhub/hpvsim_orig/pull/673>`__
+
+
 Version 2.1.0 (2025-03-25)
 ---------------------------
 - Updates how HPV prognoses are re-evaluated for WLWH

@@ -17,7 +17,7 @@ from .settings import options as hpo # For setting global options
 
 
 __all__ = ['Analyzer', 'snapshot', 'age_pyramid', 'age_results', 'age_causal_infection',
-           'cancer_detection', 'dalys', 'analyzer_map']
+           'dalys', 'analyzer_map']
 
 
 class Analyzer(sc.prettyobj):
@@ -669,15 +669,12 @@ class age_results(Analyzer):
                 rdict.size = na
                 rdict.by_genotype = False
             rdict.by_hiv = False
-            if '_with_hiv' in result_name:
-                result_name = result_name.replace('_with_hiv', '')  # remove "_with_hiv" from result name
-                rdict.by_hiv = True
-                rdict.hiv_attr = True
-            elif '_no_hiv' in result_name:
-                result_name = result_name.replace('_no_hiv', '')  # remove "_no_hiv" from result name
-                rdict.by_hiv = True
-                rdict.hiv_attr = False
-
+            hiv_labels = ['_with_hiv', '_no_hiv']
+            for hiv_label in hiv_labels:
+                if hiv_label in result_name:
+                    rdict.by_hiv = True
+                    rdict.hiv_attr = 'with' if 'with' in hiv_label else 'no'
+                    result_name = result_name.replace(hiv_label, '')  # remove "_with_hiv" or "_no_hiv" from result name
             # Figure out if it's a flow or incidence
             if result_name in hpd.flow_keys or 'incidence' in result_name or 'mortality' in result_name:
                 date_attr, attr = self.convert_rname_flows(result_name)
@@ -689,6 +686,15 @@ class age_results(Analyzer):
 
             rdict.attr = attr
             rdict.date_attr = date_attr
+
+            # Add special case for rate ratios
+            if result_name == 'cancer_hiv_rate_ratios':
+                rdict.by_hiv = True
+                rdict.hiv_attr = 'ratio'
+                result_name = 'cancers'
+                rdict.result_type = 'stock'
+                rdict.attr = 'cancerous'
+                rdict.date_attr = 'date_cancerous'
 
             # Initialize results
             for year in rdict.years:
@@ -740,10 +746,7 @@ class age_results(Analyzer):
             'cins':  ['date_cin', 'cin'],
             'cancers': ['date_cancerous', 'cancerous'],
             'cancer': ['date_cancerous', 'cancerous'],
-            'detected_cancer': ['date_detected_cancer', 'detected_cancer'],
-            'detected_cancers': ['date_detected_cancer', 'detected_cancer'],
             'cancer_deaths': ['date_dead_cancer', 'dead_cancer'],
-            'detected_cancer_deaths': ['date_dead_cancer', 'dead_cancer']
         }
         attr1 = mapping[attr][0]  # Messy way of turning 'total cancers' into 'date_cancerous' and 'cancerous' etc
         attr2 = mapping[attr][1]  # As above
@@ -781,16 +784,13 @@ class age_results(Analyzer):
                 # Figure out if it's a flow
                 if rdict.result_type == 'flow':
                     if not rdict.by_genotype:  # Results across all genotypes
-                        if rkey == 'detected_cancer_deaths':
-                            inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl['detected_cancer'])).nonzero()[-1]
+                        if rdict.by_hiv:
+                            if rdict.hiv_attr == 'with':
+                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl['hiv'])).nonzero()[-1]
+                            elif rdict.hiv_attr == 'no':
+                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (~ppl['hiv'])).nonzero()[-1]
                         else:
-                            if rdict.by_hiv:
-                                if rdict.hiv_attr:
-                                    inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (ppl['hiv'])).nonzero()[-1]
-                                else:
-                                    inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr]) * (~ppl['hiv'])).nonzero()[-1]
-                            else:
-                                inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr])).nonzero()[-1]
+                            inds = ((ppl[rdict.date_attr] == sim.t) * (ppl[rdict.attr])).nonzero()[-1]
                         self.results[rkey][date] += bin_ages(inds, bins)  # Bin the people
                     else:  # Results by genotype
                         for g in range(ng):  # Loop over genotypes
@@ -802,16 +802,23 @@ class age_results(Analyzer):
 
                     if not rdict.by_genotype:
                         if rdict.by_hiv:
-                            if rdict.hiv_attr:
+                            if rdict.hiv_attr == 'with':
                                 inds = (ppl[rdict.attr].any(axis=0) * ppl['hiv']).nonzero()[-1]
-                            else:
+                                self.results[rkey][date] = bin_ages(inds, bins)
+                            elif rdict.hiv_attr == 'no':
                                 inds = (ppl[rdict.attr].any(axis=0) * ~ppl['hiv']).nonzero()[-1]
+                                self.results[rkey][date] = bin_ages(inds, bins)
+                            elif rdict.hiv_attr == 'ratio':
+                                hiv_inds = (ppl[rdict.attr].any(axis=0) * ppl['hiv']).nonzero()[-1]
+                                no_hiv_inds = (ppl[rdict.attr].any(axis=0) * ~ppl['hiv']).nonzero()[-1]
+                                self.results[rkey][date] = sc.safedivide(bin_ages(hiv_inds, bins), bin_ages(no_hiv_inds, bins))
                         elif isinstance(rdict.attr, list):
                             inds = (ppl[rdict.attr[0]].any(axis=0) + ppl[rdict.attr[1]].any(axis=0)).nonzero()[-1]
                             inds = np.unique(inds)
+                            self.results[rkey][date] = bin_ages(inds, bins)
                         else:
                             inds = ppl[rdict.attr].any(axis=0).nonzero()[-1]
-                        self.results[rkey][date] = bin_ages(inds, bins)
+                            self.results[rkey][date] = bin_ages(inds, bins)
                     else:
                         for g in range(ng):
                             inds = ppl[rdict.attr][g, :].nonzero()[-1]
@@ -823,9 +830,9 @@ class age_results(Analyzer):
                 if 'prevalence' in rkey:
                     if 'hpv' in rkey:  # Denominator is whole population
                         if rdict.by_hiv:
-                            if rdict.hiv_attr:
+                            if rdict.hiv_attr == 'with':
                                 inds = sc.findinds(ppl['hiv'])
-                            else:
+                            elif rdict.hiv_attr == 'no':
                                 inds = sc.findinds(~ppl['hiv'])
                             denom = bin_ages(inds=inds, bins=bins)
                         else:
@@ -841,9 +848,9 @@ class age_results(Analyzer):
                         denom = bin_ages(inds=hpu.true(ppl.sus_pool), bins=bins)
                     else:  # Denominator is females at risk for cancer
                         if rdict.by_hiv:
-                            if rdict.hiv_attr:
+                            if rdict.hiv_attr == 'with':
                                 inds = sc.findinds(ppl.is_female_alive & ppl['hiv'] * ~ppl.cancerous.any(axis=0))
-                            else:
+                            elif rdict.hiv_attr == 'no':
                                 inds = sc.findinds(ppl.is_female_alive & ~ppl['hiv'] * ~ppl.cancerous.any(axis=0))
                         else:
                             inds = sc.findinds(ppl.is_female_alive & ~ppl.cancerous.any(axis=0))
@@ -1104,6 +1111,7 @@ class age_causal_infection(Analyzer):
         if self.start_year is None:
             self.start_year = sim['start']
         self.age_causal = []
+        self.age_cin = []
         self.age_cancer = []
         self.dwelltime = dict()
         for state in ['precin', 'cin', 'total']:
@@ -1120,6 +1128,7 @@ class age_causal_infection(Analyzer):
                 cin_time = (sim.t - date_cin) * sim['dt']
                 total_time = (sim.t - date_exposed) * sim['dt']
                 self.age_causal += (current_age - total_time).tolist()
+                self.age_cin += (current_age - cin_time).tolist()
                 self.age_cancer += current_age.tolist()
                 self.dwelltime['precin'] += hpv_time.tolist()
                 self.dwelltime['cin'] += cin_time.tolist()
@@ -1128,55 +1137,6 @@ class age_causal_infection(Analyzer):
 
     def finalize(self, sim=None):
         ''' Convert things to arrays '''
-
-
-class cancer_detection(Analyzer):
-    '''
-    Cancer detection via symptoms
-    
-    Args:
-        symp_prob: Probability of having cancer detected via symptoms, rather than screening
-        treat_prob: Probability of receiving treatment for those with symptom-detected cancer
-    '''
-
-    def __init__(self, symp_prob=0.01, treat_prob=0.01, product=None, **kwargs):
-        super().__init__(**kwargs)
-        self.symp_prob = symp_prob
-        self.treat_prob = treat_prob
-        self.product = product or hpi.radiation()
-
-    def initialize(self, sim):
-        super().initialize(sim)
-        self.dt = sim['dt']
-
-
-    def apply(self, sim):
-        '''
-        Check for new cancer detection, treat subset of detected cancers
-        '''
-        cancer_genotypes, cancer_inds = sim.people.cancerous.nonzero()  # Get everyone with cancer
-        new_detections, new_treatments = 0, 0
-
-        if len(cancer_inds) > 0:
-
-            detection_probs = np.full(len(cancer_inds), self.symp_prob / self.dt, dtype=hpd.default_float)  # Initialize probabilities of cancer detection
-            detection_probs[sim.people.detected_cancer[cancer_inds]] = 0
-            is_detected = hpu.binomial_arr(detection_probs)
-            is_detected_inds = cancer_inds[is_detected]
-            new_detections = len(is_detected_inds)
-
-            if new_detections>0:
-                sim.people.detected_cancer[is_detected_inds] = True
-                sim.people.date_detected_cancer[is_detected_inds] = sim.t
-                treat_probs = np.full(len(is_detected_inds), self.treat_prob)
-                treat_inds = is_detected_inds[hpu.binomial_arr(treat_probs)]
-                if len(treat_inds)>0:
-                    self.product.administer(sim, treat_inds)
-
-        # Update flows
-        sim.people.flows['detected_cancers'] = new_detections
-
-        return new_detections, new_treatments
 
 
 class dalys(Analyzer):
@@ -1244,7 +1204,6 @@ analyzer_map = {
     'age_pyramid': age_pyramid,
     'age_results': age_results,
     'age_causal_infection': age_causal_infection,
-    'cancer_detection': cancer_detection,
     'dalys': dalys,
 }
 

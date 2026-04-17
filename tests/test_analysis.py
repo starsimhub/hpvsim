@@ -212,26 +212,6 @@ def test_age_causal_analyzer(do_plot=True):
     return sim, a
 
 
-def test_detection():
-    sc.heading('Test detection analyzers')
-
-    pars = {
-        'n_agents': n_agents,
-        'n_years': 50,
-        'burnin': 20,
-        'start': 1980,
-        'genotypes': [16, 18],
-        'location': 'tanzania',
-        'dt': 1.,
-    }
-
-    sim = hpv.Sim(pars=pars, analyzers='cancer_detection')
-    sim.run()
-    a = sim.get_analyzer(hpv.cancer_detection)
-
-    return sim, a
-
-
 def test_dalys():
     dalys = hpv.dalys(start=2000)
     sim = hpv.Sim(analyzers=dalys)

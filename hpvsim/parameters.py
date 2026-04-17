@@ -267,7 +267,9 @@ def get_genotype_choices():
     choices = {
         'hpv16':    ['hpv16', '16'],
         'hpv18':    ['hpv18', '18'],
+        'hpv45':    ['hpv45', '45'],
         'hi5':      ['hi5hpv', 'hi5hpv', 'cross-protective'],
+        'hi4':      ['hi4', 'hi4hpv'],
         'ohr':      ['ohrhpv', 'non-cross-protective'],
         'hr':       ['allhr', 'allhrhpv', 'hrhpv', 'oncogenic', 'hr10', 'hi10'],
         'lo':       ['lohpv'],
@@ -347,6 +349,16 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hpv18.rel_beta         = 0.75  # Relative transmissibility, current estimate from Harvard model calibration of m2f tx
     pars.hpv18.sero_prob        = 0.56 # https://www.sciencedirect.com/science/article/pii/S2666679022000027#fig1
 
+    # using same parameter values as high-risk oncogenic types included in 9valent vaccine (31, 33, 45, 52, 58)
+    # Warning: this should not be used in conjuction with hi5 or hr
+    pars.hpv45 = sc.objdict()
+    pars.hpv45.dur_precin       = dict(dist='lognormal', par1=2.5, par2=9)  # Duration of infection prior to precancer
+    pars.hpv45.dur_cin          = dict(dist='lognormal', par1=4.5, par2=20) # Duration of infection prior to cancer
+    pars.hpv45.cin_fn           = dict(form='logf2', k=0.2, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
+    pars.hpv45.cancer_fn        = dict(method='cin_integral', transform_prob=1.5e-3)  # Function mapping duration of infection to severity
+    pars.hpv45.rel_beta         = 0.9 # placeholder
+    pars.hpv45.sero_prob        = 0.60 # placeholder
+
     # High-risk oncogenic types included in 9valent vaccine: 31, 33, 45, 52, 58
     pars.hi5 = sc.objdict()
     pars.hi5.dur_precin         = dict(dist='lognormal', par1=2.5, par2=9)  # Duration of infection prior to precancer
@@ -355,6 +367,16 @@ def get_genotype_pars(default=False, genotype=None):
     pars.hi5.cancer_fn          = dict(method='cin_integral', transform_prob=1.5e-3)  # Function mapping duration of infection to severity
     pars.hi5.rel_beta           = 0.9 # placeholder
     pars.hi5.sero_prob          = 0.60 # placeholder
+
+    # High-risk oncogenic types included in 9valent vaccine, excluding 45: 31, 33, 52, 58
+    # Warning: this should not be used in conjunction with hi5 or hr
+    pars.hi4 = sc.objdict()
+    pars.hi4.dur_precin         = dict(dist='lognormal', par1=2.5, par2=9)  # Duration of infection prior to precancer
+    pars.hi4.dur_cin            = dict(dist='lognormal', par1=4.5, par2=20) # Duration of infection prior to cancer
+    pars.hi4.cin_fn             = dict(form='logf2', k=0.2, x_infl=0, ttc=50)  # Function mapping duration of infection to probability of developing cin
+    pars.hi4.cancer_fn          = dict(method='cin_integral', transform_prob=1.5e-3)  # Function mapping duration of infection to severity
+    pars.hi4.rel_beta           = 0.9 # placeholder
+    pars.hi4.sero_prob          = 0.60 # placeholder
 
     # Other high-risk: oncogenic but not covered in 9valent vaccine: 35, 39, 51, 56, 59
     pars.ohr = sc.objdict()
@@ -366,7 +388,7 @@ def get_genotype_pars(default=False, genotype=None):
     pars.ohr.sero_prob          = 0.60 # placeholder
 
     # All other high-risk types: 31, 33, 35, 39, 45, 51, 52, 56, 58, 59
-    # Warning: this should not be used in conjuction with hi5 or ohr
+    # Warning: this should not be used in conjuction with hi5, 45/hi4, or ohr
     pars.hr = sc.objdict()
     pars.hr.dur_precin       = dict(dist='lognormal', par1=2, par2=10)  # Duration of infection prior to precancer
     pars.hr.dur_cin          = dict(dist='lognormal', par1=4, par2=4) # Duration of infection prior to cancer
@@ -396,7 +418,9 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
         hpv16 = dict(
             hpv16=1.0, # Default for own-immunity
             hpv18=cross_imm_high,
+            hpv45=cross_imm_med,
             hi5=cross_imm_med,
+            hi4=cross_imm_med,
             ohr=cross_imm_med,
             hr=cross_imm_med,
             lr=cross_imm_med,
@@ -405,7 +429,20 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
         hpv18 = dict(
             hpv16=cross_imm_high,
             hpv18=1.0,  # Default for own-immunity
+            hpv45=cross_imm_med,
             hi5=cross_imm_med,
+            hi4=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+
+        hpv45 = dict(
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv45=own_imm_hr,
+            hi5=cross_imm_med,
+            hi4=cross_imm_med,
             ohr=cross_imm_med,
             hr=cross_imm_med,
             lr=cross_imm_med,
@@ -414,7 +451,20 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
         hi5=dict(
             hpv16=cross_imm_med,
             hpv18=cross_imm_med,
+            hpv45=cross_imm_med,
             hi5=own_imm_hr,
+            hi4=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+
+        hi4=dict(
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv45=cross_imm_med,
+            hi5=cross_imm_med,
+            hi4=own_imm_hr,
             ohr=cross_imm_med,
             hr=cross_imm_med,
             lr=cross_imm_med,
@@ -423,16 +473,31 @@ def get_cross_immunity(cross_imm_med=None, cross_imm_high=None, own_imm_hr=None,
         ohr=dict(
             hpv16=cross_imm_med,
             hpv18=cross_imm_med,
+            hpv45=cross_imm_med,
             hi5=cross_imm_med,
+            hi4=cross_imm_med,
             ohr=own_imm_hr,
             hr=cross_imm_med,
+            lr=cross_imm_med,
+        ),
+
+        hr=dict(
+            hpv16=cross_imm_med,
+            hpv18=cross_imm_med,
+            hpv45=cross_imm_med,
+            hi5=cross_imm_med,
+            hi4=cross_imm_med,
+            ohr=cross_imm_med,
+            hr=own_imm_hr,
             lr=cross_imm_med,
         ),
 
         lr=dict(
             hpv16=cross_imm_med,
             hpv18=cross_imm_med,
+            hpv45=cross_imm_med,
             hi5=cross_imm_med,
+            hi4=cross_imm_med,
             ohr=cross_imm_med,
             hr=cross_imm_med,
             lr=own_imm_hr,
