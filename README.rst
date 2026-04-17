@@ -35,7 +35,7 @@ HPVsim has been used for analyses in several countries. Academic papers that hav
 Installation
 ------------
 
-The easiest way to install is simply via pip: ``pip install hpvsim``. Alternatively, you can clone this repository, then run ``pip install -e .`` (don't forget the dot!) in this folder to install ``hpvsim`` and its dependencies. This will make ``hpvsim`` available on the Python path. The first time HPVsim is imported, it will automatically download the required data files (~30 MB).
+The easiest way to install is simply via pip: ``pip install hpvsim``. Alternatively, you can clone this repository, then run ``pip install -e .`` (don't forget the dot!) in this folder to install ``hpvsim`` and its dependencies. This will make ``hpvsim`` available on the Python path. The first time HPVsim is imported, it will automatically download the required data files (~30 MB). You can also download the data manually by running ``hpvsim-download-data`` from the terminal.
 
 
 Usage and documentation
@@ -47,7 +47,7 @@ Documentation is available at https://docs.hpvsim.org. Additional usage examples
 Contributing
 ------------
 
-If you wish to contribute, please follow the Starsim style guide at: https://github.com/amath-idm/styleguide. See the code of conduct readme for more information.
+If you wish to contribute, please follow the Starsim style guide at: https://github.com/starsimhub/styleguide. See the code of conduct readme for more information.
 
 
 Disclaimer

@@ -47,6 +47,9 @@ dependencies = [
     'optuna',
 ]
 
+[project.scripts]
+hpvsim-download-data = "hpvsim.data.downloaders:download_data"
+
 [project.urls]
 "Website" = "https://hpvsim.org"
 "Source" = "https://github.com/institutefordiseasemodeling/hpvsim/"
