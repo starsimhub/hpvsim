@@ -1,0 +1,182 @@
+project:
+  type: website
+  pre-render: python quarto_utils.py pre
+  post-render: python quarto_utils.py post
+  output-dir: _site
+  title: "HPVsim"
+  execute-dir: file
+
+website:
+  title: "HPVsim"
+  image: /assets/idm-logo-transparent.png
+  favicon: /assets/favicon.ico
+
+  repo-url: https://github.com/starsimhub/hpvsim
+  repo-actions: [issue]
+  page-navigation: true
+  search:
+    type: overlay
+
+  page-footer:
+    center: "Docs built for HPVsim v{{< var version >}} ({{< var versiondate >}}).<br>© 2020–2026, Gates Foundation. All rights reserved. [Privacy and Cookies Notice](https://www.gatesfoundation.org/Privacy-and-Cookies-Notice) | [Terms of Use](https://www.gatesfoundation.org/Terms-of-Use)"
+    right:
+      - icon: github
+        href: https://github.com/starsimhub/hpvsim
+        aria-label: GitHub
+      - icon: envelope-at-fill
+        href: mailto:info@hpvsim.org
+      - icon: globe
+        href: https://hpvsim.org/
+
+  navbar:
+    logo: /assets/idm-logo-transparent.png
+    title: false
+    collapse-below: lg
+
+    tools:
+      - icon: github
+        href: https://github.com/starsimhub/hpvsim
+      - icon: envelope-at-fill
+        href: mailto:info@hpvsim.org
+      - icon: globe
+        href: https://hpvsim.org
+
+    left:
+      - href: index.md
+        text: Home
+      - href: whats-new.md
+        text: What's new
+      - href: tutorials.md
+        text: Tutorials
+      - href: overview.md
+        text: Overview
+      - href: conduct.md
+        text: Code of conduct
+      - href: api/index.qmd
+        text: API reference
+
+  sidebar:
+    - id: main
+      collapse-level: 3
+      contents:
+        - href: index.md
+          text: "**Home**"
+        - href: whats-new.md
+          text: "**What's new**"
+        - href: api/index.qmd
+          text: "**API reference**"
+        - section: "**Tutorials**"
+          contents:
+            - tutorials/tut_intro.ipynb
+            - tutorials/tut_plotting.ipynb
+            - tutorials/tut_running.ipynb
+            - tutorials/tut_people.ipynb
+            - tutorials/tut_interventions.ipynb
+            - tutorials/tut_analyzers.ipynb
+            - tutorials/tut_calibration.ipynb
+        - href: overview.md
+          text: "**Overview**"
+        - href: conduct.md
+          text: "**Code of conduct**"
+    - id: api
+      collapse-level: 2
+      contents:
+        - href: index.md
+          text: "**Home**"
+        - href: api/index.qmd
+          text: "**API reference**"
+        - section: "**Modules**"
+          contents:
+            - api/analysis.qmd
+            - api/base.qmd
+            - api/calibration.qmd
+            - api/defaults.qmd
+            - api/hiv.qmd
+            - api/immunity.qmd
+            - api/interventions.qmd
+            - api/misc.qmd
+            - api/parameters.qmd
+            - api/people.qmd
+            - api/plotting.qmd
+            - api/population.qmd
+            - api/run.qmd
+            - api/settings.qmd
+            - api/sim.qmd
+            - api/utils.qmd
+            - api/data.downloaders.qmd
+            - api/data.loaders.qmd
+
+format:
+  html:
+    theme:
+      light: [cosmo, ./assets/styles-light.scss]
+      dark: [cosmo, ./assets/styles-dark.scss]
+    css: ./assets/styles.css
+    toc: true
+    toc-depth: 3
+    highlight-style: github
+
+filters:
+  - machow/interlinks
+
+interlinks:
+  fast: false
+  sources:
+    python:
+      url: https://docs.python.org/3/
+    numpy:
+      url: https://numpy.org/doc/stable/
+    pandas:
+      url: https://pandas.pydata.org/pandas-docs/stable/
+    scipy:
+      url: https://docs.scipy.org/doc/scipy/
+    matplotlib:
+      url: https://matplotlib.org/stable/
+    sciris:
+      url: https://docs.sciris.org/en/latest/
+  autolink: true
+  aliases:
+    numpy: [np]
+    pandas: [pd]
+    matplotlib: [plt]
+    sciris: [sc]
+    hpvsim: [null, hpv]
+
+quartodoc:
+  package: hpvsim
+  title: API reference
+  style: pkgdown
+  dir: api
+  parser: google
+  render_interlinks: true
+  sections:
+    - title: API reference
+      desc: Full details on all HPVsim classes and functions.
+      contents:
+        - analysis
+        - base
+        - calibration
+        - defaults
+        - hiv
+        - immunity
+        - interventions
+        - misc
+        - parameters
+        - people
+        - plotting
+        - population
+        - run
+        - settings
+        - sim
+        - utils
+        - data.downloaders
+        - data.loaders
+
+execute:
+  freeze: auto
+  cache: true
+  error: false
+  echo: true
+  warning: true
+  env:
+    HPVSIM_DOCS_BUILD: "1"

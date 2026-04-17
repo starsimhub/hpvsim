@@ -166,7 +166,7 @@ class snapshot(Analyzer):
     Args:
         timepoints  (list): list of ints/strings/date objects, the days on which to take the snapshot
         die         (bool): whether or not to raise an exception if a date is not found (default true)
-        kwargs      (dict): passed to :py:class:`Analyzer`
+        kwargs      (dict): passed to `Analyzer`
 
 
     **Example**::
@@ -515,7 +515,7 @@ class age_results(Analyzer):
     Args:
         result_args (dict): dict of results to generate and associated years/age-bins to generate each result as well as whether to compute_fit
         die         (bool): whether or not to raise an exception if errors are found
-        kwargs      (dict): passed to :py:class:`Analyzer`
+        kwargs      (dict): passed to `Analyzer`
 
     **Example**::
 

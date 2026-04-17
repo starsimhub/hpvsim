@@ -79,9 +79,11 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
+# Sphinx (legacy) / Quarto documentation
 docs/_build/
 docs/api/_autosummary
+docs/_site/
+objects.json
 
 # PyBuilder
 target/

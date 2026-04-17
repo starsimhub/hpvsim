@@ -1,6 +1,6 @@
 include LICENSE
 global-include requirements*.txt
-global-include *.rst
+global-include *.md
 recursive-include hpvsim *.py
 recursive-include hpvsim *.csv
 recursive-include hpvsim *.json
