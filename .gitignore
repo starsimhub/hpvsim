@@ -2,6 +2,9 @@
 *.obj
 files/
 
+# Regression baselines (regenerate via tests/generate_v2_baselines.py)
+tests/regression_baselines/
+
 # Other files
 .idea
 .vscode
