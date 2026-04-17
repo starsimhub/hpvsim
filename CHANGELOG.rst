@@ -9,6 +9,12 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 2.2.6 (2026-04-17)
+---------------------------
+- Reconcile different copies of repository
+- *Github info* PR `75 <https://github.com/starsimhub/hpvsim/pull/75>`__
+
+
 Version 2.2.5 (2025-10-27)
 ---------------------------
 - Small bugfix for campaign vaccination
