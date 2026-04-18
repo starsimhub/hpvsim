@@ -68,6 +68,7 @@ website:
         - href: api/index.qmd
           text: "**API reference**"
         - section: "**Tutorials**"
+          file: tutorials.md
           contents:
             - tutorials/tut_intro.qmd
             - tutorials/tut_plotting.qmd
