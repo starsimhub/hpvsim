@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.42">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>T2 - Plotting, printing, and saving – HPVsim</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../tutorials/tut_running.html" rel="next">
+<link href="../tutorials/tut_intro.html" rel="prev">
+<link href="..//assets/favicon.ico" rel="icon">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-de84f8d6bb715db06a919283c2d1e787.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-9a023c9ade86a60361e96e3e3f11bc54.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-59543038ce2dbea0d2434f74fa4d1829.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-7ea877b0c499ea30230d408925a201b3.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+
+<body class="nav-sidebar floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../assets/starsim-logo.png" alt="" class="navbar-logo">
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="../index.html" aria-current="page"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../overview.html"> 
+<span class="menu-text">Overview</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../whats-new.html"> 
+<span class="menu-text">What’s new</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../tutorials.html"> 
+<span class="menu-text">Tutorials</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../conduct.html"> 
+<span class="menu-text">Code of conduct</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../api/index.html"> 
+<span class="menu-text">API reference</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools tools-wide">
+    <a href="https://github.com/starsimhub/hpvsim" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="mailto:info@hpvsim.org" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-envelope-at-fill"></i></a>
+    <a href="https://hpvsim.org" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-globe"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../tutorials/tut_intro.html"><strong>Tutorials</strong></a></li><li class="breadcrumb-item"><a href="../tutorials/tut_plotting.html">T2 - Plotting, printing, and saving</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>Home</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../overview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>Overview</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../whats-new.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>What’s new</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Tutorials</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../tutorials/tut_intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">T1 - Getting started</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../tutorials/tut_plotting.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">T2 - Plotting, printing, and saving</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../tutorials/tut_running.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">T3 - Running scenarios</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../tutorials/tut_people.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">T4 - People, populations, and networks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../tutorials/tut_interventions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">T5 - Using interventions</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../tutorials/tut_analyzers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">T6 - Using analyzers</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../tutorials/tut_calibration.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">T7 - Calibration</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../conduct.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>Code of conduct</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../api/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>API reference</strong></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="3">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#global-plotting-configuration" id="toc-global-plotting-configuration" class="nav-link active" data-scroll-target="#global-plotting-configuration">Global plotting configuration</a></li>
+  <li><a href="#printing-objects" id="toc-printing-objects" class="nav-link" data-scroll-target="#printing-objects">Printing objects</a></li>
+  <li><a href="#plotting-options" id="toc-plotting-options" class="nav-link" data-scroll-target="#plotting-options">Plotting options</a></li>
+  <li><a href="#customizing-plots" id="toc-customizing-plots" class="nav-link" data-scroll-target="#customizing-plots">Customizing plots</a></li>
+  <li><a href="#saving-options" id="toc-saving-options" class="nav-link" data-scroll-target="#saving-options">Saving options</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/starsimhub/hpvsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../tutorials/tut_intro.html"><strong>Tutorials</strong></a></li><li class="breadcrumb-item"><a href="../tutorials/tut_plotting.html">T2 - Plotting, printing, and saving</a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title">T2 - Plotting, printing, and saving</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This tutorial provides a brief overview of options for plotting results, printing objects, and saving results.</p>
+<div class="alert alert-info">
+<p>Click <a href="https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_plotting.ipynb">here</a> to open an interactive version of this notebook.</p>
+</div>
+<section id="global-plotting-configuration" class="level2">
+<h2 class="anchored" data-anchor-id="global-plotting-configuration">Global plotting configuration</h2>
+<p>HPVsim allows the user to set various options that apply to all plots. You can change the font size, default DPI, whether plots should be shown by default, etc. (for the full list, see <code>hpv.options.help()</code>). For example, we might want higher resolution, to turn off automatic figure display, close figures after they’re rendered, and to turn off the messages that print when a simulation is running. We can do this using built-in defaults for Jupyter notebooks (and then run a sim) with:</p>
+<div id="13ab4ec7" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> hpvsim <span class="im">as</span> hpv</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>hpv.options(jupyter<span class="op">=</span><span class="va">True</span>, verbose<span class="op">=</span><span class="dv">0</span>) <span class="co"># Standard options for Jupyter notebook</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>sim <span class="op">=</span> hpv.Sim()</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>sim.run()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>HPVsim 2.2.6 (2026-04-17) — © 2023-2026 by the Gates Foundation
+Loading location-specific demographic data for "nigeria"</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="1">
+<pre><code>Sim(&lt;no label&gt;; 1995.0 to 2030.0; pop: 20000 default; epi: 8.24814e+08⚙, 512386♋︎)</code></pre>
+</div>
+</div>
+</section>
+<section id="printing-objects" class="level2">
+<h2 class="anchored" data-anchor-id="printing-objects">Printing objects</h2>
+<p>There are three levels of detail available for most objects (sims, multisims, scenarios, and people). The shortest is <code>brief()</code>:</p>
+<div id="df5802ac" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>sim.brief()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Sim(&lt;no label&gt;; 1995.0 to 2030.0; pop: 20000 default; epi: 8.24814e+08⚙, 512386♋︎)</code></pre>
+</div>
+</div>
+<p>You can get more detail with <code>summarize()</code>:</p>
+<div id="f26c38c0" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>sim.summarize()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Simulation summary:
+     824,814,324 total HPV infections
+         512,386 total cancers
+         275,606 total cancer deaths
+           14.47 mean HPV prevalence (%)
+           14.72 mean cancer incidence (per 100k)
+           33.14 mean age of infection (years)
+           46.65 mean age of cancer (years)
+           49.93 mean age of cancer death (years)
+</code></pre>
+</div>
+</div>
+<p>Finally, to show the full object, including all methods and attributes, use <code>disp()</code>:</p>
+<div id="5542193c" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>sim.disp()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;hpvsim.sim.Sim at 0x710d8f380830&gt;
+[&lt;class 'hpvsim.sim.Sim'&gt;, &lt;class 'hpvsim.base.BaseSim'&gt;, &lt;class 'hpvsim.base.ParsObj'&gt;, &lt;class 'hpvsim.base.FlexPretty'&gt;, &lt;class 'sciris.sc_printing.prettyobj'&gt;]
+————————————————————————————————————————————————————————————————————————
+Methods:
+  _brief()                get_intervention()      reset_layer_pars()      
+  _disp()                 get_interventions()     result_keys()           
+  _get_ia()               get_t()                 result_types()          
+  brief()                 init_analyzers()        run()                   
+  compute_age_mean()      init_genotypes()        save()                  
+  compute_fit()           init_hiv()              set_metadata()          
+  compute_results()       init_immunity()         shrink()                
+  compute_states()        init_interventions()    step()                  
+  compute_summary()       init_people()           summarize()             
+  copy()                  init_results()          to_df()                 
+  disp()                  init_states()           to_excel()              
+  export_pars()           init_time_vecs()        to_json()               
+  export_results()        initialize()            update_pars()           
+  finalize()              layer_keys()            validate_dt()           
+  finalize_analyzers()    load()                  validate_init_condi...  
+  get_analyzer()          load_data()             validate_layer_pars()   
+  get_analyzers()         plot()                  validate_pars()         
+————————————————————————————————————————————————————————————————————————
+Properties:
+  n                       
+————————————————————————————————————————————————————————————————————————
+ _default_ver: None
+   _orig_pars: {'n_agents': 20000, 'total_pop': None, 'pop_scale':
+               5468.3692, 'ms_ [...]
+    analyzers: []
+ art_datafile: None
+     complete: True
+      created: None
+         data: None
+     datafile: None
+ hiv_datafile: None
+       hivsim: &lt;hpvsim.hiv.HIVsim at 0x710d8f381550&gt;
+
+  initialized: True
+interventions: []
+        label: None
+         npts: 144
+         pars: {'n_agents': 20000, 'total_pop': None, 'pop_scale':
+               5468.3692, 'ms_ [...]
+       people: People(n=68376; layers: m, c)
+      popdict: None
+      popfile: None
+     res_npts: 36
+     res_tvec: array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11,
+               12, 13, 14,  [...]
+  res_yearvec: array([1995., 1996., 1997., 1998., 1999., 2000., 2001.,
+               2002., 2003 [...]
+      resfreq: 4
+      results: #0. 'infections':
+               &lt;hpvsim.base.Result at 0x710d8f381010&gt;
+               [&lt;class 'h [...]
+results_ready: True
+short_summary: #0: 'total HPV infections':             824814324.5
+               #1: 'total canc [...]
+      summary: #0. 'infections':            27453947.0
+               #1. 'cins':                 [...]
+            t: 143
+         tvec: array([  0,   1,   2,   3,   4,   5,   6,   7,   8,
+               9,  10,  11,  [...]
+        years: array([1995., 1996., 1997., 1998., 1999., 2000., 2001.,
+               2002., 2003 [...]
+      yearvec: array([1995.  , 1995.25, 1995.5 , 1995.75, 1996.  ,
+               1996.25, 1996.5 [...]
+————————————————————————————————————————————————————————————————————————
+</code></pre>
+</div>
+</div>
+</section>
+<section id="plotting-options" class="level2">
+<h2 class="anchored" data-anchor-id="plotting-options">Plotting options</h2>
+<p>While a sim can be plotted using default settings simply by <code>sim.plot()</code>, this is just a small fraction of what’s available. First, note that results can be plotted directly using e.g.&nbsp;Matplotlib. You can see what quantities are available for plotting with <code>sim.results.keys()</code> (remember, it’s just a dict). A simple example of plotting using Matplotlib is:</p>
+<div id="29bffce0" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pylab <span class="im">as</span> plt <span class="co"># Shortcut for import matplotlib.pyplot as plt</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>plt.plot(sim.results[<span class="st">'year'</span>], sim.results[<span class="st">'infections'</span>])<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="tut_plotting_files/figure-html/cell-6-output-1.png" width="571" height="425" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>However, as you can see, this isn’t ideal since the default formatting is…not great. (Also, note that each result is a <a href="../api/base.html#hpvsim.base.Result" title="0"><code>Result</code></a> object, not a simple Numpy array; like a pandas dataframe, you can get the array of values directly via e.g.&nbsp;<code>sim.results.infections.values</code>.)</p>
+<p>An alternative, you can also select one or more quantities to plot with the first (<code>to_plot</code>) argument, e.g.</p>
+<div id="6e884575" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>sim.plot(to_plot<span class="op">=</span>[<span class="st">'infections'</span>, <span class="st">'hpv_incidence'</span>])<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="tut_plotting_files/figure-html/cell-7-output-1.png" width="950" height="758" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>While we can save this figure using Matplotlib’s built-in <a href="../api/misc.html#hpvsim.misc.savefig" title="0"><code>savefig()</code></a>, if we use HPVsim’s <a href="../api/misc.html#hpvsim.misc.savefig" title="0"><code>hpv.savefig()</code></a> we get a couple of advantages:</p>
+<div id="e778b4fa" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>hpv.savefig(<span class="st">'my-fig.png'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
+<pre><code>'my-fig.png'</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>&lt;Figure size 672x480 with 0 Axes&gt;</code></pre>
+</div>
+</div>
+<p>First, it saves the figure at higher resolution by default (which you can adjust with the <code>dpi</code> argument). But second, it stores information about the code that was used to generate the figure as metadata, which can be loaded later. Made an awesome plot but can’t remember even what script you ran to generate it, much less what version of the code? You’ll never have to worry about that again.</p>
+<div id="76150a0a" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>hpv.get_png_metadata(<span class="st">'my-fig.png'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>HPVsim version: 2.2.6
+HPVsim branch: quarto
+HPVsim hash: 9e21854
+HPVsim date: 2026-04-18 02:28:39 UTC
+HPVsim caller branch: quarto
+HPVsim caller hash: 9e21854
+HPVsim caller date: 2026-04-18 02:28:39 UTC
+HPVsim caller filename: /home/cliffk/idm/hpvsim/hpvsim/misc.py
+HPVsim current time: 2026-Apr-17 22:32:35
+HPVsim calling file: /tmp/ipykernel_838472/1797766398.py</code></pre>
+</div>
+</div>
+</section>
+<section id="customizing-plots" class="level2">
+<h2 class="anchored" data-anchor-id="customizing-plots">Customizing plots</h2>
+<p>We saw above how to set default plot configuration options for Jupyter. HPVsim provides a lot of flexibility in customizing the appearance of plots as well. There are three different levels at which you can set plotting options: global, just for HPVsim, or just for the current plot. To give an example with changing the figure DPI: - Change the setting globally (for both HPVsim and Matplotlib): <code>sc.options(dpi=150)</code> or <code>pl.rc('figure', dpi=150)</code> (where <code>sc</code> is <code>import sciris as sc</code>) - Change for HPVsim plots, but not for Matplotlib plots: <code>hpv.options(dpi=150)</code> - Change for the current HPVsim plot, but not other HPVsim plots: <code>sim.plot(dpi=150)</code></p>
+<p>The easiest way to change the style of HPVsim plots is with the <code>style</code> argument. For example, to plot using a built-in Matplotlib style would simply be:</p>
+<div id="a43c8540" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>sim.plot(style<span class="op">=</span><span class="st">'ggplot'</span>)<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="tut_plotting_files/figure-html/cell-10-output-1.png" width="950" height="758" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In addition to the default style (<code>'hpvsim'</code>), there is also a “simple” style. You can combine built-in styles with additional overrides, including any valid Matplotlib commands:</p>
+<div id="23b3e328" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>sim.plot(style<span class="op">=</span><span class="st">'simple'</span>, legend_args<span class="op">=</span>{<span class="st">'frameon'</span>:<span class="va">True</span>}, style_args<span class="op">=</span>{<span class="st">'ytick.direction'</span>:<span class="st">'in'</span>})<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="tut_plotting_files/figure-html/cell-11-output-1.png" width="950" height="758" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Although most style handling is done automatically, you can also use it yourself in a with block, e.g.:</p>
+<div id="ca3f96a8" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> hpv.options.with_style(fontsize<span class="op">=</span><span class="dv">6</span>):</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    sim.plot() <span class="co"># This will have 6 point font</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    plt.figure()<span class="op">;</span> plt.plot(np.random.rand(<span class="dv">20</span>), <span class="st">'o'</span>) <span class="co"># So will this</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="tut_plotting_files/figure-html/cell-12-output-1.png" width="962" height="770" class="figure-img"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="tut_plotting_files/figure-html/cell-12-output-2.png" width="562" height="406" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="saving-options" class="level2">
+<h2 class="anchored" data-anchor-id="saving-options">Saving options</h2>
+<p>Saving sims is also pretty simple. The simplest way to save is simply</p>
+<div id="431cd2de" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>sim.save(<span class="st">'my-sim.sim'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<pre><code>'/home/cliffk/idm/hpvsim/docs/tutorials/my-sim.sim'</code></pre>
+</div>
+</div>
+<p>Technically, this saves as a gzipped pickle file (via <code>sc.saveobj()</code> using the Sciris library). By default this does not save the people in the sim since they are very large (and since, if the random seed is saved, they can usually be regenerated). If you want to save the people as well, you can use the <code>keep_people</code> argument. For example, here’s what it would look like to create a sim, run it halfway, save it, load it, change the overall transmissibility (beta), and finish running it:</p>
+<div id="446590c3" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>sim_orig <span class="op">=</span> hpv.Sim(start<span class="op">=</span><span class="dv">2000</span>, end<span class="op">=</span><span class="dv">2030</span>, label<span class="op">=</span><span class="st">'Load &amp; save example'</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>sim_orig.run(until<span class="op">=</span><span class="st">'2015'</span>)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>sim_orig.save(<span class="st">'my-half-finished-sim.sim'</span>) <span class="co"># Note: HPVsim always saves the people if the sim isn't finished running yet</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>sim <span class="op">=</span> hpv.load(<span class="st">'my-half-finished-sim.sim'</span>)</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>sim[<span class="st">'beta'</span>] <span class="op">*=</span> <span class="fl">0.3</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>sim.run()</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>sim.plot([<span class="st">'infections'</span>, <span class="st">'hpv_incidence'</span>, <span class="st">'cancer_incidence'</span>])<span class="op">;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Loading location-specific demographic data for "nigeria"</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="tut_plotting_files/figure-html/cell-14-output-2.png" width="950" height="758" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Aside from saving the entire simulation, there are other export options available. You can export the results and parameters to a JSON file (using <code>sim.to_json()</code>), but probably the most useful is to export the results to an Excel workbook, where they can easily be stored and processed with e.g.&nbsp;Pandas:</p>
+<div id="71d26bbd" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>sim.to_excel(<span class="st">'my-sim.xlsx'</span>)</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.read_excel(<span class="st">'my-sim.xlsx'</span>)</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Object saved to /home/cliffk/idm/hpvsim/docs/tutorials/my-sim.xlsx.
+    year   t   infections          cins       cancers  cancer_deaths  \
+0   2000   0  29432950.50  3.191645e+05      0.000000       0.000000   
+1   2001   1  24800701.50  6.345888e+05      0.000000       0.000000   
+2   2002   2  24262734.50  7.237304e+05      0.000000       0.000000   
+3   2003   3  24298267.50  8.191058e+05   1246.736328       0.000000   
+4   2004   4  25373577.50  8.110020e+05   1870.104492       0.000000   
+5   2005   5  25192177.50  1.075933e+06   2493.472656       0.000000   
+6   2006   6  25499498.50  1.063466e+06   3116.840820       0.000000   
+7   2007   7  24237801.00  1.000506e+06   4986.945312       0.000000   
+8   2008   8  24950311.00  1.012350e+06   8103.786133       0.000000   
+9   2009   9  24485901.00  8.540144e+05   7480.417969       0.000000   
+10  2010  10  24741482.00  1.061596e+06   7480.417969     623.368164   
+11  2011  11  24876753.50  8.365601e+05  14337.467773    2493.472656   
+12  2012  12  25190930.00  8.758322e+05  12467.363281    2493.472656   
+13  2013  13  23411838.50  8.976501e+05   8103.786133    2493.472656   
+14  2014  14  23471681.00  9.119876e+05  17454.308594    1870.104492   
+15  2015  15  18640577.00  9.250783e+05  13090.731445    4986.945312   
+16  2016  16  18196115.50  8.783257e+05  24934.726562    6857.049805   
+17  2017  17  17175039.50  8.770790e+05  18077.676758    8103.786133   
+18  2018  18  16574735.25  8.440405e+05  19324.413086   11220.626953   
+19  2019  19  16471880.50  7.162500e+05  20571.149414    8727.154297   
+20  2020  20  16170793.75  7.293407e+05  23064.622070   10597.258789   
+21  2021  21  15114184.50  6.520431e+05  18077.676758   11843.995117   
+22  2022  22  14270143.50  6.557833e+05  19324.413086   16207.572266   
+23  2023  23  14301312.50  6.071606e+05  18701.044922   15584.204102   
+24  2024  24  14079393.75  6.539132e+05  13090.731445   19947.781250   
+25  2025  25  13768956.00  6.713675e+05  17454.308594    8727.154297   
+26  2026  26  13395558.25  5.292396e+05  21194.517578   22441.253906   
+27  2027  27  13011563.50  6.046671e+05  21817.885742   12467.363281   
+28  2028  28  12520349.75  6.963022e+05  26804.831055   13090.731445   
+29  2029  29  12534687.50  4.856038e+05  18077.676758   13090.731445   
+30  2030  30  12262898.50  5.036815e+05  21817.885742   12467.363281   
+
+    reinfections  reactivations  n_susceptible  n_infectious  ...  \
+0   1.035415e+07              0      348562496      22623898  ...   
+1   1.648248e+07              0      358287040      22547848  ...   
+2   1.704912e+07              0      367606400      23155632  ...   
+3   1.803903e+07              0      378315872      23915520  ...   
+4   1.907569e+07              0      388794688      24581276  ...   
+5   1.925148e+07              0      400040224      24798208  ...   
+6   1.982498e+07              0      412021344      25291292  ...   
+7   1.899216e+07              0      424650816      25538146  ...   
+8   1.964108e+07              0      437049632      25972010  ...   
+9   1.952826e+07              0      450944512      25616068  ...   
+10  1.960867e+07              0      464920448      25843596  ...   
+11  1.970654e+07              0      478572192      26255018  ...   
+12  2.008056e+07              0      492741312      26480678  ...   
+13  1.934872e+07              0      507995136      26329200  ...   
+14  1.906509e+07              0      523242752      26322964  ...   
+15  1.500198e+07              0      541681920      23843832  ...   
+16  1.495460e+07              0      557085440      22890702  ...   
+17  1.387056e+07              0      572519936      22227438  ...   
+18  1.334507e+07              0      588116608      21535500  ...   
+19  1.315556e+07              0      602329408      21231920  ...   
+20  1.298850e+07              0      616560960      20624758  ...   
+21  1.210893e+07              0      630755072      20328656  ...   
+22  1.131538e+07              0      645603648      19480876  ...   
+23  1.127174e+07              0      659398784      19494590  ...   
+24  1.144005e+07              0      674845824      19099998  ...   
+25  1.102863e+07              0      689507392      18930442  ...   
+26  1.081419e+07              0      704374784      18578238  ...   
+27  1.052308e+07              0      719834240      17893156  ...   
+28  9.989475e+06              0      735187840      17447448  ...   
+29  9.735140e+06              0      750267136      17336488  ...   
+30  9.627922e+06              0      765745344      17011092  ...   
+
+    cum_cin_treated  cum_cancer_treatments  cum_cancer_treated  \
+0                 0                      0                   0   
+1                 0                      0                   0   
+2                 0                      0                   0   
+3                 0                      0                   0   
+4                 0                      0                   0   
+5                 0                      0                   0   
+6                 0                      0                   0   
+7                 0                      0                   0   
+8                 0                      0                   0   
+9                 0                      0                   0   
+10                0                      0                   0   
+11                0                      0                   0   
+12                0                      0                   0   
+13                0                      0                   0   
+14                0                      0                   0   
+15                0                      0                   0   
+16                0                      0                   0   
+17                0                      0                   0   
+18                0                      0                   0   
+19                0                      0                   0   
+20                0                      0                   0   
+21                0                      0                   0   
+22                0                      0                   0   
+23                0                      0                   0   
+24                0                      0                   0   
+25                0                      0                   0   
+26                0                      0                   0   
+27                0                      0                   0   
+28                0                      0                   0   
+29                0                      0                   0   
+30                0                      0                   0   
+
+    cancer_mortality    n_alive       cdr       cbr  hpv_prevalence  \
+0           0.000000  124214208  0.016310  0.043360        0.182136   
+1           0.000000  127442000  0.013163  0.042408        0.176926   
+2           0.000000  130848712  0.013497  0.042257        0.176965   
+3           0.000000  134483568  0.011829  0.042227        0.177832   
+4           0.000000  138099712  0.011858  0.042070        0.177997   
+5           0.000000  141841184  0.013664  0.041927        0.174831   
+6           0.000000  145753440  0.010508  0.041913        0.173521   
+7           0.000000  149782880  0.010767  0.041660        0.170501   
+8           0.000000  153921440  0.010959  0.041593        0.168735   
+9           0.000000  158216432  0.011840  0.041251        0.161905   
+10          0.779454  162677248  0.010216  0.040963        0.158864   
+11          3.035040  167264624  0.011028  0.040623        0.156967   
+12          2.955695  171919936  0.011665  0.039921        0.154029   
+13          2.877533  176605152  0.012403  0.039286        0.149085   
+14          2.101135  181456224  0.010742  0.038785        0.145065   
+15          5.457213  186265504  0.006874  0.038085        0.128010   
+16          7.323326  190953216  0.010655  0.036824        0.119876   
+17          8.446825  195789952  0.010707  0.035787        0.113527   
+18         11.412197  200584896  0.011039  0.034807        0.107364   
+19          8.684056  205209664  0.010210  0.033901        0.103465   
+20         10.322361  209689216  0.010708  0.032969        0.098359   
+21         11.299167  214110752  0.010411  0.032841        0.094945   
+22         15.138723  218693120  0.009418  0.032495        0.089079   
+23         14.260534  223233728  0.010137  0.032281        0.087328   
+24         17.870906  228110352  0.008196  0.031837        0.083731   
+25          7.656591  232939584  0.009540  0.031498        0.081268   
+26         19.292916  237756960  0.009580  0.031148        0.078140   
+27         10.504257  242645424  0.009431  0.030726        0.073742   
+28         10.818051  247576896  0.009296  0.030391        0.070473   
+29         10.605258  252598112  0.008961  0.030083        0.068633   
+30          9.898883  257652384  0.009482  0.029638        0.066023   
+
+    precin_prevalence  cin_prevalence  
+0            0.057622        0.004356  
+1            0.055229        0.010807  
+2            0.054935        0.016171  
+3            0.053854        0.020504  
+4            0.052341        0.023398  
+5            0.050582        0.028022  
+6            0.048756        0.031626  
+7            0.047692        0.031925  
+8            0.046777        0.033243  
+9            0.044964        0.030496  
+10           0.043005        0.031061  
+11           0.042685        0.029402  
+12           0.041286        0.029350  
+13           0.039763        0.028092  
+14           0.038645        0.027532  
+15           0.035458        0.027122  
+16           0.033319        0.025459  
+17           0.031271        0.024041  
+18           0.029196        0.023611  
+19           0.027636        0.023199  
+20           0.026488        0.022630  
+21           0.025253        0.021617  
+22           0.023593        0.019948  
+23           0.023241        0.018864  
+24           0.022193        0.018575  
+25           0.021437        0.018425  
+26           0.020659        0.017353  
+27           0.019162        0.016114  
+28           0.018210        0.016624  
+29           0.018066        0.015797  
+30           0.017269        0.014358  
+
+[31 rows x 58 columns]</code></pre>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../tutorials/tut_intro.html" class="pagination-link" aria-label="T1 - Getting started">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">T1 - Getting started</span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../tutorials/tut_running.html" class="pagination-link" aria-label="T3 - Running scenarios">
+        <span class="nav-page-text">T3 - Running scenarios</span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Docs built for HPVsim v2.2.6 (2026-04-17).<br>© 2020–2026, Gates Foundation. All rights reserved. <a href="https://www.gatesfoundation.org/Privacy-and-Cookies-Notice">Privacy and Cookies Notice</a> | <a href="https://www.gatesfoundation.org/Terms-of-Use">Terms of Use</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/starsimhub/hpvsim/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/starsimhub/hpvsim">
+      <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+    </a>
+  </li>  
+    <li class="nav-item compact">
+    <a class="nav-link" href="mailto:info@hpvsim.org">
+      <i class="bi bi-envelope-at-fill" role="img">
+</i> 
+    </a>
+  </li>  
+    <li class="nav-item compact">
+    <a class="nav-link" href="https://hpvsim.org/">
+      <i class="bi bi-globe" role="img">
+</i> 
+    </a>
+  </li>  
+</ul>
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
