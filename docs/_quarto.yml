@@ -42,33 +42,30 @@ website:
         href: https://hpvsim.org
 
     left:
-      - href: index.md
-        text: Home
-      - href: overview.md
-        text: Overview
-      - href: whats-new.md
-        text: What's new
-      - href: tutorials.md
-        text: Tutorials
-      - href: conduct.md
-        text: Code of conduct
-      - href: api/index.qmd
-        text: API reference
+      - text: Home
+        href: index.md
+      - text: Overview
+        href: overview.md
+      - text: What's new
+        href: whats-new.md
+      - text: Tutorials
+        href: tutorials.md
+      - text: Code of conduct
+        href: conduct.md
+      - text: API reference
+        href: api/index.qmd
 
   sidebar:
     - id: main
       collapse-level: 3
       contents:
-        - href: index.md
-          text: "**Home**"
-        - href: overview.md
-          text: "**Overview**"
-        - href: whats-new.md
-          text: "**What's new**"
-        - href: api/index.qmd
-          text: "**API reference**"
+        - text: "**Home**"
+          href: index.md
+        - text: "**Overview**"
+          href: overview.md
+        - text: "**What's new**"
+          href: whats-new.md
         - section: "**Tutorials**"
-          file: tutorials.md
           contents:
             - tutorials/tut_intro.qmd
             - tutorials/tut_plotting.qmd
@@ -79,13 +76,15 @@ website:
             - tutorials/tut_calibration.qmd
         - href: conduct.md
           text: "**Code of conduct**"
+        - text: "**API reference**"
+          href: api/index.qmd
     - id: api
-      collapse-level: 2
+      collapse-level: 3
       contents:
-        - href: index.md
-          text: "**Home**"
-        - href: api/index.qmd
-          text: "**API reference**"
+        - text: "**Home**"
+          href: index.md
+        - text: "**API reference**"
+          href: api/index.qmd
         - section: "**Modules**"
           contents:
             - api/analysis.qmd
@@ -136,12 +135,15 @@ interlinks:
       url: https://matplotlib.org/stable/
     sciris:
       url: https://docs.sciris.org/en/latest/
+    starsim:
+      url: https://docs.starsim.org/
   autolink: true
   aliases:
     numpy: [np]
     pandas: [pd]
     matplotlib: [plt]
     sciris: [sc]
+    starsim: [ss]
     hpvsim: [null, hpv]
 
 quartodoc:
