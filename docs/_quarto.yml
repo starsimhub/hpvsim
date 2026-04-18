@@ -1,7 +1,6 @@
 project:
   type: website
   pre-render: python quarto_utils.py pre
-  post-render: python quarto_utils.py post
   output-dir: _site
   title: "HPVsim"
   execute-dir: file
@@ -67,13 +66,13 @@ website:
           text: "**API reference**"
         - section: "**Tutorials**"
           contents:
-            - tutorials/tut_intro.ipynb
-            - tutorials/tut_plotting.ipynb
-            - tutorials/tut_running.ipynb
-            - tutorials/tut_people.ipynb
-            - tutorials/tut_interventions.ipynb
-            - tutorials/tut_analyzers.ipynb
-            - tutorials/tut_calibration.ipynb
+            - tutorials/tut_intro.qmd
+            - tutorials/tut_plotting.qmd
+            - tutorials/tut_running.qmd
+            - tutorials/tut_people.qmd
+            - tutorials/tut_interventions.qmd
+            - tutorials/tut_analyzers.qmd
+            - tutorials/tut_calibration.qmd
         - href: overview.md
           text: "**Overview**"
         - href: conduct.md
