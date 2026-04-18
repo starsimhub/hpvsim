@@ -44,12 +44,12 @@ website:
     left:
       - href: index.md
         text: Home
+      - href: overview.md
+        text: Overview
       - href: whats-new.md
         text: What's new
       - href: tutorials.md
         text: Tutorials
-      - href: overview.md
-        text: Overview
       - href: conduct.md
         text: Code of conduct
       - href: api/index.qmd
@@ -61,6 +61,8 @@ website:
       contents:
         - href: index.md
           text: "**Home**"
+        - href: overview.md
+          text: "**Overview**"
         - href: whats-new.md
           text: "**What's new**"
         - href: api/index.qmd
@@ -74,8 +76,6 @@ website:
             - tutorials/tut_interventions.qmd
             - tutorials/tut_analyzers.qmd
             - tutorials/tut_calibration.qmd
-        - href: overview.md
-          text: "**Overview**"
         - href: conduct.md
           text: "**Code of conduct**"
     - id: api
@@ -113,6 +113,7 @@ format:
       dark: [cosmo, ./assets/styles-dark.scss]
     css: ./assets/styles.css
     toc: true
+    toc-expand: 3
     toc-depth: 3
     highlight-style: github
 
