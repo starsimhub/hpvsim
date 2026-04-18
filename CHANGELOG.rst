@@ -9,6 +9,11 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
+Version 2.3.0 (2026-04-18)
+---------------------------
+- TBC
+
+
 Version 2.2.6 (2026-04-17)
 ---------------------------
 - Reconcile different copies of repository
