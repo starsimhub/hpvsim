@@ -1,0 +1,92 @@
+---
+title: T7 - Calibration
+jupyter: python3
+---
+
+
+Tutorial 2 demonstrated how to run the model and plot the outputs. But it's entirely possible that the model outputs won't look like the data for the country that you wish to model. The default parameter values included in HPVsim are intended as points of departure to be iteratively refined via calibration. The process of model calibration involves finding the model parameters that are the most likely explanation for the observed data. This tutorial gives an introduction to the Fit object and some recipes for optimization approaches.
+
+
+<div class="alert alert-info">
+    
+Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_calibration.ipynb) to open an interactive version of this notebook.
+    
+</div>
+
+## Data types supported by HPVsim
+
+Data on HPV and cervical disease comes in many different formats. When using HPVsim, the goal is typically to produce population-level estimates of epidemic outputs like:
+    - age-specific incidence of cancer or high-grade lesions in one or more years;
+    - number of cases of cancer or high-grade lesions reported in one or more years;
+    - HPV prevalence over time;
+    - lifetime incidence of HPV;
+    - the distribution of genotypes in detected cases of cancer/high-grade lesions;
+    - sexual behavior metrics like the average age at first marriage, duration of relationships, or number of lifetime partners.
+
+After running HPVsim, estimates all of these variables are included within the `results` dictionary. To plot them alongside data, the easiest method is to use the `Calibration` object.
+
+
+## The Calibration object
+
+Calibration objects contain the following ingredients:
+    - an `hpv.Sim()` instance with details of the model configuration;
+    - two lists of parameters to vary, one for parameters that vary by genotype and one for those that don't;
+    - dataframes that hold the calibration targets, which are typically added as csv files;
+    - a list of any additional results to plot;
+    - settings that are passed to the Optuna package[LINK], an open source hyperparameter optimization framework that automates calibration for HPVsim.
+
+We have included Optuna as a built-in calibration option as we have found that it works reasonably well, but it is also possible to use other methods; we will discuss this a little further down.
+
+The example below illustrates the general idea of calibration, and can be adapted for different use cases:
+
+```{python}
+#| pycharm: {is_executing: true}
+# Import HPVsim
+import hpvsim as hpv
+
+# Configure a simulation with some parameters
+pars = dict(n_agents=10e3, start=1980, end=2020, dt=0.25, location='nigeria')
+sim = hpv.Sim(pars)
+
+# Specify some parameters to adjust during calibration.
+# The parameters in the calib_pars dictionary don't vary by genotype,
+# whereas those in the genotype_pars dictionary do. Both kinds are
+# given in the order [best, lower_bound, upper_bound].
+calib_pars = dict(
+        beta=[0.05, 0.010, 0.20],
+    )
+
+genotype_pars = dict(
+    hpv16=dict(
+        cin_fn=dict(k=[0.5, 0.2, 1.0]),
+        dur_cin=dict(par1=[6, 4, 12])
+    ),
+    hpv18=dict(
+        cin_fn=dict(k=[0.5, 0.2, 1.0]),
+        dur_cin=dict(par1=[6, 4, 12])
+    )
+)
+
+# List the datafiles that contain data that we wish to compare the model to:
+datafiles=['nigeria_cancer_cases.csv',
+           'nigeria_cancer_types.csv']
+
+# List extra results that we don't have data on, but wish to include in the
+# calibration object so we can plot them.
+results_to_plot = ['cancer_incidence', 'asr_cancer_incidence']
+
+# Create the calibration object, run it, and plot the results
+calib = hpv.Calibration(
+    sim,
+    calib_pars=calib_pars,
+    genotype_pars=genotype_pars,
+    extra_sim_result_keys=results_to_plot,
+    datafiles=datafiles,
+    total_trials=3, n_workers=1
+)
+calib.calibrate(die=True)
+calib.plot(res_to_plot=4);
+```
+
+This isn't a great fit yet! In general, it will probably be necessary to run many more trials that the 3 we ran here. Moreover, careful consideration should be given to the parameters that you want to adjust during calibration. In HPVsim we have taken the approach that any parameter can be adjusted. As we learn more about which parameters make most sense to calibrate, we will add details here. We would also enourage users to share their experiences with calibration and parameter searches.
+
