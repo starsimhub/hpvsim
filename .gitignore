@@ -2,6 +2,12 @@
 *.obj
 files/
 
+# Quarto
+_freeze/
+_inv/
+api/
+.jupyter_cache/
+
 # Other files
 .idea
 .vscode
