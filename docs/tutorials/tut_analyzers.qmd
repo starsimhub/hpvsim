@@ -74,7 +74,7 @@ It's also possible to plot these results alongside data.
 az2 = hpv.age_results(
     result_args=sc.objdict(
         cancers=sc.objdict(
-            datafile='example_cancer_cases.csv',
+            datafile='nigeria_cancer_cases.csv',
         ),
     )
 )

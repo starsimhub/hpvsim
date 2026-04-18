@@ -9,6 +9,10 @@ import subprocess
 import sciris as sc
 import hpvsim as hpv
 
+default_folders = ['tutorials'] # Folders with notebooks
+temp_patterns = ['**/my-*.*', '**/example*.*'] # Temporary files to be removed
+temp_items = ['user_guide/results'] # Temporary files/folders to be removed
+
 def run(cmd):
     """Verbose version of subprocess.run."""
     sc.printgreen(f'\n> {cmd}\n')
@@ -25,7 +29,6 @@ def build_api_docs():
     return run('python -m quartodoc build')
 
 
-@sc.timer('Customize aliases')
 def customize_aliases(mod_name='hpvsim', json_path='objects.json'):
     """
     Add aliases so links can use hpvsim.ClassName as well as submodule paths.
@@ -55,10 +58,30 @@ def customize_aliases(mod_name='hpvsim', json_path='objects.json'):
     print(f'  Saved {len(json_data["items"])} items')
 
 
-@sc.timer('Build interlinks')
 def build_interlinks():
     sc.heading('Building docs links...')
     return run('python -m quartodoc interlinks')
+
+
+def clean_outputs(folders=None, sleep=3, patterns=None):
+    """ Clears outputs from notebooks """
+    sc.heading('Cleaning outputs ...')
+    if folders is None:
+        folders = default_folders
+    if patterns is None:
+        patterns = temp_patterns
+    filenames = sc.dcp(temp_items)
+    for pattern in patterns:
+        for folder in folders:
+            filenames += sc.getfilelist(folder=folder, pattern=pattern, recursive=True)
+    if len(filenames):
+        print(f'Deleting: {sc.newlinejoin(filenames)}\nin {sleep} seconds')
+        sc.timedsleep(sleep)
+        for filename in filenames:
+            sc.rmpath(filename, verbose=True, die=False)
+    else:
+        print('No files found to clean')
+    return
 
 
 if __name__ == '__main__':
@@ -69,7 +92,12 @@ if __name__ == '__main__':
         build_api_docs()
         customize_aliases()
         build_interlinks()
+
+    elif 'post' in sys.argv:
+        clean_outputs()
+
     elif len(sys.argv) > 1:
-        raise ValueError(f'Currently only "pre" is supported, not {sys.argv}')
+        errormsg = f'Argument must be "pre" or "post", not {sys.argv}'
+        raise ValueError(errormsg)
     else:
-        raise ValueError('Run with pre as argv')
+        raise ValueError('Run with pre or post as argv')

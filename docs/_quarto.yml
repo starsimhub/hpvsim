@@ -1,6 +1,7 @@
 project:
   type: website
   pre-render: python quarto_utils.py pre
+  post-render: python quarto_utils.py post
   output-dir: _site
   title: "HPVsim"
   execute-dir: file
