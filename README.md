@@ -1,8 +1,7 @@
 # Human papillomavirus simulator (HPVsim)
 
-[![image](https://badgen.net/pypi/v/hpvsim/?color=blue)](https://pypi.org/project/hpvsim)
-
-[![pipeline status](https://github.com/institutefordiseasemodeling/hpvsim/actions/workflows/tests.yaml/badge.svg)](https://github.com/institutefordiseasemodeling/hpvsim/actions/workflows/tests.yaml)
+[![PyPI version](https://badgen.net/pypi/v/hpvsim/?color=blue)](https://pypi.org/project/hpvsim)
+[![Tests](https://github.com/starsimhub/hpvsim/actions/workflows/tests.yaml/badge.svg?branch=main)](https://github.com/starsimhub/hpvsim/actions/workflows/tests.yaml)
 
 ## About HPVsim
 
