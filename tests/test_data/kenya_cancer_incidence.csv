@@ -1,0 +1,16 @@
+year,name,age,sex,genotype,value
+2020,total_cancer_incidence,0,female,total,0
+2020,total_cancer_incidence,15,female,total,0.2
+2020,total_cancer_incidence,20,female,total,0.38
+2020,total_cancer_incidence,25,female,total,3.5
+2020,total_cancer_incidence,30,female,total,14.4
+2020,total_cancer_incidence,35,female,total,29.1
+2020,total_cancer_incidence,40,female,total,50.4
+2020,total_cancer_incidence,45,female,total,72.9
+2020,total_cancer_incidence,50,female,total,91.4
+2020,total_cancer_incidence,55,female,total,109.7
+2020,total_cancer_incidence,60,female,total,122.3
+2020,total_cancer_incidence,65,female,total,124.7
+2020,total_cancer_incidence,70,female,total,114.1
+2020,total_cancer_incidence,75,female,total,100.2
+2020,total_cancer_incidence,80,female,total,88

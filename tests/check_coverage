@@ -1,0 +1,14 @@
+#!/bin/bash
+
+echo 'Running tests...'
+export SCIRIS_BACKEND='agg' # Don't show plots
+pytest -v test_*.py --cov-config=.coveragerc --cov=../hpvsim -n auto --durations=0
+
+echo 'Creating HTML report...'
+coverage html
+
+echo 'Printing report...'
+coverage report
+
+echo 'Report location:'
+echo "`pwd`/htmlcov/index.html"

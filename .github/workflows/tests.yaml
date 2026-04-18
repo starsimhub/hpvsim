@@ -1,0 +1,40 @@
+name: HPVsim CI tests
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  install_and_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        python-version: [ '3.13' ]
+    name: Install and test
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - uses: actions/setup-python@master
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+      - name: Install HPVsim
+        run:  pip install -e .
+      - name: Download data on first load
+        run: hpvsim-download-data
+      - name: Install tests
+        working-directory: ./tests
+        run: pip install -r requirements.txt
+      - name: Run all tests
+        working-directory: ./tests
+        run: pytest test_*.py -n auto --durations=0 --junitxml=test-results.xml # Run actual tests
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v3
+        if: always() # always run even if the previous step fails
+        with:
+          report_paths: './tests/test-results.xml'
