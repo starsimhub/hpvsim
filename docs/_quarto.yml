@@ -114,7 +114,7 @@ format:
     css: ./assets/styles.css
     toc: true
     toc-expand: 3
-    toc-depth: 3
+    toc-depth: 5
     highlight-style: github
 
 filters:
