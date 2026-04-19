@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "hpvsim"
 dynamic = ["version"]
 description = "HPVsim: Human Papillomavirus Simulator"
-readme = "README.rst"
+readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE"]

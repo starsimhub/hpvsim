@@ -136,7 +136,7 @@ def savefig(filename=None, comments=None, fig=None, **kwargs):
 
     By default, saves (git) information from both the HPVsim version and the calling
     function. Additional comments can be added to the saved file as well. These can
-    be retrieved via ``hpv.get_png_metadata()`` (or :py:func:`sciris.sc_plotting.loadmetadata`). Metadata can
+    be retrieved via ``hpv.get_png_metadata()`` (or `sciris.sc_plotting.loadmetadata`). Metadata can
     also be stored for PDF, but cannot be automatically retrieved.
 
     Args:

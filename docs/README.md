@@ -1,20 +1,30 @@
-# HPVsim docs
+# HPVsim docs (Quarto)
 
-## Tutorials
+Published documentation lives at [https://docs.hpvsim.org](https://docs.hpvsim.org).
 
-Please see the `tutorials` subfolder.
+## Build locally
 
-## Everything else
+1. Install [Quarto](https://quarto.org/docs/get-started/) and Python dependencies:
 
-This folder includes source code for building the docs. Users are unlikely to need to do this themselves. Instead, view the HPVsim docs at https://docs.hpvsim.org.
+   ```bash
+   pip install -e ..
+   pip install -r requirements.txt
+   quarto add machow/quartodoc --no-prompt
+   hpvsim-download-data
+   ```
 
-To build the docs, follow these steps:
+2. From this directory, render the site:
 
-1.  Make sure dependencies are installed::
-    ```
-    pip install -r requirements.txt
-    ```
+   ```bash
+   quarto render
+   ```
 
-2.  Make the documents; there are many build options. In most cases, running `./build_docs` (to rerun the tutorials; takes 2 min) or `./build_docs never` (does not rebuild the tutorials; takes 15 s) is best. Alternatively, one can call `make html` directly.
+   Output is written to `_site/`. The `pre-render` step runs `quarto_utils.py` to refresh API pages (`quartodoc`) and `post-render` cleans temporary tutorial artifacts.
 
-3.  The built documents will be in `./_build/html`.
+3. To preview:
+
+   ```bash
+   quarto preview
+   ```
+
+Notebooks under `tutorials/` are executed during render when Quarto’s execute settings allow it; ensure data are downloaded first.

@@ -231,7 +231,7 @@ class Options(sc.objdict):
             if jupyter == True:
                 jupyter = 'retina' # Default option for True
             try: 
-                if not os.environ.get('SPHINX_BUILD'): # Custom check implemented in conf.py to skip this if we're inside Sphinx
+                if not os.environ.get('HPVSIM_DOCS_BUILD'):  # Set when building Quarto docs (see docs/_quarto.yml execute.env)
                     if jupyter == 'retina': # This makes plots much nicer, but isn't available on all systems
                         import matplotlib_inline
                         matplotlib_inline.backend_inline.set_matplotlib_formats('retina')

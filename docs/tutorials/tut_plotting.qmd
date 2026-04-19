@@ -1,0 +1,137 @@
+---
+title: T2 - Plotting, printing, and saving
+jupyter: python3
+---
+
+
+This tutorial provides a brief overview of options for plotting results, printing objects, and saving results.
+
+
+<div class="alert alert-info">
+    
+Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_plotting.ipynb) to open an interactive version of this notebook.
+    
+</div>
+
+## Global plotting configuration
+
+HPVsim allows the user to set various options that apply to all plots. You can change the font size, default DPI, whether plots should be shown by default, etc. (for the full list, see `hpv.options.help()`). For example, we might want higher resolution, to turn off automatic figure display, close figures after they're rendered, and to turn off the messages that print when a simulation is running. We can do this using built-in defaults for Jupyter notebooks (and then run a sim) with:
+
+```{python}
+import hpvsim as hpv
+
+hpv.options(jupyter=True, verbose=0) # Standard options for Jupyter notebook
+
+sim = hpv.Sim()
+sim.run()
+```
+
+## Printing objects
+
+There are three levels of detail available for most objects (sims, multisims, scenarios, and people). The shortest is `brief()`:
+
+```{python}
+sim.brief()
+```
+
+You can get more detail with `summarize()`:
+
+```{python}
+sim.summarize()
+```
+
+Finally, to show the full object, including all methods and attributes, use `disp()`:
+
+```{python}
+sim.disp()
+```
+
+## Plotting options
+
+While a sim can be plotted using default settings simply by `sim.plot()`, this is just a small fraction of what's available. First, note that results can be plotted directly using e.g. Matplotlib. You can see what quantities are available for plotting with `sim.results.keys()` (remember, it's just a dict). A simple example of plotting using Matplotlib is:
+
+```{python}
+import pylab as plt # Shortcut for import matplotlib.pyplot as plt
+plt.plot(sim.results['year'], sim.results['infections']);
+```
+
+However, as you can see, this isn't ideal since the default formatting is...not great. (Also, note that each result is a `Result` object, not a simple Numpy array; like a pandas dataframe, you can get the array of values directly via e.g. `sim.results.infections.values`.)
+
+An alternative, you can also select one or more quantities to plot with the first (`to_plot`) argument, e.g.
+
+```{python}
+sim.plot(to_plot=['infections', 'hpv_incidence']);
+```
+
+
+While we can save this figure using Matplotlib's built-in `savefig()`, if we use HPVsim's `hpv.savefig()` we get a couple of advantages:
+
+```{python}
+hpv.savefig('my-fig.png')
+```
+
+First, it saves the figure at higher resolution by default (which you can adjust with the `dpi` argument). But second, it stores information about the code that was used to generate the figure as metadata, which can be loaded later. Made an awesome plot but can't remember even what script you ran to generate it, much less what version of the code? You'll never have to worry about that again. 
+
+```{python}
+hpv.get_png_metadata('my-fig.png')
+```
+
+## Customizing plots
+
+We saw above how to set default plot configuration options for Jupyter. HPVsim provides a lot of flexibility in customizing the appearance of plots as well. There are three different levels at which you can set plotting options: global, just for HPVsim, or just for the current plot. To give an example with changing the figure DPI:
+- Change the setting globally (for both HPVsim and Matplotlib): `sc.options(dpi=150)` or `pl.rc('figure', dpi=150)` (where `sc` is `import sciris as sc`)
+- Change for HPVsim plots, but not for Matplotlib plots: `hpv.options(dpi=150)`
+- Change for the current HPVsim plot, but not other HPVsim plots: `sim.plot(dpi=150)`
+
+The easiest way to change the style of HPVsim plots is with the `style` argument. For example, to plot using a built-in Matplotlib style would simply be:
+
+```{python}
+sim.plot(style='ggplot');
+```
+
+In addition to the default style (`'hpvsim'`), there is also a "simple" style. You can combine built-in styles with additional overrides, including any valid Matplotlib commands:
+
+```{python}
+sim.plot(style='simple', legend_args={'frameon':True}, style_args={'ytick.direction':'in'});
+```
+
+Although most style handling is done automatically, you can also use it yourself in a with block, e.g.:
+
+```{python}
+import numpy as np
+with hpv.options.with_style(fontsize=6):
+    sim.plot() # This will have 6 point font
+    plt.figure(); plt.plot(np.random.rand(20), 'o') # So will this
+```
+
+## Saving options
+
+Saving sims is also pretty simple. The simplest way to save is simply
+
+```{python}
+sim.save('my-sim.sim')
+```
+
+Technically, this saves as a gzipped pickle file (via `sc.saveobj()` using the Sciris library). By default this does not save the people in the sim since they are very large (and since, if the random seed is saved, they can usually be regenerated). If you want to save the people as well, you can use the `keep_people` argument. For example, here's what it would look like to create a sim, run it halfway, save it, load it, change the overall transmissibility (beta), and finish running it:
+
+```{python}
+sim_orig = hpv.Sim(start=2000, end=2030, label='Load & save example')
+sim_orig.run(until='2015')
+sim_orig.save('my-half-finished-sim.sim') # Note: HPVsim always saves the people if the sim isn't finished running yet
+
+sim = hpv.load('my-half-finished-sim.sim')
+sim['beta'] *= 0.3
+sim.run()
+sim.plot(['infections', 'hpv_incidence', 'cancer_incidence']);
+```
+
+Aside from saving the entire simulation, there are other export options available. You can export the results and parameters to a JSON file (using `sim.to_json()`), but probably the most useful is to export the results to an Excel workbook, where they can easily be stored and processed with e.g. Pandas:
+
+```{python}
+import pandas as pd
+
+sim.to_excel('my-sim.xlsx')
+df = pd.read_excel('my-sim.xlsx')
+print(df)
+```
+
