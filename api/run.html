@@ -319,19 +319,89 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
    
   <ul>
   <li><a href="#hpvsim.run" id="toc-hpvsim.run" class="nav-link active" data-scroll-target="#hpvsim.run">run</a>
-  <ul class="collapse">
+  <ul>
   <li><a href="#classes" id="toc-classes" class="nav-link" data-scroll-target="#classes">Classes</a>
+  <ul>
+  <li><a href="#hpvsim.run.MultiSim" id="toc-hpvsim.run.MultiSim" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim">MultiSim</a>
   <ul class="collapse">
-  <li><a href="#hpvsim.run.MultiSim" id="toc-hpvsim.run.MultiSim" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim">MultiSim</a></li>
-  <li><a href="#hpvsim.run.Scenarios" id="toc-hpvsim.run.Scenarios" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios">Scenarios</a></li>
-  <li><a href="#hpvsim.run.Sweep" id="toc-hpvsim.run.Sweep" class="nav-link" data-scroll-target="#hpvsim.run.Sweep">Sweep</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
+  <ul class="collapse">
+  <li><a href="#hpvsim.run.MultiSim.brief" id="toc-hpvsim.run.MultiSim.brief" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.brief">brief</a></li>
+  <li><a href="#hpvsim.run.MultiSim.combine" id="toc-hpvsim.run.MultiSim.combine" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.combine">combine</a></li>
+  <li><a href="#hpvsim.run.MultiSim.compare" id="toc-hpvsim.run.MultiSim.compare" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.compare">compare</a></li>
+  <li><a href="#hpvsim.run.MultiSim.disp" id="toc-hpvsim.run.MultiSim.disp" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.disp">disp</a></li>
+  <li><a href="#hpvsim.run.MultiSim.init_sims" id="toc-hpvsim.run.MultiSim.init_sims" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.init_sims">init_sims</a></li>
+  <li><a href="#hpvsim.run.MultiSim.load" id="toc-hpvsim.run.MultiSim.load" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.load">load</a></li>
+  <li><a href="#hpvsim.run.MultiSim.mean" id="toc-hpvsim.run.MultiSim.mean" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.mean">mean</a></li>
+  <li><a href="#hpvsim.run.MultiSim.median" id="toc-hpvsim.run.MultiSim.median" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.median">median</a></li>
+  <li><a href="#hpvsim.run.MultiSim.merge" id="toc-hpvsim.run.MultiSim.merge" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.merge">merge</a></li>
+  <li><a href="#hpvsim.run.MultiSim.plot" id="toc-hpvsim.run.MultiSim.plot" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.plot">plot</a></li>
+  <li><a href="#hpvsim.run.MultiSim.plot_compare" id="toc-hpvsim.run.MultiSim.plot_compare" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.plot_compare">plot_compare</a></li>
+  <li><a href="#hpvsim.run.MultiSim.plot_result" id="toc-hpvsim.run.MultiSim.plot_result" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.plot_result">plot_result</a></li>
+  <li><a href="#hpvsim.run.MultiSim.reduce" id="toc-hpvsim.run.MultiSim.reduce" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.reduce">reduce</a></li>
+  <li><a href="#hpvsim.run.MultiSim.reset" id="toc-hpvsim.run.MultiSim.reset" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.reset">reset</a></li>
+  <li><a href="#hpvsim.run.MultiSim.result_keys" id="toc-hpvsim.run.MultiSim.result_keys" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.result_keys">result_keys</a></li>
+  <li><a href="#hpvsim.run.MultiSim.run" id="toc-hpvsim.run.MultiSim.run" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.run">run</a></li>
+  <li><a href="#hpvsim.run.MultiSim.save" id="toc-hpvsim.run.MultiSim.save" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.save">save</a></li>
+  <li><a href="#hpvsim.run.MultiSim.shrink" id="toc-hpvsim.run.MultiSim.shrink" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.shrink">shrink</a></li>
+  <li><a href="#hpvsim.run.MultiSim.split" id="toc-hpvsim.run.MultiSim.split" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.split">split</a></li>
+  <li><a href="#hpvsim.run.MultiSim.summarize" id="toc-hpvsim.run.MultiSim.summarize" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.summarize">summarize</a></li>
+  <li><a href="#hpvsim.run.MultiSim.to_excel" id="toc-hpvsim.run.MultiSim.to_excel" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.to_excel">to_excel</a></li>
+  <li><a href="#hpvsim.run.MultiSim.to_json" id="toc-hpvsim.run.MultiSim.to_json" class="nav-link" data-scroll-target="#hpvsim.run.MultiSim.to_json">to_json</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#hpvsim.run.Scenarios" id="toc-hpvsim.run.Scenarios" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios">Scenarios</a>
+  <ul class="collapse">
+  <li><a href="#parameters-17" id="toc-parameters-17" class="nav-link" data-scroll-target="#parameters-17">Parameters</a></li>
+  <li><a href="#returns-9" id="toc-returns-9" class="nav-link" data-scroll-target="#returns-9">Returns</a></li>
+  <li><a href="#methods-1" id="toc-methods-1" class="nav-link" data-scroll-target="#methods-1">Methods</a>
+  <ul class="collapse">
+  <li><a href="#hpvsim.run.Scenarios.brief" id="toc-hpvsim.run.Scenarios.brief" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.brief">brief</a></li>
+  <li><a href="#hpvsim.run.Scenarios.compare" id="toc-hpvsim.run.Scenarios.compare" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.compare">compare</a></li>
+  <li><a href="#hpvsim.run.Scenarios.disp" id="toc-hpvsim.run.Scenarios.disp" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.disp">disp</a></li>
+  <li><a href="#hpvsim.run.Scenarios.load" id="toc-hpvsim.run.Scenarios.load" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.load">load</a></li>
+  <li><a href="#hpvsim.run.Scenarios.merge" id="toc-hpvsim.run.Scenarios.merge" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.merge">merge</a></li>
+  <li><a href="#hpvsim.run.Scenarios.plot" id="toc-hpvsim.run.Scenarios.plot" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.plot">plot</a></li>
+  <li><a href="#hpvsim.run.Scenarios.plot_age_results" id="toc-hpvsim.run.Scenarios.plot_age_results" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.plot_age_results">plot_age_results</a></li>
+  <li><a href="#hpvsim.run.Scenarios.result_keys" id="toc-hpvsim.run.Scenarios.result_keys" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.result_keys">result_keys</a></li>
+  <li><a href="#hpvsim.run.Scenarios.run" id="toc-hpvsim.run.Scenarios.run" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.run">run</a></li>
+  <li><a href="#hpvsim.run.Scenarios.save" id="toc-hpvsim.run.Scenarios.save" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.save">save</a></li>
+  <li><a href="#hpvsim.run.Scenarios.summarize" id="toc-hpvsim.run.Scenarios.summarize" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.summarize">summarize</a></li>
+  <li><a href="#hpvsim.run.Scenarios.to_excel" id="toc-hpvsim.run.Scenarios.to_excel" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.to_excel">to_excel</a></li>
+  <li><a href="#hpvsim.run.Scenarios.to_json" id="toc-hpvsim.run.Scenarios.to_json" class="nav-link" data-scroll-target="#hpvsim.run.Scenarios.to_json">to_json</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#hpvsim.run.Sweep" id="toc-hpvsim.run.Sweep" class="nav-link" data-scroll-target="#hpvsim.run.Sweep">Sweep</a>
+  <ul class="collapse">
+  <li><a href="#parameters-27" id="toc-parameters-27" class="nav-link" data-scroll-target="#parameters-27">Parameters</a></li>
+  <li><a href="#returns-16" id="toc-returns-16" class="nav-link" data-scroll-target="#returns-16">Returns</a></li>
+  <li><a href="#methods-2" id="toc-methods-2" class="nav-link" data-scroll-target="#methods-2">Methods</a>
+  <ul class="collapse">
+  <li><a href="#hpvsim.run.Sweep.reduce" id="toc-hpvsim.run.Sweep.reduce" class="nav-link" data-scroll-target="#hpvsim.run.Sweep.reduce">reduce</a></li>
+  <li><a href="#hpvsim.run.Sweep.run" id="toc-hpvsim.run.Sweep.run" class="nav-link" data-scroll-target="#hpvsim.run.Sweep.run">run</a></li>
+  </ul></li>
+  </ul></li>
   </ul></li>
   <li><a href="#functions" id="toc-functions" class="nav-link" data-scroll-target="#functions">Functions</a>
-  <ul class="collapse">
+  <ul>
   <li><a href="#hpvsim.run.make_metapars" id="toc-hpvsim.run.make_metapars" class="nav-link" data-scroll-target="#hpvsim.run.make_metapars">make_metapars</a></li>
-  <li><a href="#hpvsim.run.multi_run" id="toc-hpvsim.run.multi_run" class="nav-link" data-scroll-target="#hpvsim.run.multi_run">multi_run</a></li>
-  <li><a href="#hpvsim.run.parallel" id="toc-hpvsim.run.parallel" class="nav-link" data-scroll-target="#hpvsim.run.parallel">parallel</a></li>
-  <li><a href="#hpvsim.run.single_run" id="toc-hpvsim.run.single_run" class="nav-link" data-scroll-target="#hpvsim.run.single_run">single_run</a></li>
+  <li><a href="#hpvsim.run.multi_run" id="toc-hpvsim.run.multi_run" class="nav-link" data-scroll-target="#hpvsim.run.multi_run">multi_run</a>
+  <ul class="collapse">
+  <li><a href="#parameters-28" id="toc-parameters-28" class="nav-link" data-scroll-target="#parameters-28">Parameters</a></li>
+  <li><a href="#returns-18" id="toc-returns-18" class="nav-link" data-scroll-target="#returns-18">Returns</a></li>
+  </ul></li>
+  <li><a href="#hpvsim.run.parallel" id="toc-hpvsim.run.parallel" class="nav-link" data-scroll-target="#hpvsim.run.parallel">parallel</a>
+  <ul class="collapse">
+  <li><a href="#parameters-29" id="toc-parameters-29" class="nav-link" data-scroll-target="#parameters-29">Parameters</a></li>
+  <li><a href="#returns-19" id="toc-returns-19" class="nav-link" data-scroll-target="#returns-19">Returns</a></li>
+  </ul></li>
+  <li><a href="#hpvsim.run.single_run" id="toc-hpvsim.run.single_run" class="nav-link" data-scroll-target="#hpvsim.run.single_run">single_run</a>
+  <ul class="collapse">
+  <li><a href="#parameters-30" id="toc-parameters-30" class="nav-link" data-scroll-target="#parameters-30">Parameters</a></li>
+  <li><a href="#returns-20" id="toc-returns-20" class="nav-link" data-scroll-target="#returns-20">Returns</a></li>
+  </ul></li>
   </ul></li>
   </ul></li>
   </ul>
