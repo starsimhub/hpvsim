@@ -11,7 +11,7 @@ import hpvsim as hpv
 
 default_folders = ['tutorials'] # Folders with notebooks
 temp_patterns = ['**/my-*.*', '**/example*.*'] # Temporary files to be removed
-temp_items = ['user_guide/results'] # Temporary files/folders to be removed
+temp_items = [] # Temporary files/folders to be removed
 
 def run(cmd):
     """Verbose version of subprocess.run."""
