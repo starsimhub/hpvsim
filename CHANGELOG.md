@@ -3,9 +3,16 @@ that may result in differences in model output, or are required in order
 to run an old parameter set with the current version, are flagged with
 the term "Regression information".
 
-## Version 2.3.0 (2026-04-18)
+## Version 2.3.0 (2026-04-20)
 
-- TBC
+- Fixes dt-dependent results by scaling partnership formation rates to
+  per-timestep probabilities; `layer_probs` and cross-layer defaults
+  converted to annual probabilities. **Regression information:** baseline
+  model outputs change; baselines have been regenerated.
+- Fixes `dysplasias` and `precins` flows never being incremented.
+- Adds tooling under `tests/project_validation/` to compare outputs
+  between versions of the code.
+- Adds test coverage for previously untested code paths.
 
 ## Version 2.2.6 (2026-04-17)
 
