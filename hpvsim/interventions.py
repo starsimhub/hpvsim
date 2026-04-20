@@ -1411,22 +1411,52 @@ class tx(Product):
 
 
 class vx(Product):
-    ''' Vaccine product '''
+    '''
+    Vaccine product.
+
+    imm_init controls the probability that a vaccinated person gets sterilizing
+    (all-or-nothing) immunity. People who don't get sterilizing immunity still
+    receive leaky (per-contact) protection equal to imm_init.
+
+    imm_init can be:
+        - a float (e.g. 0.95): used directly as the sterilizing probability
+        - a dict with dist/par keys (legacy beta-distribution format): the
+          mean of the distribution is used as the sterilizing probability
+    '''
     def __init__(self, genotype_pars=None, imm_init=None, imm_boost=None):
         self.genotype_pars = genotype_pars
-        self.imm_init = imm_init
         self.imm_boost = imm_boost
         self.imm_source = None # Set during immunity initialization. Warning, fragile!!!
         if (imm_init is None and imm_boost is None) or (imm_init is not None and imm_boost is not None):
             errormsg = 'Must provide either an initial immune effect (for first doses) or an immune boosting effect (for subsequent doses), not both/neither.'
             raise ValueError(errormsg)
 
+        # Convert imm_init to a float (sterilizing probability)
+        if imm_init is not None:
+            if isinstance(imm_init, dict):
+                if imm_init.get('dist') == 'beta':
+                    a, b = imm_init['par1'], imm_init['par2']
+                    self.imm_init = a / (a + b)
+                elif imm_init.get('dist') == 'beta_mean':
+                    self.imm_init = imm_init['par1']
+                else:
+                    # Estimate the mean of an unknown distribution via Monte Carlo;
+                    # 10k samples is just for accuracy, not related to agent count
+                    self.imm_init = float(np.mean(hpu.sample(**imm_init, size=10000)))
+            else:
+                self.imm_init = float(imm_init)
+        else:
+            self.imm_init = None
+
 
     def administer(self, people, inds):
         ''' Apply the vaccine to the requested people indices. '''
         inds = inds[people.alive[inds]]  # Skip anyone that is dead
         if self.imm_init is not None:
-            people.peak_imm[self.imm_source, inds] = hpu.sample(**self.imm_init, size=len(inds))* people.rel_imm[inds]
+            n = len(inds)
+            sterilizing = np.random.random(n) < self.imm_init
+            peak = np.where(sterilizing, 1.0, self.imm_init)
+            people.peak_imm[self.imm_source, inds] = peak * people.rel_imm[inds]
         elif self.imm_boost is not None:
             people.peak_imm[self.imm_source, inds] *= self.imm_boost
         people.t_imm_event[self.imm_source, inds] = people.t
@@ -1512,7 +1542,7 @@ def default_vx(prod_name=None):
     dfvx = pd.read_csv(datafiles.vx) # Read in dataframe with parameters
     vxprods = dict()
     for name in dfvx.name.unique():
-        vxprods[name]       = vx(genotype_pars=dfvx[dfvx.name==name], imm_init=dict(dist='beta', par1=30, par2=2))
+        vxprods[name]       = vx(genotype_pars=dfvx[dfvx.name==name], imm_init=0.95)
         vxprods[name+'2']   = vx(genotype_pars=dfvx[dfvx.name==name], imm_boost=1.2) # 2nd dose
         vxprods[name+'3']   = vx(genotype_pars=dfvx[dfvx.name==name], imm_boost=1.1) # 3rd dose
     if prod_name is not None:   return vxprods[prod_name]

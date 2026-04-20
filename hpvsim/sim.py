@@ -794,6 +794,8 @@ class Sim(hpb.BaseSim):
         for lkey, layer in people.contacts.items():
 
             sus = people.susceptible.copy() # for each layer, update who's still susceptible
+            if not hasattr(self, '_transmission_log'):
+                self._transmission_log = []
 
             # Shorten variables
             f = layer['f']
@@ -822,6 +824,8 @@ class Sim(hpb.BaseSim):
                     transmissions = (np.random.random(len(betas)) < betas).nonzero()[0] # Apply probabilities to determine partnerships in which transmission occurred
                     target_inds   = targets[transmissions] # Extract indices of those who got infected
                     target_inds, unique_inds = np.unique(target_inds, return_index=True)  # Due to multiple partnerships, some people will be counted twice; remove them
+                    source_inds = sources[transmissions[unique_inds]]
+                    self._transmission_log.append((source_inds, target_inds, lkey, g))
                     people.infect(inds=target_inds, g=g, layer=lkey)  # Infect people
 
         # Determine if there are any reactivated infections on this timestep

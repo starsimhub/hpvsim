@@ -636,42 +636,42 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
     pars = dict(
 
         default = dict(
-            imm_init  = dict(dist='beta', par1=30, par2=2), # Initial distribution of immunity
+            imm_init  = 0.95, # Probability of sterilizing immunity
             doses     = 1, # Number of doses for this vaccine
             interval  = None, # Interval between doses
             imm_boost=None,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity
         ),
 
         bivalent = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
             imm_boost=None,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity
         ),
 
         bivalent_2dose = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=2,  # Number of doses for this vaccine
             interval=0.5,  # Interval between doses in years
             imm_boost=1.2,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity
         ),
 
         bivalent_3dose = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=3,  # Number of doses for this vaccine
             interval=[0.2, 0.5],  # Interval between doses in years
             imm_boost=[1.2, 1.1],  # Factor by which each dose increases immunity
         ),
 
         quadrivalent = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
             imm_boost=None,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity
         ),
 
         nonavalent = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
             imm_boost=None,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity

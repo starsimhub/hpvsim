@@ -89,8 +89,10 @@ class Calibration(sc.prettyobj):
         if keep_db   is None: keep_db   = False
         if storage   is None: storage   = f'sqlite:///{db_name}'
         if total_trials is not None: n_trials = int(np.ceil(total_trials/n_workers))
-        self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), name=name, db_name=db_name,
-                                     keep_db=keep_db, storage=storage, rand_seed=rand_seed, sampler=sampler)
+        total_trials = int(n_trials * n_workers)
+        self.run_args   = sc.objdict(n_trials=int(n_trials), n_workers=int(n_workers), total_trials=total_trials,
+                                     name=name, db_name=db_name, keep_db=keep_db, storage=storage,
+                                     rand_seed=rand_seed, sampler=sampler)
 
         # Handle other inputs
         self.label          = label
@@ -412,7 +414,11 @@ class Calibration(sc.prettyobj):
         else:
             op.logging.set_verbosity(op.logging.ERROR)
         study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler = self.run_args.sampler)
-        output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None)
+        try:
+            output = study.optimize(self.run_trial, n_trials=self.run_args.n_trials, callbacks=None)
+        except Exception as E:
+            print(f'Worker failed with error: {E}')
+            output = None
         return output
 
 
@@ -455,7 +461,8 @@ class Calibration(sc.prettyobj):
             raise NotImplementedError('Implemented but does not work')
         else:
             sampler = None
-        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=sampler)
+        output = op.create_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler=sampler,
+                                 load_if_exists=self.run_args.keep_db)
         return output
 
 
@@ -485,7 +492,23 @@ class Calibration(sc.prettyobj):
         # Run the optimization
         t0 = sc.tic()
         self.make_study()
-        self.run_workers()
+
+        # If resuming with keep_db, check for existing trials and only run the remainder
+        if self.run_args.keep_db:
+            study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name)
+            n_existing = len([t for t in study.trials if t.state == op.trial.TrialState.COMPLETE])
+            if n_existing > 0:
+                n_remaining = max(0, self.run_args.total_trials - n_existing)
+                if n_remaining == 0:
+                    print(f'Calibration already has {n_existing} completed trials, skipping workers')
+                else:
+                    self.run_args.n_trials = int(np.ceil(n_remaining / self.run_args.n_workers))
+                    print(f'Resuming calibration: {n_existing} trials complete, running ~{n_remaining} more')
+                    self.run_workers()
+            else:
+                self.run_workers()
+        else:
+            self.run_workers()
         study = op.load_study(storage=self.run_args.storage, study_name=self.run_args.name, sampler = self.run_args.sampler)
         self.best_pars = sc.objdict(study.best_params)
         self.elapsed = sc.toc(t0, output=True)
@@ -500,6 +523,7 @@ class Calibration(sc.prettyobj):
         self.analyzer_results = []
         self.sim_results = []
         self.extra_sim_results = []
+        loaded_trials = set()
         if load:
             print('Loading saved results...')
             for trial in study.trials:
@@ -510,6 +534,7 @@ class Calibration(sc.prettyobj):
                     self.sim_results.append(results['sim'])
                     self.analyzer_results.append(results['analyzer'])
                     self.extra_sim_results.append(results['extra_sim_results'])
+                    loaded_trials.add(n)
                     if tidyup:
                         try:
                             os.remove(filename)
@@ -524,7 +549,7 @@ class Calibration(sc.prettyobj):
 
         # Compare the results
         self.initial_pars, self.par_bounds = self.sim_to_sample_pars()
-        self.parse_study(study)
+        self.parse_study(study, loaded_trials=loaded_trials)
 
         # Tidy up
         self.calibrated = True
@@ -534,7 +559,7 @@ class Calibration(sc.prettyobj):
         return self
 
 
-    def parse_study(self, study):
+    def parse_study(self, study, loaded_trials=None):
         '''Parse the study into a data frame -- called automatically '''
         best = study.best_params
         self.best_pars = best
@@ -548,6 +573,8 @@ class Calibration(sc.prettyobj):
             for key,val in trial.params.items():
                 data[key] = val
             if data['mismatch'] is None:
+                failed_trials.append(data['index'])
+            elif loaded_trials is not None and trial.number not in loaded_trials:
                 failed_trials.append(data['index'])
             else:
                 results.append(data)
@@ -653,7 +680,7 @@ class Calibration(sc.prettyobj):
 
         # determine how many results to plot
         if res_to_plot is not None:
-            index_to_plot = self.df.iloc[0:res_to_plot, 0].values
+            index_to_plot = self.df.index[0:res_to_plot].values
             analyzer_results = [analyzer_results[i] for i in index_to_plot]
             sim_results = [sim_results[i] for i in index_to_plot]
 
