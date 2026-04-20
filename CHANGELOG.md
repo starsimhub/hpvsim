@@ -9,7 +9,7 @@ the term "Regression information".
   per-timestep probabilities; `layer_probs` and cross-layer defaults
   converted to annual probabilities. **Regression information:** baseline
   model outputs change; baselines have been regenerated.
-- Fixes `dysplasias` and `precins` flows never being incremented.
+- Fixes `precins` flow never being incremented; removes redundant `dysplasias` flow (was an alias of `cins`).
 - Adds tooling under `tests/project_validation/` to compare outputs
   between versions of the code.
 - Adds test coverage for previously untested code paths.

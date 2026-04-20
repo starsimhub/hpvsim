@@ -327,10 +327,6 @@ def test_result_consistency():
     # assert np.allclose(sim.results.age['n_infectious_by_age'][:].sum(axis=0),sim.results['n_infectious'][:]) # Check stocks by age are equal to stocks flows
 
 
-    # # Check that CINs by grade sum up the the correct totals
-    # assert np.allclose((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]),sim.results['dysplasias'][:])
-    # assert np.allclose((sim.results['cin1s_by_genotype'][:] + sim.results['cin2s_by_genotype'][:] + sim.results['cin3s_by_genotype'][:]), sim.results['dysplasias_by_genotype'][:])
-
     # Check that results by age sum to the correct totals
     assert np.allclose(sim.results['cancers_by_age'][:].sum(axis=0),sim.results['cancers'][:])
     assert np.allclose(sim.results['infections_by_age'][:].sum(axis=0),sim.results['infections'][:])

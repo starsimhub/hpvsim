@@ -21,7 +21,7 @@ n_seeds = 3
 
 # Result keys to save for time series
 ts_keys = [
-    'infections', 'dysplasias', 'precins', 'cins',
+    'infections', 'precins', 'cins',
     'cancers', 'cancer_deaths', 'detected_cancers',
     'hpv_incidence', 'cancer_incidence', 'asr_cancer_incidence',
     'hpv_prevalence', 'cin_prevalence',

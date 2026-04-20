@@ -208,11 +208,6 @@ class People(hpb.BasePeople):
                 self.age_flows[
                     key
                 ] += cases_by_age  # Increment flows by age (summed over all genotypes)
-                # dysplasias tracks CIN transitions (same events as cins)
-                if key == "cins":
-                    self.flows["dysplasias"] += cases
-                    self.genotype_flows["dysplasias"][g] = cases
-                    self.age_flows["dysplasias"] += cases_by_age
 
     # %% Disease progression methods
     def set_prognoses(self, inds, g, gpars, dt):
