@@ -9,7 +9,7 @@ All notable changes to the codebase are documented in this file. Changes that ma
    :depth: 1
 
 
-Version 2.2.6 (2026-03-24)
+Version 2.3.0 (2026-04-18)
 ---------------------------
 - Vaccine immunity is now sterilizing (all-or-nothing) rather than leaky (per-contact). ``imm_init`` sets the probability of sterilizing immunity; non-sterilizing recipients get leaky protection at the ``imm_init`` level. Default is 0.95.
 - Adds per-timestep transmission logging (``sim._transmission_log``) for downstream analysis of transmission chains.
@@ -17,6 +17,12 @@ Version 2.2.6 (2026-03-24)
 - Calibration workers catch exceptions instead of crashing the entire run.
 - Fixes ``res_to_plot`` indexing bug in ``Calibration.plot()``.
 - *Regression information*: vaccine efficacy will differ from previous versions due to the immunity model change.
+
+
+Version 2.2.6 (2026-04-17)
+---------------------------
+- Reconcile different copies of repository
+- *Github info* PR `75 <https://github.com/starsimhub/hpvsim/pull/75>`__
 
 Version 2.2.5 (2025-10-27)
 ---------------------------

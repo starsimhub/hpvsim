@@ -101,9 +101,6 @@ html_context = {
     },
     "default_mode": "light",
 }
-# Add any extra paths that contain custom files
-if not on_rtd:
-    html_extra_path = ['robots.txt']
 
 
 # If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
