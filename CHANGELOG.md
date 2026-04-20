@@ -13,6 +13,12 @@ the term "Regression information".
 - Adds tooling under `tests/project_validation/` to compare outputs
   between versions of the code.
 - Adds test coverage for previously untested code paths.
+- Vaccine immunity is now sterilizing (all-or-nothing) rather than leaky (per-contact). `imm_init` sets the probability of sterilizing immunity; non-sterilizing recipients get leaky protection at the `imm_init` level. Default is 0.95.
+- Adds per-timestep transmission logging (`sim._transmission_log`) for downstream analysis of transmission chains.
+- Calibration now supports resuming from an existing database via `keep_db=True`, running only the remaining trials.
+- Calibration workers catch exceptions instead of crashing the entire run.
+- Fixes `res_to_plot` indexing bug in `Calibration.plot()`.
+- *Regression information*: vaccine efficacy will differ from previous versions due to the immunity model change.
 
 ## Version 2.2.6 (2026-04-17)
 
