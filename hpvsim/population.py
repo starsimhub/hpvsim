@@ -22,7 +22,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
     '''
     Make the people for the simulation.
 
-    Usually called via :py:func:`hpvsim.sim.Sim.initialize`.
+    Usually called via `hpvsim.sim.Sim.initialize`.
 
     Args:
         sim      (Sim)  : the simulation object; population parameters are taken from the sim object
