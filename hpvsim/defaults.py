@@ -271,6 +271,8 @@ class Flow():
 
 flows = [
     Flow('infections',              color='#c78f65',    label='Infections'),
+    Flow('dysplasias',              color='#c1ad71',    label='Dysplasias'),
+    Flow('precins',                 color='#c1ad71',    label='Pre-CINs'),
     Flow('cins',                    color='#b86113',    label='CINs'),
     Flow('cancers',                 color='#5f5cd2',    label='Cancers'),
     Flow('cancer_deaths',           color='#000000',    label='Cancer deaths', by_genotype=False),
