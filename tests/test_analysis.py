@@ -66,8 +66,6 @@ def test_age_pyramids(do_plot=True):
     for date in reduced.dates:
         for sk in ['f', 'm']:
             assert hasattr(reduced.age_pyramids[date][sk], 'best')
-            assert hasattr(reduced.age_pyramids[date][sk], 'low')
-            assert hasattr(reduced.age_pyramids[date][sk], 'high')
             assert np.all(reduced.age_pyramids[date][sk].low <= reduced.age_pyramids[date][sk].high)
 
     # Test reduce with use_mean=True

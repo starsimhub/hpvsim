@@ -952,32 +952,6 @@ class People(hpb.BasePeople):
         )  # These are not indices, so they scale differently
 
     # %% Methods to make events occur (death, infection, others TBC)
-    def make_naive(self, inds):
-        """
-        Make a set of people naive. This is used during dynamic resampling.
-
-        Args:
-            inds (array): list of people to make naive
-        """
-        for state in self.meta.alive_states + self.meta.stock_states:
-            if state.shape:
-                self[state.name][:, inds] = state.fill_value
-            else:
-                self[state.name][inds] = state.fill_value
-
-        # Reset immunity
-        for state in self.meta.imm_states:
-            self[state.name][:, inds] = 0
-
-        # Reset dates
-        for state in self.meta.dates + self.meta.durs:
-            if state.shape:
-                self[state.name][:, inds] = np.nan
-            else:
-                self[state.name][inds] = np.nan
-
-        return
-
     def infect(self, inds, g=None, layer=None):
         """
         Infect people and determine their eventual outcomes.
