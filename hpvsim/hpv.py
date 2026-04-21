@@ -32,13 +32,13 @@ class Genotype(sti.BaseSTI):
             # - Susceptible, added by the Infection base class
             # - Infectious, a derived state defined as infected & ~inactive
             # - Inactive, added below, includes latent infections and those with cancer
-            ss.State("inactive", label="Inactive"),
+            ss.BoolState("inactive", label="Inactive"),
 
             # Dysplasia states
-            ss.State("precin", label="HPV without HSIL"),
-            ss.State("cin", label="HPV with HSIL"),
-            ss.State("cancerous", label="Cancerous"),
-            ss.State("dead_cancer", label="Died of cancer"),
+            ss.BoolState("precin", label="HPV without HSIL"),
+            ss.BoolState("cin", label="HPV with HSIL"),
+            ss.BoolState("cancerous", label="Cancerous"),
+            ss.BoolState("dead_cancer", label="Died of cancer"),
 
             # Duration and timestep of states
             ss.FloatArr("dur_precin", label="Duration of infection without HSIL (years)"),
@@ -297,7 +297,7 @@ class HPV(ss.Connector, Genotype):
         super().__init__(name='hpv')  # This will call Genotype.__init__ due to MRO
 
         # Handle parameters
-        self.pars = ss.Pars()  # Wipe the Genotype's pars, since this is a connector
+        self.setattribute('pars', ss.Pars())  # Wipe the Genotype's pars, since this is a connector
         default_pars = hpv.ImmPars()
         self.define_pars(**default_pars)
         self.update_pars(pars, **kwargs)
@@ -311,13 +311,11 @@ class HPV(ss.Connector, Genotype):
 
     def add_states(self):
         states = [
-            ss.State("susceptible", label="susceptible", default=True),
-            ss.State("infected", label="infected"),
-            ss.State("inactive", label="inactive"),
-            ss.State("precin", label="precin"),
-            ss.State("cin", label="CIN"),
-            ss.State("cancerous", label="cancerous"),
-            ss.State("dead_cancer", label="Died from cancer"),
+            ss.BoolState("inactive", label="inactive"),
+            ss.BoolState("precin", label="precin"),
+            ss.BoolState("cin", label="CIN"),
+            ss.BoolState("cancerous", label="cancerous"),
+            ss.BoolState("dead_cancer", label="Died from cancer"),
             ss.FloatArr("nti_cancer", label="Number of timesteps spent with cancer"),
             ss.FloatArr("ti_cancer", label="Timestep of cancer"),
             ss.FloatArr("ti_cin", label="Timestep of CIN"),

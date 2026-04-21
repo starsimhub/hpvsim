@@ -1,6 +1,7 @@
 # HPVsim-generated files
 *.obj
 files/
+tests/hpvsim_calib_*.db
 
 # Other files
 .idea

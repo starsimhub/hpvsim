@@ -7,7 +7,7 @@ name = "hpvsim"
 dynamic = ["version"]
 description = "HPVsim: Human Papillomavirus Simulator"
 readme = "README.rst"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 keywords = ["HPV", "human papillomavirus", "cervical cancer", "agent-based model", "disease modeling", "simulation"]
 
@@ -40,12 +40,17 @@ classifiers = [
 dependencies = [
     'numpy',
     'scipy',
-    'pandas>=2.0.0', 
+    'pandas>=2.0.0',
     'sciris>=3.0.0',
+    'starsim>=3.3.3',
+    'stisim>=1.5.0',
     'matplotlib',
     'seaborn',
     'optuna',
 ]
+
+[project.optional-dependencies]
+test = ['pytest']
 
 [project.urls]
 "Website" = "https://hpvsim.org"
