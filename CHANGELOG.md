@@ -3,8 +3,16 @@ that may result in differences in model output, or are required in order
 to run an old parameter set with the current version, are flagged with
 the term "Regression information".
 
-## Version 2.3.0 (2026-04-18)
+## Version 2.3.0 (2026-04-20)
 
+- Fixes dt-dependent results by scaling partnership formation rates to
+  per-timestep probabilities; `layer_probs` and cross-layer defaults
+  converted to annual probabilities. **Regression information:** baseline
+  model outputs change; baselines have been regenerated.
+- Fixes `precins` flow never being incremented; removes redundant `dysplasias` flow (was an alias of `cins`).
+- Adds tooling under `tests/project_validation/` to compare outputs
+  between versions of the code.
+- Adds test coverage for previously untested code paths.
 - Vaccine immunity is now sterilizing (all-or-nothing) rather than leaky (per-contact). `imm_init` sets the probability of sterilizing immunity; non-sterilizing recipients get leaky protection at the `imm_init` level. Default is 0.95.
 - Adds per-timestep transmission logging (`sim._transmission_log`) for downstream analysis of transmission chains.
 - Calibration now supports resuming from an existing database via `keep_db=True`, running only the remaining trials.

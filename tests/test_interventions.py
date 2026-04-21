@@ -572,6 +572,96 @@ def test_cytology():
     return scens
 
 
+def test_find_timepoint():
+    sc.heading('Test find_timepoint')
+
+    from hpvsim.interventions import find_timepoint
+
+    arr = np.array([0, 5, 10, 10, 15])
+
+    # No match
+    assert len(find_timepoint(arr, t=3)) == 0
+
+    # Single match — 'first' (default)
+    result = find_timepoint(arr, t=5, which='first')
+    assert len(result) == 1 and result[0] == 1
+
+    # Duplicate match — 'first' vs 'last'
+    assert find_timepoint(arr, t=10, which='first') == [2]
+    assert find_timepoint(arr, t=10, which='last') == [3]
+
+    # All matches
+    assert list(find_timepoint(arr, t=10, which='all')) == [2, 3]
+
+    # Callable arr
+    result = find_timepoint(lambda interv, sim: [0, 5, 10], t=5)
+    assert len(result) == 1
+
+
+def test_get_subtargets():
+    sc.heading('Test get_subtargets')
+
+    from hpvsim.interventions import get_subtargets
+
+    sim = hpv.Sim(n_agents=500, n_years=5, verbose=0)
+    sim.initialize()
+
+    # Direct indices and values
+    subtarget = {'inds': np.array([0, 1, 2]), 'vals': np.array([0.5, 0.5, 0.5])}
+    inds, vals = get_subtargets(subtarget, sim)
+    assert np.array_equal(inds, np.array([0, 1, 2]))
+    assert np.array_equal(vals, np.array([0.5, 0.5, 0.5]))
+
+    # Scalar value
+    subtarget_scalar = {'inds': np.array([0, 1]), 'vals': 0.8}
+    inds, vals = get_subtargets(subtarget_scalar, sim)
+    assert vals == 0.8
+
+    # Callable inds
+    subtarget_fn = {'inds': lambda sim: np.array([3, 4]), 'vals': 1.0}
+    inds, vals = get_subtargets(subtarget_fn, sim)
+    assert np.array_equal(inds, np.array([3, 4]))
+
+    # Callable vals
+    subtarget_fn2 = {'inds': np.array([0]), 'vals': lambda sim: np.array([0.9])}
+    inds, vals = get_subtargets(subtarget_fn2, sim)
+    assert np.array_equal(vals, np.array([0.9]))
+
+    # Callable subtarget itself
+    subtarget_callable = lambda sim: {'inds': np.array([0]), 'vals': 0.5}
+    inds, vals = get_subtargets(subtarget_callable, sim)
+    assert np.array_equal(inds, np.array([0]))
+
+
+def test_dynamic_pars():
+    sc.heading('Test dynamic_pars intervention')
+
+    pars = dict(n_agents=500, start=2000, n_years=10, dt=0.5, verbose=0)
+
+    # Change beta at year 2005
+    dp = hpv.dynamic_pars(beta=dict(timepoints='2005', vals=0.001))
+    sim = hpv.Sim(pars, interventions=[dp])
+    sim.run()
+
+    # Beta should have been changed
+    assert sim['beta'] == 0.001
+
+    # Test with multiple timepoints
+    dp2 = hpv.dynamic_pars(pars={'beta': {'timepoints': ['2003', '2007'], 'vals': [0.5, 0.01]}})
+    sim2 = hpv.Sim(pars, interventions=[dp2])
+    sim2.run()
+    assert sim2['beta'] == 0.01  # Last applied value
+
+    # Test with nested dict value (e.g. debut)
+    dp3 = hpv.dynamic_pars(debut=dict(
+        timepoints='2005',
+        vals=dict(f=dict(dist='normal', par1=20, par2=2.1))
+    ))
+    sim3 = hpv.Sim(pars, interventions=[dp3])
+    sim3.run()
+    assert sim3['debut']['f']['par1'] == 20
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -584,6 +674,9 @@ if __name__ == '__main__':
     sim3 = test_screening()
     scens0 = test_vx_effect()
     scens1 = test_cytology()
+    test_find_timepoint()
+    test_get_subtargets()
+    test_dynamic_pars()
 
     sc.toc(T)
     print('Done.')
