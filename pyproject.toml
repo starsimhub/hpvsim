@@ -50,7 +50,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ['pytest']
+test = ['pytest', 'pytest-xdist']
 
 [project.urls]
 "Website" = "https://hpvsim.org"
