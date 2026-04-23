@@ -214,12 +214,62 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 
 ## Scope items not pinned to a milestone
 
+| Item | Suggested home | Notes |
+|---|---|---|
+| Population scaling (`pop_scale` / `total_pop`) | M2 | Required for long-horizon natural history |
+| Age-specific migration | M2 | Required for demographic realism in multi-decade runs |
+| `radiation` intervention | M5 | Part of the full intervention cascade |
+| `dynamic_pars` | M5 | Needed to vary parameters over time |
+| Additional genotypes (`hr`, `lo`) | M2 | Low priority; add when natural history is wired up |
+| Multiscale modeling | Unscheduled | Low priority; not a release blocker |
+| Save/load | M9 or opportunistic | Not capability-blocking |
+| Split data files (#12) | M9 or opportunistic | Loading performance |
+| Fix automatic download failures (#30) | M0 or M9 | Infrastructure hygiene |
+| Sex-specific initial prevalence | M2 | v2.x seeds initial infections differently by sex |
+
 ## Out of scope
+
+Not ported to v3.0 (can revisit in a future release):
+
+- **Waning immunity** — never used in published analyses.
+- **v2.x incidence-based HIV** — superseded by STIsim's transmission-based HIV.
+- **`EventSchedule`** — rarely used.
+- **Custom `settings.py`** — superseded by `ss.options`.
 
 ## Implementation conventions
 
+These conventions apply to every milestone; contributors should align on them from day one.
+
+1. **Continuous runnability invariant.** `hpv.Sim().run()` must return results at every commit on `v3.0-dev`. CI enforces this; a PR that breaks the invariant is not mergeable.
+2. **Dual validation gates.**
+   - **Development gate (per PR).** An *anchor scenario* (vanilla natural history, no interventions, fixed seed) plus per-milestone *capability scenarios* are run against stored v2.x baselines. Target: ±10% per summary result, where "summary result" initially means total HPV prevalence, age-standardized CIN prevalence, age-standardized cancer incidence, and total population; the exact list is pinned in M0 alongside the comparison script. **On failure the gate is informational, not auto-blocking**: the PR carries either a fix, or an explicit note classifying the drift as expected feature-misalignment with a tracking issue for re-convergence.
+   - **Release gate (per milestone acceptance test and at v3.0.0).** Overlapping uncertainty intervals against the analysis-repo suite. This is the scientific gate.
+3. **Subclass-first tactic permitted as an interim.** `class Foo(ss.X)` that delegates to v2.x logic is allowed during a milestone. Every such delegation must have a tracking issue to strip it before M9. No delegations ship in v3.0.0.
+4. **Lift-and-shift exclusion — HIV only.** v2.x incidence-based HIV is not lifted; STIsim's transmission-based HIV is adopted directly. The sexual network is *not* excluded — lift-and-shift of the network is the expected starting point.
+
 ## Branching and sync strategy
+
+- `v3.0-dev` was created off `rc2.3` on 2026-04-23. rc2.3 is feature-complete and will merge into `main` in due course.
+- Periodically, `main` is merged into `v3.0-dev`. Normal merge commits — no rebase, no force-push.
+- No merges from `v3.0-dev` back into `main` until v3.0.0 release.
+- Bugs discovered on `v3.0-dev` that also affect `main` are fixed on `main` first, then merged forward.
+- Old branches `rc3`, `rc3-integration`, `rc3-jc` on `origin` are left untouched as read-only references.
 
 ## GitHub milestones and issues
 
+A hybrid update of `starsimhub/hpvsim` milestones and migration-labeled issues is tracked in a separate GitHub issue (linked below). The update:
+
+- Reviews the existing M00–M11 milestones and renames or restructures them to match this plan's M0–M9 partition where they don't match.
+- Closes issues that no longer map, with a pointer to their replacement.
+- Opens new issues for sub-tasks in this plan's milestones (one per sub-task).
+- Leaves v2.3 release work in its own existing milestone on `rc2.3` / `main` — not absorbed into the migration plan.
+
+Tracking issue: *(to be created; linked here after creation)*.
+
 ## Linked documents
+
+- [`KICKOFF_DISCUSSION.md`](./KICKOFF_DISCUSSION.md) — RACI rationale, scope discussion, timeline, open questions from the original kick-off.
+- [`docs/superpowers/specs/2026-04-23-hpvsim-starsim-port-design.md`](./docs/superpowers/specs/2026-04-23-hpvsim-starsim-port-design.md) — design spec behind this plan.
+- [Old `rc3` branch](https://github.com/starsimhub/hpvsim/tree/rc3) — read-only reference for the earlier port attempt.
+- [Issue #64](https://github.com/starsimhub/hpvsim/issues/64) — canonical validation-repo list.
+- Issues #68–#73 and #82–#87 — v2.3 reproducibility checks against the validation repos.
