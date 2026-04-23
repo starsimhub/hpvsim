@@ -66,6 +66,75 @@ Revised 2026-04-23:
 
 ## Milestones
 
+Each milestone produces a user-visible demo and must meet its acceptance test before the next begins. Tests written during a milestone stay in CI from that point onward. Sub-tasks map 1:1 to GitHub issues (see "GitHub milestones and issues" below).
+
+### M0: Foundation
+
+**Demo:** `v3.0-dev` branch exists with CI green on a stub sim; `KICKOFF_DISCUSSION.md` + `MIGRATION_PLAN.md` committed; v2.x baseline outputs stored; anchor-scenario script and ±10% comparison script committed.
+
+**Acceptance test:** CI passes; regression harness compares a v3 run to a stored v2 baseline and reports diffs.
+
+**Sub-tasks:**
+- Set up CI on `v3.0-dev` (adapted from rc2.3 CI).
+- Generate v2.x baseline outputs for the regression harness and commit them (or commit a script that reproduces them deterministically).
+- Write the anchor scenario script: vanilla 4-genotype HPV sim, one country, fixed seed, no interventions.
+- Write the ±10% comparison script that diffs a v3 run against the stored v2 baseline and emits per-summary-result drift.
+- Document how to run the regression harness in a `CONTRIBUTING.md` (or equivalent) section.
+
+### M1: Basic transmission sim
+
+**Demo:** Run a vanilla 4-genotype HPV sim on one country; plot aggregate HPV prevalence over time.
+
+**Acceptance test:** Aggregate HPV prevalence trajectory overlaps v2.x uncertainty interval on the same country/pars; partnership patterns (age mixing, concurrency, duration) match v2.x.
+
+**Sub-tasks:**
+- Port `People` as `hpv.People(ss.People)` subclass using lift-and-shift; open a tracking issue to strip the subclass before M9.
+- Port HPVsim's custom sexual network as `hpv.Network(ss.Network)` using lift-and-shift; open a tracking issue to refine toward Starsim idioms before M9.
+- Assemble a minimal `hpv.Sim(ss.Sim)` that composes `hpv.People` and `hpv.Network` and runs without interventions.
+- Add tests for partnership pattern equivalence (age-mixing matrix, concurrency distribution, partnership duration distribution) vs. v2.x.
+- Add tests for HPV prevalence trajectory vs. the stored v2 baseline from M0.
+
+### M2: Natural history parity
+
+**Demo:** Show age- and genotype-stratified prevalence/incidence curves matching v2.x.
+
+**Acceptance test:** Age-stratified HPV / CIN / cancer incidence by genotype overlaps v2.x intervals.
+
+**Sub-tasks:**
+- Port disease progression for each of the 4 genotypes into `Genotype(ss.Disease)`.
+- Port cross-immunity via `HPV(ss.Connector)`.
+- Port `age_results` analyzer at minimum viable scope (enough for calibration to consume in M3).
+- Add population scaling (`pop_scale` / `total_pop`).
+- Add age-specific migration (from v2.x `people.py:check_migration()`).
+- Add tests: age-stratified HPV / CIN / cancer incidence by genotype match v2.x baselines.
+
+### M3: Calibration loop
+
+**Demo:** End-to-end calibration of one country (e.g., India) to age-stratified cancer incidence data converges and reproduces a published calibration.
+
+**Acceptance test:** Optuna-based calibration produces a posterior consistent with v2.x calibration on the same target data.
+
+**Sub-tasks:**
+- Integrate Starsim's Optuna-based calibration with `hpv.Sim`.
+- Port `compute_gof()` and likelihood functions for cancer incidence by age.
+- Add calibration tests that run a small number of trials end-to-end.
+- Run a full calibration for India; confirm posterior parameter ranges overlap v2.x calibration.
+- Write a short calibration guide section (expanded further in M9).
+
+### M4: Vaccination scenarios
+
+**Demo:** Run routine + catch-up + therapeutic vaccination and show cancer incidence reduction.
+
+**Acceptance test:** Vaccination impact trajectory overlaps v2.x intervals on `hpvsim_1dose` / `hpvsim_pxv_younger`.
+
+**Sub-tasks:**
+- Port product base classes (`dx`, `tx`, `vx`) and adapt CSV product files from v2.x `data/`.
+- Port `routine_vx` intervention.
+- Port `campaign_vx` intervention.
+- Port `txvx` (therapeutic vaccination: `BaseTxVx`, `routine_txvx`, `campaign_txvx`, `linked_txvx`).
+- Add intervention-level results tracking (number vaccinated, doses administered, by age and year).
+- Add tests: vaccination scenarios reproduce `hpvsim_1dose` / `hpvsim_pxv_younger` with overlapping intervals.
+
 ## Scope items not pinned to a milestone
 
 ## Out of scope
