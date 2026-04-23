@@ -20,6 +20,11 @@ the term "Regression information".
 - Fixes `res_to_plot` indexing bug in `Calibration.plot()`.
 - *Regression information*: vaccine efficacy will differ from previous versions due to the immunity model change.
 
+## Version 2.2.7 (2026-04-22)
+
+- Fix cancer treatment results always being blank: `BaseTreatment.check_eligibility` was excluding cancer patients (preventing radiation from running), `BaseTreatment.apply` was writing to CIN fields for cancer treatment, and `cum_cancer_treated` cumsum used the wrong source array
+- *Github info* PR [94](https://github.com/starsimhub/hpvsim/pull/94), issue [91](https://github.com/starsimhub/hpvsim/issues/91)
+
 ## Version 2.2.6 (2026-04-17)
 
 - Reconcile different copies of repository

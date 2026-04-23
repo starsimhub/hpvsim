@@ -1138,7 +1138,7 @@ class Sim(hpb.BaseSim):
         self.results['cum_cin_treatments'][:] = np.cumsum(self.results['new_cin_treatments'][:], axis=0)
         self.results['cum_cin_treated'][:] = np.cumsum(self.results['new_cin_treated'][:], axis=0)
         self.results['cum_cancer_treatments'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
-        self.results['cum_cancer_treated'][:] = np.cumsum(self.results['new_cancer_treatments'][:], axis=0)
+        self.results['cum_cancer_treated'][:] = np.cumsum(self.results['new_cancer_treated'][:], axis=0)
 
         return
     

@@ -662,6 +662,63 @@ def test_dynamic_pars():
     assert sim3['debut']['f']['par1'] == 20
 
 
+def test_cancer_treatment():
+    sc.heading('Test that cancer treatment results are non-zero (issue #91)')
+
+    screen_eligible = lambda sim: np.isnan(sim.people.date_screened) | (sim.t > (sim.people.date_screened + 5 / sim['dt']))
+    screen = hpv.routine_screening(
+        product='hpv',
+        prob=1.0,
+        eligibility=screen_eligible,
+        age_range=[0, 100],
+        start_year=2010,
+        label='screen',
+    )
+
+    screen_positive = lambda sim: sim.get_intervention('screen').outcomes['positive']
+    assign_treatment = hpv.routine_triage(
+        prob=1.0,
+        product='tx_assigner',
+        eligibility=screen_positive,
+        label='tx assigner',
+    )
+
+    radiation_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['radiation']
+    radiation = hpv.treat_num(
+        prob=1.0,
+        product=hpv.radiation(),
+        eligibility=radiation_eligible,
+        label='radiation',
+    )
+
+    ablation_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['ablation']
+    ablation = hpv.treat_num(prob=1.0, product='ablation', eligibility=ablation_eligible, label='ablation')
+
+    excision_eligible = lambda sim: sim.get_intervention('tx assigner').outcomes['excision']
+    excision = hpv.treat_num(prob=1.0, product='excision', eligibility=excision_eligible, label='excision')
+
+    interventions = [screen, assign_treatment, ablation, excision, radiation]
+    for intv in interventions: intv.do_plot = False
+
+    sim = hpv.Sim(pars=base_pars, interventions=interventions)
+    sim.run(verbose=0)
+
+    cum_cancer_tx   = sim.results['cum_cancer_treatments'][-1]
+    cum_cancer_txd  = sim.results['cum_cancer_treated'][-1]
+    cum_cin_tx      = sim.results['cum_cin_treatments'][-1]
+
+    print(f'Cumulative cancer treatments:      {cum_cancer_tx:.0f}')
+    print(f'Cumulative people treated (cancer): {cum_cancer_txd:.0f}')
+    print(f'Cumulative CIN treatments:          {cum_cin_tx:.0f}')
+
+    assert cum_cancer_tx  > 0, 'cum_cancer_treatments is zero — cancer treatment not being recorded'
+    assert cum_cancer_txd > 0, 'cum_cancer_treated is zero — cancer treatment not being recorded'
+    assert cum_cancer_txd <= cum_cancer_tx, 'people treated cannot exceed treatment events'
+    assert cum_cin_tx     > 0, 'CIN treatments broken by cancer-treatment fix'
+
+    return sim
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -672,6 +729,7 @@ if __name__ == '__main__':
     sim1 = test_all_interventions(do_plot=do_plot)
     sim2 = test_txvx_noscreen()
     sim3 = test_screening()
+    sim4 = test_cancer_treatment()
     scens0 = test_vx_effect()
     scens1 = test_cytology()
     test_find_timepoint()
