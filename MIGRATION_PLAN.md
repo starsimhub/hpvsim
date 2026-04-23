@@ -135,6 +135,83 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Add intervention-level results tracking (number vaccinated, doses administered, by age and year).
 - Add tests: vaccination scenarios reproduce `hpvsim_1dose` / `hpvsim_pxv_younger` with overlapping intervals.
 
+### M5: Screen-and-treat cascade
+
+**Demo:** Run a screen → triage → treat scenario on one country.
+
+**Acceptance test:** Screening scenario overlaps v2.x intervals on `hpvsim_methods_manuscript` or equivalent.
+
+**Sub-tasks:**
+- Port screening intervention (`screen_num` style).
+- Port triage logic (full screen → triage → treat cascade).
+- Port treatment interventions: `treat_num` and `treat_delay`.
+- Port `radiation` intervention (cancer treatment).
+- Port `dynamic_pars` for time-varying parameters (e.g., condom use).
+- Add tests: screening scenarios reproduce `hpvsim_methods_manuscript` with overlapping intervals.
+
+### M6: MultiSim and scenarios
+
+**Demo:** Run N=20 seeds, combine, produce CIs for all previous milestones; run a scenario sweep.
+
+**Acceptance test:** Previously-matched trajectories produce uncertainty intervals from seeds; `Scenarios`-based comparison works.
+
+**Sub-tasks:**
+- Verify `ss.MultiSim` works with `hpv.Sim` (multi-seed runs, result aggregation, median + quantiles).
+- Port the `Scenarios` class for parameter sweeps and intervention comparisons.
+- Port the `Sweep` class for systematic parameter variation.
+- Verify `ss.parallel()` works with proper random-seed handling.
+- Re-run M1–M5 acceptance tests under proper uncertainty quantification (overlap intervals, not deterministic-seed equality).
+
+### M7: HIV–HPV co-infection
+
+**Demo:** Reproduce HIV-stratified HPV prevalence and cancer incidence on a high-HIV-burden setting.
+
+**Acceptance test:** Reproduces `hpvsim_rwanda` outputs with overlapping intervals.
+
+**Sub-tasks:**
+- Integrate STIsim's HIV transmission model with `hpv.Sim`.
+- Implement `hpv_hiv_connector(ss.Connector)` for cross-disease effects.
+- Port CD4-stratified HPV progression effects (accelerated CIN, altered clearance at low CD4).
+- Port ART effects on HPV (partial immune restoration slows HPV progression).
+- Add HIV-stratified results (HPV prevalence by HIV status, by age group).
+- Add tests: reproduces `hpvsim_rwanda` outputs with overlapping intervals.
+
+### M8: Remaining analyzers and plotting
+
+**Demo:** All secondary analyzers work; key paper figures reproducible via built-in plotting.
+
+**Acceptance test:** Each analyzer matches v2.x output; `sim.plot()` and plots-by-age/genotype produce the standard figures from validation papers.
+
+**Sub-tasks:**
+- Port `snapshot` analyzer.
+- Port `age_pyramid` analyzer.
+- Port `age_causal_infection` analyzer.
+- Port `dalys` analyzer (YLL + YLD).
+- Add type-distribution results (genotype distribution of cancers).
+- Implement `sim.plot()` for HPV-specific result views.
+- Add plots by age group and by genotype.
+- Add intervention-impact plots.
+- Add calibration-result plots (data vs. fit, parameter distributions, convergence).
+
+### M9: Release readiness
+
+**Demo:** Migration guide published; tutorials updated; docs on MkDocs/Quarto; `pip install hpvsim==3.0.0` works.
+
+**Acceptance test:** Full analysis-repo suite (#64 + #68–#73 + #82–#87 set) reproduces on v3 within overlapping intervals; migration guide merged; `v3.0.0` published to PyPI.
+
+**Sub-tasks:**
+- Write migration guide (v2 → v3) documenting API changes, parameter remapping, and script conversion.
+- Switch docs from Sphinx to MkDocs/Quarto (issue #32).
+- Update tutorials to use v3.0 API.
+- Add workflow examples for calibration, multi-country comparison, HPV-HIV, vaccination impact.
+- Auto-generate API reference from docstrings.
+- Fix automatic download failures (issue #30).
+- Split data files for faster loading (issue #12).
+- Verify save/load works correctly with the new architecture.
+- Strip all remaining subclass-first delegations (tracking issues from M1–M8).
+- Run the full analysis-repo validation suite; confirm overlapping intervals.
+- Tag v3.0.0 and publish to PyPI.
+
 ## Scope items not pinned to a milestone
 
 ## Out of scope
