@@ -3,6 +3,11 @@ that may result in differences in model output, or are required in order
 to run an old parameter set with the current version, are flagged with
 the term "Regression information".
 
+## Version 2.2.7 (2026-04-22)
+
+- Fix cancer treatment results always being blank: `BaseTreatment.check_eligibility` was excluding cancer patients (preventing radiation from running), `BaseTreatment.apply` was writing to CIN fields for cancer treatment, and `cum_cancer_treated` cumsum used the wrong source array
+- *Github info* PR [92](https://github.com/starsimhub/hpvsim/pull/92), issue [91](https://github.com/starsimhub/hpvsim/issues/91)
+
 ## Version 2.2.6 (2026-04-17)
 
 - Reconcile different copies of repository
