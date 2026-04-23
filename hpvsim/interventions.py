@@ -967,6 +967,7 @@ class BaseTreatment(Intervention):
         self.eligibility = eligibility
         self._parse_product(product)
         self.age_range = age_range or [0,99] # By default, no restrictions on treatment age
+        self.treat_cancer = isinstance(self.product, radiation)
 
 
     def _parse_product(self, product):
@@ -998,8 +999,11 @@ class BaseTreatment(Intervention):
         females         = sim.people.is_female
         in_age_range    = (sim.people.age >= self.age_range[0]) * (sim.people.age <= self.age_range[1])
         alive           = sim.people.alive
-        nocancer        = ~sim.people.cancerous.any(axis=0)
-        conditions      = (females * in_age_range * alive * nocancer)
+        if self.treat_cancer:
+            cancer_cond = sim.people.cancerous.any(axis=0)
+        else:
+            cancer_cond = ~sim.people.cancerous.any(axis=0)
+        conditions      = (females * in_age_range * alive * cancer_cond)
         return conditions
 
     def get_accept_inds(self, sim):
@@ -1030,17 +1034,16 @@ class BaseTreatment(Intervention):
         treat_inds = hpu.itruei(still_eligible, treat_candidates)
 
         # Store treatment and dates
-        new_treat_inds = hpu.ifalsei(sim.people.cin_treated, treat_inds)  # Figure out people who are getting radiation for the first time
-        sim.people.cin_treated[treat_inds] = True
-        sim.people.cin_treatments[treat_inds] += 1
-        sim.people.date_cin_treated[treat_inds] = sim.t
-
-        # Store results
         idx = int(sim.t / sim.resfreq)
-        n_new_cin_treatments = sim.people.scale_flows(treat_inds)  # Scale
-        n_new_people = sim.people.scale_flows(new_treat_inds)  # Scale
-        sim.results['new_cin_treated'][idx] += n_new_people
-        sim.results['new_cin_treatments'][idx] += n_new_cin_treatments
+        if not self.treat_cancer:
+            new_treat_inds = hpu.ifalsei(sim.people.cin_treated, treat_inds)
+            sim.people.cin_treated[treat_inds] = True
+            sim.people.cin_treatments[treat_inds] += 1
+            sim.people.date_cin_treated[treat_inds] = sim.t
+            n_new_cin_treatments = sim.people.scale_flows(treat_inds)
+            n_new_people = sim.people.scale_flows(new_treat_inds)
+            sim.results['new_cin_treated'][idx] += n_new_people
+            sim.results['new_cin_treatments'][idx] += n_new_cin_treatments
 
         # Administer treatment and store products used
         self.outcomes = self.product.administer(sim, treat_inds)
