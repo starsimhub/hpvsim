@@ -7,8 +7,10 @@ the term "Regression information".
 
 - Fixes dt-dependent results by scaling partnership formation rates to
   per-timestep probabilities; `layer_probs` and cross-layer defaults
-  converted to annual probabilities. **Regression information:** baseline
-  model outputs change; baselines have been regenerated.
+  converted to annual probabilities.
+- *Regression information*: If workflows from v2.2.6 or earlier override default `layer_probs`, `f_cross_layer`, or `m_cross_layer` values
+  and have timesteps not equal to 1 year, then the probabilities must be converted to annual probabilities instead of per-timestep probabilities using this formula: `1 - (1 - prob) ** dt`
+- *Regression information:* baseline model outputs change; baselines have been regenerated.
 - Fixes `precins` flow never being incremented; removes redundant `dysplasias` flow (was an alias of `cins`).
 - Adds tooling under `tests/project_validation/` to compare outputs
   between versions of the code.
