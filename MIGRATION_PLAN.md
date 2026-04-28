@@ -70,15 +70,15 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 
 ### M0: Foundation
 
-**Demo:** `v3.0-dev` branch exists with CI green on a stub sim; `KICKOFF_DISCUSSION.md` + `MIGRATION_PLAN.md` committed; v2.x baseline outputs stored; anchor-scenario script and ±10% comparison script committed.
+**Demo:** `v3.0-dev` branch exists with CI green on a stub sim; `KICKOFF_DISCUSSION.md` + `MIGRATION_PLAN.md` committed; v2.x baseline-generation script committed (baseline files themselves are generated locally and gitignored, never committed); anchor-scenario script and ±10% comparison script committed.
 
-**Acceptance test:** CI passes; regression harness compares a v3 run to a stored v2 baseline and reports diffs.
+**Acceptance test:** CI passes; regression harness compares a v3 run to a locally-generated v2 baseline and reports diffs.
 
 **Sub-tasks:**
 - Set up CI on `v3.0-dev` (adapted from rc2.3 CI).
-- Generate v2.x baseline outputs for the regression harness and commit them (or commit a script that reproduces them deterministically).
+- Commit a deterministic v2.x baseline-generation script for the regression harness. Generated baseline files stay local (gitignored), never committed.
 - Write the anchor scenario script: vanilla 4-genotype HPV sim, one country, fixed seed, no interventions.
-- Write the ±10% comparison script that diffs a v3 run against the stored v2 baseline and emits per-summary-result drift.
+- Write the ±10% comparison script that diffs a v3 run against the locally-stored v2 baseline and emits per-summary-result drift.
 - Document how to run the regression harness in a `CONTRIBUTING.md` (or equivalent) section.
 
 ### M1: Basic transmission sim
