@@ -64,7 +64,7 @@ def format_table(rows, threshold=THRESHOLD):
     """Format drift rows as a printable table (str)."""
     out = []
     out.append(f'{"key":<40} {"baseline":>12} {"current":>12} {"abs_diff":>12} {"rel_diff":>10} {"over":>6}')
-    out.append('-' * 96)
+    out.append('-' * 97)
     for r in rows:
         rel = f'{r["rel_diff"]*100:+.2f}%' if r['rel_diff'] is not None else 'n/a'
         flag = 'YES' if r['over_threshold'] else ''
@@ -94,8 +94,11 @@ def main(argv=None):
         print('To generate a baseline, run: python tests/regression/baseline.py')
         return 0
 
-    # Local import: only run the anchor when we actually need to.
-    sys.path.insert(0, str(Path(__file__).parent))
+    # Local import: hpvsim is expensive to load. Skip it entirely on the fast
+    # no-baseline path, which CI uses as a smoke check.
+    _regression_dir = str(Path(__file__).parent)
+    if _regression_dir not in sys.path:
+        sys.path.insert(0, _regression_dir)
     from anchor import run_and_summarize  # noqa: E402
 
     with open(args.baseline) as f:
