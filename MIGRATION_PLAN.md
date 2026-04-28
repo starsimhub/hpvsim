@@ -75,11 +75,11 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 **Acceptance test:** CI passes; regression harness compares a v3 run to a locally-generated v2 baseline and reports diffs.
 
 **Sub-tasks:**
-- Set up CI on `v3.0-dev` (adapted from rc2.3 CI).
-- Commit a deterministic v2.x baseline-generation script for the regression harness. Generated baseline files stay local (gitignored), never committed.
-- Write the anchor scenario script: vanilla 4-genotype HPV sim, one country, fixed seed, no interventions.
-- Write the ±10% comparison script that diffs a v3 run against the locally-stored v2 baseline and emits per-summary-result drift.
-- Document how to run the regression harness in a `CONTRIBUTING.md` (or equivalent) section.
+- Set up CI on `v3.0-dev` (adapted from rc2.3 CI); add a smoke-check step for the comparison CLI.
+- Commit a deterministic v2.x baseline-generation script (`tests/regression/baseline.py`). Generated baseline files stay local (gitignored), never committed.
+- Write the anchor scenario script (`tests/regression/anchor.py`): vanilla 4-genotype HPV sim, Nigeria, fixed seed (`0`), no interventions, 1990–2060.
+- Write the ±10% comparison script (`tests/regression/compare.py`) that diffs a current run against the locally-stored v2 baseline and emits per-summary-result relative drift.
+- Document how to run the regression harness in `tests/regression/README.md` and add a pointer from `tests/README.md`.
 
 ### M1: Basic transmission sim
 
@@ -242,7 +242,7 @@ These conventions apply to every milestone; contributors should align on them fr
 
 1. **Continuous runnability invariant.** `hpv.Sim().run()` must return results at every commit on `v3.0-dev`. CI enforces this; a PR that breaks the invariant is not mergeable.
 2. **Dual validation gates.**
-   - **Development gate (per PR).** An *anchor scenario* (vanilla natural history, no interventions, fixed seed) plus per-milestone *capability scenarios* are run against stored v2.x baselines. Target: ±10% per summary result, where "summary result" initially means total HPV prevalence, age-standardized CIN prevalence, age-standardized cancer incidence, and total population; the exact list is pinned in M0 alongside the comparison script. **On failure the gate is informational, not auto-blocking**: the PR carries either a fix, or an explicit note classifying the drift as expected feature-misalignment with a tracking issue for re-convergence.
+   - **Development gate (per PR).** An *anchor scenario* (vanilla natural history, no interventions, fixed seed) plus per-milestone *capability scenarios* are run against locally-stored v2.x baselines. Target: ±10% relative drift per summary result. The pinned summary-result set, established in M0, is `sim.short_summary` (total HPV infections, total cancers, total cancer deaths, mean HPV prevalence, mean cancer incidence, mean ages of infection / cancer / cancer death) plus total population. **On failure the gate is informational, not auto-blocking**: the PR carries either a fix, or an explicit note classifying the drift as expected feature-misalignment with a tracking issue for re-convergence.
    - **Release gate (per milestone acceptance test and at v3.0.0).** Overlapping uncertainty intervals against the analysis-repo suite. This is the scientific gate.
 3. **Subclass-first tactic permitted as an interim.** `class Foo(ss.X)` that delegates to v2.x logic is allowed during a milestone. Every such delegation must have a tracking issue to strip it before M9. No delegations ship in v3.0.0.
 4. **Lift-and-shift exclusion — HIV only.** v2.x incidence-based HIV is not lifted; STIsim's transmission-based HIV is adopted directly. The sexual network is *not* excluded — lift-and-shift of the network is the expected starting point.
