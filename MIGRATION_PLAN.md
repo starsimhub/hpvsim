@@ -249,11 +249,17 @@ These conventions apply to every milestone; contributors should align on them fr
 
 ## Branching and sync strategy
 
-- `v3.0-dev` was created off `rc2.3` on 2026-04-23. rc2.3 is feature-complete and will merge into `main` in due course.
-- Periodically, `main` is merged into `v3.0-dev`. Normal merge commits — no rebase, no force-push.
-- No merges from `v3.0-dev` back into `main` until v3.0.0 release.
-- Bugs discovered on `v3.0-dev` that also affect `main` are fixed on `main` first, then merged forward.
+- `v3.0-dev` was created off `rc2.3` on 2026-04-23 and is the long-lived branch where all migration work converges.
+- `rc2.3` is frozen — no further development on it. It awaits merge to `main` once approved.
+- Each milestone gets its own branch off `v3.0-dev`, named after the milestone (e.g., `m01-basic-transmission-sim`). All commits for that milestone's sub-tasks land on that branch.
+- When a milestone is complete (all its sub-tasks done, acceptance test green locally), open a PR from the milestone branch to `v3.0-dev`. The PR is the team review surface — Robyn (per §RACI) reviews migration work here. After merge, the milestone branch can be deleted.
+- A draft PR can be opened early in the milestone so CI runs on every push to the milestone branch; flip from draft to ready-for-review when the milestone is complete.
+- `v3.0-dev` is always runnable (per §Implementation conventions item 1). The milestone-PR review enforces this on each merge.
+- No merges from `v3.0-dev` back into `main` until v3.0.0 release at M09. At that point, `v3.0-dev` merges to `main`.
+- No further development on `main` is expected until `v3.0-dev` merges. Should a critical bug fix land on `main` (e.g., a v2.x issue affecting `rc2.3`/`main`), it gets forward-merged into `v3.0-dev` via PR. Otherwise, periodic merges from `main` are unnecessary.
+- CI runs on PR open/update, on manual workflow_dispatch, and on a daily cron (against the default branch). Existing triggers in `.github/workflows/tests.yaml` — no push trigger is added.
 - Old branches `rc3`, `rc3-integration`, `rc3-jc` on `origin` are left untouched as read-only references.
+- M00 (Foundation) was bootstrapped as direct commits to `v3.0-dev` rather than via a milestone branch, since the planning artifacts and regression harness pre-date the milestone-branch convention. The milestone-branch model starts with M01.
 
 ## GitHub milestones and issues
 
