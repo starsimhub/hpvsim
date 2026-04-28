@@ -264,7 +264,7 @@ A hybrid update of `starsimhub/hpvsim` milestones and migration-labeled issues i
 - Opens new issues for sub-tasks in this plan's milestones (one per sub-task).
 - Leaves v2.3 release work in its own existing milestone on `rc2.3` / `main` — not absorbed into the migration plan.
 
-Tracking issue: *(to be created; linked here after creation)*.
+Tracking issue: [#95](https://github.com/starsimhub/hpvsim/issues/95).
 
 ## Linked documents
 
