@@ -51,11 +51,11 @@ tests/
 │   ├── compare.py               # CLI: runs anchor, loads baseline, prints per-key drift table
 │   └── README.md                # full detail (anchor pars, usage, drift semantics, gate behavior)
 ├── regression_baselines/        # gitignored (already excluded in .gitignore)
-├── test_regression_smoke.py     # pytest smoke test: imports anchor.make_sim(), runs, asserts completion
+├── test_regression.py           # pytest: smoke test for anchor + unit tests for compute_drift
 └── README.md                    # append a one-paragraph pointer to tests/regression/README.md
 ```
 
-`anchor.py` is the scientific definition. `baseline.py` and `compare.py` are tooling that imports from `anchor.py`. The smoke test lives at `tests/test_regression_smoke.py` (not under `tests/regression/`) because the existing CI invokes `pytest test_*.py -n auto` from the `tests/` directory — that shell glob only picks up `test_*.py` files at the `tests/` root, not in subdirectories. Putting the smoke test at `tests/` root keeps the CI command unchanged.
+`anchor.py` is the scientific definition. `baseline.py` and `compare.py` are tooling that imports from `anchor.py`. The pytest file lives at `tests/test_regression.py` (not under `tests/regression/`) because the existing CI invokes `pytest test_*.py -n auto` from the `tests/` directory — that shell glob only picks up `test_*.py` files at the `tests/` root, not in subdirectories. The single `test_regression.py` file holds both the anchor smoke test and the unit tests for `compute_drift`.
 
 ## Comparison rules
 
@@ -82,7 +82,7 @@ Drift semantics:
 
 `.github/workflows/tests.yaml` is updated minimally:
 
-- Existing pytest run stays as-is. The new `tests/test_regression_smoke.py` is at the `tests/` root, so it is picked up automatically by the existing `pytest test_*.py -n auto` invocation (which globs `test_*.py` from the `tests/` working directory).
+- Existing pytest run stays as-is. The new `tests/test_regression.py` is at the `tests/` root, so it is picked up automatically by the existing `pytest test_*.py -n auto` invocation (which globs `test_*.py` from the `tests/` working directory).
 - A new step is added after the pytest step that runs `python tests/regression/compare.py` (no-baseline mode). This proves the comparison CLI itself does not bitrot.
 
 No second-venv v2 install. The actual ±10% drift comparison remains a developer-local action.
