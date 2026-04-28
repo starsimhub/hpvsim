@@ -15,3 +15,11 @@ If you want to test a specific version of HPVsim, you can use the
 included `conda` environments, e.g.:
 
     conda env create -f hpvsim_v1.2.2.yml
+
+## Regression harness
+
+There is also a regression harness under `tests/regression/` used for the v2 → v3
+migration. It runs outside the standard pytest flow and is documented in
+[`tests/regression/README.md`](regression/README.md). The harness compares a
+pinned anchor scenario run against a stored v2 baseline and reports per-key drift;
+it is informational, not a CI gate.
