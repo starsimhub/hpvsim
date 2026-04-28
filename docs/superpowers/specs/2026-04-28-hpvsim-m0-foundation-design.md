@@ -76,7 +76,7 @@ Drift semantics:
 - **Relative drift:** `(new - baseline) / baseline`. ±10% is the informational threshold.
 - **Zero-baseline guard:** if a baseline value is zero (not expected for these keys in the anchor scenario, but guarded for safety), the comparison reports absolute drift and flags the row.
 - **Output format:** a table with columns `key | baseline | new | abs_diff | rel_diff | over_threshold?`. Always exits 0.
-- **No-baseline mode:** if `tests/regression_baselines/anchor.json` is missing, `compare.py` runs the anchor and prints `no baseline; skipping diff`. Exits 0. This is the mode CI runs.
+- **No-baseline mode:** if `tests/regression_baselines/anchor.json` is missing, `compare.py` prints `no baseline; skipping diff` and exits 0 *without* running the anchor. The anchor-runs check is the pytest smoke test's job; no-baseline mode is about CLI integrity only. This is the mode CI runs `compare.py` in.
 
 ## CI integration
 
