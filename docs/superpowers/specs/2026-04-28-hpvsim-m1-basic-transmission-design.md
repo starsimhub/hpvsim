@@ -15,6 +15,15 @@ sexual network and adds a single-genotype transmission-only HPV disease module.
 Demonstrate via aggregate HPV prevalence over time on a Nigeria anchor scenario,
 and validate partnership patterns against v2.x within tolerance.
 
+This is an **in-place replacement** of v2's `hpvsim` package, not a coexisting
+v3 subpackage. Public API stays at `hpvsim` (e.g., `import hpvsim as hpv`,
+`hpv.Sim(...)`, `hpv.HPV(...)`). v2 modules that don't have a v3 equivalent
+yet are quarantined to `hpvsim/_v2_legacy/` for porting reference; v2 tests
+that exercise removed APIs are quarantined to `tests/_legacy/`. Both
+quarantines exist so M02-M09 porters can consult v2 code by line, not by
+git archaeology, and so the active package surface only exposes
+current-milestone functionality.
+
 ## Scope
 
 **In scope:**
@@ -48,6 +57,8 @@ and validate partnership patterns against v2.x within tolerance.
 
 ## Architecture
 
+### Runtime composition
+
 ```
 hpv.Sim(ss.Sim)                                 ← HPVsim-owned, thin wrapper
 ├── people = ss.People(n_agents, age_data=df)                ← stock
@@ -68,6 +79,65 @@ hpv.Sim(ss.Sim)                                 ← HPVsim-owned, thin wrapper
 hpv.data.load_country(location)                ← HPVsim-owned, adapter
    returns dict(age_data, fertility, death_rate, network_pars)
 ```
+
+### Package layout after M01
+
+```
+hpvsim/                          ← in-place v3 package
+├── __init__.py                  ← rewritten: exports HPV, SexualNetwork, Sim, data
+├── hpv.py                       ← new: HPV(ss.Infection)
+├── network.py                   ← new: SexualNetwork(ss.SexualNetwork)
+├── sim.py                       ← rewritten: thin Sim(ss.Sim) wrapper
+├── parameters.py                ← kept active (used by hpv.data.load_country)
+├── version.py                   ← kept
+├── settings.py                  ← kept (options used by parameters/defaults)
+├── defaults.py                  ← kept (default_int/float, datadir)
+├── misc.py                      ← kept (helpers used by parameters)
+├── utils.py                     ← kept (numerical helpers — choose_w etc.)
+├── data/                        ← kept; adds new country.py adapter
+│   ├── __init__.py              ← re-exports load_country
+│   ├── country.py               ← new: load_country() function
+│   ├── loaders.py               ← v2 loaders (kept; wrapped by adapter)
+│   ├── downloaders.py           ← kept (used by loaders)
+│   └── files/                   ← v2 data files (kept)
+├── regression/                  ← v2 pars JSONs (kept as artifacts)
+└── _v2_legacy/                  ← NEW: quarantined v2 modules
+    ├── __init__.py              ← empty; "do not import from active code"
+    ├── analysis.py              ← moved from hpvsim/
+    ├── base.py                  ← moved
+    ├── calibration.py           ← moved
+    ├── hiv.py                   ← moved
+    ├── immunity.py              ← moved
+    ├── interventions.py         ← moved
+    ├── people.py                ← moved (god-object replaced by ss.People)
+    ├── plotting.py              ← moved
+    ├── population.py            ← moved (network logic ported to network.py)
+    ├── run.py                   ← moved (MultiSim)
+    └── sim.py                   ← moved (1395-line v2 Sim, replaced wholesale)
+
+tests/                           ← active tests for current milestone surface
+├── test_hpv.py                  ← new
+├── test_network.py              ← new
+├── test_sim.py                  ← new
+├── test_data.py                 ← new
+├── test_partnership_equivalence.py  ← new (M01 acceptance gate)
+├── test_regression.py           ← modified: M00 4-gt smoke skipped until M03
+├── regression/                  ← M00 harness; M01 anchor added
+│   ├── anchor.py                ← M00 4-gt; harness still imported but smoke skipped
+│   ├── anchor_hpv16.py          ← new: M01 1-gt anchor
+│   ├── demo_anchor_hpv16.py     ← new: M01 demo (plots prevalence)
+│   ├── compare.py               ← kept
+│   ├── baseline.py              ← kept
+│   └── README.md                ← updated with M01 baseline procedure
+└── _legacy/                     ← NEW: quarantined v2 tests
+    └── (all v2 tests that exercise removed APIs)
+```
+
+The quarantines (`hpvsim/_v2_legacy/`, `tests/_legacy/`) are **never imported
+by active code** — the linting rule is: if you find yourself reaching into
+either, lift the necessary v2 code into the active package as part of the
+relevant milestone instead. Quarantines exist purely as a porting-reference
+convenience; M10 deletes both wholesale.
 
 ### Why this shape
 
@@ -270,7 +340,10 @@ class Sim(ss.Sim):
 ### `hpv.data.load_country(location)`
 
 Thin adapter wrapping v2's existing data loaders. All values come from v2's
-existing data files and helper functions; the adapter just reshapes them.
+existing data files and helper functions (which stay active in `hpvsim/`,
+not quarantined); the adapter just reshapes them. Lives at
+`hpvsim/data/country.py` and is re-exported from `hpvsim/data/__init__.py`
+so the call site is `hpv.data.load_country(...)`.
 
 ```python
 def load_country(location):
@@ -524,6 +597,10 @@ milestone numbers.
    - Drop "Port People as `hpv.People(ss.People)` using lift-and-shift"
      (multi-resolution deferred indefinitely; stock `ss.People` is sufficient).
    - Change "stored v2 baseline from M0" → "new 1-gt M1 baseline".
+5. Add a paragraph to §"Implementation conventions" documenting the in-place
+   replacement strategy and the `hpvsim/_v2_legacy/` + `tests/_legacy/`
+   quarantine convention (active code never imports from quarantine; quarantine
+   is porting reference; both deleted wholesale at M10).
 
 ### GitHub reconciliation
 
@@ -538,6 +615,32 @@ milestone numbers.
    baseline from M00") → "Tests: HPV prevalence trajectory vs. v2 baseline
    (single-genotype HPV16, M01)".
 6. Update tracking issue #95 to reflect new milestone count and structure.
+
+### v2 quarantine moves (during M01 implementation, after housekeeping)
+
+Bulk `git mv` v2 modules that aren't touched by M01 into `hpvsim/_v2_legacy/`,
+and v2 tests that exercise removed APIs into `tests/_legacy/`. The complete
+list lives in the implementation plan (single dedicated task) so the moves
+land in one commit with full git history preserved.
+
+Specific moves:
+
+- `hpvsim/{analysis,base,calibration,hiv,immunity,interventions,people,plotting,population,run,sim}.py`
+  → `hpvsim/_v2_legacy/`. Note that the original `hpvsim/sim.py` is preserved
+  here before the new (small) `hpvsim/sim.py` is written in place.
+- v2 tests under `tests/test_*.py` that import any of the above (or directly
+  exercise v2 `Sim` / `People` / partnership APIs that no longer exist) →
+  `tests/_legacy/`.
+- `tests/regression/anchor.py` (M00 4-genotype anchor) **stays in place** —
+  its baseline (`tests/regression_baselines/anchor.json`) is still valid as
+  the M03 target. The smoke test `test_anchor_runs` is marked
+  `@pytest.mark.skip(reason='Multi-genotype not yet ported; restored in M03')`.
+
+Modules that **stay active** at the top level because the new M01 code
+depends on them: `parameters.py`, `defaults.py`, `settings.py`, `misc.py`,
+`utils.py`, `version.py`, `data/` (subdirectory). These are utilities or
+data plumbing, not v2 entry points, and the new `hpv.data.load_country`
+adapter wraps them.
 
 ---
 
@@ -555,6 +658,7 @@ milestone numbers.
 | Q8 | Cross-layer concurrency | Each network reads sibling `hpv.SexualNetwork` instances at `add_pairs` time; filtered by `isinstance(other, hpv.SexualNetwork)`. No connector. |
 | — | Milestone scope | Split current M02 into M02 (1-gt nat hx) + new M03 (multi-gt + cross-immunity). Renumber M03-M09 → M04-M10. |
 | — | Performance | No M01 budget. Estimated ~2-3x overhead in M03 vs. v2; profile after M03. |
+| — | Replacement strategy | **In-place replacement** of `hpvsim/`. v2 modules untouched by M01 → `hpvsim/_v2_legacy/`; v2 tests that exercise removed APIs → `tests/_legacy/`. Both quarantines never imported by active code, exist as porting reference, deleted wholesale at M10. |
 
 ---
 
