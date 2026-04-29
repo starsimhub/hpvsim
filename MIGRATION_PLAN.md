@@ -88,27 +88,40 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 **Acceptance test:** Aggregate HPV prevalence trajectory overlaps v2.x uncertainty interval on the same country/pars; partnership patterns (age mixing, concurrency, duration) match v2.x.
 
 **Sub-tasks:**
-- Port `People` as `hpv.People(ss.People)` subclass using lift-and-shift; open a tracking issue to strip the subclass before M9.
-- Port HPVsim's custom sexual network as `hpv.Network(ss.Network)` using lift-and-shift; open a tracking issue to refine toward Starsim idioms before M9.
-- Assemble a minimal `hpv.Sim(ss.Sim)` that composes `hpv.People` and `hpv.Network` and runs without interventions.
+- Port HPVsim's custom sexual network as `hpv.SexualNetwork(ss.SexualNetwork)` using lift-and-shift; one class, three instances (m/c/o); cross-layer concurrency via sibling iteration.
+- Add a minimal single-genotype `hpv.HPV(ss.Infection)` for HPV16 — transmission only, SIS clearance, no precin/CIN/cancer.
+- Replace `hpvsim.Sim` with thin `hpv.Sim(ss.Sim)` wrapper; rely on stock `ss.People`, `ss.Pregnancy`, `ss.Deaths`. Add `hpv.data.load_country()` adapter.
+- Quarantine v2 modules untouched by M01 to `hpvsim/_v2_legacy/` and v2 tests to `tests/_legacy/`.
 - Add tests for partnership pattern equivalence (age-mixing matrix, concurrency distribution, partnership duration distribution) vs. v2.x.
-- Add tests for HPV prevalence trajectory vs. the stored v2 baseline from M0.
+- Add tests for HPV prevalence trajectory vs. a new M1 1-genotype HPV16 baseline.
+- Multi-resolution state (`scale`/`level0`/`level1`/`cluster`) deferred indefinitely; stock `ss.People` is sufficient.
 
 ### M2: Natural history parity
 
-**Demo:** Show age- and genotype-stratified prevalence/incidence curves matching v2.x.
+**Demo:** Show single-genotype (HPV16) natural history — clearance, precin, CIN, and cancer progression — matching v2.x.
 
-**Acceptance test:** Age-stratified HPV / CIN / cancer incidence by genotype overlaps v2.x intervals.
+**Acceptance test:** HPV → CIN → cancer dynamics for HPV16 match v2.x's HPV16-only run within calibration tolerance, against a v2 1-genotype baseline.
 
 **Sub-tasks:**
-- Port disease progression for each of the 4 genotypes into `Genotype(ss.Disease)`.
-- Port cross-immunity via `HPV(ss.Connector)`.
-- Port `age_results` analyzer at minimum viable scope (enough for calibration to consume in M3).
-- Add population scaling (`pop_scale` / `total_pop`).
-- Add age-specific migration (from v2.x `people.py:check_migration()`).
-- Add tests: age-stratified HPV / CIN / cancer incidence by genotype match v2.x baselines.
+- Port disease progression for HPV16 into `hpv.HPV(ss.Infection)` — add precin/CIN/cancer states, port duration distributions and progression functions from v2 `parameters.get_genotype_pars('hpv16')`.
+- Port `age_results` analyzer at minimum scope (enough for calibration to consume in M4).
+- Port `pop_scale` / `total_pop`.
+- Port age-specific migration (from v2 `people.check_migration`).
+- Add tests: HPV16 CIN/cancer trajectories match v2 1-genotype baseline.
 
-### M3: Calibration loop
+### M3: Multi-genotype and cross-immunity
+
+**Demo:** 4-genotype HPV sim with cross-immunity matching v2's 4-genotype Nigeria baseline.
+
+**Acceptance test:** Age-stratified HPV / CIN / cancer incidence by genotype overlaps v2.x intervals against the M0 4-genotype baseline.
+
+**Sub-tasks:**
+- Replicate `hpv.HPV(ss.Infection)` across all four genotypes `[16, 18, hi5, ohr]`; auto-instantiate via `hpv.Sim(genotypes=[...])` API.
+- Add `hpv.CrossImmunity(ss.Connector)` implementing v2's cross-protection matrix.
+- Wire genotype-specific natural history params (`rel_beta`, `dur_precin`, `dur_cin`, `cin_fn`, `cancer_fn`) per genotype.
+- Add tests: 4-genotype prevalence + CIN + cancer trajectories match the M0 stored 4-genotype baseline.
+
+### M4: Calibration loop
 
 **Demo:** End-to-end calibration of one country (e.g., India) to age-stratified cancer incidence data converges and reproduces a published calibration.
 
@@ -119,9 +132,9 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Port `compute_gof()` and likelihood functions for cancer incidence by age.
 - Add calibration tests that run a small number of trials end-to-end.
 - Run a full calibration for India; confirm posterior parameter ranges overlap v2.x calibration.
-- Write a short calibration guide section (expanded further in M9).
+- Write a short calibration guide section (expanded further in M10).
 
-### M4: Vaccination scenarios
+### M5: Vaccination scenarios
 
 **Demo:** Run routine + catch-up + therapeutic vaccination and show cancer incidence reduction.
 
@@ -135,7 +148,7 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Add intervention-level results tracking (number vaccinated, doses administered, by age and year).
 - Add tests: vaccination scenarios reproduce `hpvsim_1dose` / `hpvsim_pxv_younger` with overlapping intervals.
 
-### M5: Screen-and-treat cascade
+### M6: Screen-and-treat cascade
 
 **Demo:** Run a screen → triage → treat scenario on one country.
 
@@ -149,7 +162,7 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Port `dynamic_pars` for time-varying parameters (e.g., condom use).
 - Add tests: screening scenarios reproduce `hpvsim_methods_manuscript` with overlapping intervals.
 
-### M6: MultiSim and scenarios
+### M7: MultiSim and scenarios
 
 **Demo:** Run N=20 seeds, combine, produce CIs for all previous milestones; run a scenario sweep.
 
@@ -160,9 +173,9 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Port the `Scenarios` class for parameter sweeps and intervention comparisons.
 - Port the `Sweep` class for systematic parameter variation.
 - Verify `ss.parallel()` works with proper random-seed handling.
-- Re-run M1–M5 acceptance tests under proper uncertainty quantification (overlap intervals, not deterministic-seed equality).
+- Re-run M1–M6 acceptance tests under proper uncertainty quantification (overlap intervals, not deterministic-seed equality).
 
-### M7: HIV–HPV co-infection
+### M8: HIV–HPV co-infection
 
 **Demo:** Reproduce HIV-stratified HPV prevalence and cancer incidence on a high-HIV-burden setting.
 
@@ -176,7 +189,7 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Add HIV-stratified results (HPV prevalence by HIV status, by age group).
 - Add tests: reproduces `hpvsim_rwanda` outputs with overlapping intervals.
 
-### M8: Remaining analyzers and plotting
+### M9: Remaining analyzers and plotting
 
 **Demo:** All secondary analyzers work; key paper figures reproducible via built-in plotting.
 
@@ -193,7 +206,7 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Add intervention-impact plots.
 - Add calibration-result plots (data vs. fit, parameter distributions, convergence).
 
-### M9: Release readiness
+### M10: Release readiness
 
 **Demo:** Migration guide published; tutorials updated; docs on MkDocs/Quarto; `pip install hpvsim==3.0.0` works.
 
@@ -208,7 +221,7 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Fix automatic download failures (issue #30).
 - Split data files for faster loading (issue #12).
 - Verify save/load works correctly with the new architecture.
-- Strip all remaining subclass-first delegations (tracking issues from M1–M8).
+- Strip all remaining subclass-first delegations (tracking issues from M1–M9).
 - Run the full analysis-repo validation suite; confirm overlapping intervals.
 - Tag v3.0.0 and publish to PyPI.
 
@@ -218,13 +231,13 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 |---|---|---|
 | Population scaling (`pop_scale` / `total_pop`) | M2 | Required for long-horizon natural history |
 | Age-specific migration | M2 | Required for demographic realism in multi-decade runs |
-| `radiation` intervention | M5 | Part of the full intervention cascade |
-| `dynamic_pars` | M5 | Needed to vary parameters over time |
+| `radiation` intervention | M6 | Part of the full intervention cascade |
+| `dynamic_pars` | M6 | Needed to vary parameters over time |
 | Additional genotypes (`hr`, `lo`) | M2 | Low priority; add when natural history is wired up |
 | Multiscale modeling | Unscheduled | Low priority; not a release blocker |
-| Save/load | M9 or opportunistic | Not capability-blocking |
-| Split data files (#12) | M9 or opportunistic | Loading performance |
-| Fix automatic download failures (#30) | M0 or M9 | Infrastructure hygiene |
+| Save/load | M10 or opportunistic | Not capability-blocking |
+| Split data files (#12) | M10 or opportunistic | Loading performance |
+| Fix automatic download failures (#30) | M0 or M10 | Infrastructure hygiene |
 | Sex-specific initial prevalence | M2 | v2.x seeds initial infections differently by sex |
 
 ## Out of scope
@@ -244,8 +257,9 @@ These conventions apply to every milestone; contributors should align on them fr
 2. **Dual validation gates.**
    - **Development gate (per PR).** An *anchor scenario* (vanilla natural history, no interventions, fixed seed) plus per-milestone *capability scenarios* are run against locally-stored v2.x baselines. Target: ±10% relative drift per summary result. The pinned summary-result set, established in M0, is `sim.short_summary` (total HPV infections, total cancers, total cancer deaths, mean HPV prevalence, mean cancer incidence, mean ages of infection / cancer / cancer death) plus total population. **On failure the gate is informational, not auto-blocking**: the PR carries either a fix, or an explicit note classifying the drift as expected feature-misalignment with a tracking issue for re-convergence.
    - **Release gate (per milestone acceptance test and at v3.0.0).** Overlapping uncertainty intervals against the analysis-repo suite. This is the scientific gate.
-3. **Subclass-first tactic permitted as an interim.** `class Foo(ss.X)` that delegates to v2.x logic is allowed during a milestone. Every such delegation must have a tracking issue to strip it before M9. No delegations ship in v3.0.0.
+3. **Subclass-first tactic permitted as an interim.** `class Foo(ss.X)` that delegates to v2.x logic is allowed during a milestone. Every such delegation must have a tracking issue to strip it before M10. No delegations ship in v3.0.0.
 4. **Lift-and-shift exclusion — HIV only.** v2.x incidence-based HIV is not lifted; STIsim's transmission-based HIV is adopted directly. The sexual network is *not* excluded — lift-and-shift of the network is the expected starting point.
+5. **In-place replacement, with quarantines.** v3 work replaces `hpvsim/` in place. v2 modules untouched by the current milestone are moved to `hpvsim/_v2_legacy/`; v2 tests that exercise removed APIs are moved to `tests/_legacy/`. Active code never imports from either quarantine — quarantines exist purely as a porting reference. M10 deletes both wholesale.
 
 ## Branching and sync strategy
 
@@ -255,7 +269,7 @@ These conventions apply to every milestone; contributors should align on them fr
 - When a milestone is complete (all its sub-tasks done, acceptance test green locally), open a PR from the milestone branch to `v3.0-dev`. The PR is the team review surface — Robyn (per §RACI) reviews migration work here. After merge, the milestone branch can be deleted.
 - A draft PR can be opened early in the milestone so CI runs on every push to the milestone branch; flip from draft to ready-for-review when the milestone is complete.
 - `v3.0-dev` is always runnable (per §Implementation conventions item 1). The milestone-PR review enforces this on each merge.
-- No merges from `v3.0-dev` back into `main` until v3.0.0 release at M09. At that point, `v3.0-dev` merges to `main`.
+- No merges from `v3.0-dev` back into `main` until v3.0.0 release at M10. At that point, `v3.0-dev` merges to `main`.
 - No further development on `main` is expected until `v3.0-dev` merges. Should a critical bug fix land on `main` (e.g., a v2.x issue affecting `rc2.3`/`main`), it gets forward-merged into `v3.0-dev` via PR. Otherwise, periodic merges from `main` are unnecessary.
 - CI runs on PR open/update, on manual workflow_dispatch, and on a daily cron (against the default branch). Existing triggers in `.github/workflows/tests.yaml` — no push trigger is added.
 - Old branches `rc3`, `rc3-integration`, `rc3-jc` on `origin` are left untouched as read-only references.
@@ -265,7 +279,7 @@ These conventions apply to every milestone; contributors should align on them fr
 
 A hybrid update of `starsimhub/hpvsim` milestones and migration-labeled issues is tracked in a separate GitHub issue (linked below). The update:
 
-- Reviews the existing M00–M11 milestones and renames or restructures them to match this plan's M0–M9 partition where they don't match.
+- Reviews the existing M00–M11 milestones and renames or restructures them to match this plan's M0–M10 partition where they don't match.
 - Closes issues that no longer map, with a pointer to their replacement.
 - Opens new issues for sub-tasks in this plan's milestones (one per sub-task).
 - Leaves v2.3 release work in its own existing milestone on `rc2.3` / `main` — not absorbed into the migration plan.
