@@ -113,3 +113,106 @@ CI runs:
   imports and parses arguments cleanly.
 
 Neither step fails on drift. Drift is a developer-local concern.
+
+## M01 1-genotype baseline (`anchor_hpv16.json`)
+
+The M01 anchor (`anchor_hpv16.py`) compares against a v2 hpvsim run configured
+with `genotypes=['hpv16']` and otherwise identical pars to the M00 4-genotype
+anchor. This baseline is gitignored at:
+
+```
+tests/regression_baselines/anchor_hpv16.json
+```
+
+### Generating the baseline
+
+In a v2-only environment (a separate venv with v2.3.x hpvsim from PyPI, or a
+checkout of the `rc2.3` branch of this repo before the v3 migration):
+
+```python
+import json
+import sciris as sc
+import hpvsim as hpv2  # v2 package
+
+PARS = dict(
+    n_agents=10e3,
+    location='nigeria',
+    genotypes=['hpv16'],
+    start=1990,
+    end=2060,
+    dt=0.5,
+    burnin=20,
+    rand_seed=0,
+    verbose=0,
+)
+
+sim = hpv2.Sim(sc.dcp(PARS))
+sim.run()
+
+# v2 result-key names may differ from v3's hpv.Sim().results.hpv16.* keys.
+# Compute the equivalent quantities from v2's underlying time series and
+# store them under the v3 key names (see tests/regression/anchor_hpv16.py
+# for the exact keys: 'total HPV infections', 'mean HPV prevalence (%)',
+# 'mean age of infection (years)').
+
+short = {
+    'total HPV infections': float(sim.results['total_infections'].sum()),
+    'mean HPV prevalence (%)': 100 * float(sim.results['hpv_prevalence'].mean()),
+    'mean age of infection (years)': float(sim.results['mean_age_infection'].mean()),
+}
+total_pop = float(sim.results['n_alive'][-1])
+
+out = dict(summary={**short, 'total population': total_pop}, pars=PARS)
+with open('tests/regression_baselines/anchor_hpv16.json', 'w') as f:
+    json.dump(out, f, indent=2)
+```
+
+The summary keys **must match v3's `run_and_summarize()` output keys exactly**.
+If v2's result names differ, compute the equivalent quantities from v2's
+underlying time series and store them under the v3 key names.
+
+### Partnership-equivalence baseline (`partnership_v2.json`)
+
+Supports the M01 acceptance gate (`tests/test_partnership_equivalence.py`,
+landing in Task 13). v2 has 2 layers (m, c) — partnership_v2.json uses
+both. Recipe:
+
+```python
+import json
+import numpy as np
+import sciris as sc
+import hpvsim as hpv2
+
+PARS = dict(
+    n_agents=10e3,
+    location='nigeria',
+    genotypes=['hpv16'],
+    start=1990,
+    end=2015,
+    dt=0.5,
+    burnin=20,
+    rand_seed=0,
+    verbose=0,
+)
+
+sim = hpv2.Sim(sc.dcp(PARS))
+sim.run()
+
+# Capture per-layer (m, c) mixing matrix (16x16 for 5y bins, 0-80,
+# female × male), concurrency histogram, and partnership-duration samples.
+# v2 stores these on sim.people in layer-keyed structures; consult v2
+# internals for exact attribute names.
+
+out = {}
+for layer in ('m', 'c'):
+    out[layer] = {
+        'mixing_matrix': ...,      # 2d list, 16x16, density-normalized
+        'concurrency_hist': ...,   # 1d list, indexed by n_concurrent_partners
+        'duration_samples': ...,   # 1d list, completed-edge durations in years
+    }
+with open('tests/regression_baselines/partnership_v2.json', 'w') as f:
+    json.dump(out, f)
+```
+
+The M01 partnership-equivalence test reads this JSON and runs KS-tests +
+bin-wise diff against equivalent quantities produced by v3.
