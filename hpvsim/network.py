@@ -58,17 +58,32 @@ class SexualNetwork(ss.SexualNetwork):
             acts=None,
         )
         self.update_pars(pars=pars, **kwargs)
+        # Per-agent desired partner count (sampled once when agent enters
+        # the network). IntArr because v2's partner-count distributions
+        # (poisson, poisson1, neg_binomial) all yield integers; Starsim's
+        # IntArr auto-tracks births/deaths.
+        self.define_states(
+            ss.IntArr('partners_target', default=0,
+                      label='Desired partner count for this layer'),
+        )
 
     def _n_partners_elsewhere(self):
         """Count current partnerships each agent has in OTHER hpv.SexualNetwork
-        layers. Used by add_pairs (Task 6) for cross-layer concurrency
-        eligibility.
+        layers. Returns an int array sized at len(sim.people) — i.e., one
+        entry per currently-alive agent's UID slot. Used by external code
+        and tests; add_pairs uses _n_partners_elsewhere_uid_space directly.
 
         Returns:
-            np.ndarray of int, shape (n_agents,). Returns all zeros if no
+            np.ndarray of int, shape (len(sim.people),). All zeros if no
             sibling SexualNetwork instances exist.
         """
-        n = np.zeros(len(self.sim.people), dtype=int)
+        return self._n_partners_elsewhere_uid_space(len(self.sim.people))
+
+    def _n_partners_elsewhere_uid_space(self, n_uids):
+        """Same as _n_partners_elsewhere but returns an array sized at n_uids
+        (the underlying agent storage size, which covers all live UIDs).
+        Used by add_pairs to keep all per-agent arrays the same shape."""
+        n = np.zeros(n_uids, dtype=int)
         for other in self.sim.networks():
             if other is self:
                 continue
@@ -81,31 +96,41 @@ class SexualNetwork(ss.SexualNetwork):
         return n
 
     def _init_partners_target(self, people):
-        """Sample each agent's desired partner count for this layer once.
+        """Sample each agent's desired partner count for this layer.
 
-        v2 stored the desired count per-agent in the static `partners` array
-        sampled at population creation. We replicate that here at first call
-        of add_pairs by sampling per-sex from the ss.Dist instances at
-        pars.partners['m'/'f'].
+        v2 sampled the desired count once per agent at population creation
+        and stored it in a static array. We do the same via the
+        ``partners_target`` IntArr state, which Starsim auto-resizes on
+        births/deaths. We sample for any agent whose target is still 0
+        (uninitialized), so newly-born agents get a sample on first
+        add_pairs after their birth.
         """
-        n_agents = len(people)
-        self._partners_target = np.zeros(n_agents)
-        f_uids = people.female.uids
-        m_uids = (~people.female).uids
+        unset_uids = (people.alive & (self.partners_target == 0)).uids
+        if not len(unset_uids):
+            return
+        is_female_unset = people.female[unset_uids]
+        f_uids = unset_uids[is_female_unset]
+        m_uids = unset_uids[~is_female_unset]
         if len(f_uids):
-            self._partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
+            self.partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
         if len(m_uids):
-            self._partners_target[m_uids] = self.pars.partners['m'].rvs(m_uids)
+            self.partners_target[m_uids] = self.pars.partners['m'].rvs(m_uids)
         # v2's `is_active` is `age > debut`; we set `participant` to True so
         # ss.SexualNetwork.active() reduces to the same predicate (alive AND
         # age > debut). Per-age participation rates are applied per-step via
         # hpu.participation_filter, mirroring v2.
-        self.participant[people.auids] = True
+        self.participant[unset_uids] = True
         return
 
-    def _own_n_partners(self, n_agents):
-        """Number of edges in *this* layer touching each agent."""
-        n = np.zeros(n_agents, dtype=int)
+    def _own_n_partners(self):
+        """Number of edges in *this* layer touching each currently-alive agent.
+
+        Returns an int array indexed in the same UID space as the network's
+        ``partners_target`` FloatArr — i.e., the underlying agent storage
+        size, which always covers all live UIDs.
+        """
+        n_uids = len(self.partners_target.raw)
+        n = np.zeros(n_uids, dtype=int)
         if len(self.edges.p1):
             np.add.at(n, np.asarray(self.edges.p1), 1)
             np.add.at(n, np.asarray(self.edges.p2), 1)
@@ -132,30 +157,34 @@ class SexualNetwork(ss.SexualNetwork):
 
         people = self.sim.people
         n_agents = len(people)
-        is_female = np.asarray(people.female)
 
-        # First-time setup: sample per-agent desired partner count and
-        # mark all agents as `participant` (mirrors v2 where every agent
-        # is potentially active subject to the participation filter).
-        if not hasattr(self, '_partners_target'):
-            self._init_partners_target(people)
+        # Sample desired partner count for any agent that doesn't have one
+        # yet (covers initial population AND newly-born agents on subsequent
+        # timesteps). FloatArr auto-resizes; _init samples only the unset.
+        self._init_partners_target(people)
 
-        # Useful variables (mirror v2 lines 308-311)
-        active = np.asarray(self.active(people))  # alive & participating & age>debut
-        f_active = is_female & active
-        m_active = ~is_female & active
-        underpartnered = self._own_n_partners(n_agents) < self._partners_target
+        # Work in UID space so newly-born / dead agents resize cleanly.
+        n_uids = len(self.partners_target.raw)
+        is_female = np.asarray(people.female.raw, dtype=bool)
+        # ss.SexualNetwork.active() returns a BoolArr indexed by alive uids;
+        # project it into a full-size ndarray via the BoolArr's True UIDs.
+        active_mask = np.zeros(n_uids, dtype=bool)
+        active_mask[self.active(people).uids] = True
+
+        f_active = is_female & active_mask
+        m_active = ~is_female & active_mask
+        underpartnered = self._own_n_partners() < np.asarray(self.partners_target.raw)
 
         # Cross-layer concurrency eligibility (mirror v2 lines 318-326).
         # In v2 every layer has its own current_partners row; we use the
         # SexualNetwork-only sibling count, which is equivalent for M01.
-        n_elsewhere = self._n_partners_elsewhere()
+        n_elsewhere = self._n_partners_elsewhere_uid_space(n_uids)
         other_partners = n_elsewhere > 0
         f_with_other = (other_partners & is_female).nonzero()[0]
         m_with_other = (other_partners & ~is_female).nonzero()[0]
         f_cross_inds = hpu.binomial_filter(self.pars.cross_layer['f'], f_with_other)
         m_cross_inds = hpu.binomial_filter(self.pars.cross_layer['m'], m_with_other)
-        cross_layer_bools = np.zeros(n_agents, dtype=bool)
+        cross_layer_bools = np.zeros(n_uids, dtype=bool)
         cross_layer_bools[f_cross_inds] = True
         cross_layer_bools[m_cross_inds] = True
 
@@ -165,7 +194,7 @@ class SexualNetwork(ss.SexualNetwork):
         # Bin participants by age (mirror v2 lines 330-339).
         layer_probs = self.pars.layer_probs
         bins = layer_probs[0, :]
-        age = np.asarray(people.age)
+        age = np.asarray(people.age.raw)
         m_eligible_inds = m_eligible.nonzero()[0]
         m_participants = hpu.participation_filter(
             m_eligible_inds, age, layer_probs[2, :], bins=bins,
@@ -174,7 +203,7 @@ class SexualNetwork(ss.SexualNetwork):
             return  # no males available for pairing in any age bin
 
         age_bins_m = np.digitize(age[m_participants], bins=bins) - 1
-        m_probs = np.ones(n_agents)  # equal initial weighting (v2 line 343)
+        m_probs = np.ones(n_uids)  # equal initial weighting (v2 line 343)
 
         # Single-cluster handling: stock ss.People has no cluster array.
         # v2's loop `for cl in cluster_range` collapses to one iteration;
