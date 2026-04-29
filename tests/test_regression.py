@@ -97,3 +97,34 @@ def test_anchor_hpv16_runs():
     # All summary values should be finite and non-negative for a clean run.
     for k, v in short.items():
         assert v >= 0 and v == v, f'summary value {k}={v} should be finite and non-negative'
+
+
+# --- M01 anchor drift (added in Task 12) --------------------------------------
+
+import json
+from pathlib import Path
+
+
+_BASELINE_HPV16 = Path(__file__).resolve().parent / 'regression_baselines' / 'anchor_hpv16.json'
+
+
+@pytest.mark.skipif(not _BASELINE_HPV16.exists(),
+                    reason='anchor_hpv16.json baseline not present (gitignored; '
+                           'see tests/regression/README.md for generation procedure)')
+def test_anchor_hpv16_drift():
+    """Tier-3 informational drift test against v2 1-genotype baseline.
+    10% relative threshold; does NOT fail the build (mirrors M00 drift)."""
+    short, total_pop = run_anchor_hpv16()
+    current_summary = {**{k: float(v) for k, v in short.items()},
+                       'total population': total_pop}
+
+    with open(_BASELINE_HPV16) as f:
+        baseline = json.load(f)
+    rows = compute_drift(baseline['summary'], current_summary, threshold=0.10)
+    n_over = sum(1 for r in rows if r['over_threshold'])
+    print(f'\nM01 anchor drift: {n_over}/{len(rows)} keys exceed 10% relative drift')
+    for r in rows:
+        rel = f"{r['rel_diff']*100:+.2f}%" if r['rel_diff'] is not None else 'n/a'
+        flag = 'YES' if r['over_threshold'] else ''
+        print(f'  {r["key"]:<40} {r["baseline"]:>12.4g} {r["current"]:>12.4g} {rel:>10} {flag}')
+    # Informational only; no assertion.
