@@ -75,3 +75,25 @@ def test_compute_drift_skips_keys_missing_from_current():
     rows = compute_drift(baseline, current)
     keys = [r['key'] for r in rows]
     assert keys == ['a']
+
+
+# --- M01 anchor smoke (added in Task 10) --------------------------------------
+
+from regression.anchor_hpv16 import run_and_summarize as run_anchor_hpv16  # noqa: E402
+
+
+def test_anchor_hpv16_runs():
+    """Tier-2 smoke: M01 anchor runs end-to-end with finite shaped summary.
+    Runtime ~3 minutes; no baseline file required."""
+    short, total_pop = run_anchor_hpv16()
+    expected_keys = {
+        'total HPV infections',
+        'mean HPV prevalence (%)',
+        'mean age of infection (years)',
+    }
+    missing = expected_keys - set(short.keys())
+    assert not missing, f'short_summary missing keys: {missing}'
+    assert total_pop > 0, f'total_pop should be positive, got {total_pop}'
+    # All summary values should be finite and non-negative for a clean run.
+    for k, v in short.items():
+        assert v >= 0 and v == v, f'summary value {k}={v} should be finite and non-negative'
