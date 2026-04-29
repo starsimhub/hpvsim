@@ -25,10 +25,13 @@ from . import parameters
 from . import misc
 from . import utils
 
-# M01 public API — populated as components land in Tasks 3-7. Imports are
-# commented out for now and uncommented in Task 8 (final hpvsim/__init__.py).
-# from .hpv import HPV
-# from .network import SexualNetwork
-# from .sim import Sim
+from .hpv import HPV
+from .network import SexualNetwork
+from .sim import Sim
+
+__all__ = [
+    'HPV', 'SexualNetwork', 'Sim', 'data',
+    'options', 'datadir', '__version__',
+]
 
 del sc
