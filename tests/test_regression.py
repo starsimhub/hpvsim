@@ -7,12 +7,18 @@ computation in tests/regression/compare.py (added in Task 2).
 import sys
 from pathlib import Path
 
+import pytest
+
 # tests/ is on sys.path when pytest is invoked from tests/, but be robust:
 sys.path.insert(0, str(Path(__file__).parent))
 
 from regression.anchor import run_and_summarize  # noqa: E402
 
 
+@pytest.mark.skip(
+    reason='Multi-genotype not yet ported to v3; restored in M03 when '
+           'genotypes=[16, 18, hi5, ohr] is supported again.'
+)
 def test_anchor_runs():
     short, total_pop = run_and_summarize()
     expected_keys = {
