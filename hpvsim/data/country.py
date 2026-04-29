@@ -25,13 +25,69 @@ Notes on v2 -> v3 reshaping:
   layer exists in v2 code. partners and cross_layer are split by sex in v2
   (m_partners/f_partners, m_cross_layer/f_cross_layer); we expose both
   sexes per-layer.
+- Distributions: v2 stores distributions as plain dicts like
+  ``{'dist': 'poisson1', 'par1': 0.5}`` consumed by hpvsim.utils.sample().
+  v3 prefers Starsim Dist instances (sampled via .rvs(uids)). The
+  ``_v2_dist_to_starsim`` helper below converts between the two for
+  partners, duration, and acts.
 """
 
 import numpy as np
 import pandas as pd
+import starsim as ss
 
 from .. import parameters as _params
 from . import loaders as _loaders
+
+
+class _PoissonShifted(ss.poisson):
+    """v2-style 'poisson1' distribution: scipy.stats.poisson with loc=shift.
+
+    v2's ``poisson1`` is "Poisson(rate) + 1" — i.e. every agent has at least
+    one partner. scipy.stats.poisson supports a `loc` parameter that shifts
+    the support, which we wire through Starsim's sync_pars hook.
+    """
+    def __init__(self, lam=1.0, shift=1, **kwargs):
+        self._shift = shift
+        super().__init__(lam=lam, **kwargs)
+
+    def sync_pars(self):
+        spars = dict(mu=self._pars.lam, loc=self._shift)
+        self.update_dist_pars(spars)
+        return spars
+
+
+def _v2_dist_to_starsim(d):
+    """Convert a v2-format distribution dict to a Starsim Dist instance.
+
+    v2 stores distributions as ``{'dist': name, 'par1': p1, 'par2': p2}``;
+    Starsim distributions take named parameters and are sampled via
+    ``.rvs(uids)``. M01 only needs poisson, poisson1, lognormal, neg_binomial
+    (the four used in v2's default Nigeria network pars).
+    """
+    dist = d['dist']
+    par1 = d.get('par1')
+    par2 = d.get('par2')
+    if dist == 'poisson':
+        return ss.poisson(lam=par1)
+    if dist == 'poisson1':
+        return _PoissonShifted(lam=par1, shift=1)
+    if dist in ('lognormal', 'lognorm'):
+        # v2 'lognormal' parameters are mean and std of the LOGNORMAL itself;
+        # ss.lognorm_ex takes the same parameterization.
+        return ss.lognorm_ex(mean=par1, std=par2)
+    if dist == 'neg_binomial':
+        # v2: par1=mean, par2=k (dispersion).
+        # scipy.stats.nbinom: n=number-of-successes, p=success-probability.
+        # Mapping: n = k, p = k / (k + mean).
+        n_param = par2
+        p_param = par2 / (par2 + par1) if (par2 + par1) > 0 else 0.5
+        return ss.nbinom(n=n_param, p=p_param)
+    if dist == 'normal':
+        return ss.normal(loc=par1, scale=par2)
+    if dist == 'uniform':
+        return ss.uniform(low=par1, high=par2)
+    raise ValueError(f'Unsupported v2 distribution: {dist!r}')
 
 
 _KNOWN_LOCATIONS = ['nigeria']  # M01 ships with Nigeria only; expand as needed.
@@ -151,13 +207,13 @@ def _network_pars(location):
     for layer in ('m', 'c'):
         out[layer] = dict(
             partners={
-                'm': default_pars['m_partners'][layer],
-                'f': default_pars['f_partners'][layer],
+                'm': _v2_dist_to_starsim(default_pars['m_partners'][layer]),
+                'f': _v2_dist_to_starsim(default_pars['f_partners'][layer]),
             },
             mixing=default_pars['mixing'][layer],
             layer_probs=default_pars['layer_probs'][layer],
             cross_layer=cross_layer_by_sex,
-            duration=default_pars['dur_pship'][layer],
-            acts=default_pars['acts'][layer],
+            duration=_v2_dist_to_starsim(default_pars['dur_pship'][layer]),
+            acts=_v2_dist_to_starsim(default_pars['acts'][layer]),
         )
     return out

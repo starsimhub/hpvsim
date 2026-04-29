@@ -42,10 +42,13 @@ class SexualNetwork(ss.SexualNetwork):
         self.layer = layer
         kwargs.setdefault('name', layer)
         super().__init__()
-        # Pars are v2-format dicts (e.g. {'dist': 'poisson1', 'par1': 0.5})
-        # consumed by hpu.sample, NOT ss.Dist instances. partners and
-        # cross_layer are per-sex {'m': ..., 'f': ...}; mixing and
-        # layer_probs are 2D ndarrays; duration and acts are v2 dist dicts.
+        # Pars (when supplied via hpv.data.load_country):
+        #   partners, duration, acts: ss.Dist instances (sampled via .rvs(uids))
+        #   partners is per-sex: {'m': ss.Dist, 'f': ss.Dist}
+        #   cross_layer is per-sex scalar: {'m': float, 'f': float}
+        #   mixing, layer_probs: 2D ndarrays
+        # Defaults are minimal placeholders; tests/scaffold paths short-
+        # circuit add_pairs when the full pars set isn't supplied.
         self.define_pars(
             partners=None,
             mixing=None,
@@ -82,20 +85,17 @@ class SexualNetwork(ss.SexualNetwork):
 
         v2 stored the desired count per-agent in the static `partners` array
         sampled at population creation. We replicate that here at first call
-        of add_pairs by sampling per-sex from pars.partners['m'/'f'].
+        of add_pairs by sampling per-sex from the ss.Dist instances at
+        pars.partners['m'/'f'].
         """
         n_agents = len(people)
         self._partners_target = np.zeros(n_agents)
         f_uids = people.female.uids
         m_uids = (~people.female).uids
         if len(f_uids):
-            self._partners_target[f_uids] = hpu.sample(
-                size=len(f_uids), **self.pars.partners['f']
-            )
+            self._partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
         if len(m_uids):
-            self._partners_target[m_uids] = hpu.sample(
-                size=len(m_uids), **self.pars.partners['m']
-            )
+            self._partners_target[m_uids] = self.pars.partners['m'].rvs(m_uids)
         # v2's `is_active` is `age > debut`; we set `participant` to True so
         # ss.SexualNetwork.active() reduces to the same predicate (alive AND
         # age > debut). Per-age participation rates are applied per-step via
@@ -223,12 +223,17 @@ class SexualNetwork(ss.SexualNetwork):
         n_new = len(f_arr)
         if n_new == 0:
             return
-        dur = hpu.sample(size=n_new, **self.pars.duration)
-        acts = hpu.sample(size=n_new, **self.pars.acts)
+        f_uids = ss.uids(f_arr.astype(int))
+        m_uids = ss.uids(m_arr.astype(int))
+        # ss.Dist.rvs takes uids; sample over the female-side uids of the
+        # newly-formed pairs (per-pair, not per-agent — uids array length
+        # = number of pairs).
+        dur = self.pars.duration.rvs(f_uids)
+        acts = self.pars.acts.rvs(f_uids)
         beta = np.ones(n_new)
         self.append(
-            p1=ss.uids(f_arr.astype(int)),
-            p2=ss.uids(m_arr.astype(int)),
+            p1=f_uids,
+            p2=m_uids,
             beta=beta,
             dur=dur,
             acts=acts,
