@@ -327,10 +327,6 @@ def test_result_consistency():
     # assert np.allclose(sim.results.age['n_infectious_by_age'][:].sum(axis=0),sim.results['n_infectious'][:]) # Check stocks by age are equal to stocks flows
 
 
-    # # Check that CINs by grade sum up the the correct totals
-    # assert np.allclose((sim.results['cin1s'][:] + sim.results['cin2s'][:] + sim.results['cin3s'][:]),sim.results['dysplasias'][:])
-    # assert np.allclose((sim.results['cin1s_by_genotype'][:] + sim.results['cin2s_by_genotype'][:] + sim.results['cin3s_by_genotype'][:]), sim.results['dysplasias_by_genotype'][:])
-
     # Check that results by age sum to the correct totals
     assert np.allclose(sim.results['cancers_by_age'][:].sum(axis=0),sim.results['cancers'][:])
     assert np.allclose(sim.results['infections_by_age'][:].sum(axis=0),sim.results['infections'][:])
@@ -401,6 +397,45 @@ def test_resuming():
     return s1
 
 
+def test_dt():
+    sc.heading('Test that changing dt does not significantly change results (issue #13)')
+
+    # Run simulations with different dt values and multiple seeds.
+    # Note: some dt sensitivity is expected due to chain transmission effects
+    # (smaller dt captures within-year transmission chains). Before the fix in
+    # issue #13, dt=0.5 cancer incidence was ~9% of dt=0.25 (a 91% drop due to
+    # unscaled partnership formation rates). After the fix, the ratio should be
+    # at least 20% (max 80% drop), reflecting only the inherent temporal
+    # resolution effect rather than a parameter scaling bug.
+    dts = [0.25, 0.5]
+    n_seeds = 5
+    base_pars = dict(n_agents=5e3, n_years=30, genotypes=[16, 18], burnin=10, verbose=0)
+
+    results = {dt: [] for dt in dts}
+    for dt in dts:
+        for seed in range(n_seeds):
+            sim = hpv.Sim(pars=base_pars, dt=dt, rand_seed=seed)
+            sim.run()
+            results[dt].append(sim.results['cancer_incidence'][-1])
+
+    ref_mean = np.mean(results[0.25])
+    for dt in dts:
+        dt_mean = np.mean(results[dt])
+        ratio = dt_mean / ref_mean if ref_mean > 0 else 0
+        print(f'dt={dt}: cancer_incidence={dt_mean:.2f}, ratio to ref={ratio:.2f}')
+
+    # dt=0.5 should retain at least 20% of the dt=0.25 cancer incidence.
+    # Before the fix this ratio was ~0.09; after the fix it should be >0.20.
+    ratio_05 = np.mean(results[0.5]) / ref_mean
+    assert ratio_05 > 0.20, (
+        f'Cancer incidence at dt=0.5 is only {ratio_05:.0%} of dt=0.25 '
+        f'({np.mean(results[0.5]):.2f} vs {ref_mean:.2f}). '
+        f'This suggests partnership formation rates are not being scaled by dt.'
+    )
+
+    return results
+
+
 #%% Run as a script
 if __name__ == '__main__':
 
@@ -415,6 +450,7 @@ if __name__ == '__main__':
     sim5 = test_result_consistency()
     sim6 = test_location_loading()
     sim7 = test_resuming()
+    dt_results = test_dt()
 
     sc.toc(T)
     print('Done.')

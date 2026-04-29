@@ -3,10 +3,27 @@ that may result in differences in model output, or are required in order
 to run an old parameter set with the current version, are flagged with
 the term "Regression information".
 
+## Version 2.3.0 (2026-04-20)
+
+- Fixes dt-dependent results by scaling partnership formation rates to
+  per-timestep probabilities; `layer_probs` and cross-layer defaults
+  converted to annual probabilities.
+- *Regression information*: If workflows from v2.2.6 or earlier override default `layer_probs`, `f_cross_layer`, or `m_cross_layer` values
+  and have timesteps not equal to 1 year, then the probabilities must be converted to annual probabilities instead of per-timestep probabilities using this formula: `1 - (1 - prob) ** dt`
+- *Regression information:* baseline model outputs change; baselines have been regenerated.
+- Fixes `precins` flow never being incremented; removes redundant `dysplasias` flow (was an alias of `cins`).
+- Adds test coverage for previously untested code paths.
+- Vaccine immunity is now sterilizing (all-or-nothing) rather than leaky (per-contact). `imm_init` sets the probability of sterilizing immunity; non-sterilizing recipients get leaky protection at the `imm_init` level. Default is 0.95.
+- Adds per-timestep transmission logging (`sim._transmission_log`) for downstream analysis of transmission chains.
+- Calibration now supports resuming from an existing database via `keep_db=True`, running only the remaining trials.
+- Calibration workers catch exceptions instead of crashing the entire run.
+- Fixes `res_to_plot` indexing bug in `Calibration.plot()`.
+- *Regression information*: vaccine efficacy will differ from previous versions due to the immunity model change.
+
 ## Version 2.2.7 (2026-04-22)
 
 - Fix cancer treatment results always being blank: `BaseTreatment.check_eligibility` was excluding cancer patients (preventing radiation from running), `BaseTreatment.apply` was writing to CIN fields for cancer treatment, and `cum_cancer_treated` cumsum used the wrong source array
-- *Github info* PR [92](https://github.com/starsimhub/hpvsim/pull/92), issue [91](https://github.com/starsimhub/hpvsim/issues/91)
+- *Github info* PR [94](https://github.com/starsimhub/hpvsim/pull/94), issue [91](https://github.com/starsimhub/hpvsim/issues/91)
 
 ## Version 2.2.6 (2026-04-17)
 

@@ -40,9 +40,15 @@ def estimator(actual, predicted):
 
     return gofs
 
-def test_calibration(do_plot=True):
+def test_calibration(do_plot=True, tmp_path=None):
 
     sc.heading('Testing calibration')
+
+    # Use a unique db name to avoid file-locking conflicts
+    if tmp_path is not None:
+        db_name = str(tmp_path / 'calib_test.db')
+    else:
+        db_name = f'hpvsim_calib_{sc.uuid(length=8)}.db'
 
     pars = dict(n_agents=n_agents, start=1980, end=2020, dt=0.25, location='south africa')
     pars['init_hpv_prev'] = 0.6 # Set high init_prev to generate more cancers
@@ -50,7 +56,6 @@ def test_calibration(do_plot=True):
     # Change the sim age bins so they're the same as the analyzer age bins
     age_bin_edges = np.array([ 0., 20., 30., 40., 50., 60., 70., 80., 100])
     pars['age_bin_edges'] = age_bin_edges
-    pars['standard_pop']  = np.array([age_bin_edges, [.4, .16, .12, .12, .09, .07, .03, .01, 0]])
     pars['standard_pop']  = np.array([age_bin_edges, [.4, .16, .12, .12, .09, .07, .03, .01, 0]])
     az = hpv.age_results(
         result_args=sc.objdict(
@@ -80,7 +85,7 @@ def test_calibration(do_plot=True):
 
     # Save some extra sim results
     extra_sim_result_keys = ['cancer_incidence', 'asr_cancer_incidence']
-    
+
     # Make the calibration
     calib = hpv.Calibration(sim, calib_pars=calib_pars, genotype_pars=genotype_pars,
                             datafiles=[
@@ -88,7 +93,8 @@ def test_calibration(do_plot=True):
                                 'test_data/south_africa_cancer_data_2020.csv',
                             ], estimator = estimator,
                             extra_sim_result_keys=extra_sim_result_keys,
-                            total_trials=2, n_workers=1, die=True)
+                            total_trials=2, n_workers=1, die=True,
+                            db_name=db_name)
     calib.calibrate()
     calib.plot(res_to_plot=4)
 
@@ -142,7 +148,7 @@ if __name__ == '__main__':
 
     T = sc.tic()
 
-    sim, calib = test_calibration()
+    sim, calib = test_calibration(tmp_path=None)
 
     sc.toc(T)
     print('Done.')

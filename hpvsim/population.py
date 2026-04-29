@@ -110,6 +110,17 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
         # Create the contacts
         lkeys = sim['acts'].keys() # TODO: consider a more robust way to do this
         if microstructure in ['random', 'default']:
+            # Scale annual participation rates to per-timestep probabilities so
+            # that initial-network formation matches ongoing per-timestep rates
+            # (issue #13). Matches the scaling in People.create_partnerships.
+            dt = sim['dt']
+            scaled_layer_probs = {k: v.copy() for k, v in sim['layer_probs'].items()}
+            for lp in scaled_layer_probs.values():
+                lp[1, :] = 1 - (1 - lp[1, :]) ** dt
+                lp[2, :] = 1 - (1 - lp[2, :]) ** dt
+            scaled_f_cross = 1 - (1 - sim['f_cross_layer']) ** dt
+            scaled_m_cross = 1 - (1 - sim['m_cross_layer']) ** dt
+
             contacts = dict()
             current_partners = np.zeros((len(lkeys),n_agents))
             lno=0
@@ -117,7 +128,7 @@ def make_people(sim, popdict=None, reset=False, verbose=None, use_age_data=True,
                 contacts[lkey], current_partners,_,_ = make_contacts(
                     lno=lno, tind=0, partners=partners[lno,:], current_partners=current_partners, ages=ages,
                     debuts=debuts, is_female=is_female, is_active=is_active, mixing=sim['mixing'][lkey],
-                    layer_probs=sim['layer_probs'][lkey], f_cross_layer=sim['f_cross_layer'], m_cross_layer=sim['m_cross_layer'],
+                    layer_probs=scaled_layer_probs[lkey], f_cross_layer=scaled_f_cross, m_cross_layer=scaled_m_cross,
                     durations=sim['dur_pship'][lkey], acts=sim['acts'][lkey], age_act_pars=sim['age_act_pars'][lkey],
                     cluster=cluster, add_mixing=sim['add_mixing'], **kwargs
                 )

@@ -73,8 +73,8 @@ def make_pars(**kwargs):
     pars['add_mixing']      = None  # Mixing matrix between clusters
     pars['debut']           = dict(f=dict(dist='normal', par1=15.0, par2=2.1), # Location-specific data should be used here if possible
                                    m=dict(dist='normal', par1=17.6, par2=1.8))
-    pars['f_cross_layer']   = 0.05  # Proportion of females who have concurrent cross-layer relationships - by layer
-    pars['m_cross_layer']   = 0.30  # Proportion of males who have concurrent cross-layer relationships - by layer
+    pars['f_cross_layer']   = 0.185  # Annual probability of females having concurrent cross-layer relationships
+    pars['m_cross_layer']   = 0.760  # Annual probability of males having concurrent cross-layer relationships
     pars['f_partners']      = None  # Distribution of preferred number of concurrent sexual partners, females
     pars['m_partners']      = None  # Distribution of preferred number of concurrent sexual partners, males
     pars['acts']            = None  # The number of sexual acts for each partnership type per year
@@ -578,16 +578,14 @@ def get_mixing(network=None):
 
         layer_probs = dict(
             m=np.array([
-                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  0.01,   0.5,  0.5,  0.5,  0.5,  0.5,   0.5,   0.5,   0.5,  0.3,  0.2,  0.1, 0.05, 0.01], # Share of females of each age who are actively seeking marriage if underpartnered
-                [ 0,  0,  0.01,   0.2,  0.3,  0.5,  0.5,  0.5,   0.5,   0.5,   0.5,  0.3,  0.2,  0.1, 0.05, 0.01]] # Share of males of each age who are actively seeking marriage if underpartnered
-                # [ 1,  1,     1,     1,    1,    1,    1,    1,     1,     1,     1,    1,    1,    1,    1,    1]] # Share of males of each age who are actively seeking marriage if underpartnered
+                [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
+                [ 0,    0,  0.0394, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.760, 0.590, 0.344, 0.185, 0.0394], # Annual prob of females seeking marriage if underpartnered
+                [ 0,    0,  0.0394, 0.590, 0.760, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.760, 0.590, 0.344, 0.185, 0.0394]] # Annual prob of males seeking marriage if underpartnered
             ),
             c=np.array([
-                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,   0.2,   0.6,  0.8,  0.6,  0.4,  0.4,   0.4,   0.1,  0.02, 0.02, 0.02, 0.02, 0.02, 0.02], # Share of females of each age actively seeking casual relationships if underpartnered
-                [ 0,  0,   0.2,   0.4,  0.4,  0.4,  0.4,  0.6,   0.8,   0.6,   0.2,  0.1, 0.05, 0.02, 0.02, 0.02]] # Share of males of each age actively seeking casual relationships if underpartnered
-                # [ 1,  1,     1,     1,    1,    1,    1,    1,     1,     1,     1,    1,    1,    1,    1,    1]] # Share of males of each age actively seeking casual relationships if underpartnered
+                [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
+                [ 0,    0,  0.590, 0.974, 0.998, 0.974, 0.870, 0.870, 0.870, 0.344, 0.0776, 0.0776, 0.0776, 0.0776, 0.0776, 0.0776], # Annual prob of females seeking casual relationships if underpartnered
+                [ 0,    0,  0.590, 0.870, 0.870, 0.870, 0.870, 0.974, 0.998, 0.974, 0.590, 0.344, 0.185, 0.0776, 0.0776, 0.0776]] # Annual prob of males seeking casual relationships if underpartnered
             )
         )
 
@@ -615,9 +613,9 @@ def get_mixing(network=None):
         )
         layer_probs = dict(
             a=np.array([
-                [ 0,  5,    10,    15,   20,   25,   30,   35,    40,    45,    50,   55,   60,   65,   70,   75],
-                [ 0,  0,  0.04,   0.2,  0.6,  0.8,  0.8,  0.8,  0.75,  0.65,  0.55,  0.4,  0.4,  0.4,  0.4,  0.4], # Share of females of each age who are married
-                [ 0,  0,  0.01,  0.01,  0.2,  0.6,  0.8,  0.9,  0.90,  0.90,  0.90,  0.8,  0.7,  0.6,  0.5,  0.6]] # Share of males of each age who are married
+                [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
+                [ 0,    0,  0.151, 0.590, 0.974, 0.998, 0.998, 0.998, 0.996, 0.985, 0.959, 0.870, 0.870, 0.870, 0.870, 0.870], # Annual prob of females seeking partnership if underpartnered
+                [ 0,    0,  0.0394, 0.0394, 0.590, 0.974, 0.998, 0.999, 0.999, 0.999, 0.999, 0.998, 0.992, 0.974, 0.938, 0.974]] # Annual prob of males seeking partnership if underpartnered
             ))
 
     else:
@@ -636,42 +634,42 @@ def get_vaccine_dose_pars(default=False, vaccine=None):
     pars = dict(
 
         default = dict(
-            imm_init  = dict(dist='beta', par1=30, par2=2), # Initial distribution of immunity
+            imm_init  = 0.95, # Probability of sterilizing immunity
             doses     = 1, # Number of doses for this vaccine
             interval  = None, # Interval between doses
             imm_boost=None,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity
         ),
 
         bivalent = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
             imm_boost=None,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity
         ),
 
         bivalent_2dose = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=2,  # Number of doses for this vaccine
             interval=0.5,  # Interval between doses in years
             imm_boost=1.2,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity
         ),
 
         bivalent_3dose = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=3,  # Number of doses for this vaccine
             interval=[0.2, 0.5],  # Interval between doses in years
             imm_boost=[1.2, 1.1],  # Factor by which each dose increases immunity
         ),
 
         quadrivalent = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
             imm_boost=None,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity
         ),
 
         nonavalent = dict(
-            imm_init=dict(dist='beta', par1=30, par2=2),  # Initial distribution of immunity
+            imm_init=0.95,  # Probability of sterilizing immunity
             doses=1,  # Number of doses for this vaccine
             interval=None,  # Interval between doses
             imm_boost=None,  # For vaccines wiht >1 dose, the factor by which each additional boost increases immunity

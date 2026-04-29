@@ -458,6 +458,16 @@ class People(hpb.BasePeople):
         # Initialize
         new_pships = dict()
 
+        # Scale annual participation rates to per-timestep probabilities so that
+        # partnership formation rates are consistent regardless of dt (issue #13)
+        dt = self.dt
+        scaled_layer_probs = {lkey: lp.copy() for lkey, lp in layer_probs.items()}
+        for lp in scaled_layer_probs.values():
+            lp[1, :] = 1 - (1 - lp[1, :]) ** dt  # Female participation
+            lp[2, :] = 1 - (1 - lp[2, :]) ** dt  # Male participation
+        scaled_f_cross = 1 - (1 - f_cross_layer) ** dt
+        scaled_m_cross = 1 - (1 - m_cross_layer) ** dt
+
         # Loop over layers
         lno = 0
         for lkey in self.layer_keys():
@@ -471,9 +481,9 @@ class People(hpb.BasePeople):
                 is_female=self.is_female,
                 is_active=self.is_active,
                 mixing=mixing[lkey],
-                layer_probs=layer_probs[lkey],
-                f_cross_layer=f_cross_layer,
-                m_cross_layer=m_cross_layer,
+                layer_probs=scaled_layer_probs[lkey],
+                f_cross_layer=scaled_f_cross,
+                m_cross_layer=scaled_m_cross,
                 durations=dur_pship[lkey],
                 acts=acts[lkey],
                 age_act_pars=age_act_pars[lkey],
@@ -942,31 +952,6 @@ class People(hpb.BasePeople):
         )  # These are not indices, so they scale differently
 
     # %% Methods to make events occur (death, infection, others TBC)
-    def make_naive(self, inds):
-        """
-        Make a set of people naive. This is used during dynamic resampling.
-
-        Args:
-            inds (array): list of people to make naive
-        """
-        for key in self.meta.states:
-            if key in ["susceptible"]:
-                self[key][:, inds] = True
-            elif key in ["other_dead"]:
-                self[key][inds] = False
-            else:
-                self[key][:, inds] = False
-
-        # Reset immunity
-        for key in self.meta.imm_states:
-            self[key][:, inds] = 0
-
-        # Reset dates
-        for key in self.meta.dates + self.meta.durs:
-            self[key][:, inds] = np.nan
-
-        return
-
     def infect(self, inds, g=None, layer=None):
         """
         Infect people and determine their eventual outcomes.
@@ -1048,6 +1033,14 @@ class People(hpb.BasePeople):
         # Only women can progress beyond infection.
         f_inds = hpu.itruei(self.is_female, inds)
         m_inds = hpu.itruei(self.is_male, inds)
+
+        # Count new precin cases (females entering the precin state)
+        if layer != "seed_infection" and layer != "reactivation" and len(f_inds) > 0:
+            self.flows["precins"] += self.scale_flows(f_inds)
+            self.genotype_flows["precins"][g] += self.scale_flows(f_inds)
+            self.age_flows["precins"] += np.histogram(
+                self.age[f_inds], bins=self.age_bin_edges, weights=self.scale[f_inds]
+            )[0]
 
         # Compute disease progression for females
         if len(f_inds) > 0:
@@ -1168,10 +1161,12 @@ class People(hpb.BasePeople):
 
             intro = f"\nThis is the story of {uid}, a {p.age:.0f} year old {sex}."
             intro += f"\n{uid} became sexually active at age {p.debut:.0f}."
-            if not p.susceptible:
-                if ~np.isnan(p.date_infectious):
+            if not np.all(p.susceptible):
+                dates_inf = p.date_infectious
+                if np.any(~np.isnan(dates_inf)):
+                    earliest = np.nanmin(dates_inf)
                     print(
-                        f"{intro}\n{uid} contracted HPV on timestep {p.date_infectious} of the simulation."
+                        f"{intro}\n{uid} contracted HPV on timestep {earliest:.0f} of the simulation."
                     )
                 else:
                     print(f"{intro}\n{uid} did not contract HPV during the simulation.")
@@ -1196,13 +1191,14 @@ class People(hpb.BasePeople):
             events = []
 
             dates = {
-                "date_HPV_clearance": "HPV cleared",
+                "date_clearance": "HPV cleared",
             }
 
             for attribute, message in dates.items():
                 date = getattr(p, attribute)
-                if not np.isnan(date):
-                    events.append((date, message))
+                if np.any(~np.isnan(date)):
+                    earliest = np.nanmin(date)
+                    events.append((earliest, message))
 
             if len(events):
                 for timestep, event in sorted(events, key=lambda x: x[0]):
