@@ -65,7 +65,6 @@ hpv.Sim(ss.Sim)                                 ← HPVsim-owned, thin wrapper
 ├── networks = [
 │       hpv.SexualNetwork(layer='m', ...),                   ← HPVsim-owned
 │       hpv.SexualNetwork(layer='c', ...),                   ← HPVsim-owned
-│       hpv.SexualNetwork(layer='o', ...),                   ← HPVsim-owned
 │   ]
 ├── diseases = [hpv.HPV(genotype='hpv16')]                   ← HPVsim-owned
 ├── demographics = [
@@ -154,10 +153,13 @@ convenience; M10 deletes both wholesale.
   `active(people)`, `available(people, sex)`, `net_beta(...)`, `step()`,
   `end_pairs()` out of the box. We only own `add_pairs()` and the per-layer pars.
 
-- **One class, three instances for layers.** v2's `population.create_edgelist`
-  is a single algorithm parameterized by layer (`lno`); the m/c/o layers differ
+- **One class, two instances for layers.** v2's `population.create_edgelist`
+  is a single algorithm parameterized by layer (`lno`); the m/c layers differ
   only in distributions and matrices, not in behavior. One `hpv.SexualNetwork`
-  class, three instances.
+  class, two instances. (An earlier draft of this spec assumed three layers
+  including a one-off layer 'o' based on a misleading comment in v2's
+  `parameters.py`; verification of v2 source confirmed only `m` and `c` are
+  defined in any v2 network configuration.)
 
 - **No HPVsim subclass of `ss.People`.** All HPV state lives on `hpv.HPV` via
   `define_states`; Starsim auto-aggregates module states onto People. Network
@@ -289,7 +291,6 @@ class SexualNetwork(ss.SexualNetwork):
   networks = [
       hpv.SexualNetwork(layer='m', pars=marital_pars),
       hpv.SexualNetwork(layer='c', pars=casual_pars),
-      hpv.SexualNetwork(layer='o', pars=oneoff_pars),
   ]
   ```
 - The `isinstance(other, hpv.SexualNetwork)` filter in `_n_partners_elsewhere`
@@ -317,7 +318,7 @@ class Sim(ss.Sim):
         diseases = kwargs.pop('diseases', None) or [HPV(genotype=genotype)]
         networks = kwargs.pop('networks', None) or [
             SexualNetwork(layer=k, pars=country['network_pars'][k])
-            for k in ('m', 'c', 'o')
+            for k in ('m', 'c')
         ]
         demographics = kwargs.pop('demographics', None) or [
             ss.Pregnancy(fertility_rate=country['fertility']),
@@ -398,8 +399,7 @@ hpv.data.load_country('nigeria')              # one read
 ss.People(n_agents, age_data=...)
 diseases    = [hpv.HPV(genotype='hpv16')]
 networks    = [hpv.SexualNetwork(layer='m', pars=...),
-               hpv.SexualNetwork(layer='c', pars=...),
-               hpv.SexualNetwork(layer='o', pars=...)]
+               hpv.SexualNetwork(layer='c', pars=...)]
 demographics = [ss.Pregnancy(...), ss.Deaths(...)]
   ↓
 super().__init__(...)
@@ -416,7 +416,7 @@ Stock Starsim loop order (from `loop.py`):
 1. demographics.step()    — ss.Pregnancy adds new agents, ss.Deaths kills
 2. diseases.step_state()  — hpv.HPV: infected → susceptible (clearance)
 3. connectors.step()      — empty in M01
-4. networks.step()        — for each hpv.SexualNetwork (m, c, o in order):
+4. networks.step()        — for each hpv.SexualNetwork (m, c in order):
                                 end_pairs()   [stock: duration & death]
                                 add_pairs()   [our override: port v2 logic;
                                                iterates sibling hpv.SexualNetwork
@@ -654,7 +654,7 @@ adapter wraps them.
 | Q4 | Demographics | Stock `ss.Pregnancy` + `ss.Deaths` + `ss.People(age_data=...)`, fed by thin `hpv.data.load_country()` adapter. No subclassing of demographic modules. |
 | Q5 | M01 baseline | New 1-gt HPV16 Nigeria anchor + baseline (sibling to M00's 4-gt anchor). |
 | Q6 | `hpv.People` | Don't build it for M01. Multi-scale logic deferred indefinitely. Stock `ss.People` sufficient. |
-| Q7 | Multi-layer network shape | One `hpv.SexualNetwork` class, three instances (m/c/o). Layers differ only by parameterization. |
+| Q7 | Multi-layer network shape | One `hpv.SexualNetwork` class, two instances (m/c). Layers differ only by parameterization. (An earlier draft assumed m/c/o; verification of v2 source confirmed only m and c are defined.) |
 | Q8 | Cross-layer concurrency | Each network reads sibling `hpv.SexualNetwork` instances at `add_pairs` time; filtered by `isinstance(other, hpv.SexualNetwork)`. No connector. |
 | — | Milestone scope | Split current M02 into M02 (1-gt nat hx) + new M03 (multi-gt + cross-immunity). Renumber M03-M09 → M04-M10. |
 | — | Performance | No M01 budget. Estimated ~2-3x overhead in M03 vs. v2; profile after M03. |

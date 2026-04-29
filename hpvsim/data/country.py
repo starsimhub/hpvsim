@@ -20,10 +20,11 @@ Notes on v2 -> v3 reshaping:
   {year: {sex: ndarray(M, 2) with columns (age, rate)}}. We flatten into
   long form (Year, AgeGrp, Sex, Rate).
 - Network parameters: v2's "default" network has 2 layers (m, c). M01 ships
-  three layers (m, c, o) where o (one-off) is synthesized from c-style
-  defaults with shorter duration and lower partners. partners and
-  cross_layer are split by sex in v2 (m_partners/f_partners,
-  m_cross_layer/f_cross_layer); we expose both sexes per-layer.
+  the same two layers — earlier plan drafts assumed a third 'o' (one-off)
+  layer based on a misleading comment in v2 parameters.py, but no such
+  layer exists in v2 code. partners and cross_layer are split by sex in v2
+  (m_partners/f_partners, m_cross_layer/f_cross_layer); we expose both
+  sexes per-layer.
 """
 
 import numpy as np
@@ -131,10 +132,11 @@ def _network_pars(location):
     """Build per-layer network parameter dicts.
 
     v2's "default" network defines 2 layers (m=marital, c=casual). M01
-    expects 3 layers (m, c, o=one-off); we synthesize the o layer from
-    c-style defaults with shorter duration and lower partners.
+    matches that — the earlier plan's reference to a third 'o' layer was
+    based on a misleading comment in v2 parameters.py; no such layer is
+    defined anywhere in v2 code.
 
-    Returns ``{'m': {...}, 'c': {...}, 'o': {...}}`` where each layer dict has:
+    Returns ``{'m': {...}, 'c': {...}}`` where each layer dict has:
     partners, mixing, layer_probs, cross_layer, duration, acts.
     """
     default_pars = _params.make_pars(location=location)
@@ -158,19 +160,4 @@ def _network_pars(location):
             duration=default_pars['dur_pship'][layer],
             acts=default_pars['acts'][layer],
         )
-
-    # Synthesize 'o' (one-off) layer from casual defaults: short duration,
-    # low partners, fewer acts. The v2 default network does not provide a
-    # native one-off layer; this gives Tasks 5-6 a third layer to scaffold.
-    out['o'] = dict(
-        partners={
-            'm': dict(dist='poisson', par1=0.1),
-            'f': dict(dist='poisson', par1=0.1),
-        },
-        mixing=default_pars['mixing']['c'],
-        layer_probs=default_pars['layer_probs']['c'],
-        cross_layer=cross_layer_by_sex,
-        duration=dict(dist='lognormal', par1=0.01, par2=0.01),
-        acts=dict(dist='neg_binomial', par1=1, par2=1),
-    )
     return out

@@ -4,7 +4,7 @@
 
 **Goal:** In-place replacement of v2 `hpvsim` with the minimum runnable HPV sim on Starsim — single-genotype HPV16 transmission-only disease module + ported v2 sexual network + thin `Sim` wrapper + data adapter — and validate against v2 via a new 1-genotype Nigeria regression baseline and partnership-pattern equivalence tests.
 
-**Architecture:** `hpvsim/` is rewritten in place — new entry points (`HPV`, `SexualNetwork`, `Sim`, `data.load_country`) replace the v2 implementations. v2 modules untouched by M01 are quarantined to `hpvsim/_v2_legacy/`; v2 tests that exercise removed APIs go to `tests/_legacy/`. Quarantines are never imported by active code; M10 deletes them wholesale. Rotasim-style multi-genotype design (one `HPV(ss.Infection)` per genotype, instantiated with N=1 for M01); cross-immunity connector deferred to M03. Three `SexualNetwork(ss.SexualNetwork)` instances (one per v2 layer m/c/o); cross-layer concurrency at `add_pairs` time via `isinstance` filtering of sibling networks.
+**Architecture:** `hpvsim/` is rewritten in place — new entry points (`HPV`, `SexualNetwork`, `Sim`, `data.load_country`) replace the v2 implementations. v2 modules untouched by M01 are quarantined to `hpvsim/_v2_legacy/`; v2 tests that exercise removed APIs go to `tests/_legacy/`. Quarantines are never imported by active code; M10 deletes them wholesale. Rotasim-style multi-genotype design (one `HPV(ss.Infection)` per genotype, instantiated with N=1 for M01); cross-immunity connector deferred to M03. Two `SexualNetwork(ss.SexualNetwork)` instances (one per v2 layer m/c); cross-layer concurrency at `add_pairs` time via `isinstance` filtering of sibling networks. (An earlier draft assumed three layers including 'o' based on a misleading comment in v2's parameters.py; verification confirmed only m and c exist in v2.)
 
 **Tech Stack:** Python 3.13, Starsim 3.3.3, Sciris, NumPy, Pandas, pytest, gh CLI.
 
@@ -145,7 +145,7 @@ In `### M1: Basic transmission sim`, replace sub-tasks with:
 
 ```markdown
 **Sub-tasks:**
-- Port HPVsim's custom sexual network as `hpv.SexualNetwork(ss.SexualNetwork)` using lift-and-shift; one class, three instances (m/c/o); cross-layer concurrency via sibling iteration.
+- Port HPVsim's custom sexual network as `hpv.SexualNetwork(ss.SexualNetwork)` using lift-and-shift; one class, two instances (m/c); cross-layer concurrency via sibling iteration.
 - Add a minimal single-genotype `hpv.HPV(ss.Infection)` for HPV16 — transmission only, SIS clearance, no precin/CIN/cancer.
 - Replace `hpvsim.Sim` with thin `hpv.Sim(ss.Sim)` wrapper; rely on stock `ss.People`, `ss.Pregnancy`, `ss.Deaths`. Add `hpv.data.load_country()` adapter.
 - Quarantine v2 modules untouched by M01 to `hpvsim/_v2_legacy/` and v2 tests to `tests/_legacy/`.
@@ -576,10 +576,10 @@ def test_death_rate_shape():
 
 
 def test_network_pars_per_layer():
-    """network_pars contains entries for the three v2 layers m/c/o."""
+    """network_pars contains entries for the two v2 layers m/c."""
     out = hpvsim.data.load_country('nigeria')
     np_pars = out['network_pars']
-    assert set(np_pars.keys()) == {'m', 'c', 'o'}, f'layers: {list(np_pars.keys())}'
+    assert set(np_pars.keys()) == {'m', 'c'}, f'layers: {list(np_pars.keys())}'
     expected = {'partners', 'mixing', 'layer_probs', 'cross_layer', 'duration', 'acts'}
     for layer, layer_pars in np_pars.items():
         assert expected.issubset(layer_pars.keys()), \
@@ -696,7 +696,7 @@ def _network_pars(location):
     mixing = _params.get_mixing(network=default_pars.get('network', None))
 
     out = {}
-    for layer in ('m', 'c', 'o'):
+    for layer in ('m', 'c'):
         out[layer] = dict(
             partners=default_pars['partners'][layer],
             mixing=mixing[layer],
@@ -994,7 +994,7 @@ from hpvsim.network import SexualNetwork
 
 
 def test_known_layers_accepted():
-    for layer in ('m', 'c', 'o'):
+    for layer in ('m', 'c'):
         net = SexualNetwork(layer=layer)
         assert net.layer == layer
 
@@ -1072,14 +1072,14 @@ import numpy as np
 import starsim as ss
 
 
-_KNOWN_LAYERS = ('m', 'c', 'o')
+_KNOWN_LAYERS = ('m', 'c')
 
 
 class SexualNetwork(ss.SexualNetwork):
     """One layer of HPVsim's heterosexual partnership network.
 
     Args:
-        layer: one of 'm' (marital/long-term), 'c' (casual), 'o' (one-off).
+        layer: one of 'm' (marital/long-term), 'c' (casual).
         pars: dict of layer parameters; see hpvsim.data.load_country for
             the expected shape (partners, mixing, layer_probs, cross_layer,
             duration, acts).
@@ -1198,7 +1198,7 @@ import sciris as sc
 import hpvsim
 
 
-def _layered_sim(layers=('m', 'c', 'o'), n_agents=2000, n_steps=4):
+def _layered_sim(layers=('m', 'c'), n_agents=2000, n_steps=4):
     """Build a Sim with three SexualNetwork instances configured from Nigeria data."""
     country = hpvsim.data.load_country('nigeria')
     networks = [SexualNetwork(layer=k, pars=country['network_pars'][k])
@@ -1220,7 +1220,7 @@ def test_pairs_form_after_a_few_steps():
 
 
 def test_pairs_dissolve_via_stock_end_pairs():
-    sim = _layered_sim(layers=('o',), n_steps=20)
+    sim = _layered_sim(layers=('c',), n_steps=20)
     sim.run()
     net = sim.networks()[0]
     assert (net.edges.dur > 0).all() or len(net) == 0
@@ -1524,7 +1524,7 @@ def test_sim_has_three_sexual_network_layers():
     sim.init()
     sx_layers = [n for n in sim.networks() if isinstance(n, SexualNetwork)]
     assert len(sx_layers) == 3
-    assert {n.layer for n in sx_layers} == {'m', 'c', 'o'}
+    assert {n.layer for n in sx_layers} == {'m', 'c'}
 
 
 def test_sim_has_one_hpv_disease():
@@ -1587,7 +1587,7 @@ class Sim(ss.Sim):
         diseases = kwargs.pop('diseases', None) or [HPV(genotype=genotype)]
         networks = kwargs.pop('networks', None) or [
             SexualNetwork(layer=k, pars=country['network_pars'][k])
-            for k in ('m', 'c', 'o')
+            for k in ('m', 'c')
         ]
         demographics = kwargs.pop('demographics', None) or [
             ss.Pregnancy(fertility_rate=country['fertility']),
@@ -1630,7 +1630,7 @@ git commit -m "$(cat <<'EOF'
 Add hpvsim.sim.Sim(ss.Sim) convenience wrapper
 
 In-place replacement for the (now quarantined) v2 1395-line Sim. Composes
-HPV disease module, three SexualNetwork layers (m/c/o), stock ss.Pregnancy
+HPV disease module, two SexualNetwork layers (m/c), stock ss.Pregnancy
 + ss.Deaths demographics, and ss.People with location-specific age pyramid
 via hpvsim.data.load_country. All defaults overridable via kwargs (passing
 diseases/networks/demographics short-circuits the convenience wiring).
@@ -1984,7 +1984,7 @@ sim.run()
 # attribute names.
 
 out = {}
-for layer in ('m', 'c', 'o'):
+for layer in ('m', 'c'):
     out[layer] = {
         'mixing_matrix': ...,      # 2d list, 16x16, density-normalized
         'concurrency_hist': ...,   # 1d list, indexed by n_concurrent_partners
@@ -2201,7 +2201,7 @@ def v2_stats():
         return json.load(f)
 
 
-@pytest.mark.parametrize('layer', ['m', 'c', 'o'])
+@pytest.mark.parametrize('layer', ['m', 'c'])
 def test_age_mixing_matrix(v3_stats, v2_stats, layer):
     v3 = np.array(v3_stats[layer]['mixing_matrix'])
     v2 = np.array(v2_stats[layer]['mixing_matrix'])
@@ -2215,7 +2215,7 @@ def test_age_mixing_matrix(v3_stats, v2_stats, layer):
         f'layer {layer} mixing matrix max bin-wise rel diff {max_diff:.3f} >= 0.15'
 
 
-@pytest.mark.parametrize('layer', ['m', 'c', 'o'])
+@pytest.mark.parametrize('layer', ['m', 'c'])
 def test_concurrency_distribution(v3_stats, v2_stats, layer):
     v3_hist = np.array(v3_stats[layer]['concurrency_hist'])
     v2_hist = np.array(v2_stats[layer]['concurrency_hist'])
@@ -2228,7 +2228,7 @@ def test_concurrency_distribution(v3_stats, v2_stats, layer):
         f'layer {layer} concurrency KS p={p_value:.4f} <= 0.01'
 
 
-@pytest.mark.parametrize('layer', ['m', 'c', 'o'])
+@pytest.mark.parametrize('layer', ['m', 'c'])
 def test_duration_distribution(v3_stats, v2_stats, layer):
     v3_dur = np.array(v3_stats[layer]['duration_samples'])
     v2_dur = np.array(v2_stats[layer]['duration_samples'])
@@ -2389,7 +2389,7 @@ gh pr create --base v3.0-dev \
 In-place replacement of v2 `hpvsim` with the minimum runnable HPV sim on Starsim. Implements M01 of the v2 → v3 migration:
 
 - `hpvsim.HPV(ss.Infection)` — single-genotype HPV16 transmission-only disease module (SIS clearance; CIN/cancer ship in M02).
-- `hpvsim.SexualNetwork(ss.SexualNetwork)` — lift-and-shift of v2's three-layer (m/c/o) heterosexual network. One class, three instances; cross-layer concurrency resolved at `add_pairs` time via `isinstance`-filtered iteration of sibling networks.
+- `hpvsim.SexualNetwork(ss.SexualNetwork)` — lift-and-shift of v2's two-layer (m/c) heterosexual network. One class, two instances; cross-layer concurrency resolved at `add_pairs` time via `isinstance`-filtered iteration of sibling networks.
 - `hpvsim.Sim(ss.Sim)` — convenience wrapper providing the v2-compatible `hpv.Sim(location=..., genotype=...)` API.
 - `hpvsim.data.load_country()` — adapter wrapping v2's data loaders into Starsim-shaped DataFrames.
 
@@ -2407,7 +2407,7 @@ v2 modules untouched by M01 are quarantined to `hpvsim/_v2_legacy/`; v2 tests th
 
 ## Decisions log
 
-See `docs/superpowers/specs/2026-04-28-hpvsim-m1-basic-transmission-design.md` §"Decisions log" for the architectural choices settled during the M01 brainstorm: rotasim-style multi-genotype direction, `ss.SexualNetwork` parent class, three instances per layer, isinstance-filtered cross-layer concurrency, no `hpv.People` (multi-scale deferred), in-place replacement with v2 quarantine, milestone split (M02 1-gt nat hx, new M03 multi-gt + cross-immunity).
+See `docs/superpowers/specs/2026-04-28-hpvsim-m1-basic-transmission-design.md` §"Decisions log" for the architectural choices settled during the M01 brainstorm: rotasim-style multi-genotype direction, `ss.SexualNetwork` parent class, two instances (m/c, matching v2's actual default network), isinstance-filtered cross-layer concurrency, no `hpv.People` (multi-scale deferred), in-place replacement with v2 quarantine, milestone split (M02 1-gt nat hx, new M03 multi-gt + cross-immunity).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF

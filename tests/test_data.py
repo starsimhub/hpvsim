@@ -43,10 +43,10 @@ def test_death_rate_shape():
 
 
 def test_network_pars_per_layer():
-    """network_pars contains entries for the three v2 layers m/c/o."""
+    """network_pars contains entries for the two v2 layers m/c."""
     out = hpvsim.data.load_country('nigeria')
     np_pars = out['network_pars']
-    assert set(np_pars.keys()) == {'m', 'c', 'o'}, f'layers: {list(np_pars.keys())}'
+    assert set(np_pars.keys()) == {'m', 'c'}, f'layers: {list(np_pars.keys())}'
     expected = {'partners', 'mixing', 'layer_probs', 'cross_layer', 'duration', 'acts'}
     for layer, layer_pars in np_pars.items():
         assert expected.issubset(layer_pars.keys()), \
