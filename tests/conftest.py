@@ -1,1 +1,1 @@
-collect_ignore_glob = ['_legacy/*']
+collect_ignore_glob = ['_legacy/*', 'devtests/*']
