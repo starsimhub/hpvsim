@@ -29,6 +29,8 @@ from .hpv import HPV
 from .network import SexualNetwork
 from .sim import Sim
 
+rootdir = sc.thispath(__file__).parent
+
 __all__ = [
     'HPV', 'SexualNetwork', 'Sim', 'data',
     'options', 'datadir', '__version__',
