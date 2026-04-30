@@ -20,12 +20,9 @@ Notes on v2 -> v3 reshaping:
 - Death rates: v2's get_death_rates(by_sex=True) returns
   {year: {sex: ndarray(M, 2) with columns (age, rate)}}. We flatten into
   long form (Year, AgeGrp, Sex, Rate).
-- Network parameters: v2's "default" network has 2 layers (m, c). M01 ships
-  the same two layers — earlier plan drafts assumed a third 'o' (one-off)
-  layer based on a misleading comment in v2 parameters.py, but no such
-  layer exists in v2 code. partners and cross_layer are split by sex in v2
-  (m_partners/f_partners, m_cross_layer/f_cross_layer); we expose both
-  sexes per-layer.
+- Network parameters: v2's "default" network has 2 layers (m, c).
+  partners and cross_layer are split by sex in v2 (m_partners/f_partners,
+  m_cross_layer/f_cross_layer); we expose both sexes per-layer.
 - Distributions: v2 stores distributions as plain dicts like
   ``{'dist': 'poisson1', 'par1': 0.5}`` consumed by hpvsim.utils.sample().
   v3 prefers Starsim Dist instances (sampled via .rvs(uids)). The
@@ -187,13 +184,10 @@ def _death_rate(location):
 def _network_pars(location):
     """Build per-layer network parameter dicts.
 
-    v2's "default" network defines 2 layers (m=marital, c=casual). M01
-    matches that — the earlier plan's reference to a third 'o' layer was
-    based on a misleading comment in v2 parameters.py; no such layer is
-    defined anywhere in v2 code.
+    v2's "default" network defines 2 layers (m=marital, c=casual).
 
     Returns ``{'m': {...}, 'c': {...}}`` where each layer dict has:
-    partners, mixing, layer_probs, cross_layer, duration, acts.
+    partners, mixing, layer_probs, cross_layer, duration, acts, debut.
     """
     default_pars = _params.make_pars(location=location)
 

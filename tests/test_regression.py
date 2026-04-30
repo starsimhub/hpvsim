@@ -1,7 +1,9 @@
 """Tests for the v2 -> v3 regression harness.
 
-Smoke test for the anchor sim (this file) plus unit tests for the drift
-computation in tests/regression/compare.py (added in Task 2).
+Smoke tests for the M00 4-genotype anchor (skipped until M03 multi-genotype
+support lands) and the M01 1-genotype HPV16 anchor, plus unit tests for the
+drift computation in tests/regression/compare.py and a gated drift test
+that runs when the v2 baseline file is present.
 """
 
 import sys
@@ -77,7 +79,7 @@ def test_compute_drift_skips_keys_missing_from_current():
     assert keys == ['a']
 
 
-# --- M01 anchor smoke (added in Task 10) --------------------------------------
+# --- M01 1-genotype HPV16 anchor smoke ----------------------------------------
 
 from regression.anchor_hpv16 import run_and_summarize as run_anchor_hpv16  # noqa: E402
 
@@ -99,7 +101,7 @@ def test_anchor_hpv16_runs():
         assert v >= 0 and v == v, f'summary value {k}={v} should be finite and non-negative'
 
 
-# --- M01 anchor drift (added in Task 12) --------------------------------------
+# --- M01 anchor drift vs. v2 1-gt baseline (gated on baseline file) -----------
 
 import json
 from pathlib import Path

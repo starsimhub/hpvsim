@@ -8,8 +8,7 @@ Per-layer comparison of:
 Against v2 baselines stored in tests/regression_baselines/partnership_v2.json
 (gitignored; generation procedure documented in tests/regression/README.md).
 
-Layer count: v2 has 2 layers (m, c) -- earlier plan drafts assumed 3, but
-verification of v2 source confirmed only m and c are defined.
+v2 has 2 layers (m, c); the test parametrizes over both.
 
 Pass criteria:
   - mixing-matrix bin-wise relative diff < 15% (per non-zero bin)

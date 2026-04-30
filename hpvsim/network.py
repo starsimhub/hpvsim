@@ -1,18 +1,12 @@
 """HPVsim sexual partnership network.
 
 Lift-and-shift of v2 hpvsim's two-layer (marital, casual) sexual network.
-One class instantiated twice, one per layer; cross-layer concurrency
-resolved at add_pairs time via isinstance-filtered iteration of sibling
-networks. Inherits scaffolding (debut, participant, duration tracking,
-end_pairs, net_beta) from ss.SexualNetwork.
-
-Task 5: class scaffold + cross-layer helper.
-Task 6 (this commit): port v2's create_edgelist into add_pairs.
-
-Note on layer count: v2's default network has only two layers (m, c). An
-earlier plan draft assumed a third 'o' (one-off) layer based on a
-misleading comment in v2's parameters.py; verification confirmed only m
-and c exist in v2 code.
+The pair-formation algorithm is ported from
+``hpvsim/_v2_legacy/population.py:create_edgelist`` (lines 281-379) with
+adaptations for Starsim's idioms (UID-indexed arrays, isinstance-filtered
+sibling iteration for cross-layer concurrency). One class instantiated
+twice, one per layer; inherits scaffolding (debut, participant, duration
+tracking, end_pairs, net_beta) from ss.SexualNetwork.
 """
 
 import numpy as np
@@ -70,10 +64,9 @@ class SexualNetwork(ss.SexualNetwork):
             ss.FloatArr('partners_target', default=np.nan,
                         label='Desired partner count for this layer'),
         )
-        # CRN-safe Dists for ordering/selection inside add_pairs (replace
-        # earlier np.random.shuffle / np.random.choice). Following MFNet's
-        # pattern: one ss.choice instance per use, configured per-call via
-        # .set(a=...).
+        # CRN-safe Dists for ordering/selection inside add_pairs. Each
+        # ss.choice gets a unique seed via Starsim's per-Dist isolation;
+        # configured per-call via .set(a=...) (MFNet pattern).
         self._dist_bin_order = ss.choice(name=f'{layer}_bin_order', replace=False)
         self._dist_f_select = ss.choice(name=f'{layer}_f_select', replace=False)
 
@@ -242,8 +235,7 @@ class SexualNetwork(ss.SexualNetwork):
         if len(f_cl) > 0:
             age_bins_f = np.digitize(age[f_cl], bins=bins) - 1
             bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)
-            # CRN-safe permutation of age-bin processing order via ss.choice
-            # (replaces np.random.shuffle).
+            # CRN-safe permutation of age-bin processing order via ss.choice.
             n_bins = len(bin_range_f)
             if n_bins > 1:
                 self._dist_bin_order.set(a=np.arange(n_bins))
@@ -261,8 +253,7 @@ class SexualNetwork(ss.SexualNetwork):
                 this_weighting_nonzero = this_weighting[males_nonzero]
                 f_inds = f_cl[age_bins_f == ab]
                 if nm > len(this_weighting_nonzero):
-                    # Not enough males — drop a CRN-safe random subset of
-                    # females (replaces np.random.choice).
+                    # Not enough males — drop a CRN-safe random subset of females.
                     self._dist_f_select.set(a=f_inds)
                     f_selected = np.asarray(
                         self._dist_f_select.rvs(len(this_weighting_nonzero))
