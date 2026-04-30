@@ -70,6 +70,12 @@ class SexualNetwork(ss.SexualNetwork):
             ss.FloatArr('partners_target', default=np.nan,
                         label='Desired partner count for this layer'),
         )
+        # CRN-safe Dists for ordering/selection inside add_pairs (replace
+        # earlier np.random.shuffle / np.random.choice). Following MFNet's
+        # pattern: one ss.choice instance per use, configured per-call via
+        # .set(a=...).
+        self._dist_bin_order = ss.choice(name=f'{layer}_bin_order', replace=False)
+        self._dist_f_select = ss.choice(name=f'{layer}_f_select', replace=False)
 
     def _n_partners_elsewhere(self):
         """Count current partnerships each agent has in OTHER hpv.SexualNetwork
@@ -236,8 +242,14 @@ class SexualNetwork(ss.SexualNetwork):
         if len(f_cl) > 0:
             age_bins_f = np.digitize(age[f_cl], bins=bins) - 1
             bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)
-            bin_order = np.arange(len(bin_range_f))
-            np.random.shuffle(bin_order)
+            # CRN-safe permutation of age-bin processing order via ss.choice
+            # (replaces np.random.shuffle).
+            n_bins = len(bin_range_f)
+            if n_bins > 1:
+                self._dist_bin_order.set(a=np.arange(n_bins))
+                bin_order = np.asarray(self._dist_bin_order.rvs(n_bins))
+            else:
+                bin_order = np.arange(n_bins)
 
             for ab, nm in zip(bin_range_f[bin_order], males_needed[bin_order]):
                 # Female-of-age `ab` preferences over male age bins
@@ -249,10 +261,12 @@ class SexualNetwork(ss.SexualNetwork):
                 this_weighting_nonzero = this_weighting[males_nonzero]
                 f_inds = f_cl[age_bins_f == ab]
                 if nm > len(this_weighting_nonzero):
-                    # not enough males - randomly drop females
-                    f_selected = f_inds[np.random.choice(
-                        len(f_inds), len(this_weighting_nonzero), replace=False,
-                    )]
+                    # Not enough males — drop a CRN-safe random subset of
+                    # females (replaces np.random.choice).
+                    self._dist_f_select.set(a=f_inds)
+                    f_selected = np.asarray(
+                        self._dist_f_select.rvs(len(this_weighting_nonzero))
+                    )
                     nm = f_selected.size
                 else:
                     f_selected = f_inds
