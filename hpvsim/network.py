@@ -164,11 +164,11 @@ class SexualNetwork(ss.SexualNetwork):
         # Cross-layer concurrency eligibility (mirror v2 lines 318-326).
         # In v2 every layer has its own current_partners row; we use the
         # SexualNetwork-only sibling count, which is equivalent for M01.
-        # Scale ANNUAL cross_layer/layer_probs to per-timestep so partnership
-        # formation rates are dt-independent (mirrors v2 sim step lines 461-469).
-        dt = float(self.t.dt)
-        f_cross_p = 1.0 - (1.0 - self.pars.cross_layer['f']) ** dt
-        m_cross_p = 1.0 - (1.0 - self.pars.cross_layer['m']) ** dt
+        # cross_layer is an ss.prob (annual); .to_prob(dt) converts to a
+        # dt-correct per-step probability (mirrors v2 sim step lines 461-469).
+        dt = self.t.dt
+        f_cross_p = self.pars.cross_layer['f'].to_prob(dt)
+        m_cross_p = self.pars.cross_layer['m'].to_prob(dt)
         n_elsewhere = self._n_partners_elsewhere()
         other_partners = n_elsewhere > 0
         f_with_other = (other_partners & is_female).nonzero()[0]
@@ -183,16 +183,15 @@ class SexualNetwork(ss.SexualNetwork):
         m_eligible = m_active & underpartnered & (~other_partners | cross_layer_bools)
 
         # Bin participants by age (mirror v2 lines 330-339).
-        # Scale annual female/male participation probabilities to per-timestep
-        # (mirror v2 sim step lines 464-467); leaves bins (row 0) untouched.
-        layer_probs = self.pars.layer_probs.copy()
-        layer_probs[1, :] = 1.0 - (1.0 - layer_probs[1, :]) ** dt
-        layer_probs[2, :] = 1.0 - (1.0 - layer_probs[2, :]) ** dt
-        bins = layer_probs[0, :]
+        # layer_probs is a dict with annual ss.prob arrays for f/m and a
+        # plain ndarray for bins; convert to per-step probabilities here.
+        bins = self.pars.layer_probs['bins']
+        f_part_p = self.pars.layer_probs['f'].to_prob(dt)
+        m_part_p = self.pars.layer_probs['m'].to_prob(dt)
         age = people.age.raw
         m_eligible_inds = m_eligible.nonzero()[0]
         m_participants = hpu.participation_filter(
-            m_eligible_inds, age, layer_probs[2, :], bins=bins,
+            m_eligible_inds, age, m_part_p, bins=bins,
         )
         if len(m_participants) == 0:
             return  # no males available for pairing in any age bin
@@ -205,7 +204,7 @@ class SexualNetwork(ss.SexualNetwork):
         # add_mixing[cl, cluster[m_participants]] reduces to a constant 1.
         f_eligible_inds = f_eligible.nonzero()[0]
         f_cl = hpu.participation_filter(
-            f_eligible_inds, age, layer_probs[1, :], bins=bins,
+            f_eligible_inds, age, f_part_p, bins=bins,
         )
 
         # Accumulate selected pairs across age bins
@@ -257,8 +256,11 @@ class SexualNetwork(ss.SexualNetwork):
         # ss.Dist.rvs takes uids; sample over the female-side uids of the
         # newly-formed pairs (per-pair, not per-agent — uids array length
         # = number of pairs).
-        # v2's dur_pship is sampled in YEARS; Starsim's DynamicNetwork
-        # decrements edges.dur by 1 each step (units of dt). Convert.
+        # v2's dur_pship is sampled in YEARS once per pair; Starsim's
+        # DynamicNetwork decrements edges.dur by 1 each step (units of dt).
+        # Divide here rather than dist-level unit-wrapping: nbinom (used
+        # for marital dur) only supports predraw rate scaling, which would
+        # inflate per-pair sample variance and break v2 equivalence.
         dur_years = self.pars.duration.rvs(f_uids)
         dur = dur_years / float(self.t.dt)
         acts = self.pars.acts.rvs(f_uids)

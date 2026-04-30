@@ -117,7 +117,10 @@ def test_cross_layer_concurrency_filter():
     nets = []
     for k in ('m', 'c'):
         pars = sc.dcp(country['network_pars'][k])
-        pars['cross_layer'] = {'m': 0.0, 'f': 0.0}
+        pars['cross_layer'] = {
+            'm': ss.prob(0.0, ss.years(1)),
+            'f': ss.prob(0.0, ss.years(1)),
+        }
         nets.append(SexualNetwork(layer=k, pars=pars))
     sim = ss.Sim(networks=nets, n_agents=2000, diseases=None,
                  dur=ss.years(2), dt=ss.years(0.5), rand_seed=0, verbose=0,

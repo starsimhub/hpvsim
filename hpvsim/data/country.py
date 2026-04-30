@@ -62,6 +62,15 @@ def _v2_dist_to_starsim(d):
     Starsim distributions take named parameters and are sampled via
     ``.rvs(uids)``. M01 only needs poisson, poisson1, lognormal, neg_binomial
     (the four used in v2's default Nigeria network pars).
+
+    Time-unit wrapping: we deliberately do NOT pass ``ss.years`` or
+    ``ss.freqperyear`` to dur/acts dists. v2 samples once per pair in
+    annual units and multiplies by ``dt`` at use-time, preserving the
+    per-pair sample variance. Starsim's ``predraw`` auto-scaling for
+    ``poisson``/``nbinom`` would instead scale the rate parameter inside
+    the dist, which inflates per-sample variance by ``1/dt`` and breaks
+    the v2 equivalence gate. Probability pars (``layer_probs``,
+    ``cross_layer``) ARE wrapped via ``ss.prob`` — see ``_network_pars``.
     """
     dist = d['dist']
     par1 = d.get('par1')
@@ -71,8 +80,6 @@ def _v2_dist_to_starsim(d):
     if dist == 'poisson1':
         return _PoissonShifted(lam=par1, shift=1)
     if dist in ('lognormal', 'lognorm'):
-        # v2 'lognormal' parameters are mean and std of the LOGNORMAL itself;
-        # ss.lognorm_ex takes the same parameterization.
         return ss.lognorm_ex(mean=par1, std=par2)
     if dist == 'neg_binomial':
         # v2: par1=mean, par2=k (dispersion).
@@ -186,14 +193,16 @@ def _network_pars(location):
     partners, mixing, layer_probs, cross_layer, duration, acts, debut.
     """
     default_pars = _params.make_pars(location=location)
+    annual = ss.years(1)  # unit shared by all annual probability params
 
-    # Per-sex cross-layer concurrency is a scalar in v2; expose as {sex: val}.
+    # Per-sex cross-layer concurrency is an annual probability in v2.
+    # ``ss.prob`` lets the network call ``.to_prob(self.t.dt)`` to get a
+    # dt-correct per-step probability: 1 - exp(-rate*dt) == 1-(1-p)^dt.
     cross_layer_by_sex = {
-        'm': default_pars['m_cross_layer'],
-        'f': default_pars['f_cross_layer'],
+        'm': ss.prob(default_pars['m_cross_layer'], annual),
+        'f': ss.prob(default_pars['f_cross_layer'], annual),
     }
 
-    # v2's debut is per-sex but layer-independent.
     debut_by_sex = {
         'm': _v2_dist_to_starsim(default_pars['debut']['m']),
         'f': _v2_dist_to_starsim(default_pars['debut']['f']),
@@ -201,13 +210,23 @@ def _network_pars(location):
 
     out = {}
     for layer in ('m', 'c'):
+        # v2's layer_probs[layer] is a (3, N) ndarray: row 0 = age-bin lower
+        # bounds, row 1 = annual female participation prob, row 2 = annual
+        # male participation prob. Split into a dict so the per-sex rows
+        # carry their unit (annual) explicitly.
+        lp = default_pars['layer_probs'][layer]
+        layer_probs = dict(
+            bins=np.asarray(lp[0, :]),
+            f=ss.prob(np.asarray(lp[1, :]), annual),
+            m=ss.prob(np.asarray(lp[2, :]), annual),
+        )
         out[layer] = dict(
             partners={
                 'm': _v2_dist_to_starsim(default_pars['m_partners'][layer]),
                 'f': _v2_dist_to_starsim(default_pars['f_partners'][layer]),
             },
             mixing=default_pars['mixing'][layer],
-            layer_probs=default_pars['layer_probs'][layer],
+            layer_probs=layer_probs,
             cross_layer=cross_layer_by_sex,
             duration=_v2_dist_to_starsim(default_pars['dur_pship'][layer]),
             acts=_v2_dist_to_starsim(default_pars['acts'][layer]),
