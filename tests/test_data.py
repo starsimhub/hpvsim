@@ -8,7 +8,7 @@ import hpvsim
 def test_load_country_returns_expected_keys():
     """load_country returns a dict with exactly the expected top-level keys."""
     out = hpvsim.data.load_country('nigeria')
-    expected = {'age_data', 'fertility', 'death_rate', 'network_pars'}
+    expected = {'age_data', 'birth_rate', 'death_rate', 'network_pars'}
     assert set(out.keys()) == expected, f'unexpected keys: {set(out.keys())}'
 
 
@@ -22,14 +22,14 @@ def test_age_data_shape():
     assert (df['value'] >= 0).all()
 
 
-def test_fertility_shape():
-    """fertility is a DataFrame ss.Pregnancy(fertility_rate=...) accepts."""
+def test_birth_rate_shape():
+    """birth_rate is a DataFrame ss.Births(birth_rate=...) accepts."""
     out = hpvsim.data.load_country('nigeria')
-    df = out['fertility']
+    df = out['birth_rate']
     assert isinstance(df, pd.DataFrame)
-    assert {'Time', 'AgeGrp', 'ASFR'}.issubset(df.columns), f'columns: {df.columns.tolist()}'
+    assert {'Year', 'CBR'}.issubset(df.columns), f'columns: {df.columns.tolist()}'
     assert len(df) > 0
-    assert (df['ASFR'] >= 0).all()
+    assert (df['CBR'] >= 0).all()
 
 
 def test_death_rate_shape():

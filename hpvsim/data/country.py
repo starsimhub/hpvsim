@@ -12,10 +12,11 @@ Notes on v2 -> v3 reshaping:
   with columns (age_lower, age_upper, count). We expand bins into a per-year
   long form with columns (age, value).
 - Birth rates: v2's get_birth_rates returns a sciris dataframe with columns
-  (Location, year, cbr) — i.e. a crude birth rate per year, not an
-  age-specific fertility rate (ASFR). To produce ASFR for ss.Pregnancy we
-  spread the CBR over reproductive ages (15-49) uniformly. Future work can
-  refine this when age-specific data is wired in.
+  (Location, year, cbr) — a crude birth rate per year. v3 uses ss.Births
+  (population-level CBR, matching v2's mechanism) rather than ss.Pregnancy
+  (per-woman ASFR), so we just rename columns to [Year, CBR] for the
+  ss.Births interface. M02+ may switch to ss.Pregnancy if/when proper ASFR
+  data becomes available.
 - Death rates: v2's get_death_rates(by_sex=True) returns
   {year: {sex: ndarray(M, 2) with columns (age, rate)}}. We flatten into
   long form (Year, AgeGrp, Sex, Rate).
@@ -116,7 +117,7 @@ def load_country(location):
 
     return dict(
         age_data=_age_data(location),
-        fertility=_fertility(location),
+        birth_rate=_birth_rate(location),
         death_rate=_death_rate(location),
         network_pars=_network_pars(location),
     )
@@ -140,27 +141,20 @@ def _age_data(location):
     return pd.DataFrame(rows)
 
 
-def _fertility(location):
-    """Reshape v2 birth rates into [Time, AgeGrp, ASFR] long form.
+def _birth_rate(location):
+    """Reshape v2 birth rates into [Year, CBR] long form for ss.Births.
 
-    v2 returns a sciris dataframe with (Location, year, cbr) per year — a
-    crude birth rate (per 1000 population), not age-specific. To match the
-    shape ss.Pregnancy(fertility_rate=...) consumes, we spread the CBR over
-    reproductive ages (15-49) uniformly and convert from per-1000 to per-1
-    by dividing by 1000. Future work can substitute true ASFR data here.
+    v2's get_birth_rates returns a sciris dataframe with (Location, year, cbr).
+    ss.Births accepts a DataFrame with columns [Year, CBR]; CBR is per 1000
+    population per year (the v2 unit), and ss.Births handles the conversion.
     """
     raw = _loaders.get_birth_rates(location=location)
-    # raw is a sciris dataframe; iterate rows.
-    repro_lower, repro_upper = 15, 50  # 15-49 inclusive
-    repro_ages = list(range(repro_lower, repro_upper))
     rows = []
     for i in range(len(raw)):
-        year = int(raw['year'][i])
-        cbr = float(raw['cbr'][i])  # per 1000 population
-        # Spread evenly across reproductive ages and normalise to per-1.
-        asfr = (cbr / 1000.0) / len(repro_ages)
-        for age in repro_ages:
-            rows.append({'Time': year, 'AgeGrp': age, 'ASFR': asfr})
+        rows.append({
+            'Year': int(raw['year'][i]),
+            'CBR': float(raw['cbr'][i]),
+        })
     return pd.DataFrame(rows)
 
 
