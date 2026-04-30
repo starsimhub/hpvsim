@@ -56,6 +56,7 @@ class SexualNetwork(ss.SexualNetwork):
             cross_layer=None,
             duration=None,
             acts=None,
+            debut=None,   # per-sex {'f': ss.Dist, 'm': ss.Dist} for sexual debut age
         )
         self.update_pars(pars=pars, **kwargs)
         # Per-agent desired partner count (sampled once when agent enters
@@ -96,14 +97,16 @@ class SexualNetwork(ss.SexualNetwork):
         return n
 
     def _init_partners_target(self, people):
-        """Sample each agent's desired partner count for this layer.
+        """Sample each agent's desired partner count for this layer, and
+        their debut age (matches v2's per-sex debut distribution).
 
         v2 sampled the desired count once per agent at population creation
         and stored it in a static array. We do the same via the
         ``partners_target`` IntArr state, which Starsim auto-resizes on
         births/deaths. We sample for any agent whose target is still 0
         (uninitialized), so newly-born agents get a sample on first
-        add_pairs after their birth.
+        add_pairs after their birth. Debut is sampled into the parent
+        ss.SexualNetwork's ``debut`` FloatArr at the same time.
         """
         unset_uids = (people.alive & (self.partners_target == 0)).uids
         if not len(unset_uids):
@@ -115,10 +118,14 @@ class SexualNetwork(ss.SexualNetwork):
             self.partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
         if len(m_uids):
             self.partners_target[m_uids] = self.pars.partners['m'].rvs(m_uids)
-        # v2's `is_active` is `age > debut`; we set `participant` to True so
-        # ss.SexualNetwork.active() reduces to the same predicate (alive AND
-        # age > debut). Per-age participation rates are applied per-step via
-        # hpu.participation_filter, mirroring v2.
+        # Sample debut age per-sex (matches v2: female mean 15, male mean 17.6).
+        # ss.SexualNetwork.active() requires people.age > self.debut, so this
+        # gates young agents out of pairing.
+        if self.pars.debut is not None:
+            if len(f_uids):
+                self.debut[f_uids] = self.pars.debut['f'].rvs(f_uids)
+            if len(m_uids):
+                self.debut[m_uids] = self.pars.debut['m'].rvs(m_uids)
         self.participant[unset_uids] = True
         return
 

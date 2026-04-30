@@ -82,14 +82,47 @@ class HPV(ss.Infection):
             ss.FloatArr('ti_clearance', label='Time of natural clearance'),
         )
 
+    def init_results(self):
+        """Add per-timestep first-infection accumulators so the post-run mean
+        age-of-(first-)infection can be computed (matches v2's per-agent
+        ``date_infectious`` semantics; SIS re-infections are excluded).
+        """
+        super().init_results()
+        self.define_results(
+            ss.Result('new_first_infections_count',
+                      dtype=int, scale=False,
+                      label='New first-time infections this step'),
+            ss.Result('new_first_infections_age_sum',
+                      dtype=float, scale=False,
+                      label='Sum of ages at first infection this step'),
+        )
+
     def set_prognoses(self, uids, sources=None):
-        """Mark uids as infected; schedule clearance per dur_inf."""
+        """Mark uids as infected; schedule clearance per dur_inf;
+        accumulate first-infection-age sum for the per-step mean.
+
+        Counts first infections only (not SIS re-infections), to match
+        v2's per-agent ``date_infectious`` semantics (in v2's natural-
+        history model HPV16 confers immunity, so each agent has at most
+        one infection event recorded; M01's SIS dynamics generate
+        re-infections that we exclude from this metric).
+        """
         super().set_prognoses(uids, sources)
         ti = self.ti
+        # Determine first-time-infected agents BEFORE we overwrite ti_infected.
+        first_time_mask = np.isnan(np.asarray(self.ti_infected[uids]))
         self.susceptible[uids] = False
         self.infected[uids] = True
         self.ti_infected[uids] = ti
         self.ti_clearance[uids] = ti + self.pars.dur_inf.rvs(uids)
+        # Accumulate per-step first-infection (count, age_sum) so a v2-
+        # equivalent mean age of (first) infection can be computed in
+        # post-processing.
+        if first_time_mask.any():
+            first_uids = uids[first_time_mask]
+            ages = np.asarray(self.sim.people.age[first_uids])
+            self.results.new_first_infections_count[ti] += int(len(first_uids))
+            self.results.new_first_infections_age_sum[ti] += float(ages.sum())
 
     def step_state(self):
         """SIS: agents past ti_clearance return to susceptible."""

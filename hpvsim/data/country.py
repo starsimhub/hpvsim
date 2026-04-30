@@ -197,6 +197,12 @@ def _network_pars(location):
         'f': default_pars['f_cross_layer'],
     }
 
+    # v2's debut is per-sex but layer-independent.
+    debut_by_sex = {
+        'm': _v2_dist_to_starsim(default_pars['debut']['m']),
+        'f': _v2_dist_to_starsim(default_pars['debut']['f']),
+    }
+
     out = {}
     for layer in ('m', 'c'):
         out[layer] = dict(
@@ -209,5 +215,6 @@ def _network_pars(location):
             cross_layer=cross_layer_by_sex,
             duration=_v2_dist_to_starsim(default_pars['dur_pship'][layer]),
             acts=_v2_dist_to_starsim(default_pars['acts'][layer]),
+            debut=debut_by_sex,
         )
     return out

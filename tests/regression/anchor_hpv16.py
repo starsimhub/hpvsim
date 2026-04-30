@@ -54,20 +54,16 @@ def run_and_summarize():
 
     mean_prev_pct = 100 * float(res.prevalence.mean())
 
-    # Mean age of infection: agents with finite ti_infected got infected
-    # during the run. Compute their age at the time of infection.
-    hpv_mod = sim.diseases.hpv16
-    ti_inf = hpv_mod.ti_infected   # FloatArr; nan for never-infected
-    infected_uids = ti_inf.notnan.uids
-    if len(infected_uids):
-        ages_now = np.asarray(sim.people.age[infected_uids])
-        ti_at_inf = np.asarray(ti_inf[infected_uids])
-        ti_now = float(sim.t.ti)
-        # dt is an ss.years() instance; PARS pinned dt=0.5 years
-        dt_years = float(PARS['dt'])
-        years_since_inf = (ti_now - ti_at_inf) * dt_years
-        ages_at_inf = ages_now - years_since_inf
-        mean_age_inf = float(ages_at_inf.mean())
+    # Mean age of first infection: matches v2's per-agent date_infectious
+    # semantics (in v2 each agent's first HPV16 infection is recorded
+    # once; immunity prevents re-infection). hpv.HPV.set_prognoses
+    # accumulates per-step (count, age-sum) of first-time infections.
+    age_sum = np.asarray(res.new_first_infections_age_sum)
+    age_count = np.asarray(res.new_first_infections_count)
+    has_inf = age_count > 0
+    if has_inf.any():
+        per_step_mean = age_sum[has_inf] / age_count[has_inf]
+        mean_age_inf = float(per_step_mean.mean())
     else:
         mean_age_inf = 0.0
 
