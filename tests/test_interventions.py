@@ -700,7 +700,11 @@ def test_cancer_treatment():
     interventions = [screen, assign_treatment, ablation, excision, radiation]
     for intv in interventions: intv.do_plot = False
 
-    sim = hpv.Sim(pars=base_pars, interventions=interventions)
+    # Use a larger population than base_pars: cancer→screen-positive→radiation is a rare
+    # chain (≈25% of cancerous screen-positives), and 500 agents leaves it seed-dependent.
+    pars = sc.dcp(base_pars)
+    pars['n_agents'] = 5000
+    sim = hpv.Sim(pars=pars, interventions=interventions)
     sim.run(verbose=0)
 
     cum_cancer_tx   = sim.results['cum_cancer_treatments'][-1]
