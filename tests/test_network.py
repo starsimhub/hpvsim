@@ -57,7 +57,8 @@ def test_n_partners_elsewhere_counts_sibling_hpv_networks():
     hpv_c.append(p1=ss.uids([0, 1]), p2=ss.uids([2, 3]),
                  beta=np.array([1.0, 1.0]),
                  dur=np.array([10.0, 10.0]),
-                 acts=np.array([100, 100]))
+                 acts=np.array([100, 100]),
+                 start_ti=np.array([0.0, 0.0]))
     n = hpv_m._n_partners_elsewhere()
     assert n[0] == 1 and n[1] == 1 and n[2] == 1 and n[3] == 1
     assert n[4:].sum() == 0
