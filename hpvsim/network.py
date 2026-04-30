@@ -60,12 +60,15 @@ class SexualNetwork(ss.SexualNetwork):
         )
         self.update_pars(pars=pars, **kwargs)
         # Per-agent desired partner count (sampled once when agent enters
-        # the network). IntArr because v2's partner-count distributions
-        # (poisson, poisson1, neg_binomial) all yield integers; Starsim's
-        # IntArr auto-tracks births/deaths.
+        # the network). FloatArr with default=NaN gives an unambiguous
+        # "unsampled" sentinel; using IntArr with default=0 would collide
+        # with legitimate Poisson(λ) draws that legitimately yield 0
+        # (re-sampling would bias the distribution upward and break CRN
+        # reproducibility). v2's partner-count distributions yield integers,
+        # which we cast at sample-time.
         self.define_states(
-            ss.IntArr('partners_target', default=0,
-                      label='Desired partner count for this layer'),
+            ss.FloatArr('partners_target', default=np.nan,
+                        label='Desired partner count for this layer'),
         )
 
     def _n_partners_elsewhere(self):
@@ -102,18 +105,24 @@ class SexualNetwork(ss.SexualNetwork):
 
         v2 sampled the desired count once per agent at population creation
         and stored it in a static array. We do the same via the
-        ``partners_target`` IntArr state, which Starsim auto-resizes on
-        births/deaths. We sample for any agent whose target is still 0
-        (uninitialized), so newly-born agents get a sample on first
-        add_pairs after their birth. Debut is sampled into the parent
-        ss.SexualNetwork's ``debut`` FloatArr at the same time.
+        ``partners_target`` FloatArr state, which Starsim auto-resizes on
+        births/deaths. We sample for any agent whose target is still NaN
+        (uninitialized) — using a NaN sentinel rather than 0 because v2's
+        Poisson(λ=1) for casual partners legitimately yields 0 ~36% of the
+        time, and re-sampling those would bias the distribution. Newly-born
+        agents start as NaN and get a sample on first add_pairs after their
+        birth. Debut is sampled into the parent ss.SexualNetwork's ``debut``
+        FloatArr at the same time.
         """
-        unset_uids = (people.alive & (self.partners_target == 0)).uids
-        if not len(unset_uids):
+        unset_uids = self.partners_target.isnan.uids
+        # Limit to currently-alive agents (Starsim's nan-mask covers all
+        # ever-allocated UIDs, including dead ones we shouldn't sample for).
+        alive_unset = unset_uids[np.asarray(people.alive[unset_uids])]
+        if not len(alive_unset):
             return
-        is_female_unset = people.female[unset_uids]
-        f_uids = unset_uids[is_female_unset]
-        m_uids = unset_uids[~is_female_unset]
+        is_female_unset = people.female[alive_unset]
+        f_uids = alive_unset[is_female_unset]
+        m_uids = alive_unset[~is_female_unset]
         if len(f_uids):
             self.partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
         if len(m_uids):
