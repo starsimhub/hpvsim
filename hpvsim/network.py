@@ -72,27 +72,15 @@ class SexualNetwork(ss.SexualNetwork):
 
     def _n_partners_elsewhere(self):
         """Count current partnerships each agent has in OTHER hpv.SexualNetwork
-        layers. Returns an int array sized at len(sim.people) — i.e., one
-        entry per currently-alive agent's UID slot. Used by external code
-        and tests; add_pairs uses _n_partners_elsewhere_uid_space directly.
-
-        Returns:
-            np.ndarray of int, shape (len(sim.people),). All zeros if no
-            sibling SexualNetwork instances exist.
+        layers. Returns an int array sized at the underlying agent storage
+        (covers all live UIDs); used by add_pairs for cross-layer concurrency.
+        Filtered to ``hpv.SexualNetwork`` siblings via ``isinstance`` so
+        non-sexual networks (e.g., maternal, environmental) don't contribute.
         """
-        return self._n_partners_elsewhere_uid_space(len(self.sim.people))
-
-    def _n_partners_elsewhere_uid_space(self, n_uids):
-        """Same as _n_partners_elsewhere but returns an array sized at n_uids
-        (the underlying agent storage size, which covers all live UIDs).
-        Used by add_pairs to keep all per-agent arrays the same shape."""
+        n_uids = len(self.partners_target.raw)
         n = np.zeros(n_uids, dtype=int)
         for other in self.sim.networks():
-            if other is self:
-                continue
-            if not isinstance(other, SexualNetwork):
-                continue
-            if len(other) == 0:
+            if other is self or not isinstance(other, SexualNetwork) or len(other) == 0:
                 continue
             n[other.edges.p1] += 1
             n[other.edges.p2] += 1
@@ -113,29 +101,21 @@ class SexualNetwork(ss.SexualNetwork):
         birth. Debut is sampled into the parent ss.SexualNetwork's ``debut``
         FloatArr at the same time.
         """
-        unset_uids = self.partners_target.isnan.uids
-        # Limit to currently-alive agents (Starsim's nan-mask covers all
-        # ever-allocated UIDs, including dead ones we shouldn't sample for).
-        alive_unset = unset_uids[np.asarray(people.alive[unset_uids])]
-        if not len(alive_unset):
+        unset_alive = (people.alive & self.partners_target.isnan).uids
+        if not len(unset_alive):
             return
-        is_female_unset = people.female[alive_unset]
-        f_uids = alive_unset[is_female_unset]
-        m_uids = alive_unset[~is_female_unset]
-        if len(f_uids):
-            self.partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
-        if len(m_uids):
-            self.partners_target[m_uids] = self.pars.partners['m'].rvs(m_uids)
+        is_female = people.female[unset_alive]
+        f_uids = unset_alive[is_female]
+        m_uids = unset_alive[~is_female]
+        self.partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
+        self.partners_target[m_uids] = self.pars.partners['m'].rvs(m_uids)
         # Sample debut age per-sex (matches v2: female mean 15, male mean 17.6).
         # ss.SexualNetwork.active() requires people.age > self.debut, so this
         # gates young agents out of pairing.
         if self.pars.debut is not None:
-            if len(f_uids):
-                self.debut[f_uids] = self.pars.debut['f'].rvs(f_uids)
-            if len(m_uids):
-                self.debut[m_uids] = self.pars.debut['m'].rvs(m_uids)
-        self.participant[unset_uids] = True
-        return
+            self.debut[f_uids] = self.pars.debut['f'].rvs(f_uids)
+            self.debut[m_uids] = self.pars.debut['m'].rvs(m_uids)
+        self.participant[unset_alive] = True
 
     def _own_n_partners(self):
         """Number of edges in *this* layer touching each currently-alive agent.
@@ -193,7 +173,7 @@ class SexualNetwork(ss.SexualNetwork):
         # Cross-layer concurrency eligibility (mirror v2 lines 318-326).
         # In v2 every layer has its own current_partners row; we use the
         # SexualNetwork-only sibling count, which is equivalent for M01.
-        n_elsewhere = self._n_partners_elsewhere_uid_space(n_uids)
+        n_elsewhere = self._n_partners_elsewhere()
         other_partners = n_elsewhere > 0
         f_with_other = (other_partners & is_female).nonzero()[0]
         m_with_other = (other_partners & ~is_female).nonzero()[0]

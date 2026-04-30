@@ -146,13 +146,10 @@ def _birth_rate(location):
     population per year (the v2 unit), and ss.Births handles the conversion.
     """
     raw = _loaders.get_birth_rates(location=location)
-    rows = []
-    for i in range(len(raw)):
-        rows.append({
-            'Year': int(raw['year'][i]),
-            'CBR': float(raw['cbr'][i]),
-        })
-    return pd.DataFrame(rows)
+    return pd.DataFrame({
+        'Year': np.asarray(raw['year'], dtype=int),
+        'CBR': np.asarray(raw['cbr'], dtype=float),
+    })
 
 
 def _death_rate(location):
@@ -167,18 +164,17 @@ def _death_rate(location):
     """
     raw = _loaders.get_death_rates(location=location, by_sex=True)
     sex_label = {'f': 'Female', 'm': 'Male'}  # match ss.Deaths' default sex_keys
-    rows = []
+    chunks = []
     for year, sex_to_arr in raw.items():
         for sex, arr in sex_to_arr.items():
             arr = np.asarray(arr)
-            for age, rate in arr:
-                rows.append({
-                    'Time': int(year),
-                    'AgeGrpStart': int(age),
-                    'Sex': sex_label.get(sex, sex),
-                    'mx': float(rate) * 1000.0,  # per-1 → per-1000
-                })
-    return pd.DataFrame(rows)
+            chunks.append(pd.DataFrame({
+                'Time': int(year),
+                'AgeGrpStart': arr[:, 0].astype(int),
+                'Sex': sex_label.get(sex, sex),
+                'mx': arr[:, 1].astype(float) * 1000.0,  # per-1 → per-1000
+            }))
+    return pd.concat(chunks, ignore_index=True)
 
 
 def _network_pars(location):
