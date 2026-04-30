@@ -54,19 +54,12 @@ class SexualNetwork(ss.SexualNetwork):
         )
         self.update_pars(pars=pars, **kwargs)
         # Per-agent desired partner count (sampled once when agent enters
-        # the network). FloatArr with default=NaN gives an unambiguous
-        # "unsampled" sentinel; using IntArr with default=0 would collide
-        # with legitimate Poisson(λ) draws that legitimately yield 0
-        # (re-sampling would bias the distribution upward and break CRN
-        # reproducibility). v2's partner-count distributions yield integers,
-        # which we cast at sample-time.
+        # the network).
         self.define_states(
             ss.FloatArr('partners_target', default=np.nan,
                         label='Desired partner count for this layer'),
         )
-        # CRN-safe Dists for ordering/selection inside add_pairs. Each
-        # ss.choice gets a unique seed via Starsim's per-Dist isolation;
-        # configured per-call via .set(a=...) (MFNet pattern).
+
         self._dist_bin_order = ss.choice(name=f'{layer}_bin_order', replace=False)
         self._dist_f_select = ss.choice(name=f'{layer}_f_select', replace=False)
 
@@ -92,11 +85,8 @@ class SexualNetwork(ss.SexualNetwork):
 
         v2 sampled the desired count once per agent at population creation
         and stored it in a static array. We do the same via the
-        ``partners_target`` FloatArr state, which Starsim auto-resizes on
-        births/deaths. We sample for any agent whose target is still NaN
-        (uninitialized) — using a NaN sentinel rather than 0 because v2's
-        Poisson(λ=1) for casual partners legitimately yields 0 ~36% of the
-        time, and re-sampling those would bias the distribution. Newly-born
+        ``partners_target`` FloatArr state. We sample for any agent whose
+        target is still NaN (uninitialized). Newly-born
         agents start as NaN and get a sample on first add_pairs after their
         birth. Debut is sampled into the parent ss.SexualNetwork's ``debut``
         FloatArr at the same time.
@@ -155,20 +145,17 @@ class SexualNetwork(ss.SexualNetwork):
 
         # Sample desired partner count for any agent that doesn't have one
         # yet (covers initial population AND newly-born agents on subsequent
-        # timesteps). FloatArr auto-resizes; _init samples only the unset.
+        # timesteps).
         self._init_partners_target(people)
 
-        # Work in UID space so newly-born / dead agents resize cleanly.
-        n_uids = len(self.partners_target.raw)
-        is_female = np.asarray(people.female.raw, dtype=bool)
-        # ss.SexualNetwork.active() returns a BoolArr indexed by alive uids;
-        # project it into a full-size ndarray via the BoolArr's True UIDs.
-        active_mask = np.zeros(n_uids, dtype=bool)
-        active_mask[self.active(people).uids] = True
-
+        # All per-uid masks below are full-storage bool ndarrays (same shape
+        # as partners_target.raw), so they index cleanly into edges and uids.
+        is_female = people.female.raw
+        active_mask = self.active(people).raw
         f_active = is_female & active_mask
         m_active = ~is_female & active_mask
-        underpartnered = self._own_n_partners() < np.asarray(self.partners_target.raw)
+        underpartnered = self._own_n_partners() < self.partners_target.raw
+        n_uids = len(self.partners_target.raw)
 
         # Cross-layer concurrency eligibility (mirror v2 lines 318-326).
         # In v2 every layer has its own current_partners row; we use the
@@ -189,7 +176,7 @@ class SexualNetwork(ss.SexualNetwork):
         # Bin participants by age (mirror v2 lines 330-339).
         layer_probs = self.pars.layer_probs
         bins = layer_probs[0, :]
-        age = np.asarray(people.age.raw)
+        age = people.age.raw
         m_eligible_inds = m_eligible.nonzero()[0]
         m_participants = hpu.participation_filter(
             m_eligible_inds, age, layer_probs[2, :], bins=bins,
