@@ -116,12 +116,16 @@ class LegacyRngSexualNetwork(SexualNetwork):
         underpartnered = self._own_n_partners() < self.partners_target.raw
 
         n_uids = len(self.partners_target.raw)
+        # Mirror v2 sim step lines 461-469: scale annual probabilities to dt.
+        dt = float(self.t.dt)
+        f_cross_p = 1.0 - (1.0 - self._v2['cross_layer']['f']) ** dt
+        m_cross_p = 1.0 - (1.0 - self._v2['cross_layer']['m']) ** dt
         n_elsewhere = self._n_partners_elsewhere()
         other_partners = n_elsewhere > 0
         f_with_other = (other_partners & is_female).nonzero()[0]
         m_with_other = (other_partners & ~is_female).nonzero()[0]
-        f_cross_inds = hpu.binomial_filter(self._v2['cross_layer']['f'], f_with_other)
-        m_cross_inds = hpu.binomial_filter(self._v2['cross_layer']['m'], m_with_other)
+        f_cross_inds = hpu.binomial_filter(f_cross_p, f_with_other)
+        m_cross_inds = hpu.binomial_filter(m_cross_p, m_with_other)
         cross_layer_bools = np.zeros(n_uids, dtype=bool)
         cross_layer_bools[f_cross_inds] = True
         cross_layer_bools[m_cross_inds] = True
@@ -129,7 +133,9 @@ class LegacyRngSexualNetwork(SexualNetwork):
         f_eligible = f_active & underpartnered & (~other_partners | cross_layer_bools)
         m_eligible = m_active & underpartnered & (~other_partners | cross_layer_bools)
 
-        layer_probs = self._v2['layer_probs']
+        layer_probs = self._v2['layer_probs'].copy()
+        layer_probs[1, :] = 1.0 - (1.0 - layer_probs[1, :]) ** dt
+        layer_probs[2, :] = 1.0 - (1.0 - layer_probs[2, :]) ** dt
         bins = layer_probs[0, :]
         age = people.age.raw
         m_eligible_inds = m_eligible.nonzero()[0]
@@ -183,7 +189,10 @@ class LegacyRngSexualNetwork(SexualNetwork):
         if n_new == 0:
             return
         # v2 plumbing for duration and acts: hpu.sample from raw dicts.
-        dur = hpu.sample(size=n_new, **self._v2['duration'])
+        # v2 stored dur in years; convert to timesteps for ss.DynamicNetwork's
+        # decrement-by-one end_pairs.
+        dur_years = hpu.sample(size=n_new, **self._v2['duration'])
+        dur = dur_years / float(self.t.dt)
         acts = hpu.sample(size=n_new, **self._v2['acts'])
         beta = np.ones(n_new)
         import starsim as ss
