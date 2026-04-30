@@ -127,13 +127,19 @@ tests/regression_baselines/anchor_hpv16.json
 ### Generating the baseline
 
 In a v2-only environment (a separate venv with v2.3.x hpvsim from PyPI, or a
-checkout of the `rc2.3` branch of this repo before the v3 migration):
+worktree on the `rc2.3` branch of this repo with v2's hpvsim installed in
+that venv). The script below is the verified-working version used for the
+initial M01 baseline. Save as `gen_anchor_hpv16.py` in the v2 environment:
 
 ```python
-import json
+import json, os, sys
+import numpy as np
 import sciris as sc
 import hpvsim as hpv2  # v2 package
 
+# Pinned PARS — must mirror the v3 anchor (tests/regression/anchor_hpv16.py).
+# pop_scale=1 + total_pop=n_agents disables v2's pop-scaling so absolute
+# counts are agent-level (v3 doesn't yet wire pop_scale; that's M02 work).
 PARS = dict(
     n_agents=10e3,
     location='nigeria',
@@ -144,32 +150,66 @@ PARS = dict(
     burnin=20,
     rand_seed=0,
     verbose=0,
+    pop_scale=1,
+    total_pop=10000,
 )
 
 sim = hpv2.Sim(sc.dcp(PARS))
 sim.run()
+res = sim.results
 
-# v2 result-key names may differ from v3's hpv.Sim().results.hpv16.* keys.
-# Compute the equivalent quantities from v2's underlying time series and
-# store them under the v3 key names (see tests/regression/anchor_hpv16.py
-# for the exact keys: 'total HPV infections', 'mean HPV prevalence (%)',
-# 'mean age of infection (years)').
+# total HPV infections — sum 'infections' (per-step new infections, 1 gt → 1D)
+n_inf = float(np.asarray(res['infections']).sum())
+
+# mean HPV prevalence (%) — mean of 'hpv_prevalence' (instantaneous per-step)
+mean_prev_pct = 100 * float(np.asarray(res['hpv_prevalence']).mean())
+
+# mean age of (first) infection — v2 doesn't expose this as a result key;
+# compute from sim.people.date_infectious (per-genotype per-agent timestep
+# of first HPV acquisition). Subtract from current year-of-birth via age.
+people = sim.people
+date_inf = np.asarray(people.date_infectious[0])  # shape: (1, n_agents) → row 0
+ever_infected = ~np.isnan(date_inf)
+if ever_infected.any():
+    year_at_inf = PARS['start'] + date_inf[ever_infected] * PARS['dt']
+    current_year = PARS['end']
+    current_ages = np.asarray(people.age)[ever_infected]
+    year_of_birth = current_year - current_ages
+    ages_at_inf = year_at_inf - year_of_birth
+    valid = (ages_at_inf > 0) & (ages_at_inf < 100)
+    mean_age_inf = float(ages_at_inf[valid].mean()) if valid.any() else 0.0
+else:
+    mean_age_inf = 0.0
+
+total_pop = float(np.asarray(res['n_alive'])[-1])
 
 short = {
-    'total HPV infections': float(sim.results['total_infections'].sum()),
-    'mean HPV prevalence (%)': 100 * float(sim.results['hpv_prevalence'].mean()),
-    'mean age of infection (years)': float(sim.results['mean_age_infection'].mean()),
+    'total HPV infections': n_inf,
+    'mean HPV prevalence (%)': mean_prev_pct,
+    'mean age of infection (years)': mean_age_inf,
 }
-total_pop = float(sim.results['n_alive'][-1])
+print('v2 1-genotype HPV16 anchor summary:')
+for k, v in short.items():
+    print(f'  {k:<40} {v:>12.4g}')
+print(f'  {"total population":<40} {total_pop:>12.4g}')
 
-out = dict(summary={**short, 'total population': total_pop}, pars=PARS)
-with open('tests/regression_baselines/anchor_hpv16.json', 'w') as f:
+out = dict(
+    summary={**short, 'total population': total_pop},
+    pars={k: (v if not isinstance(v, float) else float(v)) for k, v in PARS.items()},
+)
+target = sys.argv[1] if len(sys.argv) > 1 else (
+    'tests/regression_baselines/anchor_hpv16.json'
+)
+os.makedirs(os.path.dirname(target), exist_ok=True)
+with open(target, 'w') as f:
     json.dump(out, f, indent=2)
+print(f'Wrote: {target}')
 ```
 
 The summary keys **must match v3's `run_and_summarize()` output keys exactly**.
-If v2's result names differ, compute the equivalent quantities from v2's
-underlying time series and store them under the v3 key names.
+If v2's result names differ from those above, compute the equivalent
+quantities from v2's underlying time series and store them under the v3 key
+names.
 
 ### Partnership-equivalence baseline (`partnership_v2.json`)
 
