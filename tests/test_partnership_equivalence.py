@@ -56,15 +56,23 @@ def _capture_partnership_stats(sim):
                 duration_samples=[],
             )
             continue
-        # Mixing matrix
+        # Mixing matrix at FORMATION TIME (matches v2's age_f/age_m in
+        # to_df, which v2 stores at pair creation). edges.start_ti is the
+        # timestep when the pair formed; subtract that from current age to
+        # get age-at-formation.
+        dt_years = float(sim.t.dt)
+        ti_now = float(sim.t.ti)
         f_at_p1 = np.asarray(people.female[net.edges.p1])
         f_uids = np.where(f_at_p1, np.asarray(net.edges.p1),
                           np.asarray(net.edges.p2))
         m_uids = np.where(f_at_p1, np.asarray(net.edges.p2),
                           np.asarray(net.edges.p1))
+        years_since = (ti_now - np.asarray(net.edges.start_ti)) * dt_years
+        f_age_form = np.asarray(people.age[f_uids]) - years_since
+        m_age_form = np.asarray(people.age[m_uids]) - years_since
         bins = np.arange(0, 81, 5)
-        f_bins = np.digitize(np.asarray(people.age[f_uids]), bins) - 1
-        m_bins = np.digitize(np.asarray(people.age[m_uids]), bins) - 1
+        f_bins = np.digitize(f_age_form, bins) - 1
+        m_bins = np.digitize(m_age_form, bins) - 1
         n_bins = len(bins) - 1
         mat = np.zeros((n_bins, n_bins))
         for fb, mb in zip(f_bins, m_bins):
@@ -84,14 +92,14 @@ def _capture_partnership_stats(sim):
         max_k = max(5, int(n_per_alive.max()) + 1) if len(n_per_alive) else 5
         conc_hist = np.bincount(n_per_alive, minlength=max_k).tolist()
 
-        # Remaining partnership duration in YEARS (edges.dur is decremented
-        # each step, so it stores remaining time in timesteps; multiply by
-        # dt to match the v2 baseline-generation script's units).
-        if hasattr(net.edges, 'dur'):
-            dt_years = float(sim.t.dt)
-            durations = (np.asarray(net.edges.dur) * dt_years).tolist()
-        else:
-            durations = []
+        # Original partnership duration in YEARS at formation (matches v2's
+        # stored `dur` in to_df). edges.dur is the REMAINING duration in
+        # timesteps (decremented each step); reconstruct the original by
+        # adding elapsed time since formation.
+        remaining_ts = np.asarray(net.edges.dur)
+        elapsed_ts = ti_now - np.asarray(net.edges.start_ti)
+        original_ts = remaining_ts + elapsed_ts
+        durations = (original_ts * dt_years).tolist()
 
         out[net.layer] = dict(
             mixing_matrix=mat.tolist(),

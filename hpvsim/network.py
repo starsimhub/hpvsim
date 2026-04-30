@@ -62,6 +62,10 @@ class SexualNetwork(ss.SexualNetwork):
 
         self._dist_bin_order = ss.choice(name=f'{layer}_bin_order', replace=False)
         self._dist_f_select = ss.choice(name=f'{layer}_f_select', replace=False)
+        # Record formation timestep per edge so the partnership-equivalence
+        # test can compute age-at-formation (matching v2's age_f/age_m in
+        # to_df) and reconstruct original-duration (matching v2's stored dur).
+        self.meta.start_ti = float
 
     def _n_partners_elsewhere(self):
         """Count current partnerships each agent has in OTHER hpv.SexualNetwork
@@ -247,11 +251,13 @@ class SexualNetwork(ss.SexualNetwork):
         dur = self.pars.duration.rvs(f_uids)
         acts = self.pars.acts.rvs(f_uids)
         beta = np.ones(n_new)
+        start_ti = np.full(n_new, float(self.t.ti))
         self.append(
             p1=f_uids,
             p2=m_uids,
             beta=beta,
             dur=dur,
             acts=acts,
+            start_ti=start_ti,
         )
         return n_new
