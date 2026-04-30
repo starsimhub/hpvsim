@@ -130,19 +130,16 @@ def load_country(location):
 def _age_data(location):
     """Reshape v2's age distribution to a (age, value) long-form DataFrame.
 
-    v2 returns an ndarray of shape (N, 3) with columns
-    (age_lower, age_upper, count). We expand each [lower, upper) bin into
-    one row per integer age, with the bin count distributed evenly.
+    ``get_age_distribution`` returns an (N, 3) ndarray of
+    ``(age_lower, age_upper, count)``. v2 data is at single-year resolution
+    (age_upper == age_lower + 1), so age_lower IS the age and we don't need
+    to expand bins.
     """
     arr = _loaders.get_age_distribution(location=location)
-    rows = []
-    for row in arr:
-        age_lower, age_upper, count = float(row[0]), float(row[1]), float(row[2])
-        n_ages_in_bin = max(1, int(round(age_upper - age_lower)))
-        per_age = count / n_ages_in_bin
-        for a in range(int(age_lower), int(age_lower) + n_ages_in_bin):
-            rows.append({'age': a, 'value': per_age})
-    return pd.DataFrame(rows)
+    return pd.DataFrame({
+        'age': arr[:, 0].astype(int),
+        'value': arr[:, 2].astype(float),
+    })
 
 
 def _birth_rate(location):
@@ -160,28 +157,15 @@ def _birth_rate(location):
 
 
 def _death_rate(location):
-    """Reshape v2 death rates into ss.Deaths' default UN-style columns.
-
-    v2 returns ``{year: {sex: ndarray(M, 2) with columns (age, rate)}}``;
-    rates are fractional (per-1, not per-1000). We reshape to columns
-    ``[Time, AgeGrpStart, Sex, mx]`` (matching ss.Deaths' default metadata)
-    and multiply rate by 1000 (since ss.Deaths' default ``rate_units=1e-3``
-    expects per-1000). This keeps the Sim wiring kwarg-free — passing the
-    DataFrame to ``ss.Deaths(death_rate=df)`` Just Works.
-    """
-    raw = _loaders.get_death_rates(location=location, by_sex=True)
-    sex_label = {'f': 'Female', 'm': 'Male'}  # match ss.Deaths' default sex_keys
-    chunks = []
-    for year, sex_to_arr in raw.items():
-        for sex, arr in sex_to_arr.items():
-            arr = np.asarray(arr)
-            chunks.append(pd.DataFrame({
-                'Time': int(year),
-                'AgeGrpStart': arr[:, 0].astype(int),
-                'Sex': sex_label.get(sex, sex),
-                'mx': arr[:, 1].astype(float) * 1000.0,  # per-1 → per-1000
-            }))
-    return pd.concat(chunks, ignore_index=True)
+    """Read v2 death rates as ss.Deaths' default UN-style columns."""
+    df = _loaders.map_entries(_loaders.load_file(_loaders.files.death), location)
+    df = df[df['Sex'].isin(('Male', 'Female'))]  # drop 'Total'
+    return pd.DataFrame({
+        'Time': df['Time'].astype(int).values,
+        'AgeGrpStart': df['AgeGrpStart'].astype(int).values,
+        'Sex': df['Sex'].values,
+        'mx': df['mx'].astype(float).values * 1000.0,  # per-1 to per-1000
+    })
 
 
 def _network_pars(location):
