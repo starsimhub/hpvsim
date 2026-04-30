@@ -84,10 +84,14 @@ def _capture_partnership_stats(sim):
         max_k = max(5, int(n_per_alive.max()) + 1) if len(n_per_alive) else 5
         conc_hist = np.bincount(n_per_alive, minlength=max_k).tolist()
 
-        # Durations: current edges' dur values (proxy for sampled duration
-        # at formation; M02 can refine via tracking dissolution events).
-        durations = (np.asarray(net.edges.dur).tolist()
-                     if hasattr(net.edges, 'dur') else [])
+        # Remaining partnership duration in YEARS (edges.dur is decremented
+        # each step, so it stores remaining time in timesteps; multiply by
+        # dt to match the v2 baseline-generation script's units).
+        if hasattr(net.edges, 'dur'):
+            dt_years = float(sim.t.dt)
+            durations = (np.asarray(net.edges.dur) * dt_years).tolist()
+        else:
+            durations = []
 
         out[net.layer] = dict(
             mixing_matrix=mat.tolist(),

@@ -39,20 +39,20 @@ from . import loaders as _loaders
 
 
 class _PoissonShifted(ss.poisson):
-    """v2-style 'poisson1' distribution: scipy.stats.poisson with loc=shift.
+    """v2-style 'poisson1' distribution: ss.poisson + a constant shift.
 
-    v2's ``poisson1`` is "Poisson(rate) + 1" — i.e. every agent has at least
-    one partner. scipy.stats.poisson supports a `loc` parameter that shifts
-    the support, which we wire through Starsim's sync_pars hook.
+    v2's ``poisson1`` is "Poisson(rate) + 1" — i.e. every agent has at
+    least one partner. We override ``rvs`` to add the shift after sampling
+    rather than passing ``loc`` through to scipy, because Starsim's
+    ``sync_pars`` plumbing only propagates ``mu`` to the underlying
+    ``rv_discrete_frozen`` and a ``loc`` override is silently dropped.
     """
     def __init__(self, lam=1.0, shift=1, **kwargs):
         self._shift = shift
         super().__init__(lam=lam, **kwargs)
 
-    def sync_pars(self):
-        spars = dict(mu=self._pars.lam, loc=self._shift)
-        self.update_dist_pars(spars)
-        return spars
+    def rvs(self, *args, **kwargs):
+        return super().rvs(*args, **kwargs) + self._shift
 
 
 def _v2_dist_to_starsim(d):
