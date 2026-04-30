@@ -15,6 +15,13 @@ tests/regression_baselines/
 .idea
 .vscode
 .DS_Store
+.claude/
+
+# Calibration artifacts emitted by tests
+tests/hpvsim_calib_*.db
+
+# uv lockfile (hpvsim is a library, not an app)
+uv.lock
 
 
 # Byte-compiled / optimized / DLL files

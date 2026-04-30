@@ -7,10 +7,17 @@ Run with:
     python tests/regression/demo_anchor_hpv16.py
 """
 
+import sys
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 
 import hpvsim as hpv
-from regression.anchor_hpv16 import PARS
+
+# Make sibling anchor_hpv16.py importable when this script is invoked
+# directly (python tests/regression/demo_anchor_hpv16.py).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from anchor_hpv16 import PARS  # noqa: E402
 
 
 def main():
