@@ -280,18 +280,17 @@ def get_death_rates(location=None, by_sex=True, overall=False):
     if overall: sex_keys += ['Both sexes']
     sex_key_map = {'Male': 'm', 'Female': 'f', 'Both sexes': 'tot'}
 
-    # max_age = 99
-    # age_groups = raw_df['AgeGrpStart'].unique()
-    years = raw_df['Time'].unique()
     result = dict()
+    output_df = raw_df[['AgeGrpStart','mx']]
 
     # Processing
-    for year in years:
-        result[year] = dict()
-        for sk in sex_keys:
-            sk_out = sex_key_map[sk]
-            result[year][sk_out] = np.array(raw_df[(raw_df['Time']==year) & (raw_df['Sex']== sk)][['AgeGrpStart','mx']])
-            result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
+    for (year, sk), indices  in raw_df.groupby(["Time", "Sex"]).groups.items():
+        if sk not in sex_key_map:
+            continue
+        result.setdefault(year, dict())
+        sk_out = sex_key_map[sk]
+        result[year][sk_out] = np.array(output_df.loc[indices])
+        result[year][sk_out] = result[year][sk_out][result[year][sk_out][:, 0].argsort()]
 
     return result
 
