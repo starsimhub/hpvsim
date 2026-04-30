@@ -202,7 +202,6 @@ class SexualNetwork(ss.SexualNetwork):
         if len(f_cl) > 0:
             age_bins_f = np.digitize(age[f_cl], bins=bins) - 1
             bin_range_f, males_needed = np.unique(age_bins_f, return_counts=True)
-            # CRN-safe permutation of age-bin processing order via ss.choice.
             n_bins = len(bin_range_f)
             if n_bins > 1:
                 self._dist_bin_order.set(a=np.arange(n_bins))
