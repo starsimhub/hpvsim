@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 import starsim as ss
+import sciris as sc
+import hpvsim
 
 from hpvsim.network import SexualNetwork
 
@@ -61,11 +63,7 @@ def test_n_partners_elsewhere_counts_sibling_hpv_networks():
     assert n[4:].sum() == 0
 
 
-# --- add_pairs behavior tests (Task 6) ----------------------------------------
 
-import sciris as sc
-
-import hpvsim
 
 
 def _layered_sim(layers=('m', 'c'), n_agents=2000, n_steps=4):
