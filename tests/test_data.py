@@ -33,13 +33,20 @@ def test_birth_rate_shape():
 
 
 def test_death_rate_shape():
-    """death_rate is a DataFrame ss.Deaths(death_rate=...) accepts."""
+    """death_rate is a DataFrame ss.Deaths(death_rate=...) accepts directly.
+
+    Columns match ss.Deaths' default UN-style metadata
+    (Time, AgeGrpStart, Sex, mx); rates are per-1000 (matching default
+    rate_units=1e-3) and Sex labels are 'Female'/'Male' (matching default
+    sex_keys).
+    """
     out = hpvsim.data.load_country('nigeria')
     df = out['death_rate']
     assert isinstance(df, pd.DataFrame)
-    assert {'Year', 'AgeGrp', 'Sex', 'Rate'}.issubset(df.columns), f'columns: {df.columns.tolist()}'
+    assert {'Time', 'AgeGrpStart', 'Sex', 'mx'}.issubset(df.columns), f'columns: {df.columns.tolist()}'
     assert len(df) > 0
-    assert (df['Rate'] >= 0).all()
+    assert (df['mx'] >= 0).all()
+    assert set(df['Sex'].unique()) <= {'Female', 'Male'}
 
 
 def test_network_pars_per_layer():

@@ -15,7 +15,11 @@ import numpy as np
 import starsim as ss
 
 
-_KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
+# M01 ships defaults (beta, init_prev) tuned to HPV16 only. Other genotypes
+# (hpv18, hi5, ohr) require per-genotype natural-history params that land
+# in M02 + M03 — accepting them here without those defaults would silently
+# run with wrong values. The validation is intentionally narrow until M03.
+_KNOWN_GENOTYPES = ('hpv16',)
 
 
 # v2 default initial HPV prevalence table from
@@ -58,7 +62,9 @@ class HPV(ss.Infection):
     def __init__(self, genotype='hpv16', pars=None, **kwargs):
         if genotype not in _KNOWN_GENOTYPES:
             raise ValueError(
-                f'Unknown genotype {genotype!r}. Known: {list(_KNOWN_GENOTYPES)}.'
+                f'M01 supports genotype={list(_KNOWN_GENOTYPES)} only; '
+                f'got {genotype!r}. Other genotypes (hpv18, hi5, ohr) '
+                f'require per-genotype natural-history params that land in M03.'
             )
         self.genotype = genotype
         if 'name' not in kwargs:
@@ -106,6 +112,15 @@ class HPV(ss.Infection):
         history model HPV16 confers immunity, so each agent has at most
         one infection event recorded; M01's SIS dynamics generate
         re-infections that we exclude from this metric).
+
+        Note on initial seeding: ``ss.Infection.init_post`` calls this
+        method for the ``init_prev`` seeding at ti=0, so initial seeds
+        are counted in the first-infection accumulator (their
+        ``ti_infected`` was NaN before this call). This matches v2's
+        behavior — v2's ``date_infectious`` is also set at population
+        creation for initial-prev agents. The v2 baseline-generation
+        script computes mean age the same way, so the comparison
+        remains apples-to-apples.
         """
         super().set_prognoses(uids, sources)
         ti = self.ti

@@ -42,24 +42,15 @@ class Sim(ss.Sim):
             ]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
-            # hpv.data.load_country produces death-rate data with columns
-            # (Year, AgeGrp, Sex, Rate); ss.Deaths defaults to UN-style
-            # (Time, AgeGrpStart, Sex, mx) and rate_units=1e-3, so we pass
-            # matching metadata AND rate_units=1 (v2 mortality data is
-            # already fractional, not per-1000).
-            # Birth-rate data is [Year, CBR], matching ss.Births defaults
-            # (per-1000 — keep the default rate_units=1e-3).
-            death_metadata = dict(
-                data_cols=dict(year='Year', age='AgeGrp', sex='Sex', value='Rate'),
-                sex_keys={'f': 'f', 'm': 'm'},
-            )
+            # hpv.data.load_country produces birth_rate and death_rate in
+            # the column shapes ss.Births / ss.Deaths consume by default
+            # (Year/CBR for births; Time/AgeGrpStart/Sex/mx with sex labels
+            # 'Female'/'Male' and per-1000 rate units for deaths). No
+            # metadata override needed — the v2-to-Starsim translation is
+            # encapsulated in the adapter.
             demographics = [
                 ss.Births(birth_rate=country['birth_rate']),
-                ss.Deaths(
-                    death_rate=country['death_rate'],
-                    rate_units=1,
-                    metadata=death_metadata,
-                ),
+                ss.Deaths(death_rate=country['death_rate']),
             ]
         super().__init__(
             start=ss.years(start),

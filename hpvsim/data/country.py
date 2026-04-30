@@ -159,21 +159,27 @@ def _birth_rate(location):
 
 
 def _death_rate(location):
-    """Reshape v2 death rates into [Year, AgeGrp, Sex, Rate] long form.
+    """Reshape v2 death rates into ss.Deaths' default UN-style columns.
 
-    v2 returns ``{year: {sex: ndarray(M, 2) with columns (age, rate)}}``.
+    v2 returns ``{year: {sex: ndarray(M, 2) with columns (age, rate)}}``;
+    rates are fractional (per-1, not per-1000). We reshape to columns
+    ``[Time, AgeGrpStart, Sex, mx]`` (matching ss.Deaths' default metadata)
+    and multiply rate by 1000 (since ss.Deaths' default ``rate_units=1e-3``
+    expects per-1000). This keeps the Sim wiring kwarg-free — passing the
+    DataFrame to ``ss.Deaths(death_rate=df)`` Just Works.
     """
     raw = _loaders.get_death_rates(location=location, by_sex=True)
+    sex_label = {'f': 'Female', 'm': 'Male'}  # match ss.Deaths' default sex_keys
     rows = []
     for year, sex_to_arr in raw.items():
         for sex, arr in sex_to_arr.items():
             arr = np.asarray(arr)
             for age, rate in arr:
                 rows.append({
-                    'Year': int(year),
-                    'AgeGrp': int(age),
-                    'Sex': sex,
-                    'Rate': float(rate),
+                    'Time': int(year),
+                    'AgeGrpStart': int(age),
+                    'Sex': sex_label.get(sex, sex),
+                    'mx': float(rate) * 1000.0,  # per-1 → per-1000
                 })
     return pd.DataFrame(rows)
 
