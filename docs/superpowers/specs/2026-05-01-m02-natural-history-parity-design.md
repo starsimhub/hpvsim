@@ -1,0 +1,449 @@
+# M02: Natural History Parity — Design
+
+**Date:** 2026-05-01
+**Milestone:** M02 (Natural history parity)
+**Branch:** `m02-natural-history-parity` (off `v3.0-dev`, after M01 PR merges)
+**Predecessor:** [M01 Basic Transmission Sim](2026-04-28-hpvsim-m1-basic-transmission-design.md)
+**Status:** Draft pending implementation plan
+
+---
+
+## Goal
+
+Bring HPV16 natural history into the v3 disease module: precancerous infection
+(precin), cervical intraepithelial neoplasia (CIN), invasive cancer, and cancer
+death. The single-genotype HPV16 trajectory must match v2.x's HPV16-only run
+within the regression-gate tolerance against a v2 1-genotype baseline.
+
+M02 also picks up the auxiliary plumbing required for natural-history results
+to be epidemiologically meaningful at multi-decade horizons: population
+scaling (`pop_scale` / `total_pop`), age-specific migration, and a
+minimum-scope `age_results` analyzer for cancer incidence (the M04 calibration
+target).
+
+This milestone is the headline natural-history work for v3. Multi-genotype
+dynamics and cross-immunity are deferred to M03; calibration to M04.
+
+## Scope
+
+**In scope:**
+- Disease progression for HPV16 inside `hpv.HPV(ss.Infection)`: precin/CIN/cancer
+  states, full-trajectory sampling at infection time, scheduled state
+  transitions, cancer-caused death.
+- `hpv.AgeResults(ss.Analyzer)` — minimum-scope analyzer producing
+  age-stratified cancer incidence for M04 calibration consumption.
+- `pop_scale` / `total_pop` plumbing through `hpv.SimPars`.
+- `hpv.AgeMigration(ss.Demographics)` — age-specific net-migration adapter
+  ported from v2's `_v2_legacy/people.py:check_migration`.
+- Slimming `hpvsim/parameters.py` to the starsimhub-conventional shape
+  (`SimPars`, `GenotypePars`); migrating remaining v2 content to
+  `_v2_legacy/parameters.py` or to data files.
+- Auditing `hpvsim/utils.py`: replacing v2 helpers with starsim-native
+  equivalents where they exist; quarantining the rest.
+- Extended regression coverage: 8-metric `short_summary` parity gate; new
+  capability test for age-stratified cancer trajectories; unit tests for
+  vendored progression math; analyzer smoke test.
+- Re-running the M01 partnership-equivalence test to confirm the network gates
+  still hold (or have tightened) once age-specific migration changes the
+  population composition.
+
+**Explicitly out of scope (deferred):**
+- Multi-genotype dynamics, cross-immunity (M03).
+- Calibration loop (M04).
+- Vaccination, screening, treatment, dynamic_pars (M05+).
+- Multiscale dynamic agent spawning. v2 spawns extra cancer agents in
+  `set_prognoses` to amplify rare events; v3 uses simple multiplicative
+  `pop_scale` only. **Tracking issue (M02):** revisit before v3.0.0 if the
+  natural-history acceptance test exhibits high-variance tails on cancer
+  metrics.
+- Network-equivalence tightening beyond M01's 50% gate. M02 only re-measures
+  to detect drift. If the gate is still loose post-M02, a follow-up issue is
+  filed; production-network tightening + the `LegacyV2SexualNetwork` parity
+  test land in a later milestone branch.
+- Sex-specific initial prevalence — already implemented in M01
+  (`hpvsim/hpv.py:_INIT_HPV_PREV_M`/`_F`). Listed here only to note completion.
+- All other analyzers (`snapshot`, `age_pyramid`, `age_causal_infection`,
+  `dalys`) — M09.
+
+---
+
+## Architecture
+
+### Disease module: `hpv.HPV(ss.Infection)`
+
+Trajectory-based natural history, lifted directly from v2's
+`_v2_legacy/people.py:set_prognoses` algorithm and translated to starsim's
+standard `set_prognoses` / `step_state` / `step_die` shape (per
+[starsim disease pattern 2: SEIR with exposed state](
+https://docs.starsim.org/) — same lifecycle, more compartments). Single
+class, single file.
+
+**Why trajectory-based, not per-step Markov:** v2's `cancer_fn = cin_integral`
+is a function of the *full* `dur_cin` duration, i.e. an integral over the
+trajectory; per-step transition hazards would diverge mathematically from v2.
+Trajectory sampling at infection time matches v2 algorithmically.
+
+**New states (`define_states`):**
+
+| Kind | Name | Purpose |
+|---|---|---|
+| `BoolState` | `precin` | Precancerous infection compartment |
+| `BoolState` | `cin` | Cervical intraepithelial neoplasia |
+| `BoolState` | `cancerous` | Invasive cancer (no longer infectious) |
+| `FloatArr` | `ti_cin` | Scheduled time of CIN onset |
+| `FloatArr` | `ti_cancerous` | Scheduled time of invasive cancer onset |
+| `FloatArr` | `ti_dead_cancer` | Scheduled time of cancer-caused death |
+| `FloatArr` | `dur_precin` | Sampled per-agent precin duration (kept for analyzers/diagnostics) |
+| `FloatArr` | `dur_cin` | Sampled per-agent CIN duration |
+
+M01 states preserved: `infected`, `susceptible`, `ti_infected`,
+`ti_first_infection`, `ti_clearance`. SIS clearance path remains as the
+"cleared without progression" branch.
+
+**New pars (`define_pars`):**
+
+| Par | Source (v2) | Type |
+|---|---|---|
+| `dur_precin` | `parameters.py:337` lognormal(par1=3, par2=9) | `ss.lognorm_ex` |
+| `dur_cin` | `parameters.py:339` lognormal(par1=5, par2=20) | `ss.lognorm_ex` |
+| `dur_cancer` | `parameters.py:96` lognormal(par1=8, par2=3) | `ss.lognorm_ex` |
+| `cin_fn` | `parameters.py:338` `dict(form='logf2', k=0.3, x_infl=0, ttc=50)` | dict |
+| `cancer_fn` | `parameters.py:340` `dict(method='cin_integral', transform_prob=2e-3)` | dict |
+
+**`set_prognoses(uids, sources)` — trajectory sampling:**
+
+```
+super().set_prognoses(uids, sources)   # M01: infected/ti_infected/ti_first_infection
+1. dur_precin = pars.dur_precin.rvs(uids)
+2. precin[uids] = True
+3. p_cin = compute_severity(dur_precin, cin_fn)
+4. cin_uids = uids subset where bernoulli(p_cin) AND female
+5. nocin_uids = uids \ cin_uids                 # incl. all males
+   ti_clearance[nocin_uids] = ti + dur_precin[nocin_uids]
+
+For cin_uids:
+  ti_cin[cin_uids] = ti + dur_precin[cin_uids]
+  dur_cin = pars.dur_cin.rvs(cin_uids)
+  p_cancer = compute_severity(dur_cin, cancer_fn)        # cin_integral
+  cancer_uids = cin_uids subset where bernoulli(p_cancer)
+  nocancer_uids = cin_uids \ cancer_uids
+  ti_clearance[nocancer_uids] = ti_cin + dur_cin[nocancer_uids]
+
+  For cancer_uids:
+    ti_cancerous = ti_cin + dur_cin
+    dur_cancer = pars.dur_cancer.rvs(cancer_uids)
+    ti_dead_cancer = ti_cancerous + dur_cancer
+```
+
+**Sex specificity:** CIN and cancer are female-only in v2. Males in
+`set_prognoses` go directly into the SIS branch and clear after `dur_precin`.
+
+**`step_state()` — execute scheduled transitions:**
+
+```
+# (existing M01 SIS clearance path, on infected & not progressing)
+cleared = self.infected & self.precin & ~self.cin & ~self.cancerous \
+          & (self.ti_clearance <= self.ti)
+flip cleared agents back to susceptible; reset precin
+
+# Progression transitions
+to_cin = self.precin & (self.ti_cin <= self.ti)
+flip: precin = False; cin = True
+
+to_cancerous = self.cin & (self.ti_cancerous <= self.ti)
+flip: cin = False; cancerous = True
+      infected = False; susceptible = False    # cancer agents not re-infectable
+self.rel_trans[to_cancerous] = 0               # and no longer transmitting
+
+to_dead = self.cancerous & (self.ti_dead_cancer <= self.ti)
+sim.people.request_death(to_dead)   # standard starsim cancer-death wiring
+```
+
+**`step_die(uids)`:** call `super()`, then reset `precin`, `cin`, `cancerous`,
+plus M01's `infected`/`susceptible` if not already handled by parent. Required
+for any custom `BoolState` per starsim disease pattern 3.
+
+**Cancer-death mechanism:** `sim.people.request_death(uids)` — disease-caused
+death goes through People's death pipeline. `ss.Deaths` continues to handle
+background mortality independently.
+
+### Vendored progression math
+
+`compute_severity`, `compute_severity_integral`, `logf2`, `cancer_fn ==
+cin_integral` — these are HPV-specific math functions, not generic utilities.
+They live as private module-level functions inside `hpv.py`. If `hpv.py`
+exceeds ~400 LOC during implementation, they get split into a sibling
+`hpvsim/_progression.py`; that's a judgment call during execution, not a
+gate.
+
+Source: v2's `hpvsim/parameters.py:685` (`compute_severity`),
+`hpvsim/utils.py:101` (`logf2`), `hpvsim/utils.py:193` (`transform_prob`).
+
+### Sim parameters: `hpvsim/parameters.py`
+
+Rewrite to the starsimhub-conventional slim shape (mirrors
+`stisim/parameters.py`, `fpsim/parameters.py`):
+
+```python
+class SimPars(ss.SimPars):
+    """HPV-specific defaults on top of ss.SimPars."""
+    # n_agents, total_pop, pop_scale, location, start, stop, dt, rand_seed, etc.
+
+class GenotypePars(ss.Pars):
+    """Per-genotype natural-history pars.
+    M02: HPV16 only. M03 wires hpv18 / hi5 / ohr defaults."""
+    # dur_precin, cin_fn, dur_cin, cancer_fn, rel_beta, sero_prob
+
+genotype_aliases = {'hpv16': ['hpv16', '16'], ...}   # carried from v2
+
+def get_genotype_pars(genotype='hpv16') -> GenotypePars:
+    """Factory for per-genotype defaults; M03 multi-genotype consumer."""
+```
+
+The 845-LOC v2 file's content is partitioned:
+- M02-relevant pars (HPV16 progression, sim defaults) → migrate into
+  `SimPars` / `GenotypePars`.
+- Pure data (regional pars, partner-mixing matrices) → migrate to
+  `hpvsim/data/` JSON or CSV files alongside existing country data.
+- Future-milestone content (intervention defaults, calibration pars) →
+  `_v2_legacy/parameters.py` for porters in M05+.
+
+`GenotypePars` (vs. inlining everything into `HPV.define_pars`) is the right
+shape for M03's `hpv.Sim(genotypes=[...])` factory: M03 wants to look up
+per-genotype defaults from a structured object, not parse `hpv.HPV.pars`
+defaults.
+
+### Utilities: `hpvsim/utils.py`
+
+Audit step: replace v2 helpers with starsim-native equivalents where they
+exist; keep what genuinely has no starsim counterpart; quarantine the rest.
+
+| v2 helper | Replacement |
+|---|---|
+| `hpu.binomial_arr`, `hpu.sample` | `ss.bernoulli`, `ss.lognorm_ex`, `ss.choice` (some already migrated in M01) |
+| `hpu.true`, `hpu.false`, `hpu.itrue` | starsim `BoolArr.uids` / `.notnan` patterns |
+| `hpu.set_seed` | sim-level seed via `ss.options` / `ss.Sim(rand_seed=...)` |
+| `hpu.invlogit`, `hpu.logf2`, `hpu.transform_prob` | colocate with `hpv.py` (HPV-specific math, not generic) |
+| Helpers without starsim equivalents | keep in `utils.py` |
+
+Target: `hpvsim/utils.py` ends M02 at <100 LOC.
+
+### Population scaling
+
+`SimPars.total_pop` (target real-world population the agents represent) and
+`SimPars.pop_scale = total_pop / n_agents` (computed at init). Applied as a
+multiplicative result-scaling factor on cumulative outcomes (cancers, cancer
+deaths, infections). No multiscale dynamic agent spawning; that branch of
+v2's `set_prognoses` is dropped.
+
+Mirrors stisim's `SimPars`:
+
+```python
+self.total_pop = None   # If defined, used for calculating the scale factor
+self.pop_scale = None   # How much to scale the population
+```
+
+### Demographics: `hpv.AgeMigration(ss.Demographics)`
+
+Small adapter porting v2's `_v2_legacy/people.py:check_migration` against the
+existing `hpvsim/data/` country files (already loaded by M01's `country.py`
+adapter). Sits alongside `ss.Births` and `ss.Deaths` already wired in M01.
+Adds/removes agents per age band each step to track a target age pyramid.
+Required for multi-decade demographic realism when computing cancer incidence
+rates.
+
+### Analyzer: `hpv.AgeResults(ss.Analyzer)`
+
+Lives in new `hpvsim/analyzers.py`. Class-based (multi-year snapshots + state
+is cleaner than function-based per starsim analyzer conventions).
+
+```python
+class AgeResults(ss.Analyzer):
+    def __init__(self, results=('cancer',), age_bins=None, year=None, **kwargs):
+        # age_bins: default 5-year bins 0-100
+        # year: scalar or list of report years
+        # results: M02 default and only validated key is 'cancer';
+        #   additional keys ('cins', 'hpv') are accepted for M04+ extension.
+
+    def init_post(self):
+        # allocate (n_years × n_bins) result arrays, register as ss.Result.
+
+    def step(self):
+        # if self.ti.year matches a requested year → bin agents by age,
+        # count new cancers in [year-1, year] window per bin → divide by
+        # n_alive females per bin → store as incidence-per-100k.
+```
+
+**Output:** `sim.results.age_results.cancer_incidence_by_age` — `(n_years,
+n_bins)` array, units cases per 100k female-years. Mirrors v2's
+`cancer_incidence_by_age` for M04 calibration consumption.
+
+### Public API impact
+
+`hpvsim/__init__.py` already does `from . import parameters` and `from .
+import utils`. No active v3 module currently imports symbols from either
+(M01's hpv.py only references `parameters.py` in doc comments), so the
+parameters/utils slimming has zero internal-refactor surface. Add
+`from .parameters import SimPars, GenotypePars` and
+`from .analyzers import AgeResults` for ergonomics.
+
+---
+
+## Validation gates
+
+Following migration plan §Implementation conventions item 2 (dual validation
+gates).
+
+### Development gate (per PR / per merge to milestone branch)
+
+Anchor scenario: same as M01 — `tests/regression/anchor_hpv16.py`,
+single-genotype HPV16, Nigeria, fixed seed 0, no interventions, 1990–2060.
+With M02 the natural-history machinery is on, so the cancer-related summary
+metrics populate non-zero.
+
+**Pinned summary set (8 metrics + total population):** matches v2's
+`compute_summary` (`_v2_legacy/sim.py:1179`).
+
+| Metric | M01 value | M02 expectation |
+|---|---|---|
+| total HPV infections | tracked | tracked |
+| total cancers | 0 (not modeled) | non-zero, ±10% vs. v2 baseline |
+| total cancer deaths | 0 | non-zero, ±10% vs. v2 baseline |
+| mean HPV prevalence (%) | tracked | tracked |
+| mean cancer incidence (per 100k) | 0 | non-zero, ±10% vs. v2 baseline |
+| mean age of infection (years) | tracked | tracked |
+| mean age of cancer (years) | undefined | non-zero, ±10% vs. v2 baseline |
+| mean age of cancer death (years) | undefined | non-zero, ±10% vs. v2 baseline |
+| total population | tracked | tracked |
+
+**Threshold:** ±10% relative drift per metric. Informational, not
+auto-blocking, per migration convention 2 — on failure the PR carries either
+a fix or an explicit drift-classification note + tracking issue for
+re-convergence.
+
+**Baseline regeneration:** v2 baseline (`tests/regression_baselines/anchor.json`)
+regenerated locally against v2.3 by running `tests/regression/baseline.py`
+inside the v2.3 environment. Baseline files stay gitignored per migration
+plan §Branching and sync strategy.
+
+### Capability test (M02-specific)
+
+Age-stratified **cumulative cancers + cancer deaths at end-of-sim** by 5-year
+age band against the v2 baseline, ±10% per band. This is the tightest gate
+for "natural history parity" and feeds M04's calibration target. Uses the
+new `AgeResults` analyzer to produce both v2 and v3 cuts.
+
+### Release gate
+
+Per migration plan: overlapping uncertainty intervals against the
+analysis-repo suite. Not exercised at M02 — that's M04+ once calibration
+exists. M02's release-gate contribution is "natural history is in place so
+the calibration loop has something to optimize."
+
+### Network re-measure (M01 follow-up)
+
+Re-run `tests/test_partnership_equivalence.py` from M01 unchanged. Three
+outcomes:
+
+| Outcome | Action |
+|---|---|
+| Gates still pass at the M01 50% threshold | Document in M02 PR; close out the M02 network-tightening note as "no regression, follow-up not needed yet." |
+| Gates tighten on their own (lower drift) | Document the new measurements; consider tightening the threshold in M03 once re-measured under multi-genotype. |
+| Gates loosened or fail | Block merge until investigated. The M02 changes that *could* affect network metrics are: (a) age-specific migration alters the pool of pair-eligible agents over time; (b) `parameters.py` refactor — if anything network-related accidentally moved. |
+
+---
+
+## Tests
+
+| Test | Type | Status |
+|---|---|---|
+| `tests/regression/anchor_hpv16.py` `run_and_summarize()` | Extended (3 → 8 metrics) | Modified |
+| `tests/regression/baseline.py` | Unchanged code; rerun against v2.3 env | Unmodified |
+| `tests/test_regression.py` | ±10% drift gate, covers extended summary | Unmodified |
+| `tests/test_partnership_equivalence.py` | M01 network re-measure | Unmodified |
+| `tests/test_natural_history.py` | New — capability test (age-stratified cumulative cancers/deaths) + lifecycle smoke (single-agent trajectory through precin → cin → cancerous → dead) | New |
+| `tests/test_progression_math.py` | New — unit tests for `compute_severity`, `logf2`, `cin_integral`. Pinned outputs against v2 (one-shot fixture from v2.3 env, checked in) | New |
+| `tests/test_analyzers.py` | New — `AgeResults` smoke + scaling test | New |
+
+Demo: `tests/regression/demo_anchor_hpv16.py` extended with CIN-prevalence
+and cancer-incidence-by-year trajectories alongside the existing prevalence
+plot.
+
+---
+
+## Sub-task ordering
+
+CI must be green at every commit (migration convention 1). Phases below are
+ordered to maintain that invariant — plumbing first, then progression on top
+of plumbing, then validation last.
+
+**Branching prerequisite:** open M01 PR (`m01-basic-transmission-sim` →
+`v3.0-dev`) and wait for merge before starting M02. Then:
+`git checkout v3.0-dev && git pull && git checkout -b m02-natural-history-parity`.
+
+| Phase | Sub-task | Purpose |
+|---|---|---|
+| **A. Slim plumbing** | A1 | Rewrite `parameters.py` → `SimPars` + `GenotypePars`; migrate v2 content to `_v2_legacy/parameters.py` or `data/`. |
+| | A2 | Audit `utils.py`; replace with starsim-native helpers; quarantine remainder. |
+| **B. Progression** | B1 | Vendor progression-math helpers (`compute_severity`/`logf2`/`cin_integral`) inside `hpv.py`. |
+| | B2 | Add new states (`precin`/`cin`/`cancerous` + `ti_*` + `dur_*`) and pars to `hpv.HPV`. |
+| | B3 | Implement trajectory sampling in `set_prognoses`. |
+| | B4 | Implement progression transitions in `step_state`. |
+| | B5 | Update `step_die` to reset all new BoolStates. |
+| | B6 | Thread `total_pop` / `pop_scale` through `SimPars`; apply to result-scaling. |
+| **C. Demographics** | C1 | `hpv.AgeMigration(ss.Demographics)` adapter. |
+| **D. Analyzer** | D1 | `hpvsim/analyzers.py` with `hpv.AgeResults` (cancer-only). |
+| **E. Validation** | E1 | Extend `anchor_hpv16.run_and_summarize()` to 8 metrics. |
+| | E2 | Regenerate v2 baseline locally against v2.3 env. |
+| | E3 | Add `tests/test_natural_history.py` (capability + smoke). |
+| | E4 | Add `tests/test_progression_math.py` (unit math). |
+| | E5 | Add `tests/test_analyzers.py` (AgeResults smoke). |
+| | E6 | Re-run `tests/test_partnership_equivalence.py`; document outcome. |
+| **F. Close-out** | F1 | Extend `demo_anchor_hpv16.py` with CIN/cancer trajectories. |
+| | F2 | Open M02 PR to `v3.0-dev`. |
+
+---
+
+## Definition of done
+
+- All sub-tasks A1–F2 complete.
+- CI green; runnability invariant (`hpv.Sim().run()` works) holds at every
+  commit per migration convention 1.
+- Anchor regression passes ±10% per metric on the 8-metric `short_summary` +
+  total population, OR PR carries an explicit drift-classification note +
+  tracking issue per migration convention 2.
+- Capability test (age-stratified cumulative cancers/deaths) passes ±10% per
+  5-yr band.
+- Partnership-equivalence test re-run; outcome documented in PR.
+- Tracking issues filed for:
+  - Multiscale dynamic-spawning revisit before v3.0.0 (acceptance: assess
+    cancer-metric tail variance under M02 acceptance run; if unacceptable,
+    reintroduce v2's spawning branch in a later milestone).
+  - Any subclass-first delegations introduced (per migration convention 3,
+    must strip before M10).
+  - M02 network-tightening follow-up if E6 found gates still loose at 50%.
+
+---
+
+## Open questions / follow-ups
+
+- **`hpv.py` size:** if it crosses ~400 LOC during B-phase, split progression
+  math into `hpvsim/_progression.py`. Judgment call during execution, not a
+  pre-commit gate.
+- **Cancer-death wiring:** `sim.people.request_death(uids)` is the assumed
+  pattern from starsim disease conventions. If implementation discovers a
+  cleaner starsim idiom (e.g., setting `ti_dead` on a built-in `ss.Disease`
+  field that `step_die` picks up automatically), use that and amend this
+  spec.
+- **Age-specific migration data shape:** v2's `check_migration` reads net
+  migration rates per age band per location. Expected to live alongside
+  existing `hpvsim/data/` country files; concrete data-file format settled
+  during C1 implementation.
+- **Lognormal parametrization mapping:** v2 declares durations as
+  `dict(dist='lognormal', par1=X, par2=Y)` consumed by `hpu.sample`; M01
+  uses `ss.lognorm_ex(mean=...)`. The exact translation
+  (par1=mean+par2=std vs. par1=μ+par2=σ on the log scale) must be
+  confirmed against v2's `hpu.sample` implementation during B2 to keep
+  the v2 baseline comparison apples-to-apples. If the v2 parametrization
+  is μ/σ on the log scale, use `ss.lognorm_im(meanlog=..., sigmalog=...)`
+  instead of `ss.lognorm_ex`.
