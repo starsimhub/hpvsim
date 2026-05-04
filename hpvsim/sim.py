@@ -57,6 +57,10 @@ class Sim(ss.Sim):
         # sim.init()) will set pop_scale = total_pop / n_agents when total_pop
         # is given, or pop_scale = 1.0 when it is None.
         self._total_pop = total_pop
+        # Store location so demographic modules (e.g. AgeMigration) can load
+        # country data during their init_pre without needing it passed as a
+        # constructor argument.
+        self.location = location.lower()
         super().__init__(
             start=ss.years(start),
             stop=ss.years(stop),
