@@ -20,20 +20,19 @@ def test_unknown_layer_rejected():
         SexualNetwork(layer='x')
 
 
-def test_n_partners_elsewhere_with_no_siblings_returns_zeros():
-    """One-layer-only sim: helper returns all zeros."""
+def test_other_layer_partner_uids_with_no_siblings_returns_empty():
+    """One-layer-only sim: helper returns no UIDs."""
     net = SexualNetwork(layer='m')
     sim = ss.Sim(networks=[net], n_agents=200, diseases=None,
                  dur=ss.years(1), dt=ss.years(0.5), verbose=0,
                  copy_inputs=False)
     sim.init()
-    n = net._n_partners_elsewhere()
-    assert n.shape == (len(sim.people),)
-    assert (n == 0).all()
+    other = net._other_layer_partner_uids()
+    assert len(other) == 0
 
 
-def test_n_partners_elsewhere_filters_non_hpv_networks():
-    """An ss.RandomNet sibling should NOT be counted."""
+def test_other_layer_partner_uids_filters_non_hpv_networks():
+    """An ss.RandomNet sibling should NOT contribute UIDs."""
     hpv_m = SexualNetwork(layer='m')
     rand = ss.RandomNet(n_contacts=5)
     sim = ss.Sim(networks=[hpv_m, rand], n_agents=200, diseases=None,
@@ -41,12 +40,12 @@ def test_n_partners_elsewhere_filters_non_hpv_networks():
                  copy_inputs=False)
     sim.init()
     sim.run_one_step()
-    n = hpv_m._n_partners_elsewhere()
-    assert (n == 0).all(), \
-        f'isinstance filter failed - {n.sum()} non-zero entries from non-hpv siblings'
+    other = hpv_m._other_layer_partner_uids()
+    assert len(other) == 0, \
+        f'isinstance filter failed - {len(other)} UIDs leaked from non-hpv siblings'
 
 
-def test_n_partners_elsewhere_counts_sibling_hpv_networks():
+def test_other_layer_partner_uids_picks_up_sibling_hpv_networks():
     """A sibling SexualNetwork instance contributes its edge endpoints."""
     hpv_m = SexualNetwork(layer='m')
     hpv_c = SexualNetwork(layer='c')
@@ -59,9 +58,8 @@ def test_n_partners_elsewhere_counts_sibling_hpv_networks():
                  dur=np.array([10.0, 10.0]),
                  acts=np.array([100, 100]),
                  start_ti=np.array([0.0, 0.0]))
-    n = hpv_m._n_partners_elsewhere()
-    assert n[0] == 1 and n[1] == 1 and n[2] == 1 and n[3] == 1
-    assert n[4:].sum() == 0
+    other = hpv_m._other_layer_partner_uids()
+    assert set(np.asarray(other).tolist()) == {0, 1, 2, 3}
 
 
 

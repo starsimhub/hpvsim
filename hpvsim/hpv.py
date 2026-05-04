@@ -99,6 +99,9 @@ class HPV(ss.Infection):
         at ti=0 — matching v2's ``date_infectious`` behavior for initial
         prevalence and keeping the v2-baseline comparison apples-to-apples.
         """
+        # ss.Infection.set_prognoses just appends to the infection_log if it's
+        # enabled in pars (off by default); does not touch states. We set the
+        # infection states explicitly below.
         super().set_prognoses(uids, sources)
         ti = self.ti
         # Record first-ever infection time only for agents whose

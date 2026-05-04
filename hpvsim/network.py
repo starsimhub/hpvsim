@@ -60,6 +60,12 @@ class SexualNetwork(ss.SexualNetwork):
                         label='Desired partner count for this layer'),
         )
 
+        # CRN-safe shuffle/sampling streams used inside add_pairs (one stream
+        # per layer instance, so cross-layer order doesn't couple their RNG):
+        # _dist_bin_order: shuffles the order in which female age-bins are
+        #     processed when forming pairs (matches v2's randomized loop order).
+        # _dist_f_select: when there aren't enough males in the male age-bin
+        #     to satisfy a female bin, picks the female subset to drop.
         self._dist_bin_order = ss.choice(name=f'{layer}_bin_order', replace=False)
         self._dist_f_select = ss.choice(name=f'{layer}_f_select', replace=False)
         # Record formation timestep per edge so the partnership-equivalence
@@ -67,21 +73,21 @@ class SexualNetwork(ss.SexualNetwork):
         # to_df) and reconstruct original-duration (matching v2's stored dur).
         self.meta.start_ti = float
 
-    def _n_partners_elsewhere(self):
-        """Count current partnerships each agent has in OTHER hpv.SexualNetwork
-        layers. Returns an int array sized at the underlying agent storage
-        (covers all live UIDs); used by add_pairs for cross-layer concurrency.
-        Filtered to ``hpv.SexualNetwork`` siblings via ``isinstance`` so
+    def _other_layer_partner_uids(self):
+        """ss.uids of agents currently partnered in any OTHER hpv.SexualNetwork
+        layer. Filtered to ``hpv.SexualNetwork`` siblings via ``isinstance`` so
         non-sexual networks (e.g., maternal, environmental) don't contribute.
+        Used by ``add_pairs`` to gate cross-layer concurrency.
         """
-        n_uids = len(self.partners_target.raw)
-        n = np.zeros(n_uids, dtype=int)
+        endpoints = []
         for other in self.sim.networks():
             if other is self or not isinstance(other, SexualNetwork) or len(other) == 0:
                 continue
-            n[other.edges.p1] += 1
-            n[other.edges.p2] += 1
-        return n
+            endpoints.append(other.edges.p1)
+            endpoints.append(other.edges.p2)
+        if not endpoints:
+            return ss.uids()
+        return ss.uids(np.unique(np.concatenate(endpoints)))
 
     def _init_partners_target(self, people):
         """Sample each agent's desired partner count for this layer, and
@@ -95,7 +101,7 @@ class SexualNetwork(ss.SexualNetwork):
         birth. Debut is sampled into the parent ss.SexualNetwork's ``debut``
         FloatArr at the same time.
         """
-        unset_alive = (people.alive & self.partners_target.isnan).uids
+        unset_alive = self.partners_target.isnan.uids
         if not len(unset_alive):
             return
         is_female = people.female[unset_alive]
@@ -112,18 +118,20 @@ class SexualNetwork(ss.SexualNetwork):
         self.participant[unset_alive] = True
 
     def _own_n_partners(self):
-        """Number of edges in *this* layer touching each currently-alive agent.
+        """Per-UID count of own-layer edges, restricted to agents who have
+        any.
 
-        Returns an int array indexed in the same UID space as the network's
-        ``partners_target`` FloatArr — i.e., the underlying agent storage
-        size, which always covers all live UIDs.
+        Returns ``(uids, counts)``: ``ss.uids`` of agents with at least one
+        edge in this layer, and an int ndarray of their edge counts (in the
+        same order). Used by ``add_pairs`` to identify agents at or above
+        their per-layer ``partners_target``.
         """
-        n_uids = len(self.partners_target.raw)
-        n = np.zeros(n_uids, dtype=int)
-        if len(self.edges.p1):
-            np.add.at(n, np.asarray(self.edges.p1), 1)
-            np.add.at(n, np.asarray(self.edges.p2), 1)
-        return n
+        if not len(self.edges.p1):
+            return ss.uids(), np.array([], dtype=int)
+        endpoints = np.concatenate([np.asarray(self.edges.p1), np.asarray(self.edges.p2)])
+        partnered = ss.uids(np.unique(endpoints))
+        counts = np.bincount(endpoints)[partnered]
+        return partnered, counts
 
     def add_pairs(self):
         """Form new partnerships in this layer for one timestep.
@@ -133,7 +141,7 @@ class SexualNetwork(ss.SexualNetwork):
 
         - lno (layer index) -> self.layer (informational only)
         - current_partners[lno, :] count -> self._own_n_partners()
-        - current_partners[other_layers, :].any(axis=0) -> self._n_partners_elsewhere() > 0
+        - current_partners[other_layers, :].any(axis=0) -> self._other_layer_partner_uids()
         - current_partners updates -> self.append(...)
         - cluster (multi-cluster on hpvsim.People) -> single cluster on stock ss.People
 
@@ -145,42 +153,48 @@ class SexualNetwork(ss.SexualNetwork):
             return
 
         people = self.sim.people
-        n_agents = len(people)
 
         # Sample desired partner count for any agent that doesn't have one
         # yet (covers initial population AND newly-born agents on subsequent
         # timesteps).
         self._init_partners_target(people)
 
-        # All per-uid masks below are full-storage bool ndarrays (same shape
-        # as partners_target.raw), so they index cleanly into edges and uids.
-        is_female = people.female.raw
-        active_mask = self.active(people).raw
-        f_active = is_female & active_mask
-        m_active = ~is_female & active_mask
-        underpartnered = self._own_n_partners() < self.partners_target.raw
-        n_uids = len(self.partners_target.raw)
+        # Eligible-for-new-partnership = active in this layer AND wants any
+        # partners (``partners_target > 0``; v2's casual layer uses a plain
+        # ``poisson`` so a large fraction of agents draw target=0) AND
+        # own-layer edge count is below target. ``self.active(people)`` is
+        # alive-filtered; ``.asnew()`` is the BoolArr-preserving copy
+        # (``.copy()`` would downgrade to a plain ndarray).
+        eligible = (self.active(people) & (self.partners_target > 0)).asnew()
+        own_uids, own_counts = self._own_n_partners()
+        if len(own_uids):
+            saturated = own_uids[own_counts >= self.partners_target[own_uids]]
+            eligible[saturated] = False
 
-        # Cross-layer concurrency eligibility (mirror v2 lines 318-326).
-        # In v2 every layer has its own current_partners row; we use the
-        # SexualNetwork-only sibling count, which is equivalent for M01.
-        # cross_layer is an ss.prob (annual); .to_prob(dt) converts to a
+        # Cross-layer concurrency eligibility (mirror v2 lines 318-326). Of
+        # agents currently partnered in OTHER hpv.SexualNetwork layers, only
+        # those who pass the per-step cross_layer probability remain eligible.
+        # cross_layer is an ss.prob (annual); ``.to_prob(dt)`` converts to a
         # dt-correct per-step probability (mirrors v2 sim step lines 461-469).
         dt = self.t.dt
-        f_cross_p = self.pars.cross_layer['f'].to_prob(dt)
-        m_cross_p = self.pars.cross_layer['m'].to_prob(dt)
-        n_elsewhere = self._n_partners_elsewhere()
-        other_partners = n_elsewhere > 0
-        f_with_other = (other_partners & is_female).nonzero()[0]
-        m_with_other = (other_partners & ~is_female).nonzero()[0]
-        f_cross_inds = hpu.binomial_filter(f_cross_p, f_with_other)
-        m_cross_inds = hpu.binomial_filter(m_cross_p, m_with_other)
-        cross_layer_bools = np.zeros(n_uids, dtype=bool)
-        cross_layer_bools[f_cross_inds] = True
-        cross_layer_bools[m_cross_inds] = True
+        other_uids = self._other_layer_partner_uids()
+        if len(other_uids):
+            other_is_female = np.asarray(people.female[other_uids])
+            other_f = other_uids[other_is_female]
+            other_m = other_uids[~other_is_female]
+            f_cross_p = self.pars.cross_layer['f'].to_prob(dt)
+            m_cross_p = self.pars.cross_layer['m'].to_prob(dt)
+            f_winners = hpu.binomial_filter(f_cross_p, other_f)
+            m_winners = hpu.binomial_filter(m_cross_p, other_m)
+            cross_winners = np.concatenate([f_winners, m_winners])
+            cross_losers = ss.uids(np.setdiff1d(other_uids, cross_winners))
+            eligible[cross_losers] = False
 
-        f_eligible = f_active & underpartnered & (~other_partners | cross_layer_bools)
-        m_eligible = m_active & underpartnered & (~other_partners | cross_layer_bools)
+        # Split eligible by sex.
+        elig_uids = eligible.uids
+        elig_is_female = np.asarray(people.female[elig_uids])
+        f_eligible_uids = elig_uids[elig_is_female]
+        m_eligible_uids = elig_uids[~elig_is_female]
 
         # Bin participants by age (mirror v2 lines 330-339).
         # layer_probs is a dict with annual ss.prob arrays for f/m and a
@@ -188,24 +202,26 @@ class SexualNetwork(ss.SexualNetwork):
         bins = self.pars.layer_probs['bins']
         f_part_p = self.pars.layer_probs['f'].to_prob(dt)
         m_part_p = self.pars.layer_probs['m'].to_prob(dt)
-        age = people.age.raw
-        m_eligible_inds = m_eligible.nonzero()[0]
-        m_participants = hpu.participation_filter(
-            m_eligible_inds, age, m_part_p, bins=bins,
-        )
+        age = people.age
+        m_participants = ss.uids(hpu.participation_filter(
+            m_eligible_uids, age, m_part_p, bins=bins,
+        ))
         if len(m_participants) == 0:
             return  # no males available for pairing in any age bin
 
         age_bins_m = np.digitize(age[m_participants], bins=bins) - 1
-        m_probs = np.ones(n_uids)  # equal initial weighting (v2 line 343)
 
         # Single-cluster handling: stock ss.People has no cluster array.
         # v2's loop `for cl in cluster_range` collapses to one iteration;
         # add_mixing[cl, cluster[m_participants]] reduces to a constant 1.
-        f_eligible_inds = f_eligible.nonzero()[0]
-        f_cl = hpu.participation_filter(
-            f_eligible_inds, age, f_part_p, bins=bins,
-        )
+        f_cl = ss.uids(hpu.participation_filter(
+            f_eligible_uids, age, f_part_p, bins=bins,
+        ))
+
+        # ``paired_m`` tracks males already selected this timestep so they
+        # aren't picked again across age-bin iterations (replaces the v2
+        # raw-sized ``m_probs`` scratch buffer).
+        paired_m = ss.BoolArr(people=people)
 
         # Accumulate selected pairs across age bins
         f_arr = np.array([], dtype=int)
@@ -222,9 +238,12 @@ class SexualNetwork(ss.SexualNetwork):
                 bin_order = np.arange(n_bins)
 
             for ab, nm in zip(bin_range_f[bin_order], males_needed[bin_order]):
-                # Female-of-age `ab` preferences over male age bins
+                # Female-of-age `ab` preferences over male age bins.
+                # Weight each m_participant by mixing prob; males already paired
+                # this timestep contribute 0 (v2 line 343 + the m_probs=0 reset).
                 male_dist = self.pars.mixing[:, ab + 1]
-                this_weighting = m_probs[m_participants] * male_dist[age_bins_m]
+                available_m = (~paired_m[m_participants]).astype(float)
+                this_weighting = available_m * male_dist[age_bins_m]
                 if this_weighting.sum() <= 0:
                     continue
                 males_nonzero = this_weighting.nonzero()[0]
@@ -242,7 +261,7 @@ class SexualNetwork(ss.SexualNetwork):
                 m_selected = m_participants[
                     males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]
                 ]
-                m_probs[m_selected] = 0  # remove males that just got paired
+                paired_m[ss.uids(m_selected)] = True
                 m_arr = np.concatenate((m_arr, m_selected))
                 f_arr = np.concatenate((f_arr, f_selected))
 

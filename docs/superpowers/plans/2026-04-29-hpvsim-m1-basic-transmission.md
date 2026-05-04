@@ -1199,7 +1199,7 @@ import hpvsim
 
 
 def _layered_sim(layers=('m', 'c'), n_agents=2000, n_steps=4):
-    """Build a Sim with three SexualNetwork instances configured from Nigeria data."""
+    """Build a Sim with two SexualNetwork instances configured from Nigeria data."""
     country = hpvsim.data.load_country('nigeria')
     networks = [SexualNetwork(layer=k, pars=country['network_pars'][k])
                 for k in layers]

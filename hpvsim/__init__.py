@@ -21,18 +21,20 @@ from .version import __version__, __versiondate__, __license__
 from .settings import options
 from .defaults import datadir, default_int, default_float, get_default_plots
 from . import data
+from . import migration_utils
 from . import parameters
 from . import misc
 from . import utils
 
 from .hpv import HPV
+from .migration_utils import Poisson1
 from .network import SexualNetwork
 from .sim import Sim
 
 rootdir = sc.thispath(__file__).parent
 
 __all__ = [
-    'HPV', 'SexualNetwork', 'Sim', 'data',
+    'HPV', 'Poisson1', 'SexualNetwork', 'Sim', 'data', 'migration_utils',
     'options', 'datadir', '__version__',
 ]
 
