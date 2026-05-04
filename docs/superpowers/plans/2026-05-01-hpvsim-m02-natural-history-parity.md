@@ -121,7 +121,7 @@ Expected: M01 anchor drift gate and partnership-equivalence test pass (or are sk
 git log --oneline -5
 ```
 
-Expected: `5ef31039 M02: add Natural History Parity design spec` (or equivalent) appears in the log.
+Expected: a `M02: add Natural History Parity design spec` commit and a `M02 spec: amend after v2 migration trace + cancerous-state cleanup` commit appear in the log (SHAs vary after rebase).
 
 ---
 
