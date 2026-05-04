@@ -12,6 +12,7 @@ stratified (see :data:`_INIT_HPV_PREV_TABLE`).
 """
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 
 
@@ -73,6 +74,150 @@ def _transform_prob(tp, dysp):
     '''
     # return 1-np.power(1-tp, ((dysp*100)**2))
     return 1-np.power(1-tp, 0.5*((dysp)**3)*100)
+
+
+def _indef_int_logf2(x, k, x_infl, ttc=25, y_max=1):
+    '''
+    Indefinite integral of logf2; see definition there for arguments
+    '''
+    t1 = 1 + np.exp(k*(x_infl-ttc))
+    t2 = 1 + np.exp(k*x_infl)
+    integ = np.log(np.exp(k*(x_infl-x)) + 1) / k + x
+    result = y_max/(t1-t2)*(1-t1*t2*integ)
+    return result
+
+
+def _intlogf2(upper, k, x_infl, ttc=25, y_max=1):
+    '''
+    Integral of logf2 between 0 and the limit given by upper
+    '''
+    # Find the upper limits not including the part past time to cancer
+    exceeding_ttc_inds = (upper > ttc).nonzero()
+    lims_to_find = np.minimum(ttc, upper)
+
+    # Take the integral
+    val_at_0 = _indef_int_logf2(0, k, x_infl, ttc)
+    val_at_lim = _indef_int_logf2(lims_to_find, k, x_infl, ttc)
+    integral = val_at_lim - val_at_0
+
+    # Deal with those whose duration of infection exceeds the time to cancer
+    # Note, another option would be to set their transformation probability to 1
+    excess_integral = upper[exceeding_ttc_inds] - ttc
+    integral[exceeding_ttc_inds] += excess_integral
+
+    return integral
+
+
+def _compute_severity_integral(t, rel_sev=None, pars=None):
+    '''
+    Process functional form and parameters into values:
+    '''
+
+    pars = sc.dcp(pars)
+    form = pars.pop('form')
+    choices = [
+        'logf2',
+        'logf3 with s=1',
+    ]
+
+    # Scale t
+    if rel_sev is not None:
+        t = rel_sev * t
+
+    # Process inputs
+    if form is None or form == 'logf2':
+        output = _intlogf2(t, **pars)
+
+    elif form == 'logf3':
+        s = pars.pop('s')
+        if s == 1:
+            output = _intlogf2(t, **pars)
+        else:
+            raise NotImplementedError(
+                'Analytic integral for logf3 only implemented for s=1. '
+                'Select integral=numeric.'
+            )
+
+    else:
+        errormsg = (
+            f'Analytic integral for the selected functional form "{form}" is '
+            f'not implemented; choices are: {sc.strjoin(choices)}, or select '
+            f'integral=numeric.'
+        )
+        raise NotImplementedError(errormsg)
+
+    return output
+
+
+def _compute_severity(t, rel_sev=None, pars=None):
+    '''
+    This function is used for two types of calculation related to disease progression:
+        1. to model the probability of progressing to further disease stages
+        2. to model the 'severity' of dysplasia on a scale from 0-1, historically interpreted as
+           the percentage of the epithelium affected by dysplasia.
+    Args:
+        t: array of durations that women have been in their current health state
+        rel_sev: array of individual relative severity values
+        pars: dict with required key 'form', which dictates which subfunction will be used.
+
+    Notes:
+         If the pars dict contains the key 'cin_integral', then this function will call
+         _compute_severity_integral to determine the progression probabilities.
+    '''
+
+    pars = sc.dcp(pars)
+
+    # Complete these next stages if cancer progression probabilities are being modeled
+    # as the cumulative severity-time of dysplasia.
+    if pars.get('method') == 'cin_integral':
+        del pars['method']
+        if pars.get('ld50'):
+            ld50 = pars.pop('ld50')
+            if pars.get('transform_prob'):
+                _ = pars.pop('transform_prob')
+            sev_at_ld50 = _compute_severity_integral(np.array([ld50]), rel_sev=None, pars=pars)[0]
+            transform_prob = 1 - 0.5**(1/sev_at_ld50**2)
+        elif pars.get('transform_prob'):
+            transform_prob = pars.pop('transform_prob')
+        else:
+            errormsg = ('If using calculating cancer probabilities using the integral of the CIN function, '
+                        'must provide an LD50 or transform prob.')
+            raise ValueError(errormsg)
+
+        sev = _compute_severity_integral(t, rel_sev=rel_sev, pars=pars)
+        cancer_probs = 1 - np.power(1 - transform_prob, sev**2)
+        return cancer_probs
+
+    # Proceed with severity calculations
+    form = pars.pop('form')
+    choices = [
+        'logf2',
+        'logf3',
+        'linear',
+    ]
+
+    # Scale t
+    if rel_sev is not None:
+        t = rel_sev * t
+
+    # Process inputs
+    if form is None or form == 'logf2':
+        output = _logf2(t, **pars)
+
+    elif form == 'logf3':
+        output = _logf3(t, **pars)
+
+    elif form == 'linear':
+        raise NotImplementedError('linear form not used in M02')
+
+    elif callable(form):
+        output = form(t, **pars)
+
+    else:
+        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
+        raise NotImplementedError(errormsg)
+
+    return output
 
 
 # M01 ships defaults (beta, init_prev) tuned to HPV16 only. Other genotypes

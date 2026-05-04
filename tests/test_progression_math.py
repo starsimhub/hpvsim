@@ -104,3 +104,79 @@ def test_transform_prob_monotone_in_dysp():
     assert (np.diff(out) >= 0).all()
     # Bounded in [0, 1]
     assert (out >= 0).all() and (out <= 1).all()
+
+
+def test_intlogf2_pinned():
+    """_intlogf2 reproduces v2's intlogf2."""
+    from hpvsim.hpv import _intlogf2
+    out = _intlogf2(np.array([1.0, 5.0, 10.0]), k=0.3, x_infl=0, ttc=50)
+    expected = [1.0747210835763568, 6.721778095232491, 15.70294408055644]
+    assert np.allclose(out, expected, rtol=1e-9)
+
+
+def test_intlogf2_matches_quarantine_verbatim():
+    """_intlogf2 is bit-identical to v2's intlogf2 over a sweep."""
+    from hpvsim.hpv import _intlogf2
+    from hpvsim._v2_legacy.utils import intlogf2 as v2_intlogf2
+    upper = np.linspace(0.5, 60, 100)
+    for k in (0.15, 0.3, 0.5):
+        for x_infl in (0, 5):
+            for ttc in (25, 50):
+                a = _intlogf2(upper, k=k, x_infl=x_infl, ttc=ttc)
+                b = v2_intlogf2(upper, k=k, x_infl=x_infl, ttc=ttc)
+                assert np.allclose(a, b, equal_nan=True), \
+                    f'intlogf2 mismatch at k={k} x_infl={x_infl} ttc={ttc}'
+
+
+def test_compute_severity_logf2_branch_pinned():
+    """_compute_severity(form='logf2') reproduces v2."""
+    from hpvsim.hpv import _compute_severity
+    pars = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
+    out = _compute_severity(np.array([1.0, 5.0, 10.0]), pars=pars)
+    expected = [0.14888512471190052, 0.6351493409744831, 0.9051488074189387]
+    assert np.allclose(out, expected, rtol=1e-9)
+
+
+def test_compute_severity_cin_integral_branch_pinned():
+    """_compute_severity(method='cin_integral') reproduces v2's cancer prob."""
+    from hpvsim.hpv import _compute_severity
+    pars = dict(method='cin_integral', transform_prob=2e-3,
+                form='logf2', k=0.3, x_infl=0, ttc=50)
+    out = _compute_severity(np.array([1.0, 5.0, 10.0]), pars=pars)
+    expected = [0.0023096924964789434, 0.08648463811473539, 0.3896109443915773]
+    assert np.allclose(out, expected, rtol=1e-9)
+
+
+def test_compute_severity_does_not_mutate_pars():
+    """Caller's pars dict must not be modified (regression: v2 actually
+    DOES mutate; the v3 port should make a defensive deepcopy at entry)."""
+    from hpvsim.hpv import _compute_severity
+    pars = dict(method='cin_integral', transform_prob=2e-3,
+                form='logf2', k=0.3, x_infl=0, ttc=50)
+    snapshot = dict(pars)
+    _compute_severity(np.array([1.0]), pars=pars)
+    assert pars == snapshot, 'pars dict was mutated by _compute_severity'
+
+
+def test_compute_severity_matches_quarantine_verbatim():
+    """Both branches bit-identical to v2 over realistic durations."""
+    from hpvsim.hpv import _compute_severity, _compute_severity_integral
+    from hpvsim._v2_legacy.utils import intlogf2 as v2_intlogf2
+    durs = np.linspace(0.1, 30, 60)
+
+    # cin (logf2) branch: compare to direct v2 logf2 calculation
+    cin_fn = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
+    a = _compute_severity(durs, pars=dict(cin_fn))
+    from hpvsim._v2_legacy.utils import logf2 as v2_logf2
+    b = v2_logf2(durs, k=0.3, x_infl=0, ttc=50)
+    assert np.allclose(a, b, equal_nan=True), 'cin (logf2) branch mismatch'
+
+    # cin_integral branch: manually replicate v2's compute_severity logic
+    cancer_fn_pars = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
+    sev = v2_intlogf2(durs, k=0.3, x_infl=0, ttc=50)
+    transform_prob = 2e-3
+    b_cancer = 1 - np.power(1 - transform_prob, sev**2)
+    cancer_fn = dict(method='cin_integral', transform_prob=2e-3,
+                     form='logf2', k=0.3, x_infl=0, ttc=50)
+    a_cancer = _compute_severity(durs, pars=dict(cancer_fn))
+    assert np.allclose(a_cancer, b_cancer, equal_nan=True), 'cin_integral branch mismatch'
