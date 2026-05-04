@@ -12,8 +12,6 @@ tracking, end_pairs, net_beta) from ss.SexualNetwork.
 import numpy as np
 import starsim as ss
 
-import hpvsim.utils as hpu
-
 
 _KNOWN_LAYERS = ('m', 'c')
 
@@ -66,8 +64,18 @@ class SexualNetwork(ss.SexualNetwork):
         #     processed when forming pairs (matches v2's randomized loop order).
         # _dist_f_select: when there aren't enough males in the male age-bin
         #     to satisfy a female bin, picks the female subset to drop.
+        # _dist_cross_f/_dist_cross_m: Bernoulli for cross-layer concurrency
+        #     filtering (replaces v2 hpu.binomial_filter, now CRN-safe).
+        # _dist_participate: Bernoulli for age-bin participation filtering
+        #     (replaces v2 hpu.participation_filter, now CRN-safe).
+        # _dist_choose_m: weighted random choice for male selection per bin
+        #     (replaces v2 hpu.choose_w, now CRN-safe).
         self._dist_bin_order = ss.choice(name=f'{layer}_bin_order', replace=False)
         self._dist_f_select = ss.choice(name=f'{layer}_f_select', replace=False)
+        self._dist_cross_f = ss.bernoulli(p=0.5, name=f'{layer}_cross_f')
+        self._dist_cross_m = ss.bernoulli(p=0.5, name=f'{layer}_cross_m')
+        self._dist_participate = ss.bernoulli(p=0.5, name=f'{layer}_participate')
+        self._dist_choose_m = ss.choice(a=2, replace=False, name=f'{layer}_choose_m')
         # Record formation timestep per edge so the partnership-equivalence
         # test can compute age-at-formation (matching v2's age_f/age_m in
         # to_df) and reconstruct original-duration (matching v2's stored dur).
@@ -133,6 +141,34 @@ class SexualNetwork(ss.SexualNetwork):
         counts = np.bincount(endpoints)[partnered]
         return partnered, counts
 
+    def _participation_filter(self, inds, age, layer_probs, bins):
+        """Apply age-specific participation filter using Bernoulli draws.
+
+        Replaces the v2 ``hpu.participation_filter`` helper. Uses
+        ``self._dist_participate`` (a linked ``ss.bernoulli``) so draws are
+        CRN-safe within the sim's RNG stream.
+
+        Args:
+            inds (ss.uids): candidate agent UIDs
+            age (FloatArr): per-agent ages (indexed by UID)
+            layer_probs (ndarray): per-bin participation probability (scalar per bin)
+            bins (ndarray): age-bin boundaries
+
+        Returns:
+            ndarray of UIDs that passed the Bernoulli draw
+        """
+        if not len(inds):
+            return np.array([], dtype=int)
+        age_bins = np.digitize(age[inds], bins=bins) - 1
+        participating = np.array([], dtype=int)
+        for ab in np.unique(age_bins):
+            bin_inds = inds[age_bins == ab]
+            self._dist_participate.set(p=float(layer_probs[ab]))
+            participating = np.concatenate(
+                [participating, self._dist_participate.filter(bin_inds)]
+            )
+        return participating
+
     def add_pairs(self):
         """Form new partnerships in this layer for one timestep.
 
@@ -184,8 +220,10 @@ class SexualNetwork(ss.SexualNetwork):
             other_m = other_uids[~other_is_female]
             f_cross_p = self.pars.cross_layer['f'].to_prob(dt)
             m_cross_p = self.pars.cross_layer['m'].to_prob(dt)
-            f_winners = hpu.binomial_filter(f_cross_p, other_f)
-            m_winners = hpu.binomial_filter(m_cross_p, other_m)
+            self._dist_cross_f.set(p=f_cross_p)
+            self._dist_cross_m.set(p=m_cross_p)
+            f_winners = self._dist_cross_f.filter(other_f)
+            m_winners = self._dist_cross_m.filter(other_m)
             cross_winners = np.concatenate([f_winners, m_winners])
             cross_losers = ss.uids(np.setdiff1d(other_uids, cross_winners))
             eligible[cross_losers] = False
@@ -203,8 +241,8 @@ class SexualNetwork(ss.SexualNetwork):
         f_part_p = self.pars.layer_probs['f'].to_prob(dt)
         m_part_p = self.pars.layer_probs['m'].to_prob(dt)
         age = people.age
-        m_participants = ss.uids(hpu.participation_filter(
-            m_eligible_uids, age, m_part_p, bins=bins,
+        m_participants = ss.uids(self._participation_filter(
+            m_eligible_uids, age, m_part_p, bins,
         ))
         if len(m_participants) == 0:
             return  # no males available for pairing in any age bin
@@ -214,8 +252,8 @@ class SexualNetwork(ss.SexualNetwork):
         # Single-cluster handling: stock ss.People has no cluster array.
         # v2's loop `for cl in cluster_range` collapses to one iteration;
         # add_mixing[cl, cluster[m_participants]] reduces to a constant 1.
-        f_cl = ss.uids(hpu.participation_filter(
-            f_eligible_uids, age, f_part_p, bins=bins,
+        f_cl = ss.uids(self._participation_filter(
+            f_eligible_uids, age, f_part_p, bins,
         ))
 
         # ``paired_m`` tracks males already selected this timestep so they
@@ -258,8 +296,10 @@ class SexualNetwork(ss.SexualNetwork):
                     nm = f_selected.size
                 else:
                     f_selected = f_inds
+                norm_w = this_weighting_nonzero / this_weighting_nonzero.sum()
+                self._dist_choose_m.set(a=len(this_weighting_nonzero), p=norm_w)
                 m_selected = m_participants[
-                    males_nonzero[hpu.choose_w(this_weighting_nonzero, nm)]
+                    males_nonzero[np.asarray(self._dist_choose_m.rvs(nm))]
                 ]
                 paired_m[ss.uids(m_selected)] = True
                 m_arr = np.concatenate((m_arr, m_selected))
