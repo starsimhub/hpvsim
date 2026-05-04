@@ -68,12 +68,12 @@ def test_set_prognoses_flips_state():
 
 
 def test_step_state_clears_at_ti_clearance():
-    """An agent whose ti_clearance is reached flips to recovered (SIR).
+    """An agent whose ti_clearance is reached returns to susceptible with reduced rel_sus.
 
-    M02: clearance grants permanent same-genotype immunity — agents become
-    recovered=True, susceptible stays False. This is the SIR pattern (no
-    return to susceptible), matching v2's near-100% nab_imm/cell_imm
-    post-clearance protection under default HPV16 pars.
+    M02: clearance applies partial permanent same-genotype immunity — agents
+    return to susceptible=True (SIS-like) but rel_sus is multiplied by
+    (1 - imm_init). Default imm_init=0.35, so rel_sus drops from 1.0 to ~0.65.
+    Re-infection is allowed at the reduced rate.
     """
     sim, hpv = _minimal_sim(init_prev=0.0)
     sim.init()
@@ -81,9 +81,13 @@ def test_step_state_clears_at_ti_clearance():
     hpv.set_prognoses(target, sources=None)
     hpv.ti_clearance[target] = hpv.ti
     hpv.step_state()
-    assert hpv.recovered[target].all(), "cleared agent should be recovered"
-    assert (~hpv.susceptible[target]).all(), "cleared agent must not be susceptible (SIR immunity)"
-    assert (~hpv.infected[target]).all()
+    assert hpv.susceptible[target].all(), "cleared agent should return to susceptible"
+    assert (~hpv.infected[target]).all(), "cleared agent must not remain infected"
+    imm_init = float(hpv.pars.imm_init)
+    expected_rel_sus = 1.0 - imm_init
+    rel_sus_val = float(hpv.rel_sus[target][0])
+    assert abs(rel_sus_val - expected_rel_sus) < 1e-6, \
+        f"rel_sus={rel_sus_val} expected {expected_rel_sus} after clearance"
 
 
 def test_runs_a_few_timesteps():
