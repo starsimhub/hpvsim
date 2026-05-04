@@ -44,3 +44,20 @@ def test_sim_runs_short_window():
     sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2003, dt=0.5)
     sim.run()
     assert sim.results.hpv16.n_infected[-1] >= 0
+
+
+def test_sim_pop_scale_computed_from_total_pop():
+    """If total_pop is set, pop_scale = total_pop / n_agents."""
+    import hpvsim as hpv
+    sim = hpv.Sim(n_agents=10_000, total_pop=2_000_000,
+                  start=1990, stop=1991, dt=1.0, rand_seed=0)
+    sim.init()
+    assert sim.pars.pop_scale == 200.0
+
+
+def test_sim_pop_scale_default_one_when_total_pop_none():
+    """When total_pop is None, pop_scale defaults to 1.0."""
+    import hpvsim as hpv
+    sim = hpv.Sim(n_agents=1000, start=1990, stop=1991, dt=1.0, rand_seed=0)
+    sim.init()
+    assert sim.pars.pop_scale == 1.0

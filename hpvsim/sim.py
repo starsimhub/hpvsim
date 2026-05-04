@@ -26,7 +26,7 @@ class Sim(ss.Sim):
 
     def __init__(self, location='nigeria', genotype='hpv16',
                  n_agents=10_000, start=1990, stop=2060, dt=0.5,
-                 pars=None, **kwargs):
+                 total_pop=None, pars=None, **kwargs):
         country = load_country(location)
         people = kwargs.pop('people', None)
         if people is None:
@@ -52,6 +52,11 @@ class Sim(ss.Sim):
                 ss.Births(birth_rate=country['birth_rate']),
                 ss.Deaths(death_rate=country['death_rate']),
             ]
+        # Store total_pop so init() can compute pop_scale after ss.Sim.__init__
+        # wires self.pars.  ss.SimPars.validate_total_pop() (called during
+        # sim.init()) will set pop_scale = total_pop / n_agents when total_pop
+        # is given, or pop_scale = 1.0 when it is None.
+        self._total_pop = total_pop
         super().__init__(
             start=ss.years(start),
             stop=ss.years(stop),
@@ -61,5 +66,6 @@ class Sim(ss.Sim):
             networks=networks,
             demographics=demographics,
             pars=pars,
+            total_pop=total_pop,
             **kwargs,
         )
