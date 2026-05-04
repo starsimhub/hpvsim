@@ -134,3 +134,31 @@ def test_step_state_cancer_death_removes_agents():
             alive_arr = np.asarray(sim.people.alive[passed_uids])
             assert not alive_arr.any(), \
                 f'{int(alive_arr.sum())} cancer-death-scheduled agents still alive'
+
+
+def test_step_die_resets_bool_states():
+    """Dying agents have precin/cin/cancerous cleared (so result counts are accurate)."""
+    sim = hpv.Sim(n_agents=500, location='nigeria',
+                  start=1990, stop=2010, dt=0.5, rand_seed=0)
+    sim.init()
+    mod = sim.diseases.hpv16
+
+    # Manually infect and progress some agents to each state to test cleanup
+    test_uids = np.array([0, 1, 2, 3, 4], dtype=int)
+
+    # Set up test agents in different compartments
+    mod.infected[test_uids] = True
+    mod.precin[test_uids] = True
+    mod.susceptible[test_uids] = True
+    mod.cin[test_uids[[1, 2, 3]]] = True
+    mod.cancerous[test_uids[[2, 3]]] = True
+
+    # Call step_die for these agents (simulating death)
+    mod.step_die(test_uids)
+
+    # Verify all disease-compartment states are cleared for dead agents
+    assert not mod.precin[test_uids].any(), "precin not cleared after step_die"
+    assert not mod.cin[test_uids].any(), "cin not cleared after step_die"
+    assert not mod.cancerous[test_uids].any(), "cancerous not cleared after step_die"
+    assert not mod.infected[test_uids].any(), "infected not cleared after step_die"
+    assert not mod.susceptible[test_uids].any(), "susceptible not cleared after step_die"

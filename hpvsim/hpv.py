@@ -478,3 +478,17 @@ class HPV(ss.Infection):
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
             self.sim.people.request_death(to_dead)
+
+    def step_die(self, uids):
+        """Reset all custom BoolStates for dying agents.
+
+        Required for any custom BoolState per starsim disease pattern. Without
+        this, dead agents retain their disease-compartment flags, corrupting
+        n_precin / n_cin / n_cancerous result counts.
+        """
+        super().step_die(uids)
+        self.precin[uids] = False
+        self.cin[uids] = False
+        self.cancerous[uids] = False
+        self.infected[uids] = False
+        self.susceptible[uids] = False
