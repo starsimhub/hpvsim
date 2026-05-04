@@ -311,3 +311,54 @@ To regenerate against v2.3:
 - Mean ages of cancer / cancer death rely on starsim freezing `people.age`
   at agent death. If that assumption changes in a future starsim version,
   recompute against the actual people-age semantics.
+
+## M02 age-cancer capability baseline
+
+Supports the M02 capability gate (`tests/test_natural_history.py::test_m02_capability_age_stratified_cancers`,
+landing in Task 16). The baseline file is gitignored at:
+
+```
+tests/regression_baselines/m02_age_cancer.json
+```
+
+### Generating the baseline
+
+Generate by running, in the v2.3 environment described in the M02 baseline-regeneration section above:
+
+```python
+import numpy as np
+import json
+import sciris as sc
+import hpvsim as hpv  # v2.3 here
+
+# Same anchor pars as the regression baseline
+pars = dict(
+    n_agents=10_000,
+    location='nigeria',
+    genotypes=['hpv16'],
+    start=1990,
+    end=2060,
+    dt=0.5,
+    rand_seed=0,
+    verbose=0,
+)
+
+# Capture age-stratified cancer incidence at end of sim (year 2059)
+sim = hpv.Sim(sc.dcp(pars))
+sim.run()
+
+# v2.3 stores cancer_incidence_by_age as a 2D result array
+# (time x age_bins). Extract the final year's column (index -1).
+# v2's default age bins: 0, 5, 10, ..., 100 (21 bins).
+arr = np.asarray(sim.results['cancer_incidence_by_age'])[:, -1]
+
+import os
+os.makedirs('tests/regression_baselines', exist_ok=True)
+with open('tests/regression_baselines/m02_age_cancer.json', 'w') as f:
+    json.dump({'cancer_incidence_by_age': arr.tolist()}, f, indent=2)
+print(f'Wrote m02_age_cancer.json with {len(arr)} age bands')
+```
+
+The output shape must match `(n_bins,)` and use the same 5-yr age bins as
+`hpv.AgeResults` defaults (0, 5, 10, ..., 100, so 21 bins total). The file
+is gitignored.
