@@ -245,12 +245,32 @@ self.pop_scale = None   # How much to scale the population
 
 ### Demographics: `hpv.AgeMigration(ss.Demographics)`
 
-Small adapter porting v2's `_v2_legacy/people.py:check_migration` against the
-existing `hpvsim/data/` country files (already loaded by M01's `country.py`
-adapter). Sits alongside `ss.Births` and `ss.Deaths` already wired in M01.
-Adds/removes agents per age band each step to track a target age pyramid.
-Required for multi-decade demographic realism when computing cancer incidence
-rates.
+Lifts v2's `_v2_legacy/people.py:check_migration` algorithm — *age-pyramid
+pinning*, not rate-based migration. Each timestep:
+
+1. Look up the target age pyramid for the current year from `pop_age_trend`
+   (year × single-age × sex counts in real-world units).
+2. Compute `scale = sim.n_agents / pop_at_sim_start` from `pop_trend`
+   (year × total-pop trajectory).
+3. For each (sex, integer age):
+   - `count_sim` = alive sim agents at this exact age × sex.
+   - `count_target = age_dist[sex][age] * scale`.
+   - `diff = round(count_target - count_sim)`.
+   - If `diff > 0`: add `diff` immigrants at that exact age, HPV-naive.
+   - If `diff < 0`: weight-pick `|diff|` agents at that age and request
+     their death (treated as emigration).
+
+Skips silently when current year is outside `pop_trend`'s range (matches
+v2). Immigrants enter HPV-naive — all disease BoolStates default `False`,
+which mirrors v2's `add_births` behavior (it only seeds HIV, never HPV
+state, when called from `check_migration`).
+
+Required for multi-decade demographic realism when computing cancer
+incidence rates. The two data tables (`pop_trend`, `pop_age_trend`) are
+already loadable via the v3-active `hpvsim/data/loaders.get_total_pop` and
+`get_age_distribution_over_time` helpers; M02 wires them through
+`load_country()` alongside the existing `age_data` / `birth_rate` /
+`death_rate` keys.
 
 ### Analyzer: `hpv.AgeResults(ss.Analyzer)`
 
@@ -435,10 +455,6 @@ of plumbing, then validation last.
   cleaner starsim idiom (e.g., setting `ti_dead` on a built-in `ss.Disease`
   field that `step_die` picks up automatically), use that and amend this
   spec.
-- **Age-specific migration data shape:** v2's `check_migration` reads net
-  migration rates per age band per location. Expected to live alongside
-  existing `hpvsim/data/` country files; concrete data-file format settled
-  during C1 implementation.
 - **Lognormal parametrization mapping:** v2 declares durations as
   `dict(dist='lognormal', par1=X, par2=Y)` consumed by `hpu.sample`; M01
   uses `ss.lognorm_ex(mean=...)`. The exact translation
