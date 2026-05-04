@@ -68,14 +68,21 @@ def test_set_prognoses_flips_state():
 
 
 def test_step_state_clears_at_ti_clearance():
-    """An agent whose ti_clearance is reached returns to susceptible (SIS)."""
+    """An agent whose ti_clearance is reached flips to recovered (SIR).
+
+    M02: clearance grants permanent same-genotype immunity — agents become
+    recovered=True, susceptible stays False. This is the SIR pattern (no
+    return to susceptible), matching v2's near-100% nab_imm/cell_imm
+    post-clearance protection under default HPV16 pars.
+    """
     sim, hpv = _minimal_sim(init_prev=0.0)
     sim.init()
     target = ss.uids([0])
     hpv.set_prognoses(target, sources=None)
     hpv.ti_clearance[target] = hpv.ti
     hpv.step_state()
-    assert hpv.susceptible[target].all()
+    assert hpv.recovered[target].all(), "cleared agent should be recovered"
+    assert (~hpv.susceptible[target]).all(), "cleared agent must not be susceptible (SIR immunity)"
     assert (~hpv.infected[target]).all()
 
 

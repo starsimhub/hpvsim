@@ -1,7 +1,13 @@
 """HPV genotype as a Starsim Infection.
 
 M01: single-genotype, transmission-only with SIS clearance (no precin/CIN/cancer).
-M02 will add natural-history states (precin, CIN, cancer) and override step_state.
+M02: natural-history states (precin, CIN, cancer) + **same-genotype immunity**.
+     Clearance is now SIR-style: cleared agents flip to ``recovered=True``,
+     ``susceptible=False``, and are permanently immune to same-genotype
+     re-infection. This mirrors v2's near-100% same-genotype protection that
+     v2's nab_imm/cell_imm machinery produces under default HPV16 pars.
+     M02 simplifies this to a hard "no re-infection" rule; M03 may refine with
+     the full immunity-with-waning machinery if needed for cross-genotype work.
 M03 will instantiate one HPV per genotype and add a CrossImmunity connector.
 
 Default values for ``beta`` and ``init_prev`` are taken from v2's
@@ -320,6 +326,7 @@ class HPV(ss.Infection):
             ss.BoolState('precin', label='Precancerous infection'),
             ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
             ss.BoolState('cancerous', label='Invasive cancer'),
+            ss.BoolState('recovered', label='Recovered (cleared HPV; immune to same-genotype re-infection)'),
             # M02 scheduled transition times
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
@@ -364,6 +371,11 @@ class HPV(ss.Infection):
 
         # Mark precin compartment for all newly-infected agents.
         self.precin[uids] = True
+
+        # Defensive reset: same-genotype immunity means set_prognoses should
+        # never fire on an already-recovered agent (they're not susceptible),
+        # but init_prev seeding may overlap with cleared agents in edge cases.
+        self.recovered[uids] = False
 
         # Reset trajectory fields so re-infection always starts from a clean slate.
         # v2 resets these fields at clearance time (people.py:696-701); here we
@@ -443,12 +455,16 @@ class HPV(ss.Infection):
         """
         ti = self.ti
 
-        # --- 1. Clear from precin (SIS path: precin with no CIN scheduled) ---
+        # --- 1. Clear from precin (SIR path: precin with no CIN scheduled) ---
+        # M02: clearance grants permanent same-genotype immunity (recovered=True,
+        # susceptible stays False). Mirrors v2's near-100% nab_imm/cell_imm
+        # post-clearance protection under default HPV16 pars.
         cleared = (self.infected & self.precin & ~self.cin & ~self.cancerous
                    & (self.ti_clearance <= ti)).uids
         if len(cleared):
             self.infected[cleared] = False
-            self.susceptible[cleared] = True
+            self.susceptible[cleared] = False    # SIR: no return to susceptible
+            self.recovered[cleared] = True
             self.precin[cleared] = False
 
         # --- 2. Clear from CIN (CIN regression: had CIN, no cancer scheduled) ---
@@ -456,7 +472,8 @@ class HPV(ss.Infection):
                             & (self.ti_clearance <= ti)).uids
         if len(cleared_from_cin):
             self.infected[cleared_from_cin] = False
-            self.susceptible[cleared_from_cin] = True
+            self.susceptible[cleared_from_cin] = False    # SIR: same-genotype immunity
+            self.recovered[cleared_from_cin] = True
             self.cin[cleared_from_cin] = False
 
         # --- 3. Precin → CIN ---
@@ -490,5 +507,6 @@ class HPV(ss.Infection):
         self.precin[uids] = False
         self.cin[uids] = False
         self.cancerous[uids] = False
+        self.recovered[uids] = False
         self.infected[uids] = False
         self.susceptible[uids] = False

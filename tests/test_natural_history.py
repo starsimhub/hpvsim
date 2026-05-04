@@ -19,7 +19,7 @@ def test_hpv_has_progression_states():
     sim.init()
     mod = sim.diseases.hpv16
     # New compartment flags
-    for name in ('precin', 'cin', 'cancerous'):
+    for name in ('precin', 'cin', 'cancerous', 'recovered'):
         assert hasattr(mod, name), f'HPV missing BoolState {name!r}'
     # New scheduled-time arrays
     for name in ('ti_cin', 'ti_cancerous', 'ti_dead_cancer'):
@@ -160,6 +160,7 @@ def test_step_die_resets_bool_states():
     mod.susceptible[test_uids] = True
     mod.cin[test_uids[[1, 2, 3]]] = True
     mod.cancerous[test_uids[[2, 3]]] = True
+    mod.recovered[test_uids[[4]]] = True  # one recovered agent
 
     # Call step_die for these agents (simulating death)
     mod.step_die(test_uids)
@@ -168,8 +169,31 @@ def test_step_die_resets_bool_states():
     assert not mod.precin[test_uids].any(), "precin not cleared after step_die"
     assert not mod.cin[test_uids].any(), "cin not cleared after step_die"
     assert not mod.cancerous[test_uids].any(), "cancerous not cleared after step_die"
+    assert not mod.recovered[test_uids].any(), "recovered not cleared after step_die"
     assert not mod.infected[test_uids].any(), "infected not cleared after step_die"
     assert not mod.susceptible[test_uids].any(), "susceptible not cleared after step_die"
+
+
+def test_cleared_agents_do_not_get_reinfected():
+    """Once an agent clears HPV (or progresses to cancer), they should never
+    get a second infection. Mirrors v2's same-genotype immunity (high
+    nab_imm/cell_imm post-clearance reduces per-act probability to ~0).
+    """
+    sim = hpv.Sim(n_agents=2000, location='nigeria',
+                  start=1990, stop=2030, dt=0.25, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    # Agents who have ever been infected (ti_first_infection set).
+    ever = mod.ti_first_infection.notnan.uids
+    # For each ever-infected agent, ti_infected at end-of-sim should equal
+    # ti_first_infection — no overwrite from a second infection event.
+    ti_first = np.asarray(mod.ti_first_infection[ever])
+    ti_inf = np.asarray(mod.ti_infected[ever])
+    n_reinfected = int((ti_inf > ti_first).sum())
+    assert n_reinfected == 0, (
+        f'{n_reinfected}/{len(ever)} agents got re-infected; '
+        f'M02 same-genotype immunity should prevent this.'
+    )
 
 
 @pytest.mark.skipif(not CAPABILITY_BASELINE.exists(),
