@@ -460,18 +460,21 @@ class HPV(ss.Infection):
         ti = self.ti
 
         # --- 1. Clear from precin (partial-immunity path) ---
-        # M02: clearance returns agents to susceptible=True (SIS-like) but applies
-        # a permanent per-act susceptibility reduction: rel_sus *= (1 - imm_init).
+        # M02: clearance returns agents to susceptible=True (SIS-like) but caps
+        # rel_sus at (1 - imm_init), capturing v2's partial permanent immunity.
         # Default imm_init=0.35 (v2's beta_mean par1=0.35; _v2_legacy/parameters.py:102)
-        # means agents retain ~65% per-act susceptibility post-clearance. Re-infection
-        # is allowed at this reduced rate, matching v2's partial permanent immunity.
+        # ⇒ rel_sus ≤ 0.65 post-clearance. v2 takes np.maximum(prior, new) on
+        # repeat clearances (_v2_legacy/immunity.py:172,175), so a re-cleared
+        # agent's susceptibility doesn't keep compounding downward — matched
+        # here with np.minimum on rel_sus (smaller rel_sus ↔ larger immunity).
         cleared = (self.infected & self.precin & ~self.cin & ~self.cancerous
                    & (self.ti_clearance <= ti)).uids
         if len(cleared):
             self.infected[cleared] = False
             self.susceptible[cleared] = True
             self.precin[cleared] = False
-            self.rel_sus[cleared] *= (1.0 - self.pars.imm_init)
+            self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
+                                               1.0 - self.pars.imm_init)
 
         # --- 2. Clear from CIN (CIN regression; same partial-immunity logic) ---
         cleared_from_cin = (self.infected & self.cin & ~self.cancerous
@@ -480,7 +483,8 @@ class HPV(ss.Infection):
             self.infected[cleared_from_cin] = False
             self.susceptible[cleared_from_cin] = True
             self.cin[cleared_from_cin] = False
-            self.rel_sus[cleared_from_cin] *= (1.0 - self.pars.imm_init)
+            self.rel_sus[cleared_from_cin] = np.minimum(self.rel_sus[cleared_from_cin],
+                                                        1.0 - self.pars.imm_init)
 
         # --- 3. Precin → CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
