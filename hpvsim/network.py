@@ -101,12 +101,12 @@ class SexualNetwork(ss.SexualNetwork):
         birth. Debut is sampled into the parent ss.SexualNetwork's ``debut``
         FloatArr at the same time.
         """
-        unset_alive = self.partners_target.isnan.uids
-        if not len(unset_alive):
+        unset = self.partners_target.isnan.uids
+        if not len(unset):
             return
-        is_female = people.female[unset_alive]
-        f_uids = unset_alive[is_female]
-        m_uids = unset_alive[~is_female]
+        is_female = people.female[unset]
+        f_uids = unset[is_female]
+        m_uids = unset[~is_female]
         self.partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
         self.partners_target[m_uids] = self.pars.partners['m'].rvs(m_uids)
         # Sample debut age per-sex (matches v2: female mean 15, male mean 17.6).
@@ -115,7 +115,7 @@ class SexualNetwork(ss.SexualNetwork):
         if self.pars.debut is not None:
             self.debut[f_uids] = self.pars.debut['f'].rvs(f_uids)
             self.debut[m_uids] = self.pars.debut['m'].rvs(m_uids)
-        self.participant[unset_alive] = True
+        self.participant[unset] = True
 
     def _own_n_partners(self):
         """Per-UID count of own-layer edges, restricted to agents who have
@@ -162,9 +162,9 @@ class SexualNetwork(ss.SexualNetwork):
         # Eligible-for-new-partnership = active in this layer AND wants any
         # partners (``partners_target > 0``; v2's casual layer uses a plain
         # ``poisson`` so a large fraction of agents draw target=0) AND
-        # own-layer edge count is below target. ``self.active(people)`` is
-        # alive-filtered; ``.asnew()`` is the BoolArr-preserving copy
-        # (``.copy()`` would downgrade to a plain ndarray).
+        # own-layer edge count is below target. ``.asnew()`` is the
+        # BoolArr-preserving copy (``.copy()`` would downgrade to a plain
+        # ndarray).
         eligible = (self.active(people) & (self.partners_target > 0)).asnew()
         own_uids, own_counts = self._own_n_partners()
         if len(own_uids):
