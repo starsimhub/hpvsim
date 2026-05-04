@@ -1305,8 +1305,9 @@ class dx(Product):
                 # Filter the dataframe to extract test results for people in this state
                 df_filter = (self.df.state == state)  # filter by state
                 thisdf = self.df[df_filter]  # apply filter to get the results for this state & genotype
-                probs = [thisdf[thisdf.result == result].probability.values[0] for result in
-                         self.hierarchy]  # Pull out the result probabilities in the order specified by the result hierarchy
+                # Pull out the result probabilities in the order specified by the result hierarchy
+                probs_by_result = thisdf.groupby("result").probability.first().to_dict()
+                probs = [probs_by_result[result] for result in self.hierarchy]
                 # Sort people into one of the possible result states and then update their overall results (aggregating over genotypes)
                 this_result = hpu.n_multinomial(probs, len(theseinds))
                 results[theseinds] = np.minimum(this_result, results[theseinds])
@@ -1320,7 +1321,8 @@ class dx(Product):
                     df_filter = (self.df.state == state) # filter by state
                     if self.ng>1: df_filter = df_filter & (self.df.genotype == genotype) # also filter by genotype, if this test is by genotype
                     thisdf = self.df[df_filter] # apply filter to get the results for this state & genotype
-                    probs = [thisdf[thisdf.result==result].probability.values[0] for result in self.hierarchy] # Pull out the result probabilities in the order specified by the result hierarchy
+                    probs_by_result = thisdf.groupby("result").probability.first().to_dict()
+                    probs = [probs_by_result[result] for result in self.hierarchy]
                     # Sort people into one of the possible result states and then update their overall results (aggregating over genotypes)
                     this_gtype_results = hpu.n_multinomial(probs, len(theseinds))
                     results[theseinds] = np.minimum(this_gtype_results, results[theseinds])

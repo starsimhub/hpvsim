@@ -875,7 +875,7 @@ class Sim(hpb.BaseSim):
             # Number infectious/susceptible by age, for prevalence calculations
             f_inds = hpu.true(people['sex']==0)
             infinds = hpu.true(people['infectious'])
-            f_infinds = np.intersect1d(f_inds, infinds)
+            f_infinds = np.intersect1d(f_inds, infinds, assume_unique=True)
             susinds = hpu.true(people['susceptible'])
             precininds = hpu.true(people['precin'])
             cininds = hpu.true(people['cin'])
