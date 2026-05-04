@@ -31,7 +31,7 @@ Pinned in `anchor.py:PARS`:
 | `genotypes` | `[16, 18, 'hi5', 'ohr']` |
 | `start` | `1990` |
 | `end` | `2060` |
-| `dt` | `0.5` |
+| `dt` | `0.25` |
 | `burnin` | `20` |
 | `rand_seed` | `0` |
 | `verbose` | `0` |
@@ -146,7 +146,7 @@ PARS = dict(
     genotypes=['hpv16'],
     start=1990,
     end=2060,
-    dt=0.5,
+    dt=0.25,  # Must match v2's default and the v3 anchor_hpv16.py PARS
     burnin=20,
     rand_seed=0,
     verbose=0,
@@ -229,7 +229,7 @@ PARS = dict(
     genotypes=['hpv16'],
     start=1990,
     end=2015,
-    dt=0.5,
+    dt=0.25,  # Must match v2's default
     burnin=20,
     rand_seed=0,
     verbose=0,
@@ -311,6 +311,19 @@ To regenerate against v2.3:
 - Mean ages of cancer / cancer death rely on starsim freezing `people.age`
   at agent death. If that assumption changes in a future starsim version,
   recompute against the actual people-age semantics.
+- **dt must be 0.25** in both v3 and v2 baseline-gen scripts. v2's default
+  sim timestep is `dt=0.25` (quarterly), declared at
+  `_v2_legacy/parameters.py:61`. The M02 anchor (and any v2 baseline-regen
+  script) must use the same `dt=0.25` so both runs use v2's default-driven
+  calibrations. If you regenerate the v2 baseline, update the generation
+  script's `PARS` dict to `dt=0.25`.
+- **AgeMigration fires annually, not every sim step.** v2's
+  `check_migration` ran annually via `update_freq = max(1, int(dt_demog/dt))
+  = 4` at `dt=0.25` (fired once every 4 sim steps). v3 matches this by
+  setting `dt=ss.year` on the `AgeMigration` module constructor, which causes
+  `ss.Loop` to call `step()` only at integer-year timesteps regardless of the
+  sim's own dt. Per-step immigration/emigration counts in v3 results reflect
+  annual totals (1 firing/year), not quarterly (4 firings/year).
 
 ## M02 age-cancer capability baseline
 
@@ -338,7 +351,7 @@ pars = dict(
     genotypes=['hpv16'],
     start=1990,
     end=2060,
-    dt=0.5,
+    dt=0.25,  # Must match v2's default and the v3 anchor_hpv16.py PARS
     rand_seed=0,
     verbose=0,
 )

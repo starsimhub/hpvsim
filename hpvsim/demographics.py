@@ -5,7 +5,7 @@ people.check_migration. Sits alongside ss.Births and ss.Deaths in
 hpv.Sim's default demographics list.
 
 Algorithm (lift-and-shift from v2 _v2_legacy/people.py:818-945):
-  Each step (annual cadence in v2; respects sim.dt here):
+  Once per year (annual cadence matching v2's update_freq gating):
     1. Look up the target age pyramid for the current year (pop_age_trend).
     2. Compute scale = sim.n_agents / pop_at_sim_start (pop_trend).
     3. For each (sex, integer age):
@@ -15,6 +15,12 @@ Algorithm (lift-and-shift from v2 _v2_legacy/people.py:818-945):
          if diff > 0:  add `diff` immigrants at age (HPV-naive — matches v2)
          if diff < 0:  weight-pick |diff| existing agents at age and
                        request their removal (treated as emigration)
+
+The annual cadence is enforced by passing dt=ss.year to ss.Module.__init__,
+which sets this module's Timeline dt to 1 year. ss.Loop only fires step() at
+times in mod.t.tvec, so AgeMigration.step() runs once per integer year
+regardless of sim.dt. This matches v2's check_migration, which ran annually
+via update_freq = max(1, int(dt_demog/dt)) = 4 at v2's default dt=0.25.
 """
 import numpy as np
 import pandas as pd
@@ -27,9 +33,10 @@ __all__ = ['AgeMigration']
 class AgeMigration(ss.Demographics):
     """Age-pyramid pinning to a target population trajectory.
 
-    Each timestep, looks up the target age pyramid for the current (integer)
-    year and forces the sim's age × sex composition to match by adding
-    immigrants (HPV-naive) or removing emigrants.
+    Fires once per integer year (dt=ss.year, matching v2's annual
+    check_migration cadence). Looks up the target age pyramid for the
+    current year and forces the sim's age × sex composition to match
+    by adding immigrants (HPV-naive) or removing emigrants.
 
     Data can be supplied explicitly via ``pop_trend`` / ``pop_age_trend``
     arguments, or loaded automatically from the sim's ``location`` parameter.
@@ -41,7 +48,12 @@ class AgeMigration(ss.Demographics):
     """
 
     def __init__(self, pars=None, pop_trend=None, pop_age_trend=None, **kwargs):
-        super().__init__()
+        # Pass dt=ss.year to ss.Module so this module's Timeline has annual
+        # timesteps. ss.Loop only calls step() at times in mod.t.tvec, so
+        # setting dt=ss.year here gates AgeMigration to fire once per year —
+        # matching v2's check_migration annual cadence (update_freq = 4 at
+        # v2's default dt=0.25, fired once per year).
+        super().__init__(dt=ss.year)
         self.update_pars(pars, **kwargs)
         self._pop_trend = pop_trend
         self._pop_age_trend = pop_age_trend
@@ -112,7 +124,10 @@ class AgeMigration(ss.Demographics):
     # ---------------------------------------------------------------------- #
 
     def step(self):
-        """Pin age × sex pyramid to the target for the current integer year."""
+        """Pin age × sex pyramid to the target for the current year.
+
+        Called once per integer year (module dt=ss.year gates firing via Loop).
+        """
         sim = self.sim
         year = int(sim.t.now('year'))
 

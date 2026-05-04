@@ -14,13 +14,15 @@ import sciris as sc
 import hpvsim as hpv
 
 # Pinned anchor pars. Do not change without coordinating with regression baselines.
+# dt=0.25 matches v2's default sim timestep (declared at _v2_legacy/parameters.py:61)
+# so that v2 baseline regen and v3 runs both use v2's default-driven calibrations.
 PARS = dict(
     n_agents=10e3,
     location='nigeria',
     genotype='hpv16',
     start=1990,
     stop=2060,
-    dt=0.5,
+    dt=0.25,
     rand_seed=0,
     verbose=0,
 )
