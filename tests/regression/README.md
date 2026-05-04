@@ -256,3 +256,58 @@ with open('tests/regression_baselines/partnership_v2.json', 'w') as f:
 
 The M01 partnership-equivalence test reads this JSON and runs KS-tests +
 bin-wise diff against equivalent quantities produced by v3.
+
+## M02 baseline regeneration
+
+The M02 milestone extends `short_summary` from 3 keys (M01) to 8 keys
+covering HPV + CIN/cancer trajectories (`total cancers`, `total cancer
+deaths`, `mean cancer incidence (per 100k)`, `mean age of cancer`,
+`mean age of cancer death`). M01-era 3-key baselines at
+`tests/regression_baselines/anchor_hpv16.json` are incompatible with the
+M02 drift gate.
+
+To regenerate against v2.3:
+
+1. **Set up a v2.3 environment** alongside this repo. Two options:
+   - Local clone: `C:/Users/ryanhu/PycharmProjects/hpvsim_v23_frozen` (already
+     present on the user's machine) — activate that repo's venv.
+   - Fresh venv: `python -m venv .v23-venv && .v23-venv/Scripts/pip install
+     hpvsim==2.3` (Windows) or `.v23-venv/bin/pip install hpvsim==2.3`
+     (Linux/macOS).
+
+2. **Update the baseline-generation script (if needed)** to call v2.3's
+   `Sim(...)` API. v2.3's constructor signature differs from v3's — e.g.
+   `genotypes=['hpv16']` (a list) vs. v3's `genotype='hpv16'`
+   (single). For the M02 1-genotype anchor, pass `genotypes=['hpv16']` to v2.3
+   to match the M02 anchor.
+
+3. **Run** the v2.3 baseline-generation script to produce
+   `anchor_hpv16.json` with all 8 keys filled in. The summary keys must
+   match what `tests/regression/anchor_hpv16.py:run_and_summarize()`
+   produces. Use the template provided in the M01 section above as a starting
+   point, but compute all 8 M02 keys (cancer counts, ages, incidence rates).
+
+4. **Place the result at** `tests/regression_baselines/anchor_hpv16.json`.
+   The path is gitignored by `.gitignore` (`tests/regression_baselines/*.json`)
+   so the baseline file stays local-only.
+
+5. **Run the drift gate**:
+
+   ```
+   pytest tests/test_regression.py::test_anchor_hpv16_drift -v
+   ```
+
+   Expected: PASS within ±10% per metric, OR FAIL with a printed list of
+   out-of-tolerance metrics. Per migration convention 2 the gate is
+   informational, not auto-blocking — on failure the PR carries either
+   a fix or an explicit drift-classification note + tracking issue.
+
+### M02-specific notes
+
+- `total cancer deaths` may be 0 in the M02 anchor scenario (1990–2060)
+  because cancer durations average ~8 years and the last cancer-onset events
+  fire in the late 2050s, leaving no time for cancer deaths to realize.
+  Both v2.3 and v3 should agree on this — verify after regenerating.
+- Mean ages of cancer / cancer death rely on starsim freezing `people.age`
+  at agent death. If that assumption changes in a future starsim version,
+  recompute against the actual people-age semantics.
