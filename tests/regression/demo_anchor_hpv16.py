@@ -1,6 +1,7 @@
-"""M01 demo: run the 1-genotype HPV16 anchor and plot aggregate prevalence.
+"""M02 demo: run the 1-genotype HPV16 anchor and plot natural history trajectory.
 
-Visible artifact of the M01 milestone (acceptance gate #4 per the M01
+Extends M01 demo with CIN prevalence and cancer incidence visualization.
+Visible artifact of the M02 milestone (acceptance gate #4 per the M02
 design spec).
 
 Run with:
@@ -25,15 +26,41 @@ def main():
     sim.run()
 
     yearvec = sim.t.yearvec
-    prev = sim.results.hpv16.prevalence
+    res = sim.results.hpv16
+    mod = sim.diseases.hpv16
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(yearvec, prev * 100, label='HPV16 prevalence (M01 anchor)')
-    ax.set_xlabel('Year')
-    ax.set_ylabel('Prevalence (%)')
-    ax.set_title('M01 demo: HPV16 prevalence trajectory, Nigeria 1990-2060')
-    ax.grid(True, alpha=0.3)
+    fig, axes = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
+
+    # Panel 1: HPV prevalence
+    ax = axes[0]
+    ax.plot(yearvec, res.prevalence * 100, color='C0',
+            label='HPV16 prevalence')
+    ax.set_ylabel('HPV16 prevalence (%)')
     ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # Panel 2: CIN prevalence
+    ax = axes[1]
+    n_cin_arr = res.n_cin if 'n_cin' in res else None
+    if n_cin_arr is not None:
+        n_alive_arr = sim.results['n_alive']
+        cin_prev = (n_cin_arr / n_alive_arr) * 100
+        ax.plot(yearvec, cin_prev, color='C1', label='CIN prevalence')
+    ax.set_ylabel('CIN prevalence (%)')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # Panel 3: cumulative cancers
+    ax = axes[2]
+    n_canc_arr = res.n_cancerous if 'n_cancerous' in res else None
+    if n_canc_arr is not None:
+        ax.plot(yearvec, n_canc_arr, color='C3', label='N currently cancerous')
+    ax.set_ylabel('N cancerous')
+    ax.set_xlabel('Year')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    fig.suptitle('M02 demo: HPV16 / CIN / cancer trajectory, Nigeria 1990-2060')
     plt.tight_layout()
     plt.show()
     return fig
