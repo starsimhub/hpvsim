@@ -62,6 +62,19 @@ def _logf2(x, k, x_infl, y_max=1, ttc=25):
     return _logf3(x, k, x_infl, s=1, y_max=y_max, ttc=ttc)
 
 
+def _transform_prob(tp, dysp):
+    '''
+    Returns transformation probability given dysplasia
+    Using formula for half an ellipsoid:
+        V = 1/2 * 4/3 * pi * a*b*c
+          = 2 * a*b*c
+          = 2* dysp * (dysp/2)**2, assuming that b = c = 1/2 a
+          = 1/2 * dysp**3
+    '''
+    # return 1-np.power(1-tp, ((dysp*100)**2))
+    return 1-np.power(1-tp, 0.5*((dysp)**3)*100)
+
+
 # M01 ships defaults (beta, init_prev) tuned to HPV16 only. Other genotypes
 # (hpv18, hi5, ohr) require per-genotype natural-history params that land
 # in M02 + M03 — accepting them here without those defaults would silently

@@ -72,3 +72,35 @@ def test_logf2_matches_quarantine_verbatim():
                 b = v2_logf2(xs, k=k, x_infl=x_infl, ttc=ttc)
                 assert np.allclose(a, b, equal_nan=True), \
                     f'mismatch at k={k} x_infl={x_infl} ttc={ttc}'
+
+
+def test_transform_prob_pinned():
+    """_transform_prob reproduces v2's transform_prob outputs.
+
+    Generated from hpvsim._v2_legacy.utils.transform_prob.
+    """
+    from hpvsim.hpv import _transform_prob
+    out = _transform_prob(2e-3, np.array([0.1, 0.5, 1.0, 2.0]))
+    expected = np.array([0.00010009512368247542, 0.012434560635623426, 0.09525318199596433, 0.55103083492734])
+    assert np.allclose(out, expected, rtol=1e-9)
+
+
+def test_transform_prob_matches_quarantine_verbatim():
+    """_transform_prob is bit-identical to v2's transform_prob over a sweep."""
+    from hpvsim.hpv import _transform_prob
+    from hpvsim._v2_legacy.utils import transform_prob as v2_transform_prob
+    for tp in (1e-4, 2e-3, 1e-2):
+        dysp = np.linspace(0.01, 1.5, 100)
+        a = _transform_prob(tp, dysp)
+        b = v2_transform_prob(tp, dysp)
+        assert np.allclose(a, b, equal_nan=True), f'mismatch at tp={tp}'
+
+
+def test_transform_prob_monotone_in_dysp():
+    """Output is monotonically increasing in dysp (sanity check)."""
+    from hpvsim.hpv import _transform_prob
+    dysp = np.linspace(0.05, 2.0, 50)
+    out = _transform_prob(2e-3, dysp)
+    assert (np.diff(out) >= 0).all()
+    # Bounded in [0, 1]
+    assert (out >= 0).all() and (out <= 1).all()
