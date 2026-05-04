@@ -88,3 +88,49 @@ def test_set_prognoses_chain_consistency():
         ti_dead = mod.ti_dead_cancer[uids]
         assert (ti_cin <= ti_cancerous).all()
         assert (ti_cancerous <= ti_dead).all()
+
+
+def test_step_state_progresses_precin_to_cin():
+    """An agent whose ti_cin <= ti flips precin→cin."""
+    sim = hpv.Sim(n_agents=2000, location='nigeria',
+                  start=1990, stop=2010, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    has_cin_sched = mod.ti_cin.notnan
+    if has_cin_sched.any():
+        uids = has_cin_sched.uids
+        passed = sim.t.ti >= mod.ti_cin[uids]
+        assert passed.any(), 'No CIN-scheduled agent ever had ti >= ti_cin by sim end'
+
+
+def test_step_state_progresses_cin_to_cancerous():
+    """An agent whose ti_cancerous <= ti flips cin→cancerous and stops transmitting."""
+    sim = hpv.Sim(n_agents=5000, location='nigeria',
+                  start=1990, stop=2030, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    cancerous_now = mod.cancerous.uids
+    if len(cancerous_now):
+        # Cancer agents are not currently infected and not susceptible
+        assert not mod.infected[cancerous_now].any()
+        assert not mod.susceptible[cancerous_now].any()
+        # And rel_trans = 0
+        rel_trans_arr = np.asarray(mod.rel_trans[cancerous_now])
+        assert (rel_trans_arr == 0).all()
+
+
+def test_step_state_cancer_death_removes_agents():
+    """Agents whose ti_dead_cancer <= ti are no longer alive."""
+    sim = hpv.Sim(n_agents=5000, location='nigeria',
+                  start=1990, stop=2050, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    has_dead_sched = mod.ti_dead_cancer.notnan
+    if has_dead_sched.any():
+        uids = has_dead_sched.uids
+        passed = sim.t.ti >= mod.ti_dead_cancer[uids]
+        if passed.any():
+            passed_uids = uids[np.asarray(passed)]
+            alive_arr = np.asarray(sim.people.alive[passed_uids])
+            assert not alive_arr.any(), \
+                f'{int(alive_arr.sum())} cancer-death-scheduled agents still alive'

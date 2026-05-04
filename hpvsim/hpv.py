@@ -426,8 +426,55 @@ class HPV(ss.Infection):
         )
 
     def step_state(self):
-        """SIS: agents past ti_clearance return to susceptible."""
-        clearing = (self.infected & (self.ti_clearance <= self.ti)).uids
-        if len(clearing):
-            self.infected[clearing] = False
-            self.susceptible[clearing] = True
+        """Advance agents through the natural-history compartment chain.
+
+        Transitions are applied in this order (order matters — clear first so a
+        just-cleared agent is not accidentally re-flipped by a forward transition
+        at the same timestep):
+
+          1. Clear from precin (SIS path) — precin→susceptible, no CIN scheduled
+          2. Clear from CIN (regression path) — CIN→susceptible, no cancer scheduled
+          3. Precin → CIN (ti_cin reached)
+          4. CIN → cancerous (ti_cancerous reached; stops transmitting)
+          5. Cancer death (ti_dead_cancer reached; routed through people death pipeline)
+
+        ``request_death`` API: ``self.sim.people.request_death(uids)`` — see
+        starsim/people.py line 412; takes only a uid array, no extra kwargs.
+        """
+        ti = self.ti
+
+        # --- 1. Clear from precin (SIS path: precin with no CIN scheduled) ---
+        cleared = (self.infected & self.precin & ~self.cin & ~self.cancerous
+                   & (self.ti_clearance <= ti)).uids
+        if len(cleared):
+            self.infected[cleared] = False
+            self.susceptible[cleared] = True
+            self.precin[cleared] = False
+
+        # --- 2. Clear from CIN (CIN regression: had CIN, no cancer scheduled) ---
+        cleared_from_cin = (self.infected & self.cin & ~self.cancerous
+                            & (self.ti_clearance <= ti)).uids
+        if len(cleared_from_cin):
+            self.infected[cleared_from_cin] = False
+            self.susceptible[cleared_from_cin] = True
+            self.cin[cleared_from_cin] = False
+
+        # --- 3. Precin → CIN ---
+        to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
+        if len(to_cin):
+            self.precin[to_cin] = False
+            self.cin[to_cin] = True
+
+        # --- 4. CIN → cancerous (no longer infectious, no longer re-infectable) ---
+        to_cancerous = (self.cin & ~self.cancerous & (self.ti_cancerous <= ti)).uids
+        if len(to_cancerous):
+            self.cin[to_cancerous] = False
+            self.cancerous[to_cancerous] = True
+            self.infected[to_cancerous] = False
+            self.susceptible[to_cancerous] = False
+            self.rel_trans[to_cancerous] = 0.0
+
+        # --- 5. Cancer death: route through starsim's people death pipeline ---
+        to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
+        if len(to_dead):
+            self.sim.people.request_death(to_dead)
