@@ -15,6 +15,53 @@ import numpy as np
 import starsim as ss
 
 
+# ---------------------------------------------------------------------------
+# Math helpers ported verbatim from hpvsim._v2_legacy.utils (v2).
+# Renamed with leading underscore to mark as private to this module.
+# These implement the logistic-2 (logf2) family used by cin_fn / cancer_fn.
+# ---------------------------------------------------------------------------
+
+def _get_asymptotes(k, x_infl, s=1, y_max=1, ttc=25):
+    '''
+    Get upper asymptotes for logistic functions
+    '''
+    term1 = (1 + np.exp(k*(x_infl-ttc)))**s # Note, this is 1 for most parameter combinations
+    term2 = (1 + np.exp(k*x_infl))**s
+    u_asymp_num = y_max*term1*(1-term2)
+    u_asymp_denom = term1 - term2
+    u_asymp = u_asymp_num / u_asymp_denom
+    l_asymp = y_max * term1 / (term1 - term2)
+    return l_asymp, u_asymp
+
+
+def _logf3(x, k, x_infl, s=1, y_max=1, ttc=25):
+    '''
+    Logistic function passing through (0,0) and (ttc,y_max).
+    This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+    However, since it's constrained to pass through 2 points, there are 3 free parameters remaining.
+    Args:
+         k: growth rate, equivalent to b in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         x_infl: a location parameter, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         s: asymmetry parameter, equivalent to s in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
+    '''
+    l_asymp, u_asymp = _get_asymptotes(k, x_infl, s=1, y_max=y_max, ttc=ttc)
+    return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
+
+
+def _logf2(x, k, x_infl, y_max=1, ttc=25):
+    '''
+    Logistic function constrained to pass through (0,0) and (ttc,y_max).
+    This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+    Since it's constrained to pass through 2 points, there are 3 free parameters remaining, and this verison fixes s=1
+    Args:
+         k: growth rate, equivalent to b in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         x_infl: point of inflection, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
+    '''
+    return _logf3(x, k, x_infl, s=1, y_max=y_max, ttc=ttc)
+
+
 # M01 ships defaults (beta, init_prev) tuned to HPV16 only. Other genotypes
 # (hpv18, hi5, ohr) require per-genotype natural-history params that land
 # in M02 + M03 — accepting them here without those defaults would silently
