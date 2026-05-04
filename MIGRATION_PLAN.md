@@ -108,6 +108,8 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Port `pop_scale` / `total_pop`.
 - Port age-specific migration (from v2 `people.check_migration`).
 - Add tests: HPV16 CIN/cancer trajectories match v2 1-genotype baseline.
+- Tighten partnership-network equivalence beyond M01 thresholds. M01 closes the n_pairs / mean_dur / concurrency_max / mixing-cosine gates (50% / 50% / ±2 / 0.85), but the casual layer still sits ~35-40% above v2 on count and ~20-25% on mean duration; the marital layer matches within 2-3%. v3 prod and a numpy-RNG variant of the network track each other (~1.5% apart) but diverge from v2 the same way, so the residual is algorithmic, not RNG-stream. Most likely culprit: cross-layer concurrency uses sibling-edge counts in v3 vs per-layer `current_partners` arrays in v2. Investigate and tighten the gate (target: each metric within 10-15% of v2 instead of 50%).
+- Add a "legacy-network" parity test that runs v2's `create_edgelist` directly inside v3 (e.g., as a `LegacyV2SexualNetwork(ss.SexualNetwork)` subclass that delegates to `hpvsim._v2_legacy.population.create_edgelist` with v2-format inputs). With matched RNG seeds this should reproduce v2 nearly exactly and gives a tight upper bound on what the v3 algorithmic port can achieve. Use it as a regression anchor while tightening the production network in the bullet above.
 
 ### M3: Multi-genotype and cross-immunity
 

@@ -40,8 +40,9 @@ classifiers = [
 dependencies = [
     'numpy',
     'scipy',
-    'pandas>=2.0.0', 
+    'pandas>=2.0.0',
     'sciris>=3.0.0',
+    'starsim>=3.3',
     'matplotlib',
     'seaborn',
     'optuna',
