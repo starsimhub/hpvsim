@@ -295,6 +295,12 @@ class HPV(ss.Infection):
             cin_fn=dict(form='logf2', k=0.3, x_infl=0, ttc=50),
             cancer_fn=dict(method='cin_integral', transform_prob=2e-3,
                            form='logf2', k=0.3, x_infl=0, ttc=50),
+            # M02 Bernoulli distributions for CIN and cancer draws.
+            # Placeholder p=0.5 is overwritten per-call via .set(p=per_agent_arr)
+            # in set_prognoses; they live in pars so starsim initializes them
+            # (links RNG, registers slots) before the first set_prognoses call.
+            _cin_bern=ss.bernoulli(p=0.5),
+            _cancer_bern=ss.bernoulli(p=0.5),
         )
         self.update_pars(pars=pars, **kwargs)
         # ss.Infection already provides: susceptible, infected, rel_sus,
@@ -324,8 +330,16 @@ class HPV(ss.Infection):
         )
 
     def set_prognoses(self, uids, sources=None):
-        """Mark uids as infected; schedule clearance per dur_inf; record
-        ti_first_infection for never-before-infected agents.
+        """Sample full natural-history trajectory for newly-infected agents.
+
+        Mirrors v2's _v2_legacy/people.py:set_prognoses algorithm:
+          - precin sampled for everyone (males + females)
+          - probability of CIN computed via _compute_severity(dur_precin, cin_fn);
+            only females eligible. Non-CIN agents clear after dur_precin.
+          - probability of cancer computed via _compute_severity(dur_cin,
+            cancer_fn). Non-cancer CIN agents clear after dur_precin + dur_cin.
+          - cancer agents get ti_cancerous and ti_dead_cancer scheduled;
+            cancer-caused removal is handled in step_state via people.request_death.
 
         Initial seeding via ``init_post → set_prognoses`` also flows through
         here, so init_prev-seeded agents get their ti_first_infection set
@@ -337,14 +351,79 @@ class HPV(ss.Infection):
         # infection states explicitly below.
         super().set_prognoses(uids, sources)
         ti = self.ti
+        p = self.pars
+
         # Record first-ever infection time only for agents whose
         # ti_first_infection is still NaN.
         first_uids = uids[self.ti_first_infection.isnan[uids]]
         self.ti_first_infection[first_uids] = ti
+
         self.susceptible[uids] = False
         self.infected[uids] = True
         self.ti_infected[uids] = ti
-        self.ti_clearance[uids] = ti + self.pars.dur_precin.rvs(uids)
+
+        # Mark precin compartment for all newly-infected agents.
+        self.precin[uids] = True
+
+        # Reset trajectory fields so re-infection always starts from a clean slate.
+        # v2 resets these fields at clearance time (people.py:696-701); here we
+        # do it at the start of set_prognoses so that any stale values from a
+        # prior infection don't conflict with the newly sampled trajectory.
+        # Task 9 (step_state) will perform the same reset at clearance.
+        nan = np.nan
+        self.ti_clearance[uids] = nan
+        self.ti_cin[uids] = nan
+        self.ti_cancerous[uids] = nan
+        self.ti_dead_cancer[uids] = nan
+        self.dur_cin[uids] = nan
+
+        # 1. Sample precin durations for everyone (males + females).
+        dur_precin = p.dur_precin.rvs(uids)
+        self.dur_precin[uids] = dur_precin
+
+        # 2. Probability of CIN — computed from dur_precin via cin_fn.
+        #    Only females are eligible for CIN; males always clear after precin.
+        female = np.asarray(self.sim.people.female[uids])
+        p_cin = _compute_severity(np.asarray(dur_precin), pars=p.cin_fn)
+        p._cin_bern.set(p=p_cin)
+        cin_draw = p._cin_bern.rvs(uids)
+        cin_mask = cin_draw & female       # boolean array, len == len(uids)
+        cin_uids = uids[cin_mask]
+        nocin_uids = uids[~cin_mask]
+
+        # 3. Branch A: clearance from precin (males + non-CIN females).
+        self.ti_clearance[nocin_uids] = ti + dur_precin[~cin_mask]
+
+        if len(cin_uids) == 0:
+            return
+
+        # 4. Branch B: progression to CIN.
+        self.ti_cin[cin_uids] = ti + dur_precin[cin_mask]
+        dur_cin = p.dur_cin.rvs(cin_uids)
+        self.dur_cin[cin_uids] = dur_cin
+
+        # 5. Probability of cancer given dur_cin.
+        p_cancer = _compute_severity(np.asarray(dur_cin), pars=p.cancer_fn)
+        p._cancer_bern.set(p=p_cancer)
+        cancer_draw = p._cancer_bern.rvs(cin_uids)
+        cancer_uids = cin_uids[cancer_draw]
+        nocancer_uids = cin_uids[~cancer_draw]
+
+        # 5a. Sub-branch: clear after CIN (no cancer).
+        self.ti_clearance[nocancer_uids] = (
+            self.ti_cin[nocancer_uids] + dur_cin[~cancer_draw]
+        )
+
+        # 5b. Sub-branch: progression to cancer.
+        if len(cancer_uids) == 0:
+            return
+        self.ti_cancerous[cancer_uids] = (
+            self.ti_cin[cancer_uids] + dur_cin[cancer_draw]
+        )
+        dur_cancer = p.dur_cancer.rvs(cancer_uids)
+        self.ti_dead_cancer[cancer_uids] = (
+            self.ti_cancerous[cancer_uids] + dur_cancer
+        )
 
     def step_state(self):
         """SIS: agents past ti_clearance return to susceptible."""

@@ -46,3 +46,45 @@ def test_hpv_progression_pars_match_v2_hpv16():
     # Lognormal is non-negative; check shape and positivity.
     assert len(durs) == 5000
     assert np.all(durs >= 0)
+
+
+def test_set_prognoses_assigns_ti_clearance_or_ti_cin():
+    """Every newly-infected agent has either ti_clearance or ti_cin set."""
+    sim = hpv.Sim(n_agents=500, location='nigeria',
+                  start=1990, stop=1992, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    ever_infected = mod.ti_first_infection.notnan
+    has_clearance = mod.ti_clearance.notnan
+    has_cin = mod.ti_cin.notnan
+    assert (has_clearance | has_cin)[ever_infected].all()
+
+
+def test_set_prognoses_cancer_only_in_females():
+    """Males never progress to CIN; only females reach ti_cin / ti_cancerous."""
+    sim = hpv.Sim(n_agents=2000, location='nigeria',
+                  start=1990, stop=2000, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    has_cin = mod.ti_cin.notnan
+    has_cancer = mod.ti_cancerous.notnan
+    males = ~sim.people.female
+    assert not (has_cin & males).any()
+    assert not (has_cancer & males).any()
+
+
+def test_set_prognoses_chain_consistency():
+    """For agents with cancer scheduled: ti_cin <= ti_cancerous <= ti_dead_cancer."""
+    sim = hpv.Sim(n_agents=5000, location='nigeria',
+                  start=1990, stop=2000, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    has_cancer_sched = mod.ti_cancerous.notnan
+    if has_cancer_sched.any():
+        uids = has_cancer_sched.uids
+        # Compare time-step values directly
+        ti_cin = mod.ti_cin[uids]
+        ti_cancerous = mod.ti_cancerous[uids]
+        ti_dead = mod.ti_dead_cancer[uids]
+        assert (ti_cin <= ti_cancerous).all()
+        assert (ti_cancerous <= ti_dead).all()
