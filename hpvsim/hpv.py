@@ -278,7 +278,23 @@ class HPV(ss.Infection):
         self.define_pars(
             init_prev=ss.bernoulli(p=_age_stratified_init_prev),
             beta=0.25,
-            dur_inf=ss.lognorm_ex(mean=ss.years(2.0)),
+            # M02 progression durations (sourced from GenotypePars('hpv16') —
+            # v2 _v2_legacy/parameters.py:337,339 + 96):
+            #   dur_precin: lognormal(par1=3, par2=9)   — mean=3y, std=9y
+            #   dur_cin:    lognormal(par1=5, par2=20)  — mean=5y, std=20y
+            #   dur_cancer: lognormal(par1=8, par2=3)   — mean=8y, std=3y
+            # par1/par2 are mean/std of the lognormal itself per
+            # _v2_legacy/utils.py:239 (sample('lognormal') docstring).
+            dur_precin=ss.lognorm_ex(mean=ss.years(3.0), std=ss.years(9.0)),
+            dur_cin=ss.lognorm_ex(mean=ss.years(5.0), std=ss.years(20.0)),
+            dur_cancer=ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0)),
+            # M02 severity functions (passed verbatim to _compute_severity).
+            # cancer_fn flattens cin_fn's keys so _compute_severity's cin_integral
+            # branch can run _compute_severity_integral internally (matching v2's
+            # _v2_legacy/people.py:274 merge-on-call pattern).
+            cin_fn=dict(form='logf2', k=0.3, x_infl=0, ttc=50),
+            cancer_fn=dict(method='cin_integral', transform_prob=2e-3,
+                           form='logf2', k=0.3, x_infl=0, ttc=50),
         )
         self.update_pars(pars=pars, **kwargs)
         # ss.Infection already provides: susceptible, infected, rel_sus,
@@ -291,8 +307,20 @@ class HPV(ss.Infection):
         #    naturally first-only; M01's SIS would overwrite ti_infected
         #    on re-infection, hence this separate state).
         self.define_states(
+            # M01 states
             ss.FloatArr('ti_clearance', label='Time of natural clearance'),
             ss.FloatArr('ti_first_infection', label='Time of first infection'),
+            # M02 progression compartments
+            ss.BoolState('precin', label='Precancerous infection'),
+            ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
+            ss.BoolState('cancerous', label='Invasive cancer'),
+            # M02 scheduled transition times
+            ss.FloatArr('ti_cin', label='Time of CIN onset'),
+            ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
+            ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
+            # M02 sampled durations (kept for analyzers/diagnostics)
+            ss.FloatArr('dur_precin', label='Sampled duration of precin'),
+            ss.FloatArr('dur_cin', label='Sampled duration of CIN'),
         )
 
     def set_prognoses(self, uids, sources=None):
@@ -316,7 +344,7 @@ class HPV(ss.Infection):
         self.susceptible[uids] = False
         self.infected[uids] = True
         self.ti_infected[uids] = ti
-        self.ti_clearance[uids] = ti + self.pars.dur_inf.rvs(uids)
+        self.ti_clearance[uids] = ti + self.pars.dur_precin.rvs(uids)
 
     def step_state(self):
         """SIS: agents past ti_clearance return to susceptible."""

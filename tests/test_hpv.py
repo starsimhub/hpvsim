@@ -19,7 +19,7 @@ def _minimal_sim(genotype='hpv16', n_agents=1000, init_prev=0.05, beta=0.3,
         genotype=genotype,
         init_prev=ss.bernoulli(p=init_prev),
         beta=ss.peryear(beta),
-        dur_inf=ss.lognorm_ex(mean=ss.years(dur_years)),
+        dur_precin=ss.lognorm_ex(mean=ss.years(dur_years)),
     )
     sim = ss.Sim(
         diseases=hpv,
