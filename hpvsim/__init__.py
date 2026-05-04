@@ -23,6 +23,7 @@ from .defaults import datadir, default_int, default_float, get_default_plots
 from . import data
 from . import migration_utils
 from . import parameters
+from .parameters import SimPars, GenotypePars, get_genotype_pars
 from . import misc
 from . import utils
 
@@ -36,6 +37,7 @@ rootdir = sc.thispath(__file__).parent
 __all__ = [
     'HPV', 'Poisson1', 'SexualNetwork', 'Sim', 'data', 'migration_utils',
     'options', 'datadir', '__version__',
+    'SimPars', 'GenotypePars', 'get_genotype_pars',
 ]
 
 del sc
