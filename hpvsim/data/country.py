@@ -34,12 +34,123 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 
-from .. import parameters as _params
 from ..migration_utils import _v2_dist_to_starsim
 from . import loaders as _loaders
 
 
 _KNOWN_LOCATIONS = ['nigeria']  # M01 ships with Nigeria only; expand as needed.
+
+
+def _default_network_pars(location):  # noqa: ARG001  (location reserved for future per-country data)
+    """Return the subset of v2 ``make_pars(location=location)`` that country.py consumes.
+
+    Values are copied verbatim from v2's ``make_pars`` / ``reset_layer_pars`` /
+    ``get_mixing`` for ``network='default'``. The ``location`` argument is
+    accepted for API symmetry (and future extension) but currently has no effect
+    on network parameters — v2's defaults are location-agnostic for Nigeria.
+
+    Keys returned:
+        debut, f_cross_layer, m_cross_layer,
+        f_partners, m_partners, acts, dur_pship,
+        mixing, layer_probs
+    """
+    # ------------------------------------------------------------------ #
+    # Verbatim from v2 make_pars (network-parameter block only)           #
+    # ------------------------------------------------------------------ #
+    debut = dict(
+        f=dict(dist='normal', par1=15.0, par2=2.1),
+        m=dict(dist='normal', par1=17.6, par2=1.8),
+    )
+    f_cross_layer = 0.185  # Annual prob of females having concurrent cross-layer relationships
+    m_cross_layer = 0.760  # Annual prob of males having concurrent cross-layer relationships
+
+    # ------------------------------------------------------------------ #
+    # Verbatim from v2 reset_layer_pars (network='default')               #
+    # ------------------------------------------------------------------ #
+    m_partners = dict(
+        m=dict(dist='poisson1', par1=0.01),
+        c=dict(dist='poisson1', par1=0.5),
+    )
+    f_partners = dict(
+        m=dict(dist='poisson1', par1=0.01),
+        c=dict(dist='poisson', par1=1),
+    )
+    acts = dict(
+        m=dict(dist='neg_binomial', par1=80, par2=40),
+        c=dict(dist='neg_binomial', par1=50, par2=5),
+    )
+    dur_pship = dict(
+        m=dict(dist='neg_binomial', par1=80, par2=3),
+        c=dict(dist='lognormal', par1=1, par2=2),
+    )
+
+    # ------------------------------------------------------------------ #
+    # Verbatim from v2 get_mixing(network='default')                      #
+    # ------------------------------------------------------------------ #
+    mixing = dict(
+        m=np.array([
+            #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
+            [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [10,    0,  0, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0, .1, .1, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0, .5, .1, .5, .1, .1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  1, .5, .5, .5, .5, .1,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0, .5,  1,  1, .5,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0, .5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0, .1,  1,  1,  2,  1,  1, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0, .1,  1,  1,  1,  1,  2, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0, .1, .5,  1,  1,  1,  2, .5,  0,  0],
+            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, .5,  0],
+            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1, .5],
+            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1],
+        ], dtype=float),
+        c=np.array([
+            #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
+            [ 0,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 5,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [10,    0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [15,    0,  0,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [20,    0,  0,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [25,    0,  0, .5,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0],
+            [30,    0,  0,  0, .5,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0,  0],
+            [35,    0,  0,  0, .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0,  0],
+            [40,    0,  0,  0,  0, .5,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0,  0],
+            [45,    0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0,  0],
+            [50,    0,  0,  0,  0,  0, .5,  1,  1,  1,  1,  1, .5,  0,  0,  0,  0],
+            [55,    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0,  0],
+            [60,    0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5,  0,  0],
+            [65,    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, .5,  0],
+            [70,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1, .5],
+            [75,    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1],
+        ], dtype=float),
+    )
+    layer_probs = dict(
+        m=np.array([
+            [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
+            [ 0,    0,  0.0394, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.760, 0.590, 0.344, 0.185, 0.0394],  # Annual prob of females seeking marriage if underpartnered
+            [ 0,    0,  0.0394, 0.590, 0.760, 0.938, 0.938, 0.938, 0.938, 0.938, 0.938, 0.760, 0.590, 0.344, 0.185, 0.0394], # Annual prob of males seeking marriage if underpartnered
+        ], dtype=float),
+        c=np.array([
+            [ 0,    5,      10,     15,    20,    25,    30,    35,     40,     45,     50,    55,    60,    65,    70,    75],
+            [ 0,    0,  0.590, 0.974, 0.998, 0.974, 0.870, 0.870, 0.870, 0.344, 0.0776, 0.0776, 0.0776, 0.0776, 0.0776, 0.0776],  # Annual prob of females seeking casual relationships if underpartnered
+            [ 0,    0,  0.590, 0.870, 0.870, 0.870, 0.870, 0.974, 0.998, 0.974, 0.590, 0.344, 0.185, 0.0776, 0.0776, 0.0776],    # Annual prob of males seeking casual relationships if underpartnered
+        ], dtype=float),
+    )
+
+    return dict(
+        debut=debut,
+        f_cross_layer=f_cross_layer,
+        m_cross_layer=m_cross_layer,
+        f_partners=f_partners,
+        m_partners=m_partners,
+        acts=acts,
+        dur_pship=dur_pship,
+        mixing=mixing,
+        layer_probs=layer_probs,
+    )
 
 
 def load_country(location):
@@ -120,7 +231,7 @@ def _network_pars(location):
     Returns ``{'m': {...}, 'c': {...}}`` where each layer dict has:
     partners, mixing, layer_probs, cross_layer, duration, acts, debut.
     """
-    default_pars = _params.make_pars(location=location)
+    default_pars = _default_network_pars(location)
     annual = ss.years(1)  # unit shared by all annual probability params
 
     # Per-sex cross-layer concurrency is an annual probability in v2.
