@@ -305,12 +305,20 @@ class HPV(ss.Infection):
             cancer_fn=dict(method='cin_integral', transform_prob=2e-3,
                            form='logf2', k=0.3, x_infl=0, ttc=50),
             # M02 same-genotype partial permanent immunity.
-            # Source: v2 _v2_legacy/parameters.py:102 — imm_init=dict(dist='beta_mean',
-            # par1=0.35, par2=0.025). We use the scalar mean (0.35) directly;
-            # v2's variance (0.025) is small and beta-distributed sampling is M03 scope.
-            # On clearance: rel_sus *= (1 - imm_init), i.e. agent retains ~65%
-            # per-act susceptibility. use_waning=False in v2, so no decay applied.
+            # Source: v2 _v2_legacy/parameters.py:102-104 — imm_init / cell_imm_init
+            # both `dict(dist='beta_mean', par1=..., par2=0.025)`. We use the
+            # scalar means (0.35 / 0.25) directly; v2's variance (0.025) is small
+            # and beta-distributed sampling is M03 scope. use_waning=False in v2
+            # by default, so no decay applied.
+            #
+            # On clearance:
+            #   rel_sus[uid] = min(rel_sus[uid], 1 - imm_init)        # ~0.65
+            #   rel_sev[uid] = min(rel_sev[uid], 1 - cell_imm_init)   # ~0.75
+            # imm_init reduces per-act susceptibility (transmission); cell_imm_init
+            # reduces severity (rel_sev * dur in compute_severity), damping
+            # cancer-progression probability for re-infections.
             imm_init=0.35,
+            cell_imm_init=0.25,
             # M02 Bernoulli distributions for CIN and cancer draws.
             # Placeholder p=0.5 is overwritten per-call via .set(p=per_agent_arr)
             # in set_prognoses; they live in pars so starsim initializes them
@@ -343,6 +351,12 @@ class HPV(ss.Infection):
             # M02 sampled durations (kept for analyzers/diagnostics)
             ss.FloatArr('dur_precin', label='Sampled duration of precin'),
             ss.FloatArr('dur_cin', label='Sampled duration of CIN'),
+            # M02 relative severity multiplier (cell_imm reduction lands here).
+            # Default 1.0 = full severity. On clearance, capped at
+            # (1 - cell_imm_init), e.g. 0.75 — re-infection severity is damped.
+            # v2 stores rel_sev per-agent (sampled at set_static); we keep it
+            # constant at 1.0 for naive agents and apply post-clearance capping.
+            ss.FloatArr('rel_sev', label='Relative severity', default=1.0),
         )
 
     def set_prognoses(self, uids, sources=None):
@@ -399,8 +413,13 @@ class HPV(ss.Infection):
 
         # 2. Probability of CIN — computed from dur_precin via cin_fn.
         #    Only females are eligible for CIN; males always clear after precin.
+        #    rel_sev (per-agent severity multiplier) damps cancer probability
+        #    for re-infected agents whose rel_sev was reduced on prior clearance.
         female = np.asarray(self.sim.people.female[uids])
-        p_cin = _compute_severity(np.asarray(dur_precin), pars=p.cin_fn)
+        rel_sev_uids = np.asarray(self.rel_sev[uids])
+        p_cin = _compute_severity(np.asarray(dur_precin),
+                                  rel_sev=rel_sev_uids,
+                                  pars=p.cin_fn)
         p._cin_bern.set(p=p_cin)
         cin_draw = p._cin_bern.rvs(uids)
         cin_mask = cin_draw & female       # boolean array, len == len(uids)
@@ -418,8 +437,12 @@ class HPV(ss.Infection):
         dur_cin = p.dur_cin.rvs(cin_uids)
         self.dur_cin[cin_uids] = dur_cin
 
-        # 5. Probability of cancer given dur_cin.
-        p_cancer = _compute_severity(np.asarray(dur_cin), pars=p.cancer_fn)
+        # 5. Probability of cancer given dur_cin (with rel_sev damping for
+        #    re-infections — cell_imm reduces rel_sev on prior clearance).
+        rel_sev_cin = np.asarray(self.rel_sev[cin_uids])
+        p_cancer = _compute_severity(np.asarray(dur_cin),
+                                     rel_sev=rel_sev_cin,
+                                     pars=p.cancer_fn)
         p._cancer_bern.set(p=p_cancer)
         cancer_draw = p._cancer_bern.rvs(cin_uids)
         cancer_uids = cin_uids[cancer_draw]
@@ -461,12 +484,13 @@ class HPV(ss.Infection):
 
         # --- 1. Clear from precin (partial-immunity path) ---
         # M02: clearance returns agents to susceptible=True (SIS-like) but caps
-        # rel_sus at (1 - imm_init), capturing v2's partial permanent immunity.
-        # Default imm_init=0.35 (v2's beta_mean par1=0.35; _v2_legacy/parameters.py:102)
-        # ⇒ rel_sus ≤ 0.65 post-clearance. v2 takes np.maximum(prior, new) on
-        # repeat clearances (_v2_legacy/immunity.py:172,175), so a re-cleared
-        # agent's susceptibility doesn't keep compounding downward — matched
-        # here with np.minimum on rel_sus (smaller rel_sus ↔ larger immunity).
+        # rel_sus at (1 - imm_init) and rel_sev at (1 - cell_imm_init), capturing
+        # v2's partial permanent immunity. Defaults imm_init=0.35 / cell_imm_init=0.25
+        # (v2's beta_means; _v2_legacy/parameters.py:102-104) ⇒ rel_sus ≤ 0.65
+        # and rel_sev ≤ 0.75 post-clearance. v2 takes np.maximum(prior, new) on
+        # repeat clearances (_v2_legacy/immunity.py:172,175), so re-clearance
+        # doesn't keep compounding downward — matched with np.minimum on
+        # rel_sus / rel_sev (smaller value ↔ larger immunity).
         cleared = (self.infected & self.precin & ~self.cin & ~self.cancerous
                    & (self.ti_clearance <= ti)).uids
         if len(cleared):
@@ -475,6 +499,8 @@ class HPV(ss.Infection):
             self.precin[cleared] = False
             self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
                                                1.0 - self.pars.imm_init)
+            self.rel_sev[cleared] = np.minimum(self.rel_sev[cleared],
+                                               1.0 - self.pars.cell_imm_init)
 
         # --- 2. Clear from CIN (CIN regression; same partial-immunity logic) ---
         cleared_from_cin = (self.infected & self.cin & ~self.cancerous
@@ -485,6 +511,8 @@ class HPV(ss.Infection):
             self.cin[cleared_from_cin] = False
             self.rel_sus[cleared_from_cin] = np.minimum(self.rel_sus[cleared_from_cin],
                                                         1.0 - self.pars.imm_init)
+            self.rel_sev[cleared_from_cin] = np.minimum(self.rel_sev[cleared_from_cin],
+                                                        1.0 - self.pars.cell_imm_init)
 
         # --- 3. Precin → CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
