@@ -210,10 +210,16 @@ def test_m02_capability_age_stratified_cancers():
     PARS in a v2.3 environment and capturing
     sim.results['cancer_incidence_by_age'] at year 2059, saved as JSON.
     """
+    # v2's default age_bin_edges has 18 bins ([0, 5, ..., 80, 85, 100]) —
+    # different from hpv.AgeResults's default 20-bin (5y over 0-100). Pass
+    # v2's edges so v3 produces a shape-compatible baseline.
+    v2_age_bins = np.array([0, 5, 10, 15, 20, 25, 30, 35, 40, 45,
+                            50, 55, 60, 65, 70, 75, 80, 85, 100])
     pars = dict(n_agents=10_000, location='nigeria', genotype='hpv16',
                 start=1990, stop=2060, dt=0.25, rand_seed=0)
     sim = hpv.Sim(**pars,
                   analyzers=[hpv.AgeResults(results=('cancer',),
+                                             age_bins=v2_age_bins,
                                              year=[2059])])
     sim.run()
     az = sim.analyzers.age_results
