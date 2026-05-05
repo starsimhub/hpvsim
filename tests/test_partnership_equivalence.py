@@ -1,19 +1,21 @@
-"""M01 acceptance gate: partnership patterns vs. v2.x.
+"""M02 acceptance gate: partnership patterns vs. v2.x.
 
 Per-layer comparison of:
-  - age-mixing matrix (5y bins, 0-80, female x male)
-  - concurrency distribution (n_concurrent_partners histogram)
-  - partnership duration distribution
+  - active pair count (within 10%)
+  - mean partnership duration in years (within 10%)
+  - max concurrency (within +/-1)
+  - age-mixing matrix shape via cosine similarity (>= 0.90)
 
 Against v2 baselines stored in tests/regression_baselines/partnership_v2.json
 (gitignored; generation procedure documented in tests/regression/README.md).
 
 v2 has 2 layers (m, c); the test parametrizes over both.
 
-Pass criteria:
-  - mixing-matrix bin-wise relative diff < 15% (per non-zero bin)
-  - concurrency: KS-test p > 0.01
-  - duration: KS-test p > 0.01
+These thresholds were tightened from the M01 release (50% / 50% / +/-2 / 0.85)
+after three v3 algorithmic fixes brought all metrics within ~3% of v2:
+  - shared per-agent debut across SexualNetwork layers
+  - all-layer dissolve-then-create step ordering (was per-layer interleaved)
+  - AgeMigration in default Sim demographics
 """
 
 import json
@@ -151,26 +153,31 @@ def _cosine_similarity(a, b):
     return float(np.dot(a, b) / (na * nb))
 
 
+_PAIR_COUNT_TOL = 0.10
+_MEAN_DUR_TOL = 0.10
+_CONCURRENCY_MAX_DELTA = 1
+_MIXING_COSINE_FLOOR = 0.90
+
+
 @pytest.mark.parametrize('layer', ['m', 'c'])
 def test_active_pair_count(v3_stats, v2_stats, layer):
-    """Active pair count matches v2 within 50% (catches order-of-magnitude bugs)."""
+    """Active pair count matches v2 within 10%."""
     v3_n = _pair_count(v3_stats[layer]['concurrency_hist'])
     v2_n = _pair_count(v2_stats[layer]['concurrency_hist'])
-    if v2_n < 10:  # too few to compare meaningfully
+    if v2_n < 10:
         pytest.skip(f'layer {layer}: v2 has only {v2_n} active pairs')
     rel = _rel(v3_n, v2_n)
-    assert rel < 0.5, \
-        f'layer {layer} active pair count v3={v3_n} vs v2={v2_n} (rel diff {rel:.2f} >= 0.5)'
+    assert rel < _PAIR_COUNT_TOL, \
+        f'layer {layer} active pair count v3={v3_n} vs v2={v2_n} (rel diff {rel:.2%} >= {_PAIR_COUNT_TOL:.0%})'
 
 
 @pytest.mark.parametrize('layer', ['m', 'c'])
 def test_concurrency_max(v3_stats, v2_stats, layer):
-    """Max simultaneous partnerships per agent in this layer matches v2.
+    """Max simultaneous partnerships per agent in this layer matches v2 within ±1.
 
-    Avoids the alive-count-contamination of mean-per-agent (v2 and v3 may
-    have different alive counts due to demographic dynamics over the run);
-    the max is determined purely by partner-count distributions and
-    concurrency rules.
+    The max is determined purely by partner-count distributions and concurrency
+    rules, so it's robust to alive-count differences. ±1 absorbs single-run
+    Monte Carlo tail noise.
     """
     v3_hist = np.asarray(v3_stats[layer]['concurrency_hist'])
     v2_hist = np.asarray(v2_stats[layer]['concurrency_hist'])
@@ -181,27 +188,26 @@ def test_concurrency_max(v3_stats, v2_stats, layer):
     v2_n = _pair_count(v2_stats[layer]['concurrency_hist'])
     if v2_n < 100:
         pytest.skip(f'layer {layer}: v2 has only {v2_n} active pairs (max-concurrency tail unstable at end-of-sim)')
-    # Allow ±2 (single-run Monte Carlo noise on the tail of the distribution).
-    assert abs(v3_max - v2_max) <= 2, \
-        f'layer {layer} max concurrency v3={v3_max} vs v2={v2_max}'
+    assert abs(v3_max - v2_max) <= _CONCURRENCY_MAX_DELTA, \
+        f'layer {layer} max concurrency v3={v3_max} vs v2={v2_max} (delta > {_CONCURRENCY_MAX_DELTA})'
 
 
 @pytest.mark.parametrize('layer', ['m', 'c'])
 def test_mean_duration(v3_stats, v2_stats, layer):
-    """Mean partnership duration (years) matches v2 within 50%."""
+    """Mean partnership duration (years) matches v2 within 10%."""
     v3_dur = np.asarray(v3_stats[layer]['duration_samples'])
     v2_dur = np.asarray(v2_stats[layer]['duration_samples'])
     if len(v3_dur) < 30 or len(v2_dur) < 30:
         pytest.skip(f'layer {layer}: too few duration samples ({len(v3_dur)} vs {len(v2_dur)})')
     v3_mean, v2_mean = float(v3_dur.mean()), float(v2_dur.mean())
     rel = _rel(v3_mean, v2_mean)
-    assert rel < 0.5, \
-        f'layer {layer} mean dur v3={v3_mean:.2f}y vs v2={v2_mean:.2f}y (rel diff {rel:.2f})'
+    assert rel < _MEAN_DUR_TOL, \
+        f'layer {layer} mean dur v3={v3_mean:.2f}y vs v2={v2_mean:.2f}y (rel diff {rel:.2%} >= {_MEAN_DUR_TOL:.0%})'
 
 
 @pytest.mark.parametrize('layer', ['m', 'c'])
 def test_mixing_matrix_shape(v3_stats, v2_stats, layer):
-    """Age-mixing matrix shape (cosine similarity) matches v2 above 0.85.
+    """Age-mixing matrix shape (cosine similarity) matches v2 above 0.90.
 
     Cosine similarity tolerates Monte Carlo noise per-bin while still
     catching gross structural mismatch (e.g., wrong age preferences).
@@ -214,5 +220,5 @@ def test_mixing_matrix_shape(v3_stats, v2_stats, layer):
     if v2_n < 100:
         pytest.skip(f'layer {layer}: v2 has only {v2_n} active pairs (too few for stable mixing-matrix shape)')
     sim = _cosine_similarity(v3, v2)
-    assert sim > 0.85, \
-        f'layer {layer} mixing matrix cosine similarity {sim:.3f} <= 0.85'
+    assert sim > _MIXING_COSINE_FLOOR, \
+        f'layer {layer} mixing matrix cosine similarity {sim:.3f} <= {_MIXING_COSINE_FLOOR}'
