@@ -76,7 +76,12 @@ class AgeResults(ss.Analyzer):
             if not hasattr(disease, 'ti_cancerous'):
                 continue
 
-            ti_arr = np.asarray(disease.ti_cancerous)   # float array, len = max_uids
+            # Use .raw to include dead agents (cancer death + background
+            # mortality). Without this, agents who died from cancer are
+            # silently filtered out of the active-uid view — same bug class
+            # as anchor_hpv16.run_and_summarize had.
+            ti_arr = np.asarray(disease.ti_cancerous.raw)
+            age_raw = np.asarray(people.age.raw)
 
             # Only consider agents with a finite (non-NaN) ti_cancerous.
             finite_mask = ~np.isnan(ti_arr)
@@ -94,14 +99,19 @@ class AgeResults(ss.Analyzer):
             if not window.any():
                 continue
 
-            # Get the UIDs / indices of agents in the window.
-            # finite_mask indices correspond to agent positions in ti_arr.
+            # finite_mask indices correspond to agent positions in the .raw arrays.
             all_indices = np.where(finite_mask)[0]
             window_indices = all_indices[window]
-            cancer_uids = ss.uids(window_indices)
 
-            # Get ages of those agents at time of transition (use current age as proxy).
-            cancer_ages = np.asarray(people.age[cancer_uids])
+            # Age at cancer event. Subtracting (year_now - yr_cancerous) from
+            # the agent's stored age recovers age-at-event. For dead agents,
+            # age.raw is frozen at age-of-death; this approximation overshoots
+            # for those who survived past cancer onset and died later — small
+            # bias acceptable for the dev gate.
+            now_year = float(sim.t.now('year'))
+            cancer_ages_raw = age_raw[window_indices]
+            yr_cancerous_window = yr_cancerous[window]
+            cancer_ages = cancer_ages_raw - (now_year - yr_cancerous_window)
             counts, _ = np.histogram(cancer_ages, bins=self.age_bins)
             total_counts += counts.astype(float)
 
