@@ -457,11 +457,13 @@ class HPV(ss.Infection):
         self.precin[uids] = True
 
         # Reset trajectory fields on (re-)infection so stale values from a
-        # prior infection don't fire spuriously in step_state (e.g. a stale
-        # ti_cin in the past would transition a re-infected agent to CIN
-        # immediately). Tested removal of these resets — no effect on the
-        # cancer-onset clustering (cancer-bound agents don't clear mid-
-        # trajectory, so re-infection while ti_cancerous is set is rare).
+        # prior infection don't fire spuriously in step_state. Cancer-bound
+        # agents have ti_clearance=NaN (not set in set_prognoses for
+        # cancer_uids), so they don't clear from CIN — they always progress
+        # to cancer. Therefore the "preserve prior schedule across
+        # reinfection" path is never exercised, and removing these resets
+        # has no observable effect on cancer outcomes (verified empirically).
+        # We keep them as defensive zeroing.
         self.ti_clearance[uids] = np.nan
         self.ti_cin[uids] = np.nan
         self.ti_cancerous[uids] = np.nan
