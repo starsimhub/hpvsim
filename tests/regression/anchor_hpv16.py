@@ -76,57 +76,65 @@ def run_and_summarize():
         mean_age_inf = 0.0
 
     # 2. Total cancers — agents whose ti_cancerous was realized during the sim
-    #    (ti_cancerous <= ti_now).  Agents with ti_cancerous scheduled beyond
-    #    the sim end have their transition pre-computed but never executed, so
-    #    they should not count.  Scaled by pop_scale for real-world counts.
+    #    (ti_cancerous <= ti_now). We must use .raw arrays here, NOT
+    #    `.notnan.uids` which filters by the active-uid pool — dead agents
+    #    (cancer death + background mortality) are dropped from active uids,
+    #    so any cancer event that ended in death would be silently uncounted
+    #    and the cancer-death pipeline would appear to never fire. The .raw
+    #    array preserves the per-uid value across the agent's full lifetime.
     ti_now = float(sim.t.ti)
-    all_cancer_uids = mod.ti_cancerous.notnan.uids
-    if len(all_cancer_uids):
-        ti_cancer_all = np.asarray(mod.ti_cancerous[all_cancer_uids])
-        realized_cancer_mask = ti_cancer_all <= ti_now
-        realized_cancer_uids = all_cancer_uids[realized_cancer_mask]
-        ti_at_cancer = ti_cancer_all[realized_cancer_mask]
-    else:
-        realized_cancer_uids = all_cancer_uids  # empty
-        ti_at_cancer = np.array([], dtype=float)
-    n_cancers = float(len(realized_cancer_uids)) * pop_scale
+    ti_cancer_raw = np.asarray(mod.ti_cancerous.raw)
+    ti_dead_raw = np.asarray(mod.ti_dead_cancer.raw)
+    alive_raw = np.asarray(sim.people.alive.raw)
+    cancer_finite = np.isfinite(ti_cancer_raw)
+    cancer_realized_mask = cancer_finite & (ti_cancer_raw <= ti_now)
+    cancer_realized_idx = np.where(cancer_realized_mask)[0]
+    ti_at_cancer = ti_cancer_raw[cancer_realized_mask]
+    n_cancers = float(cancer_realized_mask.sum()) * pop_scale
 
     # 7. Mean age of cancer onset (realized cancer agents only).
-    if len(realized_cancer_uids):
-        ages_now_c = np.asarray(sim.people.age[realized_cancer_uids])
-        # age_now - (ti_now - ti_cancer)*dt recovers age-at-cancer-onset.
-        # For agents still alive: exact.
-        # For dead agents: people.age is frozen at age-of-death; the subtracted
-        # years_since_cancer overshoots slightly (by post-death frozen-age
-        # delta). Acceptable approximation for M02 dev-gate; refine if needed.
-        years_since_cancer = (ti_now - ti_at_cancer) * dt
+    #    Same .raw discipline — include dead agents.
+    age_raw = np.asarray(sim.people.age.raw)
+    if cancer_realized_mask.any():
+        ages_now_c = age_raw[cancer_realized_idx]
+        # For alive agents: people.age is current age, so years-since-cancer
+        # = (ti_now - ti_cancer) * dt and age_at_cancer = current_age - years_since.
+        # For dead agents: people.age is frozen at age-of-death, so we use
+        # ti_dead_cancer (if cancer-death) or ti_now (proxy for any-cause death,
+        # since starsim freezes age on death) as the effective "now". For
+        # agents whose ti_dead_cancer is set and in the past, that's the
+        # death time; otherwise (background mortality), the agent's age was
+        # frozen at some earlier ti — we don't have direct access to the
+        # exact death ti without an analyzer, so fall back to ti_now which
+        # may slightly underestimate the actual age-at-cancer for those
+        # who died of background mortality between cancer onset and sim end.
+        effective_ti = np.where(
+            alive_raw[cancer_realized_idx],
+            ti_now,
+            np.where(
+                np.isfinite(ti_dead_raw[cancer_realized_idx]),
+                ti_dead_raw[cancer_realized_idx],
+                ti_now,
+            ),
+        )
+        years_since_cancer = (effective_ti - ti_at_cancer) * dt
         mean_age_cancer = float((ages_now_c - years_since_cancer).mean())
     else:
         mean_age_cancer = 0.0
 
     # 3. Total cancer deaths — agents whose ti_dead_cancer is in the past
-    #    AND who are no longer alive.
-    #    Note: starsim removes dead agents from the live pool; after the sim
-    #    ends, people.alive reflects only currently-living agents.  For agents
-    #    who died from cancer (ti_dead_cancer <= ti_now), request_death fires
-    #    step_die which sets alive=False and removes them.  However, if all
-    #    cancer agents still have ti_dead_cancer > ti_now at sim end (i.e. the
-    #    sim window is shorter than cancer duration), n_cancer_deaths = 0 is
-    #    correct — no cancer deaths occurred during the run.
-    all_dead_uids = mod.ti_dead_cancer.notnan.uids
-    if len(all_dead_uids):
-        ti_dead_arr = np.asarray(mod.ti_dead_cancer[all_dead_uids])
-        alive_arr = np.asarray(sim.people.alive[all_dead_uids])
-        realized = (ti_dead_arr <= ti_now) & (~alive_arr)
-        realized_dead_uids = all_dead_uids[realized]
-    else:
-        realized_dead_uids = all_dead_uids  # empty
-    n_cancer_deaths = float(len(realized_dead_uids)) * pop_scale
+    #    AND who are no longer alive. Use .raw for the same reason as above:
+    #    dead agents disappear from .notnan.uids. (ti_dead_raw and alive_raw
+    #    were captured at the top of the cancer block.)
+    dead_finite = np.isfinite(ti_dead_raw)
+    dead_realized_mask = dead_finite & (ti_dead_raw <= ti_now) & (~alive_raw)
+    dead_realized_idx = np.where(dead_realized_mask)[0]
+    n_cancer_deaths = float(dead_realized_mask.sum()) * pop_scale
 
-    # 8. Mean age of cancer death — for dead cancer agents, people.age is
-    #    frozen at age-of-death (starsim freezes age when an agent dies).
-    if len(realized_dead_uids):
-        ages_at_death = np.asarray(sim.people.age[realized_dead_uids])
+    # 8. Mean age of cancer death — people.age is frozen at agent death,
+    #    so age.raw[uid] for a dead cancer agent ≈ age at cancer death.
+    if dead_realized_mask.any():
+        ages_at_death = age_raw[dead_realized_idx]
         mean_age_cancer_death = float(ages_at_death.mean())
     else:
         mean_age_cancer_death = 0.0
