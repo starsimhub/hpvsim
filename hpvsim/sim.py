@@ -41,10 +41,9 @@ class Sim(ss.Sim):
             diseases = [HPV(genotype=genotype)]
         networks = kwargs.pop('networks', None)
         if networks is None:
-            networks = [
-                SexualNetwork(layer=k, pars=country['network_pars'][k])
-                for k in ('m', 'c')
-            ]
+            # Single multi-layer SexualNetwork holds m + c in one edges table
+            # tagged by layer_id, with shared per-agent debut/participant.
+            networks = [SexualNetwork(**country['network_pars'])]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
             # hpv.data.load_country produces birth_rate and death_rate in

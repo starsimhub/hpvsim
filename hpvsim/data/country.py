@@ -165,8 +165,8 @@ def load_country(location):
             - 'age_data': DataFrame [age, value]
             - 'fertility': DataFrame [Time, AgeGrp, ASFR]
             - 'death_rate': DataFrame [Year, AgeGrp, Sex, Rate]
-            - 'network_pars': nested dict {layer: {key: value}}
-              with keys: partners, mixing, layer_probs, cross_layer, duration, acts.
+            - 'network_pars': dict ``{'layer_pars': {layer: {...}}, 'debut': {sex: Dist}}``
+              consumed by ``hpv.SexualNetwork(**network_pars)``.
     """
     location = location.lower()
     if location not in _KNOWN_LOCATIONS:
@@ -226,12 +226,14 @@ def _death_rate(location):
 
 
 def _network_pars(location):
-    """Build per-layer network parameter dicts.
+    """Build network parameters for ``hpv.SexualNetwork``.
 
-    v2's "default" network defines 2 layers (m=marital, c=casual).
-
-    Returns ``{'m': {...}, 'c': {...}}`` where each layer dict has:
-    partners, mixing, layer_probs, cross_layer, duration, acts, debut.
+    v2's "default" network defines 2 layers (m=marital, c=casual). Returns
+    ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ..., 'm': ...}}``,
+    matching the new ``hpv.SexualNetwork(layer_pars=..., debut=...)`` API.
+    Each per-layer dict carries: partners, mixing, layer_probs, cross_layer,
+    duration, acts. ``debut`` is shared across layers (single per-agent
+    sample, matching v2's ``people.debut``).
     """
     default_pars = _default_network_pars(location)
     annual = ss.years(1)  # unit shared by all annual probability params
@@ -249,7 +251,7 @@ def _network_pars(location):
         'f': _v2_dist_to_starsim(default_pars['debut']['f']),
     }
 
-    out = {}
+    layer_pars = {}
     for layer in ('m', 'c'):
         # v2's layer_probs[layer] is a (3, N) ndarray: row 0 = age-bin lower
         # bounds, row 1 = annual female participation prob, row 2 = annual
@@ -261,7 +263,7 @@ def _network_pars(location):
             f=ss.prob(np.asarray(lp[1, :]), annual),
             m=ss.prob(np.asarray(lp[2, :]), annual),
         )
-        out[layer] = dict(
+        layer_pars[layer] = dict(
             partners={
                 'm': _v2_dist_to_starsim(default_pars['m_partners'][layer]),
                 'f': _v2_dist_to_starsim(default_pars['f_partners'][layer]),
@@ -271,9 +273,8 @@ def _network_pars(location):
             cross_layer=cross_layer_by_sex,
             duration=_v2_dist_to_starsim(default_pars['dur_pship'][layer]),
             acts=_v2_dist_to_starsim(default_pars['acts'][layer]),
-            debut=debut_by_sex,
         )
-    return out
+    return dict(layer_pars=layer_pars, debut=debut_by_sex)
 
 
 def _pop_trend(location):

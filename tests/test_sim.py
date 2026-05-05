@@ -19,16 +19,15 @@ def test_sim_init_runs():
     assert len(sim.people) == 500
 
 
-def test_sim_has_two_sexual_network_layers():
-    """Default config produces two SexualNetwork instances (m and c).
-
-    v2's default network has only m and c layers; M01 matches that.
+def test_sim_has_one_multilayer_sexual_network():
+    """Default config produces a single hpv.SexualNetwork holding both
+    partnership layers (m, c). v2's default network has only m and c.
     """
     sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2002, dt=0.25)
     sim.init()
-    sx_layers = [n for n in sim.networks() if isinstance(n, SexualNetwork)]
-    assert len(sx_layers) == 2
-    assert {n.layer for n in sx_layers} == {'m', 'c'}
+    sx = [n for n in sim.networks() if isinstance(n, SexualNetwork)]
+    assert len(sx) == 1
+    assert set(sx[0].layers) == {'m', 'c'}
 
 
 def test_sim_has_one_hpv_disease():
