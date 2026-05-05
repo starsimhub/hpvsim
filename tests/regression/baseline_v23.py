@@ -33,7 +33,13 @@ import hpvsim as hpv  # v2.3 here
 
 
 # Pinned anchor PARS — must match tests/regression/anchor_hpv16.py:PARS
-# at v3 except for v2's API name differences.
+# at v3 except for v2's API name differences and pop_scale handling.
+#
+# pop_scale=1 + total_pop=10_000 disables v2's real-world scaling so count
+# metrics (total infections, cancers, cancer deaths) come out at the
+# agent-level — matching v3's default (where pop_scale defaults to 1.0
+# unless total_pop is explicitly set). M01's gen_anchor_hpv16.py used the
+# same convention.
 PARS = dict(
     n_agents=10_000,
     location='nigeria',
@@ -43,6 +49,13 @@ PARS = dict(
     dt=0.25,                 # matches v2's default
     rand_seed=0,
     verbose=0,
+    pop_scale=1,             # disable real-world scaling (match v3 default)
+    total_pop=10_000,        # match n_agents so pop_scale stays 1
+    ms_agent_ratio=1,        # disable multiscale dynamic spawning (v2 default
+                             # is 10; v3 M02 spec defers multiscale, so v2
+                             # baseline must be regenerated with ms_agent_ratio=1
+                             # for an apples-to-apples cancer-count comparison.
+                             # See _v2_legacy/parameters.py:38 + people.py:280-371.)
 )
 
 

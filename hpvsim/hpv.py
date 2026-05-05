@@ -395,31 +395,38 @@ class HPV(ss.Infection):
         # Mark precin compartment for all newly-infected agents.
         self.precin[uids] = True
 
-        # Reset trajectory fields so re-infection always starts from a clean slate.
-        # v2 resets these fields at clearance time (people.py:696-701); here we
-        # do it at the start of set_prognoses so that any stale values from a
-        # prior infection don't conflict with the newly sampled trajectory.
-        # Task 9 (step_state) will perform the same reset at clearance.
-        nan = np.nan
-        self.ti_clearance[uids] = nan
-        self.ti_cin[uids] = nan
-        self.ti_cancerous[uids] = nan
-        self.ti_dead_cancer[uids] = nan
-        self.dur_cin[uids] = nan
+        # Reset trajectory fields on (re-)infection so stale values from a
+        # prior infection don't fire spuriously in step_state (e.g. a stale
+        # ti_cin in the past would transition a re-infected agent to CIN
+        # immediately). Tested removal of these resets — no effect on the
+        # cancer-onset clustering (cancer-bound agents don't clear mid-
+        # trajectory, so re-infection while ti_cancerous is set is rare).
+        self.ti_clearance[uids] = np.nan
+        self.ti_cin[uids] = np.nan
+        self.ti_cancerous[uids] = np.nan
+        self.ti_dead_cancer[uids] = np.nan
+        self.dur_cin[uids] = np.nan
 
         # 1. Sample precin durations for everyone (males + females).
-        dur_precin = p.dur_precin.rvs(uids)
+        #    v2 (people.py:222-224) applies sev_imm reduction directly to
+        #    dur_precin BEFORE compute_severity: dur_precin = sample *
+        #    (1 - sev_imm). For same-genotype, sev_imm = cell_imm. We
+        #    encode rel_sev (= 1 - cell_imm post-clearance) per agent and
+        #    multiply here. Effect: re-infected agents (rel_sev=0.75) have
+        #    shorter precin durations → less time infected per re-infection
+        #    → lower steady-state HPV prevalence on the population.
+        rel_sev_uids = np.asarray(self.rel_sev[uids])
+        dur_precin = p.dur_precin.rvs(uids) * rel_sev_uids
         self.dur_precin[uids] = dur_precin
 
         # 2. Probability of CIN — computed from dur_precin via cin_fn.
         #    Only females are eligible for CIN; males always clear after precin.
-        #    rel_sev (per-agent severity multiplier) damps cancer probability
-        #    for re-infected agents whose rel_sev was reduced on prior clearance.
+        #    rel_sev's effect is already baked into dur_precin above (matches
+        #    v2's set_prognoses pre-multiplication), so we pass rel_sev=None
+        #    here — passing it again would double-count (compute_severity does
+        #    t = rel_sev * t internally).
         female = np.asarray(self.sim.people.female[uids])
-        rel_sev_uids = np.asarray(self.rel_sev[uids])
-        p_cin = _compute_severity(np.asarray(dur_precin),
-                                  rel_sev=rel_sev_uids,
-                                  pars=p.cin_fn)
+        p_cin = _compute_severity(np.asarray(dur_precin), pars=p.cin_fn)
         p._cin_bern.set(p=p_cin)
         cin_draw = p._cin_bern.rvs(uids)
         cin_mask = cin_draw & female       # boolean array, len == len(uids)
@@ -437,12 +444,10 @@ class HPV(ss.Infection):
         dur_cin = p.dur_cin.rvs(cin_uids)
         self.dur_cin[cin_uids] = dur_cin
 
-        # 5. Probability of cancer given dur_cin (with rel_sev damping for
-        #    re-infections — cell_imm reduces rel_sev on prior clearance).
-        rel_sev_cin = np.asarray(self.rel_sev[cin_uids])
-        p_cancer = _compute_severity(np.asarray(dur_cin),
-                                     rel_sev=rel_sev_cin,
-                                     pars=p.cancer_fn)
+        # 5. Probability of cancer given dur_cin. v2 does NOT apply sev_imm to
+        #    dur_cin (only to dur_precin); see _v2_legacy/people.py:241. So
+        #    dur_cin stays as sampled (no rel_sev pre-multiplication here).
+        p_cancer = _compute_severity(np.asarray(dur_cin), pars=p.cancer_fn)
         p._cancer_bern.set(p=p_cancer)
         cancer_draw = p._cancer_bern.rvs(cin_uids)
         cancer_uids = cin_uids[cancer_draw]
