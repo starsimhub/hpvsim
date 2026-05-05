@@ -335,6 +335,13 @@ class HPV(ss.Infection):
             # cancer-progression probability for re-infections.
             imm_init=0.35,
             cell_imm_init=0.25,
+            # Age-based dur_cin multiplier (v2 _v2_legacy/parameters.py:99
+            # ``age_risk = dict(age=30, risk=2)`` applied in v2 set_prognoses
+            # _v2_legacy/people.py:237-241): women aged >= ``age`` get their
+            # dur_cin sample multiplied by ``risk``, lengthening time-in-CIN
+            # and pushing more cancer progression toward older ages. Without
+            # this v3's cancer onset skews ~4y younger than v2.
+            age_risk=dict(age=30, risk=2),
             # M02 Bernoulli distributions for CIN and cancer draws.
             # Placeholder p=0.5 is overwritten per-call via .set(p=per_agent_arr)
             # in set_prognoses; they live in pars so starsim initializes them
@@ -511,6 +518,15 @@ class HPV(ss.Infection):
         # 4. Branch B: progression to CIN.
         self.ti_cin[cin_uids] = ti + dur_precin[cin_mask]
         dur_cin = p.dur_cin.rvs(cin_uids)
+        # Apply v2's age_risk multiplier: women aged >= age_risk['age'] get
+        # their dur_cin scaled by age_risk['risk']. Lengthens time-in-CIN
+        # for older women, shifting cancer onset to older ages and
+        # increasing per-CIN cancer probability via compute_severity.
+        # Mirrors _v2_legacy/people.py:237-241.
+        ages_at_cin = np.asarray(self.sim.people.age[cin_uids])
+        age_mod = np.ones(len(cin_uids))
+        age_mod[ages_at_cin >= p.age_risk['age']] = p.age_risk['risk']
+        dur_cin = np.asarray(dur_cin) * age_mod
         self.dur_cin[cin_uids] = dur_cin
 
         # 5. Probability of cancer given dur_cin. v2 does NOT apply sev_imm to
