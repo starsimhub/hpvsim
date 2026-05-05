@@ -104,10 +104,19 @@ class SexualNetwork(ss.SexualNetwork):
         v2 sampled the desired count once per agent at population creation
         and stored it in a static array. We do the same via the
         ``partners_target`` FloatArr state. We sample for any agent whose
-        target is still NaN (uninitialized). Newly-born
-        agents start as NaN and get a sample on first add_pairs after their
-        birth. Debut is sampled into the parent ss.SexualNetwork's ``debut``
-        FloatArr at the same time.
+        target is still NaN (uninitialized). Newly-born agents start as NaN
+        and get a sample on first add_pairs after their birth.
+
+        Debut is shared across all sibling hpv.SexualNetwork layers (matching
+        v2's single per-agent ``people.debut``). For each unset uid we check
+        any sibling SexualNetwork's ``debut`` FloatArr; if a sibling already
+        sampled, we copy. Otherwise this layer samples and the sibling will
+        copy on its own next call. Sharing matters because cross-layer
+        concurrency depends on whether an agent has a partner in *any* other
+        layer; if layer c's debut is sampled below layer m's, the same young
+        woman is casual-active but marital-debut-not-yet-reached, never
+        accumulates a marital partner, and skips the cross-layer Bernoulli —
+        inflating the casual-eligible pool above v2's level.
         """
         unset = self.partners_target.isnan.uids
         if not len(unset):
@@ -117,12 +126,34 @@ class SexualNetwork(ss.SexualNetwork):
         m_uids = unset[~is_female]
         self.partners_target[f_uids] = self.pars.partners['f'].rvs(f_uids)
         self.partners_target[m_uids] = self.pars.partners['m'].rvs(m_uids)
-        # Sample debut age per-sex (matches v2: female mean 15, male mean 17.6).
-        # ss.SexualNetwork.active() requires people.age > self.debut, so this
-        # gates young agents out of pairing.
+
         if self.pars.debut is not None:
-            self.debut[f_uids] = self.pars.debut['f'].rvs(f_uids)
-            self.debut[m_uids] = self.pars.debut['m'].rvs(m_uids)
+            siblings = [
+                n for n in self.sim.networks()
+                if isinstance(n, SexualNetwork) and n is not self
+            ]
+            for sex_key, sex_uids in (('f', f_uids), ('m', m_uids)):
+                if not len(sex_uids):
+                    continue
+                # Find any sibling that has already sampled debut for these
+                # uids (sibling.debut is non-default for the uid).
+                copied = np.zeros(len(sex_uids), dtype=bool)
+                debut_vals = np.zeros(len(sex_uids), dtype=float)
+                for sib in siblings:
+                    sib_vals = np.asarray(sib.debut[sex_uids])
+                    has = (sib_vals != 0) & ~copied
+                    if has.any():
+                        debut_vals[has] = sib_vals[has]
+                        copied[has] = True
+                    if copied.all():
+                        break
+                # Sample for any uids no sibling has yet.
+                if not copied.all():
+                    new_uids = sex_uids[~copied]
+                    new_vals = np.asarray(self.pars.debut[sex_key].rvs(new_uids))
+                    debut_vals[~copied] = new_vals
+                self.debut[sex_uids] = debut_vals
+
         self.participant[unset] = True
 
     def _own_n_partners(self):
