@@ -35,7 +35,7 @@ PARS = dict(
     n_agents=10_000,
     start=1990,
     stop=2015,   # 1990-2010 burnin + 2010-2015 observation per spec
-    dt=0.5,
+    dt=0.25,     # Match v2 default and v3 standard
     rand_seed=0,
     verbose=0,
 )

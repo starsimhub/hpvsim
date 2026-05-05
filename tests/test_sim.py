@@ -9,12 +9,12 @@ from hpvsim.network import SexualNetwork
 
 
 def test_sim_constructs_with_defaults():
-    sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2002, dt=0.5)
+    sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2002, dt=0.25)
     assert sim is not None
 
 
 def test_sim_init_runs():
-    sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2002, dt=0.5)
+    sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2002, dt=0.25)
     sim.init()
     assert len(sim.people) == 500
 
@@ -24,7 +24,7 @@ def test_sim_has_two_sexual_network_layers():
 
     v2's default network has only m and c layers; M01 matches that.
     """
-    sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2002, dt=0.5)
+    sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2002, dt=0.25)
     sim.init()
     sx_layers = [n for n in sim.networks() if isinstance(n, SexualNetwork)]
     assert len(sx_layers) == 2
@@ -33,7 +33,7 @@ def test_sim_has_two_sexual_network_layers():
 
 def test_sim_has_one_hpv_disease():
     sim = Sim(location='nigeria', genotype='hpv16', n_agents=500,
-              start=2000, stop=2002, dt=0.5)
+              start=2000, stop=2002, dt=0.25)
     sim.init()
     hpv_diseases = [d for d in sim.diseases() if isinstance(d, HPV)]
     assert len(hpv_diseases) == 1
@@ -41,7 +41,7 @@ def test_sim_has_one_hpv_disease():
 
 
 def test_sim_runs_short_window():
-    sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2003, dt=0.5)
+    sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2003, dt=0.25)
     sim.run()
     assert sim.results.hpv16.n_infected[-1] >= 0
 

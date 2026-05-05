@@ -59,7 +59,7 @@ def test_hpv_progression_pars_match_v2_hpv16():
 def test_set_prognoses_assigns_ti_clearance_or_ti_cin():
     """Every newly-infected agent has either ti_clearance or ti_cin set."""
     sim = hpv.Sim(n_agents=500, location='nigeria',
-                  start=1990, stop=1992, dt=0.5, rand_seed=0)
+                  start=1990, stop=1992, dt=0.25, rand_seed=0)
     sim.run()
     mod = sim.diseases.hpv16
     ever_infected = mod.ti_first_infection.notnan
@@ -71,7 +71,7 @@ def test_set_prognoses_assigns_ti_clearance_or_ti_cin():
 def test_set_prognoses_cancer_only_in_females():
     """Males never progress to CIN; only females reach ti_cin / ti_cancerous."""
     sim = hpv.Sim(n_agents=2000, location='nigeria',
-                  start=1990, stop=2000, dt=0.5, rand_seed=0)
+                  start=1990, stop=2000, dt=0.25, rand_seed=0)
     sim.run()
     mod = sim.diseases.hpv16
     has_cin = mod.ti_cin.notnan
@@ -84,7 +84,7 @@ def test_set_prognoses_cancer_only_in_females():
 def test_set_prognoses_chain_consistency():
     """For agents with cancer scheduled: ti_cin <= ti_cancerous <= ti_dead_cancer."""
     sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2000, dt=0.5, rand_seed=0)
+                  start=1990, stop=2000, dt=0.25, rand_seed=0)
     sim.run()
     mod = sim.diseases.hpv16
     has_cancer_sched = mod.ti_cancerous.notnan
@@ -101,7 +101,7 @@ def test_set_prognoses_chain_consistency():
 def test_step_state_progresses_precin_to_cin():
     """An agent whose ti_cin <= ti flips precin→cin."""
     sim = hpv.Sim(n_agents=2000, location='nigeria',
-                  start=1990, stop=2010, dt=0.5, rand_seed=0)
+                  start=1990, stop=2010, dt=0.25, rand_seed=0)
     sim.run()
     mod = sim.diseases.hpv16
     has_cin_sched = mod.ti_cin.notnan
@@ -114,7 +114,7 @@ def test_step_state_progresses_precin_to_cin():
 def test_step_state_progresses_cin_to_cancerous():
     """An agent whose ti_cancerous <= ti flips cin→cancerous and stops transmitting."""
     sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2030, dt=0.5, rand_seed=0)
+                  start=1990, stop=2030, dt=0.25, rand_seed=0)
     sim.run()
     mod = sim.diseases.hpv16
     cancerous_now = mod.cancerous.uids
@@ -130,7 +130,7 @@ def test_step_state_progresses_cin_to_cancerous():
 def test_step_state_cancer_death_removes_agents():
     """Agents whose ti_dead_cancer <= ti are no longer alive."""
     sim = hpv.Sim(n_agents=5000, location='nigeria',
-                  start=1990, stop=2050, dt=0.5, rand_seed=0)
+                  start=1990, stop=2050, dt=0.25, rand_seed=0)
     sim.run()
     mod = sim.diseases.hpv16
     has_dead_sched = mod.ti_dead_cancer.notnan
@@ -147,7 +147,7 @@ def test_step_state_cancer_death_removes_agents():
 def test_step_die_resets_bool_states():
     """Dying agents have precin/cin/cancerous cleared (so result counts are accurate)."""
     sim = hpv.Sim(n_agents=500, location='nigeria',
-                  start=1990, stop=2010, dt=0.5, rand_seed=0)
+                  start=1990, stop=2010, dt=0.25, rand_seed=0)
     sim.init()
     mod = sim.diseases.hpv16
 
@@ -211,7 +211,7 @@ def test_m02_capability_age_stratified_cancers():
     sim.results['cancer_incidence_by_age'] at year 2059, saved as JSON.
     """
     pars = dict(n_agents=10_000, location='nigeria', genotype='hpv16',
-                start=1990, stop=2060, dt=0.5, rand_seed=0)
+                start=1990, stop=2060, dt=0.25, rand_seed=0)
     sim = hpv.Sim(**pars,
                   analyzers=[hpv.AgeResults(results=('cancer',),
                                              year=[2059])])

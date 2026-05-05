@@ -16,7 +16,7 @@ def test_age_results_produces_cancer_incidence_by_age():
     """A sim with AgeResults populates cancer_incidence_by_age."""
     sim = hpv.Sim(
         n_agents=5000, location='nigeria',
-        start=1990, stop=2030, dt=0.5, rand_seed=0,
+        start=1990, stop=2030, dt=0.25, rand_seed=0,
         analyzers=[hpv.AgeResults(results=('cancer',), year=[2020, 2025])],
     )
     sim.run()

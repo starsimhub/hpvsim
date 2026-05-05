@@ -25,7 +25,7 @@ class Sim(ss.Sim):
     """HPVsim simulation."""
 
     def __init__(self, location='nigeria', genotype='hpv16',
-                 n_agents=10_000, start=1990, stop=2060, dt=0.5,
+                 n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, pars=None, **kwargs):
         country = load_country(location)
         people = kwargs.pop('people', None)
