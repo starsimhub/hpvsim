@@ -89,6 +89,31 @@ def run_and_summarize():
 
     short = {k: float(s[k]) for k in _EXPECTED_KEYS}
 
+    # Override 'mean age of infection (years)': v2's compute_summary uses
+    # compute_age_mean('infections_by_age', t=-1), which reports the age-
+    # weighted mean of NEW infections in the LAST sim step only — not a
+    # lifetime mean. v3's anchor_hpv16.run_and_summarize computes lifetime
+    # mean age-at-first-infection across alive ever-infected agents, so we
+    # recompute the v2 baseline value with matching lifetime semantics for a
+    # like-for-like comparison.
+    import numpy as np
+    people = sim.people
+    date_inf = np.asarray(people.date_infectious[0])  # genotype 0 = HPV16
+    alive_arr = np.asarray(people.alive).astype(bool)
+    ever_alive = alive_arr & ~np.isnan(date_inf)
+    if ever_alive.any():
+        end_year = float(sim.yearvec[-1])
+        year_at_inf = float(PARS['start']) + date_inf[ever_alive] * float(PARS['dt'])
+        current_ages = np.asarray(people.age)[ever_alive]
+        year_of_birth = end_year - current_ages
+        ages_at_inf = year_at_inf - year_of_birth
+        valid = (ages_at_inf > 0) & (ages_at_inf < 100)
+        short['mean age of infection (years)'] = (
+            float(ages_at_inf[valid].mean()) if valid.any() else 0.0
+        )
+    else:
+        short['mean age of infection (years)'] = 0.0
+
     # Total population at end of sim.
     if 'n_alive' in sim.results:
         total_pop = float(sim.results['n_alive'][-1])

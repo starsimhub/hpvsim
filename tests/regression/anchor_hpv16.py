@@ -64,12 +64,18 @@ def run_and_summarize():
     # 4. Mean HPV prevalence
     mean_prev_pct = 100 * float(res.prevalence.mean())
 
-    # 6. Mean age of first infection (preserved from M01)
-    ti_first = mod.ti_first_infection
-    ever_first = ti_first.notnan.uids
-    if len(ever_first):
-        ages_now = np.asarray(sim.people.age[ever_first])
-        ti_at_inf = np.asarray(ti_first[ever_first])
+    # 6. Mean age of LATEST infection across alive ever-infected agents.
+    #    Uses ``ti_infected`` (overwritten on each new infection) to match
+    #    v2's ``people.date_infectious`` semantics in baseline_v23.py:
+    #    both report the age at the most-recent infection, not the first.
+    #    With imm_init=0.35 partial permanent immunity reinfection is rare,
+    #    so most agents have ti_infected == ti_first_infection; the
+    #    distinction matters mainly for edge cases.
+    ti_latest = mod.ti_infected
+    ever_inf = ti_latest.notnan.uids
+    if len(ever_inf):
+        ages_now = np.asarray(sim.people.age[ever_inf])
+        ti_at_inf = np.asarray(ti_latest[ever_inf])
         years_since = (float(sim.t.ti) - ti_at_inf) * dt
         mean_age_inf = float((ages_now - years_since).mean())
     else:
