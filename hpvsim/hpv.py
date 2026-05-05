@@ -297,6 +297,14 @@ class HPV(ss.Infection):
             dur_precin=ss.lognorm_ex(mean=ss.years(3.0), std=ss.years(9.0)),
             dur_cin=ss.lognorm_ex(mean=ss.years(5.0), std=ss.years(20.0)),
             dur_cancer=ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0)),
+            # Male HPV clearance — v2 uses a separate, much shorter distribution
+            # for males (_v2_legacy/parameters.py:97 — dur_infection_male
+            # lognormal(par1=1, par2=1)). v2's infect() routes females through
+            # the precin/CIN/cancer trajectory but males directly through
+            # dur_infection_male. Without this, M02 males stayed infected
+            # ~3x longer (heavy-tailed dur_precin) → much higher transmission
+            # → more cumulative female re-infections → ~10x more cancer events.
+            dur_inf_male=ss.lognorm_ex(mean=ss.years(1.0), std=ss.years(1.0)),
             # M02 severity functions (passed verbatim to _compute_severity).
             # cancer_fn flattens cin_fn's keys so _compute_severity's cin_integral
             # branch can run _compute_severity_integral internally (matching v2's
@@ -407,7 +415,11 @@ class HPV(ss.Infection):
         self.ti_dead_cancer[uids] = np.nan
         self.dur_cin[uids] = np.nan
 
-        # 1. Sample precin durations for everyone (males + females).
+        # 1. Sample precin durations. v2 routes males through a separate,
+        #    much shorter dur_infection_male distribution (people.py:1051-1058).
+        #    We replicate that here: females use dur_precin (which feeds the
+        #    precin/CIN/cancer trajectory); males use dur_inf_male and clear
+        #    after that duration without any progression.
         #    v2 (people.py:222-224) applies sev_imm reduction directly to
         #    dur_precin BEFORE compute_severity: dur_precin = sample *
         #    (1 - sev_imm). For same-genotype, sev_imm = cell_imm. We
@@ -415,8 +427,16 @@ class HPV(ss.Infection):
         #    multiply here. Effect: re-infected agents (rel_sev=0.75) have
         #    shorter precin durations → less time infected per re-infection
         #    → lower steady-state HPV prevalence on the population.
+        female_all = np.asarray(self.sim.people.female[uids])
         rel_sev_uids = np.asarray(self.rel_sev[uids])
         dur_precin = p.dur_precin.rvs(uids) * rel_sev_uids
+        # Override male durations with the shorter dur_inf_male distribution.
+        if (~female_all).any():
+            male_uids = uids[~female_all]
+            dur_inf_male = p.dur_inf_male.rvs(male_uids)
+            # rel_sev still applies to males for symmetry (v2's sev_imm-equivalent).
+            male_rel_sev = rel_sev_uids[~female_all]
+            dur_precin[~female_all] = np.asarray(dur_inf_male) * male_rel_sev
         self.dur_precin[uids] = dur_precin
 
         # 2. Probability of CIN — computed from dur_precin via cin_fn.
@@ -425,7 +445,7 @@ class HPV(ss.Infection):
         #    v2's set_prognoses pre-multiplication), so we pass rel_sev=None
         #    here — passing it again would double-count (compute_severity does
         #    t = rel_sev * t internally).
-        female = np.asarray(self.sim.people.female[uids])
+        female = female_all   # alias to keep the existing variable name below
         p_cin = _compute_severity(np.asarray(dur_precin), pars=p.cin_fn)
         p._cin_bern.set(p=p_cin)
         cin_draw = p._cin_bern.rvs(uids)
