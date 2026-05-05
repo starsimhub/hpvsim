@@ -359,13 +359,35 @@ class HPV(ss.Infection):
             # M02 sampled durations (kept for analyzers/diagnostics)
             ss.FloatArr('dur_precin', label='Sampled duration of precin'),
             ss.FloatArr('dur_cin', label='Sampled duration of CIN'),
-            # M02 relative severity multiplier (cell_imm reduction lands here).
-            # Default 1.0 = full severity. On clearance, capped at
-            # (1 - cell_imm_init), e.g. 0.75 — re-infection severity is damped.
-            # v2 stores rel_sev per-agent (sampled at set_static); we keep it
-            # constant at 1.0 for naive agents and apply post-clearance capping.
+            # M02 per-agent relative severity multiplier — initialized to 1.0,
+            # overwritten with v2's sev_dist sample (truncated normal mean=1,
+            # std=0.2; _v2_legacy/parameters.py:98) in init_post for the
+            # initial population and for any new agents during the sim. On
+            # clearance, also capped at (1 - cell_imm_init) ~ 0.75 to encode
+            # v2's cell_imm dampener (v2 keeps these as separate variables;
+            # we collapse them into one effective rel_sev for M02).
             ss.FloatArr('rel_sev', label='Relative severity', default=1.0),
         )
+        # Per-agent rel_sev baseline distribution (v2 _v2_legacy/parameters.py:98
+        # sev_dist=normal_pos(par1=1, par2=0.2)). Used to override the
+        # FloatArr default 1.0 once the people array is initialized.
+        self._rel_sev_dist = ss.normal(loc=1.0, scale=0.2)
+        return
+
+    def init_post(self):
+        super().init_post()
+        # Sample rel_sev per agent at sim start so initially-seeded infections
+        # via init_prev → set_prognoses pick up the variance. Use abs() to
+        # match v2's normal_pos truncation (one-sided, no negative values).
+        people = self.sim.people
+        if hasattr(people, 'auids'):
+            uids = people.auids
+        else:
+            uids = ss.uids(np.arange(len(people)))
+        if len(uids):
+            sampled = np.abs(np.asarray(self._rel_sev_dist.rvs(uids)))
+            self.rel_sev[uids] = sampled
+        return
 
     def set_prognoses(self, uids, sources=None):
         """Sample full natural-history trajectory for newly-infected agents.
