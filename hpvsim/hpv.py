@@ -375,6 +375,11 @@ class HPV(ss.Infection):
             # v2's cell_imm dampener (v2 keeps these as separate variables;
             # we collapse them into one effective rel_sev for M02).
             ss.FloatArr('rel_sev', label='Relative severity', default=1.0),
+            # Tracker so newly-added agents (births, immigrants) get their
+            # rel_sev sampled on first step; without this they keep the
+            # default 1.0 forever, missing v2's per-agent severity variance
+            # (sev_dist normal_pos mean=1, std=0.2).
+            ss.BoolState('rel_sev_sampled', default=False),
         )
         # Per-agent rel_sev baseline distribution (v2 _v2_legacy/parameters.py:98
         # sev_dist=normal_pos(par1=1, par2=0.2)). Used to override the
@@ -384,17 +389,21 @@ class HPV(ss.Infection):
 
     def init_post(self):
         super().init_post()
-        # Sample rel_sev per agent at sim start so initially-seeded infections
-        # via init_prev → set_prognoses pick up the variance. Use abs() to
-        # match v2's normal_pos truncation (one-sided, no negative values).
-        people = self.sim.people
-        if hasattr(people, 'auids'):
-            uids = people.auids
-        else:
-            uids = ss.uids(np.arange(len(people)))
-        if len(uids):
-            sampled = np.abs(np.asarray(self._rel_sev_dist.rvs(uids)))
-            self.rel_sev[uids] = sampled
+        self._sample_rel_sev_for_unset()
+        return
+
+    def _sample_rel_sev_for_unset(self):
+        """Sample rel_sev from sev_dist for any alive agent whose rel_sev
+        hasn't been sampled yet (initial pop on first call, then newborns /
+        immigrants on subsequent calls). Mirrors v2's set_static sampling at
+        agent creation. Use abs() to match v2's normal_pos truncation.
+        """
+        unset = (~self.rel_sev_sampled).uids
+        if not len(unset):
+            return
+        sampled = np.abs(np.asarray(self._rel_sev_dist.rvs(unset)))
+        self.rel_sev[unset] = sampled
+        self.rel_sev_sampled[unset] = True
         return
 
     def set_prognoses(self, uids, sources=None):
@@ -459,14 +468,20 @@ class HPV(ss.Infection):
         #    → lower steady-state HPV prevalence on the population.
         female_all = np.asarray(self.sim.people.female[uids])
         rel_sev_uids = np.asarray(self.rel_sev[uids])
+        # Females: dur = sample * rel_sev. Matches v2 set_prognoses
+        # (_v2_legacy/people.py:222-224) which multiplies dur_precin by
+        # (1 - sev_imm) before passing to compute_severity. v3 stores the
+        # immunity factor on rel_sev (= 1 - cell_imm post-clearance).
         dur_precin = p.dur_precin.rvs(uids) * rel_sev_uids
-        # Override male durations with the shorter dur_inf_male distribution.
+        # Males: dur = dur_inf_male sample, NO rel_sev/sev_imm reduction
+        # (_v2_legacy/people.py:1051-1058 — male check_clearance samples
+        # dur_infection_male directly, no immunity factor). Earlier versions
+        # applied rel_sev "for symmetry" but that shortened male reinfection
+        # duration to 75% of expected, suppressing prevalence ~16% vs v2.
         if (~female_all).any():
             male_uids = uids[~female_all]
             dur_inf_male = p.dur_inf_male.rvs(male_uids)
-            # rel_sev still applies to males for symmetry (v2's sev_imm-equivalent).
-            male_rel_sev = rel_sev_uids[~female_all]
-            dur_precin[~female_all] = np.asarray(dur_inf_male) * male_rel_sev
+            dur_precin[~female_all] = np.asarray(dur_inf_male)
         self.dur_precin[uids] = dur_precin
 
         # 2. Probability of CIN — computed from dur_precin via cin_fn.
@@ -541,6 +556,10 @@ class HPV(ss.Infection):
         ``request_death`` API: ``self.sim.people.request_death(uids)`` — see
         starsim/people.py line 412; takes only a uid array, no extra kwargs.
         """
+        # Sample rel_sev for any newly-added alive agents (births, immigrants)
+        # before they can be selected for infection this step.
+        self._sample_rel_sev_for_unset()
+
         ti = self.ti
 
         # --- 1. Clear from precin (partial-immunity path) ---
