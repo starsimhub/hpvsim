@@ -374,19 +374,26 @@ class HPV(ss.Infection):
             # M02 sampled durations (kept for analyzers/diagnostics)
             ss.FloatArr('dur_precin', label='Sampled duration of precin'),
             ss.FloatArr('dur_cin', label='Sampled duration of CIN'),
-            # M02 per-agent relative severity multiplier — initialized to 1.0,
-            # overwritten with v2's sev_dist sample (truncated normal mean=1,
-            # std=0.2; _v2_legacy/parameters.py:98) in init_post for the
-            # initial population and for any new agents during the sim. On
-            # clearance, also capped at (1 - cell_imm_init) ~ 0.75 to encode
-            # v2's cell_imm dampener (v2 keeps these as separate variables;
-            # we collapse them into one effective rel_sev for M02).
-            ss.FloatArr('rel_sev', label='Relative severity', default=1.0),
+            # M02 per-agent BIOLOGICAL relative severity (v2 sev_dist;
+            # _v2_legacy/parameters.py:98). Sampled once at agent creation
+            # from normal_pos(mean=1, std=0.2) and never modified — captures
+            # an agent's intrinsic susceptibility to severe disease,
+            # independent of immunity state.
+            ss.FloatArr('rel_sev', label='Relative severity (biological)', default=1.0),
             # Tracker so newly-added agents (births, immigrants) get their
             # rel_sev sampled on first step; without this they keep the
-            # default 1.0 forever, missing v2's per-agent severity variance
-            # (sev_dist normal_pos mean=1, std=0.2).
+            # default 1.0 forever, missing v2's per-agent severity variance.
             ss.BoolState('rel_sev_sampled', default=False),
+            # M02 per-agent severity immunity. Defaults to 0; set to
+            # cell_imm_init (~0.25) on clearance from precin or CIN. Mirrors
+            # v2's people.sev_imm[g, :] (per-genotype). v2 keeps rel_sev and
+            # sev_imm SEPARATE and combines them as
+            # ``t_eff = dur_precin * (1 - sev_imm) * rel_sev`` in
+            # compute_severity (_v2_legacy/people.py:222-231 +
+            # compute_severity:209-210). An earlier collapse into a single
+            # capped rel_sev broke the multiplicative independence and
+            # inflated cancer probability for low-baseline-rel_sev agents.
+            ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
         )
         # Per-agent rel_sev baseline distribution (v2 _v2_legacy/parameters.py:98
         # sev_dist=normal_pos(par1=1, par2=0.2)). Used to override the
@@ -475,16 +482,15 @@ class HPV(ss.Infection):
         #    → lower steady-state HPV prevalence on the population.
         female_all = np.asarray(self.sim.people.female[uids])
         rel_sev_uids = np.asarray(self.rel_sev[uids])
-        # Females: dur = sample * rel_sev. Matches v2 set_prognoses
-        # (_v2_legacy/people.py:222-224) which multiplies dur_precin by
-        # (1 - sev_imm) before passing to compute_severity. v3 stores the
-        # immunity factor on rel_sev (= 1 - cell_imm post-clearance).
-        dur_precin = p.dur_precin.rvs(uids) * rel_sev_uids
-        # Males: dur = dur_inf_male sample, NO rel_sev/sev_imm reduction
+        sev_imm_uids = np.asarray(self.sev_imm[uids])
+        # Females: dur_precin = sample * (1 - sev_imm). Matches v2
+        # set_prognoses (_v2_legacy/people.py:222-224). The biological
+        # rel_sev is NOT applied to dur — it's passed separately to
+        # compute_severity below (matches v2's two-factor product).
+        dur_precin = p.dur_precin.rvs(uids) * (1.0 - sev_imm_uids)
+        # Males: dur = dur_inf_male sample, no immunity reductions
         # (_v2_legacy/people.py:1051-1058 — male check_clearance samples
-        # dur_infection_male directly, no immunity factor). Earlier versions
-        # applied rel_sev "for symmetry" but that shortened male reinfection
-        # duration to 75% of expected, suppressing prevalence ~16% vs v2.
+        # dur_infection_male directly, no sev_imm or rel_sev factor).
         if (~female_all).any():
             male_uids = uids[~female_all]
             dur_inf_male = p.dur_inf_male.rvs(male_uids)
@@ -493,16 +499,17 @@ class HPV(ss.Infection):
 
         # 2. Probability of CIN — computed from dur_precin via cin_fn.
         #    Only females are eligible for CIN; males always clear after precin.
-        #    rel_sev's effect is already baked into dur_precin above (matches
-        #    v2's set_prognoses pre-multiplication), so we pass rel_sev=None
-        #    here — passing it again would double-count (compute_severity does
-        #    t = rel_sev * t internally).
+        #    Matches v2 (_v2_legacy/people.py:229-231): pass rel_sev as a
+        #    separate argument so compute_severity computes
+        #    t_eff = (sample * (1-sev_imm)) * rel_sev internally. The
+        #    two-factor product is what v2 evaluates.
         #    UNITS: dur_precin from p.dur_precin.rvs() comes back in starsim
         #    timesteps. v2's compute_severity / cin_fn expect YEARS (ttc=50
         #    is years time-to-cancer). Convert via *dt before passing.
         dt_yr = float(self.t.dt)
         female = female_all   # alias to keep the existing variable name below
-        p_cin = _compute_severity(np.asarray(dur_precin) * dt_yr, pars=p.cin_fn)
+        p_cin = _compute_severity(np.asarray(dur_precin) * dt_yr,
+                                   rel_sev=rel_sev_uids, pars=p.cin_fn)
         p._cin_bern.set(p=p_cin)
         cin_draw = p._cin_bern.rvs(uids)
         cin_mask = cin_draw & female       # boolean array, len == len(uids)
@@ -531,10 +538,13 @@ class HPV(ss.Infection):
 
         # 5. Probability of cancer given dur_cin. v2 does NOT apply sev_imm to
         #    dur_cin (only to dur_precin); see _v2_legacy/people.py:241. So
-        #    dur_cin stays as sampled (no rel_sev pre-multiplication here).
-        #    Same units conversion as #2: dur_cin (timesteps) → years before
-        #    compute_severity. cancer_fn's ttc=50 is in years.
-        p_cancer = _compute_severity(np.asarray(dur_cin) * dt_yr, pars=p.cancer_fn)
+        #    dur_cin stays as sampled (no sev_imm pre-multiplication here).
+        #    Pass rel_sev separately for compute_severity to apply (matches
+        #    v2 _v2_legacy/people.py:277-278). Same units conversion as #2:
+        #    dur_cin (timesteps) → years before compute_severity.
+        rel_sev_cin = rel_sev_uids[cin_mask]
+        p_cancer = _compute_severity(np.asarray(dur_cin) * dt_yr,
+                                      rel_sev=rel_sev_cin, pars=p.cancer_fn)
         p._cancer_bern.set(p=p_cancer)
         cancer_draw = p._cancer_bern.rvs(cin_uids)
         cancer_uids = cin_uids[cancer_draw]
@@ -579,14 +589,15 @@ class HPV(ss.Infection):
         ti = self.ti
 
         # --- 1. Clear from precin (partial-immunity path) ---
-        # M02: clearance returns agents to susceptible=True (SIS-like) but caps
-        # rel_sus at (1 - imm_init) and rel_sev at (1 - cell_imm_init), capturing
-        # v2's partial permanent immunity. Defaults imm_init=0.35 / cell_imm_init=0.25
-        # (v2's beta_means; _v2_legacy/parameters.py:102-104) ⇒ rel_sus ≤ 0.65
-        # and rel_sev ≤ 0.75 post-clearance. v2 takes np.maximum(prior, new) on
-        # repeat clearances (_v2_legacy/immunity.py:172,175), so re-clearance
-        # doesn't keep compounding downward — matched with np.minimum on
-        # rel_sus / rel_sev (smaller value ↔ larger immunity).
+        # M02: clearance returns agents to susceptible=True (SIS-like) and
+        # caps rel_sus at (1 - imm_init) (transmission immunity), and SETS
+        # sev_imm to cell_imm_init (severity immunity, applied as
+        # (1 - sev_imm) factor on dur_precin in set_prognoses). v2 takes
+        # np.maximum(prior, new) on repeat clearances
+        # (_v2_legacy/immunity.py:172,175); since cell_imm_init is constant,
+        # max(prior, cell_imm_init) just sets the value (any prior would be
+        # 0 or already cell_imm_init). rel_sev is the BIOLOGICAL baseline
+        # and is NOT modified on clearance.
         cleared = (self.infected & self.precin & ~self.cin & ~self.cancerous
                    & (self.ti_clearance <= ti)).uids
         if len(cleared):
@@ -595,8 +606,7 @@ class HPV(ss.Infection):
             self.precin[cleared] = False
             self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
                                                1.0 - self.pars.imm_init)
-            self.rel_sev[cleared] = np.minimum(self.rel_sev[cleared],
-                                               1.0 - self.pars.cell_imm_init)
+            self.sev_imm[cleared] = self.pars.cell_imm_init
 
         # --- 2. Clear from CIN (CIN regression; same partial-immunity logic) ---
         cleared_from_cin = (self.infected & self.cin & ~self.cancerous
@@ -607,8 +617,7 @@ class HPV(ss.Infection):
             self.cin[cleared_from_cin] = False
             self.rel_sus[cleared_from_cin] = np.minimum(self.rel_sus[cleared_from_cin],
                                                         1.0 - self.pars.imm_init)
-            self.rel_sev[cleared_from_cin] = np.minimum(self.rel_sev[cleared_from_cin],
-                                                        1.0 - self.pars.cell_imm_init)
+            self.sev_imm[cleared_from_cin] = self.pars.cell_imm_init
 
         # --- 3. Precin → CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
