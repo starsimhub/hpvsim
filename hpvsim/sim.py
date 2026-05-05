@@ -2,13 +2,17 @@
 
 Provides a v2-compatible API: ``hpv.Sim(location='nigeria', genotype='hpv16')``.
 Instantiates the four-component default stack (HPV disease module, two
-SexualNetwork layers (m, c), ss.Births + ss.Deaths demographics, ss.People
-with location-specific age pyramid) and forwards to ss.Sim. All defaults are
-overridable via kwargs (passing ``diseases=`` / ``networks=`` /
-``demographics=`` / ``people=`` short-circuits the convenience wiring).
+SexualNetwork layers (m, c), ss.Births + ss.Deaths + AgeMigration
+demographics, ss.People with location-specific age pyramid) and forwards
+to ss.Sim. All defaults are overridable via kwargs (passing ``diseases=`` /
+``networks=`` / ``demographics=`` / ``people=`` short-circuits the
+convenience wiring).
 
 Demographics: v2 uses a population-level CBR (no per-woman ASFR data); we
-match that with ss.Births rather than ss.Pregnancy. M02+ may switch to
+match that with ss.Births rather than ss.Pregnancy. AgeMigration pins the
+agent age pyramid to the location's UN trajectory each year, matching v2's
+``check_migration``; without it, agent populations only grow via births so
+the age structure skews younger than the data target. M02+ may switch to
 ss.Pregnancy if proper age-stratified fertility data becomes available.
 
 M01: single-genotype only. M03 changes the signature to ``genotypes=[...]``.
@@ -17,6 +21,7 @@ M01: single-genotype only. M03 changes the signature to ``genotypes=[...]``.
 import starsim as ss
 
 from .data.country import load_country
+from .demographics import AgeMigration
 from .hpv import HPV
 from .network import SexualNetwork
 
@@ -48,9 +53,16 @@ class Sim(ss.Sim):
             # 'Female'/'Male' and per-1000 rate units for deaths). No
             # metadata override needed — the v2-to-Starsim translation is
             # encapsulated in the adapter.
+            #
+            # AgeMigration pins the age pyramid to the country's UN
+            # trajectory each year (matching v2's check_migration). Without
+            # it, the agent population only grows via births so the
+            # active-age cohorts skew younger than v2 / data target, which
+            # in turn inflates per-step casual-partnership formation.
             demographics = [
                 ss.Births(birth_rate=country['birth_rate']),
                 ss.Deaths(death_rate=country['death_rate']),
+                AgeMigration(),
             ]
         # Store total_pop so init() can compute pop_scale after ss.Sim.__init__
         # wires self.pars.  ss.SimPars.validate_total_pop() (called during
