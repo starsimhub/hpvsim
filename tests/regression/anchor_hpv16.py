@@ -81,19 +81,23 @@ def run_and_summarize():
     else:
         mean_age_inf = 0.0
 
-    # 2. Total cancers — agents whose ti_cancerous was realized during the sim
-    #    (ti_cancerous <= ti_now). We must use .raw arrays here, NOT
-    #    `.notnan.uids` which filters by the active-uid pool — dead agents
-    #    (cancer death + background mortality) are dropped from active uids,
-    #    so any cancer event that ended in death would be silently uncounted
-    #    and the cancer-death pipeline would appear to never fire. The .raw
-    #    array preserves the per-uid value across the agent's full lifetime.
+    # 2. Total cancers — agents who ACTUALLY transitioned to the cancerous
+    #    compartment during the sim. Use the lifetime ``ever_cancerous`` flag
+    #    rather than ``(ti_cancerous_raw <= ti_now) & finite``: ti_cancerous
+    #    is set in set_prognoses for every cancer-bound agent, but the
+    #    cin → cancerous transition only fires in step_state if the agent is
+    #    still alive (and in cin) when ti_cancerous is reached. Agents who
+    #    die of background mortality before their scheduled ti_cancerous
+    #    have step_die clear the ``cin`` flag, so the transition never
+    #    fires — yet ti_cancerous in .raw retains its scheduled value, which
+    #    inflates a naive (ti_cancerous <= ti_now) mask by ~30% (verified
+    #    empirically: 743 raw vs 543 actual transitions on the M02 anchor).
     ti_now = float(sim.t.ti)
     ti_cancer_raw = np.asarray(mod.ti_cancerous.raw)
     ti_dead_raw = np.asarray(mod.ti_dead_cancer.raw)
     alive_raw = np.asarray(sim.people.alive.raw)
-    cancer_finite = np.isfinite(ti_cancer_raw)
-    cancer_realized_mask = cancer_finite & (ti_cancer_raw <= ti_now)
+    ever_cancerous_raw = np.asarray(mod.ever_cancerous.raw)
+    cancer_realized_mask = ever_cancerous_raw
     cancer_realized_idx = np.where(cancer_realized_mask)[0]
     ti_at_cancer = ti_cancer_raw[cancer_realized_mask]
     n_cancers = float(cancer_realized_mask.sum()) * pop_scale
@@ -128,12 +132,14 @@ def run_and_summarize():
     else:
         mean_age_cancer = 0.0
 
-    # 3. Total cancer deaths — agents whose ti_dead_cancer is in the past
-    #    AND who are no longer alive. Use .raw for the same reason as above:
-    #    dead agents disappear from .notnan.uids. (ti_dead_raw and alive_raw
-    #    were captured at the top of the cancer block.)
-    dead_finite = np.isfinite(ti_dead_raw)
-    dead_realized_mask = dead_finite & (ti_dead_raw <= ti_now) & (~alive_raw)
+    # 3. Total cancer deaths — use the lifetime ``dead_cancer`` flag, set
+    #    only when the cancer-death pipeline actually fires
+    #    (cancerous & ti_dead_cancer <= ti). A naive
+    #    (ti_dead_raw <= ti_now & ~alive) mask over-counts by including
+    #    cancer-onset agents who died of background mortality after onset
+    #    but before their scheduled ti_dead_cancer fired (verified
+    #    empirically: ~+25% inflation on the M02 anchor).
+    dead_realized_mask = np.asarray(mod.dead_cancer.raw)
     dead_realized_idx = np.where(dead_realized_mask)[0]
     n_cancer_deaths = float(dead_realized_mask.sum()) * pop_scale
 

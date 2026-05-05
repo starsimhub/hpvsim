@@ -367,6 +367,25 @@ class HPV(ss.Infection):
             ss.BoolState('precin', label='Precancerous infection'),
             ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
             ss.BoolState('cancerous', label='Invasive cancer'),
+            # Lifetime "did this agent ever transition to cancerous?" flag.
+            # Set in step_state when the cin → cancerous transition fires;
+            # NOT reset in step_die. This is the correct counter for total
+            # cancer events because ti_cancerous in .raw is preserved even
+            # for agents who died of background mortality BEFORE their
+            # scheduled ti_cancerous fired (those would otherwise be counted
+            # as phantom cancers since the cin → cancerous transition never
+            # happened — their `cin` flag was cleared by step_die first).
+            ss.BoolState('ever_cancerous', label='Lifetime cancer flag'),
+            # Lifetime cause-of-death flag: True iff request_death was
+            # called via the cancer pipeline (step_state's
+            # to_dead = cancerous & ti_dead_cancer <= ti branch). NOT reset
+            # in step_die. Mirrors v2's people.dead_cancer
+            # (_v2_legacy/people.py:1069). Required because ti_dead_cancer
+            # is scheduled eagerly at cancer onset and may be in the past
+            # for agents who died of background mortality after onset but
+            # before ti_dead_cancer fired — those would otherwise inflate
+            # the cancer-death count.
+            ss.BoolState('dead_cancer', label='Cancer cause-of-death flag'),
             # M02 scheduled transition times
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
@@ -632,6 +651,7 @@ class HPV(ss.Infection):
         if len(to_cancerous):
             self.cin[to_cancerous] = False
             self.cancerous[to_cancerous] = True
+            self.ever_cancerous[to_cancerous] = True
             self.infected[to_cancerous] = False
             self.susceptible[to_cancerous] = False
             self.rel_trans[to_cancerous] = 0.0
@@ -639,6 +659,7 @@ class HPV(ss.Infection):
         # --- 5. Cancer death: route through starsim's people death pipeline ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
+            self.dead_cancer[to_dead] = True
             self.sim.people.request_death(to_dead)
 
     def step_die(self, uids):
