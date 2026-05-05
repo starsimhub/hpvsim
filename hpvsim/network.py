@@ -24,6 +24,17 @@ class SexualNetwork(ss.SexualNetwork):
         pars: dict of layer parameters; see hpvsim.data.load_country for
             the expected shape (partners, mixing, layer_probs, cross_layer,
             duration, acts).
+
+    Step ordering: ``ss.DynamicNetwork.step`` runs ``end_pairs(); add_pairs()``
+    per network. With multiple SexualNetwork layers stepped in sequence, the
+    earlier layer's ``add_pairs`` sees the later layer's edges in their
+    pre-end_pairs state — including pairs that will dissolve this step. Cross-
+    layer concurrency filtering then over-removes agents from earlier-layer
+    eligibility based on stale partnerships. v2's ``dissolve_partnerships``
+    runs once for ALL layers before any ``create_partnerships``, avoiding
+    the asymmetry. We mirror that here: each layer's ``step`` only runs
+    ``end_pairs``; the LAST hpv.SexualNetwork to step then calls
+    ``add_pairs`` on all siblings in sequence (post all-dissolutions).
     """
 
     def __init__(self, layer='m', pars=None, **kwargs):
@@ -80,6 +91,23 @@ class SexualNetwork(ss.SexualNetwork):
         # test can compute age-at-formation (matching v2's age_f/age_m in
         # to_df) and reconstruct original-duration (matching v2's stored dur).
         self.meta.start_ti = float
+
+    def step(self):
+        """Override ss.DynamicNetwork.step to run end_pairs only here; the
+        last SexualNetwork to step then calls add_pairs on all siblings.
+
+        See class docstring for rationale. Equivalent to v2's
+        ``dissolve_partnerships`` (all layers) then ``create_partnerships``
+        (m, then c).
+        """
+        self.end_pairs()
+        siblings = [
+            n for n in self.sim.networks()
+            if isinstance(n, SexualNetwork)
+        ]
+        if self is siblings[-1]:
+            for sib in siblings:
+                sib.add_pairs()
 
     def _other_layer_partner_uids(self):
         """ss.uids of agents currently partnered in any OTHER hpv.SexualNetwork
