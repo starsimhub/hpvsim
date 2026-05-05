@@ -246,12 +246,20 @@ _INIT_HPV_PREV_F = np.array([0.0, 0.35, 0.70, 0.25, 0.05, 0.01, 0.0005, 0.0])
 
 
 def _age_stratified_init_prev(module, sim, uids):
-    """Per-uid initial-infection probability based on v2's age/sex table."""
+    """Per-uid initial-infection probability based on v2's age/sex table.
+
+    Matches v2 (_v2_legacy/sim.py:700) which uses np.digitize(age, brackets):
+    that returns ``i`` such that ``brackets[i-1] <= age < brackets[i]``,
+    which is equivalent to ``np.searchsorted(brackets, age, side='right')``
+    (NOT minus 1). An earlier off-by-one shifted the entire prev-by-age
+    table down one bracket — peak 0.70 prev landed on ages 24-34 instead
+    of v2's 17-24, mis-seeding the initial infectious pool away from peak
+    partnership-formation ages and depressing onward transmission.
+    """
     age = np.asarray(sim.people.age[uids])
     is_female = np.asarray(sim.people.female[uids])
-    # Bin agent ages into the v2 brackets.
-    bin_idx = np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, age, side='right') - 1
-    bin_idx = np.clip(bin_idx, 0, len(_INIT_HPV_PREV_AGE_BRACKETS) - 1)
+    bin_idx = np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, age, side='right')
+    bin_idx = np.clip(bin_idx, 0, len(_INIT_HPV_PREV_F) - 1)
     out = np.zeros(len(uids))
     out[is_female] = _INIT_HPV_PREV_F[bin_idx[is_female]]
     out[~is_female] = _INIT_HPV_PREV_M[bin_idx[~is_female]]
