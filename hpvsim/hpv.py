@@ -322,19 +322,22 @@ class HPV(ss.Infection):
                            form='logf2', k=0.3, x_infl=0, ttc=50),
             # M02 same-genotype partial permanent immunity.
             # Source: v2 _v2_legacy/parameters.py:102-104 — imm_init / cell_imm_init
-            # both `dict(dist='beta_mean', par1=..., par2=0.025)`. We use the
-            # scalar means (0.35 / 0.25) directly; v2's variance (0.025) is small
-            # and beta-distributed sampling is M03 scope. use_waning=False in v2
-            # by default, so no decay applied.
-            #
-            # On clearance:
-            #   rel_sus[uid] = min(rel_sus[uid], 1 - imm_init)        # ~0.65
-            #   rel_sev[uid] = min(rel_sev[uid], 1 - cell_imm_init)   # ~0.75
-            # imm_init reduces per-act susceptibility (transmission); cell_imm_init
-            # reduces severity (rel_sev * dur in compute_severity), damping
-            # cancer-progression probability for re-infections.
+            # both `dict(dist='beta_mean', par1=..., par2=0.025)`. v2 SAMPLES
+            # cell_imm_init from this Beta on each clearance and applies
+            # ``cell_imm = max(prior, new sample)`` (immunity.py:171-172). The
+            # max-of-samples accumulator means agents with multiple clearances
+            # get higher sev_imm than the distribution mean (~0.36 conditional
+            # mean after several clearances vs 0.25 if held constant). Holding
+            # cell_imm_init as a scalar ~31% under-estimates sev_imm, which
+            # inflates dur_precin*(1-sev_imm) and per-female P(CIN|inf) by
+            # +2.2pp, ultimately overshooting cancer count by ~12%. Use the
+            # full beta_mean distribution and max-accumulator below to match v2.
             imm_init=0.35,
-            cell_imm_init=0.25,
+            cell_imm_init=ss.Dist(
+                distname='beta',
+                a=((1 - 0.25) / 0.025 - 1 / 0.25) * 0.25 ** 2,
+                b=(((1 - 0.25) / 0.025 - 1 / 0.25) * 0.25 ** 2) * (1 / 0.25 - 1),
+            ),
             # Age-based dur_cin multiplier (v2 _v2_legacy/parameters.py:99
             # ``age_risk = dict(age=30, risk=2)`` applied in v2 set_prognoses
             # _v2_legacy/people.py:237-241): women aged >= ``age`` get their
@@ -611,13 +614,12 @@ class HPV(ss.Infection):
 
         # --- 1. Clear from precin (partial-immunity path) ---
         # M02: clearance returns agents to susceptible=True (SIS-like) and
-        # caps rel_sus at (1 - imm_init) (transmission immunity), and SETS
-        # sev_imm to cell_imm_init (severity immunity, applied as
-        # (1 - sev_imm) factor on dur_precin in set_prognoses). v2 takes
-        # np.maximum(prior, new) on repeat clearances
-        # (_v2_legacy/immunity.py:172,175); since cell_imm_init is constant,
-        # max(prior, cell_imm_init) just sets the value (any prior would be
-        # 0 or already cell_imm_init). rel_sev is the BIOLOGICAL baseline
+        # caps rel_sus at (1 - imm_init) (transmission immunity), and BOOSTS
+        # sev_imm via np.maximum(prior, new beta sample). v2 samples
+        # cell_imm_init from beta_mean(0.25, 0.025) per clearance and takes
+        # max(prior, new) (_v2_legacy/immunity.py:171-172). The max-of-samples
+        # accumulator is what gives multi-cleared agents higher sev_imm
+        # than the distribution mean. rel_sev is the BIOLOGICAL baseline
         # and is NOT modified on clearance.
         cleared = (self.infected & self.precin & ~self.cin & ~self.cancerous
                    & (self.ti_clearance <= ti)).uids
@@ -627,7 +629,8 @@ class HPV(ss.Infection):
             self.precin[cleared] = False
             self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
                                                1.0 - self.pars.imm_init)
-            self.sev_imm[cleared] = self.pars.cell_imm_init
+            new_imm = np.asarray(self.pars.cell_imm_init.rvs(cleared))
+            self.sev_imm[cleared] = np.maximum(self.sev_imm[cleared], new_imm)
 
         # --- 2. Clear from CIN (CIN regression; same partial-immunity logic) ---
         cleared_from_cin = (self.infected & self.cin & ~self.cancerous
@@ -638,7 +641,9 @@ class HPV(ss.Infection):
             self.cin[cleared_from_cin] = False
             self.rel_sus[cleared_from_cin] = np.minimum(self.rel_sus[cleared_from_cin],
                                                         1.0 - self.pars.imm_init)
-            self.sev_imm[cleared_from_cin] = self.pars.cell_imm_init
+            new_imm = np.asarray(self.pars.cell_imm_init.rvs(cleared_from_cin))
+            self.sev_imm[cleared_from_cin] = np.maximum(
+                self.sev_imm[cleared_from_cin], new_imm)
 
         # --- 3. Precin → CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
