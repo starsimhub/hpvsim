@@ -445,8 +445,12 @@ class HPV(ss.Infection):
         #    v2's set_prognoses pre-multiplication), so we pass rel_sev=None
         #    here — passing it again would double-count (compute_severity does
         #    t = rel_sev * t internally).
+        #    UNITS: dur_precin from p.dur_precin.rvs() comes back in starsim
+        #    timesteps. v2's compute_severity / cin_fn expect YEARS (ttc=50
+        #    is years time-to-cancer). Convert via *dt before passing.
+        dt_yr = float(self.t.dt)
         female = female_all   # alias to keep the existing variable name below
-        p_cin = _compute_severity(np.asarray(dur_precin), pars=p.cin_fn)
+        p_cin = _compute_severity(np.asarray(dur_precin) * dt_yr, pars=p.cin_fn)
         p._cin_bern.set(p=p_cin)
         cin_draw = p._cin_bern.rvs(uids)
         cin_mask = cin_draw & female       # boolean array, len == len(uids)
@@ -467,7 +471,9 @@ class HPV(ss.Infection):
         # 5. Probability of cancer given dur_cin. v2 does NOT apply sev_imm to
         #    dur_cin (only to dur_precin); see _v2_legacy/people.py:241. So
         #    dur_cin stays as sampled (no rel_sev pre-multiplication here).
-        p_cancer = _compute_severity(np.asarray(dur_cin), pars=p.cancer_fn)
+        #    Same units conversion as #2: dur_cin (timesteps) → years before
+        #    compute_severity. cancer_fn's ttc=50 is in years.
+        p_cancer = _compute_severity(np.asarray(dur_cin) * dt_yr, pars=p.cancer_fn)
         p._cancer_bern.set(p=p_cancer)
         cancer_draw = p._cancer_bern.rvs(cin_uids)
         cancer_uids = cin_uids[cancer_draw]
