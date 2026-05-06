@@ -120,6 +120,10 @@ class HPV(ss.Infection):
             # slot is drawn and shifts regression numbers past the ±10% gates.
             _cin_bern=ss.bernoulli(p=0.5),
             _cancer_bern=ss.bernoulli(p=0.5),
+            # Seroconversion gate: p is overwritten via .set(p=sero_prob) at the
+            # clearance use site. Initial p=0.75 matches hpv16 default; overwritten
+            # before every draw so the value here is only a placeholder.
+            _sero_bern=ss.bernoulli(p=0.75),
         )
         self.update_pars(pars=pars, **kwargs)
         # ss.Infection provides: susceptible, infected, rel_sus, rel_trans,
@@ -341,10 +345,39 @@ class HPV(ss.Infection):
             self.susceptible[cleared] = True
             self.precin[cleared] = False
             self.cin[cleared] = False
-            new_nab = np.asarray(self.pars.imm_init.rvs(cleared))
-            self.nab_imm[cleared] = np.maximum(self.nab_imm[cleared], new_nab)
-            new_cell = np.asarray(self.pars.cell_imm_init.rvs(cleared))
-            self.cell_imm[cleared] = np.maximum(self.cell_imm[cleared], new_cell)
+
+            # v2 only updates post-clearance immunity for females (males clear
+            # without seroconverting). And first-clearance immunity is gated on
+            # sero_prob; non-seroconverters keep nab_imm/cell_imm = 0 and are
+            # fully reinfectable next exposure. Repeat clearances always update
+            # via running max (sero_prob only gates the first event).
+            # See _v2_legacy/people.py:685-693 and _v2_legacy/immunity.py:155-176.
+            female = self.sim.people.female
+            f_cleared = cleared[np.asarray(female[cleared])]
+            if len(f_cleared):
+                has_prior_imm = np.asarray(self.nab_imm[f_cleared]) > 0
+                first_uids  = f_cleared[~has_prior_imm]
+                repeat_uids = f_cleared[has_prior_imm]
+
+                if len(first_uids):
+                    p = self.pars
+                    p._sero_bern.set(p=float(p.sero_prob))
+                    seroconvert = np.asarray(p._sero_bern.rvs(first_uids))
+                    new_nab  = np.asarray(p.imm_init.rvs(first_uids))
+                    new_cell = np.asarray(p.cell_imm_init.rvs(first_uids))
+                    # Non-seroconverters keep 0 immunity; seroconverters get
+                    # the sampled boost. nab_imm/cell_imm were 0 at this point
+                    # (no prior imm), so a direct assign is equivalent to max.
+                    self.nab_imm[first_uids]  = seroconvert * new_nab
+                    self.cell_imm[first_uids] = seroconvert * new_cell
+
+                if len(repeat_uids):
+                    new_nab  = np.asarray(self.pars.imm_init.rvs(repeat_uids))
+                    self.nab_imm[repeat_uids] = np.maximum(
+                        self.nab_imm[repeat_uids], new_nab)
+                    new_cell = np.asarray(self.pars.cell_imm_init.rvs(repeat_uids))
+                    self.cell_imm[repeat_uids] = np.maximum(
+                        self.cell_imm[repeat_uids], new_cell)
 
         # --- 2. precin -> CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids

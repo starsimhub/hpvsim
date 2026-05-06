@@ -172,23 +172,28 @@ def test_hpv_has_raw_immunity_states():
 
 
 def test_cleared_agents_have_reduced_susceptibility():
-    """After running a sim, agents who cleared have rel_sus < 1.0
-    (Connector-derived from running-max nab_imm samples).
+    """After running a sim, female agents who seroconverted after clearance
+    have rel_sus < 1.0 (Connector-derived from running-max nab_imm samples).
+    Males are excluded: v2 never updates male immunity on clearance, so males
+    retain rel_sus = 1.0.  Only females with nab_imm > 0 are checked here.
     """
     sim = hpv.Sim(n_agents=500, location='nigeria',
                   start=1990, stop=1995, dt=0.25, rand_seed=0)
     sim.run()
     mod = sim.diseases.hpv16
 
-    # Agents who have ever been infected and are now susceptible (cleared,
-    # not in cancerous compartment).
+    # Female agents who have ever been infected, are now susceptible (cleared),
+    # and have seroconverted (nab_imm > 0 — i.e. not blocked by sero_prob gate).
     ever = mod.ti_first_infection.notnan
-    cleared_now = (ever & mod.susceptible & ~mod.cancerous).uids
-    if len(cleared_now):
-        rel_sus_arr = np.asarray(mod.rel_sus[cleared_now])
-        # All cleared agents should have reduced rel_sus < 1.0 (some immunity).
-        assert (rel_sus_arr < 1.0).all(), \
-            f'cleared agents have rel_sus={rel_sus_arr[:5]}; expected <1.0'
+    female = sim.people.female
+    cleared_f = (ever & mod.susceptible & ~mod.cancerous & female).uids
+    if len(cleared_f):
+        nab_arr = np.asarray(mod.nab_imm[cleared_f])
+        seroconverted = cleared_f[nab_arr > 0]
+        if len(seroconverted):
+            rel_sus_arr = np.asarray(mod.rel_sus[seroconverted])
+            assert (rel_sus_arr < 1.0).all(), \
+                f'seroconverted female cleared agents have rel_sus={rel_sus_arr[:5]}; expected <1.0'
 
 
 def test_clearance_writes_raw_immunity_not_effective():
@@ -256,4 +261,43 @@ def test_per_genotype_init_prev_curve():
         mod = sim.diseases[key]
         n_init = int(np.asarray(mod.infected.values).sum())
         assert n_init > 0, f'{key} seeded zero initial infections'
+
+
+def test_clearance_sero_prob_gates_first_immunity():
+    """First-clearance immunity is gated on sero_prob; ~(1-sero_prob) of
+    first-cleared agents keep nab_imm=0 (still fully susceptible)."""
+    sim = hpv.Sim(n_agents=5000, location='nigeria',
+                  start=1990, stop=2010, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    # Females who ever cleared. Use ti_clearance.notnan as a proxy for cleared
+    # at least once. (Only females have CIN; clearance from precin can also
+    # set ti_clearance.)
+    female = sim.people.female
+    ever_cleared_f = (mod.ti_clearance.notnan & female).uids
+    if len(ever_cleared_f) >= 50:
+        nab = np.asarray(mod.nab_imm[ever_cleared_f])
+        zero_imm_frac = float((nab == 0).sum()) / float(len(ever_cleared_f))
+        # Approximate: with sero_prob=0.75, ~25% of FIRST clearances stay 0;
+        # but agents who clear multiple times get repeat-path updates which
+        # always boost. So zero_imm_frac is bounded above by (1 - sero_prob).
+        # Some flexibility in the upper bound; just verify it's > 0 and < 0.30.
+        assert 0.0 < zero_imm_frac < 0.30, \
+            f'zero_imm_frac={zero_imm_frac:.3f}; expected sero_prob gating in (0, 0.30)'
+
+
+def test_clearance_males_get_no_immunity():
+    """Males never get post-clearance immunity (matches v2 f_cleared_inds gate)."""
+    sim = hpv.Sim(n_agents=5000, location='nigeria',
+                  start=1990, stop=2010, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    males = ~sim.people.female
+    male_uids = males.uids
+    nab_male = np.asarray(mod.nab_imm[male_uids])
+    cell_male = np.asarray(mod.cell_imm[male_uids])
+    assert (nab_male == 0).all(), \
+        f'{int((nab_male > 0).sum())} males have nab_imm > 0; expected zero (v2 only updates females)'
+    assert (cell_male == 0).all(), \
+        f'{int((cell_male > 0).sum())} males have cell_imm > 0'
 

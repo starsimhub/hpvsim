@@ -68,20 +68,30 @@ def test_set_prognoses_flips_state():
 
 
 def test_step_state_clears_at_ti_clearance():
-    """A cleared agent's nab_imm gets a beta sample (mean ~0.35); the
-    CrossImmunity connector translates that into reduced rel_sus on the
-    next sim step."""
-    sim, hpv = _minimal_sim(init_prev=0.0)
+    """Cleared agents return to susceptible=True, infected=False.
+    Post-clearance immunity (nab_imm > 0) is only granted to females who
+    seroconvert (v2 match: males get no immunity; first-clearance is gated
+    on sero_prob). This test infects a batch of female agents to verify the
+    state transitions; some will seroconvert (nab_imm > 0)."""
+    sim, hpv = _minimal_sim(init_prev=0.0, n_agents=200)
     sim.init()
-    target = ss.uids([0])
+    # Pick several female agents to make the sero_prob-gated assertion robust.
+    female = sim.people.female
+    female_uids = female.uids
+    assert len(female_uids) >= 5, 'need at least 5 female agents for this test'
+    target = female_uids[:10]
     hpv.set_prognoses(target, sources=None)
     hpv.ti_clearance[target] = hpv.ti
     hpv.step_state()
-    assert hpv.susceptible[target].all(), "cleared agent should return to susceptible"
-    assert (~hpv.infected[target]).all(), "cleared agent must not remain infected"
-    nab_val = float(hpv.nab_imm[target][0])
-    assert 0.0 < nab_val <= 1.0, \
-        f"nab_imm={nab_val} should be a beta sample in (0, 1] after clearance"
+    assert hpv.susceptible[target].all(), "cleared agents should return to susceptible"
+    assert (~hpv.infected[target]).all(), "cleared agents must not remain infected"
+    # With sero_prob=0.75 and 10 females, expect ~7-8 seroconverters.
+    # At minimum, verify the array is in [0, 1] and at least one seroconverted.
+    nab_vals = np.asarray(hpv.nab_imm[target])
+    assert (nab_vals >= 0.0).all() and (nab_vals <= 1.0).all(), \
+        f"nab_imm values should be in [0, 1]; got {nab_vals}"
+    assert (nab_vals > 0).any(), \
+        f"at least one female should seroconvert (sero_prob=0.75); got all zeros"
 
 
 def test_runs_a_few_timesteps():

@@ -7,8 +7,15 @@ capped at 1 - 0.35) became a per-clearance beta_mean(0.35, 0.025) sample.
 Small drift on M02's 8-metric short_summary is anticipated; this test pins
 that drift bound so it doesn't slip silently.
 
-Drift values pinned from the first M03 1-genotype run; recompute and update
-if the M03 anchor sim parameters change.
+Drift values updated after M03 sero_prob + female-only clearance fix (2026-05-06):
+  - total HPV infections: 0.207  (was 0.348 before fix; v3 now slightly above v2)
+  - total cancers: 0.162          (was 0.287)
+  - total cancer deaths: 0.096    (was 0.288)
+  - mean HPV prevalence (%): 0.197 (was 0.280)
+  - mean cancer incidence (per 100k): 0.231 (was 0.246)
+  - mean age of infection (years): 0.012 (was <0.05, still passing)
+  - mean age of cancer (years): 0.043 (was <0.05, still passing)
+  - mean age of cancer death (years): 0.058 (was <0.05; slightly wider now)
 """
 import os
 import pytest
@@ -20,25 +27,17 @@ from tests.regression.anchor_hpv16 import run_and_summarize
 M02_BASELINE = 'tests/regression_baselines/anchor_hpv16.json'
 
 # Per-metric pinned drift: drift > tolerance => fail. Empirically chosen
-# in the first M03 run; widen with care.
-# Empirical drifts from first run (2026-05-06):
-#   - total HPV infections: 0.348
-#   - total cancers: 0.287
-#   - total cancer deaths: 0.288
-#   - mean HPV prevalence (%): 0.280
-#   - mean cancer incidence (per 100k): 0.246
-#   - mean age of infection (years): <0.05 (passing)
-#   - mean age of cancer (years): <0.05 (passing)
-#   - mean age of cancer death (years): <0.05 (passing)
+# after M03 sero_prob + female-only clearance gate fix; widen with care.
+# Tolerances are set to empirical + 0.05 headroom (or 0.10 for count metrics).
 PINNED_TOLERANCES = {
-    'total HPV infections': 0.40,
-    'total cancers': 0.35,
-    'total cancer deaths': 0.35,
-    'mean HPV prevalence (%)': 0.35,
-    'mean cancer incidence (per 100k)': 0.30,
+    'total HPV infections': 0.31,
+    'total cancers': 0.26,
+    'total cancer deaths': 0.20,
+    'mean HPV prevalence (%)': 0.30,
+    'mean cancer incidence (per 100k)': 0.33,
     'mean age of infection (years)': 0.05,
-    'mean age of cancer (years)': 0.05,
-    'mean age of cancer death (years)': 0.05,
+    'mean age of cancer (years)': 0.07,
+    'mean age of cancer death (years)': 0.08,
 }
 
 
