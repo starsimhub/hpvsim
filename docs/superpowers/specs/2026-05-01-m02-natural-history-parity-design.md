@@ -470,15 +470,35 @@ infected far longer than v2 and inflated cancer outcomes via
 secondary infections.
 
 **Per-step Result counters** replace lifetime BoolStates for cancer
-event tracking. `HPV.step_state` now emits:
-- `new_cancers` — count of cin -> cancerous transitions per step.
-- `new_cancer_deaths` — count of cancer-pipeline deaths per step.
+event tracking. `HPV.step_state` emits, and `finalize_results` rolls up:
+- `new_cancers` / `new_cancer_deaths` — realized-event counts per step.
+- `cum_cancers` / `cum_cancer_deaths` — cumulative sums (matches the
+  starsim `Infection.cum_infections` idiom for calibration consumers).
 - `sum_age_at_cancer` / `sum_age_at_cancer_death` — age sums at
   transition; mean = sum / count.
 
 The originally-planned `dur_precin` and `dur_cin` per-agent FloatArrs
 were removed: realized durations are recoverable from the existing
 `ti_*` timestamps and no consumer required the standalone arrays.
+
+**Single source of truth for HPV16 defaults.** `GenotypePars` (rewritten
+to hold starsim-native `ss.Dist` instances rather than v2-shaped dicts)
+now carries every par the disease module needs: `beta`, all duration
+distributions, `cin_fn`/`cancer_fn`, immunity (`imm_init`,
+`cell_imm_init`), and `age_risk`. `HPV.__init__` pulls defaults via
+`get_genotype_pars(genotype)`; each call returns fresh `Dist` instances
+so per-genotype RNG slots stay independent (forward-compatible with
+multi-genotype). `rel_beta` and `sero_prob` are reserved on
+`GenotypePars` for future multi-genotype consumers.
+
+**Clearance is one branch, not two.** `step_state` clears precin and CIN
+in a single block (`infected & (precin | cin) & ~cancerous &
+ti_clearance <= ti`); the compartments are mutually exclusive, so one
+beta sample per cleared agent suffices for the `sev_imm` accumulator.
+
+**CRN-safe emigration.** `AgeMigration._emigrate` selects departing
+agents via an `ss.choice(replace=False)` distribution so the emigration
+draws are reproducible per-seed (not pulled from numpy's global RNG).
 
 **SexualNetwork refactor:** the multi-network design (separate `m` and
 `c` instances) was collapsed into a single `hpv.SexualNetwork` that
