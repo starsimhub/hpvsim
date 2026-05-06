@@ -318,8 +318,6 @@ class HPV(ss.Infection):
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
             ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
-            ss.FloatArr('dur_precin', label='Sampled duration of precin'),
-            ss.FloatArr('dur_cin', label='Sampled duration of CIN'),
             # Per-agent biological severity baseline. Sampled once at agent
             # creation and never modified; passed separately to _compute_severity
             # so the severity model evaluates t_eff = dur * (1 - sev_imm) * rel_sev.
@@ -410,7 +408,6 @@ class HPV(ss.Infection):
         self.ti_cin[uids] = np.nan
         self.ti_cancerous[uids] = np.nan
         self.ti_dead_cancer[uids] = np.nan
-        self.dur_cin[uids] = np.nan
 
         female_all = np.asarray(self.sim.people.female[uids])
         rel_sev_uids = np.asarray(self.rel_sev[uids])
@@ -426,7 +423,6 @@ class HPV(ss.Infection):
             male_uids = uids[~female_all]
             dur_inf_male = p.dur_inf_male.rvs(male_uids)
             dur_precin[~female_all] = np.asarray(dur_inf_male)
-        self.dur_precin[uids] = dur_precin
 
         # 2. P(CIN) per female. Distributions return durations in starsim
         #    timesteps; convert to years before passing (cin_fn's ttc=50 is years).
@@ -455,7 +451,6 @@ class HPV(ss.Infection):
         age_mod = np.ones(len(cin_uids))
         age_mod[ages_at_cin >= p.age_risk['age']] = p.age_risk['risk']
         dur_cin = np.asarray(dur_cin) * age_mod
-        self.dur_cin[cin_uids] = dur_cin
 
         # 5. P(cancer) given dur_cin. sev_imm is NOT applied to dur_cin —
         #    only rel_sev (passed separately to _compute_severity). Same

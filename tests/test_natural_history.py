@@ -14,18 +14,13 @@ CAPABILITY_BASELINE = (
 
 
 def test_hpv_has_progression_states():
-    """HPV defines precin/cin/cancerous BoolStates and ti_*/dur_* FloatArrs."""
+    """HPV defines precin/cin/cancerous BoolStates and ti_* FloatArrs."""
     sim = hpv.Sim(n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0)
     sim.init()
     mod = sim.diseases.hpv16
-    # New compartment flags
     for name in ('precin', 'cin', 'cancerous'):
         assert hasattr(mod, name), f'HPV missing BoolState {name!r}'
-    # New scheduled-time arrays
     for name in ('ti_cin', 'ti_cancerous', 'ti_dead_cancer'):
-        assert hasattr(mod, name), f'HPV missing FloatArr {name!r}'
-    # New duration arrays
-    for name in ('dur_precin', 'dur_cin'):
         assert hasattr(mod, name), f'HPV missing FloatArr {name!r}'
 
 
