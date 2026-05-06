@@ -92,3 +92,35 @@ def test_genotypes_sugar_matches_explicit_diseases():
         b_inf = float(np.asarray(sim_b.results[key].new_infections).sum())
         assert a_inf == pytest.approx(b_inf), \
             f'sugar vs explicit drift for {key}: {a_inf} vs {b_inf}'
+
+
+def test_aggregate_cum_infections_any():
+    """AnyGenotypeAggregator.cum_infections_any counts agents ever infected with any genotype."""
+    sim = hpv.Sim(
+        n_agents=500, location='nigeria',
+        start=1990, stop=1995, dt=1.0, rand_seed=0,
+        genotypes=[16, 18],
+    )
+    sim.run()
+    agg = sim.results['anygenotypeaggregator']
+    any_cum = float(np.asarray(agg['cum_infections_any']).max())
+    h16_cum = float(np.asarray(sim.results['hpv16'].new_infections).sum())
+    h18_cum = float(np.asarray(sim.results['hpv18'].new_infections).sum())
+    # Boolean-OR is at most the sum (equal iff no co-infections).
+    assert any_cum > 0
+    assert any_cum <= h16_cum + h18_cum + 1e-6
+
+
+def test_aggregate_cum_cancers_any():
+    """AnyGenotypeAggregator.cum_cancers_any sums per-genotype cum_cancers across genotypes."""
+    sim = hpv.Sim(
+        n_agents=2000, location='nigeria',
+        start=1990, stop=2010, dt=0.5, rand_seed=0,
+        genotypes=[16, 18],
+    )
+    sim.run()
+    agg = sim.results['anygenotypeaggregator']
+    any_c = float(np.asarray(agg['cum_cancers_any'])[-1])
+    sum_c = sum(float(np.asarray(sim.results[k].cum_cancers)[-1])
+                for k in ('hpv16', 'hpv18'))
+    assert any_c == pytest.approx(sum_c, abs=1e-6)

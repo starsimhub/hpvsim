@@ -8,6 +8,7 @@ forwards to ``ss.Sim``. Each component is overridable: passing ``diseases=``
 short-circuits the genotypes-sugar path.
 """
 
+import numpy as np
 import starsim as ss
 
 from .data.country import load_country
@@ -27,6 +28,72 @@ def _normalize_genotype(key):
     raise ValueError(
         f'Unknown genotype {key!r}; valid: {list(genotype_aliases)}'
     )
+
+
+class AnyGenotypeAggregator(ss.Analyzer):
+    """Analyzer that pools per-genotype results into Sim-level *_any aggregates.
+
+    Results are accessible at ``sim.results.anygenotypeaggregator``:
+      - ``cum_infections_any`` — per-step max of new_infections across genotypes,
+        cumsum'd. Upper-bound approximation of the boolean-OR count.
+      - ``cum_cancers_any`` — sum of per-genotype cum_cancers (no double-counting
+        since cancer is attributed to a single genotype).
+      - ``new_cancer_deaths_any`` — per-step sum of new_cancer_deaths.
+
+    The analyzer is auto-added by ``hpv.Sim`` whenever HPV modules are present.
+    ``step()`` captures per-step new_infections; ``finalize_results()`` assembles
+    the cumulative aggregates using HPV disease results (available because
+    analyzers finalize after disease modules in Starsim's finalization order).
+    """
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('cum_infections_any', dtype=int,
+                      label='Cumulative agents ever infected (any genotype)'),
+            ss.Result('cum_cancers_any', dtype=int,
+                      label='Cumulative cancers (any genotype)'),
+            ss.Result('new_cancer_deaths_any', dtype=int,
+                      label='New cancer deaths (any genotype)'),
+        )
+
+    def _hpvs(self):
+        return [d for d in self.sim.diseases.values() if isinstance(d, HPV)]
+
+    def step(self):
+        """Capture per-step new_infections (needed before they could be overwritten)."""
+        ti = self.sim.ti
+        hpvs = self._hpvs()
+        if not hpvs:
+            return
+        # Per-step max across genotypes: approximates the boolean-OR count of
+        # agents newly infected with any genotype this timestep.
+        per_step_any = max(
+            int(np.asarray(m.results.new_infections[ti])) for m in hpvs
+        )
+        self.results['cum_infections_any'][ti] = per_step_any
+
+    def finalize_results(self):
+        """Assemble cumulative aggregates after HPV disease modules have finalized."""
+        super().finalize_results()
+        hpvs = self._hpvs()
+        if not hpvs:
+            return
+        # Convert per-step max values to cumulative sum.
+        self.results['cum_infections_any'][:] = np.cumsum(
+            np.asarray(self.results['cum_infections_any'])
+        )
+        # cum_cancers_any: sum across genotypes (HPV.finalize_results has
+        # already populated cum_cancers before this analyzer finalizes).
+        cum_c_stack = np.column_stack([
+            np.asarray(m.results.cum_cancers) for m in hpvs
+        ])
+        self.results['cum_cancers_any'][:] = cum_c_stack.sum(axis=1)
+        # new_cancer_deaths_any: per-step sum across genotypes.
+        ncd_stack = np.column_stack([
+            np.asarray(m.results.new_cancer_deaths) for m in hpvs
+        ])
+        self.results['new_cancer_deaths_any'][:] = ncd_stack.sum(axis=1)
 
 
 class Sim(ss.Sim):
@@ -71,6 +138,13 @@ class Sim(ss.Sim):
                 ss.Deaths(death_rate=country['death_rate']),
                 AgeMigration(),
             ]
+
+        # Auto-add the any-genotype aggregator unless the caller supplied their
+        # own analyzers list (in which case they can add it manually).
+        analyzers = kwargs.pop('analyzers', None)
+        if analyzers is None:
+            analyzers = [AnyGenotypeAggregator()]
+
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()
         super().__init__(
@@ -82,6 +156,7 @@ class Sim(ss.Sim):
             connectors=connectors,
             networks=networks,
             demographics=demographics,
+            analyzers=analyzers,
             pars=pars,
             total_pop=total_pop,
             **kwargs,
