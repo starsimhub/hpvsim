@@ -15,7 +15,7 @@ from .defaults import datadir, default_int, default_float, get_default_plots
 from . import data
 from . import migration_utils
 from . import parameters
-from .parameters import SimPars, GenotypePars, get_genotype_pars
+from .parameters import SimPars, GenotypePars, get_genotype_pars, get_cross_immunity, GENOTYPE_KEYS
 from . import misc
 from . import utils
 
@@ -23,13 +23,15 @@ from .hpv import HPV
 from .network import SexualNetwork
 from .sim import Sim
 from .demographics import AgeMigration
+from .connectors import CrossImmunity
 
 rootdir = sc.thispath(__file__).parent
 
 __all__ = [
-    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration',
+    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'CrossImmunity',
     'data', 'migration_utils', 'options', 'datadir', '__version__',
-    'SimPars', 'GenotypePars', 'get_genotype_pars',
+    'SimPars', 'GenotypePars', 'get_genotype_pars', 'get_cross_immunity',
+    'GENOTYPE_KEYS',
 ]
 
 del sc

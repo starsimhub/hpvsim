@@ -220,3 +220,10 @@ def test_cross_immunity_step_writes_survive_dead_agents():
     # Check the write landed in raw (not just an ephemeral copy).
     assert float(mod.rel_sus.raw[target_auid]) == pytest.approx(0.6, abs=1e-6)
     assert float(mod.sev_imm.raw[target_auid]) == pytest.approx(0.3, abs=1e-6)
+
+
+def test_cross_immunity_top_level_import():
+    """hpv.CrossImmunity and hpv.get_cross_immunity are importable from package root."""
+    assert hasattr(hpv, 'CrossImmunity')
+    assert hasattr(hpv, 'get_cross_immunity')
+    assert hasattr(hpv, 'GENOTYPE_KEYS')
