@@ -58,3 +58,37 @@ def test_sim_genotype_pars_override():
     )
     sim.init()
     assert float(sim.diseases.hpv16.pars.rel_beta) == pytest.approx(1.5)
+
+
+def test_four_genotype_sim_runs():
+    """End-to-end 4-genotype Sim runs and produces per-genotype results."""
+    sim = hpv.Sim(
+        n_agents=500, location='nigeria',
+        start=1990, stop=2000, dt=0.5, rand_seed=0,
+        genotypes=[16, 18, 'hi5', 'ohr'],
+    )
+    sim.run()
+    for key in ('hpv16', 'hpv18', 'hi5', 'ohr'):
+        res = sim.results[key]
+        # Each genotype gets cum_infections via Starsim auto-stratification.
+        assert 'cum_infections' in res or 'new_infections' in res, \
+            f'{key} missing infection results'
+
+
+def test_genotypes_sugar_matches_explicit_diseases():
+    """genotypes=[16,18] == diseases=[HPV(genotype='hpv16'), HPV(genotype='hpv18')]."""
+    pars = dict(n_agents=500, location='nigeria',
+                start=1990, stop=1995, dt=1.0, rand_seed=0)
+    sim_a = hpv.Sim(genotypes=[16, 18], **pars)
+    sim_a.run()
+    sim_b = hpv.Sim(
+        diseases=[hpv.HPV(genotype='hpv16'), hpv.HPV(genotype='hpv18')],
+        connectors=[hpv.CrossImmunity()],
+        **pars,
+    )
+    sim_b.run()
+    for key in ('hpv16', 'hpv18'):
+        a_inf = float(np.asarray(sim_a.results[key].new_infections).sum())
+        b_inf = float(np.asarray(sim_b.results[key].new_infections).sum())
+        assert a_inf == pytest.approx(b_inf), \
+            f'sugar vs explicit drift for {key}: {a_inf} vs {b_inf}'
