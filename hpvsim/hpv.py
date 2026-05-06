@@ -315,16 +315,6 @@ class HPV(ss.Infection):
             ss.BoolState('precin', label='Precancerous infection'),
             ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
             ss.BoolState('cancerous', label='Invasive cancer'),
-            # Lifetime "ever transitioned to cancerous" flag, NOT reset in
-            # step_die. Correct counter for total cancer events: ti_cancerous
-            # in .raw is preserved even for agents who died of background
-            # mortality before their scheduled onset fired.
-            ss.BoolState('ever_cancerous', label='Lifetime cancer flag'),
-            # Lifetime "died from cancer" flag, NOT reset in step_die. Set
-            # when the cancer-death pipeline fires; correct counter for
-            # cancer deaths since ti_dead_cancer in .raw can be in the past
-            # for agents who died of background causes after cancer onset.
-            ss.BoolState('dead_cancer', label='Cancer cause-of-death flag'),
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
             ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
@@ -348,6 +338,27 @@ class HPV(ss.Infection):
     def init_post(self):
         super().init_post()
         self._sample_rel_sev_for_unset()
+        return
+
+    def init_results(self):
+        """Per-step Results emitted from ``step_state``.
+
+        ``new_cancers`` / ``new_cancer_deaths`` are realized-event counters
+        (the cin -> cancerous and cancerous -> dead transitions). Cumulative
+        totals are obtained by summing over time. ``sum_age_at_*`` are
+        per-step accumulators; mean age = ``sum / count``.
+        """
+        super().init_results()
+        self.define_results(
+            ss.Result('new_cancers', dtype=int, scale=True,
+                      label='New cancers'),
+            ss.Result('new_cancer_deaths', dtype=int, scale=True,
+                      label='New cancer deaths'),
+            ss.Result('sum_age_at_cancer', dtype=float, scale=True,
+                      label='Sum of ages at cancer onset'),
+            ss.Result('sum_age_at_cancer_death', dtype=float, scale=True,
+                      label='Sum of ages at cancer death'),
+        )
         return
 
     def _sample_rel_sev_for_unset(self):
@@ -531,23 +542,26 @@ class HPV(ss.Infection):
         if len(to_cancerous):
             self.cin[to_cancerous] = False
             self.cancerous[to_cancerous] = True
-            self.ever_cancerous[to_cancerous] = True
             self.infected[to_cancerous] = False
             self.susceptible[to_cancerous] = False
             self.rel_trans[to_cancerous] = 0.0
+            ages_at_cancer = np.asarray(self.sim.people.age[to_cancerous])
+            self.results.new_cancers[ti] = len(to_cancerous)
+            self.results.sum_age_at_cancer[ti] = float(ages_at_cancer.sum())
 
         # --- 5. Cancer death (routed through starsim's people death pipeline) ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
-            self.dead_cancer[to_dead] = True
+            ages_at_death = np.asarray(self.sim.people.age[to_dead])
+            self.results.new_cancer_deaths[ti] = len(to_dead)
+            self.results.sum_age_at_cancer_death[ti] = float(ages_at_death.sum())
             self.sim.people.request_death(to_dead)
 
     def step_die(self, uids):
         """Reset transient compartment flags for dying agents.
 
         Without this, dead agents would keep their compartment flags and
-        corrupt n_precin / n_cin / n_cancerous counts. ``ever_cancerous``
-        and ``dead_cancer`` are NOT reset — they're lifetime flags.
+        corrupt n_precin / n_cin / n_cancerous counts.
         """
         super().step_die(uids)
         self.precin[uids] = False

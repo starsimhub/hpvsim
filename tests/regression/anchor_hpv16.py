@@ -49,9 +49,9 @@ def run_and_summarize():
     sim = make_sim()
     sim.run()
     res = sim.results.hpv16
-    mod = sim.diseases.hpv16
     dt = float(PARS['dt'])
     pop_scale = float(getattr(sim.pars, 'pop_scale', 1.0) or 1.0)
+    mod = sim.diseases.hpv16
 
     # 1. HPV infections (cumulative)
     if 'cum_infections' in res:
@@ -66,11 +66,7 @@ def run_and_summarize():
 
     # 6. Mean age of LATEST infection across alive ever-infected agents.
     #    Uses ``ti_infected`` (overwritten on each new infection) to match
-    #    v2's ``people.date_infectious`` semantics in baseline_v23.py:
-    #    both report the age at the most-recent infection, not the first.
-    #    With imm_init=0.35 partial permanent immunity reinfection is rare,
-    #    so most agents have ti_infected == ti_first_infection; the
-    #    distinction matters mainly for edge cases.
+    #    v2's ``people.date_infectious`` semantics in baseline_v23.py.
     ti_latest = mod.ti_infected
     ever_inf = ti_latest.notnan.uids
     if len(ever_inf):
@@ -81,79 +77,27 @@ def run_and_summarize():
     else:
         mean_age_inf = 0.0
 
-    # 2. Total cancers — agents who ACTUALLY transitioned to the cancerous
-    #    compartment during the sim. Use the lifetime ``ever_cancerous`` flag
-    #    rather than ``(ti_cancerous_raw <= ti_now) & finite``: ti_cancerous
-    #    is set in set_prognoses for every cancer-bound agent, but the
-    #    cin → cancerous transition only fires in step_state if the agent is
-    #    still alive (and in cin) when ti_cancerous is reached. Agents who
-    #    die of background mortality before their scheduled ti_cancerous
-    #    have step_die clear the ``cin`` flag, so the transition never
-    #    fires — yet ti_cancerous in .raw retains its scheduled value, which
-    #    inflates a naive (ti_cancerous <= ti_now) mask by ~30% (verified
-    #    empirically: 743 raw vs 543 actual transitions on the M02 anchor).
-    ti_now = float(sim.t.ti)
-    ti_cancer_raw = np.asarray(mod.ti_cancerous.raw)
-    ti_dead_raw = np.asarray(mod.ti_dead_cancer.raw)
-    alive_raw = np.asarray(sim.people.alive.raw)
-    ever_cancerous_raw = np.asarray(mod.ever_cancerous.raw)
-    cancer_realized_mask = ever_cancerous_raw
-    cancer_realized_idx = np.where(cancer_realized_mask)[0]
-    ti_at_cancer = ti_cancer_raw[cancer_realized_mask]
-    n_cancers = float(cancer_realized_mask.sum()) * pop_scale
+    # 2. Total cancers — sum of per-step new-cancer counts emitted by the
+    #    cin -> cancerous transition in HPV.step_state.
+    new_cancers = np.asarray(res.new_cancers)
+    n_cancers_unscaled = float(new_cancers.sum())
+    n_cancers = n_cancers_unscaled * pop_scale
 
-    # 7. Mean age of cancer onset (realized cancer agents only).
-    #    Same .raw discipline — include dead agents.
-    age_raw = np.asarray(sim.people.age.raw)
-    if cancer_realized_mask.any():
-        ages_now_c = age_raw[cancer_realized_idx]
-        # For alive agents: people.age is current age, so years-since-cancer
-        # = (ti_now - ti_cancer) * dt and age_at_cancer = current_age - years_since.
-        # For dead agents: people.age is frozen at age-of-death, so we use
-        # ti_dead_cancer (if cancer-death) or ti_now (proxy for any-cause death,
-        # since starsim freezes age on death) as the effective "now". For
-        # agents whose ti_dead_cancer is set and in the past, that's the
-        # death time; otherwise (background mortality), the agent's age was
-        # frozen at some earlier ti — we don't have direct access to the
-        # exact death ti without an analyzer, so fall back to ti_now which
-        # may slightly underestimate the actual age-at-cancer for those
-        # who died of background mortality between cancer onset and sim end.
-        effective_ti = np.where(
-            alive_raw[cancer_realized_idx],
-            ti_now,
-            np.where(
-                np.isfinite(ti_dead_raw[cancer_realized_idx]),
-                ti_dead_raw[cancer_realized_idx],
-                ti_now,
-            ),
-        )
-        years_since_cancer = (effective_ti - ti_at_cancer) * dt
-        mean_age_cancer = float((ages_now_c - years_since_cancer).mean())
-    else:
-        mean_age_cancer = 0.0
+    # 7. Mean age of cancer onset = sum(age@onset) / count.
+    sum_age_cancer = float(np.asarray(res.sum_age_at_cancer).sum())
+    mean_age_cancer = (sum_age_cancer / n_cancers_unscaled) if n_cancers_unscaled > 0 else 0.0
 
-    # 3. Total cancer deaths — use the lifetime ``dead_cancer`` flag, set
-    #    only when the cancer-death pipeline actually fires
-    #    (cancerous & ti_dead_cancer <= ti). A naive
-    #    (ti_dead_raw <= ti_now & ~alive) mask over-counts by including
-    #    cancer-onset agents who died of background mortality after onset
-    #    but before their scheduled ti_dead_cancer fired (verified
-    #    empirically: ~+25% inflation on the M02 anchor).
-    dead_realized_mask = np.asarray(mod.dead_cancer.raw)
-    dead_realized_idx = np.where(dead_realized_mask)[0]
-    n_cancer_deaths = float(dead_realized_mask.sum()) * pop_scale
+    # 3. Total cancer deaths.
+    new_cancer_deaths = np.asarray(res.new_cancer_deaths)
+    n_cd_unscaled = float(new_cancer_deaths.sum())
+    n_cancer_deaths = n_cd_unscaled * pop_scale
 
-    # 8. Mean age of cancer death — people.age is frozen at agent death,
-    #    so age.raw[uid] for a dead cancer agent ≈ age at cancer death.
-    if dead_realized_mask.any():
-        ages_at_death = age_raw[dead_realized_idx]
-        mean_age_cancer_death = float(ages_at_death.mean())
-    else:
-        mean_age_cancer_death = 0.0
+    # 8. Mean age of cancer death = sum(age@death) / count.
+    sum_age_cd = float(np.asarray(res.sum_age_at_cancer_death).sum())
+    mean_age_cancer_death = (sum_age_cd / n_cd_unscaled) if n_cd_unscaled > 0 else 0.0
 
-    # 5. Mean cancer incidence (per 100k female-years).
-    # Total cancer events / total female-alive years × 100k.
-    # n_alive counts both sexes; female-years approximation = n_alive/2 × dt.
+    # 5. Mean cancer incidence (per 100k female-years). n_alive counts
+    # both sexes; female-years approximation = n_alive/2 * dt.
     n_alive_series = np.asarray(sim.results['n_alive'])
     total_alive_years = float(n_alive_series.sum()) * dt
     female_years = total_alive_years / 2.0
