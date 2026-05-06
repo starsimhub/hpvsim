@@ -118,6 +118,10 @@ class HPV(ss.Infection):
             # Severity immunity, accumulated as max-of-beta-samples on each
             # clearance. Shortens future dur_precin via (1 - sev_imm) factor.
             ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
+            # M03 raw source-genotype immunity. Bumped on clearance; read by
+            # CrossImmunity Connector to derive per-target rel_sus and sev_imm.
+            ss.FloatArr('nab_imm', label='Humoral immunity (source genotype)', default=0.0),
+            ss.FloatArr('cell_imm', label='Cell-mediated immunity (source genotype)', default=0.0),
         )
         # Baseline rel_sev distribution; abs() in _sample_rel_sev_for_unset
         # implements positive truncation.

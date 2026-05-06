@@ -159,6 +159,18 @@ def test_step_die_resets_bool_states():
     assert not mod.susceptible[test_uids].any(), "susceptible not cleared after step_die"
 
 
+def test_hpv_has_raw_immunity_states():
+    """HPV defines 1D nab_imm / cell_imm FloatArrs as source-genotype immunity stores."""
+    sim = hpv.Sim(n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0)
+    sim.init()
+    mod = sim.diseases.hpv16
+    for name in ('nab_imm', 'cell_imm'):
+        assert hasattr(mod, name), f'HPV missing FloatArr {name!r}'
+        arr = getattr(mod, name)
+        # Default 0.0 across the population at init.
+        assert np.allclose(np.asarray(arr.values), 0.0)
+
+
 def test_cleared_agents_have_reduced_susceptibility():
     """Once an agent clears HPV, their rel_sus is multiplied by (1 - imm_init)
     to model v2's partial permanent same-genotype immunity (default
