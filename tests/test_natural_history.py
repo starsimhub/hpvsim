@@ -211,3 +211,28 @@ def test_clearance_writes_raw_immunity_not_effective():
     assert np.allclose(rel_sus[cleared_uids], 1.0 - nab[cleared_uids], atol=1e-6)
     assert np.allclose(sev_imm[cleared_uids], cell[cleared_uids], atol=1e-6)
 
+
+@pytest.mark.parametrize('genotype', ['hpv18', 'hi5', 'ohr'])
+def test_genotype_pars_for_non_hpv16(genotype):
+    """GenotypePars supports hpv18, hi5, ohr with v2 defaults."""
+    gp = hpv.get_genotype_pars(genotype)
+    assert gp.genotype == genotype
+    for name in ('dur_precin', 'dur_cin', 'dur_cancer', 'cin_fn',
+                 'cancer_fn', 'imm_init', 'cell_imm_init', 'rel_beta'):
+        assert name in gp, f'{genotype} GenotypePars missing {name!r}'
+
+
+def test_hpv18_specific_v2_values():
+    """hpv18 has v2's specific cin_fn k=0.25 and rel_beta=0.75."""
+    gp = hpv.get_genotype_pars('hpv18')
+    assert gp.cin_fn['k'] == pytest.approx(0.25)
+    assert float(gp.rel_beta) == pytest.approx(0.75)
+    assert float(gp.sero_prob) == pytest.approx(0.56)
+
+
+def test_hi5_specific_v2_values():
+    """hi5 has v2's cancer_fn transform_prob=1.5e-3."""
+    gp = hpv.get_genotype_pars('hi5')
+    assert gp.cancer_fn['transform_prob'] == pytest.approx(1.5e-3)
+    assert float(gp.rel_beta) == pytest.approx(0.9)
+

@@ -4,10 +4,9 @@
 ``GenotypePars`` holds per-genotype natural-history defaults (durations,
 severity functions, immunity, age risk) consumed by ``HPV(ss.Infection)``;
 ``get_genotype_pars(genotype)`` is the factory multi-genotype consumers
-use to look up defaults by name.
-
-Currently ships HPV16 defaults only; future multi-genotype support adds
-hpv18 / hi5 / ohr.
+use to look up defaults by name. Supports the four canonical M03 genotypes:
+``hpv16``, ``hpv18``, ``hi5`` (high-risk-5 pool), and ``ohr`` (other
+high-risk pool). Hand-ported from v2's ``get_genotype_pars``.
 """
 
 import numpy as np
@@ -73,10 +72,11 @@ def _cell_imm_dist():
 
 
 class GenotypePars(ss.Pars):
-    """Per-genotype natural-history defaults. Currently HPV16 only.
+    """Per-genotype natural-history defaults for HPV.
 
     Each call returns fresh distribution instances so per-genotype RNG
-    state stays independent.
+    state stays independent. Supported genotypes: ``hpv16``, ``hpv18``,
+    ``hi5``, ``ohr``.
     """
 
     def __init__(self, genotype='hpv16', **kwargs):
@@ -110,23 +110,36 @@ class GenotypePars(ss.Pars):
             self.rel_beta = 1.0
             self.sero_prob = 0.75
         elif genotype == 'hpv18':
-            # Placeholder defaults (Task 8 will add hpv18-specific values).
             self.beta = 0.25
-            self.dur_precin = ss.lognorm_ex(mean=ss.years(3.0), std=ss.years(9.0))
+            self.dur_precin = ss.lognorm_ex(mean=ss.years(2.5), std=ss.years(9.0))
             self.dur_cin = ss.lognorm_ex(mean=ss.years(5.0), std=ss.years(20.0))
             self.dur_cancer = ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0))
             self.dur_inf_male = ss.lognorm_ex(mean=ss.years(1.0), std=ss.years(1.0))
-            self.cin_fn = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
+            self.cin_fn = dict(form='logf2', k=0.25, x_infl=0, ttc=50)
             self.cancer_fn = dict(method='cin_integral', transform_prob=2e-3,
-                                  form='logf2', k=0.3, x_infl=0, ttc=50)
+                                  form='logf2', k=0.25, x_infl=0, ttc=50)
             self.imm_init = _imm_init_dist()
             self.cell_imm_init = _cell_imm_dist()
             self.age_risk = dict(age=30, risk=2)
-            self.rel_beta = 1.0
-            self.sero_prob = 0.75
+            self.rel_beta = 0.75
+            self.sero_prob = 0.56
+        elif genotype in ('hi5', 'ohr'):
+            self.beta = 0.25
+            self.dur_precin = ss.lognorm_ex(mean=ss.years(2.5), std=ss.years(9.0))
+            self.dur_cin = ss.lognorm_ex(mean=ss.years(4.5), std=ss.years(20.0))
+            self.dur_cancer = ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0))
+            self.dur_inf_male = ss.lognorm_ex(mean=ss.years(1.0), std=ss.years(1.0))
+            self.cin_fn = dict(form='logf2', k=0.2, x_infl=0, ttc=50)
+            self.cancer_fn = dict(method='cin_integral', transform_prob=1.5e-3,
+                                  form='logf2', k=0.2, x_infl=0, ttc=50)
+            self.imm_init = _imm_init_dist()
+            self.cell_imm_init = _cell_imm_dist()
+            self.age_risk = dict(age=30, risk=2)
+            self.rel_beta = 0.9
+            self.sero_prob = 0.60
         else:
             raise NotImplementedError(
-                f'GenotypePars currently supports hpv16 and hpv18; got {genotype!r}.'
+                f'GenotypePars supports {GENOTYPE_KEYS}; got {genotype!r}.'
             )
         self.update(kwargs)
         return
