@@ -9,10 +9,19 @@ Run as a script to print the summary:
     python tests/regression/anchor_4genotype.py
 """
 
+import sys
+from pathlib import Path
+
 import sciris as sc
 
 import hpvsim as hpv
-from .short_summary import build_summary  # added in Task 13
+
+# Make sibling short_summary.py importable when this script is invoked
+# directly (python tests/regression/anchor_4genotype.py).
+# pytest adds the regression package to sys.path so the insert is harmless there.
+# Pattern matches demo_anchor_hpv16.py's sys.path.insert approach.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from short_summary import build_summary  # noqa: E402
 
 
 # Pinned anchor pars. Do not change without coordinating with regression baselines.
