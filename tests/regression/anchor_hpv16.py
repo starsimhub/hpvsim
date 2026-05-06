@@ -19,7 +19,7 @@ import hpvsim as hpv
 PARS = dict(
     n_agents=10e3,
     location='nigeria',
-    genotype='hpv16',
+    genotypes=['hpv16'],
     start=1990,
     stop=2060,
     dt=0.25,

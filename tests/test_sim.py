@@ -31,7 +31,7 @@ def test_sim_has_one_multilayer_sexual_network():
 
 
 def test_sim_has_one_hpv_disease():
-    sim = Sim(location='nigeria', genotype='hpv16', n_agents=500,
+    sim = Sim(location='nigeria', genotypes=['hpv16'], n_agents=500,
               start=2000, stop=2002, dt=0.25)
     sim.init()
     hpv_diseases = [d for d in sim.diseases() if isinstance(d, HPV)]

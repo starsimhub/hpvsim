@@ -87,6 +87,9 @@ class HPV(ss.Infection):
             imm_init=gpars.imm_init,
             cell_imm_init=gpars.cell_imm_init,
             age_risk=gpars.age_risk,
+            # Per-genotype beta scaler and serology probability (multi-genotype).
+            rel_beta=gpars.rel_beta,
+            sero_prob=gpars.sero_prob,
             # Per-call Bernoullis for CIN and cancer draws; ``p`` is overwritten
             # via .set(p=...) in set_prognoses. Held in pars (vs. as plain
             # attributes) so the per-Dist RNG-slot identifier follows the
@@ -316,9 +319,12 @@ class HPV(ss.Infection):
             self.susceptible[cleared] = True
             self.precin[cleared] = False
             self.cin[cleared] = False
+            new_nab = np.asarray(self.pars.imm_init.rvs(cleared))
+            self.nab_imm[cleared] = np.maximum(self.nab_imm[cleared], new_nab)
             self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
-                                               1.0 - self.pars.imm_init)
-            new_imm = self.pars.cell_imm_init.rvs(cleared)
+                                               1.0 - new_nab)
+            new_imm = np.asarray(self.pars.cell_imm_init.rvs(cleared))
+            self.cell_imm[cleared] = np.maximum(self.cell_imm[cleared], new_imm)
             self.sev_imm[cleared] = np.maximum(self.sev_imm[cleared], new_imm)
 
         # --- 2. precin -> CIN ---

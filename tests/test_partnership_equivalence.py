@@ -41,7 +41,7 @@ _BASELINE_PARTNERSHIP = Path(__file__).resolve().parent / 'regression_baselines'
 
 PARS = dict(
     location='nigeria',
-    genotype='hpv16',
+    genotypes=['hpv16'],
     n_agents=10_000,
     start=1990,
     stop=2015,   # 1990-2010 burnin + 2010-2015 observation per spec
