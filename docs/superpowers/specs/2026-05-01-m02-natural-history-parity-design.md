@@ -4,7 +4,7 @@
 **Milestone:** M02 (Natural history parity)
 **Branch:** `m02-natural-history-parity` (off `v3.0-dev`, after M01 PR merges)
 **Predecessor:** [M01 Basic Transmission Sim](2026-04-28-hpvsim-m1-basic-transmission-design.md)
-**Status:** Draft pending implementation plan
+**Status:** Implemented; see "Post-implementation deltas" below.
 
 ---
 
@@ -93,8 +93,6 @@ Trajectory sampling at infection time matches v2 algorithmically.
 | `FloatArr` | `ti_cin` | Scheduled time of CIN onset |
 | `FloatArr` | `ti_cancerous` | Scheduled time of invasive cancer onset |
 | `FloatArr` | `ti_dead_cancer` | Scheduled time of cancer-caused death |
-| `FloatArr` | `dur_precin` | Sampled per-agent precin duration (kept for analyzers/diagnostics) |
-| `FloatArr` | `dur_cin` | Sampled per-agent CIN duration |
 
 M01 states preserved: `infected`, `susceptible`, `ti_infected`,
 `ti_first_infection`, `ti_clearance`. SIS clearance path remains as the
@@ -442,6 +440,54 @@ of plumbing, then validation last.
   - Any subclass-first delegations introduced (per migration convention 3,
     must strip before M10).
   - M02 network-tightening follow-up if E6 found gates still loose at 50%.
+
+---
+
+## Post-implementation deltas
+
+What landed differs from this design in the following ways. The plan doc
+captures the per-task narrative; this section is the spec-level diff.
+
+**Same-genotype partial permanent immunity** (added during M02; not in
+original scope):
+- New pars: `imm_init=0.35` (transmission immunity cap on `rel_sus`),
+  `cell_imm_init` (Beta sample, ported from v2 `beta_mean(0.25, 0.025)`),
+  `age_risk=dict(age=30, risk=2)` (older-women dur_cin multiplier).
+- New states: `rel_sev` (per-agent biological severity baseline, sampled
+  from v2's `sev_dist`), `rel_sev_sampled` (init tracker), `sev_imm`
+  (severity immunity, max-of-Beta-samples on each clearance).
+- `set_prognoses` applies `dur_precin = sample * (1 - sev_imm)` for
+  females; `_compute_severity` consumes `rel_sev` separately so the
+  effective duration is `dur * (1 - sev_imm) * rel_sev` (two-factor
+  product matching v2).
+- `step_state` clearance branches reduce `rel_sus` to
+  `min(prior, 1 - imm_init)` and accumulate `sev_imm` via
+  `np.maximum(prior, new sample)`.
+
+**Male clearance** uses a separate, much shorter distribution
+`dur_inf_male` (lognormal mean=1y, std=1y); without it, males stayed
+infected far longer than v2 and inflated cancer outcomes via
+secondary infections.
+
+**Per-step Result counters** replace lifetime BoolStates for cancer
+event tracking. `HPV.step_state` now emits:
+- `new_cancers` — count of cin -> cancerous transitions per step.
+- `new_cancer_deaths` — count of cancer-pipeline deaths per step.
+- `sum_age_at_cancer` / `sum_age_at_cancer_death` — age sums at
+  transition; mean = sum / count.
+
+The originally-planned `dur_precin` and `dur_cin` per-agent FloatArrs
+were removed: realized durations are recoverable from the existing
+`ti_*` timestamps and no consumer required the standalone arrays.
+
+**SexualNetwork refactor:** the multi-network design (separate `m` and
+`c` instances) was collapsed into a single `hpv.SexualNetwork` that
+carries all layers in one edges table tagged by `layer_id`. `debut` and
+`participant` are shared per-agent across layers, and `step()` dissolves
+all pairs (single `end_pairs`) before forming new ones per layer.
+
+**Partnership-equivalence gates** were tightened from M01's 50%
+placeholder to 10% drift / 0.90 cosine and pass.
 
 ---
 
