@@ -30,10 +30,10 @@ def _normalize_genotype(key):
     )
 
 
-class AnyGenotypeAggregator(ss.Analyzer):
+class Aggregate(ss.Analyzer):
     """Analyzer that pools per-genotype results into Sim-level *_any aggregates.
 
-    Results are accessible at ``sim.results.anygenotypeaggregator``:
+    Results are accessible at ``sim.results.aggregate``:
       - ``cum_infections_any`` — per-step max of new_infections across genotypes,
         cumsum'd. Upper-bound approximation of the boolean-OR count.
       - ``cum_cancers_any`` — sum of per-genotype cum_cancers (no double-counting
@@ -143,7 +143,7 @@ class Sim(ss.Sim):
         # own analyzers list (in which case they can add it manually).
         analyzers = kwargs.pop('analyzers', None)
         if analyzers is None:
-            analyzers = [AnyGenotypeAggregator()]
+            analyzers = [Aggregate()]
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()

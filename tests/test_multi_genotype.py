@@ -95,14 +95,14 @@ def test_genotypes_sugar_matches_explicit_diseases():
 
 
 def test_aggregate_cum_infections_any():
-    """AnyGenotypeAggregator.cum_infections_any counts agents ever infected with any genotype."""
+    """Aggregate.cum_infections_any counts agents ever infected with any genotype."""
     sim = hpv.Sim(
         n_agents=500, location='nigeria',
         start=1990, stop=1995, dt=1.0, rand_seed=0,
         genotypes=[16, 18],
     )
     sim.run()
-    agg = sim.results['anygenotypeaggregator']
+    agg = sim.results['aggregate']
     any_cum = float(np.asarray(agg['cum_infections_any']).max())
     h16_cum = float(np.asarray(sim.results['hpv16'].new_infections).sum())
     h18_cum = float(np.asarray(sim.results['hpv18'].new_infections).sum())
@@ -112,14 +112,14 @@ def test_aggregate_cum_infections_any():
 
 
 def test_aggregate_cum_cancers_any():
-    """AnyGenotypeAggregator.cum_cancers_any sums per-genotype cum_cancers across genotypes."""
+    """Aggregate.cum_cancers_any sums per-genotype cum_cancers across genotypes."""
     sim = hpv.Sim(
         n_agents=2000, location='nigeria',
         start=1990, stop=2010, dt=0.5, rand_seed=0,
         genotypes=[16, 18],
     )
     sim.run()
-    agg = sim.results['anygenotypeaggregator']
+    agg = sim.results['aggregate']
     any_c = float(np.asarray(agg['cum_cancers_any'])[-1])
     sum_c = sum(float(np.asarray(sim.results[k].cum_cancers)[-1])
                 for k in ('hpv16', 'hpv18'))
