@@ -26,9 +26,9 @@ import starsim as ss
 from .utils import compute_severity
 
 
-# Other genotypes (hpv18, hi5, ohr) need per-genotype natural-history pars
-# that aren't wired yet; reject them rather than silently using HPV16 defaults.
-_KNOWN_GENOTYPES = ('hpv16',)
+# hpv18 added as a forward-stub in Task 4 (placeholder pars); Task 8 adds
+# hpv18-specific natural-history values and hi5/ohr support.
+_KNOWN_GENOTYPES = ('hpv16', 'hpv18')
 
 
 # Initial HPV prevalence by age bracket and sex. Brackets are inclusive lower

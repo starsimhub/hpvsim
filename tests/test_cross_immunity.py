@@ -108,3 +108,80 @@ def test_cross_immunity_connector_rejects_shape_mismatch():
     )
     with pytest.raises(ValueError, match='shape'):
         sim.init()
+
+
+def test_cross_immunity_step_identity_for_single_genotype():
+    """1x1 identity matrix: rel_sus = 1 - nab_imm, sev_imm = cell_imm."""
+    from hpvsim.connectors import CrossImmunity
+    sim = hpv.Sim(
+        n_agents=10, start=1990, stop=1991, dt=1.0, rand_seed=0,
+        diseases=[hpv.HPV(genotype='hpv16')],
+        connectors=[CrossImmunity()],
+    )
+    sim.init()
+    mod = sim.diseases.hpv16
+    conn = sim.connectors.crossimmunity
+    # Manually set source immunity for half the agents, then step the connector.
+    mod.nab_imm.values[:5] = 0.4
+    mod.cell_imm.values[:5] = 0.3
+    conn.step()
+    # Identity multiply: rel_sus = 1 - 0.4 = 0.6 for first five, 1.0 elsewhere.
+    rel = np.asarray(mod.rel_sus.values)
+    sev = np.asarray(mod.sev_imm.values)
+    assert np.allclose(rel[:5], 0.6)
+    assert np.allclose(rel[5:], 1.0)
+    assert np.allclose(sev[:5], 0.3)
+    assert np.allclose(sev[5:], 0.0)
+
+
+def test_cross_immunity_step_two_genotype_hand_computed():
+    """2-genotype case: rel_sus and sev_imm match hand-computed dot product."""
+    from hpvsim.connectors import CrossImmunity
+    # Cross-immunity: 16->18 = 0.5 sus / 0.7 sev; 18->16 = 0.5 sus / 0.7 sev.
+    m_sus = np.array([[1.0, 0.5], [0.5, 1.0]], dtype=np.float32)
+    m_sev = np.array([[1.0, 0.7], [0.7, 1.0]], dtype=np.float32)
+    sim = hpv.Sim(
+        n_agents=4, start=1990, stop=1991, dt=1.0, rand_seed=0,
+        diseases=[hpv.HPV(genotype='hpv16'), hpv.HPV(genotype='hpv18')],
+        connectors=[CrossImmunity(cross_imm_sus=m_sus, cross_imm_sev=m_sev)],
+    )
+    sim.init()
+    h16 = sim.diseases.hpv16
+    h18 = sim.diseases.hpv18
+    conn = sim.connectors.crossimmunity
+    # Agent 0: had hpv16 (nab=0.4, cell=0.3); no hpv18 history.
+    h16.nab_imm.values[0] = 0.4
+    h16.cell_imm.values[0] = 0.3
+    # Agent 1: had hpv18 (nab=0.6, cell=0.5); no hpv16 history.
+    h18.nab_imm.values[1] = 0.6
+    h18.cell_imm.values[1] = 0.5
+    conn.step()
+    # Target hpv16, agent 0: sus_imm = 1.0*0.4 + 0.5*0 = 0.4 -> rel_sus = 0.6
+    # Target hpv18, agent 0: sus_imm = 0.5*0.4 + 1.0*0 = 0.2 -> rel_sus = 0.8
+    # Target hpv16, agent 1: sus_imm = 1.0*0 + 0.5*0.6 = 0.3 -> rel_sus = 0.7
+    # Target hpv18, agent 1: sus_imm = 0.5*0 + 1.0*0.6 = 0.6 -> rel_sus = 0.4
+    assert h16.rel_sus.values[0] == pytest.approx(0.6, abs=1e-6)
+    assert h18.rel_sus.values[0] == pytest.approx(0.8, abs=1e-6)
+    assert h16.rel_sus.values[1] == pytest.approx(0.7, abs=1e-6)
+    assert h18.rel_sus.values[1] == pytest.approx(0.4, abs=1e-6)
+    # sev_imm: target hpv16, agent 0 = 1.0*0.3 + 0.7*0 = 0.3
+    #          target hpv18, agent 1 = 0.7*0 + 1.0*0.5 = 0.5
+    assert h16.sev_imm.values[0] == pytest.approx(0.3, abs=1e-6)
+    assert h18.sev_imm.values[1] == pytest.approx(0.5, abs=1e-6)
+
+
+def test_cross_immunity_step_clips_to_unit_interval():
+    """sus_imm and sev_imm are clipped to [0, 1] (matches v2 np.minimum cap)."""
+    from hpvsim.connectors import CrossImmunity
+    sim = hpv.Sim(
+        n_agents=4, start=1990, stop=1991, dt=1.0, rand_seed=0,
+        diseases=[hpv.HPV(genotype='hpv16'), hpv.HPV(genotype='hpv18')],
+        connectors=[CrossImmunity()],
+    )
+    sim.init()
+    sim.diseases.hpv16.nab_imm.values[0] = 0.9
+    sim.diseases.hpv18.nab_imm.values[0] = 0.9
+    sim.connectors.crossimmunity.step()
+    # Agent 0: sus_imm to hpv16 = 1*0.9 + 0.5*0.9 = 1.35 -> clipped to 1.0
+    # rel_sus = 1 - 1.0 = 0.0
+    assert sim.diseases.hpv16.rel_sus.values[0] == pytest.approx(0.0, abs=1e-6)

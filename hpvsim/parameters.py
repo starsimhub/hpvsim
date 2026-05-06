@@ -109,9 +109,24 @@ class GenotypePars(ss.Pars):
             # serology probability. Currently unused by HPV.
             self.rel_beta = 1.0
             self.sero_prob = 0.75
+        elif genotype == 'hpv18':
+            # Placeholder defaults (Task 8 will add hpv18-specific values).
+            self.beta = 0.25
+            self.dur_precin = ss.lognorm_ex(mean=ss.years(3.0), std=ss.years(9.0))
+            self.dur_cin = ss.lognorm_ex(mean=ss.years(5.0), std=ss.years(20.0))
+            self.dur_cancer = ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0))
+            self.dur_inf_male = ss.lognorm_ex(mean=ss.years(1.0), std=ss.years(1.0))
+            self.cin_fn = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
+            self.cancer_fn = dict(method='cin_integral', transform_prob=2e-3,
+                                  form='logf2', k=0.3, x_infl=0, ttc=50)
+            self.imm_init = _imm_init_dist()
+            self.cell_imm_init = _cell_imm_dist()
+            self.age_risk = dict(age=30, risk=2)
+            self.rel_beta = 1.0
+            self.sero_prob = 0.75
         else:
             raise NotImplementedError(
-                f'GenotypePars currently supports hpv16 only; got {genotype!r}.'
+                f'GenotypePars currently supports hpv16 and hpv18; got {genotype!r}.'
             )
         self.update(kwargs)
         return
