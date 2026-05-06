@@ -53,7 +53,7 @@ def test_genotype_pars_imm_init_is_distribution():
 
 
 def test_cross_immunity_connector_collects_hpv_modules():
-    """CrossImmunity.init_pre populates _hpv_modules from sim.diseases in registration order."""
+    """CrossImmunity.init_pre populates hpv_modules from sim.diseases in registration order."""
     from hpvsim.connectors import CrossImmunity
     sim = hpv.Sim(
         n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0,
@@ -62,9 +62,9 @@ def test_cross_immunity_connector_collects_hpv_modules():
     )
     sim.init()
     conn = sim.connectors.crossimmunity   # Starsim auto-snake-cases class name
-    assert len(conn._hpv_modules) == 1
-    assert conn._hpv_modules[0].genotype == 'hpv16'
-    assert conn._genotype_index == {'hpv16': 0}
+    assert len(conn.hpv_modules) == 1
+    assert conn.hpv_modules[0].genotype == 'hpv16'
+    assert conn.genotype_index == {'hpv16': 0}
 
 
 def test_cross_immunity_connector_default_matrices():

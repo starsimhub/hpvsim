@@ -6,11 +6,10 @@ to target ``g`` is ``sum_k cross[g, k] * source[uid, k]``. Matrices live on
 the Connector instance (not on SimPars). Diagonals must equal 1.0.
 """
 
-import warnings
-
 import numpy as np
 import starsim as ss
 
+from . import misc
 from .hpv import HPV
 from .parameters import get_cross_immunity
 
@@ -27,19 +26,19 @@ class CrossImmunity(ss.Connector):
         super().__init__(**kwargs)
         self.cross_imm_sus = cross_imm_sus
         self.cross_imm_sev = cross_imm_sev
-        self._hpv_modules = None
-        self._genotype_index = None
+        self.hpv_modules = None
+        self.genotype_index = None
 
     def init_pre(self, sim):
         super().init_pre(sim)
         # Discover HPV modules in registration order.
-        self._hpv_modules = [m for m in sim.diseases.values() if isinstance(m, HPV)]
-        if not self._hpv_modules:
-            warnings.warn('CrossImmunity: no HPV diseases registered; Connector is a no-op.')
-            self._genotype_index = {}
+        self.hpv_modules = [m for m in sim.diseases.values() if isinstance(m, HPV)]
+        if not self.hpv_modules:
+            misc.warn('CrossImmunity: no HPV diseases registered; Connector is a no-op.')
+            self.genotype_index = {}
             return
-        keys = tuple(m.genotype for m in self._hpv_modules)
-        self._genotype_index = {k: i for i, k in enumerate(keys)}
+        keys = tuple(m.genotype for m in self.hpv_modules)
+        self.genotype_index = {k: i for i, k in enumerate(keys)}
 
         # Populate defaults if matrices not supplied.
         if self.cross_imm_sus is None or self.cross_imm_sev is None:
@@ -52,7 +51,7 @@ class CrossImmunity(ss.Connector):
         # Cast and validate.
         self.cross_imm_sus = np.asarray(self.cross_imm_sus, dtype=np.float32)
         self.cross_imm_sev = np.asarray(self.cross_imm_sev, dtype=np.float32)
-        n = len(self._hpv_modules)
+        n = len(self.hpv_modules)
         for label, m in (('cross_imm_sus', self.cross_imm_sus),
                          ('cross_imm_sev', self.cross_imm_sev)):
             if m.shape != (n, n):
