@@ -1,7 +1,7 @@
 """hpvsim — HPV simulation tools (Starsim-based).
 
 Public API: ``Sim``, ``HPV``, ``SexualNetwork``, ``AgeMigration``,
-``AgeResults``, ``SimPars``, ``GenotypePars``, ``get_genotype_pars``, ``data``.
+``SimPars``, ``GenotypePars``, ``get_genotype_pars``, ``data``.
 
 Modules awaiting port from the legacy v2 package live in
 ``hpvsim/_v2_legacy/``. Active code must not import from there.
@@ -23,12 +23,11 @@ from .hpv import HPV
 from .network import SexualNetwork
 from .sim import Sim
 from .demographics import AgeMigration
-from .analyzers import AgeResults
 
 rootdir = sc.thispath(__file__).parent
 
 __all__ = [
-    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'AgeResults',
+    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration',
     'data', 'migration_utils', 'options', 'datadir', '__version__',
     'SimPars', 'GenotypePars', 'get_genotype_pars',
 ]

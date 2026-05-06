@@ -17,9 +17,9 @@ within the regression-gate tolerance against a v2 1-genotype baseline.
 
 M02 also picks up the auxiliary plumbing required for natural-history results
 to be epidemiologically meaningful at multi-decade horizons: population
-scaling (`pop_scale` / `total_pop`), age-specific migration, and a
-minimum-scope `age_results` analyzer for cancer incidence (the M04 calibration
-target).
+scaling (`pop_scale` / `total_pop`) and age-specific migration. (The age-
+stratified analyzer originally listed here was deferred to the calibration
+milestone — see post-implementation deltas.)
 
 This milestone is the headline natural-history work for v3. Multi-genotype
 dynamics and cross-immunity are deferred to M03; calibration to M04.
@@ -30,8 +30,6 @@ dynamics and cross-immunity are deferred to M03; calibration to M04.
 - Disease progression for HPV16 inside `hpv.HPV(ss.Infection)`: precin/CIN/cancer
   states, full-trajectory sampling at infection time, scheduled state
   transitions, cancer-caused death.
-- `hpv.AgeResults(ss.Analyzer)` — minimum-scope analyzer producing
-  age-stratified cancer incidence for M04 calibration consumption.
 - `pop_scale` / `total_pop` plumbing through `hpv.SimPars`.
 - `hpv.AgeMigration(ss.Demographics)` — age-specific net-migration adapter
   ported from v2's `_v2_legacy/people.py:check_migration`.
@@ -40,9 +38,8 @@ dynamics and cross-immunity are deferred to M03; calibration to M04.
   `_v2_legacy/parameters.py` or to data files.
 - Auditing `hpvsim/utils.py`: replacing v2 helpers with starsim-native
   equivalents where they exist; quarantining the rest.
-- Extended regression coverage: 8-metric `short_summary` parity gate; new
-  capability test for age-stratified cancer trajectories; unit tests for
-  vendored progression math; analyzer smoke test.
+- Extended regression coverage: 8-metric `short_summary` parity gate; unit
+  tests for vendored progression math.
 - Re-running the M01 partnership-equivalence test to confirm the network gates
   still hold (or have tightened) once age-specific migration changes the
   population composition.
@@ -270,31 +267,12 @@ already loadable via the v3-active `hpvsim/data/loaders.get_total_pop` and
 `load_country()` alongside the existing `age_data` / `birth_rate` /
 `death_rate` keys.
 
-### Analyzer: `hpv.AgeResults(ss.Analyzer)`
+### Analyzer: deferred to calibration milestone
 
-Lives in new `hpvsim/analyzers.py`. Class-based (multi-year snapshots + state
-is cleaner than function-based per starsim analyzer conventions).
-
-```python
-class AgeResults(ss.Analyzer):
-    def __init__(self, results=('cancer',), age_bins=None, year=None, **kwargs):
-        # age_bins: default 5-year bins 0-100
-        # year: scalar or list of report years
-        # results: M02 default and only validated key is 'cancer';
-        #   additional keys ('cins', 'hpv') are accepted for M04+ extension.
-
-    def init_post(self):
-        # allocate (n_years × n_bins) result arrays, register as ss.Result.
-
-    def step(self):
-        # if self.ti.year matches a requested year → bin agents by age,
-        # count new cancers in [year-1, year] window per bin → divide by
-        # n_alive females per bin → store as incidence-per-100k.
-```
-
-**Output:** `sim.results.age_results.cancer_incidence_by_age` — `(n_years,
-n_bins)` array, units cases per 100k female-years. Mirrors v2's
-`cancer_incidence_by_age` for M04 calibration consumption.
+The originally-planned `hpv.AgeResults(ss.Analyzer)` was deferred — see
+post-implementation deltas. The full v2 `age_results` surface (multi-key,
+`compute_fit`, `reduce`) will be ported as part of the calibration
+milestone where its only real consumer lives.
 
 ### Public API impact
 
@@ -302,8 +280,7 @@ n_bins)` array, units cases per 100k female-years. Mirrors v2's
 import utils`. No active v3 module currently imports symbols from either
 (M01's hpv.py only references `parameters.py` in doc comments), so the
 parameters/utils slimming has zero internal-refactor surface. Add
-`from .parameters import SimPars, GenotypePars` and
-`from .analyzers import AgeResults` for ergonomics.
+`from .parameters import SimPars, GenotypePars` for ergonomics.
 
 ---
 
@@ -344,12 +321,11 @@ regenerated locally against v2.3 by running `tests/regression/baseline.py`
 inside the v2.3 environment. Baseline files stay gitignored per migration
 plan §Branching and sync strategy.
 
-### Capability test (M02-specific)
+### Capability test
 
-Age-stratified **cumulative cancers + cancer deaths at end-of-sim** by 5-year
-age band against the v2 baseline, ±10% per band. This is the tightest gate
-for "natural history parity" and feeds M04's calibration target. Uses the
-new `AgeResults` analyzer to produce both v2 and v3 cuts.
+Originally planned: age-stratified cumulative cancers + cancer deaths at
+end-of-sim by 5-year age band, against the v2 baseline. Deferred to the
+calibration milestone alongside the AgeResults analyzer it depended on.
 
 ### Release gate
 
@@ -379,9 +355,8 @@ outcomes:
 | `tests/regression/baseline.py` | Unchanged code; rerun against v2.3 env | Unmodified |
 | `tests/test_regression.py` | ±10% drift gate, covers extended summary | Unmodified |
 | `tests/test_partnership_equivalence.py` | M01 network re-measure | Unmodified |
-| `tests/test_natural_history.py` | New — capability test (age-stratified cumulative cancers/deaths) + lifecycle smoke (single-agent trajectory through precin → cin → cancerous → dead) | New |
+| `tests/test_natural_history.py` | New — lifecycle smoke (single-agent trajectory through precin → cin → cancerous → dead) | New |
 | `tests/test_progression_math.py` | New — unit tests for `compute_severity`, `logf2`, `cin_integral`. Pinned outputs against v2 (one-shot fixture from v2.3 env, checked in) | New |
-| `tests/test_analyzers.py` | New — `AgeResults` smoke + scaling test | New |
 
 Demo: `tests/regression/demo_anchor_hpv16.py` extended with CIN-prevalence
 and cancer-incidence-by-year trajectories alongside the existing prevalence
@@ -410,28 +385,24 @@ of plumbing, then validation last.
 | | B5 | Update `step_die` to reset all new BoolStates. |
 | | B6 | Thread `total_pop` / `pop_scale` through `SimPars`; apply to result-scaling. |
 | **C. Demographics** | C1 | `hpv.AgeMigration(ss.Demographics)` adapter. |
-| **D. Analyzer** | D1 | `hpvsim/analyzers.py` with `hpv.AgeResults` (cancer-only). |
-| **E. Validation** | E1 | Extend `anchor_hpv16.run_and_summarize()` to 8 metrics. |
-| | E2 | Regenerate v2 baseline locally against v2.3 env. |
-| | E3 | Add `tests/test_natural_history.py` (capability + smoke). |
-| | E4 | Add `tests/test_progression_math.py` (unit math). |
-| | E5 | Add `tests/test_analyzers.py` (AgeResults smoke). |
-| | E6 | Re-run `tests/test_partnership_equivalence.py`; document outcome. |
-| **F. Close-out** | F1 | Extend `demo_anchor_hpv16.py` with CIN/cancer trajectories. |
-| | F2 | Open M02 PR to `v3.0-dev`. |
+| **D. Validation** | D1 | Extend `anchor_hpv16.run_and_summarize()` to 8 metrics. |
+| | D2 | Regenerate v2 baseline locally against v2.3 env. |
+| | D3 | Add `tests/test_natural_history.py` (lifecycle smoke). |
+| | D4 | Add `tests/test_progression_math.py` (unit math). |
+| | D5 | Re-run `tests/test_partnership_equivalence.py`; document outcome. |
+| **E. Close-out** | E1 | Extend `demo_anchor_hpv16.py` with CIN/cancer trajectories. |
+| | E2 | Open M02 PR to `v3.0-dev`. |
 
 ---
 
 ## Definition of done
 
-- All sub-tasks A1–F2 complete.
+- All sub-tasks A1–E2 complete.
 - CI green; runnability invariant (`hpv.Sim().run()` works) holds at every
   commit per migration convention 1.
 - Anchor regression passes ±10% per metric on the 8-metric `short_summary` +
   total population, OR PR carries an explicit drift-classification note +
   tracking issue per migration convention 2.
-- Capability test (age-stratified cumulative cancers/deaths) passes ±10% per
-  5-yr band.
 - Partnership-equivalence test re-run; outcome documented in PR.
 - Tracking issues filed for:
   - Multiscale dynamic-spawning revisit before v3.0.0 (acceptance: assess
@@ -439,7 +410,10 @@ of plumbing, then validation last.
     reintroduce v2's spawning branch in a later milestone).
   - Any subclass-first delegations introduced (per migration convention 3,
     must strip before M10).
-  - M02 network-tightening follow-up if E6 found gates still loose at 50%.
+  - M02 network-tightening follow-up if D5 found gates still loose at 50%.
+  - Calibration milestone: port the full v2 ``age_results`` surface (multi-
+    key, ``compute_fit``, ``reduce``) and reinstate the age-stratified
+    cancer capability gate.
 
 ---
 
@@ -499,6 +473,17 @@ beta sample per cleared agent suffices for the `sev_imm` accumulator.
 **CRN-safe emigration.** `AgeMigration._emigrate` selects departing
 agents via an `ss.choice(replace=False)` distribution so the emigration
 draws are reproducible per-seed (not pulled from numpy's global RNG).
+
+**`AgeResults` analyzer deferred to calibration milestone.** The
+minimum-scope cancer-only port originally listed as a deliverable was
+removed from M02. Rationale: its only consumer was its own test suite —
+the smoke tests in ``tests/test_analyzers.py`` and a
+capability gate in ``test_natural_history.py`` that depended on a v2
+baseline JSON that was never generated. The v2 ``age_results`` surface
+in ``_v2_legacy/analysis.py`` is much wider (multi-key results,
+``compute_fit``, ``reduce``) and is the calibration loop's primary
+entry point; porting it once at calibration time avoids shipping a
+partial implementation that would be replaced.
 
 **SexualNetwork refactor:** the multi-network design (separate `m` and
 `c` instances) was collapsed into a single `hpv.SexualNetwork` that
