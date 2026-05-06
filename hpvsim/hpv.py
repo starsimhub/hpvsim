@@ -310,9 +310,6 @@ class HPV(ss.Infection):
         # Returns agent to susceptible=True. nab_imm and cell_imm accumulate
         # the running max of per-agent beta samples; the CrossImmunity connector
         # reads them next step to derive rel_sus and sev_imm.
-        # NOTE (Task 7): the rel_sus and sev_imm writes below are interim — the
-        # Connector already overwrites them each step. Drop those two lines once
-        # any external readers no longer rely on the immediate post-step values.
         cleared = (self.infected & (self.precin | self.cin) & ~self.cancerous
                    & (self.ti_clearance <= ti)).uids
         if len(cleared):
@@ -322,11 +319,8 @@ class HPV(ss.Infection):
             self.cin[cleared] = False
             new_nab = np.asarray(self.pars.imm_init.rvs(cleared))
             self.nab_imm[cleared] = np.maximum(self.nab_imm[cleared], new_nab)
-            self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
-                                               1.0 - new_nab)
-            new_imm = np.asarray(self.pars.cell_imm_init.rvs(cleared))
-            self.cell_imm[cleared] = np.maximum(self.cell_imm[cleared], new_imm)
-            self.sev_imm[cleared] = np.maximum(self.sev_imm[cleared], new_imm)
+            new_cell = np.asarray(self.pars.cell_imm_init.rvs(cleared))
+            self.cell_imm[cleared] = np.maximum(self.cell_imm[cleared], new_cell)
 
         # --- 2. precin -> CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids

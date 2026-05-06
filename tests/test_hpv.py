@@ -68,13 +68,9 @@ def test_set_prognoses_flips_state():
 
 
 def test_step_state_clears_at_ti_clearance():
-    """An agent whose ti_clearance is reached returns to susceptible with reduced rel_sus.
-
-    M02: clearance applies partial permanent same-genotype immunity — agents
-    return to susceptible=True (SIS-like) but rel_sus is multiplied by
-    (1 - imm_init). Default imm_init=0.35, so rel_sus drops from 1.0 to ~0.65.
-    Re-infection is allowed at the reduced rate.
-    """
+    """A cleared agent's nab_imm gets a beta sample (mean ~0.35); the
+    CrossImmunity connector translates that into reduced rel_sus on the
+    next sim step."""
     sim, hpv = _minimal_sim(init_prev=0.0)
     sim.init()
     target = ss.uids([0])
@@ -83,11 +79,9 @@ def test_step_state_clears_at_ti_clearance():
     hpv.step_state()
     assert hpv.susceptible[target].all(), "cleared agent should return to susceptible"
     assert (~hpv.infected[target]).all(), "cleared agent must not remain infected"
-    imm_init = float(hpv.pars.imm_init)
-    expected_rel_sus = 1.0 - imm_init
-    rel_sus_val = float(hpv.rel_sus[target][0])
-    assert abs(rel_sus_val - expected_rel_sus) < 1e-6, \
-        f"rel_sus={rel_sus_val} expected {expected_rel_sus} after clearance"
+    nab_val = float(hpv.nab_imm[target][0])
+    assert 0.0 < nab_val <= 1.0, \
+        f"nab_imm={nab_val} should be a beta sample in (0, 1] after clearance"
 
 
 def test_runs_a_few_timesteps():

@@ -172,16 +172,13 @@ def test_hpv_has_raw_immunity_states():
 
 
 def test_cleared_agents_have_reduced_susceptibility():
-    """Once an agent clears HPV, their rel_sus is multiplied by (1 - imm_init)
-    to model v2's partial permanent same-genotype immunity (default
-    imm_init=0.35, so rel_sus drops to ~0.65 post-clearance).
+    """After running a sim, agents who cleared have rel_sus < 1.0
+    (Connector-derived from running-max nab_imm samples).
     """
     sim = hpv.Sim(n_agents=500, location='nigeria',
                   start=1990, stop=1995, dt=0.25, rand_seed=0)
     sim.run()
     mod = sim.diseases.hpv16
-    imm_init = float(mod.pars.imm_init)
-    expected_rel_sus = 1.0 - imm_init
 
     # Agents who have ever been infected and are now susceptible (cleared,
     # not in cancerous compartment).
@@ -189,10 +186,28 @@ def test_cleared_agents_have_reduced_susceptibility():
     cleared_now = (ever & mod.susceptible & ~mod.cancerous).uids
     if len(cleared_now):
         rel_sus_arr = np.asarray(mod.rel_sus[cleared_now])
-        # All cleared agents should have rel_sus ≈ (1 - imm_init).
-        # (Multiple clearances would compound, but with permanent immunity
-        # in M02 this rarely matters at sim time scales — accept any
-        # value <= expected_rel_sus + 0.01 tolerance.)
-        assert (rel_sus_arr <= expected_rel_sus + 0.01).all(), \
-            f'rel_sus_arr={rel_sus_arr[:5]} exceeds expected {expected_rel_sus}'
+        # All cleared agents should have reduced rel_sus < 1.0 (some immunity).
+        assert (rel_sus_arr < 1.0).all(), \
+            f'cleared agents have rel_sus={rel_sus_arr[:5]}; expected <1.0'
+
+
+def test_clearance_writes_raw_immunity_not_effective():
+    """After Task 7: HPV.step_state writes nab_imm/cell_imm; rel_sus/sev_imm are Connector-derived."""
+    sim = hpv.Sim(n_agents=2000, location='nigeria',
+                  start=1990, stop=2010, dt=0.5, rand_seed=0)
+    sim.run()
+    mod = sim.diseases.hpv16
+    # After running, agents that have ever cleared should have nab_imm > 0.
+    nab = np.asarray(mod.nab_imm.values)
+    cell = np.asarray(mod.cell_imm.values)
+    # At least some agents will have cleared given run length.
+    assert (nab > 0).any(), 'no agents cleared and bumped nab_imm'
+    assert (cell > 0).any(), 'no agents cleared and bumped cell_imm'
+    # And rel_sus / sev_imm reflect the source state through the Connector
+    # (single-genotype identity: rel_sus = 1 - nab_imm; sev_imm = cell_imm).
+    rel_sus = np.asarray(mod.rel_sus.values)
+    sev_imm = np.asarray(mod.sev_imm.values)
+    cleared_uids = (nab > 0).nonzero()[0]
+    assert np.allclose(rel_sus[cleared_uids], 1.0 - nab[cleared_uids], atol=1e-6)
+    assert np.allclose(sev_imm[cleared_uids], cell[cleared_uids], atol=1e-6)
 
