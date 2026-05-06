@@ -75,6 +75,7 @@ class CrossImmunity(ss.Connector):
         np.clip(sus_imm, 0.0, 1.0, out=sus_imm)
         np.clip(sev_imm, 0.0, 1.0, out=sev_imm)
         for i, m in enumerate(self.hpv_modules):
-            m.rel_sus.values[:]  = 1.0 - sus_imm[:, i]
-            m.sev_imm.values[:]  = sev_imm[:, i]
+            auids = m.rel_sus.auids
+            m.rel_sus[auids] = 1.0 - sus_imm[:, i]
+            m.sev_imm[auids] = sev_imm[:, i]
         return

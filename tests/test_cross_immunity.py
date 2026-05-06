@@ -1,6 +1,7 @@
 """Unit tests for the cross-immunity Connector and matrix-builder."""
 import numpy as np
 import pytest
+import starsim as ss
 
 import hpvsim as hpv
 from hpvsim.parameters import get_cross_immunity, GENOTYPE_KEYS
@@ -185,3 +186,37 @@ def test_cross_immunity_step_clips_to_unit_interval():
     # Agent 0: sus_imm to hpv16 = 1*0.9 + 0.5*0.9 = 1.35 -> clipped to 1.0
     # rel_sus = 1 - 1.0 = 0.0
     assert sim.diseases.hpv16.rel_sus.values[0] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_cross_immunity_step_writes_survive_dead_agents():
+    """Connector writes must use Arr __setitem__ via auids, not .values[:].
+
+    With dead agents present (raw.size != auids.size), FloatArr.values returns
+    a copy; writing to .values[:] would be silently discarded. Verify writes
+    actually land in raw.
+    """
+    from hpvsim.connectors import CrossImmunity
+    sim = hpv.Sim(
+        n_agents=20, start=1990, stop=1991, dt=1.0, rand_seed=0,
+        diseases=[hpv.HPV(genotype='hpv16')],
+        connectors=[CrossImmunity()],
+    )
+    sim.init()
+    mod = sim.diseases.hpv16
+    conn = sim.connectors.crossimmunity
+    # Kill agents 0 and 1 to force raw.size != auids.size.
+    uids_to_kill = ss.uids([0, 1])
+    sim.people.ti_dead[uids_to_kill] = -1   # mark as died before current step
+    sim.people.alive[uids_to_kill] = False
+    sim.people.remove_dead()                 # refresh active-uid arrays
+    # Confirm the dead-agent divergence is in place.
+    assert mod.rel_sus.raw.size != mod.rel_sus.auids.size
+    # Set source immunity for some live agent.
+    live_auids = mod.rel_sus.auids
+    target_auid = int(live_auids[0])
+    mod.nab_imm[ss.uids([target_auid])] = 0.4
+    mod.cell_imm[ss.uids([target_auid])] = 0.3
+    conn.step()
+    # Check the write landed in raw (not just an ephemeral copy).
+    assert float(mod.rel_sus.raw[target_auid]) == pytest.approx(0.6, abs=1e-6)
+    assert float(mod.sev_imm.raw[target_auid]) == pytest.approx(0.3, abs=1e-6)
