@@ -1,4 +1,4 @@
-"""Single-genotype HPV disease module.
+"""Per-genotype HPV disease module.
 
 Scope note: HPVsim only models cervical cancer outcomes. HPV is also
 associated with anal, oropharyngeal, penile, vaginal, and vulvar cancers
@@ -9,15 +9,14 @@ Models the natural-history pipeline as a Starsim Infection:
     susceptible -> precin -> (clear | CIN -> (clear | cancerous -> death))
 
 Females are eligible for the full progression; males clear from precin without
-entering CIN/cancer. Clearance grants partial permanent same-genotype immunity:
-``rel_sus`` is reduced by ``imm_init`` (transmission immunity), and ``sev_imm``
-accumulates the running max of beta samples (severity immunity, shortens
-future precin durations).
+entering CIN/cancer. Clearance grants partial same-genotype immunity: per-agent
+beta samples accumulate as a running max into ``nab_imm`` (humoral) and
+``cell_imm`` (cell-mediated). The ``CrossImmunity`` connector reads those
+source states each step and writes per-target ``rel_sus`` and ``sev_imm``.
 
-``beta``, ``init_prev``, and progression-pars defaults are HPV16-specific.
-Multi-genotype support, cross-immunity, and waning are out of scope for this
-module — a future multi-genotype build will instantiate one HPV per genotype
-and add a CrossImmunity connector.
+Multi-genotype runs instantiate one HPV per genotype, all sharing the People
+and going through the same Connector path; a 1-genotype run uses a 1×1
+identity matrix on the Connector.
 """
 
 import numpy as np
@@ -308,10 +307,12 @@ class HPV(ss.Infection):
         ti = self.ti
 
         # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
-        # Returns agent to susceptible=True. rel_sus is capped at (1 - imm_init)
-        # (transmission immunity). sev_imm accumulates as max(prior, new beta
-        # sample) — the running max gives multi-cleared agents higher sev_imm
-        # than the distribution mean. rel_sev (biological baseline) is unchanged.
+        # Returns agent to susceptible=True. nab_imm and cell_imm accumulate
+        # the running max of per-agent beta samples; the CrossImmunity connector
+        # reads them next step to derive rel_sus and sev_imm.
+        # NOTE (Task 7): the rel_sus and sev_imm writes below are interim — the
+        # Connector already overwrites them each step. Drop those two lines once
+        # any external readers no longer rely on the immediate post-step values.
         cleared = (self.infected & (self.precin | self.cin) & ~self.cancerous
                    & (self.ti_clearance <= ti)).uids
         if len(cleared):
