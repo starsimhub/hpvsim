@@ -236,3 +236,24 @@ def test_hi5_specific_v2_values():
     assert gp.cancer_fn['transform_prob'] == pytest.approx(1.5e-3)
     assert float(gp.rel_beta) == pytest.approx(0.9)
 
+
+def test_known_genotypes_extended_to_four():
+    """_KNOWN_GENOTYPES gates HPV(genotype=...) for all four M03 keys."""
+    for key in ('hpv16', 'hpv18', 'hi5', 'ohr'):
+        mod = hpv.HPV(genotype=key)
+        assert mod.genotype == key
+
+
+def test_per_genotype_init_prev_curve():
+    """Each genotype gets its own init_prev curve; all four seed non-zero infections."""
+    sim = hpv.Sim(
+        n_agents=5000, location='nigeria',
+        start=1990, stop=1990, dt=1.0, rand_seed=0,
+        genotypes=[16, 18, 'hi5', 'ohr'],
+    )
+    sim.init()
+    for key in ('hpv16', 'hpv18', 'hi5', 'ohr'):
+        mod = sim.diseases[key]
+        n_init = int(np.asarray(mod.infected.values).sum())
+        assert n_init > 0, f'{key} seeded zero initial infections'
+

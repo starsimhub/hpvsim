@@ -25,40 +25,64 @@ import starsim as ss
 from .utils import compute_severity
 
 
-# hpv18 added as a forward-stub in Task 4 (placeholder pars); Task 8 adds
-# hpv18-specific natural-history values and hi5/ohr support.
-_KNOWN_GENOTYPES = ('hpv16', 'hpv18')
-
-
-# Initial HPV prevalence by age bracket and sex. Brackets are inclusive lower
-# bounds; the last bracket extends to age 150.
+# Per-genotype initial HPV prevalence by age bracket and sex. Brackets are
+# inclusive lower bounds; the last bracket extends to age 150. HPV16 retains
+# M02's curves verbatim; hpv18/hi5/ohr scale-down defaults from v2 reference
+# tables (we use 0.6x for hpv18 and 0.4x for hi5/ohr as proxies for the lower
+# observed prevalence of those clades; calibrated values come in M04).
 _INIT_HPV_PREV_AGE_BRACKETS = np.array([12, 17, 24, 34, 44, 64, 80, 150])
-_INIT_HPV_PREV_M = np.array([0.0, 0.25, 0.60, 0.25, 0.05, 0.01, 0.0005, 0.0])
-_INIT_HPV_PREV_F = np.array([0.0, 0.35, 0.70, 0.25, 0.05, 0.01, 0.0005, 0.0])
+
+_INIT_PREV = {
+    'hpv16': {
+        'm': np.array([0.0, 0.25, 0.60, 0.25, 0.05, 0.01, 0.0005, 0.0]),
+        'f': np.array([0.0, 0.35, 0.70, 0.25, 0.05, 0.01, 0.0005, 0.0]),
+    },
+    'hpv18': {
+        'm': np.array([0.0, 0.15, 0.36, 0.15, 0.03, 0.006, 0.0003, 0.0]),
+        'f': np.array([0.0, 0.21, 0.42, 0.15, 0.03, 0.006, 0.0003, 0.0]),
+    },
+    'hi5': {
+        'm': np.array([0.0, 0.10, 0.24, 0.10, 0.02, 0.004, 0.0002, 0.0]),
+        'f': np.array([0.0, 0.14, 0.28, 0.10, 0.02, 0.004, 0.0002, 0.0]),
+    },
+    'ohr': {
+        'm': np.array([0.0, 0.10, 0.24, 0.10, 0.02, 0.004, 0.0002, 0.0]),
+        'f': np.array([0.0, 0.14, 0.28, 0.10, 0.02, 0.004, 0.0002, 0.0]),
+    },
+}
+
+# Public re-export — kept module-level for backward-compat with M02 imports.
+_INIT_HPV_PREV_M = _INIT_PREV['hpv16']['m']
+_INIT_HPV_PREV_F = _INIT_PREV['hpv16']['f']
 
 
-def _age_stratified_init_prev(module, sim, uids):
-    """Per-uid initial-infection probability from the age/sex prevalence table.
+def _make_init_prev_fn(genotype):
+    """Return the per-uid init-prev sampler for a given genotype."""
+    curves = _INIT_PREV[genotype]
+    f_curve = curves['f']
+    m_curve = curves['m']
 
-    ``side='right'`` so ``brackets[i-1] <= age < brackets[i]``.
-    """
-    age = sim.people.age[uids]
-    is_female = sim.people.female[uids]
-    bin_idx = np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, age, side='right')
-    bin_idx = np.clip(bin_idx, 0, len(_INIT_HPV_PREV_F) - 1)
-    out = np.zeros(len(uids))
-    out[is_female] = _INIT_HPV_PREV_F[bin_idx[is_female]]
-    out[~is_female] = _INIT_HPV_PREV_M[bin_idx[~is_female]]
-    return out
+    def _age_stratified(module, sim, uids):
+        age = np.asarray(sim.people.age[uids])
+        is_female = np.asarray(sim.people.female[uids])
+        bin_idx = np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, age, side='right')
+        bin_idx = np.clip(bin_idx, 0, len(f_curve) - 1)
+        out = np.zeros(len(uids))
+        out[is_female] = f_curve[bin_idx[is_female]]
+        out[~is_female] = m_curve[bin_idx[~is_female]]
+        return out
+    return _age_stratified
+
+
+_KNOWN_GENOTYPES = tuple(_INIT_PREV.keys())
 
 
 class HPV(ss.Infection):
-    """Single-genotype HPV disease module.
+    """Per-genotype HPV disease module.
 
-    The ``genotype`` attribute identifies which strain this instance models;
-    a future multi-genotype CrossImmunity connector can use it to discover
-    HPV diseases (duck-type marker pattern; cf. rotasim's ``hasattr(disease,
-    'G')``).
+    The ``genotype`` attribute identifies which strain this instance models.
+    The CrossImmunity connector reads each registered HPV's nab_imm/cell_imm
+    each step and writes per-target rel_sus/sev_imm.
     """
 
     def __init__(self, genotype='hpv16', pars=None, **kwargs):
@@ -75,7 +99,7 @@ class HPV(ss.Infection):
         from .parameters import get_genotype_pars
         gpars = get_genotype_pars(genotype)
         self.define_pars(
-            init_prev=ss.bernoulli(p=_age_stratified_init_prev),
+            init_prev=ss.bernoulli(p=_make_init_prev_fn(genotype)),
             beta=gpars.beta,
             dur_precin=gpars.dur_precin,
             dur_cin=gpars.dur_cin,
