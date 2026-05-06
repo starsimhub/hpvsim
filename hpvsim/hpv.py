@@ -266,38 +266,22 @@ class HPV(ss.Infection):
         if 'name' not in kwargs:
             kwargs['name'] = genotype
         super().__init__()
+        # Pull natural-history defaults from GenotypePars so there's a single
+        # source of truth per genotype.
+        from .parameters import get_genotype_pars
+        gpars = get_genotype_pars(genotype)
         self.define_pars(
             init_prev=ss.bernoulli(p=_age_stratified_init_prev),
-            # Per-sex-act probability; SexualNetwork's net_beta applies it
-            # per-act via 1 - (1-p)**acts. Scalar, not a Rate.
-            beta=0.25,
-            # Female natural-history durations (lognormal mean / std in years).
-            dur_precin=ss.lognorm_ex(mean=ss.years(3.0), std=ss.years(9.0)),
-            dur_cin=ss.lognorm_ex(mean=ss.years(5.0), std=ss.years(20.0)),
-            dur_cancer=ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0)),
-            # Males clear via this distribution without entering CIN/cancer.
-            dur_inf_male=ss.lognorm_ex(mean=ss.years(1.0), std=ss.years(1.0)),
-            # Severity functions consumed by _compute_severity. cancer_fn
-            # carries cin_fn's keys so the cin_integral branch can call
-            # _compute_severity_integral on the same logf2 internally.
-            cin_fn=dict(form='logf2', k=0.3, x_infl=0, ttc=50),
-            cancer_fn=dict(method='cin_integral', transform_prob=2e-3,
-                           form='logf2', k=0.3, x_infl=0, ttc=50),
-            # Same-genotype partial permanent immunity. imm_init reduces
-            # rel_sus on clearance (transmission immunity). cell_imm_init
-            # is sampled per clearance and accumulated as max(prior, new)
-            # into sev_imm (severity immunity, shortens future dur_precin).
-            # The (a, b) values are the beta shape parameters for mean=0.25,
-            # var=0.025.
-            imm_init=0.35,
-            cell_imm_init=ss.Dist(
-                distname='beta',
-                a=((1 - 0.25) / 0.025 - 1 / 0.25) * 0.25 ** 2,
-                b=(((1 - 0.25) / 0.025 - 1 / 0.25) * 0.25 ** 2) * (1 / 0.25 - 1),
-            ),
-            # Women aged >= ``age`` get their dur_cin sample scaled by
-            # ``risk``, shifting cancer onset to older ages.
-            age_risk=dict(age=30, risk=2),
+            beta=gpars.beta,
+            dur_precin=gpars.dur_precin,
+            dur_cin=gpars.dur_cin,
+            dur_cancer=gpars.dur_cancer,
+            dur_inf_male=gpars.dur_inf_male,
+            cin_fn=gpars.cin_fn,
+            cancer_fn=gpars.cancer_fn,
+            imm_init=gpars.imm_init,
+            cell_imm_init=gpars.cell_imm_init,
+            age_risk=gpars.age_risk,
             # Per-call Bernoullis for CIN and cancer draws; ``p`` is overwritten
             # via .set(p=...) in set_prognoses. Held in pars so starsim wires
             # the RNG before the first set_prognoses call.
@@ -342,9 +326,9 @@ class HPV(ss.Infection):
         """Per-step Results emitted from ``step_state``.
 
         ``new_cancers`` / ``new_cancer_deaths`` are realized-event counters
-        (the cin -> cancerous and cancerous -> dead transitions). Cumulative
-        totals are obtained by summing over time. ``sum_age_at_*`` are
-        per-step accumulators; mean age = ``sum / count``.
+        (the cin -> cancerous and cancerous -> dead transitions);
+        ``cum_*`` are populated as cumulative sums in ``finalize_results``.
+        ``sum_age_at_*`` are per-step accumulators; mean age = ``sum / count``.
         """
         super().init_results()
         self.define_results(
@@ -352,11 +336,22 @@ class HPV(ss.Infection):
                       label='New cancers'),
             ss.Result('new_cancer_deaths', dtype=int, scale=True,
                       label='New cancer deaths'),
+            ss.Result('cum_cancers', dtype=int, scale=True,
+                      label='Cumulative cancers'),
+            ss.Result('cum_cancer_deaths', dtype=int, scale=True,
+                      label='Cumulative cancer deaths'),
             ss.Result('sum_age_at_cancer', dtype=float, scale=True,
                       label='Sum of ages at cancer onset'),
             ss.Result('sum_age_at_cancer_death', dtype=float, scale=True,
                       label='Sum of ages at cancer death'),
         )
+        return
+
+    def finalize_results(self):
+        super().finalize_results()
+        res = self.results
+        res.cum_cancers[:] = np.cumsum(np.asarray(res.new_cancers))
+        res.cum_cancer_deaths[:] = np.cumsum(np.asarray(res.new_cancer_deaths))
         return
 
     def _sample_rel_sev_for_unset(self):
@@ -485,11 +480,10 @@ class HPV(ss.Infection):
         Order matters: clearance fires first so a just-cleared agent isn't
         re-flipped by a forward transition at the same timestep.
 
-          1. Clear from precin (SIS path)
-          2. Clear from CIN (regression path)
-          3. precin -> CIN
-          4. CIN -> cancerous (stops transmitting)
-          5. Cancer death (via people.request_death)
+          1. Clearance from precin or CIN (partial-immunity path)
+          2. precin -> CIN
+          3. CIN -> cancerous (stops transmitting)
+          4. Cancer death (via people.request_death)
         """
         # Sample rel_sev for any newly-added alive agents (births, immigrants)
         # before they can be selected for infection this step.
@@ -497,42 +491,30 @@ class HPV(ss.Infection):
 
         ti = self.ti
 
-        # --- 1. Clear from precin (partial-immunity path) ---
+        # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
         # Returns agent to susceptible=True. rel_sus is capped at (1 - imm_init)
         # (transmission immunity). sev_imm accumulates as max(prior, new beta
         # sample) — the running max gives multi-cleared agents higher sev_imm
         # than the distribution mean. rel_sev (biological baseline) is unchanged.
-        cleared = (self.infected & self.precin & ~self.cin & ~self.cancerous
+        cleared = (self.infected & (self.precin | self.cin) & ~self.cancerous
                    & (self.ti_clearance <= ti)).uids
         if len(cleared):
             self.infected[cleared] = False
             self.susceptible[cleared] = True
             self.precin[cleared] = False
+            self.cin[cleared] = False
             self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
                                                1.0 - self.pars.imm_init)
             new_imm = np.asarray(self.pars.cell_imm_init.rvs(cleared))
             self.sev_imm[cleared] = np.maximum(self.sev_imm[cleared], new_imm)
 
-        # --- 2. Clear from CIN (regression; same partial-immunity logic) ---
-        cleared_from_cin = (self.infected & self.cin & ~self.cancerous
-                            & (self.ti_clearance <= ti)).uids
-        if len(cleared_from_cin):
-            self.infected[cleared_from_cin] = False
-            self.susceptible[cleared_from_cin] = True
-            self.cin[cleared_from_cin] = False
-            self.rel_sus[cleared_from_cin] = np.minimum(self.rel_sus[cleared_from_cin],
-                                                        1.0 - self.pars.imm_init)
-            new_imm = np.asarray(self.pars.cell_imm_init.rvs(cleared_from_cin))
-            self.sev_imm[cleared_from_cin] = np.maximum(
-                self.sev_imm[cleared_from_cin], new_imm)
-
-        # --- 3. precin -> CIN ---
+        # --- 2. precin -> CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids
         if len(to_cin):
             self.precin[to_cin] = False
             self.cin[to_cin] = True
 
-        # --- 4. CIN -> cancerous (no longer infectious, no longer re-infectable) ---
+        # --- 3. CIN -> cancerous (no longer infectious, no longer re-infectable) ---
         to_cancerous = (self.cin & ~self.cancerous & (self.ti_cancerous <= ti)).uids
         if len(to_cancerous):
             self.cin[to_cancerous] = False
@@ -544,7 +526,7 @@ class HPV(ss.Infection):
             self.results.new_cancers[ti] = len(to_cancerous)
             self.results.sum_age_at_cancer[ti] = float(ages_at_cancer.sum())
 
-        # --- 5. Cancer death (routed through starsim's people death pipeline) ---
+        # --- 4. Cancer death (routed through starsim's people death pipeline) ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
             ages_at_death = np.asarray(self.sim.people.age[to_dead])

@@ -5,15 +5,20 @@ import hpvsim as hpv
 
 
 def test_genotype_pars_hpv16_defaults():
-    """GenotypePars('hpv16') matches the v2 hpv16 defaults verbatim."""
+    """GenotypePars('hpv16') exposes the HPV16 natural-history defaults."""
     g = hpv.GenotypePars('hpv16')
-    # v2 _v2_legacy/parameters.py:336–342
-    assert g.dur_precin == dict(dist='lognormal', par1=3, par2=9)
+    assert g.beta == 0.25
     assert g.cin_fn == dict(form='logf2', k=0.3, x_infl=0, ttc=50)
-    assert g.dur_cin == dict(dist='lognormal', par1=5, par2=20)
-    assert g.cancer_fn == dict(method='cin_integral', transform_prob=2e-3)
+    assert g.cancer_fn['method'] == 'cin_integral'
+    assert g.cancer_fn['transform_prob'] == 2e-3
+    assert g.imm_init == 0.35
+    assert g.age_risk == dict(age=30, risk=2)
     assert g.rel_beta == 1.0
     assert g.sero_prob == 0.75
+    # Duration distributions are starsim Dist instances, not dicts.
+    import starsim as ss
+    for name in ('dur_precin', 'dur_cin', 'dur_cancer', 'dur_inf_male'):
+        assert isinstance(getattr(g, name), ss.Dist)
 
 
 def test_genotype_aliases_hpv16():
@@ -22,9 +27,11 @@ def test_genotype_aliases_hpv16():
 
 
 def test_get_genotype_pars_factory():
-    """get_genotype_pars('hpv16') returns a GenotypePars-equivalent dict-like."""
-    g = hpv.get_genotype_pars('hpv16')
-    assert g.dur_precin['par1'] == 3
+    """get_genotype_pars('hpv16') returns a fresh GenotypePars each call."""
+    g1 = hpv.get_genotype_pars('hpv16')
+    g2 = hpv.get_genotype_pars('hpv16')
+    # Fresh distribution instances per call (independent RNG slots).
+    assert g1.dur_precin is not g2.dur_precin
 
 
 import numpy as np

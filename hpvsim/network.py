@@ -88,8 +88,8 @@ class SexualNetwork(ss.SexualNetwork):
     # ------------------------------------------------------------------ #
 
     def init_post(self):
-        self.set_network_states()
         super().init_post()
+        self.set_network_states()
 
     def set_network_states(self):
         """Sample ``debut``, ``participant``, and per-layer ``partners_target``

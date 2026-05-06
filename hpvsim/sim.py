@@ -48,10 +48,7 @@ class Sim(ss.Sim):
                 ss.Deaths(death_rate=country['death_rate']),
                 AgeMigration(),
             ]
-        # Store on self so init() can reach them: validate_total_pop()
-        # consumes total_pop to derive pop_scale; AgeMigration.init_pre
-        # consumes location to load country data.
-        self._total_pop = total_pop
+        # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()
         super().__init__(
             start=ss.years(start),

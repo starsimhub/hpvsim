@@ -20,7 +20,6 @@ from . import misc
 from . import utils
 
 from .hpv import HPV
-from .migration_utils import Poisson1
 from .network import SexualNetwork
 from .sim import Sim
 from .demographics import AgeMigration
@@ -29,7 +28,7 @@ from .analyzers import AgeResults
 rootdir = sc.thispath(__file__).parent
 
 __all__ = [
-    'HPV', 'Poisson1', 'SexualNetwork', 'Sim', 'AgeMigration', 'AgeResults',
+    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'AgeResults',
     'data', 'migration_utils', 'options', 'datadir', '__version__',
     'SimPars', 'GenotypePars', 'get_genotype_pars',
 ]

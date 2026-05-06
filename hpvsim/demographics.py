@@ -56,6 +56,8 @@ class AgeMigration(ss.Demographics):
         self._data_year_max = None
         self._n_imm = 0
         self._n_emi = 0
+        # CRN-safe emigrant selection — domain set per call.
+        self._emi_select = ss.choice(replace=False)
         return
 
     # ---------------------------------------------------------------------- #
@@ -212,8 +214,7 @@ class AgeMigration(ss.Demographics):
         if n <= 0 or len(band_uids) == 0:
             return
         n_pick = min(int(n), len(band_uids))
-        # Random choice without replacement (not CRN-tracked).
-        chosen_idx = np.random.choice(len(band_uids), size=n_pick, replace=False)
-        chosen_uids = band_uids[chosen_idx]
+        self._emi_select.set(a=band_uids)
+        chosen_uids = ss.uids(self._emi_select.rvs(n_pick))
         self.sim.people.request_removal(chosen_uids)
         return
