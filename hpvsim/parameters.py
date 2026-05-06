@@ -10,12 +10,17 @@ Currently ships HPV16 defaults only; future multi-genotype support adds
 hpv18 / hi5 / ohr.
 """
 
+import numpy as np
 import sciris as sc
 import starsim as ss
 
 
-__all__ = ['SimPars', 'GenotypePars', 'get_genotype_pars', 'genotype_aliases']
+__all__ = ['SimPars', 'GenotypePars', 'get_genotype_pars',
+           'get_cross_immunity', 'genotype_aliases', 'GENOTYPE_KEYS']
 
+# Canonical 4-genotype ordering for M03's default Sim. The Connector uses
+# this order as the default when no genotype list is supplied.
+GENOTYPE_KEYS = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
 # Genotype name aliases for user ergonomics.
 genotype_aliases = {
@@ -47,10 +52,20 @@ class SimPars(ss.SimPars):
         return
 
 
-def _cell_imm_dist():
-    """Beta sample for per-clearance severity-immunity boost.
+def _imm_init_dist():
+    """Beta sample for per-clearance humoral-immunity boost.
 
-    Shape parameters are the (a, b) implied by mean=0.25, var=0.025.
+    Shape parameters from v2's beta_mean(par1=0.35, par2=0.025).
+    """
+    a = ((1 - 0.35) / 0.025 - 1 / 0.35) * 0.35 ** 2
+    b = a * (1 / 0.35 - 1)
+    return ss.Dist(distname='beta', a=a, b=b)
+
+
+def _cell_imm_dist():
+    """Beta sample for per-clearance severity-immunity boost (v2 cell_imm_init).
+
+    Shape parameters from v2's beta_mean(par1=0.25, par2=0.025).
     """
     a = ((1 - 0.25) / 0.025 - 1 / 0.25) * 0.25 ** 2
     b = a * (1 / 0.25 - 1)
@@ -83,11 +98,9 @@ class GenotypePars(ss.Pars):
             self.cin_fn = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
             self.cancer_fn = dict(method='cin_integral', transform_prob=2e-3,
                                   form='logf2', k=0.3, x_infl=0, ttc=50)
-            # Same-genotype partial permanent immunity. imm_init reduces
-            # rel_sus on clearance (transmission immunity); cell_imm_init
-            # is sampled per clearance and accumulated as max(prior, new)
-            # into sev_imm (severity immunity, shortens future dur_precin).
-            self.imm_init = 0.35
+            # Same-genotype partial permanent immunity. imm_init is sampled
+            # per-clearance and feeds nab_imm (M03 Connector source state).
+            self.imm_init = _imm_init_dist()
             self.cell_imm_init = _cell_imm_dist()
             # Women aged >= ``age`` get their dur_cin scaled by ``risk``,
             # shifting cancer onset to older ages.
@@ -107,3 +120,53 @@ class GenotypePars(ss.Pars):
 def get_genotype_pars(genotype='hpv16'):
     """Return per-genotype natural-history defaults."""
     return GenotypePars(genotype=genotype)
+
+
+# v2 defaults (see hpvsim/_v2_legacy/parameters.py:108-112)
+_DEFAULT_CROSS_IMM_SUS_MED = 0.3
+_DEFAULT_CROSS_IMM_SUS_HIGH = 0.5
+_DEFAULT_CROSS_IMM_SEV_MED = 0.5
+_DEFAULT_CROSS_IMM_SEV_HIGH = 0.7
+
+# Pairwise cross-protection clade map. 'high' = hpv16 <-> hpv18; everything
+# else is 'med'. Hand-ported from v2's get_cross_immunity (hpvsim/_v2_legacy/
+# parameters.py:412-508).
+_CLADE_HIGH_PAIRS = frozenset({
+    ('hpv16', 'hpv18'),
+    ('hpv18', 'hpv16'),
+})
+
+
+def _build_cross_matrix(keys, scalar_med, scalar_high):
+    """Pairwise cross-protection matrix; diagonal forced to 1.0."""
+    n = len(keys)
+    m = np.full((n, n), scalar_med, dtype=np.float32)
+    for i, ki in enumerate(keys):
+        for j, kj in enumerate(keys):
+            if i == j:
+                m[i, j] = 1.0
+            elif (ki, kj) in _CLADE_HIGH_PAIRS:
+                m[i, j] = scalar_high
+    return m
+
+
+def get_cross_immunity(keys=None,
+                       cross_imm_sus_med=None, cross_imm_sus_high=None,
+                       cross_imm_sev_med=None, cross_imm_sev_high=None):
+    """Build (cross_immunity_sus, cross_immunity_sev) matrices for the given
+    genotype ordering.
+
+    Returns a tuple of two ``(n, n)`` float32 arrays. ``keys`` defaults to
+    ``GENOTYPE_KEYS``. Scalar defaults match v2 (`cross_imm_sus_med=0.3`,
+    `cross_imm_sus_high=0.5`, `cross_imm_sev_med=0.5`, `cross_imm_sev_high=0.7`).
+    Diagonals are forced to 1.0 by convention.
+    """
+    if keys is None:
+        keys = GENOTYPE_KEYS
+    if cross_imm_sus_med is None:  cross_imm_sus_med  = _DEFAULT_CROSS_IMM_SUS_MED
+    if cross_imm_sus_high is None: cross_imm_sus_high = _DEFAULT_CROSS_IMM_SUS_HIGH
+    if cross_imm_sev_med is None:  cross_imm_sev_med  = _DEFAULT_CROSS_IMM_SEV_MED
+    if cross_imm_sev_high is None: cross_imm_sev_high = _DEFAULT_CROSS_IMM_SEV_HIGH
+    m_sus = _build_cross_matrix(keys, cross_imm_sus_med, cross_imm_sus_high)
+    m_sev = _build_cross_matrix(keys, cross_imm_sev_med, cross_imm_sev_high)
+    return m_sus, m_sev
