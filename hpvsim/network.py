@@ -1,17 +1,12 @@
 """HPVsim sexual partnership network.
 
-Multi-layer heterosexual partnership network. A single ``hpv.SexualNetwork``
+Multi-layer heterosexual partnership network. A single ``SexualNetwork``
 instance holds all partnership layers (e.g. marital ``m`` + casual ``c``)
 in one ``edges`` table tagged by ``layer_id``. ``debut`` and ``participant``
 are inherited from ``ss.SexualNetwork`` as single per-agent values shared
-across all layers — matching v2's per-People ``debut``. ``step()`` ports
-v2's ``dissolve_partnerships`` (all layers) followed by per-layer
-``create_partnerships`` ordering, encoded directly in the network so no
-sibling coordination is needed.
-
-The pair-formation algorithm per layer is ported from
-``hpvsim/_v2_legacy/population.py:create_edgelist`` (lines 281-379) with
-adaptations for Starsim idioms (UID-indexed arrays, CRN-safe ``ss.Dist``).
+across all layers. ``step()`` dissolves all pairs (single ``end_pairs`` on
+the combined edges table) and then forms new pairs per layer in sequence,
+so no sibling-network coordination is needed.
 """
 
 import numpy as np
@@ -45,9 +40,8 @@ class SexualNetwork(ss.SexualNetwork):
         # network is constructed without layer_pars (scaffold tests).
         self.layers = tuple(self.pars.layer_pars.keys()) if self.pars.layer_pars else ()
         self._layer_idx = {lkey: i for i, lkey in enumerate(self.layers)}
-        # Per-layer partners_target FloatArr — one per layer. v2's
-        # ``set_static`` samples partners separately per layer (independent
-        # Poisson draws), so per-layer state is correct here.
+        # Per-layer partners_target — partners are sampled with independent
+        # Poisson draws per layer, so per-layer state is required.
         if self.layers:
             target_states = [
                 ss.FloatArr(f'partners_target_{lkey}', default=np.nan,
@@ -55,15 +49,14 @@ class SexualNetwork(ss.SexualNetwork):
                 for lkey in self.layers
             ]
             self.define_states(*target_states)
-        # Edge metadata: per-edge layer tag + formation timestep (the latter
-        # lets the partnership-equivalence test reconstruct age-at-formation
-        # and original duration).
+        # Edge metadata: per-edge layer tag + formation timestep. start_ti
+        # lets diagnostics reconstruct age-at-formation and original duration.
         self.meta.layer_id = int
         self.meta.start_ti = float
-        # CRN-safe distributions used inside ``_add_pairs_for_layer``. One
-        # set per layer (keyed in ``self._dists``) so per-layer draws are
-        # independent across layers — sharing a single set would couple m's
-        # and c's RNG state and inflate cross-layer covariance.
+        # CRN-safe distributions used inside ``_add_pairs_for_layer``. Each
+        # layer gets its own set so layers' RNG state is independent;
+        # sharing a single set would couple them and inflate cross-layer
+        # covariance.
         self._dists = {
             lkey: dict(
                 bin_order=ss.choice(name=f'{lkey}_bin_order', replace=False),
@@ -100,10 +93,10 @@ class SexualNetwork(ss.SexualNetwork):
 
     def set_network_states(self):
         """Sample ``debut``, ``participant``, and per-layer ``partners_target``
-        for any alive agent whose state hasn't been initialized yet (i.e.
-        ``participant=False``). Runs once at init for the starting population
-        and once per step to handle newly-added agents (births, AgeMigration
-        immigrants).
+        for any alive agent without initialized state (``participant=False``).
+
+        Runs once at init for the starting population and once per step to
+        handle newly-added agents (births, AgeMigration immigrants).
         """
         if not self.layers:
             return
@@ -115,8 +108,7 @@ class SexualNetwork(ss.SexualNetwork):
         f_uids = unset[is_female]
         m_uids = unset[~is_female]
 
-        # Per-layer partners_target — independent samples per layer (matches
-        # v2's per-layer partner_count).
+        # Per-layer partners_target — independent samples per layer.
         for lkey in self.layers:
             lpars = self.pars.layer_pars[lkey]
             partners = lpars.get('partners') if lpars else None
@@ -126,19 +118,16 @@ class SexualNetwork(ss.SexualNetwork):
             arr[f_uids] = partners['f'].rvs(f_uids)
             arr[m_uids] = partners['m'].rvs(m_uids)
 
-        # Single shared debut sample per agent (matches v2's people.debut).
+        # Single shared debut sample per agent (across layers).
         if self.pars.debut is not None:
             self.debut[f_uids] = self.pars.debut['f'].rvs(f_uids)
             self.debut[m_uids] = self.pars.debut['m'].rvs(m_uids)
 
-        # Mark initialized.
         self.participant[unset] = True
 
     def step(self):
-        """v2-style ordering: dissolve all pairs first (single ``end_pairs``
-        on the combined edges array), then form new pairs per layer in
-        sequence. No inter-network coordination needed — this network owns
-        all layers.
+        """Dissolve all pairs (single ``end_pairs`` on the combined edges
+        table), then form new pairs per layer in sequence.
         """
         self.end_pairs()
         self.set_network_states()
@@ -163,8 +152,9 @@ class SexualNetwork(ss.SexualNetwork):
 
     def _other_layer_partner_uids(self, lkey):
         """ss.uids of agents partnered in any layer OTHER than ``lkey``.
-        Computed on the post-``end_pairs`` edge state, so cross-layer
-        eligibility sees no stale dissolved pairs.
+
+        Called after ``end_pairs`` so cross-layer eligibility doesn't see
+        dissolved pairs.
         """
         mask = ~self.edges_for_layer(lkey)
         if not mask.any():
@@ -192,9 +182,7 @@ class SexualNetwork(ss.SexualNetwork):
     def _add_pairs_for_layer(self, lkey):
         """Form new partnerships in layer ``lkey`` for one timestep.
 
-        Ports v2's ``create_edgelist`` (``hpvsim/_v2_legacy/population.py``
-        lines 281-379). Females are placed in ``p1``, males in ``p2``,
-        matching v2's convention.
+        Females are placed in ``p1``, males in ``p2``.
         """
         lpars = self.pars.layer_pars[lkey]
         # Scaffolding short-circuit: layers with no pars (test fixtures) skip.
@@ -205,18 +193,18 @@ class SexualNetwork(ss.SexualNetwork):
         target = getattr(self, f'partners_target_{lkey}')
         dists = self._dists[lkey]
 
-        # Eligibility: alive & past debut & participant (from active()) AND
-        # wants any partners AND not already at target.
+        # Eligibility: alive & past debut & participant & wants partners
+        # & not already at target.
         eligible = (self.active(people) & (target > 0)).asnew()
         own_uids, own_counts = self._own_n_partners_in_layer(lkey)
         if len(own_uids):
             saturated = own_uids[own_counts >= target[own_uids]]
             eligible[saturated] = False
 
-        # Cross-layer concurrency: of agents currently partnered in OTHER
-        # layers, only those who pass the per-step cross_layer probability
-        # remain eligible. cross_layer is annual ``ss.prob``;
-        # ``.to_prob(dt)`` converts to dt-correct per-step probability.
+        # Cross-layer concurrency filter: agents partnered in OTHER layers
+        # only stay eligible if they pass the per-step cross_layer Bernoulli.
+        # cross_layer is annual ``ss.prob``; ``.to_prob(dt)`` converts to
+        # dt-correct per-step probability.
         dt = self.t.dt
         other_uids = self._other_layer_partner_uids(lkey)
         if len(other_uids):
@@ -255,8 +243,7 @@ class SexualNetwork(ss.SexualNetwork):
             f_eligible_uids, age, f_part_p, bins, dists['participate'],
         ))
 
-        # Track males already paired this step's bin loop (replaces v2's
-        # m_probs scratch buffer).
+        # Tracks males already paired during this step's bin loop.
         paired_m = ss.BoolArr(people=people)
         f_arr = np.array([], dtype=int)
         m_arr = np.array([], dtype=int)
@@ -281,7 +268,7 @@ class SexualNetwork(ss.SexualNetwork):
                 this_weighting_nonzero = this_weighting[males_nonzero]
                 f_inds = f_cl[age_bins_f == ab]
                 if nm > len(this_weighting_nonzero):
-                    # Not enough males — drop a CRN-safe random subset of females.
+                    # Not enough males: drop a CRN-safe random subset of females.
                     dists['f_select'].set(a=f_inds)
                     f_selected = np.asarray(
                         dists['f_select'].rvs(len(this_weighting_nonzero))
@@ -303,10 +290,10 @@ class SexualNetwork(ss.SexualNetwork):
             return
         f_uids = ss.uids(f_arr.astype(int))
         m_uids = ss.uids(m_arr.astype(int))
-        # v2 samples dur in years per pair; ss.DynamicNetwork.end_pairs
+        # Duration is sampled in years per pair; ``ss.DynamicNetwork.end_pairs``
         # decrements ``edges.dur`` by 1 each step (units of dt). Divide here
-        # rather than at dist-level (nbinom only supports predraw rate
-        # scaling, which would inflate per-pair variance).
+        # rather than at dist-level — nbinom only supports predraw rate
+        # scaling, which would inflate per-pair variance.
         dur_years = lpars['duration'].rvs(f_uids)
         dur = dur_years / float(self.t.dt)
         acts = lpars['acts'].rvs(f_uids)

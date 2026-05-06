@@ -10,16 +10,16 @@ import starsim as ss
 __all__ = ['AgeResults']
 
 
-_DEFAULT_AGE_BINS = np.arange(0, 105, 5)   # 5-yr bins; last bin is [100, 105)
+_DEFAULT_AGE_BINS = np.arange(0, 105, 5)   # 5-yr bins; last bin is [100, 105).
 
 
 class AgeResults(ss.Analyzer):
-    """Age-stratified result aggregation, cancer-only minimum scope.
+    """Age-stratified result aggregation, cancer-only.
 
     Args:
-        results: tuple of result keys to age-stratify. M02 supports
-                 ('cancer',). Other keys raise NotImplementedError.
-        age_bins: array of bin edges (default: 5-yr bins, 0–100).
+        results: tuple of result keys to age-stratify. Currently supports
+                 ``('cancer',)``; other keys raise NotImplementedError.
+        age_bins: array of bin edges (default: 5-yr bins, 0-100).
         year: scalar or list of report years. Each year produces one row in
               the output array.
     """
@@ -29,7 +29,7 @@ class AgeResults(ss.Analyzer):
         keys = tuple(results) if not isinstance(results, str) else (results,)
         if not set(keys).issubset({'cancer'}):
             raise NotImplementedError(
-                f'AgeResults M02 supports cancer only; got {keys!r}.'
+                f'AgeResults supports cancer only; got {keys!r}.'
             )
         self.results_to_collect = keys
         self.age_bins = np.asarray(age_bins) if age_bins is not None else _DEFAULT_AGE_BINS
@@ -76,21 +76,16 @@ class AgeResults(ss.Analyzer):
             if not hasattr(disease, 'ti_cancerous'):
                 continue
 
-            # Use .raw to include dead agents (cancer death + background
-            # mortality). Without this, agents who died from cancer are
-            # silently filtered out of the active-uid view — same bug class
-            # as anchor_hpv16.run_and_summarize had.
+            # Use .raw so dead agents (cancer death + background mortality)
+            # are still counted; the active-uid view filters them out.
             ti_arr = np.asarray(disease.ti_cancerous.raw)
             age_raw = np.asarray(people.age.raw)
 
-            # Only consider agents with a finite (non-NaN) ti_cancerous.
             finite_mask = ~np.isnan(ti_arr)
             if not finite_mask.any():
                 continue
 
-            # Convert ti index to year for each agent with a scheduled cancer time.
             ti_int = ti_arr[finite_mask].astype(int)
-            # Clip to valid yearvec range (shouldn't be necessary but defensive).
             ti_int = np.clip(ti_int, 0, len(yearvec) - 1)
             yr_cancerous = yearvec[ti_int]
 
@@ -99,15 +94,13 @@ class AgeResults(ss.Analyzer):
             if not window.any():
                 continue
 
-            # finite_mask indices correspond to agent positions in the .raw arrays.
             all_indices = np.where(finite_mask)[0]
             window_indices = all_indices[window]
 
-            # Age at cancer event. Subtracting (year_now - yr_cancerous) from
-            # the agent's stored age recovers age-at-event. For dead agents,
-            # age.raw is frozen at age-of-death; this approximation overshoots
-            # for those who survived past cancer onset and died later — small
-            # bias acceptable for the dev gate.
+            # Age at cancer event = stored age - (year_now - yr_cancerous).
+            # For dead agents age.raw is frozen at age-of-death, so this
+            # overshoots for those who survived cancer onset and died later —
+            # small bias accepted at this stratification.
             now_year = float(sim.t.now('year'))
             cancer_ages_raw = age_raw[window_indices]
             yr_cancerous_window = yr_cancerous[window]
@@ -115,8 +108,8 @@ class AgeResults(ss.Analyzer):
             counts, _ = np.histogram(cancer_ages, bins=self.age_bins)
             total_counts += counts.astype(float)
 
-        # Female-years denominator: count alive females per age bin.
-        # We use a 1-year window denominator approximation (alive now).
+        # Female-years denominator: alive females per age bin (1-year window
+        # approximation using alive-now).
         f_mask = np.asarray(people.alive) & np.asarray(people.female)
         f_ages = np.asarray(people.age)[f_mask]
         denom, _ = np.histogram(f_ages, bins=self.age_bins)

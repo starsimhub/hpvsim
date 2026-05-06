@@ -1,33 +1,24 @@
-"""Country-data adapter: wrap v2 hpvsim's location data into Starsim-shaped DataFrames.
+"""Country-data adapter: load location data into Starsim-shaped DataFrames.
 
-Used by hpvsim.Sim to build People (age pyramid), Pregnancy (fertility),
-Deaths (mortality), and per-layer SexualNetwork instances. All underlying data
-lives in hpvsim/data/files/ and is loaded via the existing hpvsim.data.loaders
-module and hpvsim.parameters helpers (which stayed active through the
-v2 -> v3 migration).
+Used by ``hpvsim.Sim`` to build People (age pyramid), Births (CBR), Deaths
+(age- and sex-specific mortality), and SexualNetwork (debut, partners,
+mixing, layer probs, durations, acts). Underlying data lives in
+``hpvsim/data/files/`` and is loaded via ``hpvsim.data.loaders`` and the
+``hpvsim.parameters`` helpers carried over from the legacy v2 package.
 
-Notes on v2 -> v3 reshaping:
-
-- Age pyramid: v2's get_age_distribution returns an ndarray of shape (N, 3)
-  with columns (age_lower, age_upper, count). We expand bins into a per-year
-  long form with columns (age, value).
-- Birth rates: v2's get_birth_rates returns a sciris dataframe with columns
-  (Location, year, cbr) — a crude birth rate per year. v3 uses ss.Births
-  (population-level CBR, matching v2's mechanism) rather than ss.Pregnancy
-  (per-woman ASFR), so we just rename columns to [Year, CBR] for the
-  ss.Births interface. M02+ may switch to ss.Pregnancy if/when proper ASFR
-  data becomes available.
-- Death rates: v2's get_death_rates(by_sex=True) returns
-  {year: {sex: ndarray(M, 2) with columns (age, rate)}}. We flatten into
-  long form (Year, AgeGrp, Sex, Rate).
-- Network parameters: v2's "default" network has 2 layers (m, c).
-  partners and cross_layer are split by sex in v2 (m_partners/f_partners,
-  m_cross_layer/f_cross_layer); we expose both sexes per-layer.
-- Distributions: v2 stores distributions as plain dicts like
-  ``{'dist': 'poisson1', 'par1': 0.5}`` consumed by hpvsim.utils.sample().
-  v3 prefers Starsim Dist instances (sampled via .rvs(uids)). The
-  ``_v2_dist_to_starsim`` helper in ``hpvsim.migration_utils`` converts
-  between the two for partners, duration, and acts.
+Reshaping summary:
+- Age pyramid: (N, 3) ``(age_lower, age_upper, count)`` ndarray with single-
+  year resolution -> long DataFrame ``[age, value]``.
+- Birth rates: ``[year, cbr]`` per 1000 -> ``[Year, CBR]`` for ``ss.Births``.
+  Could switch to ``ss.Pregnancy`` once age-specific fertility data exists.
+- Death rates: per-year per-sex ndarrays -> long DataFrame ``[Time,
+  AgeGrpStart, Sex, mx]`` for ``ss.Deaths``.
+- Network parameters: 2 layers (m=marital, c=casual). partners and
+  cross_layer are stored split by sex; this adapter exposes both sexes
+  per layer.
+- Distributions: ``{'dist': name, 'par1': ..., 'par2': ...}`` dicts are
+  converted to Starsim Dist instances via
+  ``hpvsim.migration_utils._v2_dist_to_starsim``.
 """
 
 import numpy as np
@@ -38,25 +29,20 @@ from ..migration_utils import _v2_dist_to_starsim
 from . import loaders as _loaders
 
 
-_KNOWN_LOCATIONS = ['nigeria']  # M01 ships with Nigeria only; expand as needed.
+_KNOWN_LOCATIONS = ['nigeria']
 
 
 def _default_network_pars(location):  # noqa: ARG001  (location reserved for future per-country data)
-    """Return the subset of v2 ``make_pars(location=location)`` that country.py consumes.
+    """Default network parameters consumed by SexualNetwork construction.
 
-    Values are copied verbatim from v2's ``make_pars`` / ``reset_layer_pars`` /
-    ``get_mixing`` for ``network='default'``. The ``location`` argument is
-    accepted for API symmetry (and future extension) but currently has no effect
-    on network parameters — v2's defaults are location-agnostic for Nigeria.
+    The ``location`` argument is accepted for API symmetry and future
+    per-country extension; current defaults are location-agnostic.
 
     Keys returned:
         debut, f_cross_layer, m_cross_layer,
         f_partners, m_partners, acts, dur_pship,
         mixing, layer_probs
     """
-    # ------------------------------------------------------------------ #
-    # Verbatim from v2 make_pars (network-parameter block only)           #
-    # ------------------------------------------------------------------ #
     debut = dict(
         f=dict(dist='normal', par1=15.0, par2=2.1),
         m=dict(dist='normal', par1=17.6, par2=1.8),
@@ -64,9 +50,6 @@ def _default_network_pars(location):  # noqa: ARG001  (location reserved for fut
     f_cross_layer = 0.185  # Annual prob of females having concurrent cross-layer relationships
     m_cross_layer = 0.760  # Annual prob of males having concurrent cross-layer relationships
 
-    # ------------------------------------------------------------------ #
-    # Verbatim from v2 reset_layer_pars (network='default')               #
-    # ------------------------------------------------------------------ #
     m_partners = dict(
         m=dict(dist='poisson1', par1=0.01),
         c=dict(dist='poisson1', par1=0.5),
@@ -84,9 +67,7 @@ def _default_network_pars(location):  # noqa: ARG001  (location reserved for fut
         c=dict(dist='lognormal', par1=1, par2=2),
     )
 
-    # ------------------------------------------------------------------ #
-    # Verbatim from v2 get_mixing(network='default')                      #
-    # ------------------------------------------------------------------ #
+    # Age-mixing matrices (rows = female age band start, cols = male age band).
     mixing = dict(
         m=np.array([
             #       0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75
@@ -200,12 +181,7 @@ def _age_data(location):
 
 
 def _birth_rate(location):
-    """Reshape v2 birth rates into [Year, CBR] long form for ss.Births.
-
-    v2's get_birth_rates returns a sciris dataframe with (Location, year, cbr).
-    ss.Births accepts a DataFrame with columns [Year, CBR]; CBR is per 1000
-    population per year (the v2 unit), and ss.Births handles the conversion.
-    """
+    """Birth rates as [Year, CBR] for ``ss.Births``. CBR is per 1000."""
     raw = _loaders.get_birth_rates(location=location)
     return pd.DataFrame({
         'Year': np.asarray(raw['year'], dtype=int),
@@ -214,7 +190,7 @@ def _birth_rate(location):
 
 
 def _death_rate(location):
-    """Read v2 death rates as ss.Deaths' default UN-style columns."""
+    """Death rates as ``ss.Deaths``-shaped UN-style columns."""
     df = _loaders.map_entries(_loaders.load_file(_loaders.files.death), location)
     df = df[df['Sex'].isin(('Male', 'Female'))]  # drop 'Total'
     return pd.DataFrame({
@@ -228,18 +204,15 @@ def _death_rate(location):
 def _network_pars(location):
     """Build network parameters for ``hpv.SexualNetwork``.
 
-    v2's "default" network defines 2 layers (m=marital, c=casual). Returns
-    ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ..., 'm': ...}}``,
-    matching the new ``hpv.SexualNetwork(layer_pars=..., debut=...)`` API.
-    Each per-layer dict carries: partners, mixing, layer_probs, cross_layer,
-    duration, acts. ``debut`` is shared across layers (single per-agent
-    sample, matching v2's ``people.debut``).
+    Returns ``{'layer_pars': {'m': {...}, 'c': {...}}, 'debut': {'f': ...,
+    'm': ...}}``. Each layer dict carries: partners, mixing, layer_probs,
+    cross_layer, duration, acts. ``debut`` is shared across layers (one
+    per-agent sample).
     """
     default_pars = _default_network_pars(location)
     annual = ss.years(1)  # unit shared by all annual probability params
 
-    # Per-sex cross-layer concurrency is an annual probability in v2.
-    # ``ss.prob`` lets the network call ``.to_prob(self.t.dt)`` to get a
+    # ``ss.prob`` lets the network call ``.to_prob(self.t.dt)`` for a
     # dt-correct per-step probability: 1 - exp(-rate*dt) == 1-(1-p)^dt.
     cross_layer_by_sex = {
         'm': ss.prob(default_pars['m_cross_layer'], annual),
@@ -253,10 +226,10 @@ def _network_pars(location):
 
     layer_pars = {}
     for layer in ('m', 'c'):
-        # v2's layer_probs[layer] is a (3, N) ndarray: row 0 = age-bin lower
+        # layer_probs[layer] is a (3, N) ndarray: row 0 = age-bin lower
         # bounds, row 1 = annual female participation prob, row 2 = annual
-        # male participation prob. Split into a dict so the per-sex rows
-        # carry their unit (annual) explicitly.
+        # male participation prob. Split into a per-sex dict so each row
+        # carries its annual unit explicitly.
         lp = default_pars['layer_probs'][layer]
         layer_probs = dict(
             bins=np.asarray(lp[0, :]),

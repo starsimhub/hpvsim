@@ -1,11 +1,12 @@
 """HPV simulation parameters.
 
-Mirrors the starsimhub-conventional shape (cf. stisim.parameters,
-fpsim.parameters): SimPars subclasses ss.SimPars with HPV-specific
-defaults; GenotypePars holds per-genotype natural-history defaults.
+``SimPars`` subclasses ``ss.SimPars`` with HPV-specific defaults;
+``GenotypePars`` holds per-genotype natural-history defaults consumed by the
+``HPV(ss.Infection)`` module. ``get_genotype_pars(genotype)`` is the factory
+multi-genotype consumers use to look up defaults by name.
 
-M02 wires HPV16 only. M03 adds hpv18 / hi5 / ohr defaults to GenotypePars
-and the multi-genotype Sim factory.
+Currently ships HPV16 defaults only; future multi-genotype support adds
+hpv18 / hi5 / ohr.
 """
 
 import sciris as sc
@@ -15,7 +16,7 @@ import starsim as ss
 __all__ = ['SimPars', 'GenotypePars', 'get_genotype_pars', 'genotype_aliases']
 
 
-# Genotype name aliases — carried from v2 for user ergonomics.
+# Genotype name aliases for user ergonomics.
 genotype_aliases = {
     'hpv16': ['hpv16', '16'],
     'hpv18': ['hpv18', '18'],
@@ -29,21 +30,16 @@ class SimPars(ss.SimPars):
 
     def __init__(self, **kwargs):
         super().__init__()
-        # Population
         self.n_agents  = 10_000
-        self.total_pop = None  # If set, pop_scale = total_pop / n_agents
-        self.pop_scale = None  # Computed at init if total_pop is set
+        self.total_pop = None  # If set, pop_scale = total_pop / n_agents.
+        self.pop_scale = None  # Computed at init if total_pop is set.
 
-        # Time
         self.start     = ss.years(1990)
         self.stop      = ss.years(2060)
         self.dt        = ss.years(0.5)
         self.rand_seed = 0
 
-        # Geography
         self.location = 'nigeria'
-
-        # Reporting
         self.verbose = ss.options.verbose
 
         self.update(kwargs)
@@ -51,15 +47,11 @@ class SimPars(ss.SimPars):
 
 
 class GenotypePars(ss.Pars):
-    """Per-genotype natural-history defaults.
-
-    M02 wires HPV16 only. M03 wires the other genotypes.
-    """
+    """Per-genotype natural-history defaults. Currently HPV16 only."""
 
     def __init__(self, genotype='hpv16', **kwargs):
         super().__init__()
         self.genotype = genotype
-        # Defaults dispatched by genotype name.
         if genotype == 'hpv16':
             self.dur_precin = dict(dist='lognormal', par1=3, par2=9)
             self.cin_fn     = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
@@ -69,13 +61,12 @@ class GenotypePars(ss.Pars):
             self.sero_prob  = 0.75
         else:
             raise NotImplementedError(
-                f'GenotypePars: M02 supports hpv16 only; got {genotype!r}. '
-                f'Other genotypes land in M03.'
+                f'GenotypePars currently supports hpv16 only; got {genotype!r}.'
             )
         self.update(kwargs)
         return
 
 
 def get_genotype_pars(genotype='hpv16'):
-    """Factory for per-genotype defaults; M03 multi-genotype consumer."""
+    """Return per-genotype natural-history defaults."""
     return GenotypePars(genotype=genotype)
