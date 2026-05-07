@@ -296,7 +296,10 @@ class SexualNetwork(ss.SexualNetwork):
         # scaling, which would inflate per-pair variance.
         dur_years = lpars['duration'].rvs(f_uids)
         dur = dur_years / float(self.t.dt)
-        acts = lpars['acts'].rvs(f_uids)
+        # acts is sampled in v2 units (per year of partnership). edges.acts is
+        # used per-step by ss.SexualNetwork.net_beta, so scale by dt to convert
+        # to acts-per-step. v2 does the equivalent at _v2_legacy/sim.py:803.
+        acts = np.asarray(lpars['acts'].rvs(f_uids)) * float(self.t.dt)
         beta = np.ones(n_new)
         start_ti = np.full(n_new, float(self.t.ti))
         layer_id = np.full(n_new, self._layer_idx[lkey], dtype=int)

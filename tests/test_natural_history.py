@@ -302,6 +302,30 @@ def test_clearance_males_get_no_immunity():
         f'{int((cell_male > 0).sum())} males have cell_imm > 0'
 
 
+def test_network_acts_are_per_step_not_per_year():
+    """Edge.acts is in per-step units (already divided by dt at formation).
+
+    v2 default marital acts is neg_binomial(par1=80, par2=40) per year.
+    With dt=0.25, per-step mean is ~20. Casual is ~12.5. Combined network
+    mean should be in the 10-30 range, not 50-90 (which would indicate the
+    per-year value is being used per step).
+    """
+    sim = hpv.Sim(
+        n_agents=2000, location='nigeria',
+        start=1990, stop=1991, dt=0.25, rand_seed=0,
+    )
+    sim.run()
+    net = sim.networks.sexualnetwork
+    if not len(net.edges):
+        pytest.skip('No edges formed; cannot check acts unit.')
+    acts = np.asarray(net.edges.acts)
+    mean_acts = float(acts.mean())
+    assert 5 <= mean_acts <= 35, (
+        f'edges.acts mean = {mean_acts:.1f}; expected per-step (10-30 range), '
+        f'not per-year (50-90 range)'
+    )
+
+
 def test_directional_beta_sets_per_network_pair():
     """HPV.pars.beta is a dict keyed by network with [transf2m, transm2f] pair.
 
