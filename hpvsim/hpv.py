@@ -77,6 +77,122 @@ def _make_init_prev_fn(genotype):
 _KNOWN_GENOTYPES = tuple(_INIT_PREV.keys())
 
 
+class _ExclusiveSeeder:
+    """Coordinated v2-style initial seeding for multi-genotype HPV.
+
+    On the first invocation of any per-genotype callback, computes the global
+    assignment (per-agent total-prevalence Bernoulli + per-infected-agent
+    genotype choice) and stores it. Each genotype's callback returns 1.0 for
+    uids assigned to it and 0.0 otherwise; a ``ss.bernoulli`` with those
+    probabilities deterministically yields exactly the assigned uids in
+    ``init_prev.filter()``.
+
+    Source: hand-port of ``_v2_legacy/sim.py:702-727`` + ``defaults.py:307``.
+
+    Random draw path: the total-prevalence Bernoulli draw uses
+    ``ss.bernoulli`` with ``strict=False`` (CRN-safe slot-based RNG). The
+    per-infected-agent genotype choice uses ``np.random.default_rng`` seeded
+    from ``sim.pars.rand_seed + 91802``; ``ss.choice`` cannot be used here
+    because it shares slot-based RNG state with the prior ``seed_bern.rvs``
+    call, producing non-uniform distributions.
+    """
+
+    def __init__(self, genotype_keys, init_hpv_dist=None):
+        self.keys = tuple(genotype_keys)
+        self.init_hpv_dist = init_hpv_dist
+        self._assignment = None  # ndarray shape (n_agents,), values in [-1, n_g)
+
+    def for_genotype(self, key):
+        """Return a callable suitable for ``ss.bernoulli(p=callback)``.
+
+        The callback signature is ``(module, sim, uids)`` matching starsim's
+        ``convert_callable`` dispatch. On first call it triggers ``_compute``
+        which populates ``self._assignment``; subsequent calls are O(len(uids))
+        lookups.
+        """
+        gen_idx = self.keys.index(key)
+
+        def callback(module, sim, uids):
+            if self._assignment is None:
+                self._compute(sim)
+            uids_arr = np.asarray(uids, dtype=int)
+            return (self._assignment[uids_arr] == gen_idx).astype(float)
+
+        return callback
+
+    def _compute(self, sim):
+        """Compute per-agent genotype assignment (called once on first callback).
+
+        Steps:
+          1. Per-agent total HPV probability using hpv16 curve as v2 total.
+          2. Zero out agents who are not yet past sexual debut.
+          3. Bernoulli draw: which agents get any HPV at all.
+          4. Per-infected-agent genotype assignment (uniform or weighted).
+        """
+        people = sim.people
+        n_agents = len(people)
+        all_uids = ss.uids(np.arange(n_agents))
+
+        # Step 1: per-agent total HPV probability using hpv16 curve as total.
+        # (v2's default_init_prev matches our _INIT_PREV['hpv16'] verbatim.)
+        total_prev_fn = _make_init_prev_fn('hpv16')
+        p_per_uid = np.asarray(total_prev_fn(None, sim, all_uids), dtype=float)
+
+        # Step 2: filter to alive agents past sexual debut.
+        # v2's is_active check: agents not yet debuted can't be seeded.
+        alive = np.asarray(people.alive).astype(bool)
+        active = alive.copy()
+        # Locate the SexualNetwork (if present) to gate on debut age.
+        net = None
+        if hasattr(sim.networks, 'get'):
+            net = sim.networks.get('sexualnetwork')
+        if net is None:
+            for nm in sim.networks.values():
+                from .network import SexualNetwork
+                if isinstance(nm, SexualNetwork):
+                    net = nm
+                    break
+        if net is not None and hasattr(net, 'debut'):
+            debut = np.asarray(net.debut)
+            age = np.asarray(people.age)
+            past_debut = (~np.isnan(debut)) & (age >= debut)
+            active = active & past_debut
+        p_per_uid = np.where(active, p_per_uid, 0.0)
+
+        # Step 3: Bernoulli draw. Use starsim distribution (CRN-safe) with
+        # strict=False so it can be initialized and called outside the normal
+        # step flow. Fall back to np.random if the starsim path fails.
+        seed_bern = ss.bernoulli(p=0.0, strict=False)
+        seed_bern.init(sim=sim)
+        seed_bern.set(p=p_per_uid)
+        infected_mask = np.asarray(seed_bern.rvs(all_uids)).astype(bool)
+        infected_uids = all_uids[infected_mask]
+
+        # Step 4: per-infected-agent genotype assignment.
+        # Use numpy's RNG seeded from sim.pars.rand_seed + a fixed offset.
+        # ss.choice uses slot-based indexing that collides with the slots
+        # already consumed by seed_bern.rvs(all_uids); falling back to
+        # np.random.default_rng avoids that collision (CRN-safe within a
+        # single run since the seed is deterministic given rand_seed).
+        n_g = len(self.keys)
+        assignment = np.full(n_agents, -1, dtype=int)
+        if len(infected_uids) > 0:
+            rand_seed = int(getattr(sim.pars, 'rand_seed', 0))
+            rng = np.random.default_rng(rand_seed + 91802)
+            if self.init_hpv_dist is None:
+                # Uniform genotype assignment.
+                gen_choices = rng.integers(0, n_g, size=len(infected_uids))
+            else:
+                # Weighted by user-supplied dict keyed by genotype name.
+                weights = np.array(
+                    [self.init_hpv_dist[k] for k in self.keys], dtype=float
+                )
+                weights = weights / weights.sum()
+                gen_choices = rng.choice(n_g, size=len(infected_uids), p=weights)
+            assignment[np.asarray(infected_uids)] = gen_choices
+        self._assignment = assignment
+
+
 class HPV(ss.Infection):
     """Per-genotype HPV disease module.
 

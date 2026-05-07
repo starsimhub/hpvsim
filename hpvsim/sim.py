@@ -6,6 +6,21 @@ SexualNetwork, ss.Births + ss.Deaths + AgeMigration demographics, ss.People
 with location-specific age pyramid, plus a CrossImmunity connector — and
 forwards to ``ss.Sim``. Each component is overridable: passing ``diseases=``
 short-circuits the genotypes-sugar path.
+
+New kwargs (M03):
+  ``init_seeding`` (str, default ``'exclusive'``):
+    ``'exclusive'`` — one Bernoulli per agent using the hpv16 age-banded
+    curve as the total HPV prevalence, then exactly one genotype assigned per
+    infected agent. Matches v2 semantics (no co-infection at initialisation).
+    ``'independent'`` — each genotype draws from its own per-genotype
+    init_prev curve independently; co-infection at initialisation is possible.
+
+  ``init_hpv_dist`` (dict or None, default ``None``):
+    Only used when ``init_seeding='exclusive'``. If ``None``, genotype
+    assignment is uniform across active genotypes. If a dict, keys must be
+    the resolved canonical genotype names (e.g. ``{'hpv16': 0.6, 'hpv18':
+    0.2, 'hi5': 0.1, 'ohr': 0.1}``) and values are weights (need not sum to
+    1; normalised internally).
 """
 
 import numpy as np
@@ -13,7 +28,7 @@ import starsim as ss
 
 from .data.country import load_country
 from .demographics import AgeMigration
-from .hpv import HPV
+from .hpv import HPV, _ExclusiveSeeder
 from .network import SexualNetwork
 from .connectors import CrossImmunity
 from .parameters import genotype_aliases
@@ -102,6 +117,7 @@ class Sim(ss.Sim):
     """HPVsim simulation."""
 
     def __init__(self, location='nigeria', genotypes=None, genotype_pars=None,
+                 init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, pars=None, **kwargs):
         country = load_country(location)
@@ -117,15 +133,49 @@ class Sim(ss.Sim):
                 'Pass diseases= OR genotypes=, not both.'
             )
 
+        if init_seeding not in ('exclusive', 'independent'):
+            raise ValueError(
+                f"init_seeding must be 'exclusive' or 'independent'; got {init_seeding!r}"
+            )
+
         if diseases is None:
             # Default to single-genotype HPV16 if neither supplied.
             keys = (tuple(_normalize_genotype(g) for g in genotypes)
                     if genotypes is not None else ('hpv16',))
             gpars_overrides = genotype_pars or {}
-            diseases = [
-                HPV(genotype=k, **gpars_overrides.get(k, {}))
-                for k in keys
-            ]
+
+            # Validate init_hpv_dist keys if provided.
+            if init_hpv_dist is not None:
+                if not isinstance(init_hpv_dist, dict):
+                    raise ValueError(
+                        f'init_hpv_dist must be a dict or None; got {type(init_hpv_dist)}'
+                    )
+                dist_keys = set(init_hpv_dist.keys())
+                sim_keys = set(keys)
+                if dist_keys != sim_keys:
+                    raise ValueError(
+                        f'init_hpv_dist keys {sorted(dist_keys)} do not match '
+                        f'resolved genotype keys {sorted(sim_keys)}'
+                    )
+
+            if init_seeding == 'exclusive':
+                # Coordinated v2-style seeding: one Bernoulli per agent using
+                # hpv16 total prevalence curve, then one genotype per infected
+                # agent. The _ExclusiveSeeder installs callbacks on init_prev
+                # so the assignment is computed lazily on first init_post call.
+                seeder = _ExclusiveSeeder(genotype_keys=keys, init_hpv_dist=init_hpv_dist)
+                diseases = []
+                for k in keys:
+                    d = HPV(genotype=k, **gpars_overrides.get(k, {}))
+                    d.pars.init_prev = ss.bernoulli(p=seeder.for_genotype(k))
+                    diseases.append(d)
+            else:
+                # 'independent': each HPV draws from its own per-genotype
+                # init_prev curve independently (current v3 default behavior).
+                diseases = [
+                    HPV(genotype=k, **gpars_overrides.get(k, {}))
+                    for k in keys
+                ]
 
         if connectors is None:
             connectors = [CrossImmunity()]
