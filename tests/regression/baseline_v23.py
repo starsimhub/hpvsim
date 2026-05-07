@@ -169,29 +169,61 @@ def run_and_summarize():
 
     short = {k: float(s[k]) for k in _EXPECTED_KEYS}
 
-    # Override 'mean age of infection (years)': v2's compute_summary uses
-    # compute_age_mean('infections_by_age', t=-1), which reports the age-
-    # weighted mean of NEW infections in the LAST sim step only — not a
-    # lifetime mean. v3's anchor_hpv16.run_and_summarize computes lifetime
-    # mean age-at-first-infection across alive ever-infected agents, so we
-    # recompute the v2 baseline value with matching lifetime semantics for a
-    # like-for-like comparison.
+    # Override age metrics: v2's compute_summary uses compute_age_mean(...,
+    # t=-1) for all three — age-weighted mean of NEW events in the LAST sim
+    # step only, not a lifetime mean. v3's anchor computes lifetime mean ages
+    # from per-agent ti/sum_age accumulators. Recompute the v2 baseline values
+    # with matching lifetime semantics for a like-for-like comparison.
     people = sim.people
-    date_inf = np.asarray(people.date_infectious[0])  # genotype 0 = HPV16
+    end_ti = float(sim.t)
+    dt = float(PARS['dt'])
     alive_arr = np.asarray(people.alive).astype(bool)
-    ever_alive = alive_arr & ~np.isnan(date_inf)
-    if ever_alive.any():
-        end_year = float(sim.yearvec[-1])
-        year_at_inf = float(PARS['start']) + date_inf[ever_alive] * float(PARS['dt'])
-        current_ages = np.asarray(people.age)[ever_alive]
-        year_of_birth = end_year - current_ages
-        ages_at_inf = year_at_inf - year_of_birth
-        valid = (ages_at_inf > 0) & (ages_at_inf < 100)
-        short['mean age of infection (years)'] = (
-            float(ages_at_inf[valid].mean()) if valid.any() else 0.0
+    age_arr = np.asarray(people.age)
+    date_dead_cancer = np.asarray(people.date_dead_cancer)
+
+    # v2 freezes people.age at death. For computing lifetime mean ages at past
+    # events (matching v3's sum_age_at_<event> accumulators), we need to include
+    # BOTH alive agents (people.age = current) AND dead agents (people.age =
+    # age at death, frozen). Reference time differs:
+    #   alive:        end_ti
+    #   dead-of-cancer: date_dead_cancer (frozen-at-death age was set then)
+    # Dead-of-other-causes have no genotype-attributed cancer-onset to count.
+
+    def _lifetime_mean_age_at_event(date_event):
+        """Lifetime mean age at the event across alive + dead-of-cancer agents."""
+        # Alive ever-evented agents
+        alive_mask = alive_arr & ~np.isnan(date_event)
+        # Dead-of-cancer ever-evented agents (people.age = age at cancer death)
+        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead_cancer)
+        ages = []
+        if alive_mask.any():
+            years_since = (end_ti - date_event[alive_mask]) * dt
+            ages.append(age_arr[alive_mask] - years_since)
+        if dead_mask.any():
+            years_since_dead = (date_dead_cancer[dead_mask] - date_event[dead_mask]) * dt
+            ages.append(age_arr[dead_mask] - years_since_dead)
+        if not ages:
+            return 0.0
+        all_ages = np.concatenate(ages)
+        valid = (all_ages > 0) & (all_ages < 100)
+        return float(all_ages[valid].mean()) if valid.any() else 0.0
+
+    short['mean age of infection (years)'] = _lifetime_mean_age_at_event(
+        np.asarray(people.date_infectious[0])
+    )
+    short['mean age of cancer (years)'] = _lifetime_mean_age_at_event(
+        np.asarray(people.date_cancerous[0])
+    )
+    # mean age of cancer death: only actual past deaths; people.age is age at death
+    actually_died = (~alive_arr) & ~np.isnan(date_dead_cancer) & (date_dead_cancer <= end_ti)
+    if actually_died.any():
+        ages_at_death = age_arr[actually_died]
+        valid_d = (ages_at_death > 0) & (ages_at_death < 100)
+        short['mean age of cancer death (years)'] = (
+            float(ages_at_death[valid_d].mean()) if valid_d.any() else 0.0
         )
     else:
-        short['mean age of infection (years)'] = 0.0
+        short['mean age of cancer death (years)'] = 0.0
 
     # Total population at end of sim.
     if 'n_alive' in sim.results:
@@ -257,12 +289,18 @@ def _per_genotype_metrics_v2(sim, gen_idx, gen_key):
     n_cancers = float(cancers_g.sum())
 
     # --- Cancer deaths attributed to this genotype ---
-    # cancer_deaths_by_genotype shape: (n_g, n_t)
-    # v2 attributes cancer death to the genotype that drove the agent to
-    # cancer (see _v2_legacy/people.py:407-409; date_dead_cancer has no
-    # genotype dim but the flow is credited per-genotype in genotype_flows).
-    cancer_deaths_g = np.asarray(res['cancer_deaths_by_genotype'][gen_idx])
-    n_cancer_deaths = float(cancer_deaths_g.sum())
+    # v2 stores cancer_deaths only in aggregate (no _by_genotype variant) and
+    # date_dead_cancer has no genotype dim. Empirically date_cancerous[g] is
+    # set for more than just the driving genotype, so per-agent attribution
+    # over-counts (sum across genotypes >> aggregate). Use proportional
+    # allocation: split aggregate cancer_deaths by each genotype's share of
+    # aggregate cancers. This is the cleanest deterministic split that
+    # preserves the aggregate total.
+    agg_cancer_deaths = float(np.asarray(res['cancer_deaths']).sum())
+    agg_cancers = float(np.asarray(res['cancers_by_genotype']).sum())
+    n_cancer_deaths = (
+        (n_cancers / agg_cancers) * agg_cancer_deaths if agg_cancers > 0 else 0.0
+    )
 
     # --- Cancer incidence (per 100k) ---
     # Use per-genotype cancer_incidence_by_genotype (already per-100k, see
@@ -271,60 +309,59 @@ def _per_genotype_metrics_v2(sim, gen_idx, gen_key):
     cancer_inc_g = np.asarray(res['cancer_incidence_by_genotype'][gen_idx])
     mean_cancer_incidence = float(cancer_inc_g.mean())
 
-    # --- Lifetime mean age of infection for this genotype ---
-    # v2's compute_age_mean uses the LAST step only (_v2_legacy/sim.py:1146).
-    # We compute lifetime semantics via per-agent date_infectious[gen_idx].
-    # date_infectious shape: (n_genotypes, n_agents); value = timestep index
-    # of first infection (_v2_legacy/people.py:369).
+    # --- Lifetime mean ages: alive-only reconstruction matching v3 anchor ---
+    # v3 anchor uses ti_infected/sum_age_at_cancer/sum_age_at_cancer_death and
+    # divides by counts; that's lifetime mean across actual events. For v2
+    # parity (people.age is frozen at death), we filter to alive agents for
+    # mean-age-of-infection and mean-age-of-cancer (people.age is current),
+    # and to actually-died-of-cancer agents for mean-age-of-cancer-death
+    # (people.age = age at death, since v2 freezes it at death event).
     people = sim.people
-    date_inf_g = np.asarray(people.date_infectious[gen_idx])
-    ever_inf_mask = ~np.isnan(date_inf_g)
-    if ever_inf_mask.any():
-        end_year = float(sim.yearvec[-1])
-        start_year = float(sim.pars['start'])
-        year_at_inf = start_year + date_inf_g[ever_inf_mask] * dt
-        current_ages = np.asarray(people.age)[ever_inf_mask]
-        year_of_birth = end_year - current_ages
-        ages_at_inf = year_at_inf - year_of_birth
-        valid = (ages_at_inf > 0) & (ages_at_inf < 100)
-        mean_age_inf = float(ages_at_inf[valid].mean()) if valid.any() else 0.0
-    else:
-        mean_age_inf = 0.0
+    end_ti = float(sim.t)
+    alive_arr = np.asarray(people.alive).astype(bool)
+    age_arr = np.asarray(people.age)
 
-    # --- Lifetime mean age of cancer for this genotype ---
-    # date_cancerous shape: (n_genotypes, n_agents); nan if never cancerous
-    # for this genotype (_v2_legacy/people.py:400-402, 588-590: only the
-    # driving genotype retains date_cancerous; others are cleared to nan).
-    date_can_g = np.asarray(people.date_cancerous[gen_idx])
-    ever_can_mask = ~np.isnan(date_can_g)
-    if ever_can_mask.any() and n_cancers > 0:
-        end_year = float(sim.yearvec[-1])
-        start_year = float(sim.pars['start'])
-        year_at_can = start_year + date_can_g[ever_can_mask] * dt
-        current_ages_c = np.asarray(people.age)[ever_can_mask]
-        year_of_birth_c = end_year - current_ages_c
-        ages_at_can = year_at_can - year_of_birth_c
-        valid_c = (ages_at_can > 0) & (ages_at_can < 100)
-        mean_age_cancer = float(ages_at_can[valid_c].mean()) if valid_c.any() else 0.0
-    else:
-        mean_age_cancer = 0.0
+    date_dead_cancer_g = np.asarray(people.date_dead_cancer)
 
-    # --- Lifetime mean age of cancer death ---
-    # date_dead_cancer shape: (n_agents,) — no genotype dimension; v2 attributes
-    # cancer death through the genotype that caused cancer (_v2_legacy/people.py:407).
-    # We approximate per-genotype cancer-death ages via agents whose
-    # date_cancerous[gen_idx] is not nan AND date_dead_cancer is not nan.
+    def _lifetime_mean_age(date_event):
+        """Mean age at event across alive + dead-of-cancer agents.
+        For alive: ref = end_ti. For dead-of-cancer: ref = date_dead_cancer
+        (people.age is frozen at death event)."""
+        alive_mask = alive_arr & ~np.isnan(date_event)
+        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead_cancer_g)
+        ages = []
+        if alive_mask.any():
+            years_since = (end_ti - date_event[alive_mask]) * dt
+            ages.append(age_arr[alive_mask] - years_since)
+        if dead_mask.any():
+            years_since_d = (date_dead_cancer_g[dead_mask] - date_event[dead_mask]) * dt
+            ages.append(age_arr[dead_mask] - years_since_d)
+        if not ages:
+            return 0.0
+        all_ages = np.concatenate(ages)
+        valid = (all_ages > 0) & (all_ages < 100)
+        return float(all_ages[valid].mean()) if valid.any() else 0.0
+
+    mean_age_inf    = _lifetime_mean_age(np.asarray(people.date_infectious[gen_idx]))
+    mean_age_cancer = _lifetime_mean_age(np.asarray(people.date_cancerous[gen_idx]))
+
+    # mean age of cancer death: only agents who actually died of cancer in
+    # this genotype. Filter via date_cancerous[gen_idx] set AND not alive AND
+    # date_dead_cancer in past. people.age is age at death (frozen).
     date_dead = np.asarray(people.date_dead_cancer)
-    dead_can_mask = ~np.isnan(date_dead) & ~np.isnan(date_can_g)
-    if dead_can_mask.any() and n_cancer_deaths > 0:
-        end_year = float(sim.yearvec[-1])
-        start_year = float(sim.pars['start'])
-        year_at_dead = start_year + date_dead[dead_can_mask] * dt
-        current_ages_d = np.asarray(people.age)[dead_can_mask]
-        year_of_birth_d = end_year - current_ages_d
-        ages_at_dead = year_at_dead - year_of_birth_d
-        valid_d = (ages_at_dead > 0) & (ages_at_dead < 100)
-        mean_age_cancer_death = float(ages_at_dead[valid_d].mean()) if valid_d.any() else 0.0
+    date_can_g_for_death = np.asarray(people.date_cancerous[gen_idx])
+    actually_died_g = (
+        (~alive_arr)
+        & ~np.isnan(date_dead)
+        & ~np.isnan(date_can_g_for_death)
+        & (date_dead <= end_ti)
+    )
+    if actually_died_g.any():
+        ages_at_death = age_arr[actually_died_g]
+        valid_d = (ages_at_death > 0) & (ages_at_death < 100)
+        mean_age_cancer_death = (
+            float(ages_at_death[valid_d].mean()) if valid_d.any() else 0.0
+        )
     else:
         mean_age_cancer_death = 0.0
 
@@ -352,7 +389,8 @@ def _aggregate_metrics_v2(sim, genotype_keys):
         infections, matching the v3 Aggregate analyzer's cum_infections_any
         (which also sums new_infections rather than counting unique agents).
       * total cancers = cancers_by_genotype.sum() (cancer is single-attributed)
-      * total cancer deaths = cancer_deaths_by_genotype.sum() (same attribution)
+      * total cancer deaths = aggregate cancer_deaths.sum() (v2 doesn't stratify
+        cancer_deaths by genotype; this is the population-wide total)
       * mean HPV prevalence = mean of per-genotype prevalence series * 100
       * mean cancer incidence = mean of per-genotype cancer_incidence_by_genotype
         (already per-100k in v2, see _v2_legacy/sim.py:1109)
@@ -372,11 +410,11 @@ def _aggregate_metrics_v2(sim, genotype_keys):
     # --- Totals from _by_genotype flow arrays ---
     inf_bg = np.asarray(res['infections_by_genotype'])    # (n_g, n_t)
     can_bg = np.asarray(res['cancers_by_genotype'])        # (n_g, n_t)
-    cd_bg  = np.asarray(res['cancer_deaths_by_genotype'])  # (n_g, n_t)
 
     n_inf         = float(inf_bg.sum())
     n_cancers     = float(can_bg.sum())
-    n_cancer_deaths = float(cd_bg.sum())
+    # v2 doesn't stratify cancer_deaths by genotype — use the aggregate.
+    n_cancer_deaths = float(np.asarray(res['cancer_deaths']).sum())
 
     # --- Mean prevalence: average across genotypes' time-series ---
     prev_bg = np.asarray(res['hpv_prevalence_by_genotype'])  # (n_g, n_t)
@@ -388,44 +426,56 @@ def _aggregate_metrics_v2(sim, genotype_keys):
     mean_cancer_incidence = float(ci_bg.mean())
 
     # --- Pool per-genotype per-agent date arrays for mean-age metrics ---
+    # Match v3 anchor's lifetime semantics: alive-only for infection/cancer
+    # onset (people.age is current); actually-died-of-cancer for cancer death
+    # (people.age is frozen at death).
+    end_ti = float(sim.t)
+    alive_arr = np.asarray(people.alive).astype(bool)
+    age_arr = np.asarray(people.age)
+    date_dead = np.asarray(people.date_dead_cancer)
+
     sum_age_inf  = 0.0; n_inf_count  = 0
     sum_age_can  = 0.0; n_can_count  = 0
     sum_age_dead = 0.0; n_dead_count = 0
 
+    def _accum_lifetime(date_event):
+        """Accumulate ages-at-event across alive + dead-of-cancer agents.
+        Returns (sum_ages, n_valid)."""
+        alive_mask = alive_arr & ~np.isnan(date_event)
+        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead)
+        ages = []
+        if alive_mask.any():
+            years_since = (end_ti - date_event[alive_mask]) * dt
+            ages.append(age_arr[alive_mask] - years_since)
+        if dead_mask.any():
+            years_since_d = (date_dead[dead_mask] - date_event[dead_mask]) * dt
+            ages.append(age_arr[dead_mask] - years_since_d)
+        if not ages:
+            return 0.0, 0
+        all_ages = np.concatenate(ages)
+        valid = (all_ages > 0) & (all_ages < 100)
+        return float(all_ages[valid].sum()), int(valid.sum())
+
     for gen_idx, gen_key in genotype_keys:
-        # Mean age of infection
-        date_inf_g = np.asarray(people.date_infectious[gen_idx])
-        ever_inf_mask = ~np.isnan(date_inf_g)
-        if ever_inf_mask.any():
-            year_at_inf = start_year + date_inf_g[ever_inf_mask] * dt
-            current_ages = np.asarray(people.age)[ever_inf_mask]
-            ages_at_inf = year_at_inf - (end_year - current_ages)
-            valid = (ages_at_inf > 0) & (ages_at_inf < 100)
-            sum_age_inf  += float(ages_at_inf[valid].sum())
-            n_inf_count  += int(valid.sum())
+        s_inf, n_inf_g = _accum_lifetime(np.asarray(people.date_infectious[gen_idx]))
+        sum_age_inf += s_inf;  n_inf_count += n_inf_g
 
-        # Mean age of cancer — date_cancerous[gen_idx] non-nan means this
-        # genotype drove cancer for that agent (_v2_legacy/people.py:588-590)
         date_can_g = np.asarray(people.date_cancerous[gen_idx])
-        ever_can_mask = ~np.isnan(date_can_g)
-        if ever_can_mask.any():
-            year_at_can = start_year + date_can_g[ever_can_mask] * dt
-            current_ages_c = np.asarray(people.age)[ever_can_mask]
-            ages_at_can = year_at_can - (end_year - current_ages_c)
-            valid_c = (ages_at_can > 0) & (ages_at_can < 100)
-            sum_age_can  += float(ages_at_can[valid_c].sum())
-            n_can_count  += int(valid_c.sum())
+        s_can, n_can_g = _accum_lifetime(date_can_g)
+        sum_age_can += s_can;  n_can_count += n_can_g
 
-        # Mean age of cancer death — date_dead_cancer has no genotype dim;
-        # we attribute to this genotype via date_cancerous[gen_idx] being set
-        date_dead = np.asarray(people.date_dead_cancer)
-        dead_can_mask = ~np.isnan(date_dead) & ~np.isnan(date_can_g)
-        if dead_can_mask.any():
-            year_at_dead = start_year + date_dead[dead_can_mask] * dt
-            current_ages_d = np.asarray(people.age)[dead_can_mask]
-            ages_at_dead = year_at_dead - (end_year - current_ages_d)
-            valid_d = (ages_at_dead > 0) & (ages_at_dead < 100)
-            sum_age_dead += float(ages_at_dead[valid_d].sum())
+        # Mean age of cancer death — actually-died-of-cancer in this genotype.
+        # people.age is frozen at death == age at cancer death directly.
+        actually_died_g = (
+            (~alive_arr)
+            & ~np.isnan(date_dead)
+            & ~np.isnan(date_can_g)
+            & (date_dead <= end_ti)
+        )
+        if actually_died_g.any():
+            ages_at_death = age_arr[actually_died_g]
+            valid_d = (ages_at_death > 0) & (ages_at_death < 100)
+            sum_age_dead += float(ages_at_death[valid_d].sum())
             n_dead_count += int(valid_d.sum())
 
     mean_age_inf          = (sum_age_inf  / n_inf_count)  if n_inf_count  > 0 else 0.0
