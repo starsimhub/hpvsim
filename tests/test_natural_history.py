@@ -301,3 +301,24 @@ def test_clearance_males_get_no_immunity():
     assert (cell_male == 0).all(), \
         f'{int((cell_male > 0).sum())} males have cell_imm > 0'
 
+
+def test_directional_beta_sets_per_network_pair():
+    """HPV.pars.beta is a dict keyed by network with [transf2m, transm2f] pair.
+
+    Verifies the v2 sex-asymmetric transmission rates flow into Starsim's
+    betamap as the per-direction values it uses inside Infection.infect.
+    """
+    sim = hpv.Sim(n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0)
+    sim.init()
+    mod = sim.diseases.hpv16
+    beta = mod.pars.beta
+    assert isinstance(beta, dict), \
+        f'beta should be a per-network dict, got {type(beta)}'
+    assert 'sexualnetwork' in beta, \
+        f'beta missing sexualnetwork key; got keys {list(beta.keys())}'
+    pair = beta['sexualnetwork']
+    assert len(pair) == 2, f'beta pair length {len(pair)}'
+    # F→M = gpars.beta * 1.0 = 0.25; M→F = gpars.beta * 3.69 = 0.9225.
+    assert float(pair[0]) == pytest.approx(0.25, abs=1e-9)
+    assert float(pair[1]) == pytest.approx(0.25 * 3.69, abs=1e-9)
+

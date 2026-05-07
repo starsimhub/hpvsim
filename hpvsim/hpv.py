@@ -100,7 +100,16 @@ class HPV(ss.Infection):
         gpars = get_genotype_pars(genotype)
         self.define_pars(
             init_prev=ss.bernoulli(p=_make_init_prev_fn(genotype)),
-            beta=gpars.beta,
+            # Sex-directional beta: p1→p2 = female→male (transf2m); p2→p1 =
+            # male→female (transm2f). SexualNetwork places females in p1 and
+            # males in p2 (see hpvsim/network.py:185). validate_beta accepts
+            # this dict shape natively (ss.Infection.validate_beta).
+            beta={
+                'sexualnetwork': [
+                    gpars.beta * gpars.transf2m,
+                    gpars.beta * gpars.transm2f,
+                ],
+            },
             dur_precin=gpars.dur_precin,
             dur_cin=gpars.dur_cin,
             dur_cancer=gpars.dur_cancer,

@@ -109,6 +109,13 @@ class GenotypePars(ss.Pars):
             # serology probability. Currently unused by HPV.
             self.rel_beta = 1.0
             self.sero_prob = 0.75
+            # Sex-directional per-act transmission scalars (v2: pars['transf2m'],
+            # pars['transm2f'] in _v2_legacy/parameters.py:89-90). Multiplied
+            # into the per-network beta dict in HPV.__init__ to produce
+            # asymmetric m→f vs f→m transmission rates. Same v2 defaults for
+            # all 4 genotypes — these are about the act, not the genotype.
+            self.transf2m = 1.0
+            self.transm2f = 3.69
         elif genotype == 'hpv18':
             self.beta = 0.25
             self.dur_precin = ss.lognorm_ex(mean=ss.years(2.5), std=ss.years(9.0))
@@ -123,6 +130,8 @@ class GenotypePars(ss.Pars):
             self.age_risk = dict(age=30, risk=2)
             self.rel_beta = 0.75
             self.sero_prob = 0.56
+            self.transf2m = 1.0
+            self.transm2f = 3.69
         elif genotype in ('hi5', 'ohr'):
             self.beta = 0.25
             self.dur_precin = ss.lognorm_ex(mean=ss.years(2.5), std=ss.years(9.0))
@@ -137,6 +146,8 @@ class GenotypePars(ss.Pars):
             self.age_risk = dict(age=30, risk=2)
             self.rel_beta = 0.9
             self.sero_prob = 0.60
+            self.transf2m = 1.0
+            self.transm2f = 3.69
         else:
             raise NotImplementedError(
                 f'GenotypePars supports {GENOTYPE_KEYS}; got {genotype!r}.'
