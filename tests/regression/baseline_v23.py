@@ -28,6 +28,12 @@ Key v2-vs-v3 syntax differences honored here:
     metrics (total infections, cancers, cancer deaths) come out at the
     agent-level — matching v3's default (where pop_scale defaults to 1.0).
 
+The PARS dicts here disable v2 features that M03 hasn't yet implemented
+(currently: ``eff_condoms=0``). This keeps the v2 baseline and v3 anchor
+simulations on equivalent footing — both run with the same effective set
+of features active. As M03 implements more v2 features, the corresponding
+PARS overrides here can be removed.
+
 Usage (from a v2.3 env, with cwd at the repo root):
 
     # M02 single-genotype HPV16 baseline (default):
@@ -72,6 +78,13 @@ PARS = dict(
                              # baseline must be regenerated with ms_agent_ratio=1
                              # for an apples-to-apples cancer-count comparison.
                              # See _v2_legacy/parameters.py:38 + people.py:280-371.)
+    eff_condoms=0,           # Disable condom modulation entirely (M03 does not yet
+                             # implement condoms; setting eff_condoms=0 makes v2's
+                             # per-layer condoms[m]=0.01, condoms[c]=0.2 a no-op).
+                             # See _v2_legacy/sim.py:806,814 — effective_condoms =
+                             # condoms[lkey] * eff_condoms is multiplied into
+                             # (1 - .) inside the per-act prob, so eff_condoms=0
+                             # makes (1 - 0) = 1 → no reduction.
 )
 
 
@@ -94,7 +107,23 @@ PARS_4GENOTYPE = dict(
     pop_scale=1,             # disable real-world scaling (match v3 default)
     total_pop=10_000,        # match n_agents so pop_scale stays 1
     ms_agent_ratio=1,        # disable multiscale (see PARS comment above)
+    eff_condoms=0,           # Disable condom modulation entirely (M03 does not yet
+                             # implement condoms; setting eff_condoms=0 makes v2's
+                             # per-layer condoms[m]=0.01, condoms[c]=0.2 a no-op).
+                             # See _v2_legacy/sim.py:806,814 — effective_condoms =
+                             # condoms[lkey] * eff_condoms is multiplied into
+                             # (1 - .) inside the per-act prob, so eff_condoms=0
+                             # makes (1 - 0) = 1 → no reduction.
 )
+
+# NOTE: v2's init_hpv_dist=None (default) gives an EVEN split — each
+# initially-infected agent is assigned a single genotype with prob 0.25
+# for each. M03 seeds each genotype independently via per-genotype init_prev
+# curves (hpvsim/hpv.py:_INIT_PREV), allowing multi-infection at t=0.
+# This is a structural mismatch in initial conditions; the impact on
+# 70-year cumulative metrics is small (transmission washes out the
+# initial-condition difference within a few years). Re-evaluate if M04
+# calibration shows sensitivity here.
 
 # Canonical genotype key order that v2 stores in genotype_map after normalisation.
 # v2 parameters.py:268-273 maps '16' -> 'hpv16', 'hi5hpv' -> 'hi5', etc.

@@ -16,6 +16,14 @@ Drift values updated after M03 age_act_pars age-modulated acts:
   - mean age of infection (years): 0.011 (was 0.011)
   - mean age of cancer (years): 0.027 (was 0.034)
   - mean age of cancer death (years): 0.042 (was 0.056)
+
+The v2 baseline at ``tests/regression_baselines/anchor_hpv16.json`` was
+generated before the ``eff_condoms=0`` alignment was added. The pinned
+drift values in ``PINNED_TOLERANCES`` reflect runs against that baseline.
+When the baseline is regenerated with the aligned config, drift on
+count metrics is expected to drop further (mainly the casual-layer
+10% transmission reduction goes away, bringing v2 numerically closer
+to v3). Recompute and tighten tolerances after the next regen.
 """
 import os
 import pytest
