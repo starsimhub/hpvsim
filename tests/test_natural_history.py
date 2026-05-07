@@ -326,6 +326,43 @@ def test_network_acts_are_per_step_not_per_year():
     )
 
 
+def test_network_acts_age_modulated():
+    """Edge.acts is age-scaled: young/old couples have lower acts than peak couples."""
+    sim = hpv.Sim(
+        n_agents=5000, location='nigeria',
+        start=1990, stop=1992, dt=0.25, rand_seed=0,
+    )
+    sim.run()
+    net = sim.networks.sexualnetwork
+    if not len(net.edges):
+        pytest.skip('No edges formed')
+    # Compute average couple age per edge.
+    # edges.p1/p2 are agent UIDs; index age via ss.FloatArr UID-based access.
+    import starsim as ss
+    p1_uids = ss.uids(np.asarray(net.edges.p1).astype(int))
+    p2_uids = ss.uids(np.asarray(net.edges.p2).astype(int))
+    age_p1 = np.asarray(sim.people.age[p1_uids])
+    age_p2 = np.asarray(sim.people.age[p2_uids])
+    acts = np.asarray(net.edges.acts)
+    layer_id = np.asarray(net.edges.layer_id)
+    avg_age = (age_p1 + age_p2) / 2.0
+
+    # In each layer, peak-age couples should have higher acts on average than
+    # young or old couples. Use marital layer (layer_id 0) and bin by avg_age.
+    m_mask = layer_id == 0
+    if m_mask.sum() < 10:
+        pytest.skip('Not enough marital edges')
+    young = m_mask & (avg_age < 22)
+    peak = m_mask & (avg_age >= 28) & (avg_age <= 32)
+    old = m_mask & (avg_age > 60)
+    if young.sum() and peak.sum():
+        assert acts[young].mean() < acts[peak].mean(), \
+            f'Young couples should have lower acts than peak: {acts[young].mean():.1f} vs {acts[peak].mean():.1f}'
+    if peak.sum() and old.sum():
+        assert acts[old].mean() < acts[peak].mean(), \
+            f'Old couples should have lower acts than peak: {acts[old].mean():.1f} vs {acts[peak].mean():.1f}'
+
+
 def test_directional_beta_sets_per_network_pair():
     """HPV.pars.beta is a dict keyed by network with [transf2m, transm2f] pair.
 

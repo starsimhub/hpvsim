@@ -7,15 +7,15 @@ capped at 1 - 0.35) became a per-clearance beta_mean(0.35, 0.025) sample.
 Small drift on M02's 8-metric short_summary is anticipated; this test pins
 that drift bound so it doesn't slip silently.
 
-Drift values updated after M03 per-edge acts unit fix (was per-year, now per-step):
-  - total HPV infections: 0.157  (was 0.202 before fix)
-  - total cancers: 0.142          (was 0.142)
-  - total cancer deaths: 0.123    (was 0.126)
-  - mean HPV prevalence (%): 0.158 (was 0.192)
-  - mean cancer incidence (per 100k): 0.209 (was 0.209)
-  - mean age of infection (years): 0.011 (was 0.017)
-  - mean age of cancer (years): 0.034 (was 0.039)
-  - mean age of cancer death (years): 0.056 (was 0.050)
+Drift values updated after M03 age_act_pars age-modulated acts:
+  - total HPV infections: 0.145  (was 0.157 before age modulation)
+  - total cancers: 0.187          (was 0.142)
+  - total cancer deaths: 0.114    (was 0.123)
+  - mean HPV prevalence (%): 0.143 (was 0.158)
+  - mean cancer incidence (per 100k): 0.257 (was 0.209)
+  - mean age of infection (years): 0.011 (was 0.011)
+  - mean age of cancer (years): 0.027 (was 0.034)
+  - mean age of cancer death (years): 0.042 (was 0.056)
 """
 import os
 import pytest

@@ -66,6 +66,15 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
         c=dict(dist='lognormal', par1=1, par2=2),
     )
 
+    # Age-based act modulation. v2 _v2_legacy/parameters.py:190-191:
+    # marital peaks at 30, casual at 25; both ramp linearly from
+    # debut_ratio at debut age to 1.0 at peak, then linearly to
+    # retirement_ratio at retirement, then 0 beyond retirement.
+    age_act_pars = dict(
+        m=dict(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1),
+        c=dict(peak=25, retirement=100, debut_ratio=0.5, retirement_ratio=0.1),
+    )
+
     # Age-mixing matrices (rows = female age band start, cols = male age band).
     mixing = dict(
         m=np.array([
@@ -128,6 +137,7 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
         m_partners=m_partners,
         acts=acts,
         dur_pship=dur_pship,
+        age_act_pars=age_act_pars,
         mixing=mixing,
         layer_probs=layer_probs,
     )
@@ -247,6 +257,7 @@ def _network_pars(location):
             cross_layer=cross_layer_by_sex,
             duration=_v2_dist_to_starsim(default_pars['dur_pship'][layer]),
             acts=_v2_dist_to_starsim(default_pars['acts'][layer]),
+            age_act_pars=default_pars['age_act_pars'][layer],
         )
     return dict(layer_pars=layer_pars, debut=debut_by_sex)
 

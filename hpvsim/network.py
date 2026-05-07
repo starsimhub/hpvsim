@@ -16,6 +16,40 @@ import starsim as ss
 _DEFAULT_LAYERS = ('m', 'c')
 
 
+def _age_scale_acts(acts, age_act_pars, age_f, age_m, debut_f, debut_m):
+    """v2 age-scaled acts: piecewise-linear modulation by couple's avg age.
+
+    Below peak: ramp from ``debut_ratio`` at debut to 1.0 at peak.
+    Above peak (below retirement): ramp from 1.0 to ``retirement_ratio``.
+    Above retirement: 0.
+
+    Hand-ported from ``_v2_legacy/population.py:248-278``.
+    """
+    avg_age = (age_f + age_m) / 2.0
+    avg_debut = (debut_f + debut_m) / 2.0
+
+    dr = age_act_pars['debut_ratio']
+    peak = age_act_pars['peak']
+    rr = age_act_pars['retirement_ratio']
+    retire = age_act_pars['retirement']
+
+    below = avg_age <= peak
+    above = (avg_age > peak) & (avg_age < retire)
+    retired = avg_age >= retire  # noqa: F841 — kept for clarity; scaled stays 0
+
+    scaled = np.zeros(len(acts))
+    if below.any():
+        scaled[below] = acts[below] * (
+            dr + (1 - dr) / (peak - avg_debut[below]) * (avg_age[below] - avg_debut[below])
+        )
+    if above.any():
+        scaled[above] = acts[above] * (
+            rr + (1 - rr) / (peak - retire) * (avg_age[above] - retire)
+        )
+    # retired stays 0
+    return scaled
+
+
 class SexualNetwork(ss.SexualNetwork):
     """Multi-layer heterosexual partnership network.
 
@@ -296,10 +330,22 @@ class SexualNetwork(ss.SexualNetwork):
         # scaling, which would inflate per-pair variance.
         dur_years = lpars['duration'].rvs(f_uids)
         dur = dur_years / float(self.t.dt)
-        # acts is sampled in v2 units (per year of partnership). edges.acts is
-        # used per-step by ss.SexualNetwork.net_beta, so scale by dt to convert
-        # to acts-per-step. v2 does the equivalent at _v2_legacy/sim.py:803.
-        acts = np.asarray(lpars['acts'].rvs(f_uids)) * float(self.t.dt)
+        # Sample raw per-year acts, then apply v2's age-based modulation, then
+        # scale to per-step. age_act_pars is optional — older test fixtures
+        # may not supply it, in which case we skip the modulation (equivalent
+        # to age=peak for everyone).
+        raw_acts = np.asarray(lpars['acts'].rvs(f_uids))
+        age_pars = lpars.get('age_act_pars')
+        if age_pars is not None:
+            people = self.sim.people
+            age_f = np.asarray(people.age[f_uids])
+            age_m = np.asarray(people.age[m_uids])
+            debut_f = np.asarray(self.debut[f_uids])
+            debut_m = np.asarray(self.debut[m_uids])
+            raw_acts = _age_scale_acts(
+                raw_acts, age_pars, age_f, age_m, debut_f, debut_m
+            )
+        acts = raw_acts * float(self.t.dt)
         beta = np.ones(n_new)
         start_ti = np.full(n_new, float(self.t.ti))
         layer_id = np.full(n_new, self._layer_idx[lkey], dtype=int)
