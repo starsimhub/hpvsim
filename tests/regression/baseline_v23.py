@@ -190,11 +190,17 @@ def run_and_summarize():
     # Dead-of-other-causes have no genotype-attributed cancer-onset to count.
 
     def _lifetime_mean_age_at_event(date_event):
-        """Lifetime mean age at the event across alive + dead-of-cancer agents."""
-        # Alive ever-evented agents
-        alive_mask = alive_arr & ~np.isnan(date_event)
-        # Dead-of-cancer ever-evented agents (people.age = age at cancer death)
-        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead_cancer)
+        """Lifetime mean age at the event across alive + dead-of-cancer agents.
+
+        Filters to date_event <= end_ti to exclude agents whose event (e.g.
+        date_cancerous) is a scheduled future ti set at CIN diagnosis but not
+        yet realised. Without this filter, alive CIN-only agents project ages
+        into the future, biasing the mean upward.
+        """
+        # Alive ever-evented agents whose event has already occurred.
+        alive_mask = alive_arr & ~np.isnan(date_event) & (date_event <= end_ti)
+        # Dead-of-cancer ever-evented agents whose event has already occurred.
+        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead_cancer) & (date_event <= end_ti)
         ages = []
         if alive_mask.any():
             years_since = (end_ti - date_event[alive_mask]) * dt
@@ -326,9 +332,13 @@ def _per_genotype_metrics_v2(sim, gen_idx, gen_key):
     def _lifetime_mean_age(date_event):
         """Mean age at event across alive + dead-of-cancer agents.
         For alive: ref = end_ti. For dead-of-cancer: ref = date_dead_cancer
-        (people.age is frozen at death event)."""
-        alive_mask = alive_arr & ~np.isnan(date_event)
-        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead_cancer_g)
+        (people.age is frozen at death event).
+
+        Filters to date_event <= end_ti to exclude agents with scheduled-but-
+        not-yet-realised events (e.g. date_cancerous set at CIN diagnosis).
+        """
+        alive_mask = alive_arr & ~np.isnan(date_event) & (date_event <= end_ti)
+        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead_cancer_g) & (date_event <= end_ti)
         ages = []
         if alive_mask.any():
             years_since = (end_ti - date_event[alive_mask]) * dt
@@ -440,9 +450,13 @@ def _aggregate_metrics_v2(sim, genotype_keys):
 
     def _accum_lifetime(date_event):
         """Accumulate ages-at-event across alive + dead-of-cancer agents.
-        Returns (sum_ages, n_valid)."""
-        alive_mask = alive_arr & ~np.isnan(date_event)
-        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead)
+        Returns (sum_ages, n_valid).
+
+        Filters to date_event <= end_ti to exclude agents with scheduled-but-
+        not-yet-realised events (e.g. date_cancerous set at CIN diagnosis).
+        """
+        alive_mask = alive_arr & ~np.isnan(date_event) & (date_event <= end_ti)
+        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead) & (date_event <= end_ti)
         ages = []
         if alive_mask.any():
             years_since = (end_ti - date_event[alive_mask]) * dt

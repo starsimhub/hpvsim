@@ -7,23 +7,16 @@ capped at 1 - 0.35) became a per-clearance beta_mean(0.35, 0.025) sample.
 Small drift on M02's 8-metric short_summary is anticipated; this test pins
 that drift bound so it doesn't slip silently.
 
-Drift values updated after M03 age_act_pars age-modulated acts:
-  - total HPV infections: 0.145  (was 0.157 before age modulation)
-  - total cancers: 0.187          (was 0.142)
-  - total cancer deaths: 0.114    (was 0.123)
-  - mean HPV prevalence (%): 0.143 (was 0.158)
-  - mean cancer incidence (per 100k): 0.257 (was 0.209)
-  - mean age of infection (years): 0.011 (was 0.011)
-  - mean age of cancer (years): 0.027 (was 0.034)
-  - mean age of cancer death (years): 0.042 (was 0.056)
-
-The v2 baseline at ``tests/regression_baselines/anchor_hpv16.json`` was
-generated before the ``eff_condoms=0`` alignment was added. The pinned
-drift values in ``PINNED_TOLERANCES`` reflect runs against that baseline.
-When the baseline is regenerated with the aligned config, drift on
-count metrics is expected to drop further (mainly the casual-layer
-10% transmission reduction goes away, bringing v2 numerically closer
-to v3). Recompute and tighten tolerances after the next regen.
+Drift values updated after M03 measurement-alignment (sum not max, date_cancerous
+filter, and v2 baseline regenerated with eff_condoms=0 + date_cancerous <= end_ti fix):
+  - total HPV infections: 0.126
+  - total cancers: 0.091
+  - total cancer deaths: 0.085
+  - mean HPV prevalence (%): 0.112
+  - mean cancer incidence (per 100k): 0.198
+  - mean age of infection (years): 0.014
+  - mean age of cancer (years): 0.016
+  - mean age of cancer death (years): 0.057
 """
 import os
 import pytest
@@ -39,14 +32,14 @@ M02_BASELINE = 'tests/regression_baselines/anchor_hpv16.json'
 # Tolerances are set to empirical + 0.10 headroom for count/prevalence metrics,
 # empirical + 0.05 for age metrics.
 PINNED_TOLERANCES = {
-    'total HPV infections': 0.26,
-    'total cancers': 0.24,
-    'total cancer deaths': 0.22,
-    'mean HPV prevalence (%)': 0.26,
-    'mean cancer incidence (per 100k)': 0.31,
-    'mean age of infection (years)': 0.06,
-    'mean age of cancer (years)': 0.08,
-    'mean age of cancer death (years)': 0.11,
+    'total HPV infections': 0.23,       # empirical 12.6% + 0.10 headroom
+    'total cancers': 0.19,              # empirical  9.1% + 0.10 headroom
+    'total cancer deaths': 0.19,        # empirical  8.5% + 0.10 headroom
+    'mean HPV prevalence (%)': 0.21,    # empirical 11.2% + 0.10 headroom
+    'mean cancer incidence (per 100k)': 0.30,  # empirical 19.8% + 0.10 headroom
+    'mean age of infection (years)': 0.06,     # empirical  1.4% + 0.05 headroom
+    'mean age of cancer (years)': 0.07,        # empirical  1.6% + 0.05 headroom
+    'mean age of cancer death (years)': 0.11,  # empirical  5.7% + 0.05 headroom
 }
 
 

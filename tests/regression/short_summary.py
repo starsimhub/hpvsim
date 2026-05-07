@@ -106,7 +106,17 @@ def _aggregate_metrics(sim, genotypes):
     n_alive_series = np.asarray(sim.results['n_alive'])
     total_alive_years = float(n_alive_series.sum()) * dt
     female_years = total_alive_years / 2.0
-    mean_cancer_incidence = (n_cancers / female_years * 100_000.0) if female_years > 0 else 0.0
+
+    # Match v2's any.mean cancer incidence: average across per-genotype rates
+    # (v2 _v2_legacy/sim.py:1109 computes per-genotype rate; aggregate is mean
+    # across genotypes, equivalent to (aggregate-rate / n_genotypes)).
+    per_genotype_rates = []
+    for g in genotypes:
+        n_cancers_g_unscaled = float(np.asarray(sim.results[g].new_cancers).sum())
+        n_cancers_g = n_cancers_g_unscaled * pop_scale
+        rate_g = (n_cancers_g / female_years * 100_000.0) if female_years > 0 else 0.0
+        per_genotype_rates.append(rate_g)
+    mean_cancer_incidence = float(np.mean(per_genotype_rates)) if per_genotype_rates else 0.0
 
     # Pool per-genotype mean-age sums and counts.
     sum_age_inf_total = 0.0

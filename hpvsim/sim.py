@@ -34,8 +34,9 @@ class Aggregate(ss.Analyzer):
     """Analyzer that pools per-genotype results into Sim-level *_any aggregates.
 
     Results are accessible at ``sim.results.aggregate``:
-      - ``cum_infections_any`` — per-step max of new_infections across genotypes,
-        cumsum'd. Upper-bound approximation of the boolean-OR count.
+      - ``cum_infections_any`` — per-step sum of new_infections across genotypes,
+        cumsum'd. Sum-of-flows matching v2's infections_by_genotype.sum() semantics.
+        Overcounts agents with co-infections but is consistent with v2's aggregate.
       - ``cum_cancers_any`` — sum of per-genotype cum_cancers (no double-counting
         since cancer is attributed to a single genotype).
       - ``new_cancer_deaths_any`` — per-step sum of new_cancer_deaths.
@@ -66,9 +67,10 @@ class Aggregate(ss.Analyzer):
         hpvs = self._hpvs()
         if not hpvs:
             return
-        # Per-step max across genotypes: approximates the boolean-OR count of
-        # agents newly infected with any genotype this timestep.
-        per_step_any = max(
+        # Per-step sum across genotypes: matches v2's infections_by_genotype.sum()
+        # semantics. Overcounts co-infected agents but is consistent with v2's
+        # aggregate (sum-of-flows, not boolean-OR).
+        per_step_any = sum(
             int(np.asarray(m.results.new_infections[ti])) for m in hpvs
         )
         self.results['cum_infections_any'][ti] = per_step_any
