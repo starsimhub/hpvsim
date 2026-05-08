@@ -120,7 +120,13 @@ class Sim(ss.Sim):
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, pars=None, **kwargs):
-        country = load_country(location)
+        # Pass start year to load_country so the initial age distribution is
+        # sampled from the right year. Without this, get_age_distribution
+        # defaults to 2000 and the population shape biases init-seed counts
+        # by ~14% for Nigeria when start=1990 (year-2000's [17, 22) band is
+        # +44% relative to year-1990). v2 wires ``sim['start']`` similarly
+        # via _v2_legacy/population.py:74.
+        country = load_country(location, year=int(start))
         people = kwargs.pop('people', None)
         if people is None:
             people = ss.People(n_agents, age_data=country['age_data'])

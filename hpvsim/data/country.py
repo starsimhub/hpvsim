@@ -143,12 +143,19 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
     )
 
 
-def load_country(location):
+def load_country(location, year=None):
     """Return Starsim-shaped data for ``location``.
 
     Args:
         location (str): country name; must be one of the supported locations
             available via the v2 loaders.
+        year (int): year to load the initial age distribution for. v2 passes
+            ``sim['start']`` here (``_v2_legacy/population.py:74``); without
+            this, ``get_age_distribution`` defaults to year 2000, which has a
+            materially different shape than year 1990 for Nigeria (the
+            ``[17, 22)`` band is +44% in 2000 vs 1990) — biasing init-seed
+            counts and downstream transmission. Pass ``int(sim_start)`` to
+            match v2.
 
     Returns:
         dict with keys:
@@ -167,7 +174,7 @@ def load_country(location):
         )
 
     return dict(
-        age_data=_age_data(location),
+        age_data=_age_data(location, year=year),
         birth_rate=_birth_rate(location),
         death_rate=_death_rate(location),
         network_pars=_network_pars(location),
@@ -176,15 +183,19 @@ def load_country(location):
     )
 
 
-def _age_data(location):
+def _age_data(location, year=None):
     """Reshape v2's age distribution to a (age, value) long-form DataFrame.
 
     ``get_age_distribution`` returns an (N, 3) ndarray of
     ``(age_lower, age_upper, count)``. v2 data is at single-year resolution
     (age_upper == age_lower + 1), so age_lower IS the age and we don't need
     to expand bins.
+
+    ``year`` is forwarded to ``_loaders.get_age_distribution``. v2 passes
+    ``sim['start']`` here; if omitted, the loader defaults to year 2000 with
+    a warning, producing a materially different age distribution than v2's.
     """
-    arr = _loaders.get_age_distribution(location=location)
+    arr = _loaders.get_age_distribution(location=location, year=year)
     return pd.DataFrame({
         'age': arr[:, 0].astype(int),
         'value': arr[:, 2].astype(float),

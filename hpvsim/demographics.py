@@ -70,6 +70,14 @@ class AgeMigration(ss.Demographics):
     def init_pre(self, sim):
         super().init_pre(sim)
 
+        # Resolve sim start year once. ss.years supports float() but not
+        # int() directly, so cast through float. Used both for load_country
+        # (so age_data samples at the right year) and for _scale below.
+        sim_start = sim.pars.start
+        sim_start_year = float(
+            sim_start.year if hasattr(sim_start, 'year') else sim_start
+        )
+
         # Pull from country data if not explicitly supplied.
         if self._pop_total is None or self._pop_by_age is None:
             from .data.country import load_country
@@ -85,17 +93,13 @@ class AgeMigration(ss.Demographics):
                     'Either pass pop_total/pop_by_age explicitly, or use '
                     'hpv.Sim which stores sim.location.'
                 )
-            cd = load_country(location)
+            cd = load_country(location, year=int(sim_start_year))
             if self._pop_total is None:
                 self._pop_total = cd['pop_total']
             if self._pop_by_age is None:
                 self._pop_by_age = cd['pop_by_age']
 
         # Scale factor: n_agents / data_population_at_sim_start.
-        sim_start = sim.pars.start
-        sim_start_year = float(
-            sim_start.year if hasattr(sim_start, 'year') else sim_start
-        )
         pt = self._pop_total
         data_pop_at_start = float(
             np.interp(sim_start_year, pt['year'].values, pt['pop_size'].values)
