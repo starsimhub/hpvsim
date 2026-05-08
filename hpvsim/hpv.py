@@ -509,15 +509,22 @@ class HPV(ss.Infection):
             f_cleared = cleared[np.asarray(female[cleared])]
             if len(f_cleared):
                 has_prior_imm = np.asarray(self.nab_imm[f_cleared]) > 0
-                first_uids  = f_cleared[~has_prior_imm]
+                first_mask  = ~has_prior_imm
+                first_uids  = f_cleared[first_mask]
                 repeat_uids = f_cleared[has_prior_imm]
 
+                # One rvs() call per immunity distribution over the union
+                # f_cleared, then split by has_prior_imm. Halves the number of
+                # rvs() invocations in this hot path; per-call Starsim wrapper
+                # overhead (process_pars, jump, copy.copy(timepars)) dominates
+                # the actual numerical work for these per-clearance draws.
+                p = self.pars
+                nab_all  = np.asarray(p.imm_init.rvs(f_cleared))
+                cell_all = np.asarray(p.cell_imm_init.rvs(f_cleared))
+
                 if len(first_uids):
-                    p = self.pars
                     p._sero_bern.set(p=float(p.sero_prob))
                     seroconvert = np.asarray(p._sero_bern.rvs(first_uids))
-                    new_nab  = np.asarray(p.imm_init.rvs(first_uids))
-                    new_cell = np.asarray(p.cell_imm_init.rvs(first_uids))
                     # nab_imm (humoral) is gated on seroconversion: non-
                     # seroconverters keep 0 nab and remain fully reinfectible.
                     # cell_imm (cell-mediated severity) is NOT gated — v2 grants
@@ -528,16 +535,14 @@ class HPV(ss.Infection):
                     # non-seroconverters get no dur_precin reduction on
                     # reinfection, inflating transmission for low-sero_prob
                     # genotypes (hpv18=0.56, hi5/ohr=0.60).
-                    self.nab_imm[first_uids]  = seroconvert * new_nab
-                    self.cell_imm[first_uids] = new_cell
+                    self.nab_imm[first_uids]  = seroconvert * nab_all[first_mask]
+                    self.cell_imm[first_uids] = cell_all[first_mask]
 
                 if len(repeat_uids):
-                    new_nab  = np.asarray(self.pars.imm_init.rvs(repeat_uids))
                     self.nab_imm[repeat_uids] = np.maximum(
-                        self.nab_imm[repeat_uids], new_nab)
-                    new_cell = np.asarray(self.pars.cell_imm_init.rvs(repeat_uids))
+                        self.nab_imm[repeat_uids], nab_all[has_prior_imm])
                     self.cell_imm[repeat_uids] = np.maximum(
-                        self.cell_imm[repeat_uids], new_cell)
+                        self.cell_imm[repeat_uids], cell_all[has_prior_imm])
 
         # --- 2. precin -> CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids

@@ -16,6 +16,7 @@ tests/regression_baselines/
 tests/regression/v[23]_seeds*.json
 tests/regression/v[23]_trace*.csv
 tests/regression/profile_v3_anchor*
+tests/regression/perf_parity_*.json
 
 # Stale legacy regression artifact
 hpvsim/regression/

@@ -158,6 +158,17 @@ class AgeMigration(ss.Demographics):
 
         n_imm_total = 0
         n_emi_total = 0
+        # Accumulate immigrants per (age, sex) bin and grow the population in
+        # one shot at the end. Each people.grow() extends every ss.Arr in the
+        # model — and any state with a Dist default samples once per grow —
+        # so per-bin grows dominated the run loop. Order of appends mirrors
+        # the original (male ages ascending, then female ages ascending), so
+        # immigrant UIDs match what one-call-per-bin produced. Per-agent
+        # values for states with Dist defaults DO shift, because the batched
+        # grow advances the RNG once instead of K times; aggregate behavior
+        # is unchanged within seed-to-seed noise.
+        imm_age_chunks = []
+        imm_female_chunks = []
 
         for sex_label, sex_mask in (
             ('male',   ~female),
@@ -173,12 +184,18 @@ class AgeMigration(ss.Demographics):
                 diff = int(round(target - count_sim))
 
                 if diff > 0:
-                    self._immigrate(n=diff, age=age, female=sex_is_female)
+                    imm_age_chunks.append(np.full(diff, age, dtype=float))
+                    imm_female_chunks.append(np.full(diff, sex_is_female, dtype=bool))
                     n_imm_total += diff
                 elif diff < 0:
                     band_uids = snap_uids[in_band]
                     self._emigrate(band_uids, n=-diff)
                     n_emi_total += -diff
+
+        if n_imm_total > 0:
+            new_uids = people.grow(n_imm_total)
+            people.age[new_uids] = np.concatenate(imm_age_chunks)
+            people.female[new_uids] = np.concatenate(imm_female_chunks)
 
         self._n_imm = n_imm_total
         self._n_emi = n_emi_total
