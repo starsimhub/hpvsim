@@ -220,10 +220,16 @@ class HPV(ss.Infection):
             # male→female (transm2f). SexualNetwork places females in p1 and
             # males in p2 (see hpvsim/network.py:185). validate_beta accepts
             # this dict shape natively (ss.Infection.validate_beta).
+            #
+            # rel_beta is the per-genotype scaler (hpv18=0.75, hi5/ohr=0.9,
+            # hpv16=1.0); v2 applies it via ``gen_betas[g] = g['rel_beta'] * beta``
+            # in _v2_legacy/sim.py:786. Without this multiplier, hpv18/hi5/ohr
+            # transmit at v2's hpv16-equivalent rate instead of their reduced
+            # genotype-specific rate.
             beta={
                 'sexualnetwork': [
-                    gpars.beta * gpars.transf2m,
-                    gpars.beta * gpars.transm2f,
+                    gpars.beta * gpars.rel_beta * gpars.transf2m,
+                    gpars.beta * gpars.rel_beta * gpars.transm2f,
                 ],
             },
             dur_precin=gpars.dur_precin,
@@ -399,14 +405,36 @@ class HPV(ss.Infection):
         cin_uids = uids[cin_mask]
         nocin_uids = uids[~cin_mask]
 
-        # 3. Branch A: clearance from precin (males + non-CIN females).
-        self.ti_clearance[nocin_uids] = ti + dur_precin[~cin_mask]
+        # Schedule events with v2-compatible rounding. v2 stores ti_<event>
+        # as integer steps via ``sc.randround(dur/dt)`` for FEMALE events
+        # (mean preserved; _v2_legacy/people.py:246-253, 392, 400-409) and
+        # ``np.ceil(dur/dt)`` for MALE clearance (_v2_legacy/people.py:1056).
+        # Without rounding, fractional ti_<event> values cause the ``<= ti``
+        # check to fire only at the next integer ti — effectively np.ceil —
+        # which is correct for males but adds ~0.5-step bias for females,
+        # inflating per-step transmission by a few percent compounded over
+        # 70 years.
+
+        # 3. Branch A: clearance from precin. Split male / female paths so
+        #    males get np.ceil and females get sc.randround per v2.
+        nocin_dur = dur_precin[~cin_mask]
+        nocin_female = female[~cin_mask]
+        rounded_dur = np.empty(len(nocin_dur), dtype=int)
+        if nocin_female.any():
+            rounded_dur[nocin_female] = np.asarray(
+                sc.randround(nocin_dur[nocin_female])
+            )
+        if (~nocin_female).any():
+            rounded_dur[~nocin_female] = np.ceil(
+                nocin_dur[~nocin_female]
+            ).astype(int)
+        self.ti_clearance[nocin_uids] = ti + rounded_dur
 
         if len(cin_uids) == 0:
             return
 
         # 4. Branch B: progression to CIN.
-        self.ti_cin[cin_uids] = ti + dur_precin[cin_mask]
+        self.ti_cin[cin_uids] = ti + sc.randround(dur_precin[cin_mask])
         dur_cin = p.dur_cin.rvs(cin_uids)
         # age_risk multiplier: women aged >= age_risk['age'] get dur_cin
         # scaled by age_risk['risk'].
@@ -428,18 +456,18 @@ class HPV(ss.Infection):
 
         # 5a. Clear after CIN (no cancer).
         self.ti_clearance[nocancer_uids] = (
-            self.ti_cin[nocancer_uids] + dur_cin[~cancer_draw]
+            self.ti_cin[nocancer_uids] + sc.randround(dur_cin[~cancer_draw])
         )
 
         # 5b. Progression to cancer.
         if len(cancer_uids) == 0:
             return
         self.ti_cancerous[cancer_uids] = (
-            self.ti_cin[cancer_uids] + dur_cin[cancer_draw]
+            self.ti_cin[cancer_uids] + sc.randround(dur_cin[cancer_draw])
         )
         dur_cancer = p.dur_cancer.rvs(cancer_uids)
         self.ti_dead_cancer[cancer_uids] = (
-            self.ti_cancerous[cancer_uids] + dur_cancer
+            self.ti_cancerous[cancer_uids] + sc.randround(np.asarray(dur_cancer))
         )
 
     def step_state(self):
@@ -490,11 +518,18 @@ class HPV(ss.Infection):
                     seroconvert = np.asarray(p._sero_bern.rvs(first_uids))
                     new_nab  = np.asarray(p.imm_init.rvs(first_uids))
                     new_cell = np.asarray(p.cell_imm_init.rvs(first_uids))
-                    # Non-seroconverters keep 0 immunity; seroconverters get
-                    # the sampled boost. nab_imm/cell_imm were 0 at this point
-                    # (no prior imm), so a direct assign is equivalent to max.
+                    # nab_imm (humoral) is gated on seroconversion: non-
+                    # seroconverters keep 0 nab and remain fully reinfectible.
+                    # cell_imm (cell-mediated severity) is NOT gated — v2 grants
+                    # severity protection to ALL first-clearance females,
+                    # regardless of whether they seroconverted (see
+                    # _v2_legacy/immunity.py:174-176; only peak_imm carries the
+                    # is_seroconvert factor, cell_imm does not). Without this,
+                    # non-seroconverters get no dur_precin reduction on
+                    # reinfection, inflating transmission for low-sero_prob
+                    # genotypes (hpv18=0.56, hi5/ohr=0.60).
                     self.nab_imm[first_uids]  = seroconvert * new_nab
-                    self.cell_imm[first_uids] = seroconvert * new_cell
+                    self.cell_imm[first_uids] = new_cell
 
                 if len(repeat_uids):
                     new_nab  = np.asarray(self.pars.imm_init.rvs(repeat_uids))
