@@ -1,5 +1,15 @@
 # M03: Multi-genotype and Cross-Immunity — Implementation Plan
 
+> **Status: IMPLEMENTATION COMPLETE; PR not yet opened.** All tasks
+> landed on `m03-multi-genotype-and-cross-immunity` and the branch was
+> rebased onto `v3.0-dev` after M02 merged. 117/118 tests pass; the one
+> failing test (`test_short_summary_parity_4genotype`) is a pre-existing
+> WIP gate on per-genotype 4-genotype drift. Both anchor regressions
+> (HPV16 and 4-genotype) run cleanly. Audit pass landed (milestone
+> strip, v2-rationale strip, scratch-script removal,
+> `GenotypePars` dict refactor); see the spec's
+> "Post-implementation deltas" section for the spec-level diff.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replicate M02's HPV16 natural-history machinery across `[hpv16, hpv18, hi5, ohr]` as four independent `ss.Disease` instances; introduce `hpv.CrossImmunity(ss.Connector)` to compute per-target `rel_sus` and `sev_imm` from per-source `nab_imm` and `cell_imm` via v2's cross-protection matrices. Match v2.x's 4-genotype Nigeria run within ±10% drift on a 40-entry per-genotype + aggregate `short_summary`, plus an age-aggregated cancer / infection trajectory gate.

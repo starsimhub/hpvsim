@@ -1,5 +1,14 @@
 # M02: Natural History Parity — Implementation Plan
 
+> **Status: COMPLETE.** Merged to `v3.0-dev` via PR #107 on 2026-05-07.
+> Anchor regression: 9/9 metrics within ±10% of v2.3 baseline (141,400
+> infections / 480 cancers / 323 cancer deaths). PR review fixes and the
+> follow-up audit pass landed on the milestone branch before the merge
+> commit; see the spec's "Post-implementation deltas" section for the
+> spec-level diff. Outstanding: `AgeResults` analyzer deferred to M04
+> calibration. Follow-ups in MIGRATION_PLAN.md "Scope items not pinned
+> to a milestone" table.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Bring HPV16 natural history into the v3 disease module — precancerous infection, CIN, invasive cancer, and cancer death — and validate against v2's HPV16-only run within ±10% drift on the 8-metric `short_summary`. Add minimum-scope `AgeResults` analyzer for cancer incidence (M04 calibration target), pop_scale plumbing, and age-specific migration. Slim `parameters.py` to the starsimhub-conventional `SimPars`/`GenotypePars` shape and audit `utils.py` to prefer starsim-native helpers.

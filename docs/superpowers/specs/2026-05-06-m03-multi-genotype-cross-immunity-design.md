@@ -440,3 +440,101 @@ Modifying `MIGRATION_PLAN.md` itself, unless M03 surfaces a real plan delta
 analogous to M02's "AgeResults deferred" amendment in commit `b5d9bdf6`.
 Plan deltas land in their own commit with rationale, not folded into
 implementation commits.
+
+---
+
+## Post-implementation deltas
+
+What landed differs from this design in the following ways. Items here
+are spec-level; the per-task narrative lives in the plan doc.
+
+**`_ExclusiveSeeder` — coordinated initial seeding via callback.** Originally
+the spec assumed each `HPV(genotype=g)` instance would draw its own
+init_prev independently from `_INIT_PREV[g]`. This let agents be
+co-infected at initialisation, which v2 doesn't do. Replaced with an
+opt-in `init_seeding='exclusive'` mode (default) on `hpv.Sim`: a shared
+``_ExclusiveSeeder`` does one Bernoulli per agent using the hpv16 curve
+as the total prevalence, then assigns exactly one genotype per infected
+agent (uniform or weighted by ``init_hpv_dist``). Pass
+``init_seeding='independent'`` to opt back into per-genotype draws.
+
+**Sex-asymmetric scheduling rounding.** Cancer-progression timing was
+biased a few percent because fractional `ti_<event>` values implicitly
+ceil at the `<= ti` check. Added `sc.randround(dur/dt)` for FEMALE
+event scheduling (mean-preserving) and `np.ceil(dur/dt)` for MALE
+clearance, splitting `set_prognoses` into two paths over the
+non-progression slice.
+
+**Post-clearance immunity gated on `sero_prob`.** First-clearance
+females draw seroconversion via `pars.sero_prob`; non-seroconverters
+keep `nab_imm=0` (fully reinfectible) but still get `cell_imm` (severity
+protection). Repeat clearances always update both via running max. The
+sero_prob gate is critical for low-`sero_prob` genotypes
+(hpv18=0.56, hi5/ohr=0.60) — without it they over-immunise on first
+clearance.
+
+**`own_imm_hr` for non-canonical genotypes.** The cross-protection
+matrix diagonal is 1.0 for hpv16/hpv18 (full self-protection after
+clearance) but 0.9 for hi5/ohr. Without this, hi5/ohr were
+under-reinfected vs. v2.
+
+**`rel_beta` placement.** `rel_beta` (per-genotype transmission
+scaler: hpv18=0.75, hi5/ohr=0.9, hpv16=1.0) was hand-applied via the
+beta dict in `HPV.__init__` rather than relying on `ss.Infection`'s
+implicit handling. Without this, hpv18/hi5/ohr transmitted at
+hpv16-equivalent rates.
+
+**`Aggregate` analyzer.** Per-genotype results pool into Sim-level
+`*_any` aggregates: `cum_infections_any` (sum-of-flows; overcounts
+co-infections), `cum_cancers_any` (sum since cancer is single-genotype
+attributed), `new_cancer_deaths_any`. Auto-added by `hpv.Sim` whenever
+HPV modules are present.
+
+**`load_country(year=...)`** now accepts a `year` arg passed from
+`hpv.Sim(start=...)` so the initial age distribution is sampled at
+sim_start, not 2000. For Nigeria with `start=1990`, year-2000's
+[17, 22) band is +44% relative to year-1990 — biases init-seed counts
+materially.
+
+**`pop_trend` → `pop_total`, `pop_age_trend` → `pop_by_age`.** Renamed
+in `load_country()` keys, `AgeMigration` kwargs, and tests during the
+M02 PR review and propagated through M03.
+
+**Scratch / scaffolding removal.** Diagnostic harnesses used during
+drift-hunting (`compare_perf_seeds.py`, `compare_traces.py`,
+`perf_parity_check.py`, `probe_partnerships.py`, `probe_partnerships_v2.py`,
+`trace_v2.py`, `trace_v3.py`) were deleted before merge — past-tense
+tooling, not ongoing utility.
+
+**Audit-pass cleanups before merge.**
+- Strip M02/M03/M04 milestone references from comments and docstrings
+  in active code; restate technical content without milestone framing.
+- Strip "matches v2 / hand-port of / _v2_legacy/X.py:Y" rationale
+  framing from active modules — keep technical content (numbers,
+  rules, behaviors) but drop relativity to v2. Exception: the
+  set_prognoses sex-asymmetric rounding comment retains its v2
+  reference because the rule is non-obvious enough that the
+  historical justification is load-bearing.
+- Move progression math (`logf2`, `compute_severity`, etc.) from
+  `hpv.py` to `hpvsim.utils` (M02 PR review carryover, propagated
+  here): `hpv.py` reads as the natural-history pipeline rather than
+  a logistic-curve helpers pile. Functions get unprefixed names
+  (`compute_severity` not `_compute_severity`) — real `hpvsim.utils`
+  API for analyzers / calibration / visualisation.
+- `GenotypePars` defaults moved to a module-level
+  ``_GENOTYPE_DEFAULTS`` dict keyed by genotype name, replacing the
+  if/elif/else chain. Adding a fifth genotype is a one-entry dict
+  edit.
+
+**`methods_fig1.py` extended to four genotypes.** Originally seeded as
+the M02 single-genotype `methods_fig1_hpv16.py` reproducing the
+manuscript's `plot_nh_simple`; M03 extended to (hpv16, hpv18, hi5, ohr)
+and renamed the file. Panel-for-panel match with the manuscript at
+fontsize=16 with `sc.gridcolors(4)` palette.
+
+**`get_cross_immunity()` factory.** Builds `(cross_immunity_sus,
+cross_immunity_sev)` matrices from a clade map (`hpv16 ↔ hpv18` is
+'high'; everything else is 'med'). Configurable via scalars
+(`cross_imm_sus_med=0.3`, `cross_imm_sus_high=0.5`, etc.); `keys`
+defaults to `GENOTYPE_KEYS`. Auto-called by `CrossImmunity` if
+matrices not supplied.
