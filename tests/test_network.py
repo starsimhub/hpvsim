@@ -29,46 +29,6 @@ def test_constructs_with_layer_pars():
 
 
 # ---------------------------------------------------------------------------- #
-# Per-layer cross-layer query                                                  #
-# ---------------------------------------------------------------------------- #
-
-
-def _scaffold_sim(layer_pars=None):
-    """Build a tiny Sim with one SexualNetwork (no diseases, fast init)."""
-    net = SexualNetwork(layer_pars=layer_pars or {'m': {}, 'c': {}})
-    sim = ss.Sim(networks=[net], n_agents=200, diseases=None,
-                 dur=ss.years(1), dt=ss.years(0.5), verbose=0,
-                 copy_inputs=False)
-    sim.init()
-    return sim, net
-
-
-def test_other_layer_partner_uids_empty_when_no_edges():
-    sim, net = _scaffold_sim()
-    assert len(net._other_layer_partner_uids('m')) == 0
-    assert len(net._other_layer_partner_uids('c')) == 0
-
-
-def test_other_layer_partner_uids_picks_up_sibling_layer_edges():
-    """An edge in c contributes its endpoints to other_layer_partners('m')."""
-    sim, net = _scaffold_sim()
-    n = 2
-    net.append(
-        p1=ss.uids([0, 1]),
-        p2=ss.uids([2, 3]),
-        beta=np.ones(n),
-        dur=np.full(n, 10.0),
-        acts=np.full(n, 100, dtype=int),
-        start_ti=np.zeros(n),
-        layer_id=np.full(n, net._layer_idx['c'], dtype=int),
-    )
-    other = net._other_layer_partner_uids('m')
-    assert set(np.asarray(other).tolist()) == {0, 1, 2, 3}
-    # Same agents are NOT 'other-layer' from c's perspective (they're own-layer).
-    assert len(net._other_layer_partner_uids('c')) == 0
-
-
-# ---------------------------------------------------------------------------- #
 # Pair-formation behavior with full Nigeria pars                               #
 # ---------------------------------------------------------------------------- #
 

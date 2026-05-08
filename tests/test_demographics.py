@@ -13,14 +13,14 @@ def test_age_migration_class_exists():
     assert issubclass(hpv.AgeMigration, ss.Demographics)
 
 
-def test_load_country_exposes_pop_trend_and_pop_age_trend():
+def test_load_country_exposes_pop_total_and_pop_by_age():
     """load_country('nigeria') returns the migration data tables."""
     data = hpv.data.load_country('nigeria')
-    assert 'pop_trend' in data
-    assert 'pop_age_trend' in data
-    pt = data['pop_trend']
+    assert 'pop_total' in data
+    assert 'pop_by_age' in data
+    pt = data['pop_total']
     assert {'year', 'pop_size'}.issubset(pt.columns)
-    pat = data['pop_age_trend']
+    pat = data['pop_by_age']
     assert {'year', 'age', 'male', 'female'}.issubset(pat.columns)
 
 
@@ -36,7 +36,7 @@ def test_age_migration_runs_without_error():
 
 
 def test_age_migration_pulls_pyramid_toward_target():
-    """With AgeMigration on, end-of-sim age pyramid tracks pop_age_trend.
+    """With AgeMigration on, end-of-sim age pyramid tracks pop_by_age.
 
     Compare a sim with AgeMigration to one without; with on, the per-age-bin
     population matches the year-X target distribution more tightly than off.
@@ -50,7 +50,7 @@ def test_age_migration_pulls_pyramid_toward_target():
     sim_off = hpv.Sim(**pars, demographics=[])
     sim_off.run()
 
-    target_pat = hpv.data.load_country('nigeria')['pop_age_trend']
+    target_pat = hpv.data.load_country('nigeria')['pop_by_age']
     target_2019 = target_pat[target_pat['year'] == 2019]
     target_dist = (target_2019['male'] + target_2019['female']).values
     target_dist = target_dist / target_dist.sum()

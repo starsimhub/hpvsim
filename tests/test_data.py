@@ -10,7 +10,7 @@ def test_load_country_returns_expected_keys():
     out = hpvsim.data.load_country('nigeria')
     expected = {
         'age_data', 'birth_rate', 'death_rate', 'network_pars',
-        'pop_trend', 'pop_age_trend',  # added in M02 for AgeMigration
+        'pop_total', 'pop_by_age',  # added in M02 for AgeMigration
     }
     assert set(out.keys()) == expected, f'unexpected keys: {set(out.keys())}'
 

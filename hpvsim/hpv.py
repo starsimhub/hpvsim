@@ -1,5 +1,9 @@
 """Single-genotype HPV disease module.
 
+Scope note: HPVsim only models cervical cancer outcomes. HPV is also
+associated with anal, oropharyngeal, penile, vaginal, and vulvar cancers
+(the first three of which can occur in males); those are out of scope here.
+
 Models the natural-history pipeline as a Starsim Infection:
 
     susceptible -> precin -> (clear | CIN -> (clear | cancerous -> death))
@@ -238,8 +242,8 @@ def _age_stratified_init_prev(module, sim, uids):
 
     ``side='right'`` so ``brackets[i-1] <= age < brackets[i]``.
     """
-    age = np.asarray(sim.people.age[uids])
-    is_female = np.asarray(sim.people.female[uids])
+    age = sim.people.age[uids]
+    is_female = sim.people.female[uids]
     bin_idx = np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, age, side='right')
     bin_idx = np.clip(bin_idx, 0, len(_INIT_HPV_PREV_F) - 1)
     out = np.zeros(len(uids))
@@ -283,8 +287,10 @@ class HPV(ss.Infection):
             cell_imm_init=gpars.cell_imm_init,
             age_risk=gpars.age_risk,
             # Per-call Bernoullis for CIN and cancer draws; ``p`` is overwritten
-            # via .set(p=...) in set_prognoses. Held in pars so starsim wires
-            # the RNG before the first set_prognoses call.
+            # via .set(p=...) in set_prognoses. Held in pars (vs. as plain
+            # attributes) so the per-Dist RNG-slot identifier follows the
+            # ``module.pars._cin_bern`` path — moving them changes which CRN
+            # slot is drawn and shifts regression numbers past the ±10% gates.
             _cin_bern=ss.bernoulli(p=0.5),
             _cancer_bern=ss.bernoulli(p=0.5),
         )
@@ -350,21 +356,23 @@ class HPV(ss.Infection):
     def finalize_results(self):
         super().finalize_results()
         res = self.results
-        res.cum_cancers[:] = np.cumsum(np.asarray(res.new_cancers))
-        res.cum_cancer_deaths[:] = np.cumsum(np.asarray(res.new_cancer_deaths))
+        res.cum_cancers[:] = np.cumsum(res.new_cancers)
+        res.cum_cancer_deaths[:] = np.cumsum(res.new_cancer_deaths)
         return
 
     def _sample_rel_sev_for_unset(self):
         """Sample rel_sev for any alive agent without a sample yet.
 
         Runs once at init for the starting population, then per-step for
-        newborns and immigrants. ``abs()`` implements the positive-truncated
-        normal.
+        newborns and immigrants. ``abs()`` folds the negative tail of the
+        normal back onto positives; with loc=1.0, scale=0.2 the affected
+        mass is < 1e-6, so this matches v2's positive-only convention
+        without changing the practical distribution.
         """
         unset = (~self.rel_sev_sampled).uids
         if not len(unset):
             return
-        sampled = np.abs(np.asarray(self._rel_sev_dist.rvs(unset)))
+        sampled = np.abs(self._rel_sev_dist.rvs(unset))
         self.rel_sev[unset] = sampled
         self.rel_sev_sampled[unset] = True
         return
@@ -404,9 +412,9 @@ class HPV(ss.Infection):
         self.ti_cancerous[uids] = np.nan
         self.ti_dead_cancer[uids] = np.nan
 
-        female_all = np.asarray(self.sim.people.female[uids])
-        rel_sev_uids = np.asarray(self.rel_sev[uids])
-        sev_imm_uids = np.asarray(self.sev_imm[uids])
+        female_all = self.sim.people.female[uids]
+        rel_sev_uids = self.rel_sev[uids]
+        sev_imm_uids = self.sev_imm[uids]
 
         # 1. Sample precin durations.
         #    Females: sample * (1 - sev_imm); rel_sev passes separately to
@@ -417,13 +425,13 @@ class HPV(ss.Infection):
         if (~female_all).any():
             male_uids = uids[~female_all]
             dur_inf_male = p.dur_inf_male.rvs(male_uids)
-            dur_precin[~female_all] = np.asarray(dur_inf_male)
+            dur_precin[~female_all] = dur_inf_male
 
         # 2. P(CIN) per female. Distributions return durations in starsim
         #    timesteps; convert to years before passing (cin_fn's ttc=50 is years).
         dt_yr = float(self.t.dt)
         female = female_all
-        p_cin = _compute_severity(np.asarray(dur_precin) * dt_yr,
+        p_cin = _compute_severity(dur_precin * dt_yr,
                                    rel_sev=rel_sev_uids, pars=p.cin_fn)
         p._cin_bern.set(p=p_cin)
         cin_draw = p._cin_bern.rvs(uids)
@@ -442,16 +450,16 @@ class HPV(ss.Infection):
         dur_cin = p.dur_cin.rvs(cin_uids)
         # age_risk multiplier: women aged >= age_risk['age'] get dur_cin
         # scaled by age_risk['risk'].
-        ages_at_cin = np.asarray(self.sim.people.age[cin_uids])
+        ages_at_cin = self.sim.people.age[cin_uids]
         age_mod = np.ones(len(cin_uids))
         age_mod[ages_at_cin >= p.age_risk['age']] = p.age_risk['risk']
-        dur_cin = np.asarray(dur_cin) * age_mod
+        dur_cin = dur_cin * age_mod
 
         # 5. P(cancer) given dur_cin. sev_imm is NOT applied to dur_cin —
         #    only rel_sev (passed separately to _compute_severity). Same
         #    timestep -> years conversion as step 2.
         rel_sev_cin = rel_sev_uids[cin_mask]
-        p_cancer = _compute_severity(np.asarray(dur_cin) * dt_yr,
+        p_cancer = _compute_severity(dur_cin * dt_yr,
                                       rel_sev=rel_sev_cin, pars=p.cancer_fn)
         p._cancer_bern.set(p=p_cancer)
         cancer_draw = p._cancer_bern.rvs(cin_uids)
@@ -505,7 +513,7 @@ class HPV(ss.Infection):
             self.cin[cleared] = False
             self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
                                                1.0 - self.pars.imm_init)
-            new_imm = np.asarray(self.pars.cell_imm_init.rvs(cleared))
+            new_imm = self.pars.cell_imm_init.rvs(cleared)
             self.sev_imm[cleared] = np.maximum(self.sev_imm[cleared], new_imm)
 
         # --- 2. precin -> CIN ---
@@ -522,14 +530,14 @@ class HPV(ss.Infection):
             self.infected[to_cancerous] = False
             self.susceptible[to_cancerous] = False
             self.rel_trans[to_cancerous] = 0.0
-            ages_at_cancer = np.asarray(self.sim.people.age[to_cancerous])
+            ages_at_cancer = self.sim.people.age[to_cancerous]
             self.results.new_cancers[ti] = len(to_cancerous)
             self.results.sum_age_at_cancer[ti] = float(ages_at_cancer.sum())
 
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
-            ages_at_death = np.asarray(self.sim.people.age[to_dead])
+            ages_at_death = self.sim.people.age[to_dead]
             self.results.new_cancer_deaths[ti] = len(to_dead)
             self.results.sum_age_at_cancer_death[ti] = float(ages_at_death.sum())
             self.sim.people.request_death(to_dead)

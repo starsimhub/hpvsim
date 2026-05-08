@@ -10,7 +10,6 @@ Reshaping summary:
 - Age pyramid: (N, 3) ``(age_lower, age_upper, count)`` ndarray with single-
   year resolution -> long DataFrame ``[age, value]``.
 - Birth rates: ``[year, cbr]`` per 1000 -> ``[Year, CBR]`` for ``ss.Births``.
-  Could switch to ``ss.Pregnancy`` once age-specific fertility data exists.
 - Death rates: per-year per-sex ndarrays -> long DataFrame ``[Time,
   AgeGrpStart, Sex, mx]`` for ``ss.Deaths``.
 - Network parameters: 2 layers (m=marital, c=casual). partners and
@@ -144,10 +143,12 @@ def load_country(location):
     Returns:
         dict with keys:
             - 'age_data': DataFrame [age, value]
-            - 'fertility': DataFrame [Time, AgeGrp, ASFR]
-            - 'death_rate': DataFrame [Year, AgeGrp, Sex, Rate]
+            - 'birth_rate': DataFrame [Year, CBR]
+            - 'death_rate': DataFrame [Time, AgeGrpStart, Sex, mx]
             - 'network_pars': dict ``{'layer_pars': {layer: {...}}, 'debut': {sex: Dist}}``
               consumed by ``hpv.SexualNetwork(**network_pars)``.
+            - 'pop_total': DataFrame [year, pop_size] (total population trajectory)
+            - 'pop_by_age': DataFrame [year, age, male, female] (age pyramid over time)
     """
     location = location.lower()
     if location not in _KNOWN_LOCATIONS:
@@ -160,8 +161,8 @@ def load_country(location):
         birth_rate=_birth_rate(location),
         death_rate=_death_rate(location),
         network_pars=_network_pars(location),
-        pop_trend=_pop_trend(location),
-        pop_age_trend=_pop_age_trend(location),
+        pop_total=_pop_total(location),
+        pop_by_age=_pop_by_age(location),
     )
 
 
@@ -250,7 +251,7 @@ def _network_pars(location):
     return dict(layer_pars=layer_pars, debut=debut_by_sex)
 
 
-def _pop_trend(location):
+def _pop_total(location):
     """Total population trajectory: DataFrame [year, pop_size].
 
     Wraps ``get_total_pop`` which already returns a DataFrame with the canonical
@@ -269,7 +270,7 @@ def _pop_trend(location):
     })
 
 
-def _pop_age_trend(location):
+def _pop_by_age(location):
     """Age pyramid over time: DataFrame [year, age, male, female].
 
     Wraps ``get_age_distribution_over_time`` which already renames columns to
@@ -286,7 +287,7 @@ def _pop_age_trend(location):
     missing = expected - set(df.columns)
     if missing:
         raise ValueError(
-            f'pop_age_trend for {location!r} missing columns {missing}; '
+            f'pop_by_age for {location!r} missing columns {missing}; '
             f'got {list(df.columns)}.'
         )
     return df[['year', 'age', 'male', 'female']].copy()

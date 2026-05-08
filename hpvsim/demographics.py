@@ -5,8 +5,8 @@ Sits alongside ``ss.Births`` and ``ss.Deaths`` in ``hpv.Sim``'s default
 demographics list.
 
 Algorithm — once per year:
-  1. Look up the target age pyramid for the current year (pop_age_trend).
-  2. Compute ``scale = sim.n_agents / pop_at_sim_start`` (from pop_trend).
+  1. Look up the target age pyramid for the current year (pop_by_age).
+  2. Compute ``scale = sim.n_agents / pop_at_sim_start`` (from pop_total).
   3. For each (sex, integer age):
        count_sim    = alive sim agents at this age and sex
        count_target = target_pyramid[sex][age] * scale
@@ -34,28 +34,31 @@ class AgeMigration(ss.Demographics):
     to match the target pyramid by adding immigrants (HPV-naive) or
     requesting removal of emigrants.
 
-    Data can be supplied explicitly via ``pop_trend`` / ``pop_age_trend``,
+    Data can be supplied explicitly via ``pop_total`` / ``pop_by_age``,
     or loaded automatically from the sim's ``location`` parameter.
 
     Args:
-        pop_trend     (DataFrame): columns [year, pop_size]. If None, loaded from country data.
-        pop_age_trend (DataFrame): columns [year, age, male, female]. If None, loaded from
+        pop_total  (DataFrame): columns [year, pop_size]. If None, loaded from country data.
+        pop_by_age (DataFrame): columns [year, age, male, female]. If None, loaded from
             country data.
     """
 
-    def __init__(self, pars=None, pop_trend=None, pop_age_trend=None, **kwargs):
+    def __init__(self, pars=None, pop_total=None, pop_by_age=None, **kwargs):
         # dt=ss.year sets this module's Timeline to annual; ss.Loop only
         # calls step() at times in mod.t.tvec, so it fires once per year
         # regardless of sim.dt.
         super().__init__(dt=ss.year)
         self.update_pars(pars, **kwargs)
-        self._pop_trend = pop_trend
-        self._pop_age_trend = pop_age_trend
+        self._pop_total = pop_total                 # [year, pop_size] DataFrame; sets _scale and the data-year window.
+        self._pop_by_age = pop_by_age               # [year, age, male, female] DataFrame; the per-step target pyramid.
+        # Sim agents per real-world person at sim.start (n_agents / pop_total
+        # at start year). Used to scale target_counts each step so the pyramid
+        # is matched in agent-space, not person-space.
         self._scale = None
-        self._data_year_min = None
-        self._data_year_max = None
-        self._n_imm = 0
-        self._n_emi = 0
+        self._data_year_min = None                  # Inclusive lower bound of pop_total years; outside this, step() no-ops.
+        self._data_year_max = None                  # Inclusive upper bound of pop_total years.
+        self._n_imm = 0                             # Immigrants added this step (for results.new_immigrants).
+        self._n_emi = 0                             # Emigrants requested this step (for results.new_emigrants).
         # CRN-safe emigrant selection — domain set per call.
         self._emi_select = ss.choice(replace=False)
         return
@@ -68,7 +71,7 @@ class AgeMigration(ss.Demographics):
         super().init_pre(sim)
 
         # Pull from country data if not explicitly supplied.
-        if self._pop_trend is None or self._pop_age_trend is None:
+        if self._pop_total is None or self._pop_by_age is None:
             from .data.country import load_country
             # hpv.Sim stores location on the sim; fall back to pars if a
             # caller wired it there instead.
@@ -79,21 +82,21 @@ class AgeMigration(ss.Demographics):
             if location is None:
                 raise AttributeError(
                     'AgeMigration could not find a location on the sim. '
-                    'Either pass pop_trend/pop_age_trend explicitly, or use '
+                    'Either pass pop_total/pop_by_age explicitly, or use '
                     'hpv.Sim which stores sim.location.'
                 )
             cd = load_country(location)
-            if self._pop_trend is None:
-                self._pop_trend = cd['pop_trend']
-            if self._pop_age_trend is None:
-                self._pop_age_trend = cd['pop_age_trend']
+            if self._pop_total is None:
+                self._pop_total = cd['pop_total']
+            if self._pop_by_age is None:
+                self._pop_by_age = cd['pop_by_age']
 
         # Scale factor: n_agents / data_population_at_sim_start.
         sim_start = sim.pars.start
         sim_start_year = float(
             sim_start.year if hasattr(sim_start, 'year') else sim_start
         )
-        pt = self._pop_trend
+        pt = self._pop_total
         data_pop_at_start = float(
             np.interp(sim_start_year, pt['year'].values, pt['pop_size'].values)
         )
@@ -131,7 +134,7 @@ class AgeMigration(ss.Demographics):
             self._n_emi = 0
             return
 
-        pat_year = self._pop_age_trend[self._pop_age_trend['year'] == year]
+        pat_year = self._pop_by_age[self._pop_by_age['year'] == year]
         if pat_year.empty:
             self._n_imm = 0
             self._n_emi = 0
@@ -145,8 +148,9 @@ class AgeMigration(ss.Demographics):
         # This ensures the boolean masks remain aligned with the UID list even
         # as immigrants are added during the loop.
         snap_uids = people.auids.copy()
+        # age is float32 — cast to int for integer-bin lookup; female is already bool.
         ages = people.age[snap_uids].astype(int)
-        female = people.female[snap_uids].astype(bool)
+        female = people.female[snap_uids]
 
         n_imm_total = 0
         n_emi_total = 0
