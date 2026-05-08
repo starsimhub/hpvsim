@@ -11,7 +11,7 @@ Kwargs:
   ``init_seeding`` (str, default ``'exclusive'``):
     ``'exclusive'`` — one Bernoulli per agent using the hpv16 age-banded
     curve as the total HPV prevalence, then exactly one genotype assigned per
-    infected agent. Matches v2 semantics (no co-infection at initialisation).
+    infected agent. No co-infection at initialisation.
     ``'independent'`` — each genotype draws from its own per-genotype
     init_prev curve independently; co-infection at initialisation is possible.
 
@@ -50,8 +50,7 @@ class Aggregate(ss.Analyzer):
 
     Results are accessible at ``sim.results.aggregate``:
       - ``cum_infections_any`` — per-step sum of new_infections across genotypes,
-        cumsum'd. Sum-of-flows matching v2's infections_by_genotype.sum() semantics.
-        Overcounts agents with co-infections but is consistent with v2's aggregate.
+        cumsum'd. Sum-of-flows: overcounts agents with co-infections.
       - ``cum_cancers_any`` — sum of per-genotype cum_cancers (no double-counting
         since cancer is attributed to a single genotype).
       - ``new_cancer_deaths_any`` — per-step sum of new_cancer_deaths.
@@ -82,9 +81,8 @@ class Aggregate(ss.Analyzer):
         hpvs = self._hpvs()
         if not hpvs:
             return
-        # Per-step sum across genotypes: matches v2's infections_by_genotype.sum()
-        # semantics. Overcounts co-infected agents but is consistent with v2's
-        # aggregate (sum-of-flows, not boolean-OR).
+        # Per-step sum across genotypes: sum-of-flows, not boolean-OR.
+        # Overcounts co-infected agents — matches summed-by-genotype semantics.
         per_step_any = sum(
             int(np.asarray(m.results.new_infections[ti])) for m in hpvs
         )
@@ -124,8 +122,7 @@ class Sim(ss.Sim):
         # sampled from the right year. Without this, get_age_distribution
         # defaults to 2000 and the population shape biases init-seed counts
         # by ~14% for Nigeria when start=1990 (year-2000's [17, 22) band is
-        # +44% relative to year-1990). v2 wires ``sim['start']`` similarly
-        # via _v2_legacy/population.py:74.
+        # +44% relative to year-1990).
         country = load_country(location, year=int(start))
         people = kwargs.pop('people', None)
         if people is None:
@@ -165,10 +162,10 @@ class Sim(ss.Sim):
                     )
 
             if init_seeding == 'exclusive':
-                # Coordinated v2-style seeding: one Bernoulli per agent using
-                # hpv16 total prevalence curve, then one genotype per infected
-                # agent. The _ExclusiveSeeder installs callbacks on init_prev
-                # so the assignment is computed lazily on first init_post call.
+                # Coordinated seeding: one Bernoulli per agent using the hpv16
+                # total prevalence curve, then one genotype per infected agent.
+                # The _ExclusiveSeeder installs callbacks on init_prev so the
+                # assignment is computed lazily on first init_post call.
                 seeder = _ExclusiveSeeder(genotype_keys=keys, init_hpv_dist=init_hpv_dist)
                 diseases = []
                 for k in keys:

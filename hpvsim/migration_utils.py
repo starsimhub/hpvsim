@@ -1,8 +1,9 @@
-"""Bridging utilities for the v2 -> v3 migration.
+"""Translation helpers for legacy distribution-dict inputs.
 
-Contents here translate v2-shaped values (parameter dicts, distributions)
-into Starsim-native equivalents. Expected to be retired once the migration
-is complete and the v2 quarantine in ``hpvsim/_v2_legacy/`` is deleted.
+Country-data adapters provide distribution parameters as
+``{'dist': name, 'par1': p1, 'par2': p2}`` dicts; this module converts
+them into Starsim Dist instances. Retired once the country-data layer is
+rewritten to emit Starsim Dist instances directly.
 """
 
 import starsim as ss
@@ -19,13 +20,11 @@ class Poisson1(ss.poisson):
 
 
 def _v2_dist_to_starsim(d):
-    """Convert a v2-format distribution dict to a Starsim Dist instance.
+    """Convert a ``{'dist': name, 'par1': p1, 'par2': p2}`` dict to a Starsim
+    Dist instance.
 
-    v2 stores distributions as ``{'dist': name, 'par1': p1, 'par2': p2}``;
-    Starsim distributions take named parameters and are sampled via
-    ``.rvs(uids)``. Currently handles the distributions used in the
-    default Nigeria network pars: poisson, poisson1, lognormal, neg_binomial,
-    normal, uniform.
+    Currently handles the distributions used in the default Nigeria network
+    pars: poisson, poisson1, lognormal, neg_binomial, normal, uniform.
 
     Time-unit wrapping: dur/acts dists are deliberately NOT wrapped in
     ``ss.years`` / ``ss.freqperyear``. They are sampled in annual units and
@@ -45,7 +44,7 @@ def _v2_dist_to_starsim(d):
     if dist in ('lognormal', 'lognorm'):
         return ss.lognorm_ex(mean=par1, std=par2)
     if dist == 'neg_binomial':
-        # v2: par1=mean, par2=k (dispersion).
+        # par1=mean, par2=k (dispersion).
         # scipy.stats.nbinom: n=number-of-successes, p=success-probability.
         # Mapping: n = k, p = k / (k + mean).
         n_param = par2
@@ -55,4 +54,4 @@ def _v2_dist_to_starsim(d):
         return ss.normal(loc=par1, scale=par2)
     if dist == 'uniform':
         return ss.uniform(low=par1, high=par2)
-    raise ValueError(f'Unsupported v2 distribution: {dist!r}')
+    raise ValueError(f'Unsupported distribution: {dist!r}')

@@ -54,7 +54,7 @@ class SimPars(ss.SimPars):
 def _imm_init_dist():
     """Beta sample for per-clearance humoral-immunity boost.
 
-    Shape parameters from v2's beta_mean(par1=0.35, par2=0.025).
+    Shape parameters: beta_mean(mean=0.35, var=0.025).
     """
     a = ((1 - 0.35) / 0.025 - 1 / 0.35) * 0.35 ** 2
     b = a * (1 / 0.35 - 1)
@@ -62,9 +62,9 @@ def _imm_init_dist():
 
 
 def _cell_imm_dist():
-    """Beta sample for per-clearance severity-immunity boost (v2 cell_imm_init).
+    """Beta sample for per-clearance severity-immunity boost (cell_imm_init).
 
-    Shape parameters from v2's beta_mean(par1=0.25, par2=0.025).
+    Shape parameters: beta_mean(mean=0.25, var=0.025).
     """
     a = ((1 - 0.25) / 0.025 - 1 / 0.25) * 0.25 ** 2
     b = a * (1 / 0.25 - 1)
@@ -110,11 +110,10 @@ class GenotypePars(ss.Pars):
             # serology probability. Currently unused by HPV.
             self.rel_beta = 1.0
             self.sero_prob = 0.75
-            # Sex-directional per-act transmission scalars (v2: pars['transf2m'],
-            # pars['transm2f'] in _v2_legacy/parameters.py:89-90). Multiplied
-            # into the per-network beta dict in HPV.__init__ to produce
-            # asymmetric m→f vs f→m transmission rates. Same v2 defaults for
-            # all 4 genotypes — these are about the act, not the genotype.
+            # Sex-directional per-act transmission scalars. Multiplied into
+            # the per-network beta dict in HPV.__init__ to produce asymmetric
+            # m→f vs f→m transmission rates. Same defaults for all 4 genotypes
+            # — these are about the act, not the genotype.
             self.transf2m = 1.0
             self.transm2f = 3.69
         elif genotype == 'hpv18':
@@ -162,23 +161,21 @@ def get_genotype_pars(genotype='hpv16'):
     return GenotypePars(genotype=genotype)
 
 
-# v2 defaults (see hpvsim/_v2_legacy/parameters.py:108-112)
+# Default cross-protection scalars.
 _DEFAULT_CROSS_IMM_SUS_MED = 0.3
 _DEFAULT_CROSS_IMM_SUS_HIGH = 0.5
 _DEFAULT_CROSS_IMM_SEV_MED = 0.5
 _DEFAULT_CROSS_IMM_SEV_HIGH = 0.7
-# v2's own-immunity for non-canonical genotypes (hpv45, hi5, hi4, ohr, hr,
-# lr): clearance grants own_imm_hr=0.9 (not 1.0) — see
-# _v2_legacy/parameters.py:112 and the per-genotype dicts at lines 416-505.
+# Own-immunity for non-canonical genotypes (hi5, ohr): clearance grants
+# own_imm_hr=0.9 (not 1.0) — they do not fully self-protect after clearance.
 _DEFAULT_OWN_IMM_HR = 0.9
 
-# Genotypes whose own-immunity is hardcoded to 1.0 in v2 (hpv16, hpv18 dicts
-# at _v2_legacy/parameters.py:419, 431). Everyone else uses ``own_imm_hr``.
+# Genotypes whose own-immunity is hardcoded to 1.0 (full self-protection
+# after clearance). Everyone else uses ``own_imm_hr``.
 _FULL_OWN_IMM_KEYS = frozenset({'hpv16', 'hpv18'})
 
-# Pairwise cross-protection clade map. 'high' = hpv16 <-> hpv18; everything
-# else is 'med'. Hand-ported from v2's get_cross_immunity (hpvsim/_v2_legacy/
-# parameters.py:412-508).
+# Pairwise cross-protection clade map. 'high' = hpv16 <-> hpv18 (same clade);
+# everything else is 'med'.
 _CLADE_HIGH_PAIRS = frozenset({
     ('hpv16', 'hpv18'),
     ('hpv18', 'hpv16'),
@@ -189,7 +186,7 @@ def _build_cross_matrix(keys, scalar_med, scalar_high, own_imm_hr):
     """Pairwise cross-protection matrix.
 
     Diagonal: 1.0 for keys in ``_FULL_OWN_IMM_KEYS`` (hpv16, hpv18); else
-    ``own_imm_hr`` (0.9 by default, matching v2's non-canonical genotypes).
+    ``own_imm_hr`` (0.9 by default).
     Off-diagonal: ``scalar_high`` for clade-high pairs, ``scalar_med`` else.
     """
     n = len(keys)
@@ -211,9 +208,9 @@ def get_cross_immunity(keys=None,
     genotype ordering.
 
     Returns a tuple of two ``(n, n)`` float32 arrays. ``keys`` defaults to
-    ``GENOTYPE_KEYS``. Scalar defaults match v2 (`cross_imm_sus_med=0.3`,
+    ``GENOTYPE_KEYS``. Scalar defaults: `cross_imm_sus_med=0.3`,
     `cross_imm_sus_high=0.5`, `cross_imm_sev_med=0.5`, `cross_imm_sev_high=0.7`,
-    `own_imm_hr=0.9`).
+    `own_imm_hr=0.9`.
 
     Diagonal: 1.0 for hpv16 and hpv18 (canonical own-immunity); ``own_imm_hr``
     for everyone else.

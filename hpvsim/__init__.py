@@ -3,8 +3,8 @@
 Public API: ``Sim``, ``HPV``, ``SexualNetwork``, ``AgeMigration``,
 ``SimPars``, ``GenotypePars``, ``get_genotype_pars``, ``data``.
 
-Modules awaiting port from the legacy v2 package live in
-``hpvsim/_v2_legacy/``. Active code must not import from there.
+Quarantined modules awaiting port live in ``hpvsim/_v2_legacy/``;
+active code must not import from there.
 """
 
 import sciris as sc

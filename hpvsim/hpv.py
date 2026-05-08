@@ -73,7 +73,7 @@ _KNOWN_GENOTYPES = tuple(_INIT_PREV.keys())
 
 
 class _ExclusiveSeeder:
-    """Coordinated v2-style initial seeding for multi-genotype HPV.
+    """Coordinated initial seeding for multi-genotype HPV.
 
     On the first invocation of any per-genotype callback, computes the global
     assignment (per-agent total-prevalence Bernoulli + per-infected-agent
@@ -81,8 +81,6 @@ class _ExclusiveSeeder:
     uids assigned to it and 0.0 otherwise; a ``ss.bernoulli`` with those
     probabilities deterministically yields exactly the assigned uids in
     ``init_prev.filter()``.
-
-    Source: hand-port of ``_v2_legacy/sim.py:702-727`` + ``defaults.py:307``.
 
     Random draw path: the total-prevalence Bernoulli draw uses
     ``ss.bernoulli`` with ``strict=False`` (CRN-safe slot-based RNG). The
@@ -119,7 +117,7 @@ class _ExclusiveSeeder:
         """Compute per-agent genotype assignment (called once on first callback).
 
         Steps:
-          1. Per-agent total HPV probability using hpv16 curve as v2 total.
+          1. Per-agent total HPV probability using hpv16 curve as the total.
           2. Zero out agents who are not yet past sexual debut.
           3. Bernoulli draw: which agents get any HPV at all.
           4. Per-infected-agent genotype assignment (uniform or weighted).
@@ -129,12 +127,11 @@ class _ExclusiveSeeder:
         all_uids = ss.uids(np.arange(n_agents))
 
         # Step 1: per-agent total HPV probability using hpv16 curve as total.
-        # (v2's default_init_prev matches our _INIT_PREV['hpv16'] verbatim.)
         total_prev_fn = _make_init_prev_fn('hpv16')
         p_per_uid = np.asarray(total_prev_fn(None, sim, all_uids), dtype=float)
 
         # Step 2: filter to alive agents past sexual debut.
-        # v2's is_active check: agents not yet debuted can't be seeded.
+        # Agents not yet debuted can't be seeded.
         alive = np.asarray(people.alive).astype(bool)
         active = alive.copy()
         # Locate the SexualNetwork (if present) to gate on debut age.
@@ -217,9 +214,8 @@ class HPV(ss.Infection):
             # this dict shape natively (ss.Infection.validate_beta).
             #
             # rel_beta is the per-genotype scaler (hpv18=0.75, hi5/ohr=0.9,
-            # hpv16=1.0); v2 applies it via ``gen_betas[g] = g['rel_beta'] * beta``
-            # in _v2_legacy/sim.py:786. Without this multiplier, hpv18/hi5/ohr
-            # transmit at v2's hpv16-equivalent rate instead of their reduced
+            # hpv16=1.0). Without this multiplier, hpv18/hi5/ohr would
+            # transmit at hpv16-equivalent rates instead of their reduced
             # genotype-specific rate.
             beta={
                 'sexualnetwork': [
@@ -327,7 +323,7 @@ class HPV(ss.Infection):
         Runs once at init for the starting population, then per-step for
         newborns and immigrants. ``abs()`` folds the negative tail of the
         normal back onto positives; with loc=1.0, scale=0.2 the affected
-        mass is < 1e-6, so this matches v2's positive-only convention
+        mass is < 1e-6, so this preserves the positive-only convention
         without changing the practical distribution.
         """
         unset = (~self.rel_sev_sampled).uids
@@ -411,7 +407,7 @@ class HPV(ss.Infection):
         # 70 years.
 
         # 3. Branch A: clearance from precin. Split male / female paths so
-        #    males get np.ceil and females get sc.randround per v2.
+        #    males get np.ceil and females get sc.randround.
         nocin_dur = dur_precin[~cin_mask]
         nocin_female = female[~cin_mask]
         rounded_dur = np.empty(len(nocin_dur), dtype=int)
@@ -494,12 +490,11 @@ class HPV(ss.Infection):
             self.precin[cleared] = False
             self.cin[cleared] = False
 
-            # v2 only updates post-clearance immunity for females (males clear
-            # without seroconverting). And first-clearance immunity is gated on
+            # Only update post-clearance immunity for females; males clear
+            # without seroconverting. First-clearance immunity is gated on
             # sero_prob; non-seroconverters keep nab_imm/cell_imm = 0 and are
-            # fully reinfectable next exposure. Repeat clearances always update
-            # via running max (sero_prob only gates the first event).
-            # See _v2_legacy/people.py:685-693 and _v2_legacy/immunity.py:155-176.
+            # fully reinfectible on next exposure. Repeat clearances always
+            # update via running max (sero_prob only gates the first event).
             female = self.sim.people.female
             f_cleared = cleared[np.asarray(female[cleared])]
             if len(f_cleared):
@@ -522,11 +517,9 @@ class HPV(ss.Infection):
                     seroconvert = np.asarray(p._sero_bern.rvs(first_uids))
                     # nab_imm (humoral) is gated on seroconversion: non-
                     # seroconverters keep 0 nab and remain fully reinfectible.
-                    # cell_imm (cell-mediated severity) is NOT gated — v2 grants
-                    # severity protection to ALL first-clearance females,
-                    # regardless of whether they seroconverted (see
-                    # _v2_legacy/immunity.py:174-176; only peak_imm carries the
-                    # is_seroconvert factor, cell_imm does not). Without this,
+                    # cell_imm (cell-mediated severity) is NOT gated — all
+                    # first-clearance females get severity protection,
+                    # regardless of whether they seroconverted. Without this,
                     # non-seroconverters get no dur_precin reduction on
                     # reinfection, inflating transmission for low-sero_prob
                     # genotypes (hpv18=0.56, hi5/ohr=0.60).

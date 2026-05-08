@@ -17,13 +17,11 @@ _DEFAULT_LAYERS = ('m', 'c')
 
 
 def _age_scale_acts(acts, age_act_pars, age_f, age_m, debut_f, debut_m):
-    """v2 age-scaled acts: piecewise-linear modulation by couple's avg age.
+    """Age-scaled acts: piecewise-linear modulation by couple's average age.
 
     Below peak: ramp from ``debut_ratio`` at debut to 1.0 at peak.
     Above peak (below retirement): ramp from 1.0 to ``retirement_ratio``.
     Above retirement: 0.
-
-    Hand-ported from ``_v2_legacy/population.py:248-278``.
     """
     avg_age = (age_f + age_m) / 2.0
     avg_debut = (debut_f + debut_m) / 2.0
@@ -330,7 +328,7 @@ class SexualNetwork(ss.SexualNetwork):
         # scaling, which would inflate per-pair variance.
         dur_years = lpars['duration'].rvs(f_uids)
         dur = dur_years / float(self.t.dt)
-        # Sample raw per-year acts, then apply v2's age-based modulation, then
+        # Sample raw per-year acts, then apply age-based modulation, then
         # scale to per-step. age_act_pars is optional — older test fixtures
         # may not supply it, in which case we skip the modulation (equivalent
         # to age=peak for everyone).

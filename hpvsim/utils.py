@@ -4,12 +4,8 @@ Pure progression / severity math used by ``hpv.py`` and downstream
 analyzers. These functions don't depend on starsim or any module state —
 they're a small, reusable surface so calibration code, future genotype
 extensions, and visualisation scripts (e.g.
-``tests/regression/methods_fig1_hpv16.py``) can import them without
-pulling in the disease module.
-
-Carries the v2 logf2/logf3/compute_severity API verbatim; bit-identical
-parity with ``hpvsim/_v2_legacy/utils.py`` is enforced by
-``tests/test_progression_math.py``.
+``tests/regression/methods_fig1.py``) can import them without pulling in
+the disease module.
 """
 
 import numpy as np

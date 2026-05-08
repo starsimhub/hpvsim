@@ -1,5 +1,5 @@
 """Cross-immunity Connector: derive per-target rel_sus and sev_imm from
-per-source nab_imm and cell_imm via v2's cross-protection matrices.
+per-source nab_imm and cell_imm via cross-protection matrices.
 
 Convention: row = target genotype, col = source genotype. Effective immunity
 to target ``g`` is ``sum_k cross[g, k] * source[uid, k]``. Matrices live on
@@ -60,8 +60,8 @@ class CrossImmunity(ss.Connector):
                     f'number of HPV modules {n}'
                 )
             # Diagonal entries are own-immunity scalars in [0, 1]: 1.0 for
-            # hpv16/hpv18, ``own_imm_hr`` (0.9 by default) for hi5/ohr per v2
-            # (_v2_legacy/parameters.py:112). Reject anything outside [0, 1].
+            # hpv16/hpv18, ``own_imm_hr`` (0.9 by default) for hi5/ohr.
+            # Reject anything outside [0, 1].
             diag = np.diag(m)
             if (diag < 0).any() or (diag > 1).any():
                 raise ValueError(

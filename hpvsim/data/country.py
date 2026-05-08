@@ -4,7 +4,7 @@ Used by ``hpvsim.Sim`` to build People (age pyramid), Births (CBR), Deaths
 (age- and sex-specific mortality), and SexualNetwork (debut, partners,
 mixing, layer probs, durations, acts). Underlying data lives in
 ``hpvsim/data/files/`` and is loaded via ``hpvsim.data.loaders`` and the
-``hpvsim.parameters`` helpers carried over from the legacy v2 package.
+``hpvsim.parameters`` helpers.
 
 Reshaping summary:
 - Age pyramid: (N, 3) ``(age_lower, age_upper, count)`` ndarray with single-
@@ -66,9 +66,8 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
         c=dict(dist='lognormal', par1=1, par2=2),
     )
 
-    # Age-based act modulation. v2 _v2_legacy/parameters.py:190-191:
-    # marital peaks at 30, casual at 25; both ramp linearly from
-    # debut_ratio at debut age to 1.0 at peak, then linearly to
+    # Age-based act modulation. Marital peaks at 30, casual at 25; both ramp
+    # linearly from debut_ratio at debut age to 1.0 at peak, then linearly to
     # retirement_ratio at retirement, then 0 beyond retirement.
     age_act_pars = dict(
         m=dict(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1),
@@ -147,15 +146,8 @@ def load_country(location, year=None):
     """Return Starsim-shaped data for ``location``.
 
     Args:
-        location (str): country name; must be one of the supported locations
-            available via the v2 loaders.
-        year (int): year to load the initial age distribution for. v2 passes
-            ``sim['start']`` here (``_v2_legacy/population.py:74``); without
-            this, ``get_age_distribution`` defaults to year 2000, which has a
-            materially different shape than year 1990 for Nigeria (the
-            ``[17, 22)`` band is +44% in 2000 vs 1990) — biasing init-seed
-            counts and downstream transmission. Pass ``int(sim_start)`` to
-            match v2.
+        location (str): country name; must be one of ``_KNOWN_LOCATIONS``.
+        year (int): year to load the initial age distribution for.
 
     Returns:
         dict with keys:
@@ -184,16 +176,16 @@ def load_country(location, year=None):
 
 
 def _age_data(location, year=None):
-    """Reshape v2's age distribution to a (age, value) long-form DataFrame.
+    """Reshape the age distribution to a (age, value) long-form DataFrame.
 
     ``get_age_distribution`` returns an (N, 3) ndarray of
-    ``(age_lower, age_upper, count)``. v2 data is at single-year resolution
+    ``(age_lower, age_upper, count)``. The data is at single-year resolution
     (age_upper == age_lower + 1), so age_lower IS the age and we don't need
     to expand bins.
 
-    ``year`` is forwarded to ``_loaders.get_age_distribution``. v2 passes
-    ``sim['start']`` here; if omitted, the loader defaults to year 2000 with
-    a warning, producing a materially different age distribution than v2's.
+    ``year`` is forwarded to ``_loaders.get_age_distribution``; if omitted,
+    the loader defaults to year 2000 with a warning, producing a materially
+    different age distribution than the sim-start year would.
     """
     arr = _loaders.get_age_distribution(location=location, year=year)
     return pd.DataFrame({
