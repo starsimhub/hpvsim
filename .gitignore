@@ -11,6 +11,15 @@ api/
 # Regression baselines (regenerate via tests/generate_v2_baselines.py)
 tests/regression_baselines/
 
+# Diagnostic outputs from regression instrumentation
+# (multi-seed JSONs, per-step traces, profiling reports)
+tests/regression/v[23]_seeds*.json
+tests/regression/v[23]_trace*.csv
+tests/regression/profile_v3_anchor*
+
+# Stale legacy regression artifact
+hpvsim/regression/
+
 # Other files
 .idea
 .vscode
