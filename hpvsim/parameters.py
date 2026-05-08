@@ -71,87 +71,124 @@ def _cell_imm_dist():
     return ss.Dist(distname='beta', a=a, b=b)
 
 
+# Per-genotype natural-history defaults. Values are primitives only so the
+# module-level dict isn't mutated by callers; ``GenotypePars.__init__``
+# constructs fresh ss.Dist / dict instances on each call. Duration entries
+# are ``(mean, std)`` tuples in years.
+_GENOTYPE_DEFAULTS = {
+    'hpv16': dict(
+        beta=0.25,
+        dur_precin_yr=(3.0, 9.0),
+        dur_cin_yr=(5.0, 20.0),
+        dur_cancer_yr=(8.0, 3.0),
+        dur_inf_male_yr=(1.0, 1.0),
+        cin_fn=dict(form='logf2', k=0.3, x_infl=0, ttc=50),
+        cancer_fn=dict(method='cin_integral', transform_prob=2e-3,
+                       form='logf2', k=0.3, x_infl=0, ttc=50),
+        age_risk=dict(age=30, risk=2),
+        rel_beta=1.0,
+        sero_prob=0.75,
+        transf2m=1.0,
+        transm2f=3.69,
+    ),
+    'hpv18': dict(
+        beta=0.25,
+        dur_precin_yr=(2.5, 9.0),
+        dur_cin_yr=(5.0, 20.0),
+        dur_cancer_yr=(8.0, 3.0),
+        dur_inf_male_yr=(1.0, 1.0),
+        cin_fn=dict(form='logf2', k=0.25, x_infl=0, ttc=50),
+        cancer_fn=dict(method='cin_integral', transform_prob=2e-3,
+                       form='logf2', k=0.25, x_infl=0, ttc=50),
+        age_risk=dict(age=30, risk=2),
+        rel_beta=0.75,
+        sero_prob=0.56,
+        transf2m=1.0,
+        transm2f=3.69,
+    ),
+    'hi5': dict(
+        beta=0.25,
+        dur_precin_yr=(2.5, 9.0),
+        dur_cin_yr=(4.5, 20.0),
+        dur_cancer_yr=(8.0, 3.0),
+        dur_inf_male_yr=(1.0, 1.0),
+        cin_fn=dict(form='logf2', k=0.2, x_infl=0, ttc=50),
+        cancer_fn=dict(method='cin_integral', transform_prob=1.5e-3,
+                       form='logf2', k=0.2, x_infl=0, ttc=50),
+        age_risk=dict(age=30, risk=2),
+        rel_beta=0.9,
+        sero_prob=0.60,
+        transf2m=1.0,
+        transm2f=3.69,
+    ),
+    'ohr': dict(
+        beta=0.25,
+        dur_precin_yr=(2.5, 9.0),
+        dur_cin_yr=(4.5, 20.0),
+        dur_cancer_yr=(8.0, 3.0),
+        dur_inf_male_yr=(1.0, 1.0),
+        cin_fn=dict(form='logf2', k=0.2, x_infl=0, ttc=50),
+        cancer_fn=dict(method='cin_integral', transform_prob=1.5e-3,
+                       form='logf2', k=0.2, x_infl=0, ttc=50),
+        age_risk=dict(age=30, risk=2),
+        rel_beta=0.9,
+        sero_prob=0.60,
+        transf2m=1.0,
+        transm2f=3.69,
+    ),
+}
+
+
+def _lognorm_yr(spec):
+    """Build an ``ss.lognorm_ex`` from a ``(mean, std)`` tuple in years."""
+    mean, std = spec
+    return ss.lognorm_ex(mean=ss.years(mean), std=ss.years(std))
+
+
 class GenotypePars(ss.Pars):
     """Per-genotype natural-history defaults for HPV.
 
     Each call returns fresh distribution instances so per-genotype RNG
     state stays independent. Supported genotypes: ``hpv16``, ``hpv18``,
     ``hi5``, ``ohr``.
+
+    Notes:
+      - ``beta`` is per-sex-act; SexualNetwork applies per-act via
+        ``1 - (1-p)**acts``.
+      - Female natural-history durations are lognormal in years; males
+        clear via ``dur_inf_male`` without entering CIN/cancer.
+      - ``cancer_fn`` carries ``cin_fn``'s keys so the ``cin_integral``
+        branch can call ``compute_severity_integral`` on the same logf2.
+      - ``imm_init`` is sampled per-clearance and feeds ``nab_imm``
+        (read by the CrossImmunity Connector).
+      - ``age_risk['age']``-and-older women get ``dur_cin`` scaled by
+        ``age_risk['risk']``, shifting cancer onset to older ages.
+      - ``transf2m`` / ``transm2f`` are sex-directional per-act scalars
+        — same across genotypes (act-level, not genotype-level).
     """
 
     def __init__(self, genotype='hpv16', **kwargs):
         super().__init__()
-        self.genotype = genotype
-        if genotype == 'hpv16':
-            # Per-sex-act probability; SexualNetwork applies per-act via
-            # 1 - (1-p)**acts.
-            self.beta = 0.25
-            # Female natural-history durations (lognormal mean / std in years).
-            self.dur_precin = ss.lognorm_ex(mean=ss.years(3.0), std=ss.years(9.0))
-            self.dur_cin = ss.lognorm_ex(mean=ss.years(5.0), std=ss.years(20.0))
-            self.dur_cancer = ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0))
-            # Males clear via this distribution without entering CIN/cancer.
-            self.dur_inf_male = ss.lognorm_ex(mean=ss.years(1.0), std=ss.years(1.0))
-            # Severity functions consumed by _compute_severity. cancer_fn
-            # carries cin_fn's keys so the cin_integral branch can call
-            # _compute_severity_integral on the same logf2 internally.
-            self.cin_fn = dict(form='logf2', k=0.3, x_infl=0, ttc=50)
-            self.cancer_fn = dict(method='cin_integral', transform_prob=2e-3,
-                                  form='logf2', k=0.3, x_infl=0, ttc=50)
-            # Same-genotype partial permanent immunity. imm_init is sampled
-            # per-clearance and feeds nab_imm (read by the CrossImmunity
-            # Connector to derive per-target rel_sus / sev_imm).
-            self.imm_init = _imm_init_dist()
-            self.cell_imm_init = _cell_imm_dist()
-            # Women aged >= ``age`` get their dur_cin scaled by ``risk``,
-            # shifting cancer onset to older ages.
-            self.age_risk = dict(age=30, risk=2)
-            # Reserved for multi-genotype: per-genotype beta scaler and
-            # serology probability. Currently unused by HPV.
-            self.rel_beta = 1.0
-            self.sero_prob = 0.75
-            # Sex-directional per-act transmission scalars. Multiplied into
-            # the per-network beta dict in HPV.__init__ to produce asymmetric
-            # m→f vs f→m transmission rates. Same defaults for all 4 genotypes
-            # — these are about the act, not the genotype.
-            self.transf2m = 1.0
-            self.transm2f = 3.69
-        elif genotype == 'hpv18':
-            self.beta = 0.25
-            self.dur_precin = ss.lognorm_ex(mean=ss.years(2.5), std=ss.years(9.0))
-            self.dur_cin = ss.lognorm_ex(mean=ss.years(5.0), std=ss.years(20.0))
-            self.dur_cancer = ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0))
-            self.dur_inf_male = ss.lognorm_ex(mean=ss.years(1.0), std=ss.years(1.0))
-            self.cin_fn = dict(form='logf2', k=0.25, x_infl=0, ttc=50)
-            self.cancer_fn = dict(method='cin_integral', transform_prob=2e-3,
-                                  form='logf2', k=0.25, x_infl=0, ttc=50)
-            self.imm_init = _imm_init_dist()
-            self.cell_imm_init = _cell_imm_dist()
-            self.age_risk = dict(age=30, risk=2)
-            self.rel_beta = 0.75
-            self.sero_prob = 0.56
-            self.transf2m = 1.0
-            self.transm2f = 3.69
-        elif genotype in ('hi5', 'ohr'):
-            self.beta = 0.25
-            self.dur_precin = ss.lognorm_ex(mean=ss.years(2.5), std=ss.years(9.0))
-            self.dur_cin = ss.lognorm_ex(mean=ss.years(4.5), std=ss.years(20.0))
-            self.dur_cancer = ss.lognorm_ex(mean=ss.years(8.0), std=ss.years(3.0))
-            self.dur_inf_male = ss.lognorm_ex(mean=ss.years(1.0), std=ss.years(1.0))
-            self.cin_fn = dict(form='logf2', k=0.2, x_infl=0, ttc=50)
-            self.cancer_fn = dict(method='cin_integral', transform_prob=1.5e-3,
-                                  form='logf2', k=0.2, x_infl=0, ttc=50)
-            self.imm_init = _imm_init_dist()
-            self.cell_imm_init = _cell_imm_dist()
-            self.age_risk = dict(age=30, risk=2)
-            self.rel_beta = 0.9
-            self.sero_prob = 0.60
-            self.transf2m = 1.0
-            self.transm2f = 3.69
-        else:
+        if genotype not in _GENOTYPE_DEFAULTS:
             raise NotImplementedError(
                 f'GenotypePars supports {GENOTYPE_KEYS}; got {genotype!r}.'
             )
+        d = _GENOTYPE_DEFAULTS[genotype]
+        self.genotype = genotype
+        self.beta = d['beta']
+        self.dur_precin = _lognorm_yr(d['dur_precin_yr'])
+        self.dur_cin = _lognorm_yr(d['dur_cin_yr'])
+        self.dur_cancer = _lognorm_yr(d['dur_cancer_yr'])
+        self.dur_inf_male = _lognorm_yr(d['dur_inf_male_yr'])
+        self.cin_fn = dict(d['cin_fn'])
+        self.cancer_fn = dict(d['cancer_fn'])
+        self.imm_init = _imm_init_dist()
+        self.cell_imm_init = _cell_imm_dist()
+        self.age_risk = dict(d['age_risk'])
+        self.rel_beta = d['rel_beta']
+        self.sero_prob = d['sero_prob']
+        self.transf2m = d['transf2m']
+        self.transm2f = d['transm2f']
         self.update(kwargs)
         return
 
