@@ -19,6 +19,7 @@ Run with:
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sciris as sc
 from scipy.stats import lognorm
 
 from hpvsim.hpv import _compute_severity
@@ -26,8 +27,13 @@ from hpvsim.parameters import get_genotype_pars
 
 
 GENOTYPES = ('hpv16',)
+# Canonical four-genotype slot order; HPV16 keeps its index-0 colour even
+# while M02 only iterates over hpv16. ``sc.gridcolors`` matches the
+# manuscript's ``plot_fig1.py``.
+_CANONICAL_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
+_PALETTE = sc.gridcolors(len(_CANONICAL_GENOTYPES))
 GENOTYPE_LABELS = {'hpv16': 'HPV16', 'hpv18': 'HPV18', 'hi5': 'Hi5', 'ohr': 'OHR'}
-GENOTYPE_COLORS = {'hpv16': 'C0', 'hpv18': 'C1', 'hi5': 'C2', 'ohr': 'C3'}
+GENOTYPE_COLORS = {g: _PALETTE[i] for i, g in enumerate(_CANONICAL_GENOTYPES)}
 
 
 def _lognorm_params(par1, par2):
