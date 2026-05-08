@@ -4,9 +4,9 @@
 ``GenotypePars`` holds per-genotype natural-history defaults (durations,
 severity functions, immunity, age risk) consumed by ``HPV(ss.Infection)``;
 ``get_genotype_pars(genotype)`` is the factory multi-genotype consumers
-use to look up defaults by name. Supports the four canonical M03 genotypes:
+use to look up defaults by name. Supports the four canonical genotypes:
 ``hpv16``, ``hpv18``, ``hi5`` (high-risk-5 pool), and ``ohr`` (other
-high-risk pool). Hand-ported from v2's ``get_genotype_pars``.
+high-risk pool).
 """
 
 import numpy as np
@@ -17,8 +17,8 @@ import starsim as ss
 __all__ = ['SimPars', 'GenotypePars', 'get_genotype_pars',
            'get_cross_immunity', 'genotype_aliases', 'GENOTYPE_KEYS']
 
-# Canonical 4-genotype ordering for M03's default Sim. The Connector uses
-# this order as the default when no genotype list is supplied.
+# Canonical 4-genotype ordering. The Connector uses this order as the
+# default when no genotype list is supplied.
 GENOTYPE_KEYS = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
 # Genotype name aliases for user ergonomics.
@@ -99,7 +99,8 @@ class GenotypePars(ss.Pars):
             self.cancer_fn = dict(method='cin_integral', transform_prob=2e-3,
                                   form='logf2', k=0.3, x_infl=0, ttc=50)
             # Same-genotype partial permanent immunity. imm_init is sampled
-            # per-clearance and feeds nab_imm (M03 Connector source state).
+            # per-clearance and feeds nab_imm (read by the CrossImmunity
+            # Connector to derive per-target rel_sus / sev_imm).
             self.imm_init = _imm_init_dist()
             self.cell_imm_init = _cell_imm_dist()
             # Women aged >= ``age`` get their dur_cin scaled by ``risk``,

@@ -27,10 +27,8 @@ from .utils import compute_severity
 
 
 # Per-genotype initial HPV prevalence by age bracket and sex. Brackets are
-# inclusive lower bounds; the last bracket extends to age 150. HPV16 retains
-# M02's curves verbatim; hpv18/hi5/ohr scale-down defaults from v2 reference
-# tables (we use 0.6x for hpv18 and 0.4x for hi5/ohr as proxies for the lower
-# observed prevalence of those clades; calibrated values come in M04).
+# inclusive lower bounds; the last bracket extends to age 150. HPV18 curves
+# are 0.6x of HPV16; hi5/ohr are 0.4x.
 _INIT_HPV_PREV_AGE_BRACKETS = np.array([12, 17, 24, 34, 44, 64, 80, 150])
 
 _INIT_PREV = {
@@ -51,10 +49,6 @@ _INIT_PREV = {
         'f': np.array([0.0, 0.14, 0.28, 0.10, 0.02, 0.004, 0.0002, 0.0]),
     },
 }
-
-# Public re-export — kept module-level for backward-compat with M02 imports.
-_INIT_HPV_PREV_M = _INIT_PREV['hpv16']['m']
-_INIT_HPV_PREV_F = _INIT_PREV['hpv16']['f']
 
 
 def _make_init_prev_fn(genotype):
@@ -280,7 +274,7 @@ class HPV(ss.Infection):
             # Severity immunity, accumulated as max-of-beta-samples on each
             # clearance. Shortens future dur_precin via (1 - sev_imm) factor.
             ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
-            # M03 raw source-genotype immunity. Bumped on clearance; read by
+            # Raw source-genotype immunity. Bumped on clearance; read by the
             # CrossImmunity Connector to derive per-target rel_sus and sev_imm.
             ss.FloatArr('nab_imm', label='Humoral immunity (source genotype)', default=0.0),
             ss.FloatArr('cell_imm', label='Cell-mediated immunity (source genotype)', default=0.0),

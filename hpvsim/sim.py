@@ -7,7 +7,7 @@ with location-specific age pyramid, plus a CrossImmunity connector — and
 forwards to ``ss.Sim``. Each component is overridable: passing ``diseases=``
 short-circuits the genotypes-sugar path.
 
-New kwargs (M03):
+Kwargs:
   ``init_seeding`` (str, default ``'exclusive'``):
     ``'exclusive'`` — one Bernoulli per agent using the hpv16 age-banded
     curve as the total HPV prevalence, then exactly one genotype assigned per
