@@ -166,6 +166,14 @@ _DEFAULT_CROSS_IMM_SUS_MED = 0.3
 _DEFAULT_CROSS_IMM_SUS_HIGH = 0.5
 _DEFAULT_CROSS_IMM_SEV_MED = 0.5
 _DEFAULT_CROSS_IMM_SEV_HIGH = 0.7
+# v2's own-immunity for non-canonical genotypes (hpv45, hi5, hi4, ohr, hr,
+# lr): clearance grants own_imm_hr=0.9 (not 1.0) — see
+# _v2_legacy/parameters.py:112 and the per-genotype dicts at lines 416-505.
+_DEFAULT_OWN_IMM_HR = 0.9
+
+# Genotypes whose own-immunity is hardcoded to 1.0 in v2 (hpv16, hpv18 dicts
+# at _v2_legacy/parameters.py:419, 431). Everyone else uses ``own_imm_hr``.
+_FULL_OWN_IMM_KEYS = frozenset({'hpv16', 'hpv18'})
 
 # Pairwise cross-protection clade map. 'high' = hpv16 <-> hpv18; everything
 # else is 'med'. Hand-ported from v2's get_cross_immunity (hpvsim/_v2_legacy/
@@ -176,14 +184,19 @@ _CLADE_HIGH_PAIRS = frozenset({
 })
 
 
-def _build_cross_matrix(keys, scalar_med, scalar_high):
-    """Pairwise cross-protection matrix; diagonal forced to 1.0."""
+def _build_cross_matrix(keys, scalar_med, scalar_high, own_imm_hr):
+    """Pairwise cross-protection matrix.
+
+    Diagonal: 1.0 for keys in ``_FULL_OWN_IMM_KEYS`` (hpv16, hpv18); else
+    ``own_imm_hr`` (0.9 by default, matching v2's non-canonical genotypes).
+    Off-diagonal: ``scalar_high`` for clade-high pairs, ``scalar_med`` else.
+    """
     n = len(keys)
     m = np.full((n, n), scalar_med, dtype=np.float32)
     for i, ki in enumerate(keys):
         for j, kj in enumerate(keys):
             if i == j:
-                m[i, j] = 1.0
+                m[i, j] = 1.0 if ki in _FULL_OWN_IMM_KEYS else own_imm_hr
             elif (ki, kj) in _CLADE_HIGH_PAIRS:
                 m[i, j] = scalar_high
     return m
@@ -191,14 +204,18 @@ def _build_cross_matrix(keys, scalar_med, scalar_high):
 
 def get_cross_immunity(keys=None,
                        cross_imm_sus_med=None, cross_imm_sus_high=None,
-                       cross_imm_sev_med=None, cross_imm_sev_high=None):
+                       cross_imm_sev_med=None, cross_imm_sev_high=None,
+                       own_imm_hr=None):
     """Build (cross_immunity_sus, cross_immunity_sev) matrices for the given
     genotype ordering.
 
     Returns a tuple of two ``(n, n)`` float32 arrays. ``keys`` defaults to
     ``GENOTYPE_KEYS``. Scalar defaults match v2 (`cross_imm_sus_med=0.3`,
-    `cross_imm_sus_high=0.5`, `cross_imm_sev_med=0.5`, `cross_imm_sev_high=0.7`).
-    Diagonals are forced to 1.0 by convention.
+    `cross_imm_sus_high=0.5`, `cross_imm_sev_med=0.5`, `cross_imm_sev_high=0.7`,
+    `own_imm_hr=0.9`).
+
+    Diagonal: 1.0 for hpv16 and hpv18 (canonical own-immunity); ``own_imm_hr``
+    for everyone else.
     """
     if keys is None:
         keys = GENOTYPE_KEYS
@@ -206,6 +223,7 @@ def get_cross_immunity(keys=None,
     if cross_imm_sus_high is None: cross_imm_sus_high = _DEFAULT_CROSS_IMM_SUS_HIGH
     if cross_imm_sev_med is None:  cross_imm_sev_med  = _DEFAULT_CROSS_IMM_SEV_MED
     if cross_imm_sev_high is None: cross_imm_sev_high = _DEFAULT_CROSS_IMM_SEV_HIGH
-    m_sus = _build_cross_matrix(keys, cross_imm_sus_med, cross_imm_sus_high)
-    m_sev = _build_cross_matrix(keys, cross_imm_sev_med, cross_imm_sev_high)
+    if own_imm_hr is None:         own_imm_hr         = _DEFAULT_OWN_IMM_HR
+    m_sus = _build_cross_matrix(keys, cross_imm_sus_med, cross_imm_sus_high, own_imm_hr)
+    m_sev = _build_cross_matrix(keys, cross_imm_sev_med, cross_imm_sev_high, own_imm_hr)
     return m_sus, m_sev

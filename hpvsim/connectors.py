@@ -59,10 +59,14 @@ class CrossImmunity(ss.Connector):
                     f'CrossImmunity.{label}: shape {m.shape} does not match '
                     f'number of HPV modules {n}'
                 )
-            if not np.allclose(np.diag(m), 1.0):
+            # Diagonal entries are own-immunity scalars in [0, 1]: 1.0 for
+            # hpv16/hpv18, ``own_imm_hr`` (0.9 by default) for hi5/ohr per v2
+            # (_v2_legacy/parameters.py:112). Reject anything outside [0, 1].
+            diag = np.diag(m)
+            if (diag < 0).any() or (diag > 1).any():
                 raise ValueError(
-                    f'CrossImmunity.{label}: diagonal must be 1.0; '
-                    f'got {np.diag(m)}'
+                    f'CrossImmunity.{label}: diagonal entries must be in '
+                    f'[0, 1]; got {diag}'
                 )
 
     def step(self):

@@ -13,17 +13,21 @@ def test_genotype_keys_are_canonical_four():
 
 
 def test_get_cross_immunity_default_shape_and_diagonal():
-    """Default cross-immunity matrices are (4, 4) float32 with diagonal == 1.0."""
+    """Default cross-immunity matrices are (4, 4) float32; diagonal = 1.0
+    for hpv16/hpv18, 0.9 (v2 own_imm_hr default) for hi5/ohr."""
     m_sus, m_sev = get_cross_immunity()
+    keys = ('hpv16', 'hpv18', 'hi5', 'ohr')
+    idx = {k: i for i, k in enumerate(keys)}
+    expected_diag = [1.0, 1.0, 0.9, 0.9]
     for m in (m_sus, m_sev):
         assert m.shape == (4, 4)
         assert m.dtype == np.float32
-        assert np.allclose(np.diag(m), 1.0)
+        assert np.allclose(np.diag(m), expected_diag)
 
 
 def test_get_cross_immunity_default_values():
     """Defaults match v2 scalars: cross_imm_sus_med=0.3, cross_imm_sus_high=0.5,
-    cross_imm_sev_med=0.5, cross_imm_sev_high=0.7."""
+    cross_imm_sev_med=0.5, cross_imm_sev_high=0.7, own_imm_hr=0.9."""
     m_sus, m_sev = get_cross_immunity()
     keys = ('hpv16', 'hpv18', 'hi5', 'ohr')
     idx = {k: i for i, k in enumerate(keys)}
@@ -34,8 +38,21 @@ def test_get_cross_immunity_default_values():
     # hpv16 -> hi5 = med
     assert m_sus[idx['hpv16'], idx['hi5']] == pytest.approx(0.3)
     assert m_sev[idx['hpv16'], idx['hi5']] == pytest.approx(0.5)
-    # Diagonal forced to 1.0 by convention.
-    assert m_sus[idx['hi5'], idx['hi5']] == pytest.approx(1.0)
+    # Diagonal: hpv16/hpv18 = 1.0 (canonical own-immunity); hi5/ohr = 0.9.
+    assert m_sus[idx['hpv16'], idx['hpv16']] == pytest.approx(1.0)
+    assert m_sus[idx['hi5'], idx['hi5']] == pytest.approx(0.9)
+    assert m_sev[idx['ohr'], idx['ohr']] == pytest.approx(0.9)
+
+
+def test_get_cross_immunity_own_imm_hr_override():
+    """own_imm_hr kwarg overrides the v2 0.9 default for non-canonical genotypes."""
+    m_sus, _ = get_cross_immunity(own_imm_hr=0.7)
+    keys = ('hpv16', 'hpv18', 'hi5', 'ohr')
+    idx = {k: i for i, k in enumerate(keys)}
+    # hpv16/hpv18 still 1.0; hi5/ohr now use the override.
+    assert m_sus[idx['hpv16'], idx['hpv16']] == pytest.approx(1.0)
+    assert m_sus[idx['hi5'], idx['hi5']] == pytest.approx(0.7)
+    assert m_sus[idx['ohr'], idx['ohr']] == pytest.approx(0.7)
 
 
 def test_get_cross_immunity_custom_keys():
@@ -83,10 +100,12 @@ def test_cross_immunity_connector_default_matrices():
     assert conn.cross_imm_sus[0, 0] == pytest.approx(1.0)
 
 
-def test_cross_immunity_connector_rejects_off_diagonal_self_immunity():
-    """Diagonal entries must be 1.0; init_pre raises otherwise."""
+def test_cross_immunity_connector_rejects_diagonal_outside_unit_interval():
+    """Diagonal entries must be in [0, 1] (own-immunity is a probability);
+    init_pre raises if outside that range. Per-key diagonal values < 1.0
+    (e.g. v2's own_imm_hr=0.9 for hi5/ohr) are now allowed."""
     from hpvsim.connectors import CrossImmunity
-    bad = np.array([[0.5]], dtype=np.float32)
+    bad = np.array([[1.5]], dtype=np.float32)
     conn = CrossImmunity(cross_imm_sus=bad, cross_imm_sev=bad)
     sim = hpv.Sim(
         n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0,
@@ -95,6 +114,19 @@ def test_cross_immunity_connector_rejects_off_diagonal_self_immunity():
     )
     with pytest.raises(ValueError, match='diagonal'):
         sim.init()
+
+
+def test_cross_immunity_connector_accepts_v2_style_diagonal():
+    """Per-key diagonal: hpv16/hpv18=1.0, hi5/ohr=0.9. init_pre must accept this."""
+    sim = hpv.Sim(
+        n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0,
+        genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
+    )
+    sim.init()
+    conn = sim.connectors.crossimmunity
+    # Diagonal layout per v2 _v2_legacy/parameters.py:419, 431, 455, 479.
+    assert np.allclose(np.diag(conn.cross_imm_sus), [1.0, 1.0, 0.9, 0.9])
+    assert np.allclose(np.diag(conn.cross_imm_sev), [1.0, 1.0, 0.9, 0.9])
 
 
 def test_cross_immunity_connector_rejects_shape_mismatch():
@@ -169,6 +201,115 @@ def test_cross_immunity_step_two_genotype_hand_computed():
     #          target hpv18, agent 1 = 0.7*0 + 1.0*0.5 = 0.5
     assert h16.sev_imm.values[0] == pytest.approx(0.3, abs=1e-6)
     assert h18.sev_imm.values[1] == pytest.approx(0.5, abs=1e-6)
+
+
+def test_cross_immunity_step_four_genotype_hand_computed():
+    """4-genotype: matrix multiply produces correct rel_sus / sev_imm.
+
+    Detects index-orientation bugs that 2-genotype cases can't catch (the 2x2
+    diagonal-symmetric matrix is invariant under target/source swap; 4x4 with
+    asymmetric source-vs-target structure is not).
+
+    Uses the v3-default 4-genotype matrices:
+        cross_imm_sus = [[1.0, 0.5, 0.3, 0.3],
+                         [0.5, 1.0, 0.3, 0.3],
+                         [0.3, 0.3, 0.9, 0.3],
+                         [0.3, 0.3, 0.3, 0.9]]
+        cross_imm_sev = [[1.0, 0.7, 0.5, 0.5],
+                         [0.7, 1.0, 0.5, 0.5],
+                         [0.5, 0.5, 0.9, 0.5],
+                         [0.5, 0.5, 0.5, 0.9]]
+    where row = target, col = source. Convention matches v2 (immunity[target_idx,
+    source_idx] = pars[label_target][label_source] in _v2_legacy/immunity.py:81).
+    """
+    from hpvsim.connectors import CrossImmunity
+    sim = hpv.Sim(
+        n_agents=8, start=1990, stop=1991, dt=1.0, rand_seed=0,
+        genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
+    )
+    sim.init()
+    h16 = sim.diseases.hpv16
+    h18 = sim.diseases.hpv18
+    hi5 = sim.diseases.hi5
+    ohr = sim.diseases.ohr
+    conn = sim.connectors.crossimmunity
+
+    # Agent 0: cleared hpv16 only (nab=0.4, cell=0.3).
+    h16.nab_imm.values[0] = 0.4
+    h16.cell_imm.values[0] = 0.3
+    # Agent 1: cleared hi5 only (nab=0.5, cell=0.4).
+    hi5.nab_imm.values[1] = 0.5
+    hi5.cell_imm.values[1] = 0.4
+    # Agent 2: cleared hpv16 (nab=0.4) AND hi5 (nab=0.5); cell=0.3 each.
+    h16.nab_imm.values[2] = 0.4
+    h16.cell_imm.values[2] = 0.3
+    hi5.nab_imm.values[2] = 0.5
+    hi5.cell_imm.values[2] = 0.3
+    # Agent 3: cleared ohr only (nab=0.6, cell=0.5).
+    ohr.nab_imm.values[3] = 0.6
+    ohr.cell_imm.values[3] = 0.5
+
+    conn.step()
+
+    # --- Agent 0 (cleared hpv16 only) ---
+    # sus_imm to each target = cross[target, hpv16] * nab[hpv16] = X * 0.4
+    # target hpv16: 1.0*0.4 = 0.40 -> rel_sus = 0.60
+    # target hpv18: 0.5*0.4 = 0.20 -> rel_sus = 0.80
+    # target hi5:   0.3*0.4 = 0.12 -> rel_sus = 0.88
+    # target ohr:   0.3*0.4 = 0.12 -> rel_sus = 0.88
+    assert h16.rel_sus.values[0] == pytest.approx(0.60, abs=1e-6)
+    assert h18.rel_sus.values[0] == pytest.approx(0.80, abs=1e-6)
+    assert hi5.rel_sus.values[0] == pytest.approx(0.88, abs=1e-6)
+    assert ohr.rel_sus.values[0] == pytest.approx(0.88, abs=1e-6)
+    # sev_imm to each target = cross_sev[target, hpv16] * cell[hpv16] = X * 0.3
+    # target hpv16: 1.0*0.3 = 0.30
+    # target hpv18: 0.7*0.3 = 0.21
+    # target hi5:   0.5*0.3 = 0.15
+    # target ohr:   0.5*0.3 = 0.15
+    assert h16.sev_imm.values[0] == pytest.approx(0.30, abs=1e-6)
+    assert h18.sev_imm.values[0] == pytest.approx(0.21, abs=1e-6)
+    assert hi5.sev_imm.values[0] == pytest.approx(0.15, abs=1e-6)
+    assert ohr.sev_imm.values[0] == pytest.approx(0.15, abs=1e-6)
+
+    # --- Agent 1 (cleared hi5 only) ---
+    # sus_imm to each target = cross[target, hi5] * nab[hi5] = X * 0.5
+    # target hpv16: 0.3*0.5 = 0.15 -> rel_sus = 0.85
+    # target hpv18: 0.3*0.5 = 0.15 -> rel_sus = 0.85
+    # target hi5:   0.9*0.5 = 0.45 -> rel_sus = 0.55
+    # target ohr:   0.3*0.5 = 0.15 -> rel_sus = 0.85
+    assert h16.rel_sus.values[1] == pytest.approx(0.85, abs=1e-6)
+    assert h18.rel_sus.values[1] == pytest.approx(0.85, abs=1e-6)
+    assert hi5.rel_sus.values[1] == pytest.approx(0.55, abs=1e-6)
+    assert ohr.rel_sus.values[1] == pytest.approx(0.85, abs=1e-6)
+    # sev_imm: cross_sev[target, hi5] * 0.4
+    # target hpv16: 0.5*0.4 = 0.20
+    # target hpv18: 0.5*0.4 = 0.20
+    # target hi5:   0.9*0.4 = 0.36
+    # target ohr:   0.5*0.4 = 0.20
+    assert h16.sev_imm.values[1] == pytest.approx(0.20, abs=1e-6)
+    assert hi5.sev_imm.values[1] == pytest.approx(0.36, abs=1e-6)
+    assert ohr.sev_imm.values[1] == pytest.approx(0.20, abs=1e-6)
+
+    # --- Agent 2 (cleared hpv16 AND hi5) — additivity test ---
+    # sus_imm[target] = cross[target, hpv16]*0.4 + cross[target, hi5]*0.5
+    # target hpv16: 1.0*0.4 + 0.3*0.5 = 0.55 -> rel_sus = 0.45
+    # target hpv18: 0.5*0.4 + 0.3*0.5 = 0.35 -> rel_sus = 0.65
+    # target hi5:   0.3*0.4 + 0.9*0.5 = 0.57 -> rel_sus = 0.43
+    # target ohr:   0.3*0.4 + 0.3*0.5 = 0.27 -> rel_sus = 0.73
+    assert h16.rel_sus.values[2] == pytest.approx(0.45, abs=1e-6)
+    assert h18.rel_sus.values[2] == pytest.approx(0.65, abs=1e-6)
+    assert hi5.rel_sus.values[2] == pytest.approx(0.43, abs=1e-6)
+    assert ohr.rel_sus.values[2] == pytest.approx(0.73, abs=1e-6)
+
+    # --- Agent 3 (cleared ohr only) — non-canonical source asymmetry ---
+    # sus_imm to each target = cross[target, ohr] * 0.6
+    # target hpv16: 0.3*0.6 = 0.18 -> rel_sus = 0.82
+    # target hpv18: 0.3*0.6 = 0.18 -> rel_sus = 0.82
+    # target hi5:   0.3*0.6 = 0.18 -> rel_sus = 0.82
+    # target ohr:   0.9*0.6 = 0.54 -> rel_sus = 0.46
+    assert h16.rel_sus.values[3] == pytest.approx(0.82, abs=1e-6)
+    assert hi5.rel_sus.values[3] == pytest.approx(0.82, abs=1e-6)
+    assert ohr.rel_sus.values[3] == pytest.approx(0.46, abs=1e-6)
 
 
 def test_cross_immunity_step_clips_to_unit_interval():
