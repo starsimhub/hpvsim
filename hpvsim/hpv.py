@@ -20,6 +20,7 @@ identity matrix on the Connector.
 """
 
 import numpy as np
+import sciris as sc
 import starsim as ss
 
 from .utils import compute_severity
