@@ -1,51 +1,40 @@
 """M02 reproduction of methods-paper Fig 1 (natural history), HPV16-only.
 
-Validates the M02 single-genotype natural-history pipeline by visualising
-the per-genotype duration distributions and progression-probability curves
-against the parameters in ``hpvsim.parameters.GenotypePars``, plus the
-final-outcome shares observed in a single-genotype anchor sim.
+Single-genotype port of ``plot_nh_simple`` from
+https://github.com/hpvsim/hpvsim_methods_manuscript/blob/main/plot_fig1.py.
 
-Adapted from the v2 ``tests/devtests/test_new_progs.py:make_fig1`` to fit
-M02's scope:
-  - Single genotype (HPV16) instead of {hpv16, hpv18, hi5, ohr}
-  - Single CIN compartment (no CIN1 / CIN2 / CIN3 stratification or
-    peak-severity colour bands)
-  - Final-outcome panel computed from the M02 sim (not a v2-specific helper)
+The manuscript script loops over four genotypes (hpv16, hpv18, hi5, ohr);
+M02 ships HPV16 only, so this version produces the same 2x2 figure with a
+single genotype. Adding genotypes in M03+ is a one-line edit to
+``GENOTYPES``.
 
-Multi-genotype panels (and CIN-grade stratification) return when those
-features land in M03+; the script is structured so adding genotypes is a
-one-line edit to ``GENOTYPES`` below.
+The math is identical to the manuscript: v3's ``GenotypePars.cancer_fn``
+already carries the cin_fn keys (form, k, x_infl, ttc), so passing
+``gp.cancer_fn`` to ``_compute_severity`` produces the same values as the
+manuscript's ``sc.mergedicts(cin_fn, cancer_fn)`` call.
 
 Run with:
     python tests/regression/methods_fig1_hpv16.py
 """
 
-import sys
-from pathlib import Path
-
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.stats import lognorm
 
-import hpvsim as hpv
 from hpvsim.hpv import _compute_severity
 from hpvsim.parameters import get_genotype_pars
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from anchor_hpv16 import PARS  # noqa: E402
-
 
 GENOTYPES = ('hpv16',)
+GENOTYPE_LABELS = {'hpv16': 'HPV16', 'hpv18': 'HPV18', 'hi5': 'Hi5', 'ohr': 'OHR'}
 GENOTYPE_COLORS = {'hpv16': 'C0', 'hpv18': 'C1', 'hi5': 'C2', 'ohr': 'C3'}
 
 
-def _lognorm_pdf(x, mean, std):
-    """PDF of a lognormal parameterised by (mean, std) — matches ``ss.lognorm_ex``."""
-    var = std ** 2
-    sigma2 = np.log(1.0 + var / mean ** 2)
-    sigma = np.sqrt(sigma2)
-    mu = np.log(mean) - 0.5 * sigma2
-    return lognorm.pdf(x, s=sigma, scale=np.exp(mu))
+def _lognorm_params(par1, par2):
+    """(mean, std) -> scipy lognorm (shape, scale). Matches the manuscript helper."""
+    mean = np.log(par1 ** 2 / np.sqrt(par2 ** 2 + par1 ** 2))
+    sigma = np.sqrt(np.log(par2 ** 2 / par1 ** 2 + 1))
+    return sigma, np.exp(mean)
 
 
 def _dur_mean_std_years(dist):
@@ -55,143 +44,73 @@ def _dur_mean_std_years(dist):
     return float(getattr(mean, 'years', mean)), float(getattr(std, 'years', std))
 
 
-def _outcome_shares(sim):
-    """Worst-progression shares for *currently-alive* ever-infected women.
-
-    Each woman is classified by the worst stage she's reached so far. We
-    restrict to alive women because dead women have their compartment
-    flags reset in ``step_die`` and the schedule timestamps don't tell
-    us whether the transition fired before background mortality. Restricting
-    to survivors biases against late-life cancer (women who died of cancer
-    are excluded), so the cancer share here is a *lower bound*.
-    """
-    mod = sim.diseases.hpv16
-    people = sim.people
-    alive = people.alive.raw.astype(bool)
-    female = people.female.raw.astype(bool)
-    ever_inf = (~mod.ti_first_infection.isnan.raw) & female & alive
-
-    # Active compartment flags are valid for alive agents.
-    in_cin = mod.cin.raw.astype(bool) & alive
-    in_cancer = mod.cancerous.raw.astype(bool) & alive
-    # "Reached CIN" includes alive agents currently in CIN, plus alive agents
-    # currently in cancer (they passed through CIN), plus alive agents who
-    # cleared from CIN (ti_cin set & ti_clearance set & ti_clearance was
-    # after ti_cin).
-    cleared_from_cin = (
-        ever_inf
-        & (~mod.ti_cin.isnan.raw)
-        & (~mod.ti_clearance.isnan.raw)
-        & (mod.ti_clearance.raw >= mod.ti_cin.raw)
-    )
-    ever_cin = ever_inf & (in_cin | in_cancer | cleared_from_cin)
-    ever_cancer = ever_inf & in_cancer
-
-    n = int(ever_inf.sum())
-    if n == 0:
-        return dict(none=0., cin=0., cancer=0.)
-    return dict(
-        none=float((ever_inf & ~ever_cin).sum()) / n,
-        cin=float((ever_cin & ~ever_cancer).sum()) / n,
-        cancer=float(ever_cancer.sum()) / n,
-    )
-
-
 def main():
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(11, 9))
+    axes = axes.flatten()
 
-    # --- Top-left: pre-CIN duration PDFs ---
-    # x starts at 0.5 — the lognormal mode for these high-variance fits is
-    # very close to 0, so plotting from 0.01 makes the rest of the body
-    # invisible in print scale.
-    ax = axes[0, 0]
-    x_precin = np.linspace(0.5, 30, 400)
-    for g in GENOTYPES:
-        gp = get_genotype_pars(g)
-        mean, std = _dur_mean_std_years(gp.dur_precin)
-        ax.plot(x_precin, _lognorm_pdf(x_precin, mean, std),
-                color=GENOTYPE_COLORS[g], lw=2, label=g.upper())
-    ax.set_xlabel('Pre-CIN duration (years)')
-    ax.set_title('Distribution of infection durations\nprior to CIN or clearance')
-    ax.grid(alpha=0.3)
-    ax.legend()
+    dt = 0.25
+    this_precinx = np.arange(dt, 15 + dt, dt)
+    years = np.arange(1, 16, 1)
+    this_cinx = np.arange(dt, 30 + dt, dt)
 
-    # --- Top-middle: P(CIN | duration) ---
-    ax = axes[0, 1]
-    for g in GENOTYPES:
-        gp = get_genotype_pars(g)
-        p_cin = _compute_severity(x_precin, rel_sev=None, pars=gp.cin_fn)
-        ax.plot(x_precin, p_cin, color=GENOTYPE_COLORS[g], lw=2, label=g.upper())
-    ax.set_xlabel('Pre-CIN duration (years)')
-    ax.set_ylabel('P(progress to CIN)')
-    ax.set_title('Probability of progressing to CIN\nby pre-CIN duration')
-    ax.set_ylim(0, 1.05)
-    ax.grid(alpha=0.3)
-    ax.legend()
+    width = 0.2
+    multiplier = 0
+    for gi, gtype in enumerate(GENOTYPES):
+        gp = get_genotype_pars(gtype)
+        color = GENOTYPE_COLORS[gtype]
+        label = GENOTYPE_LABELS[gtype]
 
-    # --- Top-right: CIN duration PDFs ---
-    ax = axes[0, 2]
-    x_cin = np.linspace(0.5, 30, 400)
-    for g in GENOTYPES:
-        gp = get_genotype_pars(g)
-        mean, std = _dur_mean_std_years(gp.dur_cin)
-        ax.plot(x_cin, _lognorm_pdf(x_cin, mean, std),
-                color=GENOTYPE_COLORS[g], lw=2, label=g.upper())
-    ax.set_xlabel('CIN duration (years)')
-    ax.set_title('Distribution of CIN durations\nprior to cancer or clearance')
-    ax.grid(alpha=0.3)
-    ax.legend()
+        # Panel A: durations of infection (bar chart at integer years).
+        precin_mean, precin_std = _dur_mean_std_years(gp.dur_precin)
+        sigma, scale = _lognorm_params(precin_mean, precin_std)
+        rv = lognorm(sigma, 0, scale)
+        offset = width * multiplier
+        axes[0].bar(years + offset - width / 3, rv.pdf(years),
+                    color=color, lw=2, label=label, width=width)
+        multiplier += 1
 
-    # --- Bottom-left: P(cancer | CIN duration) ---
-    ax = axes[1, 0]
-    for g in GENOTYPES:
-        gp = get_genotype_pars(g)
-        p_cancer = _compute_severity(x_cin, rel_sev=None, pars=gp.cancer_fn)
-        ax.plot(x_cin, p_cancer, color=GENOTYPE_COLORS[g], lw=2, label=g.upper())
-    ax.set_xlabel('CIN duration (years)')
-    ax.set_ylabel('P(progress to cancer)')
-    ax.set_title('Probability of progressing to cancer\nby CIN duration')
-    ax.grid(alpha=0.3)
-    ax.legend()
+        # Panel B: probability of CIN by infection duration.
+        dysp = _compute_severity(this_precinx, rel_sev=None, pars=gp.cin_fn)
+        axes[1].plot(this_precinx, dysp, color=color, lw=2, label=gtype.upper())
 
-    # --- Bottom-middle: simulated worst-progression shares ---
-    ax = axes[1, 1]
-    sim = hpv.Sim(**PARS)
-    sim.run()
-    shares = _outcome_shares(sim)
-    labels = ('None\n(precin clear)', 'CIN\n(no cancer)', 'Cancer')
-    keys = ('none', 'cin', 'cancer')
-    colors = ('#9ec5e8', '#f4a460', '#d97070')
-    ax.bar(labels, [shares[k] for k in keys], color=colors, edgecolor='k')
-    ax.set_ylabel('Share of ever-infected women')
-    ax.set_title(f'Eventual outcomes for women\n(HPV16 anchor sim, n={sim.pars.n_agents})')
-    ax.grid(axis='y', alpha=0.3)
-    for i, k in enumerate(keys):
-        ax.text(i, shares[k] + 0.01, f'{shares[k]:.1%}', ha='center', fontsize=10)
+        # Panel C: distribution of CIN durations.
+        cin_mean, cin_std = _dur_mean_std_years(gp.dur_cin)
+        sigma, scale = _lognorm_params(cin_mean, cin_std)
+        rv = lognorm(sigma, 0, scale)
+        axes[2].plot(this_cinx, rv.pdf(this_cinx),
+                     color=color, lw=2, label=label)
 
-    # --- Bottom-right: legend / scope notes ---
-    ax = axes[1, 2]
-    ax.axis('off')
-    notes = (
-        'M02 scope notes\n'
-        '─────────────────────\n'
-        'Single genotype: HPV16 only.\n'
-        'Genotypes hpv18 / hi5 / ohr land in M03+.\n\n'
-        'Single CIN compartment — no CIN1 / CIN2 /\n'
-        'CIN3 stratification or peak-severity bands.\n\n'
-        'Outcome shares restricted to currently-alive\n'
-        'ever-infected women (post-mortem flags are\n'
-        'reset by step_die). Cancer share is a lower\n'
-        'bound — women who died of cancer are excluded.\n\n'
-        f'Anchor: {PARS["location"]}, '
-        f'{int(getattr(PARS["start"], "years", PARS["start"]))}–'
-        f'{int(getattr(PARS["stop"], "years", PARS["stop"]))}, '
-        f'seed={PARS["rand_seed"]}.\n'
-    )
-    ax.text(0.0, 1.0, notes, ha='left', va='top', family='monospace', fontsize=11)
+        # Panel D: probability of cancer by CIN duration. v3's cancer_fn
+        # already carries cin_fn's keys, so passing it directly matches
+        # the manuscript's mergedicts(cin_fn, cancer_fn) call.
+        cancer = _compute_severity(this_cinx, rel_sev=None, pars=gp.cancer_fn)
+        axes[3].plot(this_cinx, cancer, color=color, lw=2, label=gtype.upper())
 
-    fig.suptitle('M02 natural-history confirmation (Fig 1 reproduction, HPV16)',
-                 fontsize=14)
+    axes[0].set_ylabel("")
+    axes[0].grid()
+    axes[0].set_xlabel("Duration of infection (years)")
+    axes[0].set_title("(A) Probability of persistance")
+    axes[0].legend(frameon=False)
+
+    axes[1].set_ylabel("Probability of CIN")
+    axes[1].set_xlabel("Duration of infection (years)")
+    axes[1].set_title("(B) Probability that an infection of at least\n"
+                      "X years will lead to high-grade lesions")
+    axes[1].set_ylim([0, 1])
+    axes[1].grid()
+
+    axes[2].set_ylabel("")
+    axes[2].grid()
+    axes[2].set_xlabel("Duration of high-grade lesions (years)")
+    axes[2].set_title("(C) Distribution of high-grade lesion duration")
+    axes[2].legend(frameon=False)
+
+    axes[3].set_ylim([0, 1])
+    axes[3].grid()
+    axes[3].set_xlabel("Duration of CIN (years)")
+    axes[3].set_title("(D) Probability that a high-grade lesion of \n"
+                      "at least X years will eventuate in cancer")
+
     fig.tight_layout()
     plt.show()
     return fig
