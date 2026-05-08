@@ -31,7 +31,7 @@ Pinned in `anchor.py:PARS`:
 | `genotypes` | `[16, 18, 'hi5', 'ohr']` |
 | `start` | `1990` |
 | `end` | `2060` |
-| `dt` | `0.5` |
+| `dt` | `0.25` |
 | `burnin` | `20` |
 | `rand_seed` | `0` |
 | `verbose` | `0` |
@@ -146,7 +146,7 @@ PARS = dict(
     genotypes=['hpv16'],
     start=1990,
     end=2060,
-    dt=0.5,
+    dt=0.25,  # Must match v2's default and the v3 anchor_hpv16.py PARS
     burnin=20,
     rand_seed=0,
     verbose=0,
@@ -213,46 +213,162 @@ names.
 
 ### Partnership-equivalence baseline (`partnership_v2.json`)
 
-Supports the M01 acceptance gate (`tests/test_partnership_equivalence.py`,
-landing in Task 13). v2 has 2 layers (m, c) — partnership_v2.json uses
-both. Recipe:
+Supports the M01 acceptance gate (`tests/test_partnership_equivalence.py`).
+v2 has 2 layers (m, c) — partnership_v2.json uses both. The working
+generation script lives in the v2 frozen worktree at
+`hpvsim_v23_frozen/gen_partnership_v2.py`; the PARS it uses are below.
 
 ```python
-import json
-import numpy as np
-import sciris as sc
-import hpvsim as hpv2
-
 PARS = dict(
     n_agents=10e3,
     location='nigeria',
     genotypes=['hpv16'],
     start=1990,
     end=2015,
-    dt=0.5,
+    dt=0.25,                # Match v2 default (and v3 standard)
     burnin=20,
+    rand_seed=0,
+    verbose=0,
+    pop_scale=1,            # Disable real-world scaling (match v3)
+    total_pop=10000,        # Match n_agents so pop_scale stays 1
+    ms_agent_ratio=1,       # Disable multiscale dynamic agent spawning. v3
+                            # has no multiscale; v2's default ms_agent_ratio=10
+                            # spawns level1 sub-agents on cancer events that
+                            # otherwise inflate alive-agent slots and
+                            # contaminate the comparison.
+)
+```
+
+Two accounting traps when capturing v2 stats:
+
+1. **`len(people.alive)` is the allocated-slot count, not alive-agent count.**
+   The slot array grows via births / migration / multiscale and never shrinks
+   when agents die, so dead-agent slots get bucketed into `0 partners` and
+   inflate the apparent population. Filter by `np.asarray(people.alive)` to
+   get the true alive-agent set, matching v3's
+   `_capture_partnership_stats` which uses `people.alive.uids`.
+2. **`dur` in v2's `to_df()` is the original-formation duration (years).**
+   v3 stores remaining timesteps and reconstructs original via
+   `(remaining + elapsed) * dt`. The two are directly comparable.
+
+The M01 partnership-equivalence test reads this JSON and runs KS-tests +
+bin-wise diff against equivalent quantities produced by v3.
+
+## M02 baseline regeneration
+
+The M02 milestone extends `short_summary` from 3 keys (M01) to 8 keys
+covering HPV + CIN/cancer trajectories (`total cancers`, `total cancer
+deaths`, `mean cancer incidence (per 100k)`, `mean age of cancer`,
+`mean age of cancer death`). M01-era 3-key baselines at
+`tests/regression_baselines/anchor_hpv16.json` are incompatible with the
+M02 drift gate.
+
+To regenerate against v2.3:
+
+1. **Set up a v2.3 environment** alongside this repo. Two options:
+   - Local clone: `C:/Users/ryanhu/PycharmProjects/hpvsim_v23_frozen` (already
+     present on the user's machine) — activate that repo's venv.
+   - Fresh venv: `python -m venv .v23-venv && .v23-venv/Scripts/pip install
+     hpvsim==2.3` (Windows) or `.v23-venv/bin/pip install hpvsim==2.3`
+     (Linux/macOS).
+
+2. **Update the baseline-generation script (if needed)** to call v2.3's
+   `Sim(...)` API. v2.3's constructor signature differs from v3's — e.g.
+   `genotypes=['hpv16']` (a list) vs. v3's `genotype='hpv16'`
+   (single). For the M02 1-genotype anchor, pass `genotypes=['hpv16']` to v2.3
+   to match the M02 anchor.
+
+3. **Run** the v2.3 baseline-generation script to produce
+   `anchor_hpv16.json` with all 8 keys filled in. The summary keys must
+   match what `tests/regression/anchor_hpv16.py:run_and_summarize()`
+   produces. Use the template provided in the M01 section above as a starting
+   point, but compute all 8 M02 keys (cancer counts, ages, incidence rates).
+
+4. **Place the result at** `tests/regression_baselines/anchor_hpv16.json`.
+   The path is gitignored by `.gitignore` (`tests/regression_baselines/*.json`)
+   so the baseline file stays local-only.
+
+5. **Run the drift gate**:
+
+   ```
+   pytest tests/test_regression.py::test_anchor_hpv16_drift -v
+   ```
+
+   Expected: PASS within ±10% per metric, OR FAIL with a printed list of
+   out-of-tolerance metrics. Per migration convention 2 the gate is
+   informational, not auto-blocking — on failure the PR carries either
+   a fix or an explicit drift-classification note + tracking issue.
+
+### M02-specific notes
+
+- `total cancer deaths` may be 0 in the M02 anchor scenario (1990–2060)
+  because cancer durations average ~8 years and the last cancer-onset events
+  fire in the late 2050s, leaving no time for cancer deaths to realize.
+  Both v2.3 and v3 should agree on this — verify after regenerating.
+- Mean ages of cancer / cancer death rely on starsim freezing `people.age`
+  at agent death. If that assumption changes in a future starsim version,
+  recompute against the actual people-age semantics.
+- **dt must be 0.25** in both v3 and v2 baseline-gen scripts. v2's default
+  sim timestep is `dt=0.25` (quarterly), declared at
+  `_v2_legacy/parameters.py:61`. The M02 anchor (and any v2 baseline-regen
+  script) must use the same `dt=0.25` so both runs use v2's default-driven
+  calibrations. If you regenerate the v2 baseline, update the generation
+  script's `PARS` dict to `dt=0.25`.
+- **AgeMigration fires annually, not every sim step.** v2's
+  `check_migration` ran annually via `update_freq = max(1, int(dt_demog/dt))
+  = 4` at `dt=0.25` (fired once every 4 sim steps). v3 matches this by
+  setting `dt=ss.year` on the `AgeMigration` module constructor, which causes
+  `ss.Loop` to call `step()` only at integer-year timesteps regardless of the
+  sim's own dt. Per-step immigration/emigration counts in v3 results reflect
+  annual totals (1 firing/year), not quarterly (4 firings/year).
+
+## M02 age-cancer capability baseline
+
+Supports the M02 capability gate (`tests/test_natural_history.py::test_m02_capability_age_stratified_cancers`,
+landing in Task 16). The baseline file is gitignored at:
+
+```
+tests/regression_baselines/m02_age_cancer.json
+```
+
+### Generating the baseline
+
+Generate by running, in the v2.3 environment described in the M02 baseline-regeneration section above:
+
+```python
+import numpy as np
+import json
+import sciris as sc
+import hpvsim as hpv  # v2.3 here
+
+# Same anchor pars as the regression baseline
+pars = dict(
+    n_agents=10_000,
+    location='nigeria',
+    genotypes=['hpv16'],
+    start=1990,
+    end=2060,
+    dt=0.25,  # Must match v2's default and the v3 anchor_hpv16.py PARS
     rand_seed=0,
     verbose=0,
 )
 
-sim = hpv2.Sim(sc.dcp(PARS))
+# Capture age-stratified cancer incidence at end of sim (year 2059)
+sim = hpv.Sim(sc.dcp(pars))
 sim.run()
 
-# Capture per-layer (m, c) mixing matrix (16x16 for 5y bins, 0-80,
-# female × male), concurrency histogram, and partnership-duration samples.
-# v2 stores these on sim.people in layer-keyed structures; consult v2
-# internals for exact attribute names.
+# v2.3 stores cancer_incidence_by_age as a 2D result array
+# (time x age_bins). Extract the final year's column (index -1).
+# v2's default age bins: 0, 5, 10, ..., 100 (21 bins).
+arr = np.asarray(sim.results['cancer_incidence_by_age'])[:, -1]
 
-out = {}
-for layer in ('m', 'c'):
-    out[layer] = {
-        'mixing_matrix': ...,      # 2d list, 16x16, density-normalized
-        'concurrency_hist': ...,   # 1d list, indexed by n_concurrent_partners
-        'duration_samples': ...,   # 1d list, completed-edge durations in years
-    }
-with open('tests/regression_baselines/partnership_v2.json', 'w') as f:
-    json.dump(out, f)
+import os
+os.makedirs('tests/regression_baselines', exist_ok=True)
+with open('tests/regression_baselines/m02_age_cancer.json', 'w') as f:
+    json.dump({'cancer_incidence_by_age': arr.tolist()}, f, indent=2)
+print(f'Wrote m02_age_cancer.json with {len(arr)} age bands')
 ```
 
-The M01 partnership-equivalence test reads this JSON and runs KS-tests +
-bin-wise diff against equivalent quantities produced by v3.
+The output shape must match `(n_bins,)` and use the same 5-yr age bins as
+`hpv.AgeResults` defaults (0, 5, 10, ..., 100, so 21 bins total). The file
+is gitignored.

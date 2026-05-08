@@ -8,7 +8,10 @@ import hpvsim
 def test_load_country_returns_expected_keys():
     """load_country returns a dict with exactly the expected top-level keys."""
     out = hpvsim.data.load_country('nigeria')
-    expected = {'age_data', 'birth_rate', 'death_rate', 'network_pars'}
+    expected = {
+        'age_data', 'birth_rate', 'death_rate', 'network_pars',
+        'pop_total', 'pop_by_age',  # added in M02 for AgeMigration
+    }
     assert set(out.keys()) == expected, f'unexpected keys: {set(out.keys())}'
 
 
@@ -49,15 +52,19 @@ def test_death_rate_shape():
     assert set(df['Sex'].unique()) <= {'Female', 'Male'}
 
 
-def test_network_pars_per_layer():
-    """network_pars contains entries for the two v2 layers m/c."""
+def test_network_pars_shape():
+    """network_pars carries layer_pars for v2 layers (m, c) plus shared debut."""
     out = hpvsim.data.load_country('nigeria')
     np_pars = out['network_pars']
-    assert set(np_pars.keys()) == {'m', 'c'}, f'layers: {list(np_pars.keys())}'
+    assert set(np_pars.keys()) == {'layer_pars', 'debut'}, \
+        f'top-level keys: {list(np_pars.keys())}'
+    layer_pars = np_pars['layer_pars']
+    assert set(layer_pars.keys()) == {'m', 'c'}, f'layers: {list(layer_pars.keys())}'
     expected = {'partners', 'mixing', 'layer_probs', 'cross_layer', 'duration', 'acts'}
-    for layer, layer_pars in np_pars.items():
-        assert expected.issubset(layer_pars.keys()), \
-            f'layer {layer} missing keys: {expected - set(layer_pars.keys())}'
+    for layer, lp in layer_pars.items():
+        assert expected.issubset(lp.keys()), \
+            f'layer {layer} missing keys: {expected - set(lp.keys())}'
+    assert set(np_pars['debut'].keys()) == {'f', 'm'}
 
 
 def test_unknown_location_raises():
