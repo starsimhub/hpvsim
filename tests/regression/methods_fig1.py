@@ -1,12 +1,11 @@
-"""M02 reproduction of methods-paper Fig 1 (natural history), HPV16-only.
+"""Reproduction of methods-paper Fig 1 (natural history), all four genotypes.
 
-Single-genotype port of ``plot_nh_simple`` from
+Port of ``plot_nh_simple`` from
 https://github.com/hpvsim/hpvsim_methods_manuscript/blob/main/plot_fig1.py.
 
-The manuscript script loops over four genotypes (hpv16, hpv18, hi5, ohr);
-M02 ships HPV16 only, so this version produces the same 2x2 figure with a
-single genotype. Adding genotypes in M03+ is a one-line edit to
-``GENOTYPES``.
+Loops over (hpv16, hpv18, hi5, ohr) — added in M03 once the per-genotype
+``GenotypePars`` defaults landed. The M02 single-genotype version of this
+script lived as ``methods_fig1_hpv16.py``.
 
 The math is identical to the manuscript: v3's ``GenotypePars.cancer_fn``
 already carries the cin_fn keys (form, k, x_infl, ttc), so passing
@@ -14,7 +13,7 @@ already carries the cin_fn keys (form, k, x_infl, ttc), so passing
 manuscript's ``sc.mergedicts(cin_fn, cancer_fn)`` call.
 
 Run with:
-    python tests/regression/methods_fig1_hpv16.py
+    python tests/regression/methods_fig1.py
 """
 
 import numpy as np
@@ -26,14 +25,11 @@ from hpvsim.parameters import get_genotype_pars
 from hpvsim.utils import compute_severity
 
 
-GENOTYPES = ('hpv16',)
-# Canonical four-genotype slot order; HPV16 keeps its index-0 colour even
-# while M02 only iterates over hpv16. ``sc.gridcolors`` matches the
-# manuscript's ``plot_fig1.py``.
-_CANONICAL_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
-_PALETTE = sc.gridcolors(len(_CANONICAL_GENOTYPES))
+GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
+# ``sc.gridcolors`` matches the manuscript's ``plot_fig1.py`` palette.
+_PALETTE = sc.gridcolors(len(GENOTYPES))
 GENOTYPE_LABELS = {'hpv16': 'HPV16', 'hpv18': 'HPV18', 'hi5': 'Hi5', 'ohr': 'OHR'}
-GENOTYPE_COLORS = {g: _PALETTE[i] for i, g in enumerate(_CANONICAL_GENOTYPES)}
+GENOTYPE_COLORS = {g: _PALETTE[i] for i, g in enumerate(GENOTYPES)}
 
 
 def _lognorm_params(par1, par2):
