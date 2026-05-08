@@ -241,6 +241,8 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 | Split data files (#12) | M10 or opportunistic | Loading performance |
 | Fix automatic download failures (#30) | M0 or M10 | Infrastructure hygiene |
 | Sex-specific initial prevalence | M2 | v2.x seeds initial infections differently by sex |
+| Location-name normalization + subnational regions | M4 | M2 only matches exact lower-cased country names against `_KNOWN_LOCATIONS`. Calibration users will need fuzzy matching for complex country names (e.g., "Côte d'Ivoire" / "Cote d'Ivoire" / "Ivory Coast") and a path to model subnational regions (long-standing user request that the v2 country-level adapter blocked). Touches `hpv.data.country.load_country` and `hpv.Sim`'s location handling. |
+| Cross-repo default-pars naming sync (NWPars) | M8 | STIsim and HIVsim use `NWPars(ss.Pars)` (sometimes wrapped as `default_nwpars`); HPVsim uses `network_pars` dicts and a per-genotype `GenotypePars`. Align naming across repos before STIsim/HIV integration so connector users don't see two conventions. Coordinate with STIsim/HIVsim maintainers; M02 review thread on `country.py:212`. |
 
 ## Out of scope
 
