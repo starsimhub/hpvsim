@@ -51,7 +51,12 @@ def _dur_mean_std_years(dist):
 
 
 def main():
-    fig, axes = plt.subplots(2, 2, figsize=(11, 9))
+    # Match the manuscript's ``ut.set_font(size=16)``. Libertinus Sans
+    # falls back to the system default if not installed; the default font
+    # (DejaVu Sans) is wider, so figsize is bumped from the manuscript's
+    # (11, 9) to (12, 10) so titles still fit at fontsize=16.
+    sc.options(fontsize=16)
+    fig, axes = plt.subplots(2, 2, figsize=(13, 10))
     axes = axes.flatten()
 
     dt = 0.25
