@@ -84,7 +84,7 @@ class Aggregate(ss.Analyzer):
         # Per-step sum across genotypes: sum-of-flows, not boolean-OR.
         # Overcounts co-infected agents — matches summed-by-genotype semantics.
         per_step_any = sum(
-            int(np.asarray(m.results.new_infections[ti])) for m in hpvs
+            int(m.results.new_infections[ti]) for m in hpvs
         )
         self.results['cum_infections_any'][ti] = per_step_any
 

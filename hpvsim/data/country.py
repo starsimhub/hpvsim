@@ -246,9 +246,9 @@ def _network_pars(location):
         # carries its annual unit explicitly.
         lp = default_pars['layer_probs'][layer]
         layer_probs = dict(
-            bins=np.asarray(lp[0, :]),
-            f=ss.prob(np.asarray(lp[1, :]), annual),
-            m=ss.prob(np.asarray(lp[2, :]), annual),
+            bins=lp[0, :],
+            f=ss.prob(lp[1, :], annual),
+            m=ss.prob(lp[2, :], annual),
         )
         layer_pars[layer] = dict(
             partners={

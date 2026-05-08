@@ -58,8 +58,8 @@ def _make_init_prev_fn(genotype):
     m_curve = curves['m']
 
     def _age_stratified(module, sim, uids):
-        age = np.asarray(sim.people.age[uids])
-        is_female = np.asarray(sim.people.female[uids])
+        age = sim.people.age[uids]
+        is_female = sim.people.female[uids]
         bin_idx = np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, age, side='right')
         bin_idx = np.clip(bin_idx, 0, len(f_curve) - 1)
         out = np.zeros(len(uids))
@@ -128,11 +128,11 @@ class _ExclusiveSeeder:
 
         # Step 1: per-agent total HPV probability using hpv16 curve as total.
         total_prev_fn = _make_init_prev_fn('hpv16')
-        p_per_uid = np.asarray(total_prev_fn(None, sim, all_uids), dtype=float)
+        p_per_uid = total_prev_fn(None, sim, all_uids)
 
         # Step 2: filter to alive agents past sexual debut.
         # Agents not yet debuted can't be seeded.
-        alive = np.asarray(people.alive).astype(bool)
+        alive = np.asarray(people.alive)
         active = alive.copy()
         # Locate the SexualNetwork (if present) to gate on debut age.
         net = None
@@ -157,7 +157,7 @@ class _ExclusiveSeeder:
         seed_bern = ss.bernoulli(p=0.0, strict=False)
         seed_bern.init(sim=sim)
         seed_bern.set(p=p_per_uid)
-        infected_mask = np.asarray(seed_bern.rvs(all_uids)).astype(bool)
+        infected_mask = seed_bern.rvs(all_uids)
         infected_uids = all_uids[infected_mask]
 
         # Step 4: per-infected-agent genotype assignment.
@@ -412,9 +412,7 @@ class HPV(ss.Infection):
         nocin_female = female[~cin_mask]
         rounded_dur = np.empty(len(nocin_dur), dtype=int)
         if nocin_female.any():
-            rounded_dur[nocin_female] = np.asarray(
-                sc.randround(nocin_dur[nocin_female])
-            )
+            rounded_dur[nocin_female] = sc.randround(nocin_dur[nocin_female])
         if (~nocin_female).any():
             rounded_dur[~nocin_female] = np.ceil(
                 nocin_dur[~nocin_female]
@@ -458,7 +456,7 @@ class HPV(ss.Infection):
         )
         dur_cancer = p.dur_cancer.rvs(cancer_uids)
         self.ti_dead_cancer[cancer_uids] = (
-            self.ti_cancerous[cancer_uids] + sc.randround(np.asarray(dur_cancer))
+            self.ti_cancerous[cancer_uids] + sc.randround(dur_cancer)
         )
 
     def step_state(self):
@@ -496,9 +494,9 @@ class HPV(ss.Infection):
             # fully reinfectible on next exposure. Repeat clearances always
             # update via running max (sero_prob only gates the first event).
             female = self.sim.people.female
-            f_cleared = cleared[np.asarray(female[cleared])]
+            f_cleared = cleared[female[cleared]]
             if len(f_cleared):
-                has_prior_imm = np.asarray(self.nab_imm[f_cleared]) > 0
+                has_prior_imm = self.nab_imm[f_cleared] > 0
                 first_mask  = ~has_prior_imm
                 first_uids  = f_cleared[first_mask]
                 repeat_uids = f_cleared[has_prior_imm]
@@ -509,12 +507,12 @@ class HPV(ss.Infection):
                 # overhead (process_pars, jump, copy.copy(timepars)) dominates
                 # the actual numerical work for these per-clearance draws.
                 p = self.pars
-                nab_all  = np.asarray(p.imm_init.rvs(f_cleared))
-                cell_all = np.asarray(p.cell_imm_init.rvs(f_cleared))
+                nab_all  = p.imm_init.rvs(f_cleared)
+                cell_all = p.cell_imm_init.rvs(f_cleared)
 
                 if len(first_uids):
                     p._sero_bern.set(p=float(p.sero_prob))
-                    seroconvert = np.asarray(p._sero_bern.rvs(first_uids))
+                    seroconvert = p._sero_bern.rvs(first_uids)
                     # nab_imm (humoral) is gated on seroconversion: non-
                     # seroconverters keep 0 nab and remain fully reinfectible.
                     # cell_imm (cell-mediated severity) is NOT gated — all

@@ -72,8 +72,8 @@ class CrossImmunity(ss.Connector):
     def step(self):
         if not self.hpv_modules:
             return
-        nab  = np.column_stack([np.asarray(m.nab_imm.values)  for m in self.hpv_modules])
-        cell = np.column_stack([np.asarray(m.cell_imm.values) for m in self.hpv_modules])
+        nab  = np.column_stack([m.nab_imm.values  for m in self.hpv_modules])
+        cell = np.column_stack([m.cell_imm.values for m in self.hpv_modules])
         sus_imm = nab  @ self.cross_imm_sus.T
         sev_imm = cell @ self.cross_imm_sev.T
         np.clip(sus_imm, 0.0, 1.0, out=sus_imm)

@@ -136,7 +136,7 @@ class SexualNetwork(ss.SexualNetwork):
         if not len(unset):
             return
         people = self.sim.people
-        is_female = np.asarray(people.female[unset])
+        is_female = people.female[unset]
         f_uids = unset[is_female]
         m_uids = unset[~is_female]
 
@@ -240,7 +240,7 @@ class SexualNetwork(ss.SexualNetwork):
         dt = self.t.dt
         other_uids = self._other_layer_partner_uids(lkey)
         if len(other_uids):
-            other_is_female = np.asarray(people.female[other_uids])
+            other_is_female = people.female[other_uids]
             other_f = other_uids[other_is_female]
             other_m = other_uids[~other_is_female]
             f_cross_p = lpars['cross_layer']['f'].to_prob(dt)
@@ -255,7 +255,7 @@ class SexualNetwork(ss.SexualNetwork):
 
         # Split eligible by sex.
         elig_uids = eligible.uids
-        elig_is_female = np.asarray(people.female[elig_uids])
+        elig_is_female = people.female[elig_uids]
         f_eligible_uids = elig_uids[elig_is_female]
         m_eligible_uids = elig_uids[~elig_is_female]
 
@@ -286,7 +286,7 @@ class SexualNetwork(ss.SexualNetwork):
             n_bins = len(bin_range_f)
             if n_bins > 1:
                 dists['bin_order'].set(a=np.arange(n_bins))
-                bin_order = np.asarray(dists['bin_order'].rvs(n_bins))
+                bin_order = dists['bin_order'].rvs(n_bins)
             else:
                 bin_order = np.arange(n_bins)
 
@@ -302,16 +302,14 @@ class SexualNetwork(ss.SexualNetwork):
                 if nm > len(this_weighting_nonzero):
                     # Not enough males: drop a CRN-safe random subset of females.
                     dists['f_select'].set(a=f_inds)
-                    f_selected = np.asarray(
-                        dists['f_select'].rvs(len(this_weighting_nonzero))
-                    )
+                    f_selected = dists['f_select'].rvs(len(this_weighting_nonzero))
                     nm = f_selected.size
                 else:
                     f_selected = f_inds
                 norm_w = this_weighting_nonzero / this_weighting_nonzero.sum()
                 dists['choose_m'].set(a=len(this_weighting_nonzero), p=norm_w)
                 m_selected = m_participants[
-                    males_nonzero[np.asarray(dists['choose_m'].rvs(nm))]
+                    males_nonzero[dists['choose_m'].rvs(nm)]
                 ]
                 paired_m[ss.uids(m_selected)] = True
                 m_arr = np.concatenate((m_arr, m_selected))
@@ -332,14 +330,14 @@ class SexualNetwork(ss.SexualNetwork):
         # scale to per-step. age_act_pars is optional — older test fixtures
         # may not supply it, in which case we skip the modulation (equivalent
         # to age=peak for everyone).
-        raw_acts = np.asarray(lpars['acts'].rvs(f_uids))
+        raw_acts = lpars['acts'].rvs(f_uids)
         age_pars = lpars.get('age_act_pars')
         if age_pars is not None:
             people = self.sim.people
-            age_f = np.asarray(people.age[f_uids])
-            age_m = np.asarray(people.age[m_uids])
-            debut_f = np.asarray(self.debut[f_uids])
-            debut_m = np.asarray(self.debut[m_uids])
+            age_f = people.age[f_uids]
+            age_m = people.age[m_uids]
+            debut_f = self.debut[f_uids]
+            debut_m = self.debut[m_uids]
             raw_acts = _age_scale_acts(
                 raw_acts, age_pars, age_f, age_m, debut_f, debut_m
             )
