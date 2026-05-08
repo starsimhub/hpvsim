@@ -10,7 +10,7 @@ single genotype. Adding genotypes in M03+ is a one-line edit to
 
 The math is identical to the manuscript: v3's ``GenotypePars.cancer_fn``
 already carries the cin_fn keys (form, k, x_infl, ttc), so passing
-``gp.cancer_fn`` to ``_compute_severity`` produces the same values as the
+``gp.cancer_fn`` to ``compute_severity`` produces the same values as the
 manuscript's ``sc.mergedicts(cin_fn, cancer_fn)`` call.
 
 Run with:
@@ -22,8 +22,8 @@ import matplotlib.pyplot as plt
 import sciris as sc
 from scipy.stats import lognorm
 
-from hpvsim.hpv import _compute_severity
 from hpvsim.parameters import get_genotype_pars
+from hpvsim.utils import compute_severity
 
 
 GENOTYPES = ('hpv16',)
@@ -81,7 +81,7 @@ def main():
         multiplier += 1
 
         # Panel B: probability of CIN by infection duration.
-        dysp = _compute_severity(this_precinx, rel_sev=None, pars=gp.cin_fn)
+        dysp = compute_severity(this_precinx, rel_sev=None, pars=gp.cin_fn)
         axes[1].plot(this_precinx, dysp, color=color, lw=2, label=gtype.upper())
 
         # Panel C: distribution of CIN durations.
@@ -94,7 +94,7 @@ def main():
         # Panel D: probability of cancer by CIN duration. v3's cancer_fn
         # already carries cin_fn's keys, so passing it directly matches
         # the manuscript's mergedicts(cin_fn, cancer_fn) call.
-        cancer = _compute_severity(this_cinx, rel_sev=None, pars=gp.cancer_fn)
+        cancer = compute_severity(this_cinx, rel_sev=None, pars=gp.cancer_fn)
         axes[3].plot(this_cinx, cancer, color=color, lw=2, label=gtype.upper())
 
     axes[0].set_ylabel("")

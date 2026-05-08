@@ -31,7 +31,7 @@ from . import loaders as _loaders
 _KNOWN_LOCATIONS = ['nigeria']
 
 
-def _default_network_pars(location):  # noqa: ARG001  (location reserved for future per-country data)
+def _default_network_pars(location=None):  # noqa: ARG001  (location reserved for future per-country data)
     """Default network parameters consumed by SexualNetwork construction.
 
     The ``location`` argument is accepted for API symmetry and future

@@ -1,8 +1,230 @@
 """HPVsim utility helpers.
 
-Reserved for HPV-specific helpers without a starsim equivalent. Currently
-empty — disease-progression math is colocated with ``hpv.py``; the legacy
-v2 utility surface is quarantined in ``hpvsim/_v2_legacy/utils.py``.
+Pure progression / severity math used by ``hpv.py`` and downstream
+analyzers. These functions don't depend on starsim or any module state —
+they're a small, reusable surface so calibration code, future genotype
+extensions, and visualisation scripts (e.g.
+``tests/regression/methods_fig1_hpv16.py``) can import them without
+pulling in the disease module.
+
+Carries the v2 logf2/logf3/compute_severity API verbatim; bit-identical
+parity with ``hpvsim/_v2_legacy/utils.py`` is enforced by
+``tests/test_progression_math.py``.
 """
 
-__all__ = []
+import numpy as np
+import sciris as sc
+
+
+__all__ = [
+    'get_asymptotes',
+    'logf2',
+    'logf3',
+    'transform_prob',
+    'indef_int_logf2',
+    'intlogf2',
+    'compute_severity_integral',
+    'compute_severity',
+]
+
+
+# --- Logistic-2 / logistic-3 family ----------------------------------- #
+
+def get_asymptotes(k, x_infl, s=1, y_max=1, ttc=25):
+    '''
+    Get upper asymptotes for logistic functions
+    '''
+    term1 = (1 + np.exp(k*(x_infl-ttc)))**s # Note, this is 1 for most parameter combinations
+    term2 = (1 + np.exp(k*x_infl))**s
+    u_asymp_num = y_max*term1*(1-term2)
+    u_asymp_denom = term1 - term2
+    u_asymp = u_asymp_num / u_asymp_denom
+    l_asymp = y_max * term1 / (term1 - term2)
+    return l_asymp, u_asymp
+
+
+def logf3(x, k, x_infl, s=1, y_max=1, ttc=25):
+    '''
+    Logistic function passing through (0,0) and (ttc,y_max).
+    This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+    However, since it's constrained to pass through 2 points, there are 3 free parameters remaining.
+    Args:
+         k: growth rate, equivalent to b in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         x_infl: a location parameter, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         s: asymmetry parameter, equivalent to s in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
+    '''
+    l_asymp, u_asymp = get_asymptotes(k, x_infl, s=1, y_max=y_max, ttc=ttc)
+    return np.minimum(1, l_asymp + (u_asymp-l_asymp)/(1+np.exp(k*(x_infl-x)))**s)
+
+
+def logf2(x, k, x_infl, y_max=1, ttc=25):
+    '''
+    Logistic function constrained to pass through (0,0) and (ttc,y_max).
+    This version is derived from the 5-parameter version here: https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+    Since it's constrained to pass through 2 points, there are 3 free parameters remaining, and this verison fixes s=1
+    Args:
+         k: growth rate, equivalent to b in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         x_infl: point of inflection, equivalent to C in https://www.r-bloggers.com/2019/11/five-parameters-logistic-regression/
+         ttc (time to cancer): x value for which the curve passes through 1. For x values beyond this, the function returns 1
+    '''
+    return logf3(x, k, x_infl, s=1, y_max=y_max, ttc=ttc)
+
+
+def transform_prob(tp, dysp):
+    '''
+    Returns transformation probability given dysplasia
+    Using formula for half an ellipsoid:
+        V = 1/2 * 4/3 * pi * a*b*c
+          = 2 * a*b*c
+          = 2* dysp * (dysp/2)**2, assuming that b = c = 1/2 a
+          = 1/2 * dysp**3
+    '''
+    # return 1-np.power(1-tp, ((dysp*100)**2))
+    return 1-np.power(1-tp, 0.5*((dysp)**3)*100)
+
+
+def indef_int_logf2(x, k, x_infl, ttc=25, y_max=1):
+    '''
+    Indefinite integral of logf2; see definition there for arguments
+    '''
+    t1 = 1 + np.exp(k*(x_infl-ttc))
+    t2 = 1 + np.exp(k*x_infl)
+    integ = np.log(np.exp(k*(x_infl-x)) + 1) / k + x
+    result = y_max/(t1-t2)*(1-t1*t2*integ)
+    return result
+
+
+def intlogf2(upper, k, x_infl, ttc=25, y_max=1):
+    '''
+    Integral of logf2 between 0 and the limit given by upper
+    '''
+    # Find the upper limits not including the part past time to cancer
+    exceeding_ttc_inds = (upper > ttc).nonzero()
+    lims_to_find = np.minimum(ttc, upper)
+
+    # Take the integral
+    val_at_0 = indef_int_logf2(0, k, x_infl, ttc)
+    val_at_lim = indef_int_logf2(lims_to_find, k, x_infl, ttc)
+    integral = val_at_lim - val_at_0
+
+    # Deal with those whose duration of infection exceeds the time to cancer
+    # Note, another option would be to set their transformation probability to 1
+    excess_integral = upper[exceeding_ttc_inds] - ttc
+    integral[exceeding_ttc_inds] += excess_integral
+
+    return integral
+
+
+# --- Severity / progression dispatch ---------------------------------- #
+
+def compute_severity_integral(t, rel_sev=None, pars=None):
+    '''
+    Process functional form and parameters into values:
+    '''
+
+    pars = sc.dcp(pars)
+    form = pars.pop('form')
+    choices = [
+        'logf2',
+        'logf3 with s=1',
+    ]
+
+    # Scale t
+    if rel_sev is not None:
+        t = rel_sev * t
+
+    # Process inputs
+    if form is None or form == 'logf2':
+        output = intlogf2(t, **pars)
+
+    elif form == 'logf3':
+        s = pars.pop('s')
+        if s == 1:
+            output = intlogf2(t, **pars)
+        else:
+            raise NotImplementedError(
+                'Analytic integral for logf3 only implemented for s=1. '
+                'Select integral=numeric.'
+            )
+
+    else:
+        errormsg = (
+            f'Analytic integral for the selected functional form "{form}" is '
+            f'not implemented; choices are: {sc.strjoin(choices)}, or select '
+            f'integral=numeric.'
+        )
+        raise NotImplementedError(errormsg)
+
+    return output
+
+
+def compute_severity(t, rel_sev=None, pars=None):
+    '''
+    This function is used for two types of calculation related to disease progression:
+        1. to model the probability of progressing to further disease stages
+        2. to model the 'severity' of dysplasia on a scale from 0-1, historically interpreted as
+           the percentage of the epithelium affected by dysplasia.
+    Args:
+        t: array of durations that women have been in their current health state
+        rel_sev: array of individual relative severity values
+        pars: dict with required key 'form', which dictates which subfunction will be used.
+
+    Notes:
+         If the pars dict contains the key 'cin_integral', then this function will call
+         compute_severity_integral to determine the progression probabilities.
+    '''
+
+    pars = sc.dcp(pars)
+
+    # Complete these next stages if cancer progression probabilities are being modeled
+    # as the cumulative severity-time of dysplasia.
+    if pars.get('method') == 'cin_integral':
+        del pars['method']
+        if pars.get('ld50'):
+            ld50 = pars.pop('ld50')
+            if pars.get('transform_prob'):
+                _ = pars.pop('transform_prob')
+            sev_at_ld50 = compute_severity_integral(np.array([ld50]), rel_sev=None, pars=pars)[0]
+            transform_p = 1 - 0.5**(1/sev_at_ld50**2)
+        elif pars.get('transform_prob'):
+            transform_p = pars.pop('transform_prob')
+        else:
+            errormsg = ('If using calculating cancer probabilities using the integral of the CIN function, '
+                        'must provide an LD50 or transform prob.')
+            raise ValueError(errormsg)
+
+        sev = compute_severity_integral(t, rel_sev=rel_sev, pars=pars)
+        cancer_probs = 1 - np.power(1 - transform_p, sev**2)
+        return cancer_probs
+
+    # Proceed with severity calculations
+    form = pars.pop('form')
+    choices = [
+        'logf2',
+        'logf3',
+        'linear',
+    ]
+
+    # Scale t
+    if rel_sev is not None:
+        t = rel_sev * t
+
+    # Process inputs
+    if form is None or form == 'logf2':
+        output = logf2(t, **pars)
+
+    elif form == 'logf3':
+        output = logf3(t, **pars)
+
+    elif form == 'linear':
+        raise NotImplementedError('linear severity form not implemented')
+
+    elif callable(form):
+        output = form(t, **pars)
+
+    else:
+        errormsg = f'The selected functional form "{form}" is not implemented; choices are: {sc.strjoin(choices)}'
+        raise NotImplementedError(errormsg)
+
+    return output
