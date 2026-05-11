@@ -59,7 +59,22 @@ class SexualNetwork(ss.SexualNetwork):
             ss.prob dict), ``duration``, ``acts`` (Dist instances).
         debut: per-sex debut-age distribution dict ``{'f': Dist, 'm': Dist}``.
             Sampled once per agent and shared across all layers.
+
+    Overrides ``net_beta`` to fold the per-edge ``acts`` count into the
+    per-step transmission probability via ``1 - (1 - p_per_act)^acts``.
+    Without this override, ``ss.Network.net_beta`` returns ``edges.beta *
+    disease_beta`` directly — which treats the per-act probability as
+    per-step and ignores ``edges.acts``. For long-lived pairs the system
+    saturates either way (cumulative prob → 1 over hundreds of steps),
+    but short-lived casual pairs (few steps) lose ~10% transmission
+    probability under the un-compounded formula.
     """
+
+    def net_beta(self, disease_beta=None, inds=None, disease=None):
+        if inds is None:
+            inds = Ellipsis
+        p_per_act = self.edges.beta[inds] * disease_beta
+        return 1 - (1 - p_per_act) ** self.edges.acts[inds]
 
     def __init__(self, layer_pars=None, debut=None, **kwargs):
         super().__init__()
