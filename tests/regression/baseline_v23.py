@@ -116,15 +116,6 @@ PARS_4GENOTYPE = dict(
                              # makes (1 - 0) = 1 → no reduction.
 )
 
-# NOTE: v2's init_hpv_dist=None (default) gives an EVEN split — each
-# initially-infected agent is assigned a single genotype with prob 0.25
-# for each. M03 seeds each genotype independently via per-genotype init_prev
-# curves (hpvsim/hpv.py:_INIT_PREV), allowing multi-infection at t=0.
-# This is a structural mismatch in initial conditions; the impact on
-# 70-year cumulative metrics is small (transmission washes out the
-# initial-condition difference within a few years). Re-evaluate if M04
-# calibration shows sensitivity here.
-
 # Canonical genotype key order that v2 stores in genotype_map after normalisation.
 # v2 parameters.py:268-273 maps '16' -> 'hpv16', 'hi5hpv' -> 'hi5', etc.
 # For these four we pass the canonical strings directly, so the genotype_map
