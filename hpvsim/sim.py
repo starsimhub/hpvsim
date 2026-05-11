@@ -164,13 +164,17 @@ class Sim(ss.Sim):
             if init_seeding == 'exclusive':
                 # Coordinated seeding: one Bernoulli per agent using the hpv16
                 # total prevalence curve, then one genotype per infected agent.
-                # The _ExclusiveSeeder installs callbacks on init_prev so the
-                # assignment is computed lazily on first init_post call.
-                seeder = _ExclusiveSeeder(genotype_keys=keys, init_hpv_dist=init_hpv_dist)
+                # The _ExclusiveSeeder is an ``ss.Module`` so its Dists go
+                # through the standard define_pars / init_dists lifecycle; its
+                # callbacks install on each HPV's init_prev and trigger the
+                # shared compute lazily on first call.
+                self._seeder = _ExclusiveSeeder(
+                    genotype_keys=keys, init_hpv_dist=init_hpv_dist
+                )
                 diseases = []
                 for k in keys:
                     d = HPV(genotype=k, **gpars_overrides.get(k, {}))
-                    d.pars.init_prev = ss.bernoulli(p=seeder.for_genotype(k))
+                    d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
                     diseases.append(d)
             else:
                 # 'independent': each HPV draws from its own per-genotype
@@ -182,6 +186,9 @@ class Sim(ss.Sim):
 
         if connectors is None:
             connectors = [CrossImmunity()]
+        # The _ExclusiveSeeder is reachable via each HPV's init_prev callback
+        # closure, so starsim's link_dists pass discovers and initialises its
+        # ``define_pars`` Dists automatically. No explicit registration needed.
 
         networks = kwargs.pop('networks', None)
         if networks is None:

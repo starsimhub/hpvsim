@@ -72,36 +72,55 @@ def _make_init_prev_fn(genotype):
 _KNOWN_GENOTYPES = tuple(_INIT_PREV.keys())
 
 
-class _ExclusiveSeeder:
+class _ExclusiveSeeder(ss.Connector):
     """Coordinated initial seeding for multi-genotype HPV.
 
-    On the first invocation of any per-genotype callback, computes the global
-    assignment (per-agent total-prevalence Bernoulli + per-infected-agent
-    genotype choice) and stores it. Each genotype's callback returns 1.0 for
-    uids assigned to it and 0.0 otherwise; a ``ss.bernoulli`` with those
-    probabilities deterministically yields exactly the assigned uids in
-    ``init_prev.filter()``.
+    Registered as an ``ss.Module`` so the seeding Dists go through the
+    standard ``define_pars`` -> ``init_pre`` -> ``init_dists`` lifecycle.
+    Each Dist gets a unique auto-generated trace from its module path,
+    so the bernoulli and choice draws are independent on the same uids
+    (without this, CRN coupling makes ``choice = floor(u*a)`` depend on
+    ``u < p`` — bernoulli True implies choice 0 for ``p=0.1, a=4``).
 
-    Random draw path: the total-prevalence Bernoulli draw uses
-    ``ss.bernoulli`` with ``strict=False`` (CRN-safe slot-based RNG). The
-    per-infected-agent genotype choice uses ``np.random.default_rng`` seeded
-    from ``sim.pars.rand_seed + 91802``; ``ss.choice`` cannot be used here
-    because it shares slot-based RNG state with the prior ``seed_bern.rvs``
-    call, producing non-uniform distributions.
+    On the first invocation of any per-genotype callback, computes the
+    global assignment (per-agent total-prevalence Bernoulli + per-infected
+    -agent genotype choice) and caches it. Each genotype's callback
+    returns 1.0 for uids assigned to it and 0.0 otherwise; an
+    ``ss.bernoulli`` with those probabilities deterministically yields
+    exactly the assigned uids in ``init_prev.filter()``.
+
+    Compute fires lazily on the first ``init_prev`` callback. By that
+    point ``init_dists`` has already run across the whole sim (it runs
+    between ``init_pre`` and ``init_post``), so this seeder's Dists are
+    initialized regardless of where it sits in the module list.
     """
 
-    def __init__(self, genotype_keys, init_hpv_dist=None):
+    def __init__(self, genotype_keys, init_hpv_dist=None, **kwargs):
+        super().__init__(**kwargs)
         self.keys = tuple(genotype_keys)
         self.init_hpv_dist = init_hpv_dist
+        weights = None
+        if init_hpv_dist is not None:
+            weights = np.array(
+                [init_hpv_dist[k] for k in self.keys], dtype=float
+            )
+            weights = weights / weights.sum()
+        self.define_pars(
+            seed_bern=ss.bernoulli(p=0.0),
+            seed_choice=ss.choice(a=len(self.keys), p=weights),
+        )
         self._assignment = None  # ndarray shape (n_agents,), values in [-1, n_g)
+
+    def step(self):
+        return  # No per-step logic; compute fires lazily on first init_prev callback.
 
     def for_genotype(self, key):
         """Return a callable suitable for ``ss.bernoulli(p=callback)``.
 
-        The callback signature is ``(module, sim, uids)`` matching starsim's
-        ``convert_callable`` dispatch. On first call it triggers ``_compute``
-        which populates ``self._assignment``; subsequent calls are O(len(uids))
-        lookups.
+        The callback signature is ``(module, sim, uids)`` matching
+        starsim's ``convert_callable`` dispatch. On first call it
+        triggers ``_compute`` which populates ``self._assignment``;
+        subsequent calls are O(len(uids)) lookups.
         """
         gen_idx = self.keys.index(key)
 
@@ -151,36 +170,18 @@ class _ExclusiveSeeder:
             active = active & past_debut
         p_per_uid = np.where(active, p_per_uid, 0.0)
 
-        # Step 3: Bernoulli draw. Use starsim distribution (CRN-safe) with
-        # strict=False so it can be initialized and called outside the normal
-        # step flow. Fall back to np.random if the starsim path fails.
-        seed_bern = ss.bernoulli(p=0.0, strict=False)
-        seed_bern.init(sim=sim)
-        seed_bern.set(p=p_per_uid)
-        infected_mask = seed_bern.rvs(all_uids)
+        # Step 3: Bernoulli draw — standard-init Dist via define_pars.
+        self.pars.seed_bern.set(p=p_per_uid)
+        infected_mask = self.pars.seed_bern.rvs(all_uids)
         infected_uids = all_uids[infected_mask]
 
-        # Step 4: per-infected-agent genotype assignment.
-        # Use numpy's RNG seeded from sim.pars.rand_seed + a fixed offset.
-        # ss.choice uses slot-based indexing that collides with the slots
-        # already consumed by seed_bern.rvs(all_uids); falling back to
-        # np.random.default_rng avoids that collision (CRN-safe within a
-        # single run since the seed is deterministic given rand_seed).
+        # Step 4: per-infected-agent genotype assignment — standard-init
+        # ss.choice via define_pars (independent per-uid uniforms from the
+        # bernoulli above via auto-generated unique trace).
         n_g = len(self.keys)
         assignment = np.full(n_agents, -1, dtype=int)
         if len(infected_uids) > 0:
-            rand_seed = int(getattr(sim.pars, 'rand_seed', 0))
-            rng = np.random.default_rng(rand_seed + 91802)
-            if self.init_hpv_dist is None:
-                # Uniform genotype assignment.
-                gen_choices = rng.integers(0, n_g, size=len(infected_uids))
-            else:
-                # Weighted by user-supplied dict keyed by genotype name.
-                weights = np.array(
-                    [self.init_hpv_dist[k] for k in self.keys], dtype=float
-                )
-                weights = weights / weights.sum()
-                gen_choices = rng.choice(n_g, size=len(infected_uids), p=weights)
+            gen_choices = self.pars.seed_choice.rvs(infected_uids)
             assignment[np.asarray(infected_uids)] = gen_choices
         self._assignment = assignment
 
