@@ -81,12 +81,10 @@ class Aggregate(ss.Analyzer):
         hpvs = self._hpvs()
         if not hpvs:
             return
-        # Per-step sum across genotypes: sum-of-flows, not boolean-OR.
-        # Overcounts co-infected agents — matches summed-by-genotype semantics.
-        per_step_any = sum(
-            int(m.results.new_infections[ti]) for m in hpvs
+        # Sum-of-flows across genotypes, not boolean-OR — overcounts co-infections.
+        self.results['cum_infections_any'][ti] = sum(
+            m.results.new_infections[ti] for m in hpvs
         )
-        self.results['cum_infections_any'][ti] = per_step_any
 
     def finalize_results(self):
         """Assemble cumulative aggregates after HPV disease modules have finalized."""
@@ -94,21 +92,18 @@ class Aggregate(ss.Analyzer):
         hpvs = self._hpvs()
         if not hpvs:
             return
-        # Convert per-step max values to cumulative sum.
+        # Cumulative sum of the per-step counts captured in step().
         self.results['cum_infections_any'][:] = np.cumsum(
             np.asarray(self.results['cum_infections_any'])
         )
-        # cum_cancers_any: sum across genotypes (HPV.finalize_results has
-        # already populated cum_cancers before this analyzer finalizes).
-        cum_c_stack = np.column_stack([
+        # cum_cancers_any: sum across genotypes. HPV.finalize_results runs
+        # before this analyzer, so cum_cancers is already populated.
+        self.results['cum_cancers_any'][:] = sum(
             np.asarray(m.results.cum_cancers) for m in hpvs
-        ])
-        self.results['cum_cancers_any'][:] = cum_c_stack.sum(axis=1)
-        # new_cancer_deaths_any: per-step sum across genotypes.
-        ncd_stack = np.column_stack([
+        )
+        self.results['new_cancer_deaths_any'][:] = sum(
             np.asarray(m.results.new_cancer_deaths) for m in hpvs
-        ])
-        self.results['new_cancer_deaths_any'][:] = ncd_stack.sum(axis=1)
+        )
 
 
 class Sim(ss.Sim):
@@ -118,11 +113,8 @@ class Sim(ss.Sim):
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, pars=None, **kwargs):
-        # Pass start year to load_country so the initial age distribution is
-        # sampled from the right year. Without this, get_age_distribution
-        # defaults to 2000 and the population shape biases init-seed counts
-        # by ~14% for Nigeria when start=1990 (year-2000's [17, 22) band is
-        # +44% relative to year-1990).
+        # Pass start year so the age pyramid matches sim.start (loader
+        # defaults to year 2000 with a materially different distribution).
         country = load_country(location, year=int(start))
         people = kwargs.pop('people', None)
         if people is None:
@@ -161,34 +153,20 @@ class Sim(ss.Sim):
                         f'resolved genotype keys {sorted(sim_keys)}'
                     )
 
+            diseases = [HPV(genotype=k, **gpars_overrides.get(k, {})) for k in keys]
             if init_seeding == 'exclusive':
-                # Coordinated seeding: one Bernoulli per agent using the
-                # 'total' HPV prevalence curve, then one genotype per infected agent.
-                # The _ExclusiveSeeder is an ``ss.Module`` so its Dists go
-                # through the standard define_pars / init_dists lifecycle; its
-                # callbacks install on each HPV's init_prev and trigger the
-                # shared compute lazily on first call.
+                # 'exclusive': one Bernoulli per agent for any HPV, then one
+                # genotype per infected agent via the seeder's per-genotype callback.
+                # 'independent' is the no-op path — each HPV's per-genotype init_prev
+                # curve drives its own seeding independently.
                 self._seeder = _ExclusiveSeeder(
                     genotype_keys=keys, init_hpv_dist=init_hpv_dist
                 )
-                diseases = []
-                for k in keys:
-                    d = HPV(genotype=k, **gpars_overrides.get(k, {}))
+                for d, k in zip(diseases, keys):
                     d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
-                    diseases.append(d)
-            else:
-                # 'independent': each HPV draws from its own per-genotype
-                # init_prev curve independently (current v3 default behavior).
-                diseases = [
-                    HPV(genotype=k, **gpars_overrides.get(k, {}))
-                    for k in keys
-                ]
 
         if connectors is None:
             connectors = [CrossImmunity()]
-        # The _ExclusiveSeeder is reachable via each HPV's init_prev callback
-        # closure, so starsim's link_dists pass discovers and initialises its
-        # ``define_pars`` Dists automatically. No explicit registration needed.
 
         networks = kwargs.pop('networks', None)
         if networks is None:

@@ -55,10 +55,9 @@ class AgeMigration(ss.Demographics):
         # at start year). Used to scale target_counts each step so the pyramid
         # is matched in agent-space, not person-space.
         self._scale = None
-        self._data_year_min = None                  # Inclusive lower bound of pop_total years; outside this, step() no-ops.
-        self._data_year_max = None                  # Inclusive upper bound of pop_total years.
         self._n_imm = 0                             # Immigrants added this step (for results.new_immigrants).
         self._n_emi = 0                             # Emigrants requested this step (for results.new_emigrants).
+        self._pop_by_year = None                    # {year: per-year pyramid DataFrame}, built in init_pre.
         # CRN-safe emigrant selection — domain set per call.
         self._emi_select = ss.choice(replace=False)
         return
@@ -106,8 +105,12 @@ class AgeMigration(ss.Demographics):
         )
         self._scale = float(sim.pars.n_agents) / data_pop_at_start
 
-        self._data_year_min = int(pt['year'].min())
-        self._data_year_max = int(pt['year'].max())
+        # Group pop_by_age once into a {year: DataFrame} dict so step() can
+        # do an O(1) lookup instead of an O(rows) mask + sort every year.
+        self._pop_by_year = {
+            int(y): grp.sort_values('age')
+            for y, grp in self._pop_by_age.groupby('year')
+        }
         return
 
     def init_results(self):
@@ -132,19 +135,12 @@ class AgeMigration(ss.Demographics):
         sim = self.sim
         year = int(sim.t.now('year'))
 
-        # Silent-skip if outside data range.
-        if year < self._data_year_min or year > self._data_year_max:
-            self._n_imm = 0
-            self._n_emi = 0
+        self._n_imm = 0
+        self._n_emi = 0
+        pat_year = self._pop_by_year.get(year)
+        if pat_year is None:
             return
 
-        pat_year = self._pop_by_age[self._pop_by_age['year'] == year]
-        if pat_year.empty:
-            self._n_imm = 0
-            self._n_emi = 0
-            return
-
-        pat_year = pat_year.sort_values('age')
         ages_data = pat_year['age'].values.astype(int)
 
         people = sim.people
@@ -158,15 +154,7 @@ class AgeMigration(ss.Demographics):
 
         n_imm_total = 0
         n_emi_total = 0
-        # Accumulate immigrants per (age, sex) bin and grow the population in
-        # one shot at the end. Each people.grow() extends every ss.Arr in the
-        # model — and any state with a Dist default samples once per grow —
-        # so per-bin grows dominated the run loop. Order of appends mirrors
-        # the original (male ages ascending, then female ages ascending), so
-        # immigrant UIDs match what one-call-per-bin produced. Per-agent
-        # values for states with Dist defaults DO shift, because the batched
-        # grow advances the RNG once instead of K times; aggregate behavior
-        # is unchanged within seed-to-seed noise.
+
         imm_age_chunks = []
         imm_female_chunks = []
 
@@ -178,7 +166,6 @@ class AgeMigration(ss.Demographics):
             target_counts = pat_year[sex_label].values * self._scale
 
             for age, target in zip(ages_data, target_counts):
-                # Agents at this integer age × sex in the snapshot
                 in_band = sex_mask & (ages == age)
                 count_sim = int(in_band.sum())
                 diff = int(round(target - count_sim))

@@ -271,13 +271,7 @@ def _pop_total(location):
     Wraps ``get_total_pop`` which already returns a DataFrame with the canonical
     column names (year, pop_size) scaled to real-world counts.
     """
-    raw = _loaders.get_total_pop(location=location)
-    df = pd.DataFrame(raw)
-    # Loader already names columns 'year' / 'pop_size'; normalise just in case.
-    if 'PopTotal' in df.columns and 'pop_size' not in df.columns:
-        df = df.rename(columns={'PopTotal': 'pop_size'})
-    if 'Time' in df.columns and 'year' not in df.columns:
-        df = df.rename(columns={'Time': 'year'})
+    df = _loaders.get_total_pop(location=location)
     return pd.DataFrame({
         'year': np.asarray(df['year'], dtype=int),
         'pop_size': np.asarray(df['pop_size'], dtype=float),
@@ -290,18 +284,5 @@ def _pop_by_age(location):
     Wraps ``get_age_distribution_over_time`` which already renames columns to
     year/age/male/female and scales counts to real-world units (× 1000).
     """
-    raw = _loaders.get_age_distribution_over_time(location=location)
-    df = pd.DataFrame(raw)
-    expected = {'year', 'age', 'male', 'female'}
-    missing = expected - set(df.columns)
-    if missing:
-        # Fallback: case-insensitive rename
-        rename = {c: c.lower() for c in df.columns if c.lower() in expected}
-        df = df.rename(columns=rename)
-    missing = expected - set(df.columns)
-    if missing:
-        raise ValueError(
-            f'pop_by_age for {location!r} missing columns {missing}; '
-            f'got {list(df.columns)}.'
-        )
+    df = _loaders.get_age_distribution_over_time(location=location)
     return df[['year', 'age', 'male', 'female']].copy()

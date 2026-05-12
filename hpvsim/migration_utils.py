@@ -40,7 +40,7 @@ def _v2_dist_to_starsim(d):
     if dist == 'poisson':
         return ss.poisson(lam=par1)
     if dist == 'poisson1':
-        return Poisson1(lam=par1, shift=1)
+        return Poisson1(lam=par1)
     if dist in ('lognormal', 'lognorm'):
         return ss.lognorm_ex(mean=par1, std=par2)
     if dist == 'neg_binomial':

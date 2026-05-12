@@ -11,10 +11,9 @@ import sciris as sc
 
 from .version import __version__, __versiondate__, __license__
 from .settings import options
-from .defaults import datadir, default_int, default_float, get_default_plots
+from .defaults import datadir
 from . import data
 from . import migration_utils
-from . import parameters
 from .parameters import SimPars, GenotypePars, get_genotype_pars, get_cross_immunity, GENOTYPE_KEYS
 from . import misc
 from . import utils

@@ -59,9 +59,6 @@ class CrossImmunity(ss.Connector):
                     f'CrossImmunity.{label}: shape {m.shape} does not match '
                     f'number of HPV modules {n}'
                 )
-            # Diagonal entries are own-immunity scalars in [0, 1]: 1.0 for
-            # hpv16/hpv18, ``own_imm_hr`` (0.9 by default) for hi5/ohr.
-            # Reject anything outside [0, 1].
             diag = np.diag(m)
             if (diag < 0).any() or (diag > 1).any():
                 raise ValueError(
@@ -78,8 +75,7 @@ class CrossImmunity(ss.Connector):
         sev_imm = cell @ self.cross_imm_sev.T
         np.clip(sus_imm, 0.0, 1.0, out=sus_imm)
         np.clip(sev_imm, 0.0, 1.0, out=sev_imm)
+        auids = self.sim.people.auids
         for i, m in enumerate(self.hpv_modules):
-            auids = m.rel_sus.auids
             m.rel_sus[auids] = 1.0 - sus_imm[:, i]
             m.sev_imm[auids] = sev_imm[:, i]
-        return

@@ -13,15 +13,12 @@ import numpy as np
 import starsim as ss
 
 
-_DEFAULT_LAYERS = ('m', 'c')
-
-
 def _age_scale_acts(acts, age_act_pars, age_f, age_m, debut_f, debut_m):
     """Age-scaled acts: piecewise-linear modulation by couple's average age.
 
     Below peak: ramp from ``debut_ratio`` at debut to 1.0 at peak.
     Above peak (below retirement): ramp from 1.0 to ``retirement_ratio``.
-    Above retirement: 0.
+    Above retirement: 0 (default-initialized).
     """
     avg_age = (age_f + age_m) / 2.0
     avg_debut = (debut_f + debut_m) / 2.0
@@ -33,7 +30,6 @@ def _age_scale_acts(acts, age_act_pars, age_f, age_m, debut_f, debut_m):
 
     below = avg_age <= peak
     above = (avg_age > peak) & (avg_age < retire)
-    retired = avg_age >= retire  # noqa: F841 — kept for clarity; scaled stays 0
 
     scaled = np.zeros(len(acts))
     if below.any():
@@ -44,7 +40,6 @@ def _age_scale_acts(acts, age_act_pars, age_f, age_m, debut_f, debut_m):
         scaled[above] = acts[above] * (
             rr + (1 - rr) / (peak - retire) * (avg_age[above] - retire)
         )
-    # retired stays 0
     return scaled
 
 
@@ -60,14 +55,11 @@ class SexualNetwork(ss.SexualNetwork):
         debut: per-sex debut-age distribution dict ``{'f': Dist, 'm': Dist}``.
             Sampled once per agent and shared across all layers.
 
-    Overrides ``net_beta`` to fold the per-edge ``acts`` count into the
-    per-step transmission probability via ``1 - (1 - p_per_act)^acts``.
-    Without this override, ``ss.Network.net_beta`` returns ``edges.beta *
-    disease_beta`` directly — which treats the per-act probability as
-    per-step and ignores ``edges.acts``. For long-lived pairs the system
-    saturates either way (cumulative prob → 1 over hundreds of steps),
-    but short-lived casual pairs (few steps) lose ~10% transmission
-    probability under the un-compounded formula.
+    Overrides ``net_beta`` to compound the per-act probability across the
+    per-edge ``acts`` count: ``1 - (1 - edges.beta * disease_beta)^acts``.
+    The starsim base treats ``edges.beta`` as a final scalar
+    (``edges.beta * (1 - (1 - disease_beta)^acts)``); this override treats
+    it as a per-act probability multiplier, which is the v2 convention.
     """
 
     def net_beta(self, disease_beta=None, inds=None, disease=None):
@@ -239,6 +231,8 @@ class SexualNetwork(ss.SexualNetwork):
         people = self.sim.people
         target = getattr(self, f'partners_target_{lkey}')
         dists = self._dists[lkey]
+        dt = self.t.dt
+        dt_yr = float(dt)
 
         # Eligibility: alive & past debut & participant & wants partners
         # & not already at target.
@@ -252,7 +246,6 @@ class SexualNetwork(ss.SexualNetwork):
         # only stay eligible if they pass the per-step cross_layer Bernoulli.
         # cross_layer is annual ``ss.prob``; ``.to_prob(dt)`` converts to
         # dt-correct per-step probability.
-        dt = self.t.dt
         other_uids = self._other_layer_partner_uids(lkey)
         if len(other_uids):
             other_is_female = people.female[other_uids]
@@ -340,7 +333,7 @@ class SexualNetwork(ss.SexualNetwork):
         # rather than at dist-level — nbinom only supports predraw rate
         # scaling, which would inflate per-pair variance.
         dur_years = lpars['duration'].rvs(f_uids)
-        dur = dur_years / float(self.t.dt)
+        dur = dur_years / dt_yr
         # Sample raw per-year acts, then apply age-based modulation, then
         # scale to per-step. age_act_pars is optional — older test fixtures
         # may not supply it, in which case we skip the modulation (equivalent
@@ -348,7 +341,6 @@ class SexualNetwork(ss.SexualNetwork):
         raw_acts = lpars['acts'].rvs(f_uids)
         age_pars = lpars.get('age_act_pars')
         if age_pars is not None:
-            people = self.sim.people
             age_f = people.age[f_uids]
             age_m = people.age[m_uids]
             debut_f = self.debut[f_uids]
@@ -356,7 +348,7 @@ class SexualNetwork(ss.SexualNetwork):
             raw_acts = _age_scale_acts(
                 raw_acts, age_pars, age_f, age_m, debut_f, debut_m
             )
-        acts = raw_acts * float(self.t.dt)
+        acts = raw_acts * dt_yr
         beta = np.ones(n_new)
         start_ti = np.full(n_new, float(self.t.ti))
         layer_id = np.full(n_new, self._layer_idx[lkey], dtype=int)
