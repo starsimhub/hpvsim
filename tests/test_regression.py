@@ -1,7 +1,7 @@
 """Tests for the v2 -> v3 regression harness.
 
 Smoke for the M01 1-genotype HPV16 anchor and unit tests for the drift
-computation in tests/regression/compare.py.
+computation in tests/regression/drift.py.
 """
 
 import sys
@@ -11,9 +11,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 
-# --- Unit tests for tests/regression/compare.py:compute_drift -----------------
+# --- Unit tests for tests/regression/drift.py:compute_drift -------------------
 
-from regression.compare import compute_drift  # noqa: E402
+from regression.drift import compute_drift  # noqa: E402
 
 
 def test_compute_drift_within_threshold():

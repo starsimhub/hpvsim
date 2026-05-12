@@ -1,124 +1,103 @@
 # Regression harness
 
 This directory holds the v2 → v3 migration regression harness used during the
-HPVsim v3.0 port. It runs *outside* the standard pytest flow: the harness's
-job is to compare a current run of an anchor scenario against a stored v2
-baseline and report per-summary-result drift to the developer.
+HPVsim v3.0 port. It compares current v3 runs against stored v2.3 baselines
+(per-key drift gates) or against a v2.3 multi-seed sweep (Welch-style z-score
+gate over a v3 multi-seed sweep).
 
-The harness is deliberately small and informational — it is the **development
-gate** described in `MIGRATION_PLAN.md` §Implementation conventions item 2.
-It does **not** fail PRs; the **release gate** (overlapping uncertainty
-intervals against the analysis-repo suite) is the scientific gate and lives
-elsewhere.
+The harness is the **development gate** described in `MIGRATION_PLAN.md`
+§Implementation conventions item 2. The **release gate** (overlapping
+uncertainty intervals against the analysis-repo suite) is the scientific
+gate and lives elsewhere.
 
 ## What's here
 
 | File | Role |
 |---|---|
-| `anchor.py` | Pinned anchor scenario: vanilla 4-genotype HPV sim, Nigeria, seed 0, 1990–2060, no interventions. Exposes `make_sim()` and `run_and_summarize()`; runs as `__main__` for an ad-hoc summary print. |
-| `baseline.py` | CLI: runs the anchor, writes a JSON baseline to `../regression_baselines/anchor.json` (gitignored). |
-| `compare.py` | CLI: runs the anchor, loads a baseline, prints a per-key drift table. Exits 0 always. No-baseline mode exits without running the anchor. |
-| `__init__.py` | Empty; makes this directory an importable package for the pytest smoke test in `tests/test_regression.py`. |
+| `anchor_hpv16.py` | M01 1-genotype HPV16 anchor: `make_sim()` + `run_and_summarize()` + `__main__` runner. Pars pinned to match v2.3 default `dt=0.25`. |
+| `anchor_4genotype.py` | M03 4-genotype anchor (`[hpv16, hpv18, hi5, ohr]`): `make_sim()` + `run_and_summarize()` + `__main__` runner. Drives both single-seed parity and the multi-seed sweep. |
+| `short_summary.py` | Builds the 40-entry summary dict (8 metrics × 4 genotypes + 8 aggregate-across-genotypes) used by the M03 parity gates. |
+| `multi_seed_v3.py` | CLI: runs the M03 anchor across N seeds, writes per-seed summaries to `v3_seeds.json`. |
+| `multi_seed_v2.py` | CLI: same idea but runs against a v2.3 hpvsim (must be invoked from a v2-only env). Writes `v2_seeds.json`. |
+| `multi_seed_v2_trajectory.py` | v2-side trajectory capture (per-genotype, per-timestep) used by the M03 trajectory parity gate. |
+| `compare_seeds.py` | CLI: pairs `v2_seeds.json` × `v3_seeds.json`, prints Welch-style z + v2-mean percentile in v3 distribution. |
+| `drift.py` | Pure-function `compute_drift()` used by the M01/M02 per-key drift gates in `tests/test_regression.py`. |
+| `time_v2_anchor.py` | Ad-hoc runtime profile against v2.3 (no JSON output; informational). |
+| `profile_v3_anchor.py` | Ad-hoc runtime profile of the v3 anchor. |
+| `methods_fig1.py` | Methods-paper figure script; not part of the gate. |
+| `baseline_v23.py` | Helper for the v2.3 baseline-regeneration workflows documented below. |
+| `__init__.py` | Empty; makes this directory an importable package. |
 
-## Anchor scenario
+## Pytest gates (in `tests/`)
 
-Pinned in `anchor.py:PARS`:
+| Test | Compares | Baseline file |
+|---|---|---|
+| `test_regression.py::test_compute_drift_*` | Pure unit tests for `drift.py:compute_drift` | (none) |
+| `test_regression.py::test_anchor_hpv16_runs` | Tier-2 smoke: M01 anchor runs end-to-end | (none) |
+| `test_regression.py::test_anchor_hpv16_drift` (M02) | M02 8-metric drift gate | `anchor_hpv16.json` |
+| `test_partnership_equivalence.py` | KS-tests + bin-wise diff on partnership distributions | `partnership_v2.json` |
+| `test_natural_history.py::test_m02_capability_age_stratified_cancers` | Age-stratified cancer incidence parity | `m02_age_cancer.json` |
+| `test_m03_short_summary_parity.py` | 40-metric z-score gate (10 v3 seeds vs 30 v2 seeds) | `v2_seeds_n30.json` |
+| `test_m03_trajectory_parity.py` | Per-genotype trajectory parity | `v2_trajectories_n30.json` |
 
-| Par | Value |
-|---|---|
-| `n_agents` | `10e3` |
-| `location` | `'nigeria'` |
-| `genotypes` | `[16, 18, 'hi5', 'ohr']` |
-| `start` | `1990` |
-| `end` | `2060` |
-| `dt` | `0.25` |
-| `burnin` | `20` |
-| `rand_seed` | `0` |
-| `verbose` | `0` |
+All baseline files live under `tests/regression_baselines/` and are
+gitignored (`tests/regression_baselines/*.json`). Regenerate by following
+the per-baseline sections below.
 
-No interventions, no analyzers. Nigeria was chosen because the existing v2.x
-multi-scenario script (`tests/generate_v2_baselines.py`) already uses Nigeria
-as one of its three locations and Nigeria is well-represented in the
-validation-repo suite.
+## M03 multi-seed flow
 
-## Generating a baseline
+Pinned in `anchor_4genotype.py:PARS` (4 genotypes, Nigeria, seed 0,
+1990–2060, `dt=0.25`, no interventions, no analyzers beyond the
+auto-added Aggregate analyzer).
 
-Baselines are local-only and gitignored. The recommended workflow:
-
-1. Check out a clean v2.3.x environment (typically `git checkout rc2.3` and
-   `pip install -e .`, or install `hpvsim==2.3.x` from PyPI in a separate venv).
-2. Run:
-
-   ```bash
-   python tests/regression/baseline.py
-   ```
-
-3. The baseline lands at `tests/regression_baselines/anchor.json`. Keep that
-   file as your migration target.
-
-The script takes ~30–60s to run the anchor sim. Once the baseline is in place,
-return to `v3.0-dev` and use it as the comparison reference.
-
-## Running the comparison
+Producing a v3 sweep:
 
 ```bash
-python tests/regression/compare.py
+python tests/regression/multi_seed_v3.py --n 10
 ```
 
-Output: a table of per-key drift, e.g.
+Producing a v2.3 sweep (from a v2-only env, ~30–60s/seed):
 
-```
-key                                      baseline      current     abs_diff   rel_diff   over
-------------------------------------------------------------------------------------------------
-total HPV infections                        12345        12350           5     +0.04%
-mean HPV prevalence (%)                      8.2          8.2            0     +0.04%
-...
-
-0/9 keys exceed +/- 10% relative drift threshold (informational; exit 0 regardless).
+```bash
+"<v2 env>/python.exe" tests/regression/multi_seed_v2.py --n 30
 ```
 
-Optional flags:
+Diff them ad-hoc with `compare_seeds.py` (prints per-metric z + percentile).
+The CI-level gate is the pytest test `test_m03_short_summary_parity.py`,
+which runs 10 v3 seeds in-process and compares against the committed
+30-seed v2.3 baseline (`v2_seeds_n30.json`) at `|z| < 3` per metric.
 
-- `--baseline PATH` — diff against a different baseline file.
-- `--threshold 0.05` — change the threshold (default 0.10).
+## Drift semantics (M01/M02 per-key gates)
 
-## Drift semantics
-
-- **Relative drift:** `(current - baseline) / baseline`. A row is flagged when
-  `|rel_diff| > threshold` (default 10%).
-- **Zero-baseline guard:** if the baseline value is zero (not expected for any
-  pinned key in the anchor scenario, but guarded anyway), the row reports
+- **Relative drift:** `(current - baseline) / baseline`. A row is flagged
+  when `|rel_diff| > threshold` (default 10%).
+- **Zero-baseline guard:** if the baseline value is zero, the row reports
   absolute drift only and is flagged.
-- **The threshold is informational.** A flagged row signals that the developer
-  should investigate. Either the change in this PR is the cause and is
-  legitimately fixing or breaking equivalence; or the drift is expected
-  feature-misalignment that requires a tracking issue per `MIGRATION_PLAN.md`
-  §Implementation conventions item 2. The PR is not blocked by drift.
+- **The threshold is informational.** A flagged row signals that the
+  developer should investigate. Either the change in this PR is the cause
+  and is legitimately fixing or breaking equivalence; or the drift is
+  expected feature-misalignment that requires a tracking issue per
+  `MIGRATION_PLAN.md` §Implementation conventions item 2. The pytest gate
+  may pass or fail — read the printout, don't auto-block.
 
-## When to refresh the baseline
+## When to refresh a baseline
 
-- After a new patch release of v2.3 lands on `main` and is merged into
-  `v3.0-dev`.
-- After an explicit decision that drift introduced by a milestone is the new
-  target (i.e., feature-misalignment that has been investigated and accepted).
+- After a new patch release of v2.3 lands and is merged in.
+- After an explicit decision that drift introduced by a milestone is the
+  new target (i.e., feature-misalignment that has been investigated and
+  accepted).
 - Otherwise: don't. Stable baseline = stable signal.
 
 ## CI
 
-CI runs:
-
-- The pytest smoke test (`tests/test_regression.py:test_anchor_runs`) which
-  imports `anchor.run_and_summarize` and exercises the sim end-to-end.
-- `python regression/compare.py` (no-baseline mode) which proves the CLI
-  imports and parses arguments cleanly.
-
-Neither step fails on drift. Drift is a developer-local concern.
+CI runs the full pytest suite (`pytest test_*.py -n auto`). The drift gates
+above run in-process and pass / fail like any other test. There is no
+separate CLI smoke step.
 
 ## M01 1-genotype baseline (`anchor_hpv16.json`)
 
-The M01 anchor (`anchor_hpv16.py`) compares against a v2 hpvsim run configured
-with `genotypes=['hpv16']` and otherwise identical pars to the M00 4-genotype
-anchor. This baseline is gitignored at:
+The M01 anchor (`anchor_hpv16.py`) compares against a v2 hpvsim run
+configured with `genotypes=['hpv16']`. This baseline is gitignored at:
 
 ```
 tests/regression_baselines/anchor_hpv16.json
