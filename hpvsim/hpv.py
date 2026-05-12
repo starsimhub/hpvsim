@@ -103,7 +103,6 @@ class _ExclusiveSeeder(ss.Connector):
     def __init__(self, genotype_keys, init_hpv_dist=None, **kwargs):
         super().__init__(**kwargs)
         self.keys = tuple(genotype_keys)
-        self.init_hpv_dist = init_hpv_dist
         weights = None
         if init_hpv_dist is not None:
             weights = np.array(
@@ -159,9 +158,7 @@ class _ExclusiveSeeder(ss.Connector):
                 None,
             )
         if net is not None:
-            debut = net.debut[auids]
-            past_debut = (~np.isnan(debut)) & (people.age[auids] >= debut)
-            p_per_uid = np.where(past_debut, p_per_uid, 0.0)
+            p_per_uid = np.where(net.active(people)[auids], p_per_uid, 0.0)
 
         # Step 3: Bernoulli draw — who gets any HPV at all.
         self.pars.seed_bern.set(p=p_per_uid)
@@ -369,29 +366,23 @@ class HPV(ss.Infection):
         # 2. P(CIN) per female. Distributions return durations in starsim
         #    timesteps; convert to years before passing (cin_fn's ttc=50 is years).
         dt_yr = float(self.t.dt)
-        female = female_all
         p_cin = compute_severity(dur_precin * dt_yr,
                                    rel_sev=rel_sev_uids, pars=p.cin_fn)
         self._cin_bern.set(p=p_cin)
         cin_draw = self._cin_bern.rvs(uids)
-        cin_mask = cin_draw & female
+        cin_mask = cin_draw & female_all
         cin_uids = uids[cin_mask]
         nocin_uids = uids[~cin_mask]
 
-        # Schedule events with v2-compatible rounding. v2 stores ti_<event>
-        # as integer steps via ``sc.randround(dur/dt)`` for FEMALE events
-        # (mean preserved; _v2_legacy/people.py:246-253, 392, 400-409) and
-        # ``np.ceil(dur/dt)`` for MALE clearance (_v2_legacy/people.py:1056).
-        # Without rounding, fractional ti_<event> values cause the ``<= ti``
-        # check to fire only at the next integer ti — effectively np.ceil —
-        # which is correct for males but adds ~0.5-step bias for females,
-        # inflating per-step transmission by a few percent compounded over
-        # 70 years.
+        # Schedule events with ``sc.randround`` for
+        # FEMALE events and ``np.ceil`` for MALE clearance.
+        # Without rounding, fractional ti_<event> behaves like np.ceil at the
+        # ``<= ti`` check — fine for males, but biases female timings.
 
         # 3. Branch A: clearance from precin. Split male / female paths so
         #    males get np.ceil and females get sc.randround.
         nocin_dur = dur_precin[~cin_mask]
-        nocin_female = female[~cin_mask]
+        nocin_female = female_all[~cin_mask]
         rounded_dur = np.empty(len(nocin_dur), dtype=int)
         if nocin_female.any():
             rounded_dur[nocin_female] = sc.randround(nocin_dur[nocin_female])
@@ -461,9 +452,10 @@ class HPV(ss.Infection):
         # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
         # Returns agent to susceptible=True. nab_imm and cell_imm accumulate
         # the running max of per-agent beta samples; the CrossImmunity connector
-        # reads them next step to derive rel_sus and sev_imm.
-        cleared = (self.infected & (self.precin | self.cin) & ~self.cancerous
-                   & (self.ti_clearance <= ti)).uids
+        # reads them next step to derive rel_sus and sev_imm. ``infected`` is
+        # mutually exclusive with ``cancerous`` (step 3 toggles them), so it
+        # implies precin|cin.
+        cleared = (self.infected & (self.ti_clearance <= ti)).uids
         if len(cleared):
             self.infected[cleared] = False
             self.susceptible[cleared] = True
@@ -483,11 +475,6 @@ class HPV(ss.Infection):
                 first_uids  = f_cleared[first_mask]
                 repeat_uids = f_cleared[has_prior_imm]
 
-                # One rvs() call per immunity distribution over the union
-                # f_cleared, then split by has_prior_imm. Halves the number of
-                # rvs() invocations in this hot path; per-call Starsim wrapper
-                # overhead (process_pars, jump, copy.copy(timepars)) dominates
-                # the actual numerical work for these per-clearance draws.
                 p = self.pars
                 nab_all  = p.imm_init.rvs(f_cleared)
                 cell_all = p.cell_imm_init.rvs(f_cleared)
