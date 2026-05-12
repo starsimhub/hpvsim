@@ -26,13 +26,20 @@ import starsim as ss
 from .utils import compute_severity
 
 
-# Per-genotype initial HPV prevalence by age bracket and sex. Brackets are
-# inclusive lower bounds; the last bracket extends to age 150. HPV18 curves
-# are 0.6x of HPV16; hi5/ohr are 0.4x.
+# Initial HPV prevalence curves by age bracket and sex. Brackets are
+# inclusive lower bounds; the last bracket extends to age 150.
+#
+# 'total': total-HPV prevalence curve, used by _ExclusiveSeeder
+# for the per-agent any-HPV Bernoulli before genotype assignment.
+#
+# Per-genotype curves ('hpv16', 'hpv18', 'hi5', 'ohr') are used in
+# 'independent' init_seeding mode, where each genotype seeds from its own
+# curve. hpv16's per-genotype curve aliases 'total' since hpv16 dominates
+# the total in the source v2 data. hpv18 is 0.6x of hpv16; hi5/ohr are 0.4x.
 _INIT_HPV_PREV_AGE_BRACKETS = np.array([12, 17, 24, 34, 44, 64, 80, 150])
 
 _INIT_PREV = {
-    'hpv16': {
+    'total': {
         'm': np.array([0.0, 0.25, 0.60, 0.25, 0.05, 0.01, 0.0005, 0.0]),
         'f': np.array([0.0, 0.35, 0.70, 0.25, 0.05, 0.01, 0.0005, 0.0]),
     },
@@ -49,11 +56,16 @@ _INIT_PREV = {
         'f': np.array([0.0, 0.14, 0.28, 0.10, 0.02, 0.004, 0.0002, 0.0]),
     },
 }
+_INIT_PREV['hpv16'] = _INIT_PREV['total']
 
 
-def _make_init_prev_fn(genotype):
-    """Return the per-uid init-prev sampler for a given genotype."""
-    curves = _INIT_PREV[genotype]
+def _make_init_prev_fn(key):
+    """Return the per-uid init-prev sampler for a given _INIT_PREV key.
+
+    Accepts a genotype key ('hpv16', 'hpv18', 'hi5', 'ohr') for per-genotype
+    seeding or 'total' for the v2-equivalent total-HPV curve.
+    """
+    curves = _INIT_PREV[key]
     f_curve = curves['f']
     m_curve = curves['m']
 
@@ -69,7 +81,7 @@ def _make_init_prev_fn(genotype):
     return _age_stratified
 
 
-_KNOWN_GENOTYPES = tuple(_INIT_PREV.keys())
+_KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
 
 class _ExclusiveSeeder(ss.Connector):
@@ -136,7 +148,7 @@ class _ExclusiveSeeder(ss.Connector):
         """Compute per-agent genotype assignment (called once on first callback).
 
         Steps:
-          1. Per-agent total HPV probability using hpv16 curve as the total.
+          1. Per-agent total HPV probability using the 'total' curve.
           2. Zero out agents who are not yet past sexual debut.
           3. Bernoulli draw: which agents get any HPV at all.
           4. Per-infected-agent genotype assignment (uniform or weighted).
@@ -145,8 +157,8 @@ class _ExclusiveSeeder(ss.Connector):
         n_agents = len(people)
         all_uids = ss.uids(np.arange(n_agents))
 
-        # Step 1: per-agent total HPV probability using hpv16 curve as total.
-        total_prev_fn = _make_init_prev_fn('hpv16')
+        # Step 1: per-agent total HPV probability.
+        total_prev_fn = _make_init_prev_fn('total')
         p_per_uid = total_prev_fn(None, sim, all_uids)
 
         # Step 2: filter to alive agents past sexual debut.

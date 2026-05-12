@@ -162,8 +162,8 @@ class Sim(ss.Sim):
                     )
 
             if init_seeding == 'exclusive':
-                # Coordinated seeding: one Bernoulli per agent using the hpv16
-                # total prevalence curve, then one genotype per infected agent.
+                # Coordinated seeding: one Bernoulli per agent using the
+                # 'total' HPV prevalence curve, then one genotype per infected agent.
                 # The _ExclusiveSeeder is an ``ss.Module`` so its Dists go
                 # through the standard define_pars / init_dists lifecycle; its
                 # callbacks install on each HPV's init_prev and trigger the
