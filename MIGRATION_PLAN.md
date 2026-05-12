@@ -131,23 +131,26 @@ See spec's "Post-implementation deltas" section for the full diff.
 
 ### M3: Multi-genotype and cross-immunity
 
-**Status: 🟡 Implementation complete on
-`m03-multi-genotype-and-cross-immunity`; PR not yet opened.** Both
-anchor regressions (HPV16 and 4-genotype) run cleanly; 117/118 tests
-pass (one pre-existing WIP per-genotype 4-genotype short_summary
-parity gate still fails). Deviations from plan: M03 was branched off
-`m02-natural-history-parity` rather than `v3.0-dev` (M03 substantively
-depends on M02's `sev_imm` refactor, `GenotypePars`, AgeMigration);
-rebased onto `v3.0-dev` after M02 merged. `_ExclusiveSeeder` (one
-Bernoulli per agent + per-infected-agent genotype assignment, matching
-v2's no-co-infection-at-init semantics) added; opt-out via
-`init_seeding='independent'`. Sex-asymmetric scheduling rounding
-(`sc.randround` for FEMALE events, `np.ceil` for MALE clearance) added
+**Status: ✅ Complete on `m03-multi-genotype-and-cross-immunity`; PR
+open against `v3.0-dev`.** Both anchor regressions (HPV16 and
+4-genotype) run cleanly; the multi-seed parity gates (40-metric
+z-score at `|z| < 3` over 10 v3 seeds vs 30 v2.3 seeds, plus
+per-genotype trajectory parity) are green. Deviations from plan: M03
+was branched off `m02-natural-history-parity` rather than `v3.0-dev`
+(M03 substantively depends on M02's `sev_imm` refactor, `GenotypePars`,
+AgeMigration); rebased onto `v3.0-dev` after M02 merged.
+`_ExclusiveSeeder` (one Bernoulli per agent + per-infected-agent
+genotype assignment, matching v2's no-co-infection-at-init semantics)
+added; opt-out via `init_seeding='independent'`. Sex-asymmetric
+scheduling rounding (CRN-safe stochastic round via per-decision
+`ss.bernoulli` for FEMALE events, `np.ceil` for MALE clearance) added
 because fractional `ti_<event>` values otherwise compound a few-percent
 bias. Audit pass landed pre-merge (milestone references stripped,
 v2-rationale framing dropped, scratch diagnostics removed,
-`GenotypePars` defaults moved to a per-genotype dict). See the M03
-spec's "Post-implementation deltas" section for the full diff.
+`GenotypePars` defaults moved to a per-genotype dict, M00 regression
+CLI trio `anchor.py`/`baseline.py`/`compare.py` retired and superseded
+by the M03 multi-seed pytest gates). See the M03 spec's
+"Post-implementation deltas" section for the full diff.
 
 **Demo:** 4-genotype HPV sim with cross-immunity matching v2's 4-genotype Nigeria baseline.
 
