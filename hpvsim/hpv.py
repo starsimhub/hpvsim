@@ -23,6 +23,8 @@ import numpy as np
 import sciris as sc
 import starsim as ss
 
+from .network import SexualNetwork
+from .parameters import get_genotype_pars
 from .utils import compute_severity
 
 
@@ -87,12 +89,8 @@ _KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 class _ExclusiveSeeder(ss.Connector):
     """Coordinated initial seeding for multi-genotype HPV.
 
-    Registered as an ``ss.Module`` so the seeding Dists go through the
+    Registered as an ``ss.Connector`` so the seeding Dists go through the
     standard ``define_pars`` -> ``init_pre`` -> ``init_dists`` lifecycle.
-    Each Dist gets a unique auto-generated trace from its module path,
-    so the bernoulli and choice draws are independent on the same uids
-    (without this, CRN coupling makes ``choice = floor(u*a)`` depend on
-    ``u < p`` — bernoulli True implies choice 0 for ``p=0.1, a=4``).
 
     On the first invocation of any per-genotype callback, computes the
     global assignment (per-agent total-prevalence Bernoulli + per-infected
@@ -100,11 +98,6 @@ class _ExclusiveSeeder(ss.Connector):
     returns 1.0 for uids assigned to it and 0.0 otherwise; an
     ``ss.bernoulli`` with those probabilities deterministically yields
     exactly the assigned uids in ``init_prev.filter()``.
-
-    Compute fires lazily on the first ``init_prev`` callback. By that
-    point ``init_dists`` has already run across the whole sim (it runs
-    between ``init_pre`` and ``init_post``), so this seeder's Dists are
-    initialized regardless of where it sits in the module list.
     """
 
     def __init__(self, genotype_keys, init_hpv_dist=None, **kwargs):
@@ -121,26 +114,25 @@ class _ExclusiveSeeder(ss.Connector):
             seed_bern=ss.bernoulli(p=0.0),
             seed_choice=ss.choice(a=len(self.keys), p=weights),
         )
-        self._assignment = None  # ndarray shape (n_agents,), values in [-1, n_g)
+        # Per-genotype assigned uids, aligned with self.keys. Populated lazily
+        # on the first init_prev callback.
+        self._assigned_uids = None
 
     def step(self):
         return  # No per-step logic; compute fires lazily on first init_prev callback.
 
     def for_genotype(self, key):
-        """Return a callable suitable for ``ss.bernoulli(p=callback)``.
+        """Return an init_prev callback for ``ss.bernoulli(p=callback)``.
 
-        The callback signature is ``(module, sim, uids)`` matching
-        starsim's ``convert_callable`` dispatch. On first call it
-        triggers ``_compute`` which populates ``self._assignment``;
-        subsequent calls are O(len(uids)) lookups.
+        Returns 1.0 for uids assigned to this genotype, 0.0 otherwise.
+        The first invocation triggers the shared lazy compute.
         """
         gen_idx = self.keys.index(key)
 
         def callback(module, sim, uids):
-            if self._assignment is None:
+            if self._assigned_uids is None:
                 self._compute(sim)
-            uids_arr = np.asarray(uids, dtype=int)
-            return (self._assignment[uids_arr] == gen_idx).astype(float)
+            return np.isin(uids, self._assigned_uids[gen_idx]).astype(float)
 
         return callback
 
@@ -154,48 +146,37 @@ class _ExclusiveSeeder(ss.Connector):
           4. Per-infected-agent genotype assignment (uniform or weighted).
         """
         people = sim.people
-        n_agents = len(people)
-        all_uids = ss.uids(np.arange(n_agents))
+        auids = people.auids
 
-        # Step 1: per-agent total HPV probability.
-        total_prev_fn = _make_init_prev_fn('total')
-        p_per_uid = total_prev_fn(None, sim, all_uids)
+        # Step 1: total-HPV probability per alive agent.
+        p_per_uid = _make_init_prev_fn('total')(None, sim, auids)
 
-        # Step 2: filter to alive agents past sexual debut.
-        # Agents not yet debuted can't be seeded.
-        alive = np.asarray(people.alive)
-        active = alive.copy()
-        # Locate the SexualNetwork (if present) to gate on debut age.
+        # Step 2: gate on sexual debut where a SexualNetwork is present.
         net = None
-        if hasattr(sim.networks, 'get'):
-            net = sim.networks.get('sexualnetwork')
-        if net is None:
-            for nm in sim.networks.values():
-                from .network import SexualNetwork
-                if isinstance(nm, SexualNetwork):
-                    net = nm
-                    break
-        if net is not None and hasattr(net, 'debut'):
-            debut = np.asarray(net.debut)
-            age = np.asarray(people.age)
-            past_debut = (~np.isnan(debut)) & (age >= debut)
-            active = active & past_debut
-        p_per_uid = np.where(active, p_per_uid, 0.0)
+        if sim.networks is not None:
+            net = next(
+                (n for n in sim.networks.values() if isinstance(n, SexualNetwork)),
+                None,
+            )
+        if net is not None:
+            debut = net.debut[auids]
+            past_debut = (~np.isnan(debut)) & (people.age[auids] >= debut)
+            p_per_uid = np.where(past_debut, p_per_uid, 0.0)
 
-        # Step 3: Bernoulli draw — standard-init Dist via define_pars.
+        # Step 3: Bernoulli draw — who gets any HPV at all.
         self.pars.seed_bern.set(p=p_per_uid)
-        infected_mask = self.pars.seed_bern.rvs(all_uids)
-        infected_uids = all_uids[infected_mask]
+        infected_uids = self.pars.seed_bern.filter(auids)
 
-        # Step 4: per-infected-agent genotype assignment — standard-init
-        # ss.choice via define_pars (independent per-uid uniforms from the
-        # bernoulli above via auto-generated unique trace).
-        n_g = len(self.keys)
-        assignment = np.full(n_agents, -1, dtype=int)
-        if len(infected_uids) > 0:
+        # Step 4: per-infected-agent genotype assignment. ss.choice draws
+        # independent per-uid uniforms via its auto-generated unique trace.
+        if len(infected_uids):
             gen_choices = self.pars.seed_choice.rvs(infected_uids)
-            assignment[np.asarray(infected_uids)] = gen_choices
-        self._assignment = assignment
+            self._assigned_uids = tuple(
+                infected_uids[gen_choices == i] for i in range(len(self.keys))
+            )
+        else:
+            # No infections — empty assignment for each genotype.
+            self._assigned_uids = tuple(infected_uids for _ in self.keys)
 
 
 class HPV(ss.Infection):
@@ -217,7 +198,6 @@ class HPV(ss.Infection):
         super().__init__()
         # Pull natural-history defaults from GenotypePars so there's a single
         # source of truth per genotype.
-        from .parameters import get_genotype_pars
         gpars = get_genotype_pars(genotype)
         self.define_pars(
             init_prev=ss.bernoulli(p=_make_init_prev_fn(genotype)),
@@ -225,11 +205,6 @@ class HPV(ss.Infection):
             # male→female (transm2f). SexualNetwork places females in p1 and
             # males in p2 (see hpvsim/network.py:185). validate_beta accepts
             # this dict shape natively (ss.Infection.validate_beta).
-            #
-            # rel_beta is the per-genotype scaler (hpv18=0.75, hi5/ohr=0.9,
-            # hpv16=1.0). Without this multiplier, hpv18/hi5/ohr would
-            # transmit at hpv16-equivalent rates instead of their reduced
-            # genotype-specific rate.
             beta={
                 'sexualnetwork': [
                     gpars.beta * gpars.rel_beta * gpars.transf2m,
@@ -248,17 +223,6 @@ class HPV(ss.Infection):
             # Per-genotype beta scaler and serology probability (multi-genotype).
             rel_beta=gpars.rel_beta,
             sero_prob=gpars.sero_prob,
-            # Per-call Bernoullis for CIN and cancer draws; ``p`` is overwritten
-            # via .set(p=...) in set_prognoses. Held in pars (vs. as plain
-            # attributes) so the per-Dist RNG-slot identifier follows the
-            # ``module.pars._cin_bern`` path — moving them changes which CRN
-            # slot is drawn and shifts regression numbers past the ±10% gates.
-            _cin_bern=ss.bernoulli(p=0.5),
-            _cancer_bern=ss.bernoulli(p=0.5),
-            # Seroconversion gate: p is overwritten via .set(p=sero_prob) at the
-            # clearance use site. Initial p=0.75 matches hpv16 default; overwritten
-            # before every draw so the value here is only a placeholder.
-            _sero_bern=ss.bernoulli(p=0.75),
         )
         self.update_pars(pars=pars, **kwargs)
         # ss.Infection provides: susceptible, infected, rel_sus, rel_trans,
@@ -291,6 +255,11 @@ class HPV(ss.Infection):
         # Baseline rel_sev distribution; abs() in _sample_rel_sev_for_unset
         # implements positive truncation.
         self._rel_sev_dist = ss.normal(loc=1.0, scale=0.2)
+        # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
+        # use site (placeholder p values below).
+        self._cin_bern = ss.bernoulli(p=0.5)
+        self._cancer_bern = ss.bernoulli(p=0.5)
+        self._sero_bern = ss.bernoulli(p=0.5)
         return
 
     def init_post(self):
@@ -403,8 +372,8 @@ class HPV(ss.Infection):
         female = female_all
         p_cin = compute_severity(dur_precin * dt_yr,
                                    rel_sev=rel_sev_uids, pars=p.cin_fn)
-        p._cin_bern.set(p=p_cin)
-        cin_draw = p._cin_bern.rvs(uids)
+        self._cin_bern.set(p=p_cin)
+        cin_draw = self._cin_bern.rvs(uids)
         cin_mask = cin_draw & female
         cin_uids = uids[cin_mask]
         nocin_uids = uids[~cin_mask]
@@ -451,8 +420,8 @@ class HPV(ss.Infection):
         rel_sev_cin = rel_sev_uids[cin_mask]
         p_cancer = compute_severity(dur_cin * dt_yr,
                                       rel_sev=rel_sev_cin, pars=p.cancer_fn)
-        p._cancer_bern.set(p=p_cancer)
-        cancer_draw = p._cancer_bern.rvs(cin_uids)
+        self._cancer_bern.set(p=p_cancer)
+        cancer_draw = self._cancer_bern.rvs(cin_uids)
         cancer_uids = cin_uids[cancer_draw]
         nocancer_uids = cin_uids[~cancer_draw]
 
@@ -524,8 +493,8 @@ class HPV(ss.Infection):
                 cell_all = p.cell_imm_init.rvs(f_cleared)
 
                 if len(first_uids):
-                    p._sero_bern.set(p=float(p.sero_prob))
-                    seroconvert = p._sero_bern.rvs(first_uids)
+                    self._sero_bern.set(p=float(p.sero_prob))
+                    seroconvert = self._sero_bern.rvs(first_uids)
                     # nab_imm (humoral) is gated on seroconversion: non-
                     # seroconverters keep 0 nab and remain fully reinfectible.
                     # cell_imm (cell-mediated severity) is NOT gated — all
