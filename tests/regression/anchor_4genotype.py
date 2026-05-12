@@ -19,7 +19,6 @@ import hpvsim as hpv
 # Make sibling short_summary.py importable when this script is invoked
 # directly (python tests/regression/anchor_4genotype.py).
 # pytest adds the regression package to sys.path so the insert is harmless there.
-# Pattern matches demo_anchor_hpv16.py's sys.path.insert approach.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from short_summary import build_summary  # noqa: E402
 

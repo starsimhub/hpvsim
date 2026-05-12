@@ -12,8 +12,8 @@ api/
 tests/regression_baselines/
 
 # Diagnostic outputs from regression instrumentation
-# (multi-seed JSONs, per-step traces, profiling reports)
-tests/regression/v[23]_seeds*.json
+# (multi-seed JSONs incl. seeds/trajectories, per-step traces, profiling reports)
+tests/regression/v[23]_*.json
 tests/regression/v[23]_trace*.csv
 tests/regression/profile_v3_anchor*
 tests/regression/perf_parity_*.json
