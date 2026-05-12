@@ -211,21 +211,6 @@ class AgeMigration(ss.Demographics):
     # Helpers                                                                 #
     # ---------------------------------------------------------------------- #
 
-    def _immigrate(self, n, age, female):
-        """Add n new agents at exact age and sex, HPV-naive.
-
-        ``people.grow(n)`` allocates sequential UIDs and slots. New agents
-        inherit the default state for every BoolState (False), so they
-        enter HPV-naive.
-        """
-        if n <= 0:
-            return
-        people = self.sim.people
-        new_uids = people.grow(n)
-        people.age[new_uids] = float(age)
-        people.female[new_uids] = bool(female)
-        return
-
     def _emigrate(self, band_uids, n):
         """Remove n agents from band_uids via ``request_removal``.
 
