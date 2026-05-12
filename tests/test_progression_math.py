@@ -5,7 +5,6 @@ import pytest
 import hpvsim as hpv
 from hpvsim.utils import (
     compute_severity,
-    compute_severity_integral,
     intlogf2,
     logf2,
     transform_prob,

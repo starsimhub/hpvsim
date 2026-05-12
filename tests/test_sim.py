@@ -1,8 +1,5 @@
 """Integration tests for hpvsim.sim.Sim."""
 
-import starsim as ss
-
-import hpvsim
 from hpvsim.sim import Sim
 from hpvsim.hpv import HPV
 from hpvsim.network import SexualNetwork
@@ -21,7 +18,7 @@ def test_sim_init_runs():
 
 def test_sim_has_one_multilayer_sexual_network():
     """Default config produces a single hpv.SexualNetwork holding both
-    partnership layers (m, c). v2's default network has only m and c.
+    partnership layers (m, c).
     """
     sim = Sim(location='nigeria', n_agents=500, start=2000, stop=2002, dt=0.25)
     sim.init()
