@@ -20,7 +20,6 @@ identity matrix on the Connector.
 """
 
 import numpy as np
-import sciris as sc
 import starsim as ss
 
 from .network import SexualNetwork
@@ -257,6 +256,14 @@ class HPV(ss.Infection):
         self._cin_bern = ss.bernoulli(p=0.5)
         self._cancer_bern = ss.bernoulli(p=0.5)
         self._sero_bern = ss.bernoulli(p=0.5)
+        # Per-decision Bernoullis for CRN-safe stochastic rounding of
+        # event durations. Each ``ti_<event>`` schedule gets its own dist so
+        # the per-uid round-up draw is independent across decisions.
+        self._round_clear_precin_bern = ss.bernoulli(p=0.5)
+        self._round_cin_bern = ss.bernoulli(p=0.5)
+        self._round_clear_cin_bern = ss.bernoulli(p=0.5)
+        self._round_cancer_bern = ss.bernoulli(p=0.5)
+        self._round_dead_bern = ss.bernoulli(p=0.5)
         return
 
     def init_post(self):
@@ -295,6 +302,25 @@ class HPV(ss.Infection):
         res.cum_cancers[:] = np.cumsum(res.new_cancers)
         res.cum_cancer_deaths[:] = np.cumsum(res.new_cancer_deaths)
         return
+
+    @staticmethod
+    def _randround(values, uids, dist):
+        """CRN-safe stochastic round to the nearest integer.
+
+        Equivalent to ``sc.randround(values)`` semantically (floor + a
+        Bernoulli draw on the fractional part), but routes the random draw
+        through a per-decision ``ss.bernoulli`` so each agent gets a
+        deterministic, per-uid draw under CRN. ``dist`` must be a dedicated
+        Bernoulli created in ``__init__`` and used only at this call site.
+        ``values`` and ``uids`` must align element-wise.
+        """
+        if len(uids) == 0:
+            return np.zeros(0, dtype=int)
+        floor = np.floor(values)
+        frac = values - floor
+        dist.set(p=frac)
+        bumps = dist.rvs(uids)
+        return (floor + bumps).astype(int)
 
     def _sample_rel_sev_for_unset(self):
         """Sample rel_sev for any alive agent without a sample yet.
@@ -374,18 +400,22 @@ class HPV(ss.Infection):
         cin_uids = uids[cin_mask]
         nocin_uids = uids[~cin_mask]
 
-        # Schedule events with ``sc.randround`` for
-        # FEMALE events and ``np.ceil`` for MALE clearance.
+        # Schedule events with CRN-safe stochastic rounding (``_randround``)
+        # for FEMALE events and ``np.ceil`` for MALE clearance.
         # Without rounding, fractional ti_<event> behaves like np.ceil at the
         # ``<= ti`` check — fine for males, but biases female timings.
 
         # 3. Branch A: clearance from precin. Split male / female paths so
-        #    males get np.ceil and females get sc.randround.
+        #    males get np.ceil and females get the CRN-safe stochastic round.
         nocin_dur = dur_precin[~cin_mask]
         nocin_female = female_all[~cin_mask]
         rounded_dur = np.empty(len(nocin_dur), dtype=int)
         if nocin_female.any():
-            rounded_dur[nocin_female] = sc.randround(nocin_dur[nocin_female])
+            rounded_dur[nocin_female] = self._randround(
+                nocin_dur[nocin_female],
+                nocin_uids[nocin_female],
+                self._round_clear_precin_bern,
+            )
         if (~nocin_female).any():
             rounded_dur[~nocin_female] = np.ceil(
                 nocin_dur[~nocin_female]
@@ -396,7 +426,9 @@ class HPV(ss.Infection):
             return
 
         # 4. Branch B: progression to CIN.
-        self.ti_cin[cin_uids] = ti + sc.randround(dur_precin[cin_mask])
+        self.ti_cin[cin_uids] = ti + self._randround(
+            dur_precin[cin_mask], cin_uids, self._round_cin_bern,
+        )
         dur_cin = p.dur_cin.rvs(cin_uids)
         # age_risk multiplier: women aged >= age_risk['age'] get dur_cin
         # scaled by age_risk['risk'].
@@ -418,18 +450,24 @@ class HPV(ss.Infection):
 
         # 5a. Clear after CIN (no cancer).
         self.ti_clearance[nocancer_uids] = (
-            self.ti_cin[nocancer_uids] + sc.randround(dur_cin[~cancer_draw])
+            self.ti_cin[nocancer_uids] + self._randround(
+                dur_cin[~cancer_draw], nocancer_uids, self._round_clear_cin_bern,
+            )
         )
 
         # 5b. Progression to cancer.
         if len(cancer_uids) == 0:
             return
         self.ti_cancerous[cancer_uids] = (
-            self.ti_cin[cancer_uids] + sc.randround(dur_cin[cancer_draw])
+            self.ti_cin[cancer_uids] + self._randround(
+                dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
+            )
         )
         dur_cancer = p.dur_cancer.rvs(cancer_uids)
         self.ti_dead_cancer[cancer_uids] = (
-            self.ti_cancerous[cancer_uids] + sc.randround(dur_cancer)
+            self.ti_cancerous[cancer_uids] + self._randround(
+                dur_cancer, cancer_uids, self._round_dead_bern,
+            )
         )
 
     def step_state(self):
