@@ -22,12 +22,23 @@ identity matrix on the Connector.
 import numpy as np
 import starsim as ss
 
-from .parameters import get_genotype_pars
+from .parameters import genotype_aliases, get_genotype_pars
 from .seeding import _make_init_prev_fn
 from .utils import compute_severity
 
 
 _KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
+
+
+def _normalize_genotype(key):
+    """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
+    s = str(key).lower().strip()
+    for canonical, aliases in genotype_aliases.items():
+        if s == canonical or s in aliases:
+            return canonical
+    raise ValueError(
+        f'Unknown genotype {key!r}; valid: {list(genotype_aliases)}'
+    )
 
 
 class HPV(ss.Infection):

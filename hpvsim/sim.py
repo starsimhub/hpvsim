@@ -35,21 +35,9 @@ import starsim as ss
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
 from .demographics import AgeMigration
-from .hpv import HPV
+from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
-from .parameters import genotype_aliases
 from .seeding import _ExclusiveSeeder
-
-
-def _normalize_genotype(key):
-    """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
-    s = str(key).lower().strip()
-    for canonical, aliases in genotype_aliases.items():
-        if s == canonical or s in aliases:
-            return canonical
-    raise ValueError(
-        f'Unknown genotype {key!r}; valid: {list(genotype_aliases)}'
-    )
 
 
 class Sim(ss.Sim):
