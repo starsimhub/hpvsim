@@ -72,11 +72,9 @@ def test_genotype_pars_imm_init_is_distribution():
 
 def test_cross_immunity_connector_collects_hpv_modules():
     """CrossImmunity.init_pre populates hpv_modules from sim.diseases in registration order."""
-    from hpvsim.connectors import CrossImmunity
     sim = hpv.Sim(
         n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0,
         diseases=[hpv.HPV(genotype='hpv16')],
-        connectors=[CrossImmunity()],
     )
     sim.init()
     conn = sim.connectors.crossimmunity   # Starsim auto-snake-cases class name
@@ -87,11 +85,9 @@ def test_cross_immunity_connector_collects_hpv_modules():
 
 def test_cross_immunity_connector_default_matrices():
     """If matrices not supplied, init_pre populates from get_cross_immunity for the discovered genotype set."""
-    from hpvsim.connectors import CrossImmunity
     sim = hpv.Sim(
         n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0,
         diseases=[hpv.HPV(genotype='hpv16')],
-        connectors=[CrossImmunity()],
     )
     sim.init()
     conn = sim.connectors.crossimmunity   # Starsim copies; check the live instance
@@ -103,12 +99,16 @@ def test_cross_immunity_connector_default_matrices():
 def test_cross_immunity_connector_rejects_diagonal_outside_unit_interval():
     """Diagonal entries must be in [0, 1] (own-immunity is a probability);
     init_pre raises if outside that range. Per-key diagonal values < 1.0
-    (e.g. v2's own_imm_hr=0.9 for hi5/ohr) are now allowed."""
-    from hpvsim.connectors import CrossImmunity
+    (e.g. v2's own_imm_hr=0.9 for hi5/ohr) are now allowed.
+
+    Drops down to ss.Sim since hpv.Sim appends a default CrossImmunity that
+    would mask a user-supplied one.
+    """
+    from hpvsim.cross_genotype import CrossImmunity
     bad = np.array([[1.5]], dtype=np.float32)
     conn = CrossImmunity(cross_imm_sus=bad, cross_imm_sev=bad)
-    sim = hpv.Sim(
-        n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0,
+    sim = ss.Sim(
+        n_agents=10, start=ss.years(1990), stop=ss.years(1991), dt=ss.years(1.0),
         diseases=[hpv.HPV(genotype='hpv16')],
         connectors=[conn],
     )
@@ -130,12 +130,16 @@ def test_cross_immunity_connector_accepts_v2_style_diagonal():
 
 
 def test_cross_immunity_connector_rejects_shape_mismatch():
-    """Matrix dim must match number of HPV modules."""
-    from hpvsim.connectors import CrossImmunity
+    """Matrix dim must match number of HPV modules.
+
+    Drops down to ss.Sim since hpv.Sim appends a default CrossImmunity that
+    would mask a user-supplied one.
+    """
+    from hpvsim.cross_genotype import CrossImmunity
     bad = np.eye(2, dtype=np.float32)
     conn = CrossImmunity(cross_imm_sus=bad, cross_imm_sev=bad)
-    sim = hpv.Sim(
-        n_agents=100, start=1990, stop=1991, dt=1.0, rand_seed=0,
+    sim = ss.Sim(
+        n_agents=10, start=ss.years(1990), stop=ss.years(1991), dt=ss.years(1.0),
         diseases=[hpv.HPV(genotype='hpv16')],
         connectors=[conn],
     )
@@ -145,11 +149,9 @@ def test_cross_immunity_connector_rejects_shape_mismatch():
 
 def test_cross_immunity_step_identity_for_single_genotype():
     """1x1 identity matrix: rel_sus = 1 - nab_imm, sev_imm = cell_imm."""
-    from hpvsim.connectors import CrossImmunity
     sim = hpv.Sim(
         n_agents=10, start=1990, stop=1991, dt=1.0, rand_seed=0,
         diseases=[hpv.HPV(genotype='hpv16')],
-        connectors=[CrossImmunity()],
     )
     sim.init()
     mod = sim.diseases.hpv16
@@ -168,15 +170,14 @@ def test_cross_immunity_step_identity_for_single_genotype():
 
 
 def test_cross_immunity_step_two_genotype_hand_computed():
-    """2-genotype case: rel_sus and sev_imm match hand-computed dot product."""
-    from hpvsim.connectors import CrossImmunity
-    # Cross-immunity: 16->18 = 0.5 sus / 0.7 sev; 18->16 = 0.5 sus / 0.7 sev.
-    m_sus = np.array([[1.0, 0.5], [0.5, 1.0]], dtype=np.float32)
-    m_sev = np.array([[1.0, 0.7], [0.7, 1.0]], dtype=np.float32)
+    """2-genotype case: rel_sus and sev_imm match hand-computed dot product.
+
+    The auto-default 2-genotype matrices match the values used here:
+    cross_imm_sus = [[1.0, 0.5], [0.5, 1.0]], cross_imm_sev = [[1.0, 0.7], [0.7, 1.0]].
+    """
     sim = hpv.Sim(
         n_agents=4, start=1990, stop=1991, dt=1.0, rand_seed=0,
         diseases=[hpv.HPV(genotype='hpv16'), hpv.HPV(genotype='hpv18')],
-        connectors=[CrossImmunity(cross_imm_sus=m_sus, cross_imm_sev=m_sev)],
     )
     sim.init()
     h16 = sim.diseases.hpv16
@@ -222,7 +223,7 @@ def test_cross_immunity_step_four_genotype_hand_computed():
     where row = target, col = source. Convention matches v2 (immunity[target_idx,
     source_idx] = pars[label_target][label_source] in _v2_legacy/immunity.py:81).
     """
-    from hpvsim.connectors import CrossImmunity
+    from hpvsim.cross_genotype import CrossImmunity
     sim = hpv.Sim(
         n_agents=8, start=1990, stop=1991, dt=1.0, rand_seed=0,
         genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
@@ -314,11 +315,9 @@ def test_cross_immunity_step_four_genotype_hand_computed():
 
 def test_cross_immunity_step_clips_to_unit_interval():
     """sus_imm and sev_imm are clipped to [0, 1] (matches v2 np.minimum cap)."""
-    from hpvsim.connectors import CrossImmunity
     sim = hpv.Sim(
         n_agents=4, start=1990, stop=1991, dt=1.0, rand_seed=0,
         diseases=[hpv.HPV(genotype='hpv16'), hpv.HPV(genotype='hpv18')],
-        connectors=[CrossImmunity()],
     )
     sim.init()
     sim.diseases.hpv16.nab_imm.values[0] = 0.9
@@ -336,11 +335,9 @@ def test_cross_immunity_step_writes_survive_dead_agents():
     a copy; writing to .values[:] would be silently discarded. Verify writes
     actually land in raw.
     """
-    from hpvsim.connectors import CrossImmunity
     sim = hpv.Sim(
         n_agents=20, start=1990, stop=1991, dt=1.0, rand_seed=0,
         diseases=[hpv.HPV(genotype='hpv16')],
-        connectors=[CrossImmunity()],
     )
     sim.init()
     mod = sim.diseases.hpv16

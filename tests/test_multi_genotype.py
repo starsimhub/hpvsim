@@ -6,14 +6,14 @@ import hpvsim as hpv
 
 
 def test_sim_with_explicit_diseases_and_connectors():
-    """Explicit diseases= + connectors= path still works (M02 surface)."""
+    """Explicit diseases= path still works; auto-CrossImmunity is appended."""
     sim = hpv.Sim(
         n_agents=200, start=1990, stop=1991, dt=1.0, rand_seed=0,
         diseases=[hpv.HPV(genotype='hpv16')],
-        connectors=[hpv.CrossImmunity()],
     )
     sim.run()
     assert 'hpv16' in sim.diseases
+    assert 'crossimmunity' in sim.connectors
 
 
 def test_sim_genotypes_sugar_single():
@@ -90,7 +90,6 @@ def test_genotypes_sugar_matches_explicit_diseases():
     sim_a.run()
     sim_b = hpv.Sim(
         diseases=[hpv.HPV(genotype='hpv16'), hpv.HPV(genotype='hpv18')],
-        connectors=[hpv.CrossImmunity()],
         **pars,
     )
     sim_b.run()

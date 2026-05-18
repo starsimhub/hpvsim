@@ -3,9 +3,16 @@
 ``hpv.Sim(location='nigeria', genotypes=[16, 18, 'hi5', 'ohr'])`` instantiates
 the default stack — one HPV disease module per genotype, multi-layer
 SexualNetwork, ss.Births + ss.Deaths + AgeMigration demographics, ss.People
-with location-specific age pyramid, plus a CrossImmunity connector — and
-forwards to ``ss.Sim``. Each component is overridable: passing ``diseases=``
-short-circuits the genotypes-sugar path.
+with location-specific age pyramid, plus a CrossImmunity connector and an
+Aggregate analyzer — and forwards to ``ss.Sim``.
+
+``connectors=`` and ``analyzers=`` are **append**, not override: user-supplied
+modules are added after the auto-defaults (CrossImmunity, the _ExclusiveSeeder
+when ``init_seeding='exclusive'``, and Aggregate). To replace the auto-defaults
+entirely, drop down to vanilla ``ss.Sim``.
+
+Other slots (``diseases``, ``networks``, ``demographics``, ``people``) retain
+override semantics. ``diseases=`` is mutually exclusive with ``genotypes=``.
 
 Kwargs:
   ``init_seeding`` (str, default ``'exclusive'``):
@@ -25,13 +32,13 @@ Kwargs:
 
 import starsim as ss
 
-from .analyzers import Aggregate
+from .cross_genotype import Aggregate, CrossImmunity
 from .data.country import load_country
 from .demographics import AgeMigration
-from .hpv import HPV, _ExclusiveSeeder
+from .hpv import HPV
 from .network import SexualNetwork
-from .connectors import CrossImmunity
 from .parameters import genotype_aliases
+from .seeding import _ExclusiveSeeder
 
 
 def _normalize_genotype(key):
@@ -60,7 +67,8 @@ class Sim(ss.Sim):
             people = ss.People(n_agents, age_data=country['age_data'])
 
         diseases = kwargs.pop('diseases', None)
-        connectors = kwargs.pop('connectors', None)
+        user_connectors = kwargs.pop('connectors', None) or []
+        user_analyzers = kwargs.pop('analyzers', None) or []
 
         if diseases is not None and genotypes is not None:
             raise ValueError(
@@ -71,6 +79,8 @@ class Sim(ss.Sim):
             raise ValueError(
                 f"init_seeding must be 'exclusive' or 'independent'; got {init_seeding!r}"
             )
+
+        auto_connectors = [CrossImmunity()]
 
         if diseases is None:
             # Default to single-genotype HPV16 if neither supplied.
@@ -103,9 +113,11 @@ class Sim(ss.Sim):
                 )
                 for d, k in zip(diseases, keys):
                     d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
+                # Register so the seeder's Dists go through the standard
+                # define_pars -> init_pre -> init_dists lifecycle.
+                auto_connectors.append(self._seeder)
 
-        if connectors is None:
-            connectors = [CrossImmunity()]
+        connectors = auto_connectors + user_connectors
 
         networks = kwargs.pop('networks', None)
         if networks is None:
@@ -118,11 +130,7 @@ class Sim(ss.Sim):
                 AgeMigration(),
             ]
 
-        # Auto-add the any-genotype aggregator unless the caller supplied their
-        # own analyzers list (in which case they can add it manually).
-        analyzers = kwargs.pop('analyzers', None)
-        if analyzers is None:
-            analyzers = [Aggregate()]
+        analyzers = [Aggregate()] + user_analyzers
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()

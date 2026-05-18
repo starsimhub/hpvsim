@@ -22,8 +22,7 @@ from .hpv import HPV
 from .network import SexualNetwork
 from .sim import Sim
 from .demographics import AgeMigration
-from .connectors import CrossImmunity
-from .analyzers import Aggregate
+from .cross_genotype import CrossImmunity, Aggregate
 
 rootdir = sc.thispath(__file__).parent
 
