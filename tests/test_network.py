@@ -1,7 +1,6 @@
 """Tests for hpvsim.network.SexualNetwork."""
 
 import numpy as np
-import pytest
 import starsim as ss
 import sciris as sc
 import hpvsim

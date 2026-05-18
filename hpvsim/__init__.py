@@ -3,19 +3,18 @@
 Public API: ``Sim``, ``HPV``, ``SexualNetwork``, ``AgeMigration``,
 ``SimPars``, ``GenotypePars``, ``get_genotype_pars``, ``data``.
 
-Modules awaiting port from the legacy v2 package live in
-``hpvsim/_v2_legacy/``. Active code must not import from there.
+Quarantined modules awaiting port live in ``hpvsim/_v2_legacy/``;
+active code must not import from there.
 """
 
 import sciris as sc
 
 from .version import __version__, __versiondate__, __license__
 from .settings import options
-from .defaults import datadir, default_int, default_float, get_default_plots
+from .defaults import datadir
 from . import data
 from . import migration_utils
-from . import parameters
-from .parameters import SimPars, GenotypePars, get_genotype_pars
+from .parameters import SimPars, GenotypePars, get_genotype_pars, get_cross_immunity, GENOTYPE_KEYS
 from . import misc
 from . import utils
 
@@ -23,13 +22,15 @@ from .hpv import HPV
 from .network import SexualNetwork
 from .sim import Sim
 from .demographics import AgeMigration
+from .cross_genotype import CrossImmunity, HPVTotal
 
 rootdir = sc.thispath(__file__).parent
 
 __all__ = [
-    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration',
+    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'CrossImmunity', 'HPVTotal',
     'data', 'migration_utils', 'options', 'datadir', '__version__',
-    'SimPars', 'GenotypePars', 'get_genotype_pars',
+    'SimPars', 'GenotypePars', 'get_genotype_pars', 'get_cross_immunity',
+    'GENOTYPE_KEYS',
 ]
 
 del sc

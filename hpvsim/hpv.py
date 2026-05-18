@@ -1,4 +1,4 @@
-"""Single-genotype HPV disease module.
+"""Per-genotype HPV disease module.
 
 Scope note: HPVsim only models cervical cancer outcomes. HPV is also
 associated with anal, oropharyngeal, penile, vaginal, and vulvar cancers
@@ -9,57 +9,44 @@ Models the natural-history pipeline as a Starsim Infection:
     susceptible -> precin -> (clear | CIN -> (clear | cancerous -> death))
 
 Females are eligible for the full progression; males clear from precin without
-entering CIN/cancer. Clearance grants partial permanent same-genotype immunity:
-``rel_sus`` is reduced by ``imm_init`` (transmission immunity), and ``sev_imm``
-accumulates the running max of beta samples (severity immunity, shortens
-future precin durations).
+entering CIN/cancer. Clearance grants partial same-genotype immunity: per-agent
+beta samples accumulate as a running max into ``nab_imm`` (humoral) and
+``cell_imm`` (cell-mediated). The ``CrossImmunity`` connector reads those
+source states each step and writes per-target ``rel_sus`` and ``sev_imm``.
 
-``beta``, ``init_prev``, and progression-pars defaults are HPV16-specific.
-Multi-genotype support, cross-immunity, and waning are out of scope for this
-module — a future multi-genotype build will instantiate one HPV per genotype
-and add a CrossImmunity connector.
+Multi-genotype runs instantiate one HPV per genotype, all sharing the People
+and going through the same Connector path; a 1-genotype run uses a 1×1
+identity matrix on the Connector.
 """
 
 import numpy as np
 import starsim as ss
 
+from .parameters import genotype_aliases, get_genotype_pars
+from .seeding import _make_init_prev_fn
 from .utils import compute_severity
 
 
-# Other genotypes (hpv18, hi5, ohr) need per-genotype natural-history pars
-# that aren't wired yet; reject them rather than silently using HPV16 defaults.
-_KNOWN_GENOTYPES = ('hpv16',)
+_KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
 
-# Initial HPV prevalence by age bracket and sex. Brackets are inclusive lower
-# bounds; the last bracket extends to age 150.
-_INIT_HPV_PREV_AGE_BRACKETS = np.array([12, 17, 24, 34, 44, 64, 80, 150])
-_INIT_HPV_PREV_M = np.array([0.0, 0.25, 0.60, 0.25, 0.05, 0.01, 0.0005, 0.0])
-_INIT_HPV_PREV_F = np.array([0.0, 0.35, 0.70, 0.25, 0.05, 0.01, 0.0005, 0.0])
-
-
-def _age_stratified_init_prev(module, sim, uids):
-    """Per-uid initial-infection probability from the age/sex prevalence table.
-
-    ``side='right'`` so ``brackets[i-1] <= age < brackets[i]``.
-    """
-    age = sim.people.age[uids]
-    is_female = sim.people.female[uids]
-    bin_idx = np.searchsorted(_INIT_HPV_PREV_AGE_BRACKETS, age, side='right')
-    bin_idx = np.clip(bin_idx, 0, len(_INIT_HPV_PREV_F) - 1)
-    out = np.zeros(len(uids))
-    out[is_female] = _INIT_HPV_PREV_F[bin_idx[is_female]]
-    out[~is_female] = _INIT_HPV_PREV_M[bin_idx[~is_female]]
-    return out
+def _normalize_genotype(key):
+    """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
+    s = str(key).lower().strip()
+    for canonical, aliases in genotype_aliases.items():
+        if s == canonical or s in aliases:
+            return canonical
+    raise ValueError(
+        f'Unknown genotype {key!r}; valid: {list(genotype_aliases)}'
+    )
 
 
 class HPV(ss.Infection):
-    """Single-genotype HPV disease module.
+    """Per-genotype HPV disease module.
 
-    The ``genotype`` attribute identifies which strain this instance models;
-    a future multi-genotype CrossImmunity connector can use it to discover
-    HPV diseases (duck-type marker pattern; cf. rotasim's ``hasattr(disease,
-    'G')``).
+    The ``genotype`` attribute identifies which strain this instance models.
+    The CrossImmunity connector reads each registered HPV's nab_imm/cell_imm
+    each step and writes per-target rel_sus/sev_imm.
     """
 
     def __init__(self, genotype='hpv16', pars=None, **kwargs):
@@ -73,11 +60,19 @@ class HPV(ss.Infection):
         super().__init__()
         # Pull natural-history defaults from GenotypePars so there's a single
         # source of truth per genotype.
-        from .parameters import get_genotype_pars
         gpars = get_genotype_pars(genotype)
         self.define_pars(
-            init_prev=ss.bernoulli(p=_age_stratified_init_prev),
-            beta=gpars.beta,
+            init_prev=ss.bernoulli(p=_make_init_prev_fn(genotype)),
+            # Sex-directional beta: p1→p2 = female→male (transf2m); p2→p1 =
+            # male→female (transm2f). SexualNetwork places females in p1 and
+            # males in p2 (see hpvsim/network.py:185). validate_beta accepts
+            # this dict shape natively (ss.Infection.validate_beta).
+            beta={
+                'sexualnetwork': [
+                    gpars.beta * gpars.rel_beta * gpars.transf2m,
+                    gpars.beta * gpars.rel_beta * gpars.transm2f,
+                ],
+            },
             dur_precin=gpars.dur_precin,
             dur_cin=gpars.dur_cin,
             dur_cancer=gpars.dur_cancer,
@@ -87,13 +82,9 @@ class HPV(ss.Infection):
             imm_init=gpars.imm_init,
             cell_imm_init=gpars.cell_imm_init,
             age_risk=gpars.age_risk,
-            # Per-call Bernoullis for CIN and cancer draws; ``p`` is overwritten
-            # via .set(p=...) in set_prognoses. Held in pars (vs. as plain
-            # attributes) so the per-Dist RNG-slot identifier follows the
-            # ``module.pars._cin_bern`` path — moving them changes which CRN
-            # slot is drawn and shifts regression numbers past the ±10% gates.
-            _cin_bern=ss.bernoulli(p=0.5),
-            _cancer_bern=ss.bernoulli(p=0.5),
+            # Per-genotype beta scaler and serology probability (multi-genotype).
+            rel_beta=gpars.rel_beta,
+            sero_prob=gpars.sero_prob,
         )
         self.update_pars(pars=pars, **kwargs)
         # ss.Infection provides: susceptible, infected, rel_sus, rel_trans,
@@ -118,10 +109,27 @@ class HPV(ss.Infection):
             # Severity immunity, accumulated as max-of-beta-samples on each
             # clearance. Shortens future dur_precin via (1 - sev_imm) factor.
             ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
+            # Raw source-genotype immunity. Bumped on clearance; read by the
+            # CrossImmunity Connector to derive per-target rel_sus and sev_imm.
+            ss.FloatArr('nab_imm', label='Humoral immunity (source genotype)', default=0.0),
+            ss.FloatArr('cell_imm', label='Cell-mediated immunity (source genotype)', default=0.0),
         )
         # Baseline rel_sev distribution; abs() in _sample_rel_sev_for_unset
         # implements positive truncation.
         self._rel_sev_dist = ss.normal(loc=1.0, scale=0.2)
+        # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
+        # use site (placeholder p values below).
+        self._cin_bern = ss.bernoulli(p=0.5)
+        self._cancer_bern = ss.bernoulli(p=0.5)
+        self._sero_bern = ss.bernoulli(p=0.5)
+        # Per-decision Bernoullis for CRN-safe stochastic rounding of
+        # event durations. Each ``ti_<event>`` schedule gets its own dist so
+        # the per-uid round-up draw is independent across decisions.
+        self._round_clear_precin_bern = ss.bernoulli(p=0.5)
+        self._round_cin_bern = ss.bernoulli(p=0.5)
+        self._round_clear_cin_bern = ss.bernoulli(p=0.5)
+        self._round_cancer_bern = ss.bernoulli(p=0.5)
+        self._round_dead_bern = ss.bernoulli(p=0.5)
         return
 
     def init_post(self):
@@ -161,13 +169,36 @@ class HPV(ss.Infection):
         res.cum_cancer_deaths[:] = np.cumsum(res.new_cancer_deaths)
         return
 
+    @staticmethod
+    def _randround(values, uids, dist):
+        """CRN-safe stochastic round to the nearest integer.
+
+        Equivalent to ``sc.randround(values)`` semantically (floor + a
+        Bernoulli draw on the fractional part), but routes the random draw
+        through a per-decision ``ss.bernoulli`` so each agent gets a
+        deterministic, per-uid draw under CRN. ``dist`` must be a dedicated
+        Bernoulli created in ``__init__`` and used only at this call site.
+        ``values`` and ``uids`` must align element-wise.
+
+        Defensively clamps ``values`` to >= 0 before computing the fractional
+        Bernoulli probability — a negative ``frac`` would crash the Bernoulli.
+        """
+        if len(uids) == 0:
+            return np.zeros(0, dtype=int)
+        values = np.maximum(values, 0.0)
+        floor = np.floor(values)
+        frac = values - floor
+        dist.set(p=frac)
+        bumps = dist.rvs(uids)
+        return (floor + bumps).astype(int)
+
     def _sample_rel_sev_for_unset(self):
         """Sample rel_sev for any alive agent without a sample yet.
 
         Runs once at init for the starting population, then per-step for
         newborns and immigrants. ``abs()`` folds the negative tail of the
         normal back onto positives; with loc=1.0, scale=0.2 the affected
-        mass is < 1e-6, so this matches v2's positive-only convention
+        mass is < 1e-6, so this preserves the positive-only convention
         without changing the practical distribution.
         """
         unset = (~self.rel_sev_sampled).uids
@@ -231,23 +262,45 @@ class HPV(ss.Infection):
         # 2. P(CIN) per female. Distributions return durations in starsim
         #    timesteps; convert to years before passing (cin_fn's ttc=50 is years).
         dt_yr = float(self.t.dt)
-        female = female_all
         p_cin = compute_severity(dur_precin * dt_yr,
                                    rel_sev=rel_sev_uids, pars=p.cin_fn)
-        p._cin_bern.set(p=p_cin)
-        cin_draw = p._cin_bern.rvs(uids)
-        cin_mask = cin_draw & female
+        self._cin_bern.set(p=p_cin)
+        cin_draw = self._cin_bern.rvs(uids)
+        cin_mask = cin_draw & female_all
         cin_uids = uids[cin_mask]
         nocin_uids = uids[~cin_mask]
 
-        # 3. Branch A: clearance from precin (males + non-CIN females).
-        self.ti_clearance[nocin_uids] = ti + dur_precin[~cin_mask]
+        # Schedule events with CRN-safe stochastic rounding (``_randround``)
+        # for FEMALE events and ``np.ceil`` for MALE clearance.
+        # Without rounding, fractional ti_<event> behaves like np.ceil at the
+        # ``<= ti`` check — fine for males, but biases female timings.
+        # Bias direction: np.ceil pushes male clearance to the next integer
+        # step, so males clear up to one dt later than the fractional duration.
+
+        # 3. Branch A: clearance from precin. Split male / female paths so
+        #    males get np.ceil and females get the CRN-safe stochastic round.
+        nocin_dur = dur_precin[~cin_mask]
+        nocin_female = female_all[~cin_mask]
+        rounded_dur = np.empty(len(nocin_dur), dtype=int)
+        if nocin_female.any():
+            rounded_dur[nocin_female] = self._randround(
+                nocin_dur[nocin_female],
+                nocin_uids[nocin_female],
+                self._round_clear_precin_bern,
+            )
+        if (~nocin_female).any():
+            rounded_dur[~nocin_female] = np.ceil(
+                nocin_dur[~nocin_female]
+            ).astype(int)
+        self.ti_clearance[nocin_uids] = ti + rounded_dur
 
         if len(cin_uids) == 0:
             return
 
         # 4. Branch B: progression to CIN.
-        self.ti_cin[cin_uids] = ti + dur_precin[cin_mask]
+        self.ti_cin[cin_uids] = ti + self._randround(
+            dur_precin[cin_mask], cin_uids, self._round_cin_bern,
+        )
         dur_cin = p.dur_cin.rvs(cin_uids)
         # age_risk multiplier: women aged >= age_risk['age'] get dur_cin
         # scaled by age_risk['risk'].
@@ -262,25 +315,31 @@ class HPV(ss.Infection):
         rel_sev_cin = rel_sev_uids[cin_mask]
         p_cancer = compute_severity(dur_cin * dt_yr,
                                       rel_sev=rel_sev_cin, pars=p.cancer_fn)
-        p._cancer_bern.set(p=p_cancer)
-        cancer_draw = p._cancer_bern.rvs(cin_uids)
+        self._cancer_bern.set(p=p_cancer)
+        cancer_draw = self._cancer_bern.rvs(cin_uids)
         cancer_uids = cin_uids[cancer_draw]
         nocancer_uids = cin_uids[~cancer_draw]
 
         # 5a. Clear after CIN (no cancer).
         self.ti_clearance[nocancer_uids] = (
-            self.ti_cin[nocancer_uids] + dur_cin[~cancer_draw]
+            self.ti_cin[nocancer_uids] + self._randround(
+                dur_cin[~cancer_draw], nocancer_uids, self._round_clear_cin_bern,
+            )
         )
 
         # 5b. Progression to cancer.
         if len(cancer_uids) == 0:
             return
         self.ti_cancerous[cancer_uids] = (
-            self.ti_cin[cancer_uids] + dur_cin[cancer_draw]
+            self.ti_cin[cancer_uids] + self._randround(
+                dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
+            )
         )
         dur_cancer = p.dur_cancer.rvs(cancer_uids)
         self.ti_dead_cancer[cancer_uids] = (
-            self.ti_cancerous[cancer_uids] + dur_cancer
+            self.ti_cancerous[cancer_uids] + self._randround(
+                dur_cancer, cancer_uids, self._round_dead_bern,
+            )
         )
 
     def step_state(self):
@@ -301,21 +360,54 @@ class HPV(ss.Infection):
         ti = self.ti
 
         # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
-        # Returns agent to susceptible=True. rel_sus is capped at (1 - imm_init)
-        # (transmission immunity). sev_imm accumulates as max(prior, new beta
-        # sample) — the running max gives multi-cleared agents higher sev_imm
-        # than the distribution mean. rel_sev (biological baseline) is unchanged.
-        cleared = (self.infected & (self.precin | self.cin) & ~self.cancerous
-                   & (self.ti_clearance <= ti)).uids
+        # Returns agent to susceptible=True. nab_imm and cell_imm accumulate
+        # the running max of per-agent beta samples; the CrossImmunity connector
+        # reads them next step to derive rel_sus and sev_imm. ``infected`` is
+        # mutually exclusive with ``cancerous`` (step 3 toggles them), so it
+        # implies precin|cin.
+        cleared = (self.infected & (self.ti_clearance <= ti)).uids
         if len(cleared):
             self.infected[cleared] = False
             self.susceptible[cleared] = True
             self.precin[cleared] = False
             self.cin[cleared] = False
-            self.rel_sus[cleared] = np.minimum(self.rel_sus[cleared],
-                                               1.0 - self.pars.imm_init)
-            new_imm = self.pars.cell_imm_init.rvs(cleared)
-            self.sev_imm[cleared] = np.maximum(self.sev_imm[cleared], new_imm)
+
+            # Only update post-clearance immunity for females; males clear
+            # without seroconverting. First-clearance immunity is gated on
+            # sero_prob; non-seroconverters keep nab_imm/cell_imm = 0 and are
+            # fully reinfectible on next exposure. Repeat clearances always
+            # update via running max (sero_prob only gates the first event).
+            female = self.sim.people.female
+            f_cleared = cleared[female[cleared]]
+            if len(f_cleared):
+                has_prior_imm = self.nab_imm[f_cleared] > 0
+                first_mask  = ~has_prior_imm
+                first_uids  = f_cleared[first_mask]
+                repeat_uids = f_cleared[has_prior_imm]
+
+                p = self.pars
+                nab_all  = p.imm_init.rvs(f_cleared)
+                cell_all = p.cell_imm_init.rvs(f_cleared)
+
+                if len(first_uids):
+                    self._sero_bern.set(p=float(p.sero_prob))
+                    seroconvert = self._sero_bern.rvs(first_uids)
+                    # nab_imm (humoral) is gated on seroconversion: non-
+                    # seroconverters keep 0 nab and remain fully reinfectible.
+                    # cell_imm (cell-mediated severity) is NOT gated — all
+                    # first-clearance females get severity protection,
+                    # regardless of whether they seroconverted. Without this,
+                    # non-seroconverters get no dur_precin reduction on
+                    # reinfection, inflating transmission for low-sero_prob
+                    # genotypes (hpv18=0.56, hi5/ohr=0.60).
+                    self.nab_imm[first_uids]  = seroconvert * nab_all[first_mask]
+                    self.cell_imm[first_uids] = cell_all[first_mask]
+
+                if len(repeat_uids):
+                    self.nab_imm[repeat_uids] = np.maximum(
+                        self.nab_imm[repeat_uids], nab_all[has_prior_imm])
+                    self.cell_imm[repeat_uids] = np.maximum(
+                        self.cell_imm[repeat_uids], cell_all[has_prior_imm])
 
         # --- 2. precin -> CIN ---
         to_cin = (self.precin & ~self.cin & (self.ti_cin <= ti)).uids

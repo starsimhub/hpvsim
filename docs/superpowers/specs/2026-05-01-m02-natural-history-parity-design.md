@@ -494,6 +494,54 @@ all pairs (single `end_pairs`) before forming new ones per layer.
 **Partnership-equivalence gates** were tightened from M01's 50%
 placeholder to 10% drift / 0.90 cosine and pass.
 
+### PR review (post-merge) fixes
+
+Landed during the PR #107 review and the immediate follow-up audit pass:
+
+- **Drop unnecessary `np.asarray()` wraps** in `hpv.py` (~13 sites). All
+  were no-ops since `ss.Arr[uids]`, `Dist.rvs()`, and `ss.Result` already
+  return ndarrays.
+- **Rename `pop_trend` → `pop_total`, `pop_age_trend` → `pop_by_age`** in
+  `load_country()` keys, `AgeMigration` kwargs, and tests. The DataFrames
+  weren't trends but population trajectories; the new names better signal
+  "what the value is" vs "what it does".
+- **Document `AgeMigration._scale`** and inline-comment the other init
+  state.
+- **Drop redundant `.astype(bool)`** on `people.female[uids]` (already
+  bool); keep `.astype(int)` on `age` (float32 → integer-bin index).
+- **Cervical-only scope note** added to `hpv.py` module docstring (HPV
+  is also associated with anal/oropharyngeal/penile/vaginal/vulvar
+  cancers which are out of scope).
+- **Tighten `_sample_rel_sev_for_unset` comment**: `abs(N(μ, σ))` is a
+  *folded* normal, not truncated — clarify and note that with
+  `loc=1.0, scale=0.2` the affected mass is `< 1e-6`.
+- **Soften country.py docstring** on `ss.Pregnancy`: vertical
+  transmission isn't relevant to HPV, so `ss.Births` (CBR) is the
+  appropriate mechanism, not a placeholder for `ss.Pregnancy`.
+- **Drop two unit tests** targeting the private helper
+  `_other_layer_partner_uids`; the integration test
+  `test_cross_layer_concurrency_filter` exercises the same path.
+- **`_cin_bern` / `_cancer_bern` placement clarification**: the
+  scratch Bernoullis stay in `define_pars` (not as plain attributes)
+  — `link_dists` walks `module.__dict__` so RNG wiring works either
+  way, but moving them changes the per-Dist CRN slot identifier and
+  shifts regression numbers past the ±10% gates.
+- **Move progression math to `hpvsim.utils`** (drop underscore prefix):
+  `logf2`, `logf3`, `get_asymptotes`, `transform_prob`, `indef_int_logf2`,
+  `intlogf2`, `compute_severity_integral`, `compute_severity` become
+  real `hpvsim.utils` API. `hpv.py` now reads as the natural-history
+  pipeline rather than a pile of logistic-curve helpers.
+  `_age_stratified_init_prev` and the `_INIT_HPV_PREV_*` tables stay in
+  `hpv.py` since they're tightly coupled to the disease module.
+- **Fig 1 reproduction script**: added
+  `tests/regression/methods_fig1_hpv16.py` (later renamed
+  `methods_fig1.py` and extended in M03), reproducing the
+  manuscript's `plot_nh_simple` panel-for-panel for the
+  natural-history confirmation.
+- **`migration_utils._default_network_pars(location=None)`**: keep the
+  `location` arg (with default `None`) so future per-country variation
+  has somewhere to plug in without a signature change.
+
 ---
 
 ## Open questions / follow-ups

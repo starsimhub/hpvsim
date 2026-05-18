@@ -4,12 +4,8 @@ Pure progression / severity math used by ``hpv.py`` and downstream
 analyzers. These functions don't depend on starsim or any module state —
 they're a small, reusable surface so calibration code, future genotype
 extensions, and visualisation scripts (e.g.
-``tests/regression/methods_fig1_hpv16.py``) can import them without
-pulling in the disease module.
-
-Carries the v2 logf2/logf3/compute_severity API verbatim; bit-identical
-parity with ``hpvsim/_v2_legacy/utils.py`` is enforced by
-``tests/test_progression_math.py``.
+``tests/regression/methods_fig1.py``) can import them without pulling in
+the disease module.
 """
 
 import numpy as np
@@ -34,7 +30,7 @@ def get_asymptotes(k, x_infl, s=1, y_max=1, ttc=25):
     '''
     Get upper asymptotes for logistic functions
     '''
-    term1 = (1 + np.exp(k*(x_infl-ttc)))**s # Note, this is 1 for most parameter combinations
+    term1 = (1 + np.exp(k*(x_infl-ttc)))**s
     term2 = (1 + np.exp(k*x_infl))**s
     u_asymp_num = y_max*term1*(1-term2)
     u_asymp_denom = term1 - term2
@@ -80,7 +76,6 @@ def transform_prob(tp, dysp):
           = 2* dysp * (dysp/2)**2, assuming that b = c = 1/2 a
           = 1/2 * dysp**3
     '''
-    # return 1-np.power(1-tp, ((dysp*100)**2))
     return 1-np.power(1-tp, 0.5*((dysp)**3)*100)
 
 
@@ -123,7 +118,7 @@ def compute_severity_integral(t, rel_sev=None, pars=None):
     Process functional form and parameters into values:
     '''
 
-    pars = sc.dcp(pars)
+    pars = dict(pars)
     form = pars.pop('form')
     choices = [
         'logf2',
@@ -175,7 +170,7 @@ def compute_severity(t, rel_sev=None, pars=None):
          compute_severity_integral to determine the progression probabilities.
     '''
 
-    pars = sc.dcp(pars)
+    pars = dict(pars)
 
     # Complete these next stages if cancer progression probabilities are being modeled
     # as the cumulative severity-time of dysplasia.

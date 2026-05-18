@@ -4,7 +4,7 @@ Used by ``hpvsim.Sim`` to build People (age pyramid), Births (CBR), Deaths
 (age- and sex-specific mortality), and SexualNetwork (debut, partners,
 mixing, layer probs, durations, acts). Underlying data lives in
 ``hpvsim/data/files/`` and is loaded via ``hpvsim.data.loaders`` and the
-``hpvsim.parameters`` helpers carried over from the legacy v2 package.
+``hpvsim.parameters`` helpers.
 
 Reshaping summary:
 - Age pyramid: (N, 3) ``(age_lower, age_upper, count)`` ndarray with single-
@@ -64,6 +64,14 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
     dur_pship = dict(
         m=dict(dist='neg_binomial', par1=80, par2=3),
         c=dict(dist='lognormal', par1=1, par2=2),
+    )
+
+    # Age-based act modulation. Marital peaks at 30, casual at 25; both ramp
+    # linearly from debut_ratio at debut age to 1.0 at peak, then linearly to
+    # retirement_ratio at retirement, then 0 beyond retirement.
+    age_act_pars = dict(
+        m=dict(peak=30, retirement=100, debut_ratio=0.5, retirement_ratio=0.1),
+        c=dict(peak=25, retirement=100, debut_ratio=0.5, retirement_ratio=0.1),
     )
 
     # Age-mixing matrices (rows = female age band start, cols = male age band).
@@ -128,17 +136,18 @@ def _default_network_pars(location=None):  # noqa: ARG001  (location reserved fo
         m_partners=m_partners,
         acts=acts,
         dur_pship=dur_pship,
+        age_act_pars=age_act_pars,
         mixing=mixing,
         layer_probs=layer_probs,
     )
 
 
-def load_country(location):
+def load_country(location, year=None):
     """Return Starsim-shaped data for ``location``.
 
     Args:
-        location (str): country name; must be one of the supported locations
-            available via the v2 loaders.
+        location (str): country name; must be one of ``_KNOWN_LOCATIONS``.
+        year (int): year to load the initial age distribution for.
 
     Returns:
         dict with keys:
@@ -157,7 +166,7 @@ def load_country(location):
         )
 
     return dict(
-        age_data=_age_data(location),
+        age_data=_age_data(location, year=year),
         birth_rate=_birth_rate(location),
         death_rate=_death_rate(location),
         network_pars=_network_pars(location),
@@ -166,15 +175,19 @@ def load_country(location):
     )
 
 
-def _age_data(location):
-    """Reshape v2's age distribution to a (age, value) long-form DataFrame.
+def _age_data(location, year=None):
+    """Reshape the age distribution to a (age, value) long-form DataFrame.
 
     ``get_age_distribution`` returns an (N, 3) ndarray of
-    ``(age_lower, age_upper, count)``. v2 data is at single-year resolution
+    ``(age_lower, age_upper, count)``. The data is at single-year resolution
     (age_upper == age_lower + 1), so age_lower IS the age and we don't need
     to expand bins.
+
+    ``year`` is forwarded to ``_loaders.get_age_distribution``; if omitted,
+    the loader defaults to year 2000 with a warning, producing a materially
+    different age distribution than the sim-start year would.
     """
-    arr = _loaders.get_age_distribution(location=location)
+    arr = _loaders.get_age_distribution(location=location, year=year)
     return pd.DataFrame({
         'age': arr[:, 0].astype(int),
         'value': arr[:, 2].astype(float),
@@ -233,9 +246,9 @@ def _network_pars(location):
         # carries its annual unit explicitly.
         lp = default_pars['layer_probs'][layer]
         layer_probs = dict(
-            bins=np.asarray(lp[0, :]),
-            f=ss.prob(np.asarray(lp[1, :]), annual),
-            m=ss.prob(np.asarray(lp[2, :]), annual),
+            bins=lp[0, :],
+            f=ss.prob(lp[1, :], annual),
+            m=ss.prob(lp[2, :], annual),
         )
         layer_pars[layer] = dict(
             partners={
@@ -247,6 +260,7 @@ def _network_pars(location):
             cross_layer=cross_layer_by_sex,
             duration=_v2_dist_to_starsim(default_pars['dur_pship'][layer]),
             acts=_v2_dist_to_starsim(default_pars['acts'][layer]),
+            age_act_pars=default_pars['age_act_pars'][layer],
         )
     return dict(layer_pars=layer_pars, debut=debut_by_sex)
 
@@ -257,13 +271,7 @@ def _pop_total(location):
     Wraps ``get_total_pop`` which already returns a DataFrame with the canonical
     column names (year, pop_size) scaled to real-world counts.
     """
-    raw = _loaders.get_total_pop(location=location)
-    df = pd.DataFrame(raw)
-    # Loader already names columns 'year' / 'pop_size'; normalise just in case.
-    if 'PopTotal' in df.columns and 'pop_size' not in df.columns:
-        df = df.rename(columns={'PopTotal': 'pop_size'})
-    if 'Time' in df.columns and 'year' not in df.columns:
-        df = df.rename(columns={'Time': 'year'})
+    df = _loaders.get_total_pop(location=location)
     return pd.DataFrame({
         'year': np.asarray(df['year'], dtype=int),
         'pop_size': np.asarray(df['pop_size'], dtype=float),
@@ -276,18 +284,5 @@ def _pop_by_age(location):
     Wraps ``get_age_distribution_over_time`` which already renames columns to
     year/age/male/female and scales counts to real-world units (× 1000).
     """
-    raw = _loaders.get_age_distribution_over_time(location=location)
-    df = pd.DataFrame(raw)
-    expected = {'year', 'age', 'male', 'female'}
-    missing = expected - set(df.columns)
-    if missing:
-        # Fallback: case-insensitive rename
-        rename = {c: c.lower() for c in df.columns if c.lower() in expected}
-        df = df.rename(columns=rename)
-    missing = expected - set(df.columns)
-    if missing:
-        raise ValueError(
-            f'pop_by_age for {location!r} missing columns {missing}; '
-            f'got {list(df.columns)}.'
-        )
+    df = _loaders.get_age_distribution_over_time(location=location)
     return df[['year', 'age', 'male', 'female']].copy()

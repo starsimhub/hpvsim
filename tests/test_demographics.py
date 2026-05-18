@@ -1,20 +1,16 @@
 """Tests for hpv.AgeMigration."""
 import numpy as np
-import pandas as pd
-import pytest
 
 import hpvsim as hpv
 
 
 def test_age_migration_class_exists():
-    """AgeMigration is exported from hpvsim and inherits ss.Demographics."""
     import starsim as ss
     assert hasattr(hpv, 'AgeMigration')
     assert issubclass(hpv.AgeMigration, ss.Demographics)
 
 
 def test_load_country_exposes_pop_total_and_pop_by_age():
-    """load_country('nigeria') returns the migration data tables."""
     data = hpv.data.load_country('nigeria')
     assert 'pop_total' in data
     assert 'pop_by_age' in data
@@ -25,7 +21,6 @@ def test_load_country_exposes_pop_total_and_pop_by_age():
 
 
 def test_age_migration_runs_without_error():
-    """A sim with AgeMigration runs to completion."""
     sim = hpv.Sim(
         n_agents=500, location='nigeria',
         start=1990, stop=2000, dt=1.0, rand_seed=0,

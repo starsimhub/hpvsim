@@ -5,7 +5,6 @@ import pytest
 import hpvsim as hpv
 from hpvsim.utils import (
     compute_severity,
-    compute_severity_integral,
     intlogf2,
     logf2,
     transform_prob,
@@ -19,7 +18,13 @@ def test_genotype_pars_hpv16_defaults():
     assert g.cin_fn == dict(form='logf2', k=0.3, x_infl=0, ttc=50)
     assert g.cancer_fn['method'] == 'cin_integral'
     assert g.cancer_fn['transform_prob'] == 2e-3
-    assert g.imm_init == 0.35
+    import starsim as ss
+    assert isinstance(g.imm_init, ss.Dist), \
+        f'imm_init should be a Dist, got {type(g.imm_init)}'
+    g.imm_init.mock()
+    samples = g.imm_init.rvs(2000)
+    assert 0.30 < float(samples.mean()) < 0.40, \
+        f'imm_init samples mean = {float(samples.mean()):.3f}; expected ~0.35'
     assert g.age_risk == dict(age=30, risk=2)
     assert g.rel_beta == 1.0
     assert g.sero_prob == 0.75

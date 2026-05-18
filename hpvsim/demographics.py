@@ -55,10 +55,9 @@ class AgeMigration(ss.Demographics):
         # at start year). Used to scale target_counts each step so the pyramid
         # is matched in agent-space, not person-space.
         self._scale = None
-        self._data_year_min = None                  # Inclusive lower bound of pop_total years; outside this, step() no-ops.
-        self._data_year_max = None                  # Inclusive upper bound of pop_total years.
         self._n_imm = 0                             # Immigrants added this step (for results.new_immigrants).
         self._n_emi = 0                             # Emigrants requested this step (for results.new_emigrants).
+        self._pop_by_year = None                    # {year: per-year pyramid DataFrame}, built in init_pre.
         # CRN-safe emigrant selection — domain set per call.
         self._emi_select = ss.choice(replace=False)
         return
@@ -69,6 +68,14 @@ class AgeMigration(ss.Demographics):
 
     def init_pre(self, sim):
         super().init_pre(sim)
+
+        # Resolve sim start year once. ss.years supports float() but not
+        # int() directly, so cast through float. Used both for load_country
+        # (so age_data samples at the right year) and for _scale below.
+        sim_start = sim.pars.start
+        sim_start_year = float(
+            sim_start.year if hasattr(sim_start, 'year') else sim_start
+        )
 
         # Pull from country data if not explicitly supplied.
         if self._pop_total is None or self._pop_by_age is None:
@@ -85,25 +92,25 @@ class AgeMigration(ss.Demographics):
                     'Either pass pop_total/pop_by_age explicitly, or use '
                     'hpv.Sim which stores sim.location.'
                 )
-            cd = load_country(location)
+            cd = load_country(location, year=int(sim_start_year))
             if self._pop_total is None:
                 self._pop_total = cd['pop_total']
             if self._pop_by_age is None:
                 self._pop_by_age = cd['pop_by_age']
 
         # Scale factor: n_agents / data_population_at_sim_start.
-        sim_start = sim.pars.start
-        sim_start_year = float(
-            sim_start.year if hasattr(sim_start, 'year') else sim_start
-        )
         pt = self._pop_total
         data_pop_at_start = float(
             np.interp(sim_start_year, pt['year'].values, pt['pop_size'].values)
         )
         self._scale = float(sim.pars.n_agents) / data_pop_at_start
 
-        self._data_year_min = int(pt['year'].min())
-        self._data_year_max = int(pt['year'].max())
+        # Group pop_by_age once into a {year: DataFrame} dict so step() can
+        # do an O(1) lookup instead of an O(rows) mask + sort every year.
+        self._pop_by_year = {
+            int(y): grp.sort_values('age')
+            for y, grp in self._pop_by_age.groupby('year')
+        }
         return
 
     def init_results(self):
@@ -128,19 +135,12 @@ class AgeMigration(ss.Demographics):
         sim = self.sim
         year = int(sim.t.now('year'))
 
-        # Silent-skip if outside data range.
-        if year < self._data_year_min or year > self._data_year_max:
-            self._n_imm = 0
-            self._n_emi = 0
+        self._n_imm = 0
+        self._n_emi = 0
+        pat_year = self._pop_by_year.get(year)
+        if pat_year is None:
             return
 
-        pat_year = self._pop_by_age[self._pop_by_age['year'] == year]
-        if pat_year.empty:
-            self._n_imm = 0
-            self._n_emi = 0
-            return
-
-        pat_year = pat_year.sort_values('age')
         ages_data = pat_year['age'].values.astype(int)
 
         people = sim.people
@@ -155,6 +155,13 @@ class AgeMigration(ss.Demographics):
         n_imm_total = 0
         n_emi_total = 0
 
+        # Accumulate per-(age, sex) immigrant attributes across the inner loop;
+        # concatenated and applied to People in one ``people.grow`` call below.
+        # Per-band arrays go in chunks instead of a single grow-per-band so we
+        # only pay the People-resize cost once per step.
+        imm_age_chunks = []
+        imm_female_chunks = []
+
         for sex_label, sex_mask in (
             ('male',   ~female),
             ('female',  female),
@@ -163,18 +170,27 @@ class AgeMigration(ss.Demographics):
             target_counts = pat_year[sex_label].values * self._scale
 
             for age, target in zip(ages_data, target_counts):
-                # Agents at this integer age × sex in the snapshot
                 in_band = sex_mask & (ages == age)
                 count_sim = int(in_band.sum())
                 diff = int(round(target - count_sim))
 
                 if diff > 0:
-                    self._immigrate(n=diff, age=age, female=sex_is_female)
+                    # Under-target: queue ``diff`` immigrants for this band.
+                    imm_age_chunks.append(np.full(diff, age, dtype=float))
+                    imm_female_chunks.append(np.full(diff, sex_is_female, dtype=bool))
                     n_imm_total += diff
                 elif diff < 0:
+                    # Over-target: emigrate ``-diff`` agents from this band.
                     band_uids = snap_uids[in_band]
                     self._emigrate(band_uids, n=-diff)
                     n_emi_total += -diff
+
+        if n_imm_total > 0:
+            # Single People.grow + write per attribute, sized to the total
+            # immigration across all (age, sex) bands.
+            new_uids = people.grow(n_imm_total)
+            people.age[new_uids] = np.concatenate(imm_age_chunks)
+            people.female[new_uids] = np.concatenate(imm_female_chunks)
 
         self._n_imm = n_imm_total
         self._n_emi = n_emi_total
@@ -189,21 +205,6 @@ class AgeMigration(ss.Demographics):
     # ---------------------------------------------------------------------- #
     # Helpers                                                                 #
     # ---------------------------------------------------------------------- #
-
-    def _immigrate(self, n, age, female):
-        """Add n new agents at exact age and sex, HPV-naive.
-
-        ``people.grow(n)`` allocates sequential UIDs and slots. New agents
-        inherit the default state for every BoolState (False), so they
-        enter HPV-naive.
-        """
-        if n <= 0:
-            return
-        people = self.sim.people
-        new_uids = people.grow(n)
-        people.age[new_uids] = float(age)
-        people.female[new_uids] = bool(female)
-        return
 
     def _emigrate(self, band_uids, n):
         """Remove n agents from band_uids via ``request_removal``.

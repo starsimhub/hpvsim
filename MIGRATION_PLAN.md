@@ -68,6 +68,16 @@ Revised 2026-04-23:
 
 Each milestone produces a user-visible demo and must meet its acceptance test before the next begins. Tests written during a milestone stay in CI from that point onward. Sub-tasks map 1:1 to GitHub issues (see "GitHub milestones and issues" below).
 
+### Status
+
+| Milestone | Status | PR / branch |
+|---|---|---|
+| M0: Foundation | ✅ Complete | merged into `v3.0-dev` |
+| M1: Basic transmission sim | ✅ Complete | PR #104 merged |
+| M2: Natural history parity | ✅ Complete | PR #107 merged 2026-05-07 |
+| M3: Multi-genotype and cross-immunity | 🟡 Implementation complete; PR not yet opened | branch `m03-multi-genotype-and-cross-immunity` |
+| M4–M10 | ⬜ Not started | — |
+
 ### M0: Foundation
 
 **Demo:** `v3.0-dev` branch exists with CI green on a stub sim; `KICKOFF_DISCUSSION.md` + `MIGRATION_PLAN.md` committed; v2.x baseline-generation script committed (baseline files themselves are generated locally and gitignored, never committed); anchor-scenario script and ±10% comparison script committed.
@@ -98,6 +108,14 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 
 ### M2: Natural history parity
 
+**Status: ✅ Complete (PR #107).** All 9 metrics within ±10% of v2.3
+baseline (141,400 infections / 480 cancers / 323 cancer deaths).
+Deviations from plan: `AgeResults` analyzer deferred to M4 calibration
+(its only consumer was its own test scaffolding). Same-genotype
+partial-permanent immunity (`imm_init`, `cell_imm_init`, `sev_imm`,
+`rel_sev`) was added during M02 and was not in the original M02 scope.
+See spec's "Post-implementation deltas" section for the full diff.
+
 **Demo:** Show single-genotype (HPV16) natural history — clearance, precin, CIN, and cancer progression — matching v2.x.
 
 **Acceptance test:** HPV → CIN → cancer dynamics for HPV16 match v2.x's HPV16-only run within calibration tolerance, against a v2 1-genotype baseline.
@@ -112,6 +130,27 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Add a "legacy-network" parity test that runs v2's `create_edgelist` directly inside v3 (e.g., as a `LegacyV2SexualNetwork(ss.SexualNetwork)` subclass that delegates to `hpvsim._v2_legacy.population.create_edgelist` with v2-format inputs). With matched RNG seeds this should reproduce v2 nearly exactly and gives a tight upper bound on what the v3 algorithmic port can achieve. Use it as a regression anchor while tightening the production network in the bullet above.
 
 ### M3: Multi-genotype and cross-immunity
+
+**Status: ✅ Complete on `m03-multi-genotype-and-cross-immunity`; PR
+open against `v3.0-dev`.** Both anchor regressions (HPV16 and
+4-genotype) run cleanly; the multi-seed parity gates (40-metric
+z-score at `|z| < 3` over 10 v3 seeds vs 30 v2.3 seeds, plus
+per-genotype trajectory parity) are green. Deviations from plan: M03
+was branched off `m02-natural-history-parity` rather than `v3.0-dev`
+(M03 substantively depends on M02's `sev_imm` refactor, `GenotypePars`,
+AgeMigration); rebased onto `v3.0-dev` after M02 merged.
+`_ExclusiveSeeder` (one Bernoulli per agent + per-infected-agent
+genotype assignment, matching v2's no-co-infection-at-init semantics)
+added; opt-out via `init_seeding='independent'`. Sex-asymmetric
+scheduling rounding (CRN-safe stochastic round via per-decision
+`ss.bernoulli` for FEMALE events, `np.ceil` for MALE clearance) added
+because fractional `ti_<event>` values otherwise compound a few-percent
+bias. Audit pass landed pre-merge (milestone references stripped,
+v2-rationale framing dropped, scratch diagnostics removed,
+`GenotypePars` defaults moved to a per-genotype dict, M00 regression
+CLI trio `anchor.py`/`baseline.py`/`compare.py` retired and superseded
+by the M03 multi-seed pytest gates). See the M03 spec's
+"Post-implementation deltas" section for the full diff.
 
 **Demo:** 4-genotype HPV sim with cross-immunity matching v2's 4-genotype Nigeria baseline.
 
@@ -243,6 +282,7 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 | Sex-specific initial prevalence | M2 | v2.x seeds initial infections differently by sex |
 | Location-name normalization + subnational regions | M4 | M2 only matches exact lower-cased country names against `_KNOWN_LOCATIONS`. Calibration users will need fuzzy matching for complex country names (e.g., "Côte d'Ivoire" / "Cote d'Ivoire" / "Ivory Coast") and a path to model subnational regions (long-standing user request that the v2 country-level adapter blocked). Touches `hpv.data.country.load_country` and `hpv.Sim`'s location handling. |
 | Cross-repo default-pars naming sync (NWPars) | M8 | STIsim and HIVsim use `NWPars(ss.Pars)` (sometimes wrapped as `default_nwpars`); HPVsim uses `network_pars` dicts and a per-genotype `GenotypePars`. Align naming across repos before STIsim/HIV integration so connector users don't see two conventions. Coordinate with STIsim/HIVsim maintainers; M02 review thread on `country.py:212`. |
+| Validate or drop `_ExclusiveSeeder` | Post-M03 | `init_seeding='exclusive'` (the v3 default) preserves v2's "exactly one genotype per agent at init" behavior via `hpvsim/seeding.py:_ExclusiveSeeder`. Robyn flagged in PR108 inline #12 that this is weight to carry around if the legacy behavior isn't scientifically necessary. Test: rerun M03 short-summary + trajectory parity with `init_seeding='independent'`; if drift is within `\|z\|<3` and rel<10%, drop the seeder. |
 
 ## Out of scope
 

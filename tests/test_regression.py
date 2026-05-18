@@ -1,46 +1,19 @@
 """Tests for the v2 -> v3 regression harness.
 
-Smoke tests for the M00 4-genotype anchor (skipped until M03 multi-genotype
-support lands) and the M01 1-genotype HPV16 anchor, plus unit tests for the
-drift computation in tests/regression/compare.py and a gated drift test
-that runs when the v2 baseline file is present.
+Smoke for the M01 1-genotype HPV16 anchor and unit tests for the drift
+computation in tests/regression/drift.py.
 """
 
 import sys
 from pathlib import Path
 
-import pytest
-
 # tests/ is on sys.path when pytest is invoked from tests/, but be robust:
 sys.path.insert(0, str(Path(__file__).parent))
 
-from regression.anchor import run_and_summarize  # noqa: E402
 
+# --- Unit tests for tests/regression/drift.py:compute_drift -------------------
 
-@pytest.mark.skip(
-    reason='Multi-genotype not yet ported to v3; restored in M03 when '
-           'genotypes=[16, 18, hi5, ohr] is supported again.'
-)
-def test_anchor_runs():
-    short, total_pop = run_and_summarize()
-    expected_keys = {
-        'total HPV infections',
-        'total cancers',
-        'total cancer deaths',
-        'mean HPV prevalence (%)',
-        'mean cancer incidence (per 100k)',
-        'mean age of infection (years)',
-        'mean age of cancer (years)',
-        'mean age of cancer death (years)',
-    }
-    missing = expected_keys - set(short.keys())
-    assert not missing, f'short_summary missing keys: {missing}'
-    assert total_pop > 0, f'total_pop should be positive, got {total_pop}'
-
-
-# --- Unit tests for tests/regression/compare.py:compute_drift -----------------
-
-from regression.compare import compute_drift  # noqa: E402
+from regression.drift import compute_drift  # noqa: E402
 
 
 def test_compute_drift_within_threshold():
@@ -96,37 +69,5 @@ def test_anchor_hpv16_runs():
     missing = expected_keys - set(short.keys())
     assert not missing, f'short_summary missing keys: {missing}'
     assert total_pop > 0, f'total_pop should be positive, got {total_pop}'
-    # All summary values should be finite and non-negative for a clean run.
     for k, v in short.items():
         assert v >= 0 and v == v, f'summary value {k}={v} should be finite and non-negative'
-
-
-# --- M01 anchor drift vs. v2 1-gt baseline (gated on baseline file) -----------
-
-import json
-from pathlib import Path
-
-
-_BASELINE_HPV16 = Path(__file__).resolve().parent / 'regression_baselines' / 'anchor_hpv16.json'
-
-
-@pytest.mark.skipif(not _BASELINE_HPV16.exists(),
-                    reason='anchor_hpv16.json baseline not present (gitignored; '
-                           'see tests/regression/README.md for generation procedure)')
-def test_anchor_hpv16_drift():
-    """Tier-3 informational drift test against v2 1-genotype baseline.
-    10% relative threshold; does NOT fail the build (mirrors M00 drift)."""
-    short, total_pop = run_anchor_hpv16()
-    current_summary = {**{k: float(v) for k, v in short.items()},
-                       'total population': total_pop}
-
-    with open(_BASELINE_HPV16) as f:
-        baseline = json.load(f)
-    rows = compute_drift(baseline['summary'], current_summary, threshold=0.10)
-    n_over = sum(1 for r in rows if r['over_threshold'])
-    print(f'\nM01 anchor drift: {n_over}/{len(rows)} keys exceed 10% relative drift')
-    for r in rows:
-        rel = f"{r['rel_diff']*100:+.2f}%" if r['rel_diff'] is not None else 'n/a'
-        flag = 'YES' if r['over_threshold'] else ''
-        print(f'  {r["key"]:<40} {r["baseline"]:>12.4g} {r["current"]:>12.4g} {rel:>10} {flag}')
-    # Informational only; no assertion.
