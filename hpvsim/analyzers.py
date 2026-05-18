@@ -48,6 +48,17 @@ class AgeResults(ss.Analyzer):
         df = ar.to_dataframe(key='cancers')   # index=year, columns=age bin labels
     """
 
+    # Result-name -> per-HPV-module BoolState attribute. Union across modules
+    # ("any genotype with this state"), matching HPVTotal._UNION_STATES.
+    _COUNT_TO_STATE = {
+        'cancers':       'cancerous',
+        'n_cancerous':   'cancerous',
+        'n_cin':         'cin',
+        'n_precin':      'precin',
+        'n_infected':    'infected',
+        'hpv':           'infected',   # alias used in some configs
+    }
+
     def __init__(self, result_args=None, die=False, **kwargs):
         super().__init__(**kwargs)
         if result_args is None:
@@ -119,8 +130,35 @@ class AgeResults(ss.Analyzer):
         return 'genotype_dist' in rkey
 
     def step(self):
-        """No-op scaffold; real implementation in Task 2+."""
+        """At each scheduled year, snapshot age-binned counts."""
+        sim = self.sim
+        ti = sim.ti
+        for rkey, rdict in self.result_args.items():
+            # Is this tick the recorded snapshot tick for any of the years?
+            year_match = [y for y, ti_y in rdict.year_to_ti.items() if ti_y == ti]
+            if not year_match:
+                continue
+            for year in year_match:
+                if rkey in self._COUNT_TO_STATE:
+                    self.outputs[rkey][year] = self._bin_count(rdict, attr=self._COUNT_TO_STATE[rkey])
+                # Other sub-modes handled in later tasks.
         return
+
+    def _bin_count(self, rdict, attr):
+        """Bin alive-agent count of (union-across-genotypes) BoolState `attr`."""
+        sim = self.sim
+        people = sim.people
+        alive = people.alive.values
+        state_any = np.zeros_like(alive)
+        for mod in self.hpv_modules:
+            state_any |= getattr(mod, attr).values
+        mask = state_any & alive
+        ages = people.age.values[mask]
+        weights = getattr(people, 'scale', None)
+        if weights is not None:
+            weights = weights.values[mask]
+        counts, _ = np.histogram(ages, bins=rdict.edges, weights=weights)
+        return counts
 
     def to_dataframe(self, key):
         """Return outputs for `key` as a DataFrame indexed by year.
