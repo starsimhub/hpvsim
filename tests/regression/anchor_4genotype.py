@@ -1,7 +1,7 @@
 """M03 anchor scenario for the v2 -> v3 migration regression harness.
 
 4-genotype HPV sim, Nigeria, fixed seed, no interventions, no analyzers
-(beyond the auto-added Aggregate analyzer that pools per-genotype results).
+(beyond the auto-added HPVTotal analyzer that pools per-genotype results).
 Tooling under tests/regression/ (compare.py, baseline_v23.py) imports
 ``run_and_summarize()`` from here.
 
@@ -47,8 +47,8 @@ def run_and_summarize():
 
     Summary is the 40-entry dict from short_summary.build_summary:
     8 metrics x 4 genotypes (32 entries) plus 8 aggregate-across-genotypes
-    metrics computed from the Aggregate analyzer's cum_infections_any /
-    cum_cancers_any / new_cancer_deaths_any results.
+    metrics computed from the HPVTotal analyzer's cum_infections /
+    cum_cancers / new_cancer_deaths results.
     """
     sim = make_sim()
     sim.run()

@@ -1,7 +1,7 @@
 """M03 capability gate: multi-seed mean-trajectory parity vs. v2 baseline.
 
-For each of ``cum_infections_any`` and ``cum_cancers_any``, compares the v3
-mean trajectory across ``N_V3_SEEDS`` runs to the v2 mean trajectory across
+For each of ``cum_infections`` and ``cum_cancers``, compares the v3 mean
+trajectory across ``N_V3_SEEDS`` runs to the v2 mean trajectory across
 N v2 seeds. Dual gate per timestep:
 
     z[t]   = (v3_mean[t] - v2_mean[t]) / sqrt(v2_SE[t]^2 + v3_SE[t]^2)
@@ -41,13 +41,13 @@ REL_THRESHOLD = 0.10
 # this floor.
 NONTRIVIAL_FLOOR = 100.0
 GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
-SERIES = ('cum_infections_any', 'cum_cancers_any')
+SERIES = ('cum_infections', 'cum_cancers')
 
 
 def _run_v3_seeds(n, start_seed=0):
     """Return dict series_name -> ndarray of shape (n, T_annual).
 
-    v3's ``aggregate.cum_*_any`` are per-step (dt=0.25 → 281 entries for a
+    v3's ``hpvtotal.cum_*`` are per-step (dt=0.25 → 281 entries for a
     70-year sim). v2's ``infections_by_genotype`` is annual (71 entries),
     where index ``i`` is the cumulative count THROUGH the end of year
     (start+i). To match, downsample v3 with ``full[stride::stride]`` so
@@ -66,7 +66,7 @@ def _run_v3_seeds(n, start_seed=0):
         dt = float(sim.t.dt)
         stride = max(1, int(round(1.0 / dt)))
         for s in SERIES:
-            full = np.asarray(sim.results.aggregate[s], dtype=float)
+            full = np.asarray(sim.results.hpvtotal[s], dtype=float)
             per_series[s].append(full[stride::stride])
     return {s: np.stack(per_series[s], axis=0) for s in SERIES}
 

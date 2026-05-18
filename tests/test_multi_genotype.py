@@ -100,16 +100,16 @@ def test_genotypes_sugar_matches_explicit_diseases():
             f'sugar vs explicit drift for {key}: {a_inf} vs {b_inf}'
 
 
-def test_aggregate_cum_infections_any():
-    """Aggregate.cum_infections_any counts agents ever infected with any genotype."""
+def test_hpvtotal_cum_infections():
+    """HPVTotal.cum_infections counts agents ever infected with any genotype."""
     sim = hpv.Sim(
         n_agents=500, location='nigeria',
         start=1990, stop=1995, dt=1.0, rand_seed=0,
         genotypes=[16, 18],
     )
     sim.run()
-    agg = sim.results['aggregate']
-    any_cum = float(np.asarray(agg['cum_infections_any']).max())
+    total = sim.results['hpvtotal']
+    any_cum = float(np.asarray(total['cum_infections']).max())
     h16_cum = float(np.asarray(sim.results['hpv16'].new_infections).sum())
     h18_cum = float(np.asarray(sim.results['hpv18'].new_infections).sum())
     # Boolean-OR is at most the sum (equal iff no co-infections).
@@ -117,19 +117,99 @@ def test_aggregate_cum_infections_any():
     assert any_cum <= h16_cum + h18_cum + 1e-6
 
 
-def test_aggregate_cum_cancers_any():
-    """Aggregate.cum_cancers_any sums per-genotype cum_cancers across genotypes."""
+def test_hpvtotal_cum_cancers():
+    """HPVTotal.cum_cancers sums per-genotype cum_cancers across genotypes."""
     sim = hpv.Sim(
         n_agents=2000, location='nigeria',
         start=1990, stop=2010, dt=0.5, rand_seed=0,
         genotypes=[16, 18],
     )
     sim.run()
-    agg = sim.results['aggregate']
-    any_c = float(np.asarray(agg['cum_cancers_any'])[-1])
+    total = sim.results['hpvtotal']
+    any_c = float(np.asarray(total['cum_cancers'])[-1])
     sum_c = sum(float(np.asarray(sim.results[k].cum_cancers)[-1])
                 for k in ('hpv16', 'hpv18'))
     assert any_c == pytest.approx(sum_c, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# HPVTotal aggregation invariants
+# ---------------------------------------------------------------------------
+
+def test_hpvtotal_n_susceptible_plus_n_infected_equals_n_alive():
+    """Every alive agent is either uninfected with any HPV or infected with at least one."""
+    sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
+                  dt=1.0, rand_seed=0)
+    sim.run()
+    total = sim.results.hpvtotal
+    n_inf = np.asarray(total.n_infected)
+    n_sus = np.asarray(total.n_susceptible)
+    n_alive = np.asarray(sim.results.n_alive)
+    assert n_inf.max() > 0, 'no infections — test is vacuous'
+    assert np.array_equal(n_inf + n_sus, n_alive)
+
+
+def test_hpvtotal_prevalence_matches_n_infected_over_n_alive():
+    """prevalence == n_infected / n_alive at every timestep."""
+    sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
+                  dt=1.0, rand_seed=0)
+    sim.run()
+    total = sim.results.hpvtotal
+    n_inf = np.asarray(total.n_infected, dtype=float)
+    n_alive = np.asarray(sim.results.n_alive, dtype=float)
+    prev = np.asarray(total.prevalence)
+    expected = np.divide(n_inf, n_alive,
+                         out=np.zeros_like(n_inf), where=n_alive > 0)
+    assert prev.max() > 0, 'prevalence is identically zero — test is vacuous'
+    assert np.allclose(prev, expected, atol=1e-9)
+
+
+def test_hpvtotal_cum_infections_unique_bounded_by_sum_of_flows_end_of_sim():
+    """At end of sim: cum_infections_unique <= cum_infections (sum-of-flows).
+
+    Sum-of-flows counts each new-infection event; cum_infections_unique
+    counts each currently-visible agent once. End-of-sim, ongoing transmission
+    accumulates re-infections in sum-of-flows, dominating the bound.
+
+    Early-sim transient: init-seeded agents have ti_first_infection set but
+    don't fire through the per-step new_infections counter, so unique can
+    briefly exceed sum-of-flows before transmission catches up.
+    """
+    sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
+                  dt=1.0, rand_seed=0)
+    sim.run()
+    total = sim.results.hpvtotal
+    unique_end = float(np.asarray(total.cum_infections_unique)[-1])
+    sof_end = float(np.asarray(total.cum_infections)[-1])
+    assert unique_end > 0, 'no infections — test is vacuous'
+    assert unique_end <= sof_end, f'unique={unique_end} > sof={sof_end}'
+
+
+def test_hpvtotal_n_infected_union_bounded_by_per_genotype_sum():
+    """Union count <= sum of per-genotype counts (equal iff no co-infections)."""
+    sim = hpv.Sim(genotypes=[16, 18], n_agents=500, start=1990, stop=1995,
+                  dt=1.0, rand_seed=0)
+    sim.run()
+    union = np.asarray(sim.results.hpvtotal.n_infected)
+    per_g_sum = sum(np.asarray(sim.results[k].n_infected)
+                    for k in ('hpv16', 'hpv18'))
+    assert union.max() > 0, 'no infections — test is vacuous'
+    assert np.all(union <= per_g_sum)
+
+
+def test_hpvtotal_sum_age_at_cancer_equals_sum_across_genotypes():
+    """sum_age_at_cancer is a single-attribution accumulator: total = exact sum."""
+    sim = hpv.Sim(
+        n_agents=2000, location='nigeria',
+        start=1990, stop=2010, dt=0.5, rand_seed=0,
+        genotypes=[16, 18],
+    )
+    sim.run()
+    total_arr = np.asarray(sim.results.hpvtotal.sum_age_at_cancer, dtype=float)
+    per_g_sum = sum(np.asarray(sim.results[k].sum_age_at_cancer, dtype=float)
+                    for k in ('hpv16', 'hpv18'))
+    assert total_arr.max() > 0, 'no cancers — test is vacuous'
+    assert np.allclose(total_arr, per_g_sum, atol=1e-9)
 
 
 # ---------------------------------------------------------------------------

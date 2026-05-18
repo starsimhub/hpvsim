@@ -10,9 +10,9 @@ Two modules that operate across HPV genotypes:
     ``g`` is ``sum_k cross[g, k] * source[uid, k]``. Diagonals must lie in
     [0, 1].
 
-  - ``Aggregate`` (``ss.Analyzer``): post-hoc, pools per-genotype results
-    into Sim-level ``*_any`` aggregates. Auto-added by ``hpv.Sim`` whenever
-    HPV modules are present; accessible at ``sim.results.aggregate``.
+  - ``HPVTotal`` (``ss.Analyzer``): post-hoc, pools per-genotype results
+    into Sim-level totals. Auto-added by ``hpv.Sim`` whenever HPV modules
+    are present; accessible at ``sim.results.hpvtotal``.
 """
 
 import numpy as np
@@ -23,7 +23,7 @@ from .hpv import HPV
 from .parameters import get_cross_immunity
 
 
-__all__ = ['CrossImmunity', 'Aggregate']
+__all__ = ['CrossImmunity', 'HPVTotal']
 
 
 class CrossImmunity(ss.Connector):
@@ -93,62 +93,126 @@ class CrossImmunity(ss.Connector):
             m.sev_imm[auids] = sev_imm[:, i]
 
 
-class Aggregate(ss.Analyzer):
-    """Analyzer that pools per-genotype results into Sim-level *_any aggregates.
+class HPVTotal(ss.Analyzer):
+    """Analyzer that pools per-genotype HPV results into Sim-level totals.
 
-    Results are accessible at ``sim.results.aggregate``:
-      - ``cum_infections_any`` — per-step sum of new_infections across genotypes,
-        cumsum'd. Sum-of-flows: overcounts agents with co-infections.
-      - ``cum_cancers_any`` — sum of per-genotype cum_cancers (no double-counting
-        since cancer is attributed to a single genotype).
-      - ``new_cancer_deaths_any`` — per-step sum of new_cancer_deaths.
+    Schema is mirrored from the per-genotype HPV modules at init time, so
+    HPVTotal automatically gains a matching ``hpvtotal.<metric>`` entry for
+    each per-genotype result. Three aggregation strategies are applied:
 
-    The analyzer is auto-added by ``hpv.Sim`` whenever HPV modules are present.
-    ``step()`` captures per-step new_infections; ``finalize_results()`` assembles
-    the cumulative aggregates using HPV disease results (available because
-    analyzers finalize after disease modules in Starsim's finalization order).
+      - **People-level union** for per-agent state counts listed in
+        ``_UNION_STATES``: boolean OR across each module's BoolState array,
+        then counted. Matches v2's ``any_hpv_prevalence`` semantics.
+      - **Custom derivation** for results that need it: ``n_susceptible``
+        (= n_alive - n_infected), ``prevalence`` (= n_infected / n_alive),
+        and the extra ``cum_infections_unique`` (people-level cumulative
+        unique-agent count, complementing the sum-of-flows ``cum_infections``).
+      - **Element-wise sum** across module result arrays for everything
+        else, computed in ``finalize_results``. Cancer flows/cumulatives
+        are exact under this (cancer is attributed to one genotype per
+        agent); infection flows overcount co-infections by design.
+
+    Auto-added by ``hpv.Sim`` whenever HPV modules are present.
     """
 
-    def init_results(self):
-        super().init_results()
-        self.define_results(
-            ss.Result('cum_infections_any', dtype=int,
-                      label='Cumulative agents ever infected (any genotype)'),
-            ss.Result('cum_cancers_any', dtype=int,
-                      label='Cumulative cancers (any genotype)'),
-            ss.Result('new_cancer_deaths_any', dtype=int,
-                      label='New cancer deaths (any genotype)'),
-        )
+    # Per-agent state counts aggregated by boolean OR across modules.
+    # Maps result key on the HPV module -> BoolState attribute name.
+    _UNION_STATES = {
+        'n_infected':  'infected',
+        'n_precin':    'precin',
+        'n_cin':       'cin',
+        'n_cancerous': 'cancerous',
+    }
+
+    # HPV result keys we override with custom derivation, not naive sum/union.
+    _DERIVED = ('n_susceptible', 'prevalence')
+
+    # HPV result keys not aggregated (bookkeeping artifacts).
+    _SKIP = ('timevec', 'n_rel_sev_sampled')
 
     def _hpvs(self):
         return [d for d in self.sim.diseases.values() if isinstance(d, HPV)]
 
+    def init_results(self):
+        """Mirror schema from per-genotype HPV results + add derived/extras.
+
+        Diseases initialize before analyzers in Starsim's setup, so the
+        per-genotype HPV result definitions (dtype + label) are available
+        as a template when this runs.
+        """
+        super().init_results()
+        hpvs = self._hpvs()
+        if not hpvs:
+            return
+        template = hpvs[0].results
+        defs = []
+        for key, src in template.items():
+            if key in self._SKIP or key in self._DERIVED:
+                continue
+            defs.append(ss.Result(key, dtype=src.dtype,
+                                  label=f'{src.label} (any genotype)'))
+        # Derived results (computed in step()).
+        defs.append(ss.Result('n_susceptible', dtype=int,
+                              label='Currently uninfected with any genotype'))
+        defs.append(ss.Result('prevalence', dtype=float,
+                              label='Prevalence of any HPV genotype'))
+        # Extra result with no per-genotype counterpart.
+        defs.append(ss.Result('cum_infections_unique', dtype=int,
+                              label='Cumulative agents ever infected with any genotype'))
+        self.define_results(*defs)
+
     def step(self):
-        """Capture per-step new_infections (needed before they could be overwritten)."""
+        """Capture per-step union-based state counts and derived results.
+
+        Element-wise sums for the remaining results are computed in
+        ``finalize_results`` once each module's full per-step array exists.
+        """
         ti = self.sim.ti
         hpvs = self._hpvs()
         if not hpvs:
             return
-        # Sum-of-flows across genotypes, not boolean-OR — overcounts co-infections.
-        self.results['cum_infections_any'][ti] = sum(
-            m.results.new_infections[ti] for m in hpvs
-        )
+        people = self.sim.people
+        # auids includes dead-but-not-yet-removed agents, so the alive mask
+        # (not len(auids)) is the right denominator for prevalence and the
+        # right filter for current-state counts.
+        alive = people.alive.values
+        n_alive = int(alive.sum())
+        if n_alive == 0:
+            return
+        # Per-agent state unions across modules, masked to alive agents.
+        union_arrays = {}
+        for key, attr in self._UNION_STATES.items():
+            u = np.zeros(alive.shape, dtype=bool)
+            for m in hpvs:
+                u |= getattr(m, attr).values
+            u &= alive
+            union_arrays[key] = u
+            self.results[key][ti] = int(u.sum())
+        # Derived from n_infected.
+        n_inf = int(union_arrays['n_infected'].sum())
+        self.results['n_susceptible'][ti] = n_alive - n_inf
+        self.results['prevalence'][ti] = n_inf / n_alive
+        # Cumulative unique: agents whose ti_first_infection has fired on
+        # any genotype (including init-seeded). Filter to alive agents so the
+        # count reflects currently-visible ever-infected agents. Once an
+        # agent dies and is removed from auids, they drop out of this count.
+        ever_infected = np.zeros(alive.shape, dtype=bool)
+        for m in hpvs:
+            ever_infected |= np.isfinite(m.ti_first_infection.values)
+        ever_infected &= alive
+        self.results['cum_infections_unique'][ti] = int(ever_infected.sum())
 
     def finalize_results(self):
-        """Assemble cumulative aggregates after HPV disease modules have finalized."""
+        """Sum across modules for all results not handled by step()."""
         super().finalize_results()
         hpvs = self._hpvs()
         if not hpvs:
             return
-        # Cumulative sum of the per-step counts captured in step().
-        self.results['cum_infections_any'][:] = np.cumsum(
-            np.asarray(self.results['cum_infections_any'])
-        )
-        # cum_cancers_any: sum across genotypes. HPV.finalize_results runs
-        # before this analyzer, so cum_cancers is already populated.
-        self.results['cum_cancers_any'][:] = sum(
-            np.asarray(m.results.cum_cancers) for m in hpvs
-        )
-        self.results['new_cancer_deaths_any'][:] = sum(
-            np.asarray(m.results.new_cancer_deaths) for m in hpvs
-        )
+        handled_in_step = (set(self._UNION_STATES)
+                           | set(self._DERIVED)
+                           | {'cum_infections_unique', 'timevec'})
+        template = hpvs[0].results
+        for key in template.keys():
+            if key in self._SKIP or key in handled_in_step:
+                continue
+            self.results[key][:] = sum(m.results[key] for m in hpvs)

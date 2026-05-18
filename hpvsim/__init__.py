@@ -22,12 +22,12 @@ from .hpv import HPV
 from .network import SexualNetwork
 from .sim import Sim
 from .demographics import AgeMigration
-from .cross_genotype import CrossImmunity, Aggregate
+from .cross_genotype import CrossImmunity, HPVTotal
 
 rootdir = sc.thispath(__file__).parent
 
 __all__ = [
-    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'CrossImmunity', 'Aggregate',
+    'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'CrossImmunity', 'HPVTotal',
     'data', 'migration_utils', 'options', 'datadir', '__version__',
     'SimPars', 'GenotypePars', 'get_genotype_pars', 'get_cross_immunity',
     'GENOTYPE_KEYS',

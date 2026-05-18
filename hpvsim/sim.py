@@ -4,11 +4,11 @@
 the default stack — one HPV disease module per genotype, multi-layer
 SexualNetwork, ss.Births + ss.Deaths + AgeMigration demographics, ss.People
 with location-specific age pyramid, plus a CrossImmunity connector and an
-Aggregate analyzer — and forwards to ``ss.Sim``.
+HPVTotal analyzer — and forwards to ``ss.Sim``.
 
 ``connectors=`` and ``analyzers=`` are **append**, not override: user-supplied
 modules are added after the auto-defaults (CrossImmunity, the _ExclusiveSeeder
-when ``init_seeding='exclusive'``, and Aggregate). To replace the auto-defaults
+when ``init_seeding='exclusive'``, and HPVTotal). To replace the auto-defaults
 entirely, drop down to vanilla ``ss.Sim``.
 
 Other slots (``diseases``, ``networks``, ``demographics``, ``people``) retain
@@ -32,7 +32,7 @@ Kwargs:
 
 import starsim as ss
 
-from .cross_genotype import Aggregate, CrossImmunity
+from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
 from .demographics import AgeMigration
 from .hpv import HPV
@@ -130,7 +130,7 @@ class Sim(ss.Sim):
                 AgeMigration(),
             ]
 
-        analyzers = [Aggregate()] + user_analyzers
+        analyzers = [HPVTotal()] + user_analyzers
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()

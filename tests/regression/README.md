@@ -48,7 +48,7 @@ the per-baseline sections below.
 
 Pinned in `anchor_4genotype.py:PARS` (4 genotypes, Nigeria, seed 0,
 1990–2060, `dt=0.25`, no interventions, no analyzers beyond the
-auto-added Aggregate analyzer).
+auto-added HPVTotal analyzer).
 
 Producing a v3 sweep:
 

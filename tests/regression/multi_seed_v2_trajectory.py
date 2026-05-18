@@ -1,7 +1,7 @@
 """Multi-seed sweep of the v2.3 4-genotype anchor trajectories.
 
 Runs the v2 baseline with N seeds and writes a JSON containing the per-seed
-trajectories of ``cum_infections_any`` and ``cum_cancers_any``, computed from
+trajectories of ``cum_infections`` and ``cum_cancers``, computed from
 v2's ``infections_by_genotype`` / ``cancers_by_genotype`` arrays the same way
 ``baseline_v23.regen_4genotype`` derives the single-seed trajectory baseline.
 
@@ -52,8 +52,8 @@ def run_seed(seed):
     start = int(pars['start'])
     annual_time = [float(start + i) for i in range(n_years)]
     return {
-        'cum_infections_any': np.cumsum(inf_bg.sum(axis=0)).tolist(),
-        'cum_cancers_any':    np.cumsum(can_bg.sum(axis=0)).tolist(),
+        'cum_infections': np.cumsum(inf_bg.sum(axis=0)).tolist(),
+        'cum_cancers':    np.cumsum(can_bg.sum(axis=0)).tolist(),
         'time':               annual_time,
     }
 
@@ -75,11 +75,11 @@ def main(argv=None):
         run = run_seed(seed)
         if time_vec is None:
             time_vec = run['time']
-        inf_runs.append(run['cum_infections_any'])
-        can_runs.append(run['cum_cancers_any'])
+        inf_runs.append(run['cum_infections'])
+        can_runs.append(run['cum_cancers'])
         dt = time.time() - ts
         print(f'  seed {seed}: done in {dt:.1f}s '
-              f'(end cum_infections_any={inf_runs[-1][-1]:.0f})')
+              f'(end cum_infections={inf_runs[-1][-1]:.0f})')
     total = time.time() - t0
 
     payload = {
@@ -91,8 +91,8 @@ def main(argv=None):
         },
         'time': time_vec,
         'series': {
-            'cum_infections_any': inf_runs,
-            'cum_cancers_any':    can_runs,
+            'cum_infections': inf_runs,
+            'cum_cancers':    can_runs,
         },
     }
 

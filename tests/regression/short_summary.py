@@ -3,8 +3,8 @@
 For each genotype produces the 8-metric M02 summary (total HPV infections,
 total cancers, total cancer deaths, mean HPV prevalence, mean cancer
 incidence, mean ages of infection / cancer / cancer death). Plus an
-8-metric ``any.*`` aggregate computed from the Aggregate analyzer's
-*_any results (sim.results.aggregate.*).
+8-metric ``any.*`` aggregate computed from the HPVTotal analyzer's
+results (sim.results.hpvtotal.cum_* / new_cancer_deaths).
 
 Three measurement formulas mirror v2's exact calculation methods (see
 ``baseline_v23.py``) so the v3 sim summaries are directly comparable to v2:
@@ -196,24 +196,24 @@ def _per_genotype_metrics(sim, genotype, genotypes_for_death=None):
 def _aggregate_metrics(sim, genotypes):
     """Compute the 8-metric aggregate across genotypes.
 
-    Aggregate count metrics come from the Aggregate analyzer
-    (sim.results.aggregate.cum_*_any). Mean ages pool per-genotype lifetime
-    reconstructions. Mean cancer incidence is the mean across genotypes of
-    the per-genotype mean-of-per-year rates (matches v2's ``any.mean cancer
+    Aggregate count metrics come from the HPVTotal analyzer
+    (sim.results.hpvtotal.cum_* / new_cancer_deaths). Mean ages pool per-genotype
+    lifetime reconstructions. Mean cancer incidence is the mean across genotypes
+    of the per-genotype mean-of-per-year rates (matches v2's ``any.mean cancer
     incidence`` aggregation; see _v2_legacy/sim.py:1109).
     """
     pop_scale = float(getattr(sim.pars, 'pop_scale', 1.0) or 1.0)
-    agg = sim.results.aggregate
+    total = sim.results.hpvtotal
 
-    n_inf_unscaled = float(np.asarray(agg.cum_infections_any)[-1])
+    n_inf_unscaled = float(np.asarray(total.cum_infections)[-1])
     n_inf = n_inf_unscaled * pop_scale
 
-    cum_c = float(np.asarray(agg.cum_cancers_any)[-1])
+    cum_c = float(np.asarray(total.cum_cancers)[-1])
     n_cancers = cum_c * pop_scale
     n_cancers_unscaled = cum_c
 
-    new_cd_any = np.asarray(agg.new_cancer_deaths_any)
-    n_cd_unscaled = float(new_cd_any.sum())
+    new_cd = np.asarray(total.new_cancer_deaths)
+    n_cd_unscaled = float(new_cd.sum())
     n_cancer_deaths = n_cd_unscaled * pop_scale
 
     # Mean prev: average across genotypes' prevalences (approximation).

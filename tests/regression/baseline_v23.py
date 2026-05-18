@@ -16,8 +16,8 @@ Two regen entrypoints are provided:
                        4 genotypes + 8 aggregate, keys: ``<g>.<metric>`` and
                        ``any.<metric>``).
                      tests/regression_baselines/anchor_4genotype_trajectory.json
-                       time-series of cum_cancers_any and cum_infections_any
-                       for Task 16's trajectory parity test.
+                       time-series of cum_cancers and cum_infections for the
+                       trajectory parity test.
 
 Key v2-vs-v3 syntax differences honored here:
   - v3 PARS uses ``genotype='hpv16'``; v2 expects ``genotypes=['hpv16']``.
@@ -381,14 +381,15 @@ def _per_genotype_metrics_v2(sim, gen_idx, gen_key):
 def _aggregate_metrics_v2(sim, genotype_keys):
     """Compute the 8-metric aggregate across all genotypes using v2's results.
 
-    v2 has no built-in cum_infections_any / cum_cancers_any aggregators (those
-    are v3 M03 additions).  We build them from the ``_by_genotype`` arrays:
+    v2 has no built-in cum_infections / cum_cancers aggregators (those are v3
+    M03 additions, via the HPVTotal analyzer).  We build them from v2's
+    ``_by_genotype`` arrays:
 
       * total HPV infections = infections_by_genotype.sum() (all genotypes, all t)
         This is the correct per-step new-infection count summed across time and
         genotypes.  In the small-co-infection regime it approximates unique
-        infections, matching the v3 Aggregate analyzer's cum_infections_any
-        (which also sums new_infections rather than counting unique agents).
+        infections, matching the v3 HPVTotal analyzer's cum_infections (which
+        also sums new_infections rather than counting unique agents).
       * total cancers = cancers_by_genotype.sum() (cancer is single-attributed)
       * total cancer deaths = aggregate cancer_deaths.sum() (v2 doesn't stratify
         cancer_deaths by genotype; this is the population-wide total)
@@ -520,9 +521,8 @@ def regen_4genotype(out=None, traj_out=None):
     aggregate summary (8 metrics x 4 genotypes + 8 aggregate), and writes:
 
       * ``out``      — 40-entry summary JSON (default: anchor_4genotype.json)
-      * ``traj_out`` — trajectory JSON with cum_cancers_any and
-                       cum_infections_any time-series (default:
-                       anchor_4genotype_trajectory.json)
+      * ``traj_out`` — trajectory JSON with cum_cancers and cum_infections
+                       time-series (default: anchor_4genotype_trajectory.json)
 
     Both files land in ``tests/regression_baselines/`` which is gitignored.
 
@@ -594,26 +594,26 @@ def regen_4genotype(out=None, traj_out=None):
     for k, v in summary.items():
         print(f'  {k:<56} {v:>12.4g}')
 
-    # --- Trajectory JSON for Task 16 ---
-    # cum_infections_any: cumsum of per-step new infections across all genotypes.
+    # --- Trajectory JSON for cross-version comparison ---
+    # cum_infections: cumsum of per-step new infections across all genotypes.
     #   We sum infections_by_genotype across genotypes (axis 0) to get per-step
-    #   totals, then cumsum across time.  This mirrors v3's Aggregate analyzer
-    #   cum_infections_any = cumsum(new_infections_any).
-    # cum_cancers_any: cumsum of cancers_by_genotype summed across genotypes.
+    #   totals, then cumsum across time.  Matches the v3 HPVTotal analyzer's
+    #   cum_infections = cumsum(new_infections_summed_across_genotypes).
+    # cum_cancers: cumsum of cancers_by_genotype summed across genotypes.
     inf_bg  = np.asarray(sim.results['infections_by_genotype'])  # (n_g, n_t)
     can_bg  = np.asarray(sim.results['cancers_by_genotype'])      # (n_g, n_t)
 
-    cum_infections_any = np.cumsum(inf_bg.sum(axis=0))
-    cum_cancers_any    = np.cumsum(can_bg.sum(axis=0))
+    cum_infections = np.cumsum(inf_bg.sum(axis=0))
+    cum_cancers    = np.cumsum(can_bg.sum(axis=0))
 
     trajectory = {
         'metadata': {
             'hpvsim_version': hpv.__version__,
             'pars': dict(PARS_4GENOTYPE),
         },
-        'time':               sim.yearvec.tolist(),
-        'cum_infections_any': cum_infections_any.tolist(),
-        'cum_cancers_any':    cum_cancers_any.tolist(),
+        'time':            sim.yearvec.tolist(),
+        'cum_infections':  cum_infections.tolist(),
+        'cum_cancers':     cum_cancers.tolist(),
     }
 
     traj_out = Path(traj_out)
