@@ -155,6 +155,10 @@ class AgeMigration(ss.Demographics):
         n_imm_total = 0
         n_emi_total = 0
 
+        # Accumulate per-(age, sex) immigrant attributes across the inner loop;
+        # concatenated and applied to People in one ``people.grow`` call below.
+        # Per-band arrays go in chunks instead of a single grow-per-band so we
+        # only pay the People-resize cost once per step.
         imm_age_chunks = []
         imm_female_chunks = []
 
@@ -171,15 +175,19 @@ class AgeMigration(ss.Demographics):
                 diff = int(round(target - count_sim))
 
                 if diff > 0:
+                    # Under-target: queue ``diff`` immigrants for this band.
                     imm_age_chunks.append(np.full(diff, age, dtype=float))
                     imm_female_chunks.append(np.full(diff, sex_is_female, dtype=bool))
                     n_imm_total += diff
                 elif diff < 0:
+                    # Over-target: emigrate ``-diff`` agents from this band.
                     band_uids = snap_uids[in_band]
                     self._emigrate(band_uids, n=-diff)
                     n_emi_total += -diff
 
         if n_imm_total > 0:
+            # Single People.grow + write per attribute, sized to the total
+            # immigration across all (age, sex) bands.
             new_uids = people.grow(n_imm_total)
             people.age[new_uids] = np.concatenate(imm_age_chunks)
             people.female[new_uids] = np.concatenate(imm_female_chunks)

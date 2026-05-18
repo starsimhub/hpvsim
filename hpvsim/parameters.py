@@ -51,24 +51,37 @@ class SimPars(ss.SimPars):
         return
 
 
-def _imm_init_dist():
+def _beta_from_mean_var(mean, var):
+    """Build an ``ss.Dist(distname='beta', ...)`` from (mean, variance).
+
+    Converts to the beta distribution's shape parameters (a, b):
+        a = ((1 - mean) / var - 1 / mean) * mean ** 2
+        b = a * (1 / mean - 1)
+    Valid for mean in (0, 1) and var < mean * (1 - mean).
+    """
+    a = ((1 - mean) / var - 1 / mean) * mean ** 2
+    b = a * (1 / mean - 1)
+    return ss.Dist(distname='beta', a=a, b=b)
+
+
+def _imm_init_dist(mean=0.35, var=0.025):
     """Beta sample for per-clearance humoral-immunity boost.
 
-    Shape parameters: beta_mean(mean=0.35, var=0.025).
+    Defaults match the legacy v2 calibration. Callers wanting a different
+    immunity-boost distribution can construct their own and assign it to
+    ``GenotypePars.imm_init`` (or pass via ``pars=``) on the per-genotype HPV
+    module.
     """
-    a = ((1 - 0.35) / 0.025 - 1 / 0.35) * 0.35 ** 2
-    b = a * (1 / 0.35 - 1)
-    return ss.Dist(distname='beta', a=a, b=b)
+    return _beta_from_mean_var(mean, var)
 
 
-def _cell_imm_dist():
+def _cell_imm_dist(mean=0.25, var=0.025):
     """Beta sample for per-clearance severity-immunity boost (cell_imm_init).
 
-    Shape parameters: beta_mean(mean=0.25, var=0.025).
+    Defaults match the legacy v2 calibration. See ``_imm_init_dist`` for
+    how to override per-genotype.
     """
-    a = ((1 - 0.25) / 0.025 - 1 / 0.25) * 0.25 ** 2
-    b = a * (1 / 0.25 - 1)
-    return ss.Dist(distname='beta', a=a, b=b)
+    return _beta_from_mean_var(mean, var)
 
 
 # Per-genotype natural-history defaults. Duration entries are
@@ -168,7 +181,7 @@ class GenotypePars(ss.Pars):
     def __init__(self, genotype='hpv16', **kwargs):
         super().__init__()
         if genotype not in _GENOTYPE_DEFAULTS:
-            raise NotImplementedError(
+            raise ValueError(
                 f'GenotypePars supports {GENOTYPE_KEYS}; got {genotype!r}.'
             )
         d = _GENOTYPE_DEFAULTS[genotype]

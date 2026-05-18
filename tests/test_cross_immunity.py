@@ -8,8 +8,42 @@ from hpvsim.parameters import get_cross_immunity, GENOTYPE_KEYS
 
 
 def test_genotype_keys_are_canonical_four():
-    """GENOTYPE_KEYS pins the M03 4-genotype default ordering."""
+    """GENOTYPE_KEYS pins the 4-genotype default ordering."""
     assert GENOTYPE_KEYS == ('hpv16', 'hpv18', 'hi5', 'ohr')
+
+
+def test_genotype_registries_agree_on_canonical_keys():
+    """All six genotype-key registries scattered across the package must agree
+    on the canonical key set. Adding a fifth genotype is a one-entry edit per
+    registry; this test prevents drift.
+
+    Registries:
+      - ``hpvsim.parameters.GENOTYPE_KEYS``      (tuple, canonical ordering)
+      - ``hpvsim.parameters.genotype_aliases``   (dict: canonical -> aliases)
+      - ``hpvsim.parameters._GENOTYPE_DEFAULTS`` (dict: canonical -> defaults)
+      - ``hpvsim.parameters._FULL_OWN_IMM_KEYS`` (frozenset; subset of canonical)
+      - ``hpvsim.hpv._KNOWN_GENOTYPES``          (tuple)
+      - ``hpvsim.seeding._INIT_PREV``            (dict; includes 'total' meta-key)
+    """
+    from hpvsim.parameters import (
+        GENOTYPE_KEYS, genotype_aliases, _GENOTYPE_DEFAULTS, _FULL_OWN_IMM_KEYS,
+    )
+    from hpvsim.hpv import _KNOWN_GENOTYPES
+    from hpvsim.seeding import _INIT_PREV
+
+    canonical = set(GENOTYPE_KEYS)
+    assert set(genotype_aliases.keys()) == canonical, \
+        'genotype_aliases keys do not match GENOTYPE_KEYS'
+    assert set(_GENOTYPE_DEFAULTS.keys()) == canonical, \
+        '_GENOTYPE_DEFAULTS keys do not match GENOTYPE_KEYS'
+    assert set(_KNOWN_GENOTYPES) == canonical, \
+        '_KNOWN_GENOTYPES does not match GENOTYPE_KEYS'
+    assert _FULL_OWN_IMM_KEYS <= canonical, \
+        '_FULL_OWN_IMM_KEYS contains keys not in GENOTYPE_KEYS'
+    # _INIT_PREV carries one extra non-genotype key ('total') for the
+    # _ExclusiveSeeder's any-HPV prevalence curve.
+    assert set(_INIT_PREV.keys()) - {'total'} == canonical, \
+        '_INIT_PREV genotype keys do not match GENOTYPE_KEYS'
 
 
 def test_get_cross_immunity_default_shape_and_diagonal():

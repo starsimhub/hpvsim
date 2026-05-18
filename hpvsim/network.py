@@ -59,7 +59,7 @@ class SexualNetwork(ss.SexualNetwork):
     per-edge ``acts`` count: ``1 - (1 - edges.beta * disease_beta)^acts``.
     The starsim base treats ``edges.beta`` as a final scalar
     (``edges.beta * (1 - (1 - disease_beta)^acts)``); this override treats
-    it as a per-act probability multiplier, which is the v2 convention.
+    it as a per-act probability multiplier.
     """
 
     def net_beta(self, disease_beta=None, inds=None, disease=None):

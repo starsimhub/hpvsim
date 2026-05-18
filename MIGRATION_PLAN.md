@@ -282,6 +282,7 @@ by the M03 multi-seed pytest gates). See the M03 spec's
 | Sex-specific initial prevalence | M2 | v2.x seeds initial infections differently by sex |
 | Location-name normalization + subnational regions | M4 | M2 only matches exact lower-cased country names against `_KNOWN_LOCATIONS`. Calibration users will need fuzzy matching for complex country names (e.g., "Côte d'Ivoire" / "Cote d'Ivoire" / "Ivory Coast") and a path to model subnational regions (long-standing user request that the v2 country-level adapter blocked). Touches `hpv.data.country.load_country` and `hpv.Sim`'s location handling. |
 | Cross-repo default-pars naming sync (NWPars) | M8 | STIsim and HIVsim use `NWPars(ss.Pars)` (sometimes wrapped as `default_nwpars`); HPVsim uses `network_pars` dicts and a per-genotype `GenotypePars`. Align naming across repos before STIsim/HIV integration so connector users don't see two conventions. Coordinate with STIsim/HIVsim maintainers; M02 review thread on `country.py:212`. |
+| Validate or drop `_ExclusiveSeeder` | Post-M03 | `init_seeding='exclusive'` (the v3 default) preserves v2's "exactly one genotype per agent at init" behavior via `hpvsim/seeding.py:_ExclusiveSeeder`. Robyn flagged in PR108 inline #12 that this is weight to carry around if the legacy behavior isn't scientifically necessary. Test: rerun M03 short-summary + trajectory parity with `init_seeding='independent'`; if drift is within `\|z\|<3` and rel<10%, drop the seeder. |
 
 ## Out of scope
 

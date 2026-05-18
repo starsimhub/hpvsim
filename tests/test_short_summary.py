@@ -1,4 +1,4 @@
-"""Unit tests for the M03 40-entry short-summary builder."""
+"""Unit tests for the 40-entry short-summary builder."""
 import numpy as np
 import pytest
 
@@ -7,7 +7,7 @@ from tests.regression.short_summary import build_summary, METRIC_KEYS
 
 
 def test_metric_keys_are_eight():
-    """Each genotype contributes exactly 8 metrics (matches M02 short_summary set)."""
+    """Each genotype contributes exactly 8 metrics."""
     assert len(METRIC_KEYS) == 8
 
 

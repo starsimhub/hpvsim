@@ -130,8 +130,14 @@ class HPVTotal(ss.Analyzer):
     # HPV result keys not aggregated (bookkeeping artifacts).
     _SKIP = ('timevec', 'n_rel_sev_sampled')
 
-    def _hpvs(self):
-        return [d for d in self.sim.diseases.values() if isinstance(d, HPV)]
+    def init_pre(self, sim):
+        """Discover HPV modules once at init; mirrors CrossImmunity's pattern.
+
+        Set ``hpv_modules`` before the ``super().init_pre`` call, since starsim's
+        ``Module.init_pre`` invokes ``self.init_results`` which reads this.
+        """
+        self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        super().init_pre(sim)
 
     def init_results(self):
         """Mirror schema from per-genotype HPV results + add derived/extras.
@@ -141,7 +147,7 @@ class HPVTotal(ss.Analyzer):
         as a template when this runs.
         """
         super().init_results()
-        hpvs = self._hpvs()
+        hpvs = self.hpv_modules
         if not hpvs:
             return
         template = hpvs[0].results
@@ -168,7 +174,7 @@ class HPVTotal(ss.Analyzer):
         ``finalize_results`` once each module's full per-step array exists.
         """
         ti = self.sim.ti
-        hpvs = self._hpvs()
+        hpvs = self.hpv_modules
         if not hpvs:
             return
         people = self.sim.people
@@ -205,7 +211,7 @@ class HPVTotal(ss.Analyzer):
     def finalize_results(self):
         """Sum across modules for all results not handled by step()."""
         super().finalize_results()
-        hpvs = self._hpvs()
+        hpvs = self.hpv_modules
         if not hpvs:
             return
         handled_in_step = (set(self._UNION_STATES)

@@ -168,9 +168,13 @@ class HPV(ss.Infection):
         deterministic, per-uid draw under CRN. ``dist`` must be a dedicated
         Bernoulli created in ``__init__`` and used only at this call site.
         ``values`` and ``uids`` must align element-wise.
+
+        Defensively clamps ``values`` to >= 0 before computing the fractional
+        Bernoulli probability — a negative ``frac`` would crash the Bernoulli.
         """
         if len(uids) == 0:
             return np.zeros(0, dtype=int)
+        values = np.maximum(values, 0.0)
         floor = np.floor(values)
         frac = values - floor
         dist.set(p=frac)
@@ -259,6 +263,8 @@ class HPV(ss.Infection):
         # for FEMALE events and ``np.ceil`` for MALE clearance.
         # Without rounding, fractional ti_<event> behaves like np.ceil at the
         # ``<= ti`` check — fine for males, but biases female timings.
+        # Bias direction: np.ceil pushes male clearance to the next integer
+        # step, so males clear up to one dt later than the fractional duration.
 
         # 3. Branch A: clearance from precin. Split male / female paths so
         #    males get np.ceil and females get the CRN-safe stochastic round.

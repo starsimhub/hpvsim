@@ -30,7 +30,7 @@ def test_sim_genotypes_sugar_single():
 
 
 def test_sim_genotypes_sugar_two():
-    """genotypes=[16, 18] -> two HPV modules + Connector. (Task 9 enables 4-genotype.)"""
+    """genotypes=[16, 18] -> two HPV modules + CrossImmunity connector."""
     sim = hpv.Sim(
         n_agents=200, start=1990, stop=1991, dt=1.0, rand_seed=0,
         genotypes=[16, 18],
