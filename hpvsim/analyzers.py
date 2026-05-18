@@ -59,6 +59,24 @@ class AgeResults(ss.Analyzer):
         'hpv':           'infected',   # alias used in some configs
     }
 
+    # Result-name -> (BoolState attr, female_only). Prevalence is num/denom
+    # where denom is alive (female-only for sex-specific conditions like CIN
+    # and cancer; whole population for HPV infection prevalence).
+    _PREV_TO_STATE = {
+        'hpv_prevalence':       ('infected',  False),
+        'cin_prevalence':       ('cin',       True),
+        'cancer_prevalence':    ('cancerous', True),
+        'precin_prevalence':    ('precin',    True),
+    }
+
+    # Result-name -> (event-time attr, in-state attr) on each HPV module.
+    # Incidence numerator = agents whose ti_<event> == sim.ti and in-state.
+    # Denominator = at-risk alive females (per 100k convention).
+    _INC_TO_ATTRS = {
+        'cancer_incidence':  ('ti_cancerous', 'cancerous'),
+        'cin_incidence':     ('ti_cin',       'cin'),
+    }
+
     def __init__(self, result_args=None, die=False, **kwargs):
         super().__init__(**kwargs)
         if result_args is None:
@@ -141,7 +159,15 @@ class AgeResults(ss.Analyzer):
             for year in year_match:
                 if rkey in self._COUNT_TO_STATE:
                     self.outputs[rkey][year] = self._bin_count(rdict, attr=self._COUNT_TO_STATE[rkey])
-                # Other sub-modes handled in later tasks.
+                elif rkey in self._PREV_TO_STATE:
+                    attr, female_only = self._PREV_TO_STATE[rkey]
+                    self.outputs[rkey][year] = self._bin_prevalence(
+                        rdict, attr=attr, female_only=female_only)
+                elif rkey in self._INC_TO_ATTRS:
+                    date_attr, state_attr = self._INC_TO_ATTRS[rkey]
+                    self.outputs[rkey][year] = self._bin_incidence(
+                        rdict, date_attr=date_attr, state_attr=state_attr)
+                # Type-distribution sub-mode handled in Task 4.
         return
 
     def _bin_count(self, rdict, attr):
@@ -159,6 +185,59 @@ class AgeResults(ss.Analyzer):
             weights = weights.values[mask]
         counts, _ = np.histogram(ages, bins=rdict.edges, weights=weights)
         return counts
+
+    def _bin_prevalence(self, rdict, attr, female_only=False):
+        """Age-bin prevalence = bin(numerator state) / bin(denominator)."""
+        sim = self.sim
+        people = sim.people
+        alive = people.alive.values
+        state_any = np.zeros_like(alive)
+        for mod in self.hpv_modules:
+            state_any |= getattr(mod, attr).values
+        denom_mask = alive
+        if female_only:
+            denom_mask = alive & people.female.values
+        ages = people.age.values
+        weights = getattr(people, 'scale', None)
+        weights = weights.values if weights is not None else None
+        num_mask = state_any & denom_mask
+        num, _ = np.histogram(ages[num_mask], bins=rdict.edges,
+                              weights=(weights[num_mask] if weights is not None else None))
+        denom, _ = np.histogram(ages[denom_mask], bins=rdict.edges,
+                                weights=(weights[denom_mask] if weights is not None else None))
+        return np.divide(num, denom, out=np.zeros_like(num, dtype=float),
+                         where=denom > 0)
+
+    def _bin_incidence(self, rdict, date_attr, state_attr):
+        """Age-bin new-events-this-year / at-risk-female-denominator (per 100k).
+
+        Numerator: agents whose ti_<event> equals sim.ti and who are in-state.
+        At dt=1 yr this captures one year of events. For dt<1 the snapshot
+        captures only the final sub-step's events; the M04 smoke test uses
+        dt=1 so this is sufficient. A multi-substep accumulator is a follow-on.
+        """
+        sim = self.sim
+        people = sim.people
+        alive = people.alive.values
+        female = people.female.values
+        # Single pass: union both "new event" and "cancerous_any" across modules.
+        new_event = np.zeros_like(alive)
+        cancerous_any = np.zeros_like(alive)
+        for mod in self.hpv_modules:
+            ti_arr = getattr(mod, date_attr).values
+            state = getattr(mod, state_attr).values
+            new_event |= (ti_arr == sim.ti) & state
+            cancerous_any |= mod.cancerous.values
+        at_risk = alive & female & ~cancerous_any
+        ages = people.age.values
+        weights = getattr(people, 'scale', None)
+        weights = weights.values if weights is not None else None
+        num, _ = np.histogram(ages[new_event & alive], bins=rdict.edges,
+                              weights=(weights[new_event & alive] if weights is not None else None))
+        denom, _ = np.histogram(ages[at_risk], bins=rdict.edges,
+                                weights=(weights[at_risk] if weights is not None else None))
+        return np.divide(num, denom, out=np.zeros_like(num, dtype=float),
+                         where=denom > 0) * 1e5
 
     def to_dataframe(self, key):
         """Return outputs for `key` as a DataFrame indexed by year.

@@ -88,3 +88,37 @@ def test_age_results_age_label_schema():
     ar = sim.analyzers['ageresults']
     df = ar.to_dataframe(key='cancers')
     assert list(df.columns) == ['0-20', '20-40', '40-60', '60+']
+
+
+def test_age_results_hpv_prevalence_by_age():
+    """hpv_prevalence is binned-infected / binned-alive per age bin, in [0,1]."""
+    edges = np.array([0., 20., 40., 60., 100.])
+    sim = hpv.Sim(n_agents=2000, start=1990, stop=2021, dt=1.0,
+                  rand_seed=0, analyzers=[hpv.AgeResults(
+                      result_args=sc.objdict(
+                          hpv_prevalence=sc.objdict(years=[2020], edges=edges),
+                      ),
+                  )])
+    sim.run()
+    ar = sim.analyzers['ageresults']
+    df = ar.to_dataframe(key='hpv_prevalence')
+    assert df.shape == (1, len(edges) - 1)
+    vals = df.values[0]
+    assert (vals >= 0).all() and (vals <= 1 + 1e-9).all()
+
+
+def test_age_results_cancer_incidence_by_age():
+    """cancer_incidence is per-100k new cancers among at-risk females per age bin."""
+    edges = np.array([0., 30., 60., 100.])
+    sim = hpv.Sim(n_agents=4000, start=1990, stop=2021, dt=1.0,
+                  rand_seed=0, analyzers=[hpv.AgeResults(
+                      result_args=sc.objdict(
+                          cancer_incidence=sc.objdict(years=[2020], edges=edges),
+                      ),
+                  )])
+    sim.run()
+    ar = sim.analyzers['ageresults']
+    df = ar.to_dataframe(key='cancer_incidence')
+    assert df.shape == (1, len(edges) - 1)
+    # Incidence rates are non-negative reals.
+    assert (df.values >= 0).all()
