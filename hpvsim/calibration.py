@@ -45,20 +45,60 @@ def build_sim(sim, calib_pars, **kwargs):
     from .hpv import HPV
     from .cross_genotype import CrossImmunity
 
-    # Discover registered genotype keys (names on each HPV disease module).
-    hpv_keys = {d.name for d in sim.diseases.values() if isinstance(d, HPV)}
+    # ss.Calibration deep-copies an uninitialized sim before calling build_fn.
+    # Support both initialized sims (sim.diseases is an ndict) and
+    # uninitialized sims (disease modules live in sim.pars['diseases'] list).
+    if hasattr(sim, 'diseases'):
+        # Post-init: diseases and connectors are ndict attributes on sim.
+        disease_lookup = {d.name: d for d in sim.diseases.values()
+                          if isinstance(d, HPV)}
+        connector_list = [c for c in sim.connectors.values()
+                          if isinstance(c, CrossImmunity)]
+    else:
+        # Pre-init: modules are lists in sim.pars.
+        disease_lookup = {d.name: d
+                          for d in sim.pars.get('diseases', [])
+                          if isinstance(d, HPV)}
+        connector_list = [c for c in sim.pars.get('connectors', [])
+                          if isinstance(c, CrossImmunity)]
+
+    hpv_keys = set(disease_lookup.keys())
 
     for key, value in calib_pars.items():
+        # ss.Calibration._sample_from_trial passes each entry as a spec dict
+        # {'low':..., 'high':..., 'value': <sampled_float>, 'path':..., ...}.
+        # Extract the actual scalar when that shape is present.
+        if isinstance(value, dict) and 'value' in value:
+            value = value['value']
         parts = key.split('.')
         if len(parts) == 1:
             # Top-level sim par.
             sim.pars[parts[0]] = value
         elif parts[0] in hpv_keys:
-            # Per-genotype par: walk into sim.diseases[<g>].pars[...].
-            target = sim.diseases[parts[0]].pars
+            # Per-genotype par: walk into disease.pars[...].
+            target = disease_lookup[parts[0]].pars
             for p in parts[1:-1]:
                 target = target[p]
-            target[parts[-1]] = value
+            # Special case: pars.beta is stored as a per-network dict
+            # {'sexualnetwork': [f2m, m2f]}. If the caller supplies a scalar,
+            # scale all entries proportionally (preserving the F→M / M→F ratio).
+            final_key = parts[-1]
+            if (final_key == 'beta' and sc.isnumber(value)
+                    and isinstance(target.get(final_key), dict)):
+                old_beta = target[final_key]
+                first_entry = next(iter(old_beta.values()))
+                old_ref = first_entry[0] if isinstance(first_entry, list) else first_entry
+                if old_ref == 0:
+                    scale = 1.0
+                else:
+                    scale = value / old_ref
+                target[final_key] = {
+                    net: ([v[0] * scale, v[1] * scale] if isinstance(v, list)
+                          else v * scale)
+                    for net, v in old_beta.items()
+                }
+            else:
+                target[final_key] = value
         elif parts[0] == 'cross_immunity':
             # cross_immunity.<matrix>.<tgt>.<src>
             if len(parts) != 4:
@@ -66,13 +106,11 @@ def build_sim(sim, calib_pars, **kwargs):
                     f'build_sim: cross_immunity key must be of the form '
                     f'cross_immunity.<matrix>.<tgt>.<src>; got {key!r}')
             _, matrix_name, tgt, src = parts
-            connectors = [c for c in sim.connectors.values()
-                          if isinstance(c, CrossImmunity)]
-            if not connectors:
+            if not connector_list:
                 raise ValueError(
                     f'build_sim: cross_immunity key {key!r} requires a '
                     f'CrossImmunity connector on the sim')
-            conn = connectors[0]
+            conn = connector_list[0]
             idx = {m.name: i for i, m in enumerate(conn.hpv_modules)}
             i, j = idx[tgt], idx[src]   # matrix is [target, source]
             getattr(conn, matrix_name)[i, j] = value
@@ -118,37 +156,43 @@ def _validate_age_schema(expected, sim_template):
             f'got {list(expected.columns)}')
 
 
-def cancer_by_age(expected, *, likelihood='normal', weight=1):
-    """CalibComponent for age-binned cancer counts (incident, Normal likelihood)."""
+def cancer_by_age(expected, *, weight=1):
+    """CalibComponent for age-binned cancer counts (stock snapshot, Normal likelihood).
+
+    AgeResults snapshots the count of agents with cancerous=True at each
+    requested year. This is a prevalence (stock), not an incident flow.
+    conform='step_containing' picks the sim timestep that contains the
+    target year, which is appropriate for point-in-time counts.
+    """
     _validate_age_schema(expected, None)
-    return ss.CalibComponent(
+    return ss.Normal(
         name='cancer_by_age',
         expected=expected,
         extract_fn=_make_extract_fn('cancers', expected),
-        conform='incident',
+        conform='step_containing',
         weight=weight,
     )
 
 
-def hpv_prev_by_age(expected, *, likelihood='beta', weight=1):
-    """CalibComponent for age-binned HPV prevalence (prevalent, Beta likelihood)."""
+def hpv_prev_by_age(expected, *, weight=1):
+    """CalibComponent for age-binned HPV prevalence (prevalent, Beta-Binomial likelihood)."""
     _validate_age_schema(expected, None)
-    return ss.CalibComponent(
+    return ss.BetaBinomial(
         name='hpv_prev_by_age',
         expected=expected,
         extract_fn=_make_extract_fn('hpv_prevalence', expected),
-        conform='prevalent',
+        conform='step_containing',
         weight=weight,
     )
 
 
-def cancer_genotype_dist(expected, *, likelihood='dirichlet', weight=1):
-    """CalibComponent for the cancer-genotype distribution (Dirichlet likelihood)."""
+def cancer_genotype_dist(expected, *, weight=1):
+    """CalibComponent for the cancer-genotype distribution (Dirichlet-Multinomial likelihood)."""
     # Type-dist factory: columns are genotype keys, not age labels.
     if expected.index.name != 'year':
         raise ValueError(
             f'expected.index.name must be \'year\'; got {expected.index.name!r}')
-    return ss.CalibComponent(
+    return ss.DirichletMultinomial(
         name='cancer_genotype_dist',
         expected=expected,
         extract_fn=_make_extract_fn('cancerous_genotype_dist', expected),

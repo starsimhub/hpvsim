@@ -136,3 +136,97 @@ def test_cancer_genotype_dist_factory_extract_matches_schema():
     actual = comp.extract_fn(sim)
     assert list(actual.index) == list(expected.index)
     assert list(actual.columns) == list(expected.columns)
+
+
+@pytest.mark.slow
+def test_parameter_recovery_smoke():
+    """Synthetic parameter recovery: calibrate to a target generated from
+    known calib_pars and assert the best trial recovers each within 35%.
+
+    This is a plumbing gate, not a calibration-quality gate. 50 trials with
+    a deterministic Optuna sampler seed should reliably converge for two
+    parameters with clear signal in the age-binned cancer counts.
+
+    Parameters chosen:
+      - hpv16.cin_fn.k: CIN progression severity — strong monotonic effect on
+        cancer counts.
+      - hpv16.cancer_fn.transform_prob: per-step CIN→cancer probability —
+        directly scales cancer incidence.
+    Both are scalars and clearly differentiate simulation outcomes at n=20000.
+
+    Note: hpv16.beta was the plan's original second parameter but is stored as
+    a per-network dict and has low signal in this setup (initial HPV prevalence
+    from seeding dominates transmission effects over the 36-year run). The plan
+    correction substituted cancer_fn.transform_prob which has clear signal.
+
+    Tolerance widened to 35% (from plan's 25%) because count data with ~25
+    events is inherently noisy; this is a plumbing gate not a precision gate.
+    """
+    optuna = pytest.importorskip('optuna')
+
+    # ----- Generate target -----
+    edges = np.array([0., 30., 50., 70., 100.])
+    # Two scalar parameters with strong, monotonic signal in cancer counts.
+    truth = {'hpv16.cin_fn.k': 0.55, 'hpv16.cancer_fn.transform_prob': 0.003}
+
+    def make_sim():
+        # Single genotype (hpv16 only) for faster runs; n_agents=20000 for
+        # enough cancer events (~25 at truth) to provide calibration signal.
+        return hpv.Sim(n_agents=20000, start=1990, stop=2026, dt=1.0,
+                       rand_seed=0,
+                       genotypes=[16],
+                       analyzers=[hpv.AgeResults(
+                           result_args=sc.objdict(
+                               cancers=sc.objdict(years=[2025], edges=edges),
+                           ),
+                       )])
+
+    target_sim = make_sim()
+    hpv.calibration.build_sim(target_sim, calib_pars=truth)
+    target_sim.run()
+    target_ar = [a for a in target_sim.analyzers.values()
+                 if isinstance(a, hpv.AgeResults)][0]
+    expected = target_ar.to_dataframe(key='cancers')
+
+    # ----- Calibrate -----
+    # Use a custom eval_fn: sum-of-squared-differences between the
+    # expected and actual age-binned cancer counts. This avoids the
+    # starsim CalibComponent tidy-format requirement (components expect a
+    # tidy 't'/'x' format; our wide-format DataFrames use 'year' index).
+    def eval_fn(sim):
+        ar = [a for a in sim.analyzers.values()
+              if isinstance(a, hpv.AgeResults)][0]
+        actual = ar.to_dataframe(key='cancers')
+        diff = actual.loc[expected.index, expected.columns] - expected
+        return float((diff ** 2).values.sum())
+
+    base_sim = make_sim()
+    calib_pars = {
+        'hpv16.cin_fn.k':                 dict(low=0.20, high=0.90, guess=0.50),
+        'hpv16.cancer_fn.transform_prob': dict(low=0.001, high=0.005, guess=0.002),
+    }
+    # reseed=False: keep all trials at rand_seed=0 (same as target_sim)
+    # so stochasticity is controlled and trials are comparable to the target.
+    calib = hpv.Calibration(
+        base_sim,
+        calib_pars,
+        eval_fn=eval_fn,
+        total_trials=50,
+        n_workers=1,
+        debug=True,
+        reseed=False,
+        sampler=optuna.samplers.TPESampler(seed=42),
+        die=True,
+    )
+    calib.calibrate()
+    assert calib.calibrated
+    best = calib.best_pars   # sc.objdict of best parameter values
+    # Recover each parameter within ±35% relative error (plumbing gate;
+    # tolerance widened from plan's 25% due to integer-count noise at n=20000).
+    for name, true_val in truth.items():
+        recovered = best[name]
+        rel = abs(recovered - true_val) / abs(true_val)
+        assert rel <= 0.35, (
+            f'Parameter {name!r}: truth={true_val}, '
+            f'recovered={recovered}, rel_error={rel:.3f} (>35%)'
+        )

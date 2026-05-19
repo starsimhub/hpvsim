@@ -142,12 +142,20 @@ class _ExclusiveSeeder(ss.Connector):
             p_per_uid = np.where(net.active(people)[auids], p_per_uid, 0.0)
 
         # Step 3: Bernoulli draw — who gets any HPV at all.
+        # Note: when ss.Calibration deep-copies the sim, the _ExclusiveSeeder
+        # stored as sim._seeder may be a different object from the one in
+        # sim.connectors (which is the one init_dists initialises). Ensure
+        # seed_bern is initialised before use so both paths work.
         self.pars.seed_bern.set(p=p_per_uid)
+        if not self.pars.seed_bern.initialized:
+            self.pars.seed_bern.init(sim=sim, force=True)
         infected_uids = self.pars.seed_bern.filter(auids)
 
         # Step 4: per-infected-agent genotype assignment. ss.choice draws
         # independent per-uid uniforms via its auto-generated unique trace.
         if len(infected_uids):
+            if not self.pars.seed_choice.initialized:
+                self.pars.seed_choice.init(sim=sim, force=True)
             gen_choices = self.pars.seed_choice.rvs(infected_uids)
             self._assigned_uids = tuple(
                 infected_uids[gen_choices == i] for i in range(len(self.keys))
