@@ -24,12 +24,14 @@ from .sim import Sim
 from .demographics import AgeMigration
 from .cross_genotype import CrossImmunity, HPVTotal
 from .analyzers import AgeResults
+from .calibration import Calibration
+from . import calibration
 
 rootdir = sc.thispath(__file__).parent
 
 __all__ = [
     'HPV', 'SexualNetwork', 'Sim', 'AgeMigration', 'CrossImmunity', 'HPVTotal',
-    'AgeResults',
+    'AgeResults', 'Calibration', 'calibration',
     'data', 'migration_utils', 'options', 'datadir', '__version__',
     'SimPars', 'GenotypePars', 'get_genotype_pars', 'get_cross_immunity',
     'GENOTYPE_KEYS',
