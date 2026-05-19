@@ -31,8 +31,57 @@ class Calibration(ss.Calibration):
 
 
 def build_sim(sim, calib_pars, **kwargs):
-    """Default build_fn for hpv.Calibration. Implementation in Task 7."""
-    raise NotImplementedError('build_sim — implemented in Task 7')
+    """Apply calib_pars to a (copy of) sim and return it.
+
+    calib_pars is a flat dict with dotted-key paths. Routing rules:
+      - No dot: writes to sim.pars[key].
+      - '<genotype>.<...>': writes to sim.diseases[<genotype>].pars[...].
+      - 'cross_immunity.<matrix>.<tgt>.<src>': writes a cell into the
+        CrossImmunity connector's named matrix.
+      - Anything else: raises ValueError.
+
+    ss.Calibration passes a sc.dcp(sim) in per trial, so we mutate freely.
+    """
+    from .hpv import HPV
+    from .cross_genotype import CrossImmunity
+
+    # Discover registered genotype keys (names on each HPV disease module).
+    hpv_keys = {d.name for d in sim.diseases.values() if isinstance(d, HPV)}
+
+    for key, value in calib_pars.items():
+        parts = key.split('.')
+        if len(parts) == 1:
+            # Top-level sim par.
+            sim.pars[parts[0]] = value
+        elif parts[0] in hpv_keys:
+            # Per-genotype par: walk into sim.diseases[<g>].pars[...].
+            target = sim.diseases[parts[0]].pars
+            for p in parts[1:-1]:
+                target = target[p]
+            target[parts[-1]] = value
+        elif parts[0] == 'cross_immunity':
+            # cross_immunity.<matrix>.<tgt>.<src>
+            if len(parts) != 4:
+                raise ValueError(
+                    f'build_sim: cross_immunity key must be of the form '
+                    f'cross_immunity.<matrix>.<tgt>.<src>; got {key!r}')
+            _, matrix_name, tgt, src = parts
+            connectors = [c for c in sim.connectors.values()
+                          if isinstance(c, CrossImmunity)]
+            if not connectors:
+                raise ValueError(
+                    f'build_sim: cross_immunity key {key!r} requires a '
+                    f'CrossImmunity connector on the sim')
+            conn = connectors[0]
+            idx = {m.name: i for i, m in enumerate(conn.hpv_modules)}
+            i, j = idx[tgt], idx[src]   # matrix is [target, source]
+            getattr(conn, matrix_name)[i, j] = value
+        else:
+            raise ValueError(
+                f'build_sim: unrecognized calib_par key {key!r}. '
+                f'Expected a bare sim par name, a <genotype>.<...> path '
+                f'(genotypes: {sorted(hpv_keys)}), or cross_immunity.<...>.')
+    return sim
 
 
 def cancer_by_age(expected, *, likelihood='normal', weight=1):
