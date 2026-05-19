@@ -69,3 +69,70 @@ def test_build_sim_does_not_mutate_base():
     hpv.calibration.build_sim(sim_copy, calib_pars={'rand_seed': 999})
     assert sim_base.pars.rand_seed == original_seed
     assert sim_copy.pars.rand_seed == 999
+
+
+def test_cancer_by_age_factory_extract_returns_matching_schema():
+    """cancer_by_age factory's extract_fn returns a DataFrame matching expected's schema."""
+    edges = np.array([0., 30., 60., 100.])
+    age_labels = ['0-30', '30-60', '60+']
+    expected = pd.DataFrame(
+        [[10, 50, 30]],
+        index=pd.Index([2020.0], name='year'),
+        columns=age_labels,
+    )
+    sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
+                  rand_seed=0, analyzers=[hpv.AgeResults(
+                      result_args=sc.objdict(
+                          cancers=sc.objdict(years=[2020], edges=edges),
+                      ),
+                  )])
+    sim.run()
+
+    comp = hpv.calibration.cancer_by_age(expected)
+    actual = comp.extract_fn(sim)
+    # Same index and columns as expected.
+    assert list(actual.index) == list(expected.index)
+    assert list(actual.columns) == list(expected.columns)
+
+
+def test_hpv_prev_by_age_factory_extract_matches_schema():
+    edges = np.array([0., 30., 60., 100.])
+    age_labels = ['0-30', '30-60', '60+']
+    expected = pd.DataFrame(
+        [[0.05, 0.10, 0.02]],
+        index=pd.Index([2020.0], name='year'),
+        columns=age_labels,
+    )
+    sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
+                  rand_seed=0, analyzers=[hpv.AgeResults(
+                      result_args=sc.objdict(
+                          hpv_prevalence=sc.objdict(years=[2020], edges=edges),
+                      ),
+                  )])
+    sim.run()
+    comp = hpv.calibration.hpv_prev_by_age(expected)
+    actual = comp.extract_fn(sim)
+    assert list(actual.index) == list(expected.index)
+    assert list(actual.columns) == list(expected.columns)
+
+
+def test_cancer_genotype_dist_factory_extract_matches_schema():
+    expected = pd.DataFrame(
+        [[0.7, 0.15, 0.10, 0.05]],
+        index=pd.Index([2020.0], name='year'),
+        columns=['hpv16', 'hpv18', 'hi5', 'ohr'],
+    )
+    edges = np.array([0., 100.])
+    sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
+                  rand_seed=0,
+                  genotypes=[16, 18, 'hi5', 'ohr'],
+                  analyzers=[hpv.AgeResults(
+                      result_args=sc.objdict(
+                          cancerous_genotype_dist=sc.objdict(years=[2020], edges=edges),
+                      ),
+                  )])
+    sim.run()
+    comp = hpv.calibration.cancer_genotype_dist(expected)
+    actual = comp.extract_fn(sim)
+    assert list(actual.index) == list(expected.index)
+    assert list(actual.columns) == list(expected.columns)

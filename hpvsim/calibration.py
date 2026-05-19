@@ -84,16 +84,74 @@ def build_sim(sim, calib_pars, **kwargs):
     return sim
 
 
+def _find_age_results(sim):
+    """Locate the AgeResults analyzer on the sim, regardless of its
+    name/key. Raises if there isn't exactly one."""
+    from .analyzers import AgeResults
+    matches = [a for a in sim.analyzers.values() if isinstance(a, AgeResults)]
+    if len(matches) != 1:
+        raise ValueError(
+            f'CalibComponent extract: expected exactly one AgeResults '
+            f'analyzer on sim; found {len(matches)}')
+    return matches[0]
+
+
+def _make_extract_fn(result_key, expected):
+    """Build a closure that pulls AgeResults[result_key] in expected's schema."""
+    def extract_fn(sim):
+        ar = _find_age_results(sim)
+        df = ar.to_dataframe(key=result_key)
+        # Align on expected's index/columns; missing rows/cols => KeyError,
+        # which surfaces schema mismatches at evaluation time.
+        return df.loc[expected.index, expected.columns]
+    return extract_fn
+
+
+def _validate_age_schema(expected, sim_template):
+    """expected must have a 'year'-named index and string column labels."""
+    if expected.index.name != 'year':
+        raise ValueError(
+            f'expected.index.name must be \'year\'; got {expected.index.name!r}')
+    if not all(isinstance(c, str) for c in expected.columns):
+        raise ValueError(
+            f'expected.columns must be strings (age-bin labels); '
+            f'got {list(expected.columns)}')
+
+
 def cancer_by_age(expected, *, likelihood='normal', weight=1):
-    """Implementation in Task 8."""
-    raise NotImplementedError('cancer_by_age — implemented in Task 8')
+    """CalibComponent for age-binned cancer counts (incident, Normal likelihood)."""
+    _validate_age_schema(expected, None)
+    return ss.CalibComponent(
+        name='cancer_by_age',
+        expected=expected,
+        extract_fn=_make_extract_fn('cancers', expected),
+        conform='incident',
+        weight=weight,
+    )
 
 
 def hpv_prev_by_age(expected, *, likelihood='beta', weight=1):
-    """Implementation in Task 8."""
-    raise NotImplementedError('hpv_prev_by_age — implemented in Task 8')
+    """CalibComponent for age-binned HPV prevalence (prevalent, Beta likelihood)."""
+    _validate_age_schema(expected, None)
+    return ss.CalibComponent(
+        name='hpv_prev_by_age',
+        expected=expected,
+        extract_fn=_make_extract_fn('hpv_prevalence', expected),
+        conform='prevalent',
+        weight=weight,
+    )
 
 
 def cancer_genotype_dist(expected, *, likelihood='dirichlet', weight=1):
-    """Implementation in Task 8."""
-    raise NotImplementedError('cancer_genotype_dist — implemented in Task 8')
+    """CalibComponent for the cancer-genotype distribution (Dirichlet likelihood)."""
+    # Type-dist factory: columns are genotype keys, not age labels.
+    if expected.index.name != 'year':
+        raise ValueError(
+            f'expected.index.name must be \'year\'; got {expected.index.name!r}')
+    return ss.CalibComponent(
+        name='cancer_genotype_dist',
+        expected=expected,
+        extract_fn=_make_extract_fn('cancerous_genotype_dist', expected),
+        conform='step_containing',
+        weight=weight,
+    )
