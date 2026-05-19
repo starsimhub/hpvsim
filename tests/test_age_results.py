@@ -122,3 +122,59 @@ def test_age_results_cancer_incidence_by_age():
     assert df.shape == (1, len(edges) - 1)
     # Incidence rates are non-negative reals.
     assert (df.values >= 0).all()
+
+
+def test_age_results_type_distribution_sums_to_one():
+    """cancerous_genotype_dist normalizes to a probability distribution per year."""
+    edges = np.array([0., 100.])  # one age window — all ages
+    sim = hpv.Sim(n_agents=4000, start=1990, stop=2021, dt=1.0,
+                  rand_seed=0,
+                  genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
+                  analyzers=[hpv.AgeResults(
+                      result_args=sc.objdict(
+                          cancerous_genotype_dist=sc.objdict(years=[2020], edges=edges),
+                      ),
+                  )])
+    sim.run()
+    ar = sim.analyzers['ageresults']
+    df = ar.to_dataframe(key='cancerous_genotype_dist')
+    # Columns are genotype keys (hpv16, hpv18, hi5, ohr).
+    assert list(df.columns) == ['hpv16', 'hpv18', 'hi5', 'ohr']
+    # Precondition: the scenario must actually produce cancers so the
+    # normalization path is exercised; if the sim defaults change to a
+    # zero-cancer scenario the test would otherwise silently pass.
+    row_sum = float(df.iloc[0].sum())
+    assert row_sum > 0, (
+        'Test precondition failed: no cancers in 2020. Adjust n_agents or '
+        'stop year so that the normalization path is exercised.'
+    )
+    assert abs(row_sum - 1.0) < 1e-9
+
+
+def test_age_results_type_distribution_per_genotype_sums_match_total():
+    """Sum-over-genotypes of per-bin raw counts == sum-over-genotypes-elsewhere
+    cancerous count for that bin. Confirms type-dist's binning matches the
+    aggregate 'cancers' binning at the raw-count level."""
+    edges = np.array([0., 40., 100.])
+    sim = hpv.Sim(n_agents=4000, start=1990, stop=2021, dt=1.0,
+                  rand_seed=0,
+                  genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
+                  analyzers=[hpv.AgeResults(
+                      result_args=sc.objdict(
+                          cancers=sc.objdict(years=[2020], edges=edges),
+                          cancerous_genotype_dist=sc.objdict(years=[2020], edges=edges),
+                      ),
+                  )])
+    sim.run()
+    ar = sim.analyzers['ageresults']
+    # 'cancers' output is union-across-genotypes — undercounts when an agent
+    # is cancerous in two genotypes (rare for cancer; cancer is attributed
+    # to one genotype per agent in the natural-history model). Use a generous
+    # tolerance: total dist count >= union count (each multi-genotype agent
+    # contributes to dist but counts once in union).
+    cancers_arr = ar.outputs['cancers'][2020.0]
+    dist_arr = ar.outputs['cancerous_genotype_dist'][2020.0]
+    dist_total_per_bin = dist_arr.sum(axis=1)
+    # Each agent is cancerous in exactly one genotype in the standard model,
+    # so the dist sum equals the union count exactly.
+    assert np.allclose(dist_total_per_bin, cancers_arr)

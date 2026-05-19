@@ -77,6 +77,12 @@ class AgeResults(ss.Analyzer):
         'cin_incidence':     ('ti_cin',       'cin'),
     }
 
+    # Result-name -> per-HPV-module BoolState attribute used as numerator.
+    _TYPE_DIST_TO_STATE = {
+        'cancerous_genotype_dist':  'cancerous',
+        'cin_genotype_dist':        'cin',
+    }
+
     def __init__(self, result_args=None, die=False, **kwargs):
         super().__init__(**kwargs)
         if result_args is None:
@@ -143,9 +149,9 @@ class AgeResults(ss.Analyzer):
             out[float(y)] = int(ticks[-1])
         return out
 
-    @staticmethod
-    def _is_type_dist(rkey):
-        return 'genotype_dist' in rkey
+    @classmethod
+    def _is_type_dist(cls, rkey):
+        return rkey in cls._TYPE_DIST_TO_STATE
 
     def step(self):
         """At each scheduled year, snapshot age-binned counts."""
@@ -167,7 +173,9 @@ class AgeResults(ss.Analyzer):
                     date_attr, state_attr = self._INC_TO_ATTRS[rkey]
                     self.outputs[rkey][year] = self._bin_incidence(
                         rdict, date_attr=date_attr, state_attr=state_attr)
-                # Type-distribution sub-mode handled in Task 4.
+                elif rkey in self._TYPE_DIST_TO_STATE:
+                    self.outputs[rkey][year] = self._bin_type_distribution(
+                        rdict, attr=self._TYPE_DIST_TO_STATE[rkey])
         return
 
     def _bin_count(self, rdict, attr):
@@ -239,6 +247,24 @@ class AgeResults(ss.Analyzer):
         return np.divide(num, denom, out=np.zeros_like(num, dtype=float),
                          where=denom > 0) * 1e5
 
+    def _bin_type_distribution(self, rdict, attr):
+        """Per-genotype age-binned raw counts; to_dataframe normalizes."""
+        sim = self.sim
+        people = sim.people
+        alive = people.alive.values
+        ages = people.age.values
+        weights = getattr(people, 'scale', None)
+        weights = weights.values if weights is not None else None
+        nbins = len(rdict.bins)
+        ng = len(self.hpv_modules)
+        out = np.zeros((nbins, ng), dtype=float)
+        for gi, mod in enumerate(self.hpv_modules):
+            mask = getattr(mod, attr).values & alive
+            counts, _ = np.histogram(ages[mask], bins=rdict.edges,
+                                     weights=(weights[mask] if weights is not None else None))
+            out[:, gi] = counts
+        return out
+
     def to_dataframe(self, key):
         """Return outputs for `key` as a DataFrame indexed by year.
 
@@ -256,6 +282,9 @@ class AgeResults(ss.Analyzer):
             for y, arr in self.outputs[key].items():
                 index.append(y)
                 totals = arr.sum(axis=0)
+                total_sum = totals.sum()
+                if total_sum > 0:
+                    totals = totals / total_sum
                 for i, col in enumerate(cols):
                     data[col].append(float(totals[i]))
             return pd.DataFrame(data, index=pd.Index(index, name='year'))
