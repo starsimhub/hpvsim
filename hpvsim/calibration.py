@@ -174,16 +174,15 @@ def _per_age_bin_normal_components(expected, *, result_key, name_prefix, weight,
                                    sigma2_floor=1.0):
     """Build one ss.Normal component per age-bin column in `expected`.
 
-    Starsim's Normal.compute_nll merges expected/actual on 't' and reads
-    'x_e'/'x_a' — so each component must produce single-channel 'x' data.
-    With one component per age bin, an N-bin DataFrame becomes N components,
-    each carrying a 't'-indexed 'x' column with that bin's values.
+    ss.Normal.compute_nll merges expected/actual on 't' and reads
+    'x_e'/'x_a', so each component must carry single-channel 'x' data.
+    An N-column input produces N components, each carrying one bin's
+    values as a 't'-indexed 'x' column.
 
-    Each component has its sigma2 set explicitly using a Poisson-like
-    approximation (variance ≈ mean, floored at sigma2_floor). The default
-    auto-compute in ss.Normal (sigma2 = SSE/N over expected values) is
-    degenerate with a single timepoint — sigma2 collapses to (e-a)^2 and
-    yields NaN log-likelihoods when e==a exactly.
+    Each component's sigma2 is set explicitly using a Poisson-like
+    approximation (variance ≈ mean, floored at ``sigma2_floor``). This
+    keeps the likelihood well-defined when expected and actual coincide
+    at a single timepoint.
     """
     _validate_age_schema(expected, None)
     components = []
@@ -236,8 +235,7 @@ def hpv_prev_by_age(expected, expected_n=None, *, weight=1):
       the same `t`-indexed schema; cells of ``expected_x`` are positives
       and cells of ``expected_n`` are totals per age bin. Returns one
       ss.BetaBinomial per age bin. Use when target data is reported as
-      raw counts (positives + sample size), which gives a proper count
-      likelihood instead of a Gaussian on the ratio.
+      raw counts (positives + sample size).
 
     The BetaBinomial path reads simulated (x, n) per bin from
     ``AgeResults.to_xn_per_bin('hpv_prevalence')``.

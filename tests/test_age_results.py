@@ -9,8 +9,6 @@ import hpvsim as hpv
 # so the user-side AgeResults reference passed to analyzers=[...] becomes
 # stale after sim construction. Tests construct the analyzer inline and
 # retrieve the live instance post-run via sim.analyzers['ageresults'].
-# v2's hpvsim._v2_legacy.Sim has the same deep-copy behavior; v2 tests
-# retrieve via sim['analyzers'][0].
 
 
 def test_age_results_importable_and_constructible():
@@ -78,7 +76,7 @@ def test_age_results_multi_year_snapshot():
 
 
 def test_age_results_age_label_schema():
-    """Age labels follow v2 convention: '0-20', '20-40', ..., '<last>+'."""
+    """Age labels are '<lo>-<hi>' for inner bins and '<last>+' for the final bin."""
     edges = np.array([0., 20., 40., 60., 100.])
     sim = hpv.Sim(n_agents=200, start=2019, stop=2021, dt=1.0,
                   rand_seed=0, analyzers=[hpv.AgeResults(

@@ -215,7 +215,7 @@ def test_parameter_recovery_smoke():
     This is a plumbing gate, not a calibration-quality gate. 50 trials with
     a deterministic Optuna sampler seed and 4 snapshot years (2010, 2015,
     2020, 2025) provide enough signal per ss.Normal component to recover
-    both parameters to within the plan's original 25% tolerance.
+    both parameters within 25% relative error.
 
     Parameters chosen:
       - hpv16.cin_fn.k: CIN progression severity — strong monotonic effect on
@@ -223,20 +223,14 @@ def test_parameter_recovery_smoke():
       - hpv16.cancer_fn.transform_prob: per-step CIN→cancer probability —
         directly scales cancer incidence.
     Both are scalars and clearly differentiate simulation outcomes at n=20000.
-
-    Note: hpv16.beta was the plan's original second parameter but is stored
-    as a per-network dict and has low signal in this setup (initial HPV
-    prevalence from seeding dominates transmission effects over the 36-year
-    run). The plan correction substituted cancer_fn.transform_prob which has
-    clear signal.
     """
     optuna = pytest.importorskip('optuna')
 
     # ----- Generate target -----
     edges = np.array([0., 30., 50., 70., 100.])
-    # Multi-year snapshots: each ss.Normal per-bin component sees 4 timepoints
-    # (vs 1 with a single year), which gives the Optuna sampler a clearer
-    # signal across the parameter space.
+    # Multi-year snapshots: each ss.Normal per-bin component sees 4
+    # timepoints, giving the Optuna sampler clearer signal across the
+    # parameter space.
     snapshot_years = [2010, 2015, 2020, 2025]
     # Two scalar parameters with strong, monotonic signal in cancer counts.
     truth = {'hpv16.cin_fn.k': 0.55, 'hpv16.cancer_fn.transform_prob': 0.003}
@@ -288,8 +282,7 @@ def test_parameter_recovery_smoke():
     calib.calibrate()
     assert calib.calibrated
     best = calib.best_pars   # sc.objdict of best parameter values
-    # Recover each parameter within ±25% relative error (plan's original
-    # tolerance; achievable with 4 snapshot years per component).
+    # Recover each parameter within ±25% relative error.
     for name, true_val in truth.items():
         recovered = best[name]
         rel = abs(recovered - true_val) / abs(true_val)

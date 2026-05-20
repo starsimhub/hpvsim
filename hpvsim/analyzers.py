@@ -1,8 +1,4 @@
-"""HPVsim analyzers built on starsim's ss.Analyzer.
-
-Currently contains AgeResults (M04 port of v2's age_results). M09 will add
-snapshot, age_pyramid, age_causal_infection, and dalys analyzers here.
-"""
+"""HPVsim analyzers built on starsim's ss.Analyzer."""
 import numpy as np
 import pandas as pd
 import sciris as sc
@@ -15,10 +11,11 @@ __all__ = ['AgeResults']
 class AgeResults(ss.Analyzer):
     """Snapshot age-binned simulation outputs at specified years.
 
-    Faithful port of v2's ``age_results`` analyzer
-    (``hpvsim/_v2_legacy/analysis.py:511``) onto ``ss.Analyzer``. Snapshots
-    age-binned counts (e.g. cancers), prevalences (e.g. hpv_prevalence),
-    incidences, and the type-distribution sub-mode at specified years.
+    Records counts (e.g. ``cancers``), prevalences (e.g. ``hpv_prevalence``),
+    incidences (e.g. ``cancer_incidence``), and per-genotype distributions
+    (e.g. ``cancerous_genotype_dist``) at each requested year. Observed
+    data and likelihood evaluation live on the ``CalibComponent`` side;
+    this class only produces simulation outputs.
 
     Args:
         result_args (dict): nested dict / objdict where each top-level key
@@ -27,14 +24,6 @@ class AgeResults(ss.Analyzer):
             minimum ``years`` (scalar or list) and ``edges`` (array of age
             bin edges).
         die (bool): whether to raise on configuration / validation errors.
-
-    Deltas from v2 (intentional):
-        - No ``datafile`` loading — observed data lives on the
-          ``CalibComponent``, not on the analyzer.
-        - No ``compute_fit`` / ``mismatch`` — the loss path is the
-          ``CalibComponent`` likelihood, not analyzer math.
-        - No HIV stratification — M08 will add ``with_hiv`` / ``no_hiv``
-          handling when HIV lands.
 
     Example::
 
@@ -45,18 +34,18 @@ class AgeResults(ss.Analyzer):
         ))
         sim = hpv.Sim(analyzers=[ar])
         sim.run()
-        df = ar.to_dataframe(key='cancers')   # index=year, columns=age bin labels
+        df = ar.to_dataframe(key='cancers')   # t-indexed, age-bin columns
     """
 
     # Result-name -> per-HPV-module BoolState attribute. Union across modules
-    # ("any genotype with this state"), matching HPVTotal._UNION_STATES.
+    # ("any genotype with this state").
     _COUNT_TO_STATE = {
         'cancers':       'cancerous',
         'n_cancerous':   'cancerous',
         'n_cin':         'cin',
         'n_precin':      'precin',
         'n_infected':    'infected',
-        'hpv':           'infected',   # alias used in some configs
+        'hpv':           'infected',
     }
 
     # Result-name -> (BoolState attr, female_only). Prevalence is num/denom
@@ -97,10 +86,10 @@ class AgeResults(ss.Analyzer):
         return
 
     def init_pre(self, sim):
-        """Discover HPV modules; allocate output arrays; resolve year -> ti.
+        """Discover HPV modules, validate inputs, and allocate output arrays.
 
-        Run before init_results (matches HPVTotal's pattern in
-        hpvsim/cross_genotype.py:133).
+        Sets ``self.hpv_modules`` before ``super().init_pre`` so any setup
+        that depends on the module list (e.g. ``init_results``) sees it.
         """
         from .hpv import HPV
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
@@ -112,14 +101,14 @@ class AgeResults(ss.Analyzer):
             rdict.edges = np.asarray(rdict.edges, dtype=float)
             rdict.bins = rdict.edges[:-1]
             rdict.age_labels = self._make_age_labels(rdict.edges)
-            # Map each requested year to its timeline tick (last tick within
-            # that calendar year, matching v2's end-of-year accumulation).
+            # Each requested year maps to the last sim tick within that
+            # calendar year, so annual flows are captured at year-end.
             rdict.year_to_ti = self._resolve_year_ticks(sim, rdict.years)
-            # Allocate per-year output arrays:
+            # Per-year output arrays:
             #   - Type-distribution: (n_bins, n_genotypes) raw counts.
             #   - Prevalence: (n_bins, 2) — [:, 0] = num, [:, 1] = denom.
-            #     Stored separately so factories that want (x, n) per bin
-            #     (BetaBinomial) can pull both without recomputing.
+            #     Storing both lets BetaBinomial components pull (x, n)
+            #     per bin without recomputing.
             #   - Everything else: (n_bins,).
             nbins = len(rdict.bins)
             ng = len(self.hpv_modules)
@@ -206,9 +195,9 @@ class AgeResults(ss.Analyzer):
     def _bin_prevalence(self, rdict, attr, female_only=False):
         """Age-bin prevalence as a (nbins, 2) array — [:, 0]=num, [:, 1]=denom.
 
-        Storing (num, denom) per bin rather than the ratio lets BetaBinomial
-        components consume raw counts. to_dataframe(key) collapses to the
-        ratio for backward compatibility with prevalence-as-ratio callers.
+        Storing (num, denom) per bin lets BetaBinomial components consume
+        raw counts directly. ``to_dataframe(key)`` collapses to the ratio
+        for callers that want point-in-time prevalences.
         """
         sim = self.sim
         people = sim.people
@@ -236,9 +225,9 @@ class AgeResults(ss.Analyzer):
         """Age-bin new-events-this-year / at-risk-female-denominator (per 100k).
 
         Numerator: agents whose ti_<event> equals sim.ti and who are in-state.
-        At dt=1 yr this captures one year of events. For dt<1 the snapshot
-        captures only the final sub-step's events; the M04 smoke test uses
-        dt=1 so this is sufficient. A multi-substep accumulator is a follow-on.
+        At dt=1 this captures one full year of events per snapshot. With
+        dt<1 only the final sub-step's events are captured; a multi-substep
+        accumulator is a separate enhancement.
         """
         sim = self.sim
         people = sim.people
@@ -264,7 +253,7 @@ class AgeResults(ss.Analyzer):
                          where=denom > 0) * 1e5
 
     def _bin_type_distribution(self, rdict, attr):
-        """Per-genotype age-binned raw counts; to_dataframe normalizes."""
+        """Per-genotype age-binned raw counts; ``to_dataframe`` normalizes."""
         sim = self.sim
         people = sim.people
         alive = people.alive.values
