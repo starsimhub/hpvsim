@@ -288,15 +288,51 @@ def _make_prev_xn_extract_fn(age_bin):
 
 
 def cancer_genotype_dist(expected, *, weight=1):
-    """CalibComponent for the cancer-genotype distribution (Dirichlet-Multinomial likelihood)."""
-    # Type-dist factory: columns are genotype keys, not age labels.
+    """ss.DirichletMultinomial component for the cancer-genotype distribution.
+
+    Args:
+        expected (pd.DataFrame): 't'-indexed DataFrame of raw cancer counts
+            per genotype per year. Columns are genotype names (e.g.
+            'hpv16', 'hpv18') OR already-prefixed forms ('x_hpv16', ...).
+            Values must be counts, not proportions — DirichletMultinomial's
+            likelihood treats them as multinomial trials.
+        weight (float): component weight for the overall calibration loss.
+
+    The factory normalizes the column names to the ``x_<genotype>`` form
+    that ss.DirichletMultinomial.compute_nll discovers via its
+    ``[col for col in expected.columns if col.startswith('x')]`` filter.
+    The extract_fn pulls raw counts from AgeResults
+    (``to_dataframe(key, normalize=False)``) and applies the same renaming.
+    """
     if expected.index.name != 't':
         raise ValueError(
             f'expected.index.name must be \'t\'; got {expected.index.name!r}')
+    # Normalize column names: accept either bare genotype names or x_-prefixed.
+    rename = {}
+    for col in expected.columns:
+        if not isinstance(col, str):
+            raise ValueError(
+                f'cancer_genotype_dist: expected.columns must be strings; '
+                f'got {list(expected.columns)}'
+            )
+        rename[col] = col if col.startswith('x') else f'x_{col}'
+    sub_expected = expected.rename(columns=rename)
     return ss.DirichletMultinomial(
         name='cancer_genotype_dist',
-        expected=expected,
-        extract_fn=_make_extract_fn('cancerous_genotype_dist', expected),
+        expected=sub_expected,
+        extract_fn=_make_genotype_dist_extract_fn(list(rename.values())),
         conform='step_containing',
         weight=weight,
     )
+
+
+def _make_genotype_dist_extract_fn(target_columns):
+    """Closure: pull raw cancerous_genotype_dist counts and rename to x_<gen>."""
+    def extract_fn(sim):
+        ar = _find_age_results(sim)
+        df = ar.to_dataframe(key='cancerous_genotype_dist', normalize=False)
+        # AgeResults emits columns like 'hpv16', 'hpv18'; rename to 'x_hpv16'…
+        # to match what DirichletMultinomial.compute_nll expects.
+        df = df.rename(columns={c: f'x_{c}' for c in df.columns})
+        return df[target_columns]
+    return extract_fn

@@ -173,9 +173,15 @@ def test_hpv_prev_by_age_factory_returns_one_normal_component_per_age_bin():
         assert list(actual.columns) == ['x']
 
 
-def test_cancer_genotype_dist_factory_extract_matches_schema():
+def test_cancer_genotype_dist_factory_returns_dirichlet_with_x_prefixed_columns():
+    """cancer_genotype_dist accepts genotype-name columns and emits a
+    DirichletMultinomial component with the x_<genotype> column schema that
+    ss.DirichletMultinomial.compute_nll consumes. extract_fn returns raw
+    counts (not normalized proportions)."""
     expected = pd.DataFrame(
-        [[0.7, 0.15, 0.10, 0.05]],
+        # Raw counts, not proportions — DirichletMultinomial uses them as
+        # multinomial trial outcomes.
+        [[70, 15, 10, 5]],
         index=pd.Index([2020.0], name='t'),
         columns=['hpv16', 'hpv18', 'hi5', 'ohr'],
     )
@@ -190,9 +196,15 @@ def test_cancer_genotype_dist_factory_extract_matches_schema():
                   )])
     sim.run()
     comp = hpv.calibration.cancer_genotype_dist(expected)
+    assert isinstance(comp, ss.DirichletMultinomial)
+    # Component's expected has x_-prefixed columns.
+    expected_cols = ['x_hpv16', 'x_hpv18', 'x_hi5', 'x_ohr']
+    assert list(comp.expected.columns) == expected_cols
     actual = comp.extract_fn(sim)
     assert list(actual.index) == list(expected.index)
-    assert list(actual.columns) == list(expected.columns)
+    assert list(actual.columns) == expected_cols
+    # Values are raw counts (non-negative), not proportions.
+    assert (actual.values >= 0).all()
 
 
 @pytest.mark.slow

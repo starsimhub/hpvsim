@@ -281,12 +281,15 @@ class AgeResults(ss.Analyzer):
             out[:, gi] = counts
         return out
 
-    def to_dataframe(self, key):
+    def to_dataframe(self, key, normalize=True):
         """Return outputs for `key` as a DataFrame indexed by year.
 
         For standard age-binned results: columns are age bin labels.
-        For type-distribution results: columns are genotype keys (one row per
-        year), with values summed over age bins.
+        For type-distribution results: columns are genotype keys (one row
+        per year). With ``normalize=True`` (default) values are proportions
+        summing to 1 across genotypes; with ``normalize=False`` values are
+        raw counts summed over age bins — the shape that
+        ss.DirichletMultinomial.compute_nll consumes.
         """
         if key not in self.outputs:
             raise KeyError(f'AgeResults: no output for key {key!r}; have {list(self.outputs)}')
@@ -298,9 +301,10 @@ class AgeResults(ss.Analyzer):
             for y, arr in self.outputs[key].items():
                 index.append(y)
                 totals = arr.sum(axis=0)
-                total_sum = totals.sum()
-                if total_sum > 0:
-                    totals = totals / total_sum
+                if normalize:
+                    total_sum = totals.sum()
+                    if total_sum > 0:
+                        totals = totals / total_sum
                 for i, col in enumerate(cols):
                     data[col].append(float(totals[i]))
             return pd.DataFrame(data, index=pd.Index(index, name='t'))
