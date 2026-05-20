@@ -75,10 +75,10 @@ class vx(ss.Vx):
             name=name,
             rel_imm=rel_imm,
         )
-        self._rel_imm = _resolve_vx_pars(name, rel_imm)
+        self.rel_imm = _resolve_vx_pars(name, rel_imm)
         # CRN-safe Bernoulli; p is overwritten per-genotype in administer().
         self._sterilizing_dist = ss.bernoulli(p=0.0)
 
     def administer(self, people, uids):
-        """Apply the vaccine — see class docstring for the model. Stubbed; see Task 3."""
-        raise NotImplementedError('administer() implemented in Task 3.')
+        """Apply the vaccine — see class docstring for the model."""
+        raise NotImplementedError('hpv.vx.administer() is not yet implemented.')

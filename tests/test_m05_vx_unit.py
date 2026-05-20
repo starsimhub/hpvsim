@@ -32,8 +32,8 @@ def test_vx_constructor_with_name_loads_csv():
     """hpv.vx(name='bivalent') resolves rel_imm from the CSV."""
     from hpvsim.products import vx
     product = vx(name='bivalent')
-    assert product._rel_imm['hpv16'] == pytest.approx(1.0)
-    assert product._rel_imm['hpv18'] == pytest.approx(1.0)
+    assert product.rel_imm['hpv16'] == pytest.approx(1.0)
+    assert product.rel_imm['hpv18'] == pytest.approx(1.0)
 
 
 def test_vx_constructor_with_rel_imm_uses_override():
@@ -41,7 +41,7 @@ def test_vx_constructor_with_rel_imm_uses_override():
     from hpvsim.products import vx
     custom = {'hpv16': 0.7, 'hpv18': 0.6}
     product = vx(rel_imm=custom)
-    assert product._rel_imm == custom
+    assert product.rel_imm == custom
 
 
 def test_vx_constructor_both_name_and_rel_imm_raises():
