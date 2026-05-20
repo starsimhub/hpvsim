@@ -7,6 +7,7 @@ add the therapeutic vaccine product variant.
 import functools
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import starsim as ss
 
@@ -77,8 +78,57 @@ class vx(ss.Vx):
         )
         self.rel_imm = _resolve_vx_pars(name, rel_imm)
         # CRN-safe Bernoulli; p is overwritten per-genotype in administer().
+        # Fully initialized in init_pre() once we have the sim's slot array.
         self._sterilizing_dist = ss.bernoulli(p=0.0)
 
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        # ss.Module.init_pre links dists but does not init them; sim-level
+        # dist init is what initializes them for modules registered with the
+        # sim. A standalone product (e.g. for unit tests, or future single-use
+        # APIs) needs to init its own dists. Init only if not already done,
+        # so that the intervention-wired path (where sim-level init may have
+        # already taken care of this) doesn't redundantly re-init.
+        if not self._sterilizing_dist.initialized:
+            self._sterilizing_dist.init(trace='_sterilizing_dist', sim=sim, module=self)
+
     def administer(self, people, uids):
-        """Apply the vaccine — see class docstring for the model."""
-        raise NotImplementedError('hpv.vx.administer() is not yet implemented.')
+        """Apply the vaccine: all-or-nothing+leaky per genotype, max-of-existing.
+
+        For each genotype g configured in this product:
+          1. Look up the corresponding HPV(ss.Infection) module in the sim
+             (by genotype attribute). Skip silently if not present.
+          2. Per-agent Bernoulli(rel_imm[g]):
+               - heads: peak = 1.0 (sterilizing immunity)
+               - tails: peak = rel_imm[g] (leaky protection floor)
+          3. Write hpv_mod.nab_imm[uids] = max(existing, peak).
+        """
+        if len(uids) == 0:
+            return
+        for genotype, rel_imm_g in self.rel_imm.items():
+            hpv_mod = self._find_genotype_module(genotype)
+            if hpv_mod is None:
+                continue
+            # All-or-nothing draw at p = rel_imm_g for this genotype
+            self._sterilizing_dist.set(p=float(rel_imm_g))
+            sterilizing_uids = self._sterilizing_dist.filter(uids)
+            # Build per-uid peak vector: rel_imm_g (leaky) by default; 1.0
+            # for those who got the sterilizing draw
+            peak = np.full(len(uids), float(rel_imm_g), dtype=float)
+            is_sterilizing = np.isin(uids, sterilizing_uids)
+            peak[is_sterilizing] = 1.0
+            # Max-of-existing: vaccine never downgrades existing immunity
+            hpv_mod.nab_imm[uids] = np.maximum(hpv_mod.nab_imm[uids], peak)
+
+    def _find_genotype_module(self, genotype):
+        """Return the HPV module in the sim matching this genotype, or None.
+
+        Matches M03's CrossImmunity convention: walk sim.diseases.values()
+        and identify HPV modules by isinstance + .genotype attribute.
+        """
+        # Late import avoids the products <-> hpv circular import
+        from hpvsim.hpv import HPV
+        for module in self.sim.diseases.values():
+            if isinstance(module, HPV) and module.genotype == genotype:
+                return module
+        return None

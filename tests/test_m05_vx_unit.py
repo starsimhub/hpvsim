@@ -63,3 +63,76 @@ def test_vx_unknown_name_raises_with_valid_names_listed():
     from hpvsim.products import vx
     with pytest.raises(ValueError, match='bivalent.*quadrivalent.*nonavalent'):
         vx(name='not_a_real_vaccine')
+
+
+def _make_small_sim(genotypes=('hpv16', 'hpv18', 'hi5', 'ohr')):
+    """Construct a small initialized 4-genotype sim suitable for administer tests."""
+    sim = hpv.Sim(
+        location='nigeria',
+        start=2010, stop=2012,
+        n_agents=200,
+        genotypes=list(genotypes),
+        rand_seed=0,
+    )
+    sim.init()
+    return sim
+
+
+def test_vx_administer_bumps_nab_imm_for_active_genotypes():
+    """administer() writes per-genotype nab_imm; max-of-existing semantics."""
+    from hpvsim.products import vx
+    sim = _make_small_sim()
+    product = vx(rel_imm={'hpv16': 1.0, 'hpv18': 0.5})
+    product.init_pre(sim)  # bind to sim before use
+    # Pick 20 agents and vaccinate them
+    uids = sim.people.alive.uids[:20]
+    pre_hpv16 = sim.diseases['hpv16'].nab_imm[uids].copy()
+    pre_hpv18 = sim.diseases['hpv18'].nab_imm[uids].copy()
+    product.administer(sim.people, uids)
+    post_hpv16 = sim.diseases['hpv16'].nab_imm[uids]
+    post_hpv18 = sim.diseases['hpv18'].nab_imm[uids]
+    # hpv16 has rel_imm=1.0 -> every agent is sterilizing -> post = 1.0
+    assert np.all(post_hpv16 == 1.0)
+    # hpv18 has rel_imm=0.5 -> each agent's post is either 1.0 (sterilizing)
+    # or 0.5 (leaky); never less than 0.5
+    assert np.all(post_hpv18 >= 0.5)
+    assert np.all(post_hpv18 <= 1.0)
+    # No regressions in initial state
+    assert np.all(post_hpv16 >= pre_hpv16)
+    assert np.all(post_hpv18 >= pre_hpv18)
+
+
+def test_vx_administer_skips_inactive_genotypes_silently():
+    """A 9-valent product in a 4-genotype sim must not error."""
+    from hpvsim.products import vx
+    sim = _make_small_sim()  # has hpv16/hpv18/hi5/ohr only
+    # Bivalent CSV has entries for hpv45, hi4, hr, lr which are NOT in this sim
+    product = vx(name='bivalent')
+    product.init_pre(sim)
+    uids = sim.people.alive.uids[:10]
+    # Must not raise
+    product.administer(sim.people, uids)
+
+
+def test_vx_administer_does_not_downgrade_natural_immunity():
+    """If nab_imm is already higher than the vaccine peak, it is preserved."""
+    from hpvsim.products import vx
+    sim = _make_small_sim()
+    product = vx(rel_imm={'hpv16': 0.5})
+    product.init_pre(sim)
+    uids = sim.people.alive.uids[:10]
+    # Force-bump nab_imm to 0.95 (simulating natural clearance immunity)
+    sim.diseases['hpv16'].nab_imm[uids] = 0.95
+    product.administer(sim.people, uids)
+    # leaky floor is 0.5 (rel_imm) — must not downgrade the 0.95
+    assert np.all(sim.diseases['hpv16'].nab_imm[uids] >= 0.95)
+
+
+def test_vx_administer_empty_uids_is_noop():
+    """Calling administer with empty uids does nothing."""
+    from hpvsim.products import vx
+    sim = _make_small_sim()
+    product = vx(name='bivalent')
+    product.init_pre(sim)
+    # Should not raise
+    product.administer(sim.people, sim.people.alive.uids[:0])
