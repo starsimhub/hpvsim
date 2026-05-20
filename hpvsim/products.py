@@ -7,12 +7,8 @@ add the therapeutic vaccine product variant.
 import functools
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-import sciris as sc
 import starsim as ss
-
-__all__ = ['vx']
 
 
 _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
@@ -20,10 +16,10 @@ _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
 
 @functools.lru_cache(maxsize=1)
 def _load_vx_products():
-    """Load the CSV and return {product_name: {genotype: rel_imm}}.
+    """Load the CSV and return a mapping of product name -> {genotype: rel_imm}.
 
     Cached at module load — the CSV is small (~24 rows) and never changes
-    at runtime. Returns a frozen mapping of product name -> {genotype: rel_imm}.
+    at runtime.
     """
     df = pd.read_csv(_PRODUCT_CSV)
     expected_cols = {'name', 'genotype', 'rel_imm'}
