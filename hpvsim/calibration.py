@@ -220,19 +220,71 @@ def cancer_by_age(expected, *, weight=1):
     )
 
 
-def hpv_prev_by_age(expected, *, weight=1):
-    """List of ss.Normal components for age-binned HPV prevalence.
+def hpv_prev_by_age(expected, expected_n=None, *, weight=1):
+    """Components for age-binned HPV prevalence — Normal or BetaBinomial.
 
-    Uses Normal (not BetaBinomial) because AgeResults emits prevalence as
-    a ratio rather than separate (positives, total) columns. A future
-    refactor that exposes (x, n) per bin can switch this to BetaBinomial.
+    Two modes, picked by the shape of the inputs:
 
-    Returns one component per age-bin column in `expected`.
+    - **Ratio (Normal):** call as ``hpv_prev_by_age(expected_ratio)``.
+      ``expected_ratio`` is a DataFrame with `t`-named index and age-bin
+      columns of prevalence values in [0,1]. Returns one ss.Normal per
+      age bin, comparing simulated ratios to observed ratios. Use when
+      target data is reported as prevalences only (no denominator).
+
+    - **Counts (BetaBinomial):** call as
+      ``hpv_prev_by_age(expected_x, expected_n)``. Both DataFrames share
+      the same `t`-indexed schema; cells of ``expected_x`` are positives
+      and cells of ``expected_n`` are totals per age bin. Returns one
+      ss.BetaBinomial per age bin. Use when target data is reported as
+      raw counts (positives + sample size), which gives a proper count
+      likelihood instead of a Gaussian on the ratio.
+
+    The BetaBinomial path reads simulated (x, n) per bin from
+    ``AgeResults.to_xn_per_bin('hpv_prevalence')``.
     """
-    return _per_age_bin_normal_components(
-        expected, result_key='hpv_prevalence', name_prefix='hpv_prev_by_age',
-        weight=weight,
-    )
+    if expected_n is None:
+        return _per_age_bin_normal_components(
+            expected, result_key='hpv_prevalence',
+            name_prefix='hpv_prev_by_age', weight=weight,
+        )
+    _validate_age_schema(expected, None)
+    _validate_age_schema(expected_n, None)
+    if list(expected.columns) != list(expected_n.columns):
+        raise ValueError(
+            f'hpv_prev_by_age: expected and expected_n must share columns; '
+            f'got {list(expected.columns)} vs {list(expected_n.columns)}'
+        )
+    if list(expected.index) != list(expected_n.index):
+        raise ValueError(
+            f'hpv_prev_by_age: expected and expected_n must share index; '
+            f'got {list(expected.index)} vs {list(expected_n.index)}'
+        )
+    components = []
+    for age_bin in expected.columns:
+        sub_expected = pd.DataFrame(
+            {
+                'x': expected[age_bin].values.astype(float),
+                'n': expected_n[age_bin].values.astype(float),
+            },
+            index=expected.index,
+        )
+        components.append(ss.BetaBinomial(
+            name=f'hpv_prev_by_age:{age_bin}',
+            expected=sub_expected,
+            extract_fn=_make_prev_xn_extract_fn(age_bin),
+            conform='step_containing',
+            weight=weight,
+        ))
+    return components
+
+
+def _make_prev_xn_extract_fn(age_bin):
+    """Closure: pull (x, n) per timepoint for one age bin of hpv_prevalence."""
+    def extract_fn(sim):
+        ar = _find_age_results(sim)
+        xn = ar.to_xn_per_bin('hpv_prevalence')
+        return xn[age_bin]
+    return extract_fn
 
 
 def cancer_genotype_dist(expected, *, weight=1):

@@ -108,6 +108,45 @@ def test_cancer_by_age_factory_returns_one_normal_component_per_age_bin():
         assert (actual['x'].values == full[age_bin].values).all()
 
 
+def test_hpv_prev_by_age_factory_with_counts_returns_betabinomial_per_age_bin():
+    """hpv_prev_by_age(expected_x, expected_n) returns ss.BetaBinomial per bin.
+
+    Each component's extract_fn returns a 't'-indexed DataFrame with columns
+    ['x', 'n'] for that age bin's positives and totals — the format
+    ss.BetaBinomial.compute_nll consumes.
+    """
+    edges = np.array([0., 30., 60., 100.])
+    age_labels = ['0-30', '30-60', '60+']
+    expected_x = pd.DataFrame(
+        [[5, 20, 8]],
+        index=pd.Index([2020.0], name='t'),
+        columns=age_labels,
+    )
+    expected_n = pd.DataFrame(
+        [[100, 200, 400]],
+        index=pd.Index([2020.0], name='t'),
+        columns=age_labels,
+    )
+    sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
+                  rand_seed=0, analyzers=[hpv.AgeResults(
+                      result_args=sc.objdict(
+                          hpv_prevalence=sc.objdict(years=[2020], edges=edges),
+                      ),
+                  )])
+    sim.run()
+    components = hpv.calibration.hpv_prev_by_age(expected_x, expected_n)
+    assert len(components) == len(age_labels)
+    for comp, age_bin in zip(components, age_labels):
+        assert isinstance(comp, ss.BetaBinomial)
+        assert comp.name == f'hpv_prev_by_age:{age_bin}'
+        actual = comp.extract_fn(sim)
+        assert actual.index.name == 't'
+        assert list(actual.columns) == ['x', 'n']
+        # n should equal the alive count per bin (positive integer).
+        assert (actual['n'] > 0).all()
+        assert (actual['x'] <= actual['n']).all()
+
+
 def test_hpv_prev_by_age_factory_returns_one_normal_component_per_age_bin():
     """hpv_prev_by_age returns a list of ss.Normal components, one per age bin."""
     edges = np.array([0., 30., 60., 100.])

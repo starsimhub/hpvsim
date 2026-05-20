@@ -115,11 +115,20 @@ class AgeResults(ss.Analyzer):
             # Map each requested year to its timeline tick (last tick within
             # that calendar year, matching v2's end-of-year accumulation).
             rdict.year_to_ti = self._resolve_year_ticks(sim, rdict.years)
-            # Allocate per-year output arrays. Type-distribution mode uses
-            # (n_bins, n_genotypes); everything else uses (n_bins,).
+            # Allocate per-year output arrays:
+            #   - Type-distribution: (n_bins, n_genotypes) raw counts.
+            #   - Prevalence: (n_bins, 2) — [:, 0] = num, [:, 1] = denom.
+            #     Stored separately so factories that want (x, n) per bin
+            #     (BetaBinomial) can pull both without recomputing.
+            #   - Everything else: (n_bins,).
             nbins = len(rdict.bins)
             ng = len(self.hpv_modules)
-            shape = (nbins, ng) if self._is_type_dist(rkey) else (nbins,)
+            if self._is_type_dist(rkey):
+                shape = (nbins, ng)
+            elif rkey in self._PREV_TO_STATE:
+                shape = (nbins, 2)
+            else:
+                shape = (nbins,)
             self.outputs[rkey] = {float(y): np.zeros(shape) for y in rdict.years}
         return
 
@@ -195,7 +204,12 @@ class AgeResults(ss.Analyzer):
         return counts
 
     def _bin_prevalence(self, rdict, attr, female_only=False):
-        """Age-bin prevalence = bin(numerator state) / bin(denominator)."""
+        """Age-bin prevalence as a (nbins, 2) array — [:, 0]=num, [:, 1]=denom.
+
+        Storing (num, denom) per bin rather than the ratio lets BetaBinomial
+        components consume raw counts. to_dataframe(key) collapses to the
+        ratio for backward compatibility with prevalence-as-ratio callers.
+        """
         sim = self.sim
         people = sim.people
         alive = people.alive.values
@@ -213,8 +227,10 @@ class AgeResults(ss.Analyzer):
                               weights=(weights[num_mask] if weights is not None else None))
         denom, _ = np.histogram(ages[denom_mask], bins=rdict.edges,
                                 weights=(weights[denom_mask] if weights is not None else None))
-        return np.divide(num, denom, out=np.zeros_like(num, dtype=float),
-                         where=denom > 0)
+        out = np.zeros((len(rdict.bins), 2), dtype=float)
+        out[:, 0] = num
+        out[:, 1] = denom
+        return out
 
     def _bin_incidence(self, rdict, date_attr, state_attr):
         """Age-bin new-events-this-year / at-risk-female-denominator (per 100k).
@@ -291,11 +307,45 @@ class AgeResults(ss.Analyzer):
         cols = rdict.age_labels
         rows = []
         index = []
+        is_prev = key in self._PREV_TO_STATE
         for y, arr in self.outputs[key].items():
             index.append(y)
-            rows.append(arr.astype(float))
+            if is_prev:
+                # Prev storage is (nbins, 2) = [num, denom]; emit ratio.
+                num, denom = arr[:, 0], arr[:, 1]
+                ratio = np.divide(num, denom, out=np.zeros_like(num),
+                                  where=denom > 0)
+                rows.append(ratio.astype(float))
+            else:
+                rows.append(arr.astype(float))
         return pd.DataFrame(rows, columns=cols,
                             index=pd.Index(index, name='t'))
+
+    def to_xn_per_bin(self, key):
+        """Return per-age-bin (x, n) DataFrames for a prevalence-mode result.
+
+        Each value of the returned dict is a 't'-indexed DataFrame with two
+        columns: ``x`` (positives) and ``n`` (total). Used by the
+        BetaBinomial component path in hpv.calibration.hpv_prev_by_age.
+
+        Raises if `key` is not a prevalence result.
+        """
+        if key not in self._PREV_TO_STATE:
+            raise ValueError(
+                f'AgeResults.to_xn_per_bin: {key!r} is not a prevalence '
+                f'result; supported keys are {list(self._PREV_TO_STATE)}'
+            )
+        rdict = self.result_args[key]
+        years = sorted(self.outputs[key].keys())
+        result = {}
+        for bi, label in enumerate(rdict.age_labels):
+            x_vals = [float(self.outputs[key][y][bi, 0]) for y in years]
+            n_vals = [float(self.outputs[key][y][bi, 1]) for y in years]
+            result[label] = pd.DataFrame(
+                {'x': x_vals, 'n': n_vals},
+                index=pd.Index(years, name='t'),
+            )
+        return result
 
 
 def _as_year(t):
