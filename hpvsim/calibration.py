@@ -7,6 +7,7 @@ Provides:
     - CalibComponent factories for the three common HPV target shapes:
       cancer_by_age, hpv_prev_by_age, cancer_genotype_dist.
 """
+import pandas as pd
 import sciris as sc
 import starsim as ss
 
@@ -145,6 +146,19 @@ def _make_extract_fn(result_key, expected):
     return extract_fn
 
 
+def _make_age_bin_extract_fn(result_key, age_bin):
+    """Build a closure that extracts one age bin as a 't'-indexed
+    DataFrame with a single 'x' column. Used for per-age-bin Normal
+    components: Starsim's Normal.compute_nll merges on 't' and reads
+    rep['x_e']/rep['x_a'], so each component must produce single-channel
+    'x' data."""
+    def extract_fn(sim):
+        ar = _find_age_results(sim)
+        df = ar.to_dataframe(key=result_key)
+        return pd.DataFrame({'x': df[age_bin].values}, index=df.index)
+    return extract_fn
+
+
 def _validate_age_schema(expected, sim_template):
     """expected must have a 't'-named index and string column labels."""
     if expected.index.name != 't':
@@ -156,32 +170,67 @@ def _validate_age_schema(expected, sim_template):
             f'got {list(expected.columns)}')
 
 
-def cancer_by_age(expected, *, weight=1):
-    """CalibComponent for age-binned cancer counts (stock snapshot, Normal likelihood).
+def _per_age_bin_normal_components(expected, *, result_key, name_prefix, weight,
+                                   sigma2_floor=1.0):
+    """Build one ss.Normal component per age-bin column in `expected`.
 
-    AgeResults snapshots the count of agents with cancerous=True at each
-    requested year. This is a prevalence (stock), not an incident flow.
-    conform='step_containing' picks the sim timestep that contains the
-    target year, which is appropriate for point-in-time counts.
+    Starsim's Normal.compute_nll merges expected/actual on 't' and reads
+    'x_e'/'x_a' — so each component must produce single-channel 'x' data.
+    With one component per age bin, an N-bin DataFrame becomes N components,
+    each carrying a 't'-indexed 'x' column with that bin's values.
+
+    Each component has its sigma2 set explicitly using a Poisson-like
+    approximation (variance ≈ mean, floored at sigma2_floor). The default
+    auto-compute in ss.Normal (sigma2 = SSE/N over expected values) is
+    degenerate with a single timepoint — sigma2 collapses to (e-a)^2 and
+    yields NaN log-likelihoods when e==a exactly.
     """
     _validate_age_schema(expected, None)
-    return ss.Normal(
-        name='cancer_by_age',
-        expected=expected,
-        extract_fn=_make_extract_fn('cancers', expected),
-        conform='step_containing',
+    components = []
+    for age_bin in expected.columns:
+        col = expected[age_bin].values.astype(float)
+        sub_expected = pd.DataFrame({'x': col}, index=expected.index)
+        # Poisson-like sigma2: variance ≈ mean for count data, floored to
+        # avoid sigma2=0 when expected counts are zero in this bin.
+        sigma2 = max(float(col.mean()), sigma2_floor)
+        components.append(ss.Normal(
+            name=f'{name_prefix}:{age_bin}',
+            expected=sub_expected,
+            extract_fn=_make_age_bin_extract_fn(result_key, age_bin),
+            conform='step_containing',
+            weight=weight,
+            sigma2=sigma2,
+        ))
+    return components
+
+
+def cancer_by_age(expected, *, weight=1):
+    """List of ss.Normal components for age-binned cancer counts.
+
+    AgeResults snapshots the count of agents with cancerous=True at each
+    requested year (point-in-time stock). conform='step_containing' picks
+    the sim timestep that contains the target year.
+
+    Returns one component per age-bin column in `expected`; each component
+    carries that bin's counts as a single 't'-indexed 'x' column.
+    """
+    return _per_age_bin_normal_components(
+        expected, result_key='cancers', name_prefix='cancer_by_age',
         weight=weight,
     )
 
 
 def hpv_prev_by_age(expected, *, weight=1):
-    """CalibComponent for age-binned HPV prevalence (prevalent, Beta-Binomial likelihood)."""
-    _validate_age_schema(expected, None)
-    return ss.BetaBinomial(
-        name='hpv_prev_by_age',
-        expected=expected,
-        extract_fn=_make_extract_fn('hpv_prevalence', expected),
-        conform='step_containing',
+    """List of ss.Normal components for age-binned HPV prevalence.
+
+    Uses Normal (not BetaBinomial) because AgeResults emits prevalence as
+    a ratio rather than separate (positives, total) columns. A future
+    refactor that exposes (x, n) per bin can switch this to BetaBinomial.
+
+    Returns one component per age-bin column in `expected`.
+    """
+    return _per_age_bin_normal_components(
+        expected, result_key='hpv_prevalence', name_prefix='hpv_prev_by_age',
         weight=weight,
     )
 

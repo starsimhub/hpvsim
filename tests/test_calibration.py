@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import sciris as sc
+import starsim as ss
 
 import hpvsim as hpv
 
@@ -71,8 +72,13 @@ def test_build_sim_does_not_mutate_base():
     assert sim_copy.pars.rand_seed == 999
 
 
-def test_cancer_by_age_factory_extract_returns_matching_schema():
-    """cancer_by_age factory's extract_fn returns a DataFrame matching expected's schema."""
+def test_cancer_by_age_factory_returns_one_normal_component_per_age_bin():
+    """cancer_by_age returns a list of ss.Normal components, one per age bin.
+
+    Each component's extract_fn returns a 't'-indexed DataFrame with a
+    single 'x' column carrying that age bin's counts — the shape that
+    ss.Normal.compute_nll consumes.
+    """
     edges = np.array([0., 30., 60., 100.])
     age_labels = ['0-30', '30-60', '60+']
     expected = pd.DataFrame(
@@ -87,15 +93,23 @@ def test_cancer_by_age_factory_extract_returns_matching_schema():
                       ),
                   )])
     sim.run()
+    ar = sim.analyzers['ageresults']
+    full = ar.to_dataframe(key='cancers')
 
-    comp = hpv.calibration.cancer_by_age(expected)
-    actual = comp.extract_fn(sim)
-    # Same index and columns as expected.
-    assert list(actual.index) == list(expected.index)
-    assert list(actual.columns) == list(expected.columns)
+    components = hpv.calibration.cancer_by_age(expected)
+    assert len(components) == len(age_labels)
+    for comp, age_bin in zip(components, age_labels):
+        assert isinstance(comp, ss.Normal)
+        assert comp.name == f'cancer_by_age:{age_bin}'
+        actual = comp.extract_fn(sim)
+        assert actual.index.name == 't'
+        assert list(actual.columns) == ['x']
+        # The 'x' column carries that age bin's counts from AgeResults.
+        assert (actual['x'].values == full[age_bin].values).all()
 
 
-def test_hpv_prev_by_age_factory_extract_matches_schema():
+def test_hpv_prev_by_age_factory_returns_one_normal_component_per_age_bin():
+    """hpv_prev_by_age returns a list of ss.Normal components, one per age bin."""
     edges = np.array([0., 30., 60., 100.])
     age_labels = ['0-30', '30-60', '60+']
     expected = pd.DataFrame(
@@ -110,10 +124,14 @@ def test_hpv_prev_by_age_factory_extract_matches_schema():
                       ),
                   )])
     sim.run()
-    comp = hpv.calibration.hpv_prev_by_age(expected)
-    actual = comp.extract_fn(sim)
-    assert list(actual.index) == list(expected.index)
-    assert list(actual.columns) == list(expected.columns)
+    components = hpv.calibration.hpv_prev_by_age(expected)
+    assert len(components) == len(age_labels)
+    for comp, age_bin in zip(components, age_labels):
+        assert isinstance(comp, ss.Normal)
+        assert comp.name == f'hpv_prev_by_age:{age_bin}'
+        actual = comp.extract_fn(sim)
+        assert actual.index.name == 't'
+        assert list(actual.columns) == ['x']
 
 
 def test_cancer_genotype_dist_factory_extract_matches_schema():
@@ -189,19 +207,10 @@ def test_parameter_recovery_smoke():
     expected = target_ar.to_dataframe(key='cancers')
 
     # ----- Calibrate -----
-    # Use a custom eval_fn: sum-of-squared-differences between the
-    # expected and actual age-binned cancer counts. Starsim's concrete
-    # CalibComponents (Normal/BetaBinomial/DirichletMultinomial) expect a
-    # single-channel `x` column per component; age-stratified data would
-    # need one component per age bin to integrate cleanly. Wiring that up
-    # is a follow-on; AgeResults' tidy output (t-indexed) is the necessary
-    # precondition and is now in place.
-    def eval_fn(sim):
-        ar = [a for a in sim.analyzers.values()
-              if isinstance(a, hpv.AgeResults)][0]
-        actual = ar.to_dataframe(key='cancers')
-        diff = actual.loc[expected.index, expected.columns] - expected
-        return float((diff ** 2).values.sum())
+    # Use the cancer_by_age factory directly. It returns one ss.Normal
+    # component per age bin; Starsim's Calibration sums per-component nll
+    # across the four bins to drive Optuna toward the truth values.
+    components = hpv.calibration.cancer_by_age(expected)
 
     base_sim = make_sim()
     calib_pars = {
@@ -213,7 +222,7 @@ def test_parameter_recovery_smoke():
     calib = hpv.Calibration(
         base_sim,
         calib_pars,
-        eval_fn=eval_fn,
+        components=components,
         total_trials=50,
         n_workers=1,
         debug=True,
