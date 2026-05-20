@@ -146,10 +146,10 @@ def _make_extract_fn(result_key, expected):
 
 
 def _validate_age_schema(expected, sim_template):
-    """expected must have a 'year'-named index and string column labels."""
-    if expected.index.name != 'year':
+    """expected must have a 't'-named index and string column labels."""
+    if expected.index.name != 't':
         raise ValueError(
-            f'expected.index.name must be \'year\'; got {expected.index.name!r}')
+            f'expected.index.name must be \'t\'; got {expected.index.name!r}')
     if not all(isinstance(c, str) for c in expected.columns):
         raise ValueError(
             f'expected.columns must be strings (age-bin labels); '
@@ -189,9 +189,9 @@ def hpv_prev_by_age(expected, *, weight=1):
 def cancer_genotype_dist(expected, *, weight=1):
     """CalibComponent for the cancer-genotype distribution (Dirichlet-Multinomial likelihood)."""
     # Type-dist factory: columns are genotype keys, not age labels.
-    if expected.index.name != 'year':
+    if expected.index.name != 't':
         raise ValueError(
-            f'expected.index.name must be \'year\'; got {expected.index.name!r}')
+            f'expected.index.name must be \'t\'; got {expected.index.name!r}')
     return ss.DirichletMultinomial(
         name='cancer_genotype_dist',
         expected=expected,

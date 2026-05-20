@@ -77,7 +77,7 @@ def test_cancer_by_age_factory_extract_returns_matching_schema():
     age_labels = ['0-30', '30-60', '60+']
     expected = pd.DataFrame(
         [[10, 50, 30]],
-        index=pd.Index([2020.0], name='year'),
+        index=pd.Index([2020.0], name='t'),
         columns=age_labels,
     )
     sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
@@ -100,7 +100,7 @@ def test_hpv_prev_by_age_factory_extract_matches_schema():
     age_labels = ['0-30', '30-60', '60+']
     expected = pd.DataFrame(
         [[0.05, 0.10, 0.02]],
-        index=pd.Index([2020.0], name='year'),
+        index=pd.Index([2020.0], name='t'),
         columns=age_labels,
     )
     sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
@@ -119,7 +119,7 @@ def test_hpv_prev_by_age_factory_extract_matches_schema():
 def test_cancer_genotype_dist_factory_extract_matches_schema():
     expected = pd.DataFrame(
         [[0.7, 0.15, 0.10, 0.05]],
-        index=pd.Index([2020.0], name='year'),
+        index=pd.Index([2020.0], name='t'),
         columns=['hpv16', 'hpv18', 'hi5', 'ohr'],
     )
     edges = np.array([0., 100.])
@@ -190,9 +190,12 @@ def test_parameter_recovery_smoke():
 
     # ----- Calibrate -----
     # Use a custom eval_fn: sum-of-squared-differences between the
-    # expected and actual age-binned cancer counts. This avoids the
-    # starsim CalibComponent tidy-format requirement (components expect a
-    # tidy 't'/'x' format; our wide-format DataFrames use 'year' index).
+    # expected and actual age-binned cancer counts. Starsim's concrete
+    # CalibComponents (Normal/BetaBinomial/DirichletMultinomial) expect a
+    # single-channel `x` column per component; age-stratified data would
+    # need one component per age bin to integrate cleanly. Wiring that up
+    # is a follow-on; AgeResults' tidy output (t-indexed) is the necessary
+    # precondition and is now in place.
     def eval_fn(sim):
         ar = [a for a in sim.analyzers.values()
               if isinstance(a, hpv.AgeResults)][0]

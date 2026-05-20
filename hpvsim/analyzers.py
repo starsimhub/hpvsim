@@ -287,7 +287,7 @@ class AgeResults(ss.Analyzer):
                     totals = totals / total_sum
                 for i, col in enumerate(cols):
                     data[col].append(float(totals[i]))
-            return pd.DataFrame(data, index=pd.Index(index, name='year'))
+            return pd.DataFrame(data, index=pd.Index(index, name='t'))
         cols = rdict.age_labels
         rows = []
         index = []
@@ -295,7 +295,7 @@ class AgeResults(ss.Analyzer):
             index.append(y)
             rows.append(arr.astype(float))
         return pd.DataFrame(rows, columns=cols,
-                            index=pd.Index(index, name='year'))
+                            index=pd.Index(index, name='t'))
 
 
 def _as_year(t):
