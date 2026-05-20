@@ -210,11 +210,12 @@ def test_cancer_genotype_dist_factory_returns_dirichlet_with_x_prefixed_columns(
 @pytest.mark.slow
 def test_parameter_recovery_smoke():
     """Synthetic parameter recovery: calibrate to a target generated from
-    known calib_pars and assert the best trial recovers each within 35%.
+    known calib_pars and assert the best trial recovers each within 25%.
 
     This is a plumbing gate, not a calibration-quality gate. 50 trials with
-    a deterministic Optuna sampler seed should reliably converge for two
-    parameters with clear signal in the age-binned cancer counts.
+    a deterministic Optuna sampler seed and 4 snapshot years (2010, 2015,
+    2020, 2025) provide enough signal per ss.Normal component to recover
+    both parameters to within the plan's original 25% tolerance.
 
     Parameters chosen:
       - hpv16.cin_fn.k: CIN progression severity — strong monotonic effect on
@@ -223,30 +224,33 @@ def test_parameter_recovery_smoke():
         directly scales cancer incidence.
     Both are scalars and clearly differentiate simulation outcomes at n=20000.
 
-    Note: hpv16.beta was the plan's original second parameter but is stored as
-    a per-network dict and has low signal in this setup (initial HPV prevalence
-    from seeding dominates transmission effects over the 36-year run). The plan
-    correction substituted cancer_fn.transform_prob which has clear signal.
-
-    Tolerance widened to 35% (from plan's 25%) because count data with ~25
-    events is inherently noisy; this is a plumbing gate not a precision gate.
+    Note: hpv16.beta was the plan's original second parameter but is stored
+    as a per-network dict and has low signal in this setup (initial HPV
+    prevalence from seeding dominates transmission effects over the 36-year
+    run). The plan correction substituted cancer_fn.transform_prob which has
+    clear signal.
     """
     optuna = pytest.importorskip('optuna')
 
     # ----- Generate target -----
     edges = np.array([0., 30., 50., 70., 100.])
+    # Multi-year snapshots: each ss.Normal per-bin component sees 4 timepoints
+    # (vs 1 with a single year), which gives the Optuna sampler a clearer
+    # signal across the parameter space.
+    snapshot_years = [2010, 2015, 2020, 2025]
     # Two scalar parameters with strong, monotonic signal in cancer counts.
     truth = {'hpv16.cin_fn.k': 0.55, 'hpv16.cancer_fn.transform_prob': 0.003}
 
     def make_sim():
         # Single genotype (hpv16 only) for faster runs; n_agents=20000 for
-        # enough cancer events (~25 at truth) to provide calibration signal.
+        # enough cancer events per bin per snapshot year to provide signal.
         return hpv.Sim(n_agents=20000, start=1990, stop=2026, dt=1.0,
                        rand_seed=0,
                        genotypes=[16],
                        analyzers=[hpv.AgeResults(
                            result_args=sc.objdict(
-                               cancers=sc.objdict(years=[2025], edges=edges),
+                               cancers=sc.objdict(years=snapshot_years,
+                                                  edges=edges),
                            ),
                        )])
 
@@ -284,12 +288,12 @@ def test_parameter_recovery_smoke():
     calib.calibrate()
     assert calib.calibrated
     best = calib.best_pars   # sc.objdict of best parameter values
-    # Recover each parameter within ±35% relative error (plumbing gate;
-    # tolerance widened from plan's 25% due to integer-count noise at n=20000).
+    # Recover each parameter within ±25% relative error (plan's original
+    # tolerance; achievable with 4 snapshot years per component).
     for name, true_val in truth.items():
         recovered = best[name]
         rel = abs(recovered - true_val) / abs(true_val)
-        assert rel <= 0.35, (
+        assert rel <= 0.25, (
             f'Parameter {name!r}: truth={true_val}, '
-            f'recovered={recovered}, rel_error={rel:.3f} (>35%)'
+            f'recovered={recovered}, rel_error={rel:.3f} (>25%)'
         )
