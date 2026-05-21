@@ -56,6 +56,33 @@ import sciris as sc
 import hpvsim as hpv  # v2.3 here
 
 
+def _actual_date_dead_v2(people):
+    """Per-agent step at which the agent actually died, regardless of cause.
+
+    v2 records cause-specific death dates: date_dead_cancer, date_dead_other,
+    date_dead_hiv. An agent dies of at most one cause, so at most one is set
+    on any given agent — but we min across all to be defensive in case a
+    cause-specific date is left scheduled-in-the-future on an agent who
+    died of another cause earlier.
+
+    Returns ndarray of length n_uids with NaN for still-alive agents.
+    """
+    cols = []
+    for attr in ('date_dead_cancer', 'date_dead_other', 'date_dead_hiv'):
+        if hasattr(people, attr):
+            cols.append(np.asarray(getattr(people, attr), dtype=float))
+    if not cols:
+        return np.full(len(people.alive), np.nan)
+    stacked = np.vstack(cols)
+    # All-NaN columns (still-alive agents) intentionally yield NaN; suppress
+    # the harmless "All-NaN slice" warning that np.nanmin emits in that case.
+    with np.errstate(all='ignore'):
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)
+            return np.nanmin(stacked, axis=0)
+
+
 # ---------------------------------------------------------------------------
 # M02 — single-genotype HPV16 anchor PARS
 # Pinned anchor PARS — must match tests/regression/anchor_hpv16.py:PARS
@@ -318,24 +345,34 @@ def _per_genotype_metrics_v2(sim, gen_idx, gen_key):
     alive_arr = np.asarray(people.alive).astype(bool)
     age_arr = np.asarray(people.age)
 
-    date_dead_cancer_g = np.asarray(people.date_dead_cancer)
+    # Actual death time per agent: min of date_dead_cancer / date_dead_other /
+    # date_dead_hiv (whichever fired). NaN for still-alive agents. Used below
+    # to filter phantom events — scheduled-but-never-realized cancer or
+    # infection events on agents who died of another cause first.
+    date_dead_any = _actual_date_dead_v2(people)
 
     def _lifetime_mean_age(date_event):
-        """Mean age at event across alive + dead-of-cancer agents.
-        For alive: ref = end_ti. For dead-of-cancer: ref = date_dead_cancer
-        (people.age is frozen at death event).
+        """Mean age at event across alive + dead agents whose event fired.
 
-        Filters to date_event <= end_ti to exclude agents with scheduled-but-
-        not-yet-realised events (e.g. date_cancerous set at CIN diagnosis).
+        For alive: ref = end_ti. For dead: ref = date_dead_any (the agent's
+        actual death step). Requires date_event <= date_dead_any so phantom
+        events (scheduled in set_severity but never realized because the
+        agent died of another cause first) are excluded.
         """
         alive_mask = alive_arr & ~np.isnan(date_event) & (date_event <= end_ti)
-        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead_cancer_g) & (date_event <= end_ti)
+        dead_mask = (
+            (~alive_arr)
+            & ~np.isnan(date_event)
+            & ~np.isnan(date_dead_any)
+            & (date_event <= date_dead_any)
+            & (date_event <= end_ti)
+        )
         ages = []
         if alive_mask.any():
             years_since = (end_ti - date_event[alive_mask]) * dt
             ages.append(age_arr[alive_mask] - years_since)
         if dead_mask.any():
-            years_since_d = (date_dead_cancer_g[dead_mask] - date_event[dead_mask]) * dt
+            years_since_d = (date_dead_any[dead_mask] - date_event[dead_mask]) * dt
             ages.append(age_arr[dead_mask] - years_since_d)
         if not ages:
             return 0.0
@@ -434,27 +471,37 @@ def _aggregate_metrics_v2(sim, genotype_keys):
     end_ti = float(sim.t)
     alive_arr = np.asarray(people.alive).astype(bool)
     age_arr = np.asarray(people.age)
+    # date_dead is kept for the cancer-death filter below (per-cause check);
+    # date_dead_any is the actual death time used in the lifetime accumulator.
     date_dead = np.asarray(people.date_dead_cancer)
+    date_dead_any = _actual_date_dead_v2(people)
 
     sum_age_inf  = 0.0; n_inf_count  = 0
     sum_age_can  = 0.0; n_can_count  = 0
     sum_age_dead = 0.0; n_dead_count = 0
 
     def _accum_lifetime(date_event):
-        """Accumulate ages-at-event across alive + dead-of-cancer agents.
-        Returns (sum_ages, n_valid).
+        """Accumulate ages-at-event across alive + dead agents whose event fired.
 
-        Filters to date_event <= end_ti to exclude agents with scheduled-but-
-        not-yet-realised events (e.g. date_cancerous set at CIN diagnosis).
+        Phantom events (scheduled in set_severity but never realized because
+        the agent died of another cause first) are excluded via the
+        ``date_event <= date_dead_any`` filter.
+        Returns (sum_ages, n_valid).
         """
         alive_mask = alive_arr & ~np.isnan(date_event) & (date_event <= end_ti)
-        dead_mask = (~alive_arr) & ~np.isnan(date_event) & ~np.isnan(date_dead) & (date_event <= end_ti)
+        dead_mask = (
+            (~alive_arr)
+            & ~np.isnan(date_event)
+            & ~np.isnan(date_dead_any)
+            & (date_event <= date_dead_any)
+            & (date_event <= end_ti)
+        )
         ages = []
         if alive_mask.any():
             years_since = (end_ti - date_event[alive_mask]) * dt
             ages.append(age_arr[alive_mask] - years_since)
         if dead_mask.any():
-            years_since_d = (date_dead[dead_mask] - date_event[dead_mask]) * dt
+            years_since_d = (date_dead_any[dead_mask] - date_event[dead_mask]) * dt
             ages.append(age_arr[dead_mask] - years_since_d)
         if not ages:
             return 0.0, 0

@@ -36,48 +36,39 @@ METRIC_KEYS = (
 )
 
 
-def _earliest_ti_dead_cancer(sim, genotypes):
-    """Per-uid earliest cancer-death step across all genotypes.
+def _lifetime_mean_age_at_event(sim, ti_event_arr):
+    """Lifetime reconstruction of mean age at a per-agent event.
 
-    Each agent dies of cancer in at most one genotype; this min handles the
-    edge case where multiple genotypes scheduled deaths and one fired first.
-    Returns an ndarray of length ``n_uids`` with NaN for non-cancer-deaths.
-    """
-    n = len(sim.people.alive.raw)
-    earliest = np.full(n, np.nan)
-    for g in genotypes:
-        mod = sim.diseases[g]
-        td = np.asarray(mod.ti_dead_cancer.raw)
-        valid = ~np.isnan(td)
-        update = valid & (np.isnan(earliest) | (td < earliest))
-        earliest[update] = td[update]
-    return earliest
+    For each alive agent with the event in the past: age - (end_ti - ti_event)*dt.
+    For each dead agent whose event fired BEFORE they died: frozen-age -
+    (ti_dead - ti_event)*dt, using ``sim.people.ti_dead`` (the actual
+    death step, regardless of cause).
 
+    The ``ti_event <= ti_dead`` filter on dead agents excludes phantom
+    events — agents whose ti_event was scheduled in ``set_prognoses`` but
+    never realized because the agent died of another cause first. Without
+    this filter the lifetime mean is biased toward younger ages by an
+    amount that depends on demographic dynamics (and which differs between
+    v2 and v3, breaking parity comparisons).
 
-def _lifetime_mean_age_at_event(sim, ti_event_arr, ti_dead_cancer_any):
-    """v2-compatible lifetime reconstruction of mean age at event.
-
-    Includes alive ever-evented agents (current age − years since event) AND
-    dead-of-cancer agents (frozen-at-death age − years between event and
-    cancer-death). Filters to ``ti_event <= end_ti`` so scheduled-but-not-
-    yet-realised events (e.g. ``ti_cancerous`` set at CIN onset) don't bias
-    the mean upward.
-
-    Mirrors _v2_legacy/people.py logic via baseline_v23._lifetime_mean_age.
-    Returns (sum_ages, count) so aggregate can pool across genotypes.
+    Returns (sum_ages, count) so aggregate callers can pool across genotypes.
     """
     end_ti = float(sim.t.ti)
     dt = float(sim.t.dt)
 
     age_arr = np.asarray(sim.people.age.raw)
     alive_arr = np.asarray(sim.people.alive.raw).astype(bool)
+    ti_dead_arr = np.asarray(sim.people.ti_dead.raw)
     ti_event_arr = np.asarray(ti_event_arr)
 
     alive_mask = alive_arr & ~np.isnan(ti_event_arr) & (ti_event_arr <= end_ti)
+    # Dead-and-already-evented: event must have fired before the agent
+    # actually died (ti_event <= ti_dead). Phantoms have ti_event > ti_dead.
     dead_mask = (
         (~alive_arr)
         & ~np.isnan(ti_event_arr)
-        & ~np.isnan(ti_dead_cancer_any)
+        & ~np.isnan(ti_dead_arr)
+        & (ti_event_arr <= ti_dead_arr)
         & (ti_event_arr <= end_ti)
     )
 
@@ -86,9 +77,7 @@ def _lifetime_mean_age_at_event(sim, ti_event_arr, ti_dead_cancer_any):
         years_since = (end_ti - ti_event_arr[alive_mask]) * dt
         ages.append(age_arr[alive_mask] - years_since)
     if dead_mask.any():
-        years_since_d = (
-            ti_dead_cancer_any[dead_mask] - ti_event_arr[dead_mask]
-        ) * dt
+        years_since_d = (ti_dead_arr[dead_mask] - ti_event_arr[dead_mask]) * dt
         ages.append(age_arr[dead_mask] - years_since_d)
     if not ages:
         return 0.0, 0
@@ -142,7 +131,7 @@ def _per_genotype_cancer_incidence(sim, genotype):
     return float(rate_per_year.mean())
 
 
-def _per_genotype_metrics(sim, genotype, genotypes_for_death=None):
+def _per_genotype_metrics(sim, genotype):
     """Compute the 8-metric M02 summary for one genotype (key into sim.results)."""
     res = sim.results[genotype]
     mod = sim.diseases[genotype]
@@ -167,15 +156,13 @@ def _per_genotype_metrics(sim, genotype, genotypes_for_death=None):
     sum_age_cd = float(np.asarray(res.sum_age_at_cancer_death).sum())
     mean_age_cancer_death = (sum_age_cd / n_cd_unscaled) if n_cd_unscaled > 0 else 0.0
 
-    # Lifetime mean age of infection / cancer onset (v2-compatible).
-    if genotypes_for_death is None:
-        genotypes_for_death = (genotype,)
-    ti_dead_any = _earliest_ti_dead_cancer(sim, genotypes_for_death)
+    # Lifetime mean age of infection / cancer onset (uses sim.people.ti_dead
+    # internally to exclude phantoms; see _lifetime_mean_age_at_event).
     ti_inf_arr = np.asarray(mod.ti_infected.raw)
-    s_inf, n_inf_count = _lifetime_mean_age_at_event(sim, ti_inf_arr, ti_dead_any)
+    s_inf, n_inf_count = _lifetime_mean_age_at_event(sim, ti_inf_arr)
     mean_age_inf = (s_inf / n_inf_count) if n_inf_count > 0 else 0.0
     ti_can_arr = np.asarray(mod.ti_cancerous.raw)
-    s_can, n_can_count = _lifetime_mean_age_at_event(sim, ti_can_arr, ti_dead_any)
+    s_can, n_can_count = _lifetime_mean_age_at_event(sim, ti_can_arr)
     mean_age_cancer = (s_can / n_can_count) if n_can_count > 0 else 0.0
 
     # Mean cancer incidence: per-year rate, averaged across years (v2 cadence).
@@ -226,20 +213,17 @@ def _aggregate_metrics(sim, genotypes):
         float(np.mean(per_genotype_rates)) if per_genotype_rates else 0.0
     )
 
-    # Pool per-genotype lifetime mean-age sums and counts (v2-compatible).
-    ti_dead_any = _earliest_ti_dead_cancer(sim, genotypes)
+    # Pool per-genotype lifetime mean-age sums and counts.
     sum_age_inf_total = 0.0; n_inf_count_total = 0
     sum_age_cancer_total = 0.0; n_can_count_total = 0
     sum_age_cd_total = 0.0; n_cd_count_total = 0.0
     for g in genotypes:
         mod = sim.diseases[g]
         s_inf, c_inf = _lifetime_mean_age_at_event(
-            sim, np.asarray(mod.ti_infected.raw), ti_dead_any
-        )
+            sim, np.asarray(mod.ti_infected.raw))
         sum_age_inf_total += s_inf; n_inf_count_total += c_inf
         s_can, c_can = _lifetime_mean_age_at_event(
-            sim, np.asarray(mod.ti_cancerous.raw), ti_dead_any
-        )
+            sim, np.asarray(mod.ti_cancerous.raw))
         sum_age_cancer_total += s_can; n_can_count_total += c_can
         sum_age_cd_total += float(np.asarray(sim.results[g].sum_age_at_cancer_death).sum())
         n_cd_count_total += float(np.asarray(sim.results[g].new_cancer_deaths).sum())
@@ -269,7 +253,7 @@ def build_summary(sim, genotypes):
     """
     out = {}
     for g in genotypes:
-        per = _per_genotype_metrics(sim, g, genotypes_for_death=genotypes)
+        per = _per_genotype_metrics(sim, g)
         for k, v in per.items():
             out[f'{g}.{k}'] = v
     agg = _aggregate_metrics(sim, genotypes)
