@@ -129,5 +129,62 @@ class routine_vx(BaseVaccination, ss.RoutineDelivery):
 
 
 class campaign_vx(BaseVaccination, ss.CampaignDelivery):
-    """Campaign-style prophylactic HPV vaccination."""
-    pass
+    """Campaign-style prophylactic HPV vaccination.
+
+    Coerces plain int/float ``years`` to float-year values so v2-style
+    constructor calls (``campaign_vx(..., years=[2020, 2021])``) work
+    with Starsim 3.3+'s DateArray timevec.
+
+    Starsim's ``CampaignDelivery.init_pre`` calls
+    ``sc.findnearest(sim.timevec, self.years)`` where ``sim.timevec``
+    is a ``DateArray`` of ``ss.date`` objects.  Subtracting a plain
+    int/float or an ``ss.date`` from a ``DateArray`` element returns a
+    ``datedur``, not a numeric difference, so ``np.argmin(abs(...))``
+    fails.  The fix is to use ``sim.timevec.years`` (a plain NumPy
+    float array) together with float-valued years in the
+    ``init_pre`` override below.
+    """
+
+    def __init__(self, *args, years=None, **kwargs):
+        if years is not None:
+            # Convert any int/float year to float; convert ss.date to its
+            # float-year representation.  All three input types (int, float,
+            # ss.date) are reduced to plain Python floats so that
+            # sc.findnearest can subtract them from sim.timevec.years.
+            def _to_float_year(y):
+                if isinstance(y, (int, float)):
+                    return float(ss.date(y).years)
+                # ss.date or anything with a .years attribute
+                if hasattr(y, 'years'):
+                    return float(y.years)
+                return float(y)
+            years = [_to_float_year(y) for y in years]
+        super().__init__(*args, years=years, **kwargs)
+
+    def init_pre(self, sim):
+        """Override to use sim.timevec.years (float) for findnearest.
+
+        ``ss.CampaignDelivery.init_pre`` calls
+        ``sc.findnearest(sim.timevec, self.years)`` which fails because
+        ``sim.timevec`` is a ``DateArray`` and date subtraction returns
+        ``datedur`` objects.  We replicate the logic using the float-year
+        vector instead.
+        """
+        # Call all init_pre hooks EXCEPT ss.CampaignDelivery's broken one.
+        # MRO for campaign_vx: campaign_vx -> BaseVaccination ->
+        #   ss.BaseVaccination -> ss.CampaignDelivery -> ss.Intervention
+        # We want to call ss.Intervention.init_pre (via super of CampaignDelivery).
+        super(ss.CampaignDelivery, self).init_pre(sim)
+
+        # Replicate CampaignDelivery.init_pre logic with float-year arithmetic.
+        self.timepoints = sc.findnearest(sim.timevec.years, self.years)
+
+        if len(self.prob) == 1:
+            self.prob = np.array([self.prob[0]] * len(self.timepoints))
+
+        if len(self.prob) != len(self.years):
+            errormsg = (
+                f'Length of years incompatible with length of probabilities: '
+                f'{len(self.years)} vs {len(self.prob)}'
+            )
+            raise ValueError(errormsg)
