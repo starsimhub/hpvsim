@@ -517,3 +517,32 @@ on `hpvsim_1dose` / `hpvsim_pxv_younger` headline-shape scenarios.
 To be filled in after implementation lands, documenting any divergences
 from this spec discovered during the build. Format follows M03's
 post-implementation-deltas section.
+
+- **`hpv.campaign_vx` is no longer a "thin diamond leaf".** The spec's
+  "Module layout" section described `campaign_vx` as an empty-body
+  subclass mirroring `routine_vx`. Implementation revealed that Starsim
+  3.3+ `CampaignDelivery.init_pre` calls
+  `sc.findnearest(sim.timevec, self.years)` against a DateArray timevec,
+  which raises `TypeError` regardless of whether `years` is a list of
+  ints, floats, or `ss.date` objects (date subtraction returns
+  `datedur`, breaking `np.argmin(abs(...))`). The shipped `campaign_vx`
+  therefore has a ~30-line `init_pre` override that routes around the
+  broken `CampaignDelivery.init_pre` via
+  `super(ss.CampaignDelivery, self).init_pre(sim)` and replicates the
+  timepoint/probability interpolation against `sim.timevec.years`
+  (float). An upstream Starsim issue should be filed; once fixed, the
+  entire override can be deleted.
+
+- **`test_no_vx_baseline_unchanged` was rewritten post-implementation.**
+  The originally-shipped version compared two no-vx runs against each
+  other, which is pure determinism and doesn't guard against M05
+  perturbing M03's RNG streams. Post-review fix pins a pre-M05 scalar
+  for `hpvtotal['cum_infections'].sum()` and asserts the no-vx run still
+  produces it.
+
+- **`hpv.BaseVaccination` stores raw `sex` and raw `eligibility` as
+  introspection attributes.** Added `self.sex_raw` (preserves
+  user-passed string/list form) and `self.eligibility_raw` (preserves
+  the user's callable) alongside the existing `self.age_range` and
+  `self.sex` (coerced int-set). M04 `AgeResults` consumers and the
+  migration guide can rely on the raw forms.

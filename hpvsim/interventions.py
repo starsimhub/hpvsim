@@ -115,8 +115,12 @@ class BaseVaccination(ss.BaseVaccination):
     def __init__(self, *args, age_range=None, sex=None, eligibility=None, **kwargs):
         composed = _compose_eligibility(age_range, sex, eligibility)
         super().__init__(*args, eligibility=composed, **kwargs)
+        # Raw constructor args, preserved for introspection (e.g.
+        # M04 AgeResults stratification by vaccination cohort).
         self.age_range = age_range
+        self.sex_raw = sex
         self.sex = _coerce_sex(sex)
+        self.eligibility_raw = eligibility
 
     def _parse_product_str(self, product):
         """Resolve a string product name through hpv.vx default lookup."""

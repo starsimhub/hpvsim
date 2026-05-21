@@ -107,22 +107,28 @@ def test_routine_vx_respects_age_range():
     assert np.all(ages_at_vacc < 10 + dt)
 
 
-def test_no_vx_baseline_unchanged():
-    """A sim with no vx intervention reproduces M03 numbers (CRN guard).
+# Pinned scalar from a no-vx sim under SMALL_PARS at rand_seed=0.
+# If M05 (or any later change) perturbs the RNG streams used by HPV
+# transmission / progression / clearance, this number will change and
+# the assertion below will fail loudly. Regenerate by running the
+# no-vx sim and printing float(sim.results['hpvtotal']['cum_infections'].sum()).
+EXPECTED_NO_VX_TOTAL_INFECTIONS = 11536.0
 
-    Reproducibility check: two identical no-vx sims must produce identical
-    headline numbers. If this fails, the new ss.bernoulli construction in
-    hpv.vx (or some other M05 change) may be perturbing the RNG streams
-    used by the existing M03 pipeline.
+
+def test_no_vx_baseline_unchanged():
+    """A no-vx sim reproduces the pre-M05 baseline value (CRN stream guard).
+
+    Pure-determinism would also produce identical values between two runs,
+    but pinning against a pre-recorded scalar guards against M05 (or any
+    later change) perturbing the RNG streams used by the M03 pipeline.
     """
-    sim1 = hpv.Sim(**SMALL_PARS)
-    sim1.run()
-    sim2 = hpv.Sim(**SMALL_PARS)
-    sim2.run()
-    # Pick a canonical aggregate scalar from hpvtotal (v3 result key convention)
-    s1 = float(sim1.results['hpvtotal']['cum_infections'].sum())
-    s2 = float(sim2.results['hpvtotal']['cum_infections'].sum())
-    assert s1 == pytest.approx(s2), f'No-vx baseline not reproducible: {s1} vs {s2}'
+    sim = hpv.Sim(**SMALL_PARS)
+    sim.run()
+    got = float(sim.results['hpvtotal']['cum_infections'].sum())
+    assert got == pytest.approx(EXPECTED_NO_VX_TOTAL_INFECTIONS), \
+        f'No-vx baseline drifted: got {got!r}, expected {EXPECTED_NO_VX_TOTAL_INFECTIONS!r}. ' \
+        f'Either M05 perturbed RNG streams (investigate), or the underlying ' \
+        f'model genuinely changed (regenerate the pinned value).'
 
 
 def test_routine_vx_reduces_susceptibility_post_dose():
