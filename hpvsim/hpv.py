@@ -361,8 +361,13 @@ class HPV(ss.Infection):
             # Cancel pending cancer progression in this other genotype
             module.ti_cancerous[uids] = np.nan
             module.ti_dead_cancer[uids] = np.nan
-            # Clear CIN state (agent no longer in CIN for any genotype)
+            # Clear all dysplasia state: v2 sets cin[:, inds] = False across
+            # all genotypes; v3 splits CIN into precin + cin so we clear both
+            # (and their scheduled transition times) to keep these agents from
+            # re-promoting precin -> cin on the now-cancerous body.
+            module.precin[uids] = False
             module.cin[uids] = False
+            module.ti_cin[uids] = np.nan
             # Clear pending clearance (these infections won't clear naturally;
             # the agent is dying of cancer instead)
             module.ti_clearance[uids] = np.nan
