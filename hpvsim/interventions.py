@@ -15,7 +15,7 @@ import starsim as ss
 
 from hpvsim.products import vx as _vx
 
-__all__ = []
+__all__ = ['BaseVaccination', 'routine_vx', 'campaign_vx']
 
 
 def _coerce_sex(sex):
@@ -97,3 +97,37 @@ def _compose_eligibility(age_range, sex, extra):
         return cond.uids
 
     return elig
+
+
+class BaseVaccination(ss.BaseVaccination):
+    """HPV-specific prophylactic vaccination base.
+
+    Wraps Starsim's ``ss.BaseVaccination`` to add v2-compatible
+    ``age_range`` / ``sex`` / ``eligibility`` constructor args. These
+    compose into a single Starsim eligibility callable. The originals are
+    stored on the instance for introspection (e.g. AgeResults consumption).
+
+    Also overrides ``_parse_product_str`` so that
+    ``routine_vx(product='bivalent', ...)`` resolves through
+    ``hpv.vx(name='bivalent')``, mirroring v2's string-product convention.
+    """
+
+    def __init__(self, *args, age_range=None, sex=None, eligibility=None, **kwargs):
+        composed = _compose_eligibility(age_range, sex, eligibility)
+        super().__init__(*args, eligibility=composed, **kwargs)
+        self.age_range = age_range
+        self.sex = _coerce_sex(sex)
+
+    def _parse_product_str(self, product):
+        """Resolve a string product name through hpv.vx default lookup."""
+        return _vx(name=product)
+
+
+class routine_vx(BaseVaccination, ss.RoutineDelivery):
+    """Routine prophylactic HPV vaccination."""
+    pass
+
+
+class campaign_vx(BaseVaccination, ss.CampaignDelivery):
+    """Campaign-style prophylactic HPV vaccination."""
+    pass

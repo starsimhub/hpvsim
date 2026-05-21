@@ -276,3 +276,48 @@ def test_compose_eligibility_combines_age_sex_extra():
     assert np.all(ages < 14)
     # Starsim uses people.female for sex==0 (female)
     assert np.all(sim.people.female[uids])
+
+
+def test_base_vaccination_accepts_v2_args():
+    """hpv.BaseVaccination accepts age_range, sex, eligibility as kwargs."""
+    from hpvsim.interventions import BaseVaccination, routine_vx
+    from hpvsim.products import vx
+    intv = routine_vx(
+        product=vx(name='bivalent'),
+        prob=0.9,
+        age_range=[9, 14],
+        sex='f',
+        start_year=2020,
+    )
+    assert isinstance(intv, BaseVaccination)
+    assert intv.age_range == [9, 14]
+    assert intv.sex == {0}
+
+
+def test_parse_product_str_resolves_to_default_vx():
+    """routine_vx(product='bivalent', ...) resolves through hpv.vx(name='bivalent')."""
+    from hpvsim.interventions import routine_vx
+    from hpvsim.products import vx
+    intv = routine_vx(product='bivalent', prob=0.5, start_year=2020)
+    assert isinstance(intv.product, vx)
+    assert intv.product.rel_imm['hpv16'] == pytest.approx(1.0)
+
+
+def test_routine_vx_isinstance_chain():
+    """Class identity preserved across the diamond."""
+    import starsim as ss
+    from hpvsim.interventions import routine_vx, campaign_vx, BaseVaccination
+    intv_r = routine_vx(product='bivalent', prob=0.5, start_year=2020)
+    intv_c = campaign_vx(product='bivalent', prob=0.5, years=[2020])
+    assert isinstance(intv_r, BaseVaccination)
+    assert isinstance(intv_r, ss.BaseVaccination)
+    assert isinstance(intv_r, ss.RoutineDelivery)
+    assert isinstance(intv_c, BaseVaccination)
+    assert isinstance(intv_c, ss.CampaignDelivery)
+
+
+def test_campaign_vx_passes_years_through():
+    """campaign_vx accepts years= and stores it for init_pre."""
+    from hpvsim.interventions import campaign_vx
+    intv = campaign_vx(product='bivalent', prob=[0.7, 0.5], years=[2020, 2021])
+    assert list(intv.years) == [2020, 2021]
