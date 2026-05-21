@@ -86,6 +86,14 @@ def _run_anchor(pars, n_seeds, out_path):
         pop = sim.results['n_alive'][mask]
         py = float((pop * sim['dt']).sum())
         row['cancer_incidence_2030_2060'] = n_cancers / max(py, 1.0)
+        # Trajectory baseline: per-year metrics for the parity test in Task 12.
+        # Stored as a dict on each seed row so summary + trajectory share one JSON.
+        row['_trajectory'] = sc.objdict(
+            year=list(sim.results['year']),
+            new_cancers=list(sim.results['new_cancers']),
+            hpv_total_infections=list(sim.results['hpv_total_infections']),
+            new_vaccinated=list(sim.results.get('new_vaccinated', [0] * len(sim.results['year']))),
+        )
         summaries.append(row)
         print(f'  seed {seed}: n_vaccinated={row["n_vaccinated_2060"]}')
     out_path.write_text(json.dumps(summaries, indent=2))
