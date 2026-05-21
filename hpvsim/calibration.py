@@ -1,34 +1,90 @@
-"""HPVsim calibration — thin wrapper around ss.Calibration + helpers.
+"""HPVsim calibration — ss.Calibration subclass with v2.2.7-style gof eval.
 
 Provides:
-    - hpv.Calibration: ss.Calibration subclass with HPV-aware defaults.
+    - hpv.Calibration: ss.Calibration subclass that takes a ``data`` dict of
+      observed-target DataFrames and computes a single weighted mismatch
+      using ``compute_gof`` (normalized absolute error by default).
+    - compute_gof: goodness-of-fit between actual and predicted arrays.
     - build_sim: default build_fn that routes flat dotted-key calib_pars to
       sim.pars, sim.diseases[<genotype>].pars, or the CrossImmunity connector.
-    - CalibComponent factories for the three common HPV target shapes:
-      cancer_by_age, hpv_prev_by_age, cancer_genotype_dist.
+
+The default eval_fn pulls each target's simulated values out of the
+``AgeResults`` analyzer, aligns on (year, column), then sums
+``compute_gof`` over the flattened (year × column) values. Per-target
+``weights`` scale each result's mismatch before summing.
 """
+import numpy as np
 import pandas as pd
 import sciris as sc
 import starsim as ss
 
+from .analyzers import AgeResults
 
-__all__ = ['Calibration', 'build_sim',
-           'cancer_by_age', 'hpv_prev_by_age', 'cancer_genotype_dist']
+
+__all__ = ['Calibration', 'build_sim', 'compute_gof', 'default_eval_fn']
 
 
 class Calibration(ss.Calibration):
     """HPVsim calibration. Delegates to ss.Calibration with HPV-aware defaults.
+
+    Two entry points to specify the fit target:
+
+    - ``data={'cancers': df, ...}``: dict of 't'-indexed DataFrames keyed by
+      ``AgeResults`` result name. The default eval_fn extracts the matching
+      simulated values, aligns on (year, column), and sums
+      ``compute_gof`` across all rows/columns, scaled by per-key
+      ``weights``. Mirrors v2.2.7's MAE-based mismatch.
+    - ``components=[...]`` or a custom ``eval_fn``: standard ss.Calibration
+      paths, unchanged.
 
     Default build_fn is hpv.calibration.build_sim, which routes flat
     dotted-key calib_pars (e.g. 'beta', 'hpv16.cin_fn.k',
     'cross_immunity.cross_imm_sus.hpv16.hpv18') to the right address.
     """
 
-    def __init__(self, sim, calib_pars, *, build_fn=None, **kwargs):
+    def __init__(self, sim, calib_pars, *, data=None, weights=None,
+                 gof_kwargs=None, build_fn=None, eval_fn=None, eval_kw=None,
+                 **kwargs):
         if build_fn is None:
             build_fn = build_sim
         kwargs.setdefault('study_name', 'hpvsim_calibration')
-        super().__init__(sim, calib_pars, build_fn=build_fn, **kwargs)
+
+        if data is not None:
+            if eval_fn is not None:
+                raise ValueError(
+                    'hpv.Calibration: pass either data= or eval_fn=, not both.')
+            self._validate_data(data)
+            eval_fn = default_eval_fn
+            eval_kw = sc.mergedicts(eval_kw, dict(
+                data=data,
+                weights=weights or {},
+                gof_kwargs=gof_kwargs or {},
+            ))
+
+        super().__init__(sim, calib_pars, build_fn=build_fn,
+                         eval_fn=eval_fn, eval_kw=eval_kw, **kwargs)
+
+    @staticmethod
+    def _validate_data(data):
+        """Each value must be a DataFrame whose index is named 't'."""
+        if not isinstance(data, dict):
+            raise TypeError(
+                f'hpv.Calibration.data must be a dict; got {type(data).__name__}')
+        known = set(AgeResults._COUNT_TO_STATE) | set(AgeResults._PREV_TO_STATE) \
+            | set(AgeResults._INC_TO_ATTRS) | set(AgeResults._TYPE_DIST_TO_STATE)
+        for key, df in data.items():
+            if key not in known:
+                raise ValueError(
+                    f'hpv.Calibration.data: unknown result key {key!r}; '
+                    f'must be one of {sorted(known)}')
+            if not isinstance(df, pd.DataFrame):
+                raise TypeError(
+                    f'hpv.Calibration.data[{key!r}] must be a DataFrame; '
+                    f'got {type(df).__name__}')
+            if df.index.name != 't':
+                raise ValueError(
+                    f'hpv.Calibration.data[{key!r}].index.name must be \'t\'; '
+                    f'got {df.index.name!r}')
 
 
 def build_sim(sim, calib_pars, **kwargs):
@@ -123,214 +179,116 @@ def build_sim(sim, calib_pars, **kwargs):
     return sim
 
 
+def compute_gof(actual, predicted, normalize=True, use_frac=False,
+                use_squared=False, as_scalar='none', eps=1e-9,
+                skestimator=None, estimator=None, **kwargs):
+    """Goodness-of-fit between two arrays — normalized absolute error by default.
+
+    Ported from HPVsim v2.2.7 (``hpvsim._v2_legacy.misc.compute_gof``).
+    Mean squared error is ``normalize=False, use_squared=True, as_scalar='mean'``.
+
+    Args:
+        actual:      array of observed (data) points.
+        predicted:   array of model points; same shape as ``actual``.
+        normalize:   if True, divide errors by ``max(|actual|)``.
+        use_frac:    if True, divide each error by ``max(actual, predicted) + eps``
+                     instead of normalizing by the global max.
+        use_squared: if True, square the per-point errors.
+        as_scalar:   collapse to a scalar via ``'sum'`` / ``'mean'`` / ``'median'``;
+                     ``'none'`` returns the per-point array.
+        eps:         small constant guarding the ``use_frac`` denominator.
+        skestimator: scikit-learn metric name (e.g. ``'mean_squared_error'``).
+        estimator:   user-supplied callable ``(actual, predicted, **kwargs)``.
+        kwargs:      forwarded to the scikit-learn / custom estimator.
+    """
+    actual = np.array(actual, dtype=float, copy=True)
+    predicted = np.array(predicted, dtype=float, copy=True)
+
+    if skestimator is not None:
+        import sklearn.metrics as sm
+        return getattr(sm, skestimator)(actual, predicted, **kwargs)
+
+    if estimator is not None:
+        return estimator(actual, predicted, **kwargs)
+
+    gofs = np.abs(actual - predicted)
+
+    if normalize and not use_frac:
+        actual_max = np.abs(actual).max()
+        if actual_max > 0:
+            gofs = gofs / actual_max
+
+    if use_frac:
+        if (actual < 0).any() or (predicted < 0).any():
+            # Fractional error on negative quantities is ill-defined; fall
+            # back to absolute error rather than producing nonsense.
+            pass
+        else:
+            maxvals = np.maximum(actual, predicted) + eps
+            gofs = gofs / maxvals
+
+    if use_squared:
+        gofs = gofs ** 2
+
+    if as_scalar == 'sum':
+        return float(np.sum(gofs))
+    if as_scalar == 'mean':
+        return float(np.mean(gofs))
+    if as_scalar == 'median':
+        return float(np.median(gofs))
+    return gofs
+
+
 def _find_age_results(sim):
     """Locate the AgeResults analyzer on the sim, regardless of its
     name/key. Raises if there isn't exactly one."""
-    from .analyzers import AgeResults
     matches = [a for a in sim.analyzers.values() if isinstance(a, AgeResults)]
     if len(matches) != 1:
         raise ValueError(
-            f'CalibComponent extract: expected exactly one AgeResults '
-            f'analyzer on sim; found {len(matches)}')
+            f'hpv.Calibration: expected exactly one AgeResults analyzer on '
+            f'the sim; found {len(matches)}')
     return matches[0]
 
 
-def _make_extract_fn(result_key, expected):
-    """Build a closure that pulls AgeResults[result_key] in expected's schema."""
-    def extract_fn(sim):
-        ar = _find_age_results(sim)
-        df = ar.to_dataframe(key=result_key)
-        # Align on expected's index/columns; missing rows/cols => KeyError,
-        # which surfaces schema mismatches at evaluation time.
-        return df.loc[expected.index, expected.columns]
-    return extract_fn
+def _extract_actual(ar, key, expected):
+    """Pull `key` from AgeResults, aligned to expected's (index, columns)."""
+    # Type-distribution data is compared in raw-count units (same as expected).
+    if key in AgeResults._TYPE_DIST_TO_STATE:
+        actual = ar.to_dataframe(key=key, normalize=False)
+    else:
+        actual = ar.to_dataframe(key=key)
+    missing_rows = [t for t in expected.index if t not in actual.index]
+    missing_cols = [c for c in expected.columns if c not in actual.columns]
+    if missing_rows or missing_cols:
+        raise KeyError(
+            f'hpv.Calibration eval: data[{key!r}] references rows '
+            f'{missing_rows} / columns {missing_cols} not produced by '
+            f'AgeResults; available rows={list(actual.index)}, '
+            f'columns={list(actual.columns)}')
+    return actual.loc[expected.index, expected.columns]
 
 
-def _make_age_bin_extract_fn(result_key, age_bin):
-    """Build a closure that extracts one age bin as a 't'-indexed
-    DataFrame with a single 'x' column. Used for per-age-bin Normal
-    components: Starsim's Normal.compute_nll merges on 't' and reads
-    rep['x_e']/rep['x_a'], so each component must produce single-channel
-    'x' data."""
-    def extract_fn(sim):
-        ar = _find_age_results(sim)
-        df = ar.to_dataframe(key=result_key)
-        return pd.DataFrame({'x': df[age_bin].values}, index=df.index)
-    return extract_fn
+def default_eval_fn(sim, data, weights=None, gof_kwargs=None):
+    """Default eval_fn: weighted sum of compute_gof across each data target.
 
-
-def _validate_age_schema(expected, sim_template):
-    """expected must have a 't'-named index and string column labels."""
-    if expected.index.name != 't':
-        raise ValueError(
-            f'expected.index.name must be \'t\'; got {expected.index.name!r}')
-    if not all(isinstance(c, str) for c in expected.columns):
-        raise ValueError(
-            f'expected.columns must be strings (age-bin labels); '
-            f'got {list(expected.columns)}')
-
-
-def _per_age_bin_normal_components(expected, *, result_key, name_prefix, weight,
-                                   sigma2_floor=1.0):
-    """Build one ss.Normal component per age-bin column in `expected`.
-
-    ss.Normal.compute_nll merges expected/actual on 't' and reads
-    'x_e'/'x_a', so each component must carry single-channel 'x' data.
-    An N-column input produces N components, each carrying one bin's
-    values as a 't'-indexed 'x' column.
-
-    Each component's sigma2 is set explicitly using a Poisson-like
-    approximation (variance ≈ mean, floored at ``sigma2_floor``). This
-    keeps the likelihood well-defined when expected and actual coincide
-    at a single timepoint.
+    For each ``(key, expected_df)`` in ``data``, pull the simulated values
+    from the sim's ``AgeResults`` analyzer aligned on ``(index, columns)``,
+    flatten both, call ``compute_gof(as_scalar='sum')``, then multiply by
+    ``weights.get(key, 1.0)``. Returns the total as a single float —
+    smaller is better.
     """
-    _validate_age_schema(expected, None)
-    components = []
-    for age_bin in expected.columns:
-        col = expected[age_bin].values.astype(float)
-        sub_expected = pd.DataFrame({'x': col}, index=expected.index)
-        # Poisson-like sigma2: variance ≈ mean for count data, floored to
-        # avoid sigma2=0 when expected counts are zero in this bin.
-        sigma2 = max(float(col.mean()), sigma2_floor)
-        components.append(ss.Normal(
-            name=f'{name_prefix}:{age_bin}',
-            expected=sub_expected,
-            extract_fn=_make_age_bin_extract_fn(result_key, age_bin),
-            conform='step_containing',
-            weight=weight,
-            sigma2=sigma2,
-        ))
-    return components
-
-
-def cancer_by_age(expected, *, weight=1):
-    """List of ss.Normal components for age-binned cancer counts.
-
-    AgeResults snapshots the count of agents with cancerous=True at each
-    requested year (point-in-time stock). conform='step_containing' picks
-    the sim timestep that contains the target year.
-
-    Returns one component per age-bin column in `expected`; each component
-    carries that bin's counts as a single 't'-indexed 'x' column.
-    """
-    return _per_age_bin_normal_components(
-        expected, result_key='cancers', name_prefix='cancer_by_age',
-        weight=weight,
-    )
-
-
-def hpv_prev_by_age(expected, expected_n=None, *, weight=1):
-    """Components for age-binned HPV prevalence — Normal or BetaBinomial.
-
-    Two modes, picked by the shape of the inputs:
-
-    - **Ratio (Normal):** call as ``hpv_prev_by_age(expected_ratio)``.
-      ``expected_ratio`` is a DataFrame with `t`-named index and age-bin
-      columns of prevalence values in [0,1]. Returns one ss.Normal per
-      age bin, comparing simulated ratios to observed ratios. Use when
-      target data is reported as prevalences only (no denominator).
-
-    - **Counts (BetaBinomial):** call as
-      ``hpv_prev_by_age(expected_x, expected_n)``. Both DataFrames share
-      the same `t`-indexed schema; cells of ``expected_x`` are positives
-      and cells of ``expected_n`` are totals per age bin. Returns one
-      ss.BetaBinomial per age bin. Use when target data is reported as
-      raw counts (positives + sample size).
-
-    The BetaBinomial path reads simulated (x, n) per bin from
-    ``AgeResults.to_xn_per_bin('hpv_prevalence')``.
-    """
-    if expected_n is None:
-        return _per_age_bin_normal_components(
-            expected, result_key='hpv_prevalence',
-            name_prefix='hpv_prev_by_age', weight=weight,
+    weights = weights or {}
+    gof_kwargs = dict(gof_kwargs or {})
+    # Default to a scalar-sum gof unless the caller already specified.
+    gof_kwargs.setdefault('as_scalar', 'sum')
+    ar = _find_age_results(sim)
+    total = 0.0
+    for key, expected in data.items():
+        actual = _extract_actual(ar, key, expected)
+        mismatch = compute_gof(
+            np.asarray(expected.values, dtype=float).ravel(),
+            np.asarray(actual.values, dtype=float).ravel(),
+            **gof_kwargs,
         )
-    _validate_age_schema(expected, None)
-    _validate_age_schema(expected_n, None)
-    if list(expected.columns) != list(expected_n.columns):
-        raise ValueError(
-            f'hpv_prev_by_age: expected and expected_n must share columns; '
-            f'got {list(expected.columns)} vs {list(expected_n.columns)}'
-        )
-    if list(expected.index) != list(expected_n.index):
-        raise ValueError(
-            f'hpv_prev_by_age: expected and expected_n must share index; '
-            f'got {list(expected.index)} vs {list(expected_n.index)}'
-        )
-    components = []
-    for age_bin in expected.columns:
-        sub_expected = pd.DataFrame(
-            {
-                'x': expected[age_bin].values.astype(float),
-                'n': expected_n[age_bin].values.astype(float),
-            },
-            index=expected.index,
-        )
-        components.append(ss.BetaBinomial(
-            name=f'hpv_prev_by_age:{age_bin}',
-            expected=sub_expected,
-            extract_fn=_make_prev_xn_extract_fn(age_bin),
-            conform='step_containing',
-            weight=weight,
-        ))
-    return components
-
-
-def _make_prev_xn_extract_fn(age_bin):
-    """Closure: pull (x, n) per timepoint for one age bin of hpv_prevalence."""
-    def extract_fn(sim):
-        ar = _find_age_results(sim)
-        xn = ar.to_xn_per_bin('hpv_prevalence')
-        return xn[age_bin]
-    return extract_fn
-
-
-def cancer_genotype_dist(expected, *, weight=1):
-    """ss.DirichletMultinomial component for the cancer-genotype distribution.
-
-    Args:
-        expected (pd.DataFrame): 't'-indexed DataFrame of raw cancer counts
-            per genotype per year. Columns are genotype names (e.g.
-            'hpv16', 'hpv18') OR already-prefixed forms ('x_hpv16', ...).
-            Values must be counts, not proportions — DirichletMultinomial's
-            likelihood treats them as multinomial trials.
-        weight (float): component weight for the overall calibration loss.
-
-    The factory normalizes the column names to the ``x_<genotype>`` form
-    that ss.DirichletMultinomial.compute_nll discovers via its
-    ``[col for col in expected.columns if col.startswith('x')]`` filter.
-    The extract_fn pulls raw counts from AgeResults
-    (``to_dataframe(key, normalize=False)``) and applies the same renaming.
-    """
-    if expected.index.name != 't':
-        raise ValueError(
-            f'expected.index.name must be \'t\'; got {expected.index.name!r}')
-    # Normalize column names: accept either bare genotype names or x_-prefixed.
-    rename = {}
-    for col in expected.columns:
-        if not isinstance(col, str):
-            raise ValueError(
-                f'cancer_genotype_dist: expected.columns must be strings; '
-                f'got {list(expected.columns)}'
-            )
-        rename[col] = col if col.startswith('x') else f'x_{col}'
-    sub_expected = expected.rename(columns=rename)
-    return ss.DirichletMultinomial(
-        name='cancer_genotype_dist',
-        expected=sub_expected,
-        extract_fn=_make_genotype_dist_extract_fn(list(rename.values())),
-        conform='step_containing',
-        weight=weight,
-    )
-
-
-def _make_genotype_dist_extract_fn(target_columns):
-    """Closure: pull raw cancerous_genotype_dist counts and rename to x_<gen>."""
-    def extract_fn(sim):
-        ar = _find_age_results(sim)
-        df = ar.to_dataframe(key='cancerous_genotype_dist', normalize=False)
-        # AgeResults emits columns like 'hpv16', 'hpv18'; rename to 'x_hpv16'…
-        # to match what DirichletMultinomial.compute_nll expects.
-        df = df.rename(columns={c: f'x_{c}' for c in df.columns})
-        return df[target_columns]
-    return extract_fn
+        total += float(mismatch) * float(weights.get(key, 1.0))
+    return total

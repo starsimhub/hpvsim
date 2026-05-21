@@ -1,4 +1,4 @@
-"""Unit tests for hpv.Calibration and helpers."""
+"""Unit tests for hpv.Calibration, compute_gof, and the default eval_fn."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -8,9 +8,12 @@ import starsim as ss
 import hpvsim as hpv
 
 
+# ---------------------------------------------------------------------------
+# Calibration class / build_sim
+# ---------------------------------------------------------------------------
+
 def test_calibration_importable():
     """hpv.Calibration exists at top level and is an ss.Calibration."""
-    import starsim as ss
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
     calib_pars = dict(beta=dict(low=0.10, high=0.30, guess=0.20))
     calib = hpv.Calibration(sim, calib_pars, total_trials=2, debug=True)
@@ -21,8 +24,7 @@ def test_build_sim_routes_top_level_pars():
     """A bare-name calib_pars key writes into sim.pars."""
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
     sim.init()
-    trial_pars = {'beta': 0.25}
-    out = hpv.calibration.build_sim(sim, calib_pars=trial_pars)
+    out = hpv.calibration.build_sim(sim, calib_pars={'beta': 0.25})
     assert out.pars.beta == 0.25
 
 
@@ -31,8 +33,7 @@ def test_build_sim_routes_per_genotype_pars():
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
                   genotypes=[16, 18, 'hi5', 'ohr'])
     sim.init()
-    trial_pars = {'hpv16.cin_fn.k': 0.77}
-    out = hpv.calibration.build_sim(sim, calib_pars=trial_pars)
+    out = hpv.calibration.build_sim(sim, calib_pars={'hpv16.cin_fn.k': 0.77})
     assert out.diseases.hpv16.pars.cin_fn['k'] == 0.77
 
 
@@ -41,8 +42,8 @@ def test_build_sim_routes_cross_immunity():
     sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0,
                   genotypes=[16, 18, 'hi5', 'ohr'])
     sim.init()
-    trial_pars = {'cross_immunity.cross_imm_sus.hpv16.hpv18': 0.42}
-    out = hpv.calibration.build_sim(sim, calib_pars=trial_pars)
+    out = hpv.calibration.build_sim(
+        sim, calib_pars={'cross_immunity.cross_imm_sus.hpv16.hpv18': 0.42})
     conn = [c for c in out.connectors.values()
             if isinstance(c, hpv.CrossImmunity)][0]
     idx = {m.name: i for i, m in enumerate(conn.hpv_modules)}
@@ -65,188 +66,210 @@ def test_build_sim_does_not_mutate_base():
     sim_base = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
     sim_base.init()
     original_seed = sim_base.pars.rand_seed
-    # ss.Calibration would dcp first; we simulate that here.
     sim_copy = sc.dcp(sim_base)
     hpv.calibration.build_sim(sim_copy, calib_pars={'rand_seed': 999})
     assert sim_base.pars.rand_seed == original_seed
     assert sim_copy.pars.rand_seed == 999
 
 
-def test_cancer_by_age_factory_returns_one_normal_component_per_age_bin():
-    """cancer_by_age returns a list of ss.Normal components, one per age bin.
+# ---------------------------------------------------------------------------
+# compute_gof
+# ---------------------------------------------------------------------------
 
-    Each component's extract_fn returns a 't'-indexed DataFrame with a
-    single 'x' column carrying that age bin's counts — the shape that
-    ss.Normal.compute_nll consumes.
-    """
+def test_compute_gof_normalized_abs_error_default():
+    """Default is per-point absolute error divided by max(|actual|)."""
+    actual = np.array([0.0, 10.0, 20.0])
+    predicted = np.array([0.0, 12.0, 18.0])
+    gof = hpv.calibration.compute_gof(actual, predicted)
+    # Errors |0-0|, |10-12|, |20-18| = [0, 2, 2]; max(|actual|) = 20.
+    np.testing.assert_allclose(gof, [0.0, 0.1, 0.1])
+
+
+def test_compute_gof_as_scalar_sum_returns_float():
+    """as_scalar='sum' collapses the per-point array to a scalar."""
+    gof = hpv.calibration.compute_gof([0, 10, 20], [0, 12, 18],
+                                      as_scalar='sum')
+    assert isinstance(gof, float)
+    assert gof == pytest.approx(0.2)
+
+
+def test_compute_gof_mse_via_use_squared_mean():
+    """MSE = compute_gof(normalize=False, use_squared=True, as_scalar='mean')."""
+    actual = np.array([1.0, 2.0, 3.0])
+    predicted = np.array([1.5, 2.5, 3.5])
+    gof = hpv.calibration.compute_gof(actual, predicted, normalize=False,
+                                      use_squared=True, as_scalar='mean')
+    assert gof == pytest.approx(0.25)
+
+
+def test_compute_gof_zero_actual_max_does_not_divide():
+    """If actual is all zero, the normalize step is a no-op (no divide-by-zero)."""
+    gof = hpv.calibration.compute_gof([0, 0, 0], [1, 2, 3])
+    np.testing.assert_array_equal(gof, [1.0, 2.0, 3.0])
+
+
+# ---------------------------------------------------------------------------
+# default_eval_fn
+# ---------------------------------------------------------------------------
+
+def _sim_with_age_results(*, n_agents=400, years=(2020,), keys=('cancers',),
+                         genotypes=None):
     edges = np.array([0., 30., 60., 100.])
-    age_labels = ['0-30', '30-60', '60+']
-    expected = pd.DataFrame(
-        [[10, 50, 30]],
-        index=pd.Index([2020.0], name='t'),
-        columns=age_labels,
-    )
-    sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
-                  rand_seed=0, analyzers=[hpv.AgeResults(
-                      result_args=sc.objdict(
-                          cancers=sc.objdict(years=[2020], edges=edges),
-                      ),
-                  )])
+    args = sc.objdict()
+    for k in keys:
+        args[k] = sc.objdict(years=list(years), edges=edges)
+    kw = dict(n_agents=n_agents, start=min(years) - 1,
+              stop=max(years) + 1, dt=1.0,
+              rand_seed=0, analyzers=[hpv.AgeResults(result_args=args)])
+    if genotypes is not None:
+        kw['genotypes'] = genotypes
+    return hpv.Sim(**kw)
+
+
+def test_default_eval_fn_zero_when_data_matches_sim():
+    """If the data dataframe IS the sim's AgeResults output, mismatch is 0."""
+    sim = _sim_with_age_results(keys=('cancers',))
     sim.run()
     ar = sim.analyzers['ageresults']
-    full = ar.to_dataframe(key='cancers')
+    actual = ar.to_dataframe(key='cancers')
 
-    components = hpv.calibration.cancer_by_age(expected)
-    assert len(components) == len(age_labels)
-    for comp, age_bin in zip(components, age_labels):
-        assert isinstance(comp, ss.Normal)
-        assert comp.name == f'cancer_by_age:{age_bin}'
-        actual = comp.extract_fn(sim)
-        assert actual.index.name == 't'
-        assert list(actual.columns) == ['x']
-        # The 'x' column carries that age bin's counts from AgeResults.
-        assert (actual['x'].values == full[age_bin].values).all()
+    data = {'cancers': actual.copy()}
+    fit = hpv.calibration.default_eval_fn(sim, data=data)
+    assert fit == pytest.approx(0.0, abs=1e-9)
 
 
-def test_hpv_prev_by_age_factory_with_counts_returns_betabinomial_per_age_bin():
-    """hpv_prev_by_age(expected_x, expected_n) returns ss.BetaBinomial per bin.
-
-    Each component's extract_fn returns a 't'-indexed DataFrame with columns
-    ['x', 'n'] for that age bin's positives and totals — the format
-    ss.BetaBinomial.compute_nll consumes.
-    """
-    edges = np.array([0., 30., 60., 100.])
-    age_labels = ['0-30', '30-60', '60+']
-    expected_x = pd.DataFrame(
-        [[5, 20, 8]],
-        index=pd.Index([2020.0], name='t'),
-        columns=age_labels,
-    )
-    expected_n = pd.DataFrame(
-        [[100, 200, 400]],
-        index=pd.Index([2020.0], name='t'),
-        columns=age_labels,
-    )
-    sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
-                  rand_seed=0, analyzers=[hpv.AgeResults(
-                      result_args=sc.objdict(
-                          hpv_prevalence=sc.objdict(years=[2020], edges=edges),
-                      ),
-                  )])
+def test_default_eval_fn_weighted_sum_across_targets():
+    """Total fit is sum of per-key compute_gof * weights[key]."""
+    sim = _sim_with_age_results(keys=('cancers', 'hpv_prevalence'))
     sim.run()
-    components = hpv.calibration.hpv_prev_by_age(expected_x, expected_n)
-    assert len(components) == len(age_labels)
-    for comp, age_bin in zip(components, age_labels):
-        assert isinstance(comp, ss.BetaBinomial)
-        assert comp.name == f'hpv_prev_by_age:{age_bin}'
-        actual = comp.extract_fn(sim)
-        assert actual.index.name == 't'
-        assert list(actual.columns) == ['x', 'n']
-        # n should equal the alive count per bin (positive integer).
-        assert (actual['n'] > 0).all()
-        assert (actual['x'] <= actual['n']).all()
+    ar = sim.analyzers['ageresults']
+    cancers = ar.to_dataframe(key='cancers')
+    prev = ar.to_dataframe(key='hpv_prevalence')
+
+    # Construct off-target data so each key contributes a known mismatch.
+    cancers_off = cancers + 1.0
+    prev_off = prev + 0.05
+    data = {'cancers': cancers_off, 'hpv_prevalence': prev_off}
+
+    # Per-key gofs we expect default_eval_fn to compute (sum-scalar by default).
+    gof_cancers = hpv.calibration.compute_gof(
+        cancers_off.values.ravel(), cancers.values.ravel(), as_scalar='sum')
+    gof_prev = hpv.calibration.compute_gof(
+        prev_off.values.ravel(), prev.values.ravel(), as_scalar='sum')
+
+    # Unweighted = sum of per-key gofs.
+    fit_unweighted = hpv.calibration.default_eval_fn(sim, data=data)
+    assert fit_unweighted == pytest.approx(gof_cancers + gof_prev)
+
+    # Weighted scales each per-key contribution.
+    fit_weighted = hpv.calibration.default_eval_fn(
+        sim, data=data, weights={'cancers': 2.0, 'hpv_prevalence': 0.5})
+    assert fit_weighted == pytest.approx(2.0 * gof_cancers + 0.5 * gof_prev)
 
 
-def test_hpv_prev_by_age_factory_returns_one_normal_component_per_age_bin():
-    """hpv_prev_by_age returns a list of ss.Normal components, one per age bin."""
-    edges = np.array([0., 30., 60., 100.])
-    age_labels = ['0-30', '30-60', '60+']
-    expected = pd.DataFrame(
-        [[0.05, 0.10, 0.02]],
-        index=pd.Index([2020.0], name='t'),
-        columns=age_labels,
+def test_default_eval_fn_type_distribution_uses_raw_counts():
+    """For genotype-distribution keys, eval_fn pulls raw counts (not proportions)."""
+    sim = _sim_with_age_results(
+        keys=('cancerous_genotype_dist',),
+        years=(2020,),
+        genotypes=[16, 18, 'hi5', 'ohr'],
     )
-    sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
-                  rand_seed=0, analyzers=[hpv.AgeResults(
-                      result_args=sc.objdict(
-                          hpv_prevalence=sc.objdict(years=[2020], edges=edges),
-                      ),
-                  )])
     sim.run()
-    components = hpv.calibration.hpv_prev_by_age(expected)
-    assert len(components) == len(age_labels)
-    for comp, age_bin in zip(components, age_labels):
-        assert isinstance(comp, ss.Normal)
-        assert comp.name == f'hpv_prev_by_age:{age_bin}'
-        actual = comp.extract_fn(sim)
-        assert actual.index.name == 't'
-        assert list(actual.columns) == ['x']
+    ar = sim.analyzers['ageresults']
+    raw = ar.to_dataframe(key='cancerous_genotype_dist', normalize=False)
+
+    data = {'cancerous_genotype_dist': raw.copy()}
+    fit = hpv.calibration.default_eval_fn(sim, data=data)
+    assert fit == pytest.approx(0.0, abs=1e-9)
 
 
-def test_cancer_genotype_dist_factory_returns_dirichlet_with_x_prefixed_columns():
-    """cancer_genotype_dist accepts genotype-name columns and emits a
-    DirichletMultinomial component with the x_<genotype> column schema that
-    ss.DirichletMultinomial.compute_nll consumes. extract_fn returns raw
-    counts (not normalized proportions)."""
-    expected = pd.DataFrame(
-        # Raw counts, not proportions — DirichletMultinomial uses them as
-        # multinomial trial outcomes.
-        [[70, 15, 10, 5]],
-        index=pd.Index([2020.0], name='t'),
-        columns=['hpv16', 'hpv18', 'hi5', 'ohr'],
-    )
-    edges = np.array([0., 100.])
-    sim = hpv.Sim(n_agents=500, start=2019, stop=2021, dt=1.0,
-                  rand_seed=0,
-                  genotypes=[16, 18, 'hi5', 'ohr'],
-                  analyzers=[hpv.AgeResults(
-                      result_args=sc.objdict(
-                          cancerous_genotype_dist=sc.objdict(years=[2020], edges=edges),
-                      ),
-                  )])
+def test_default_eval_fn_aligns_on_expected_subset():
+    """data only needs to cover a subset of the sim's snapshot years/bins."""
+    sim = _sim_with_age_results(keys=('cancers',),
+                                years=(2018, 2019, 2020))
     sim.run()
-    comp = hpv.calibration.cancer_genotype_dist(expected)
-    assert isinstance(comp, ss.DirichletMultinomial)
-    # Component's expected has x_-prefixed columns.
-    expected_cols = ['x_hpv16', 'x_hpv18', 'x_hi5', 'x_ohr']
-    assert list(comp.expected.columns) == expected_cols
-    actual = comp.extract_fn(sim)
-    assert list(actual.index) == list(expected.index)
-    assert list(actual.columns) == expected_cols
-    # Values are raw counts (non-negative), not proportions.
-    assert (actual.values >= 0).all()
+    ar = sim.analyzers['ageresults']
+    actual = ar.to_dataframe(key='cancers')
+
+    # Pick a single year + a single age bin.
+    one_year = actual.index[1:2]
+    one_col = actual.columns[:1]
+    sub = actual.loc[one_year, one_col]
+    data = {'cancers': sub.copy()}
+    fit = hpv.calibration.default_eval_fn(sim, data=data)
+    assert fit == pytest.approx(0.0, abs=1e-9)
+
+
+def test_default_eval_fn_missing_row_raises():
+    """An expected timepoint that AgeResults didn't record surfaces as KeyError."""
+    sim = _sim_with_age_results(keys=('cancers',), years=(2020,))
+    sim.run()
+    ar = sim.analyzers['ageresults']
+    actual = ar.to_dataframe(key='cancers')
+
+    bad_data = actual.copy()
+    bad_data.index = pd.Index([1850.0], name='t')   # not in sim's years
+    with pytest.raises(KeyError, match='1850'):
+        hpv.calibration.default_eval_fn(sim, data={'cancers': bad_data})
+
+
+def test_calibration_validates_data_keys_and_index():
+    """data= must use AgeResults result keys and 't'-named indexes."""
+    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
+    calib_pars = dict(beta=dict(low=0.10, high=0.30, guess=0.20))
+
+    good_idx = pd.DataFrame([[1.0]], index=pd.Index([2020.0], name='t'),
+                            columns=['0-100'])
+
+    with pytest.raises(ValueError, match='unknown result key'):
+        hpv.Calibration(sim, calib_pars, data={'not_a_result': good_idx},
+                        total_trials=1, debug=True)
+
+    bad_idx = pd.DataFrame([[1.0]], index=pd.Index([2020.0], name='year'),
+                           columns=['0-100'])
+    with pytest.raises(ValueError, match="must be 't'"):
+        hpv.Calibration(sim, calib_pars, data={'cancers': bad_idx},
+                        total_trials=1, debug=True)
+
+
+def test_calibration_rejects_both_data_and_eval_fn():
+    """Can't pass both data= and eval_fn= — they overwrite each other."""
+    sim = hpv.Sim(n_agents=200, start=2019, stop=2020, dt=1.0, rand_seed=0)
+    calib_pars = dict(beta=dict(low=0.10, high=0.30, guess=0.20))
+    good = pd.DataFrame([[1.0]], index=pd.Index([2020.0], name='t'),
+                        columns=['0-100'])
+    with pytest.raises(ValueError, match='data='):
+        hpv.Calibration(sim, calib_pars, data={'cancers': good},
+                        eval_fn=lambda s: 0.0, total_trials=1, debug=True)
 
 
 @pytest.mark.slow
 def test_parameter_recovery_smoke():
-    """Synthetic parameter recovery: calibrate to a target generated from
-    known calib_pars and assert the best trial recovers each within 25%.
+    """Synthetic parameter recovery using the new data= + compute_gof path.
 
-    This is a plumbing gate, not a calibration-quality gate. 50 trials with
-    a deterministic Optuna sampler seed and 4 snapshot years (2010, 2015,
-    2020, 2025) provide enough signal per ss.Normal component to recover
-    both parameters within 25% relative error.
+    Generate a target from known calib_pars, then ask Optuna to recover
+    them. Plumbing-only gate — asserts each parameter is recovered within
+    25% relative error.
 
     Parameters chosen:
-      - hpv16.cin_fn.k: CIN progression severity — strong monotonic effect on
-        cancer counts.
+      - hpv16.cin_fn.k: CIN progression severity — strong effect on cancer
+        counts.
       - hpv16.cancer_fn.transform_prob: per-step CIN→cancer probability —
         directly scales cancer incidence.
-    Both are scalars and clearly differentiate simulation outcomes at n=20000.
     """
     optuna = pytest.importorskip('optuna')
 
-    # ----- Generate target -----
     edges = np.array([0., 30., 50., 70., 100.])
-    # Multi-year snapshots: each ss.Normal per-bin component sees 4
-    # timepoints, giving the Optuna sampler clearer signal across the
-    # parameter space.
     snapshot_years = [2010, 2015, 2020, 2025]
-    # Two scalar parameters with strong, monotonic signal in cancer counts.
     truth = {'hpv16.cin_fn.k': 0.55, 'hpv16.cancer_fn.transform_prob': 0.003}
 
     def make_sim():
-        # Single genotype (hpv16 only) for faster runs; n_agents=20000 for
-        # enough cancer events per bin per snapshot year to provide signal.
         return hpv.Sim(n_agents=20000, start=1990, stop=2026, dt=1.0,
-                       rand_seed=0,
-                       genotypes=[16],
-                       analyzers=[hpv.AgeResults(
-                           result_args=sc.objdict(
-                               cancers=sc.objdict(years=snapshot_years,
-                                                  edges=edges),
-                           ),
-                       )])
+                       rand_seed=0, genotypes=[16],
+                       analyzers=[hpv.AgeResults(result_args=sc.objdict(
+                           cancers=sc.objdict(years=snapshot_years,
+                                              edges=edges),
+                       ))])
 
     target_sim = make_sim()
     hpv.calibration.build_sim(target_sim, calib_pars=truth)
@@ -255,23 +278,15 @@ def test_parameter_recovery_smoke():
                  if isinstance(a, hpv.AgeResults)][0]
     expected = target_ar.to_dataframe(key='cancers')
 
-    # ----- Calibrate -----
-    # Use the cancer_by_age factory directly. It returns one ss.Normal
-    # component per age bin; Starsim's Calibration sums per-component nll
-    # across the four bins to drive Optuna toward the truth values.
-    components = hpv.calibration.cancer_by_age(expected)
-
     base_sim = make_sim()
     calib_pars = {
         'hpv16.cin_fn.k':                 dict(low=0.20, high=0.90, guess=0.50),
         'hpv16.cancer_fn.transform_prob': dict(low=0.001, high=0.005, guess=0.002),
     }
-    # reseed=False: keep all trials at rand_seed=0 (same as target_sim)
-    # so stochasticity is controlled and trials are comparable to the target.
     calib = hpv.Calibration(
         base_sim,
         calib_pars,
-        components=components,
+        data={'cancers': expected},
         total_trials=50,
         n_workers=1,
         debug=True,
@@ -281,8 +296,7 @@ def test_parameter_recovery_smoke():
     )
     calib.calibrate()
     assert calib.calibrated
-    best = calib.best_pars   # sc.objdict of best parameter values
-    # Recover each parameter within ±25% relative error.
+    best = calib.best_pars
     for name, true_val in truth.items():
         recovered = best[name]
         rel = abs(recovered - true_val) / abs(true_val)

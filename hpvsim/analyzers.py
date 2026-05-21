@@ -134,9 +134,7 @@ class AgeResults(ss.Analyzer):
         Picks the last tick whose date falls within each calendar year, so
         annual flows accumulated through the year are captured.
         """
-        timevec = sim.timevec
-        # Convert ss.date / pd.Timestamp / float years into floats.
-        tv_years = np.array([_as_year(t) for t in timevec], dtype=float)
+        tv_years = np.asarray(sim.timevec.years, dtype=float)
         out = {}
         for y in years:
             mask = (tv_years >= y) & (tv_years < y + 1)
@@ -176,21 +174,29 @@ class AgeResults(ss.Analyzer):
                         rdict, attr=self._TYPE_DIST_TO_STATE[rkey])
         return
 
+    def _pop_arrays(self):
+        """Cache the alive/ages/weights arrays each binning method needs."""
+        people = self.sim.people
+        alive = people.alive.values
+        ages = people.age.values
+        scale = getattr(people, 'scale', None)
+        weights = scale.values if scale is not None else None
+        return people, alive, ages, weights
+
+    @staticmethod
+    def _histogram(ages, mask, edges, weights):
+        """np.histogram of ages[mask] with optional weights[mask]."""
+        w = weights[mask] if weights is not None else None
+        counts, _ = np.histogram(ages[mask], bins=edges, weights=w)
+        return counts
+
     def _bin_count(self, rdict, attr):
         """Bin alive-agent count of (union-across-genotypes) BoolState `attr`."""
-        sim = self.sim
-        people = sim.people
-        alive = people.alive.values
+        _, alive, ages, weights = self._pop_arrays()
         state_any = np.zeros_like(alive)
         for mod in self.hpv_modules:
             state_any |= getattr(mod, attr).values
-        mask = state_any & alive
-        ages = people.age.values[mask]
-        weights = getattr(people, 'scale', None)
-        if weights is not None:
-            weights = weights.values[mask]
-        counts, _ = np.histogram(ages, bins=rdict.edges, weights=weights)
-        return counts
+        return self._histogram(ages, state_any & alive, rdict.edges, weights)
 
     def _bin_prevalence(self, rdict, attr, female_only=False):
         """Age-bin prevalence as a (nbins, 2) array — [:, 0]=num, [:, 1]=denom.
@@ -199,26 +205,15 @@ class AgeResults(ss.Analyzer):
         raw counts directly. ``to_dataframe(key)`` collapses to the ratio
         for callers that want point-in-time prevalences.
         """
-        sim = self.sim
-        people = sim.people
-        alive = people.alive.values
+        people, alive, ages, weights = self._pop_arrays()
         state_any = np.zeros_like(alive)
         for mod in self.hpv_modules:
             state_any |= getattr(mod, attr).values
-        denom_mask = alive
-        if female_only:
-            denom_mask = alive & people.female.values
-        ages = people.age.values
-        weights = getattr(people, 'scale', None)
-        weights = weights.values if weights is not None else None
+        denom_mask = alive & people.female.values if female_only else alive
         num_mask = state_any & denom_mask
-        num, _ = np.histogram(ages[num_mask], bins=rdict.edges,
-                              weights=(weights[num_mask] if weights is not None else None))
-        denom, _ = np.histogram(ages[denom_mask], bins=rdict.edges,
-                                weights=(weights[denom_mask] if weights is not None else None))
         out = np.zeros((len(rdict.bins), 2), dtype=float)
-        out[:, 0] = num
-        out[:, 1] = denom
+        out[:, 0] = self._histogram(ages, num_mask, rdict.edges, weights)
+        out[:, 1] = self._histogram(ages, denom_mask, rdict.edges, weights)
         return out
 
     def _bin_incidence(self, rdict, date_attr, state_attr):
@@ -229,45 +224,28 @@ class AgeResults(ss.Analyzer):
         dt<1 only the final sub-step's events are captured; a multi-substep
         accumulator is a separate enhancement.
         """
-        sim = self.sim
-        people = sim.people
-        alive = people.alive.values
+        people, alive, ages, weights = self._pop_arrays()
         female = people.female.values
-        # Single pass: union both "new event" and "cancerous_any" across modules.
         new_event = np.zeros_like(alive)
         cancerous_any = np.zeros_like(alive)
         for mod in self.hpv_modules:
             ti_arr = getattr(mod, date_attr).values
             state = getattr(mod, state_attr).values
-            new_event |= (ti_arr == sim.ti) & state
+            new_event |= (ti_arr == self.sim.ti) & state
             cancerous_any |= mod.cancerous.values
         at_risk = alive & female & ~cancerous_any
-        ages = people.age.values
-        weights = getattr(people, 'scale', None)
-        weights = weights.values if weights is not None else None
-        num, _ = np.histogram(ages[new_event & alive], bins=rdict.edges,
-                              weights=(weights[new_event & alive] if weights is not None else None))
-        denom, _ = np.histogram(ages[at_risk], bins=rdict.edges,
-                                weights=(weights[at_risk] if weights is not None else None))
+        num = self._histogram(ages, new_event & alive, rdict.edges, weights)
+        denom = self._histogram(ages, at_risk, rdict.edges, weights)
         return np.divide(num, denom, out=np.zeros_like(num, dtype=float),
                          where=denom > 0) * 1e5
 
     def _bin_type_distribution(self, rdict, attr):
         """Per-genotype age-binned raw counts; ``to_dataframe`` normalizes."""
-        sim = self.sim
-        people = sim.people
-        alive = people.alive.values
-        ages = people.age.values
-        weights = getattr(people, 'scale', None)
-        weights = weights.values if weights is not None else None
-        nbins = len(rdict.bins)
-        ng = len(self.hpv_modules)
-        out = np.zeros((nbins, ng), dtype=float)
+        _, alive, ages, weights = self._pop_arrays()
+        out = np.zeros((len(rdict.bins), len(self.hpv_modules)), dtype=float)
         for gi, mod in enumerate(self.hpv_modules):
             mask = getattr(mod, attr).values & alive
-            counts, _ = np.histogram(ages[mask], bins=rdict.edges,
-                                     weights=(weights[mask] if weights is not None else None))
-            out[:, gi] = counts
+            out[:, gi] = self._histogram(ages, mask, rdict.edges, weights)
         return out
 
     def to_dataframe(self, key, normalize=True):
@@ -319,7 +297,7 @@ class AgeResults(ss.Analyzer):
 
         Each value of the returned dict is a 't'-indexed DataFrame with two
         columns: ``x`` (positives) and ``n`` (total). Used by the
-        BetaBinomial component path in hpv.calibration.hpv_prev_by_age.
+        BetaBinomial-style consumers of (positives, totals) per bin.
 
         Raises if `key` is not a prevalence result.
         """
@@ -339,15 +317,3 @@ class AgeResults(ss.Analyzer):
                 index=pd.Index(years, name='t'),
             )
         return result
-
-
-def _as_year(t):
-    """Convert a starsim timeline entry (ss.date / pd.Timestamp / number) to a float year."""
-    if hasattr(t, 'year') and hasattr(t, 'month'):
-        # ss.date or pd.Timestamp: use decimal year (Jan 1 = .0, Dec 31 ≈ .997).
-        import datetime as dt
-        start = dt.datetime(t.year, 1, 1)
-        end = dt.datetime(t.year + 1, 1, 1)
-        now = dt.datetime(t.year, t.month, getattr(t, 'day', 1))
-        return t.year + (now - start).total_seconds() / (end - start).total_seconds()
-    return float(t)
