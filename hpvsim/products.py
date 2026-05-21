@@ -78,19 +78,9 @@ class vx(ss.Vx):
         )
         self.rel_imm = _resolve_vx_pars(name, rel_imm)
         # CRN-safe Bernoulli; p is overwritten per-genotype in administer().
-        # Fully initialized in init_pre() once we have the sim's slot array.
+        # Initialized via the standard intervention -> product.init_pre ->
+        # sim.init_dists() chain, matching the ss.Dx / ss.Tx pattern.
         self._sterilizing_dist = ss.bernoulli(p=0.0)
-
-    def init_pre(self, sim):
-        super().init_pre(sim)
-        # ss.Module.init_pre links dists but does not init them; sim-level
-        # dist init is what initializes them for modules registered with the
-        # sim. A standalone product (e.g. for unit tests, or future single-use
-        # APIs) needs to init its own dists. Init only if not already done,
-        # so that the intervention-wired path (where sim-level init may have
-        # already taken care of this) doesn't redundantly re-init.
-        if not self._sterilizing_dist.initialized:
-            self._sterilizing_dist.init(trace='_sterilizing_dist', sim=sim, module=self)
 
     def administer(self, people, uids):
         """Apply the vaccine: all-or-nothing+leaky per genotype, max-of-existing.

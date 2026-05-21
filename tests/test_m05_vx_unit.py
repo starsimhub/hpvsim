@@ -65,25 +65,39 @@ def test_vx_unknown_name_raises_with_valid_names_listed():
         vx(name='not_a_real_vaccine')
 
 
-def _make_small_sim(genotypes=('hpv16', 'hpv18', 'hi5', 'ohr')):
-    """Construct a small initialized 4-genotype sim suitable for administer tests."""
+def _make_small_sim_with_product(product, genotypes=('hpv16', 'hpv18', 'hi5', 'ohr')):
+    """Construct a small 4-genotype sim with `product` wired through ss.routine_vx.
+
+    The intervention's prob=0.0 means it never vaccinates on its own —
+    we call product.administer() directly in the test. Wiring it through
+    the intervention is purely so that sim.init() runs the full dist-init
+    chain that initializes the product's bare-attribute distributions.
+
+    Returns (sim, initialized_product) — Starsim deep-copies modules during
+    init_module_attrs, so the product reference retrieved from the sim after
+    init is distinct from (and replaces) the one passed in.
+    """
+    import starsim as ss
+    intv = ss.routine_vx(product=product, prob=0.0, start_year=2010)
     sim = hpv.Sim(
         location='nigeria',
         start=2010, stop=2012,
         n_agents=200,
         genotypes=list(genotypes),
         rand_seed=0,
+        interventions=[intv],
     )
     sim.init()
-    return sim
+    # Retrieve the initialized copy from the sim — Starsim deep-copies modules
+    # during init_module_attrs, so the original `product` variable is stale.
+    initialized_product = sim.interventions['routine_vx'].product
+    return sim, initialized_product
 
 
 def test_vx_administer_bumps_nab_imm_for_active_genotypes():
     """administer() writes per-genotype nab_imm; max-of-existing semantics."""
     from hpvsim.products import vx
-    sim = _make_small_sim()
-    product = vx(rel_imm={'hpv16': 1.0, 'hpv18': 0.5})
-    product.init_pre(sim)  # bind to sim before use
+    sim, product = _make_small_sim_with_product(vx(rel_imm={'hpv16': 1.0, 'hpv18': 0.5}))
     # Pick 20 agents and vaccinate them
     uids = sim.people.alive.uids[:20]
     pre_hpv16 = sim.diseases['hpv16'].nab_imm[uids].copy()
@@ -105,10 +119,8 @@ def test_vx_administer_bumps_nab_imm_for_active_genotypes():
 def test_vx_administer_skips_inactive_genotypes_silently():
     """A 9-valent product in a 4-genotype sim must not error."""
     from hpvsim.products import vx
-    sim = _make_small_sim()  # has hpv16/hpv18/hi5/ohr only
-    # Bivalent CSV has entries for hpv45, hi4, hr, lr which are NOT in this sim
-    product = vx(name='bivalent')
-    product.init_pre(sim)
+    # has hpv16/hpv18/hi5/ohr only; bivalent CSV has entries for hpv45, hi4, hr, lr
+    sim, product = _make_small_sim_with_product(vx(name='bivalent'))
     uids = sim.people.alive.uids[:10]
     # Must not raise
     product.administer(sim.people, uids)
@@ -117,9 +129,7 @@ def test_vx_administer_skips_inactive_genotypes_silently():
 def test_vx_administer_does_not_downgrade_natural_immunity():
     """If nab_imm is already higher than the vaccine peak, it is preserved."""
     from hpvsim.products import vx
-    sim = _make_small_sim()
-    product = vx(rel_imm={'hpv16': 0.5})
-    product.init_pre(sim)
+    sim, product = _make_small_sim_with_product(vx(rel_imm={'hpv16': 0.5}))
     uids = sim.people.alive.uids[:10]
     # Force-bump nab_imm to 0.95 (simulating natural clearance immunity)
     sim.diseases['hpv16'].nab_imm[uids] = 0.95
@@ -131,8 +141,6 @@ def test_vx_administer_does_not_downgrade_natural_immunity():
 def test_vx_administer_empty_uids_is_noop():
     """Calling administer with empty uids does nothing."""
     from hpvsim.products import vx
-    sim = _make_small_sim()
-    product = vx(name='bivalent')
-    product.init_pre(sim)
+    sim, product = _make_small_sim_with_product(vx(name='bivalent'))
     # Should not raise
     product.administer(sim.people, sim.people.alive.uids[:0])
