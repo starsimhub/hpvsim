@@ -342,6 +342,34 @@ class HPV(ss.Infection):
             )
         )
 
+    def _cancel_other_genotype_progression_for(self, uids):
+        """Mirror v2's check_cancer cross-genotype cancellation.
+
+        When this module fires cin->cancerous for uids, all OTHER HPV
+        modules in the sim must have their pending cancer progression
+        cancelled and their state cleared for these agents. Without this,
+        agents with multi-genotype CIN can be counted as multiple cancer
+        cases (one per genotype) — biologically incorrect.
+
+        Mirrors hpvsim/_v2_legacy/people.py:565-595 (check_cancer).
+        """
+        if len(uids) == 0:
+            return
+        for module in self.sim.diseases.values():
+            if not isinstance(module, HPV) or module is self:
+                continue
+            # Cancel pending cancer progression in this other genotype
+            module.ti_cancerous[uids] = np.nan
+            module.ti_dead_cancer[uids] = np.nan
+            # Clear CIN state (agent no longer in CIN for any genotype)
+            module.cin[uids] = False
+            # Clear pending clearance (these infections won't clear naturally;
+            # the agent is dying of cancer instead)
+            module.ti_clearance[uids] = np.nan
+            # Agent is no longer susceptible / infected with this genotype either
+            module.susceptible[uids] = False
+            module.infected[uids] = False
+
     def step_state(self):
         """Advance agents through the natural-history compartment chain.
 
@@ -423,9 +451,11 @@ class HPV(ss.Infection):
             self.infected[to_cancerous] = False
             self.susceptible[to_cancerous] = False
             self.rel_trans[to_cancerous] = 0.0
+            self.ti_clearance[to_cancerous] = np.nan  # cancer supersedes clearance
             ages_at_cancer = self.sim.people.age[to_cancerous]
             self.results.new_cancers[ti] = len(to_cancerous)
             self.results.sum_age_at_cancer[ti] = float(ages_at_cancer.sum())
+            self._cancel_other_genotype_progression_for(to_cancerous)
 
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
