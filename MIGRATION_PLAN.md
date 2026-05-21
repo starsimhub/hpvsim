@@ -77,7 +77,8 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 | M2: Natural history parity | ✅ Complete | PR #107 merged 2026-05-07 |
 | M3: Multi-genotype and cross-immunity | ✅ Complete | PR #108 merged |
 | M4: Calibration loop | 🟡 In progress | branch `m04-calibration-loop` |
-| M5–M10 | ⬜ Not started | — |
+| M5 | 🟡 Implementation complete; PR not yet opened | branch `m05-vaccination-scenarios` |
+| M6–M10 | ⬜ Not started | — |
 
 ### M0: Foundation
 
@@ -183,12 +184,27 @@ by the M03 multi-seed pytest gates). See the M03 spec's
 **Acceptance test:** Vaccination impact trajectory overlaps v2.x intervals on `hpvsim_1dose` / `hpvsim_pxv_younger`.
 
 **Sub-tasks:**
-- Port product base classes (`dx`, `tx`, `vx`) and adapt CSV product files from v2.x `data/`.
-- Port `routine_vx` intervention.
-- Port `campaign_vx` intervention.
-- Port `txvx` (therapeutic vaccination: `BaseTxVx`, `routine_txvx`, `campaign_txvx`, `linked_txvx`).
-- Add intervention-level results tracking (number vaccinated, doses administered, by age and year).
-- Add tests: vaccination scenarios reproduce `hpvsim_1dose` / `hpvsim_pxv_younger` with overlapping intervals.
+- Port `hpv.vx(ss.Vx)` product class — per-genotype `rel_imm` table loaded
+  from `hpvsim/data/products_vx.csv`; `administer` applies per-genotype
+  all-or-nothing+leaky model and bumps each HPV module's `nab_imm`. Cross-
+  immunity propagation is automatic via the existing `CrossImmunity`
+  connector.
+- Add `hpv.BaseVaccination(ss.BaseVaccination)` shim adding v2-compatible
+  `age_range` / `sex` / `eligibility` constructor args; thin `hpv.routine_vx`
+  and `hpv.campaign_vx` subclasses combining the shim with Starsim's
+  `RoutineDelivery` / `CampaignDelivery`.
+- Move `products_vx.csv` from `hpvsim/_v2_legacy/data/` into active
+  `hpvsim/data/`. Default product names: `bivalent`, `quadrivalent`,
+  `nonavalent`.
+- Add two regression anchors (`anchor_vx_routine`, `anchor_vx_campaign`),
+  generator script for v2 baselines, and multi-seed z-score parity gates at
+  `|z| < 3` (M03 pattern). Includes a trajectory-parity test on the
+  routine anchor.
+- Add unit tests for `_compose_eligibility`, `_coerce_sex`, and `hpv.vx`
+  product semantics.
+- Confirm intervention-level result tracking (`vaccinated`, `n_doses`,
+  `ti_vaccinated`) is exposed via the existing `ss.BaseVaccination` state;
+  age-stratified consumption uses M04's `AgeResults` analyzer.
 
 ### M6: Screen-and-treat cascade
 
@@ -203,6 +219,17 @@ by the M03 multi-seed pytest gates). See the M03 spec's
 - Port `radiation` intervention (cancer treatment).
 - Port `dynamic_pars` for time-varying parameters (e.g., condom use).
 - Add tests: screening scenarios reproduce `hpvsim_methods_manuscript` with overlapping intervals.
+- Port `dx(ss.Product)` diagnostic product class (CSV table maps disease
+  state -> result probability). Used by screening interventions.
+- Port `tx(ss.Product)` treatment product class. Used by `treat_num` /
+  `treat_delay`.
+- Port `txvx` therapeutic vaccination: `BaseTxVx` + `routine_txvx` +
+  `campaign_txvx` + `linked_txvx`. Moved from M5 because `linked_txvx` is
+  structurally part of the screen-and-treat cascade and `BaseTxVx` shares
+  its design with the M06 treatment base classes (see M05 spec
+  "Scope adjustments" rationale).
+- Move `products_tx.csv` and `products_dx.csv` from
+  `hpvsim/_v2_legacy/data/` into active `hpvsim/data/`.
 
 ### M7: MultiSim and scenarios
 
