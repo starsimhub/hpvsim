@@ -47,8 +47,10 @@ def _run_v3_seeds(n, start_seed=0):
         else:
             year_floats = np.asarray(years, dtype=float)
         mask = (year_floats >= 2030) & (year_floats < 2060)
-        n_cancers = float(sim.results['new_cancers'][mask].sum())
-        pop = sim.results['n_alive'][mask]
+        # v3 keys: cancer time series lives under sim.results.hpvtotal,
+        # population is at the top level.
+        n_cancers = float(sim.results.hpvtotal.new_cancers[mask].sum())
+        pop = sim.results.n_alive[mask]
         dt = sim.t.dt.years if hasattr(sim.t.dt, 'years') else sim.t.dt
         py = float((pop * dt).sum())
         row['cancer_incidence_2030_2060'] = n_cancers / max(py, 1.0)

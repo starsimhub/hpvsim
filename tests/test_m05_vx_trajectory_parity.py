@@ -31,19 +31,30 @@ Z_THRESHOLD = 3.0
 TRAJECTORY_METRICS = ('new_cancers', 'hpv_total_infections', 'new_vaccinated')
 
 
-def _v3_trajectory_row(sim):
-    """Extract per-year arrays for the trajectory comparison.
+def _v3_trajectory_row(sim, intv):
+    """Per-year arrays for trajectory comparison.
 
-    v3 may store timevec as ss.date DateArray; convert to float years
-    via .years per starsim-dev-time skill.
+    new_cancers / hpv_total_infections come from sim.results.hpvtotal;
+    new_vaccinated is derived from the histogram of intv.ti_vaccinated
+    (v3 doesn't expose a per-step new_vaccinated series, only per-agent
+    timestep state).
     """
     timevec = sim.results.timevec
     year_floats = np.asarray(timevec.years if hasattr(timevec, 'years') else timevec, dtype=float)
+    n_steps = len(year_floats)
+
+    # Histogram per-agent ti_vaccinated into the timestep bins
+    ti = np.asarray(intv.ti_vaccinated)
+    valid = ~np.isnan(ti)
+    bins_per_step, _ = np.histogram(
+        ti[valid].astype(int), bins=np.arange(n_steps + 1)
+    )
+
     return dict(
         year=year_floats.tolist(),
-        new_cancers=list(sim.results['new_cancers']),
-        hpv_total_infections=list(sim.results['hpv_total_infections']),
-        new_vaccinated=list(sim.results.get('new_vaccinated', [0] * len(year_floats))),
+        new_cancers=list(sim.results.hpvtotal.new_cancers),
+        hpv_total_infections=list(sim.results.hpvtotal.new_infections),
+        new_vaccinated=bins_per_step.tolist(),
     )
 
 
@@ -72,7 +83,8 @@ def test_m05_routine_trajectory_parity():
         sim = build_v3_sim()
         sim.pars['rand_seed'] = int(seed)
         sim.run()
-        v3_rows.append(_v3_trajectory_row(sim))
+        intv = sim.interventions[0]
+        v3_rows.append(_v3_trajectory_row(sim, intv))
 
     v3_years = np.array(v3_rows[0]['year'])
     assert np.allclose(years, v3_years), (
