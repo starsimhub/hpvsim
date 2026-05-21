@@ -49,3 +49,51 @@ def _coerce_sex(sex):
     if s_int not in (0, 1):
         raise ValueError(f"sex int must be 0 or 1, got {sex!r}")
     return {s_int}
+
+
+def _as_boolarr(extra_result, people):
+    """Coerce an eligibility-callback return value into a BoolArr.
+
+    Starsim eligibility callbacks may return either a BoolArr/BoolState or
+    an ss.uids. We need a BoolArr so we can intersect with our own conditions
+    via ``&``. Clone people.alive (same shape, same linkage) all-False and
+    fill True at the returned uids.
+    """
+    if isinstance(extra_result, ss.BoolArr):
+        return extra_result
+    # Assume ss.uids or array-like of ints — build a blank BoolArr from alive
+    out = people.alive.asnew()
+    out.values[:] = False
+    out[extra_result] = True
+    return out
+
+
+def _compose_eligibility(age_range, sex, extra):
+    """Compose v2-style targeting into a Starsim eligibility callable.
+
+    Returns ``elig(sim) -> ss.uids`` that intersects:
+      - sim.people.alive
+      - sim.people.age in [age_range[0], age_range[1]) if age_range is set
+      - sim.people.sex matches sex if sex is set to a single sex
+      - extra(sim) if extra is provided (callable returning BoolArr or uids)
+    """
+    sex_set = _coerce_sex(sex)
+
+    def elig(sim):
+        cond = sim.people.alive
+        if age_range is not None:
+            lo, hi = age_range
+            cond = cond & (sim.people.age >= lo) & (sim.people.age < hi)
+        if sex_set is not None and len(sex_set) == 1:
+            (s,) = sex_set
+            # Starsim uses people.female (0) / people.male (1) BoolArrs
+            # rather than a numeric sex array; map int -> BoolArr
+            if s == 0:
+                cond = cond & sim.people.female
+            else:
+                cond = cond & sim.people.male
+        if extra is not None:
+            cond = cond & _as_boolarr(extra(sim), sim.people)
+        return cond.uids
+
+    return elig

@@ -181,3 +181,98 @@ def test_coerce_sex_invalid_raises():
         _coerce_sex(2)
     with pytest.raises(ValueError, match='sex'):
         _coerce_sex(['x', 'y'])
+
+
+def _make_plain_small_sim(genotypes=('hpv16', 'hpv18', 'hi5', 'ohr')):
+    """A small initialized 4-genotype sim without any product/intervention.
+
+    Used for eligibility-composition tests that exercise the callable
+    directly against sim.people without needing a product context.
+    """
+    sim = hpv.Sim(
+        location='nigeria',
+        start=2010, stop=2012,
+        n_agents=200,
+        genotypes=list(genotypes),
+        rand_seed=0,
+    )
+    sim.init()
+    return sim
+
+
+def test_compose_eligibility_no_filters_returns_all_alive():
+    """No age, no sex, no extra -> all alive agents are eligible."""
+    from hpvsim.interventions import _compose_eligibility
+    sim = _make_plain_small_sim()
+    elig = _compose_eligibility(age_range=None, sex=None, extra=None)
+    uids = elig(sim)
+    # All eligible uids must be alive
+    assert np.all(sim.people.alive[uids])
+    # And there are some
+    assert len(uids) > 0
+
+
+def test_compose_eligibility_age_range_filters():
+    """age_range=[lo, hi] yields only agents with lo <= age < hi."""
+    from hpvsim.interventions import _compose_eligibility
+    sim = _make_plain_small_sim()
+    elig = _compose_eligibility(age_range=[9, 14], sex=None, extra=None)
+    uids = elig(sim)
+    ages = sim.people.age[uids]
+    assert np.all(ages >= 9)
+    assert np.all(ages < 14)
+
+
+def test_compose_eligibility_sex_female_filters():
+    """sex='f' yields only agents with people.female==True (sex==0)."""
+    from hpvsim.interventions import _compose_eligibility
+    sim = _make_plain_small_sim()
+    elig = _compose_eligibility(age_range=None, sex='f', extra=None)
+    uids = elig(sim)
+    # Starsim encodes sex via people.female (BoolState); all returned uids must be female
+    assert np.all(sim.people.female[uids])
+
+
+def test_compose_eligibility_sex_male_filters():
+    """sex='m' yields only agents with people.male==True (sex==1)."""
+    from hpvsim.interventions import _compose_eligibility
+    sim = _make_plain_small_sim()
+    elig = _compose_eligibility(age_range=None, sex='m', extra=None)
+    uids = elig(sim)
+    # Starsim encodes sex via people.male (BoolArr); all returned uids must be male
+    assert np.all(sim.people.male[uids])
+
+
+def test_compose_eligibility_sex_both_applies_no_filter():
+    """sex=['f', 'm'] applies no sex filter."""
+    from hpvsim.interventions import _compose_eligibility
+    sim = _make_plain_small_sim()
+    elig_both = _compose_eligibility(age_range=None, sex=['f', 'm'], extra=None)
+    elig_none = _compose_eligibility(age_range=None, sex=None, extra=None)
+    assert set(elig_both(sim)) == set(elig_none(sim))
+
+
+def test_compose_eligibility_extra_callback_intersects():
+    """An `extra` callable intersects further with age/sex conditions."""
+    from hpvsim.interventions import _compose_eligibility
+    sim = _make_plain_small_sim()
+    # Eligible: agents alive AND age >= 20 (extra is the only filter)
+    extra = lambda s: (s.people.age >= 20).uids
+    elig = _compose_eligibility(age_range=None, sex=None, extra=extra)
+    uids = elig(sim)
+    assert np.all(sim.people.age[uids] >= 20)
+    assert np.all(sim.people.alive[uids])
+
+
+def test_compose_eligibility_combines_age_sex_extra():
+    """All three filters compose via intersection."""
+    from hpvsim.interventions import _compose_eligibility
+    sim = _make_plain_small_sim()
+    extra = lambda s: (s.people.age >= 12).uids
+    elig = _compose_eligibility(age_range=[9, 14], sex='f', extra=extra)
+    uids = elig(sim)
+    ages = sim.people.age[uids]
+    assert np.all(ages >= 12)
+    assert np.all(ages < 14)
+    # Starsim uses people.female for sex==0 (female)
+    assert np.all(sim.people.female[uids])
