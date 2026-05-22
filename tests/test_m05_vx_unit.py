@@ -94,17 +94,17 @@ def _make_small_sim_with_product(product, genotypes=('hpv16', 'hpv18', 'hi5', 'o
     return sim, initialized_product
 
 
-def test_vx_administer_bumps_nab_imm_for_active_genotypes():
-    """administer() writes per-genotype nab_imm; max-of-existing semantics."""
+def test_vx_administer_bumps_vax_imm_for_active_genotypes():
+    """administer() writes per-genotype vax_imm; max-of-existing semantics."""
     from hpvsim.products import vx
     sim, product = _make_small_sim_with_product(vx(rel_imm={'hpv16': 1.0, 'hpv18': 0.5}))
     # Pick 20 agents and vaccinate them
     uids = sim.people.alive.uids[:20]
-    pre_hpv16 = sim.diseases['hpv16'].nab_imm[uids].copy()
-    pre_hpv18 = sim.diseases['hpv18'].nab_imm[uids].copy()
+    pre_hpv16 = sim.diseases['hpv16'].vax_imm[uids].copy()
+    pre_hpv18 = sim.diseases['hpv18'].vax_imm[uids].copy()
     product.administer(sim.people, uids)
-    post_hpv16 = sim.diseases['hpv16'].nab_imm[uids]
-    post_hpv18 = sim.diseases['hpv18'].nab_imm[uids]
+    post_hpv16 = sim.diseases['hpv16'].vax_imm[uids]
+    post_hpv18 = sim.diseases['hpv18'].vax_imm[uids]
     # hpv16 has rel_imm=1.0 -> every agent is sterilizing -> post = 1.0
     assert np.all(post_hpv16 == 1.0)
     # hpv18 has rel_imm=0.5 -> each agent's post is either 1.0 (sterilizing)
@@ -114,6 +114,11 @@ def test_vx_administer_bumps_nab_imm_for_active_genotypes():
     # No regressions in initial state
     assert np.all(post_hpv16 >= pre_hpv16)
     assert np.all(post_hpv18 >= pre_hpv18)
+    # nab_imm must be untouched — vaccine writes only to vax_imm
+    assert np.all(sim.diseases['hpv16'].nab_imm[uids] == 0.0), \
+        'administer() must not touch nab_imm (clearance-only array)'
+    assert np.all(sim.diseases['hpv18'].nab_imm[uids] == 0.0), \
+        'administer() must not touch nab_imm (clearance-only array)'
 
 
 def test_vx_administer_skips_inactive_genotypes_silently():
@@ -127,15 +132,29 @@ def test_vx_administer_skips_inactive_genotypes_silently():
 
 
 def test_vx_administer_does_not_downgrade_natural_immunity():
-    """If nab_imm is already higher than the vaccine peak, it is preserved."""
+    """Vaccine writes vax_imm; leaves clearance-conferred nab_imm untouched.
+
+    Natural immunity is in nab_imm. Vaccine immunity is in vax_imm.  Since
+    they are separate arrays, the vaccine can never downgrade natural immunity.
+    This test also verifies that vax_imm respects the max-of-existing rule when
+    the agent already has prior vaccine immunity.
+    """
     from hpvsim.products import vx
     sim, product = _make_small_sim_with_product(vx(rel_imm={'hpv16': 0.5}))
     uids = sim.people.alive.uids[:10]
-    # Force-bump nab_imm to 0.95 (simulating natural clearance immunity)
+    # Simulate natural clearance immunity (nab_imm=0.95) and prior vaccine
+    # immunity (vax_imm=0.8, higher than the new vaccine's leaky floor of 0.5).
     sim.diseases['hpv16'].nab_imm[uids] = 0.95
+    sim.diseases['hpv16'].vax_imm[uids] = 0.8
     product.administer(sim.people, uids)
-    # leaky floor is 0.5 (rel_imm) — must not downgrade the 0.95
-    assert np.all(sim.diseases['hpv16'].nab_imm[uids] >= 0.95)
+    # nab_imm must be completely untouched — vaccine writes only to vax_imm
+    assert np.all(sim.diseases['hpv16'].nab_imm[uids] == 0.95), \
+        'administer() must not touch nab_imm (clearance-only array)'
+    # vax_imm must respect max-of-existing: prior 0.8 > leaky floor 0.5, so
+    # vax_imm must still be >= 0.8 (sterilizing draw may push it to 1.0, but
+    # it must never fall below the pre-administer value).
+    assert np.all(sim.diseases['hpv16'].vax_imm[uids] >= 0.8), \
+        'administer() must not downgrade existing vax_imm'
 
 
 def test_vx_administer_empty_uids_is_noop():

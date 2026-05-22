@@ -65,9 +65,16 @@ class vx(ss.Vx):
     ``'nonavalent'``.
 
     The vaccine model is "all-or-nothing + leaky": per agent per genotype,
-    draw Bernoulli(rel_imm[g]); on success the agent's ``nab_imm[g]``
+    draw Bernoulli(rel_imm[g]); on success the agent's ``vax_imm[g]``
     becomes 1.0 (sterilizing immunity), on failure it becomes rel_imm[g]
-    (leaky protection floor). Existing ``nab_imm`` is never downgraded.
+    (leaky protection floor). Existing ``vax_imm`` is never downgraded.
+
+    Vaccine immunity is written to ``vax_imm`` (NOT ``nab_imm``). The
+    ``CrossImmunity`` connector applies ``vax_imm`` directly per-genotype
+    without flowing it through the cross-immunity matrix, so the CSV's
+    per-genotype ``rel_imm`` values are the complete vaccine cross-protection
+    profile — matching v2 semantics where vaccine immunity does not amplify
+    into cross-protection against non-target genotypes.
     """
 
     def __init__(self, name=None, rel_imm=None, **kwargs):
@@ -91,7 +98,13 @@ class vx(ss.Vx):
           2. Per-agent Bernoulli(rel_imm[g]):
                - heads: peak = 1.0 (sterilizing immunity)
                - tails: peak = rel_imm[g] (leaky protection floor)
-          3. Write hpv_mod.nab_imm[uids] = max(existing, peak).
+          3. Write hpv_mod.vax_imm[uids] = max(existing, peak).
+
+        Writes to ``vax_imm``, NOT ``nab_imm``. Clearance-conferred ``nab_imm``
+        flows through the cross-immunity matrix; vaccine-conferred ``vax_imm``
+        is applied per-genotype directly by ``CrossImmunity``, so the CSV's
+        per-genotype ``rel_imm`` values carry the complete vaccine
+        cross-protection profile with no matrix amplification.
         """
         if len(uids) == 0:
             return
@@ -107,8 +120,8 @@ class vx(ss.Vx):
             peak = np.full(len(uids), float(rel_imm_g), dtype=float)
             is_sterilizing = np.isin(uids, sterilizing_uids)
             peak[is_sterilizing] = 1.0
-            # Max-of-existing: vaccine never downgrades existing immunity
-            hpv_mod.nab_imm[uids] = np.maximum(hpv_mod.nab_imm[uids], peak)
+            # Max-of-existing: vaccine never downgrades existing vax immunity
+            hpv_mod.vax_imm[uids] = np.maximum(hpv_mod.vax_imm[uids], peak)
 
     def _find_genotype_module(self, genotype):
         """Return the HPV module in the sim matching this genotype, or None.

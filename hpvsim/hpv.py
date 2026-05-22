@@ -11,8 +11,12 @@ Models the natural-history pipeline as a Starsim Infection:
 Females are eligible for the full progression; males clear from precin without
 entering CIN/cancer. Clearance grants partial same-genotype immunity: per-agent
 beta samples accumulate as a running max into ``nab_imm`` (humoral) and
-``cell_imm`` (cell-mediated). The ``CrossImmunity`` connector reads those
-source states each step and writes per-target ``rel_sus`` and ``sev_imm``.
+``cell_imm`` (cell-mediated). Vaccine-conferred immunity is stored separately
+in ``vax_imm`` and does NOT flow through the cross-immunity matrix — the
+CSV's per-genotype ``rel_imm`` is the complete vaccine cross-protection
+profile. The ``CrossImmunity`` connector reads ``nab_imm`` / ``cell_imm``
+each step, matrix-multiplies to derive cross-genotype ``rel_sus`` / ``sev_imm``,
+then combines with ``vax_imm`` via independent-protection paths.
 
 Multi-genotype runs instantiate one HPV per genotype, all sharing the People
 and going through the same Connector path; a 1-genotype run uses a 1×1
@@ -46,7 +50,10 @@ class HPV(ss.Infection):
 
     The ``genotype`` attribute identifies which strain this instance models.
     The CrossImmunity connector reads each registered HPV's nab_imm/cell_imm
-    each step and writes per-target rel_sus/sev_imm.
+    (clearance-conferred) each step, matrix-multiplies to derive per-target
+    rel_sus/sev_imm, then combines with vax_imm (vaccine-conferred, per-target
+    direct) via independent-protection paths. Vaccine immunity does NOT flow
+    through the cross-immunity matrix.
     """
 
     def __init__(self, genotype='hpv16', pars=None, **kwargs):
@@ -103,10 +110,19 @@ class HPV(ss.Infection):
             # Severity immunity, accumulated as max-of-beta-samples on each
             # clearance. Shortens future dur_precin via (1 - sev_imm) factor.
             ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
-            # Raw source-genotype immunity. Bumped on clearance; read by the
-            # CrossImmunity Connector to derive per-target rel_sus and sev_imm.
-            ss.FloatArr('nab_imm', label='Humoral immunity (source genotype)', default=0.0),
+            # Clearance-conferred humoral/cell-mediated immunity. Bumped on
+            # clearance; read by CrossImmunity to derive per-target rel_sus /
+            # sev_imm via the cross-protection matrix. Does NOT include vaccine
+            # immunity — that lives in vax_imm below so it bypasses the matrix.
+            ss.FloatArr('nab_imm', label='Humoral immunity (clearance-conferred, source genotype)', default=0.0),
             ss.FloatArr('cell_imm', label='Cell-mediated immunity (source genotype)', default=0.0),
+            # Vaccine-conferred immunity per target genotype. Written by
+            # hpv.vx.administer(); applied directly per genotype in
+            # CrossImmunity.step() WITHOUT flowing through the cross-immunity
+            # matrix. The CSV's per-genotype rel_imm values are the complete
+            # vaccine cross-protection profile. Combining formula (independent
+            # protection paths): rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm).
+            ss.FloatArr('vax_imm', label='Vaccine-conferred immunity (this genotype)', default=0.0),
         )
         # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
         # use site (placeholder p values below).

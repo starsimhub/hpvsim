@@ -132,10 +132,11 @@ def test_no_vx_baseline_unchanged():
 
 
 def test_routine_vx_reduces_susceptibility_post_dose():
-    """Vaccination bumps nab_imm immediately; CrossImmunity reduces rel_sus next step.
+    """Vaccination bumps vax_imm immediately; CrossImmunity reduces rel_sus next step.
 
     Two checks:
-    1. Every vaccinated agent has nab_imm[hpv16] > 0 (immediate effect).
+    1. Every vaccinated agent has vax_imm[hpv16] > 0 (immediate effect,
+       written to vax_imm not nab_imm so it bypasses cross-immunity matrix).
     2. The bulk of vaccinated agents (those not vaccinated on the very last
        timestep) have rel_sus[hpv16] < 1.0 after CrossImmunity propagates.
     """
@@ -153,10 +154,14 @@ def test_routine_vx_reduces_susceptibility_post_dose():
     vacc_uids = intv.vaccinated.uids
     if len(vacc_uids) == 0:
         pytest.skip('No agents vaccinated in this small-sim window')
-    # 1. Immediate effect: nab_imm bumped for every vaccinated agent
+    # 1. Immediate effect: vax_imm bumped for every vaccinated agent
+    vax_imm = sim.diseases['hpv16'].vax_imm[vacc_uids]
+    assert np.all(vax_imm > 0), \
+        f'Vaccinated agents must have vax_imm[hpv16]>0; got min={float(vax_imm.min())}'
+    # nab_imm must be untouched (clearance-only; vaccine writes only to vax_imm)
     nab_imm = sim.diseases['hpv16'].nab_imm[vacc_uids]
-    assert np.all(nab_imm > 0), \
-        f'Vaccinated agents must have nab_imm[hpv16]>0; got min={float(nab_imm.min())}'
+    assert np.all(nab_imm == 0.0), \
+        f'administer() must not touch nab_imm; got max={float(nab_imm.max())}'
     # 2. Eventual effect: CrossImmunity reduces rel_sus for the bulk of
     #    vaccinated agents (allow up to ~5% latency for agents vaccinated
     #    on the very last few timesteps).

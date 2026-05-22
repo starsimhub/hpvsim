@@ -29,9 +29,17 @@ __all__ = ['CrossImmunity', 'HPVTotal']
 class CrossImmunity(ss.Connector):
     """Cross-immunity + shared HPV-agent state for multi-genotype HPV.
 
-    Per-step, reads each registered ``HPV`` instance's source-genotype
-    ``nab_imm`` / ``cell_imm`` and writes per-target ``rel_sus`` (= 1 -
-    sus_imm) and ``sev_imm`` via cross-protection matrices.
+    Per-step, reads each registered ``HPV`` instance's clearance-conferred
+    ``nab_imm`` / ``cell_imm`` and writes per-target ``sev_imm`` and a
+    nab-based susceptibility reduction via cross-protection matrices.
+    Vaccine-conferred ``vax_imm`` is combined with the nab contribution
+    via independent-protection paths — it is NOT matrix-multiplied, so the
+    CSV's per-genotype ``rel_imm`` values are the complete vaccine
+    cross-protection profile.
+
+    Combining formula for ``rel_sus``:
+        sus_imm_nab[target] = sum_k cross_imm_sus[target, k] * nab_imm[uid, k]
+        rel_sus[target]     = (1 - sus_imm_nab[target]) * (1 - vax_imm[target])
 
     Also owns per-agent ``rel_sev`` — an intrinsic biological severity
     scaler that v2 stores once per agent and uses across every genotype's
@@ -118,15 +126,26 @@ class CrossImmunity(ss.Connector):
         self.ensure_rel_sev(self.sim.people.alive.uids)
         if not self.hpv_modules:
             return
+        # Clearance-conferred immunity — flows through cross-protection matrix.
         nab  = np.column_stack([m.nab_imm.values  for m in self.hpv_modules])
         cell = np.column_stack([m.cell_imm.values for m in self.hpv_modules])
-        sus_imm = nab  @ self.cross_imm_sus.T
-        sev_imm = cell @ self.cross_imm_sev.T
-        np.clip(sus_imm, 0.0, 1.0, out=sus_imm)
-        np.clip(sev_imm, 0.0, 1.0, out=sev_imm)
+        # Vaccine-conferred immunity — applied directly per target genotype,
+        # NOT through the matrix. Shape: (n_agents, n_genotypes).
+        vax = np.column_stack([m.vax_imm.values for m in self.hpv_modules])
+        sus_imm_nab = nab  @ self.cross_imm_sus.T
+        sev_imm     = cell @ self.cross_imm_sev.T
+        np.clip(sus_imm_nab, 0.0, 1.0, out=sus_imm_nab)
+        np.clip(sev_imm,     0.0, 1.0, out=sev_imm)
+        np.clip(vax,         0.0, 1.0, out=vax)
         auids = self.sim.people.auids
         for i, m in enumerate(self.hpv_modules):
-            m.rel_sus[auids] = 1.0 - sus_imm[:, i]
+            # Independent-protection combination:
+            # rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm[target])
+            # Both clearance cross-protection (matrix path) and direct vaccine
+            # protection (vax path) reduce susceptibility multiplicatively.
+            # sev_imm is clearance-conferred only (vaccines don't reduce
+            # severity beyond the susceptibility effect in v2).
+            m.rel_sus[auids] = (1.0 - sus_imm_nab[:, i]) * (1.0 - vax[:, i])
             m.sev_imm[auids] = sev_imm[:, i]
 
 

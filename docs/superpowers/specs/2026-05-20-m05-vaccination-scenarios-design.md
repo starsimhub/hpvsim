@@ -546,3 +546,23 @@ post-implementation-deltas section.
   the user's callable) alongside the existing `self.age_range` and
   `self.sex` (coerced int-set). M04 `AgeResults` consumers and the
   migration guide can rely on the raw forms.
+
+- **Vaccine-conferred immunity moved from `nab_imm` to a new `vax_imm`
+  state.** The original M05 spec landed on "reuse `nab_imm` for vaccine
+  immunity" on the belief that v2 also shared one immunity track between
+  clearance and vaccination. M05 parity work surfaced that v2 actually
+  routes vaccine immunity through a vaccine-specific `imm_source` row of
+  `peak_imm` which is NOT included in the cross-protection matrix, so v2
+  vaccine immunity does not flow through cross-immunity. v3's
+  `CrossImmunity` connector was double-counting cross-protection (the CSV
+  per-genotype `rel_imm` AND matrix-amplification from
+  `nab_imm[other_genotype]=1.0`), causing an hpv16-only vaccine to reduce
+  hi5/hpv18/ohr infections by 20–30%. Post-fix: each HPV module has a
+  `vax_imm` FloatArr; vaccine `administer` writes there; `CrossImmunity`
+  combines per-target `vax_imm` with the matrix-derived `nab_imm`
+  contribution via `rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm)`
+  (independent protection paths). The CSV's per-genotype `rel_imm` table
+  is now the complete vaccine cross-protection profile, matching v2
+  semantics. Adds regression test
+  `test_single_genotype_vaccine_does_not_bleed_to_others` in
+  `tests/test_m05_vx_no_cross_bleed.py`.
