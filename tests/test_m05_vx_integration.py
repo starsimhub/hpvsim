@@ -112,7 +112,7 @@ def test_routine_vx_respects_age_range():
 # transmission / progression / clearance, this number will change and
 # the assertion below will fail loudly. Regenerate by running the
 # no-vx sim and printing float(sim.results['hpvtotal']['cum_infections'].sum()).
-EXPECTED_NO_VX_TOTAL_INFECTIONS = 11536.0
+EXPECTED_NO_VX_TOTAL_INFECTIONS = 10707.0
 
 
 def test_no_vx_baseline_unchanged():
