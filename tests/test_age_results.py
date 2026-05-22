@@ -130,9 +130,14 @@ def test_age_results_cancer_incidence_by_age():
 
 
 def test_age_results_type_distribution_sums_to_one():
-    """cancerous_genotype_dist normalizes to a probability distribution per year."""
+    """cancerous_genotype_dist normalizes to a probability distribution per year.
+
+    Uses n_agents=10000 so a reasonable number of cancers (~8 at seed=0) have
+    fired by 2020 even after small RNG shifts; with n=4000 the count hovers
+    near zero and the precondition flakes under any RNG-affecting change.
+    """
     edges = np.array([0., 100.])  # one age window — all ages
-    sim = hpv.Sim(n_agents=4000, start=1990, stop=2021, dt=1.0,
+    sim = hpv.Sim(n_agents=10000, start=1990, stop=2021, dt=1.0,
                   rand_seed=0,
                   genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
                   analyzers=[hpv.AgeResults(
@@ -159,9 +164,13 @@ def test_age_results_type_distribution_sums_to_one():
 def test_age_results_type_distribution_per_genotype_sums_match_total():
     """Sum-over-genotypes of per-bin raw counts == sum-over-genotypes-elsewhere
     cancerous count for that bin. Confirms type-dist's binning matches the
-    aggregate 'cancers' binning at the raw-count level."""
+    aggregate 'cancers' binning at the raw-count level.
+
+    n_agents=10000 to match the sister test so both tests exercise the
+    normalization paths even after RNG-affecting changes.
+    """
     edges = np.array([0., 40., 100.])
-    sim = hpv.Sim(n_agents=4000, start=1990, stop=2021, dt=1.0,
+    sim = hpv.Sim(n_agents=10000, start=1990, stop=2021, dt=1.0,
                   rand_seed=0,
                   genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
                   analyzers=[hpv.AgeResults(
