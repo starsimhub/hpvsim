@@ -100,12 +100,6 @@ class HPV(ss.Infection):
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
             ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
-            # Per-agent biological severity baseline. Sampled once at agent
-            # creation and never modified; passed separately to compute_severity
-            # so the severity model evaluates t_eff = dur * (1 - sev_imm) * rel_sev.
-            ss.FloatArr('rel_sev', label='Relative severity (biological)', default=1.0),
-            # Tracks whether rel_sev has been sampled for an agent yet.
-            ss.BoolState('rel_sev_sampled', default=False),
             # Severity immunity, accumulated as max-of-beta-samples on each
             # clearance. Shortens future dur_precin via (1 - sev_imm) factor.
             ss.FloatArr('sev_imm', label='Severity immunity', default=0.0),
@@ -114,9 +108,6 @@ class HPV(ss.Infection):
             ss.FloatArr('nab_imm', label='Humoral immunity (source genotype)', default=0.0),
             ss.FloatArr('cell_imm', label='Cell-mediated immunity (source genotype)', default=0.0),
         )
-        # Baseline rel_sev distribution; abs() in _sample_rel_sev_for_unset
-        # implements positive truncation.
-        self._rel_sev_dist = ss.normal(loc=1.0, scale=0.2)
         # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
         # use site (placeholder p values below).
         self._cin_bern = ss.bernoulli(p=0.5)
@@ -133,9 +124,31 @@ class HPV(ss.Infection):
         return
 
     def init_post(self):
+        # Ensure CrossImmunity has sampled rel_sev for the starting population
+        # BEFORE super().init_post() runs init_prev seeding (which triggers
+        # set_prognoses, which reads rel_sev). First HPV module to init_post
+        # triggers the sampling; subsequent modules are no-ops because
+        # rel_sev_sampled is already True for everyone.
+        cross = self._cross_immunity_connector()
+        if cross is not None:
+            cross.ensure_rel_sev(self.sim.people.alive.uids)
         super().init_post()
-        self._sample_rel_sev_for_unset()
         return
+
+    def _cross_immunity_connector(self):
+        """Locate the CrossImmunity connector on the sim, if any.
+
+        Returns None if no CrossImmunity is registered (single-genotype
+        sims without cross-immunity get a 1x1 identity connector by
+        default, but defensive against future configurations that disable
+        it). When None, rel_sev stays at its default 1.0.
+        """
+        # Avoid circular import at module load.
+        from .cross_genotype import CrossImmunity
+        for c in self.sim.connectors.values():
+            if isinstance(c, CrossImmunity):
+                return c
+        return None
 
     def init_results(self):
         """Per-step Results emitted from ``step_state``.
@@ -192,23 +205,6 @@ class HPV(ss.Infection):
         bumps = dist.rvs(uids)
         return (floor + bumps).astype(int)
 
-    def _sample_rel_sev_for_unset(self):
-        """Sample rel_sev for any alive agent without a sample yet.
-
-        Runs once at init for the starting population, then per-step for
-        newborns and immigrants. ``abs()`` folds the negative tail of the
-        normal back onto positives; with loc=1.0, scale=0.2 the affected
-        mass is < 1e-6, so this preserves the positive-only convention
-        without changing the practical distribution.
-        """
-        unset = (~self.rel_sev_sampled).uids
-        if not len(unset):
-            return
-        sampled = np.abs(self._rel_sev_dist.rvs(unset))
-        self.rel_sev[unset] = sampled
-        self.rel_sev_sampled[unset] = True
-        return
-
     def set_prognoses(self, uids, sources=None):
         """Sample full natural-history trajectory for newly-infected agents.
 
@@ -245,7 +241,14 @@ class HPV(ss.Infection):
         self.ti_dead_cancer[uids] = np.nan
 
         female_all = self.sim.people.female[uids]
-        rel_sev_uids = self.rel_sev[uids]
+        # rel_sev is shared across HPV modules via the CrossImmunity connector;
+        # ensure it's sampled for these uids (lazy first-touch sampling).
+        cross = self._cross_immunity_connector()
+        if cross is not None:
+            cross.ensure_rel_sev(uids)
+            rel_sev_uids = cross.rel_sev[uids]
+        else:
+            rel_sev_uids = np.ones(len(uids), dtype=float)
         sev_imm_uids = self.sev_imm[uids]
 
         # 1. Sample precin durations.
@@ -386,10 +389,9 @@ class HPV(ss.Infection):
           3. CIN -> cancerous (stops transmitting)
           4. Cancer death (via people.request_death)
         """
-        # Sample rel_sev for any newly-added alive agents (births, immigrants)
-        # before they can be selected for infection this step.
-        self._sample_rel_sev_for_unset()
-
+        # rel_sev for births/immigrants is sampled lazily by the
+        # CrossImmunity connector's step() before any HPV step_infect runs,
+        # and again on first-touch in set_prognoses; no per-module work needed.
         ti = self.ti
 
         # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---

@@ -28,9 +28,14 @@ def test_age_results_importable_and_constructible():
 
 
 def test_age_results_cancers_by_age_basic():
-    """Snapshot of cancer counts by age bin at end-of-year matches alive cancerous agents."""
+    """Snapshot of cancer counts by age bin at end-of-year matches alive cancerous agents.
+
+    ``stop=2020`` (not 2021) so that the end-of-sim state coincides with the
+    analyzer's 2020-end snapshot tick — otherwise an agent firing cancer in
+    2021 would show up in the end-of-sim union but not in the snapshot.
+    """
     edges = np.array([0., 20., 40., 60., 100.])
-    sim = hpv.Sim(n_agents=2000, start=1990, stop=2021, dt=1.0,
+    sim = hpv.Sim(n_agents=2000, start=1990, stop=2020, dt=1.0,
                   rand_seed=0, analyzers=[hpv.AgeResults(
                       result_args=sc.objdict(
                           cancers=sc.objdict(years=[2020], edges=edges),
