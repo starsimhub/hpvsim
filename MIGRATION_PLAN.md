@@ -75,8 +75,9 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 | M0: Foundation | ✅ Complete | merged into `v3.0-dev` |
 | M1: Basic transmission sim | ✅ Complete | PR #104 merged |
 | M2: Natural history parity | ✅ Complete | PR #107 merged 2026-05-07 |
-| M3: Multi-genotype and cross-immunity | 🟡 Implementation complete; PR not yet opened | branch `m03-multi-genotype-and-cross-immunity` |
-| M4–M10 | ⬜ Not started | — |
+| M3: Multi-genotype and cross-immunity | ✅ Complete | PR #108 merged |
+| M4: Calibration loop | 🟡 In progress | branch `m04-calibration-loop` |
+| M5–M10 | ⬜ Not started | — |
 
 ### M0: Foundation
 

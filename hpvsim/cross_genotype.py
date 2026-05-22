@@ -27,11 +27,19 @@ __all__ = ['CrossImmunity', 'HPVTotal']
 
 
 class CrossImmunity(ss.Connector):
-    """Cross-immunity Connector for multi-genotype HPV.
+    """Cross-immunity + shared HPV-agent state for multi-genotype HPV.
 
-    Reads each registered ``HPV`` instance's source-genotype ``nab_imm`` and
-    ``cell_imm``; writes per-target ``rel_sus`` (= 1 - sus_imm) and ``sev_imm``
-    each step, after Disease.step_state and before Disease.step_infect.
+    Per-step, reads each registered ``HPV`` instance's source-genotype
+    ``nab_imm`` / ``cell_imm`` and writes per-target ``rel_sus`` (= 1 -
+    sus_imm) and ``sev_imm`` via cross-protection matrices.
+
+    Also owns per-agent ``rel_sev`` — an intrinsic biological severity
+    scaler that v2 stores once per agent and uses across every genotype's
+    progression. Per-module storage in v3 would give each genotype its
+    own independent rel_sev draw for the same agent, breaking the v2-
+    implied "intrinsic progression speed" correlation. Owning rel_sev
+    here keeps the v2 semantic — sampled once per agent, read by every
+    HPV module's ``set_prognoses``.
     """
 
     def __init__(self, cross_imm_sus=None, cross_imm_sev=None, **kwargs):
@@ -40,6 +48,16 @@ class CrossImmunity(ss.Connector):
         self.cross_imm_sev = cross_imm_sev
         self.hpv_modules = None
         self.genotype_index = None
+        self.define_states(
+            # Per-agent biological severity scaler, shared across all HPV
+            # genotypes. Sampled once on first need via _ensure_rel_sev.
+            ss.FloatArr('rel_sev', label='Relative severity (biological)', default=1.0),
+            ss.BoolState('rel_sev_sampled', default=False),
+        )
+        # Folded normal via abs() in _ensure_rel_sev; with loc=1.0, scale=0.2
+        # the negative tail mass is < 1e-6 so the practical distribution is
+        # equivalent to v2's normal_pos(1, 0.2).
+        self._rel_sev_dist = ss.normal(loc=1.0, scale=0.2)
 
     def init_pre(self, sim):
         super().init_pre(sim)
@@ -78,7 +96,26 @@ class CrossImmunity(ss.Connector):
                     f'[0, 1]; got {diag}'
                 )
 
+    def ensure_rel_sev(self, uids):
+        """Sample ``rel_sev`` for any of ``uids`` that don't have a sample yet.
+
+        Called from each HPV module's ``set_prognoses`` so the v2 semantic
+        — sampled once per agent at first need — holds regardless of
+        module init order. Subsequent calls for the same uids are no-ops.
+        """
+        if len(uids) == 0:
+            return
+        unset_mask = ~self.rel_sev_sampled[uids]
+        if not unset_mask.any():
+            return
+        unset = uids[unset_mask]
+        self.rel_sev[unset] = np.abs(self._rel_sev_dist.rvs(unset))
+        self.rel_sev_sampled[unset] = True
+
     def step(self):
+        # Catch any unset agents (births/immigrants since last step) before
+        # the downstream HPV step_infect samples new infections.
+        self.ensure_rel_sev(self.sim.people.alive.uids)
         if not self.hpv_modules:
             return
         nab  = np.column_stack([m.nab_imm.values  for m in self.hpv_modules])
@@ -128,7 +165,7 @@ class HPVTotal(ss.Analyzer):
     _DERIVED = ('n_susceptible', 'prevalence')
 
     # HPV result keys not aggregated (bookkeeping artifacts).
-    _SKIP = ('timevec', 'n_rel_sev_sampled')
+    _SKIP = ('timevec',)
 
     def init_pre(self, sim):
         """Discover HPV modules once at init; mirrors CrossImmunity's pattern.

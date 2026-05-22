@@ -60,6 +60,12 @@ class AgeMigration(ss.Demographics):
         self._pop_by_year = None                    # {year: per-year pyramid DataFrame}, built in init_pre.
         # CRN-safe emigrant selection — domain set per call.
         self._emi_select = ss.choice(replace=False)
+        # Sub-year age jitter for incoming immigrants. Without this, every
+        # "year-N" immigrant arrives at exactly age N.0 and the cohort ages
+        # in lockstep through age bins, producing discrete pyramid steps
+        # rather than smooth transitions. Jittering by uniform(0, 1) means
+        # year-N immigrants are spread across [N, N+1) within the year.
+        self._age_jitter = ss.uniform(low=0.0, high=1.0)
         return
 
     # ---------------------------------------------------------------------- #
@@ -189,7 +195,13 @@ class AgeMigration(ss.Demographics):
             # Single People.grow + write per attribute, sized to the total
             # immigration across all (age, sex) bands.
             new_uids = people.grow(n_imm_total)
-            people.age[new_uids] = np.concatenate(imm_age_chunks)
+            ages_at_arrival = np.concatenate(imm_age_chunks)
+            # Spread each "year-N" immigrant uniformly across [N, N+1) so the
+            # cohort doesn't all transition age bins on the same tick. Uses
+            # the per-module CRN dist; ages_at_arrival is the integer
+            # lower-bound of each immigrant's year band.
+            ages_at_arrival = ages_at_arrival + self._age_jitter.rvs(new_uids)
+            people.age[new_uids] = ages_at_arrival
             people.female[new_uids] = np.concatenate(imm_female_chunks)
 
         self._n_imm = n_imm_total

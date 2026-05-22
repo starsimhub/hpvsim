@@ -30,7 +30,7 @@ from tests.regression.short_summary import build_summary
 
 
 BASELINE_PATH = Path('tests/regression/v2_seeds_n30.json')
-N_V3_SEEDS = 10
+N_V3_SEEDS = 30
 Z_THRESHOLD = 3.0
 GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
