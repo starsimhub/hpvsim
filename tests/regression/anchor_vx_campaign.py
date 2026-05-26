@@ -20,6 +20,7 @@ PARS = sc.objdict(
         years=[2020, 2021],
         interpolate=False,
         name='campaign_bivalent_catchup',
+        v2_age_compat=True,  # demonstrate v2/v3 step-ordering alignment
     ),
 )
 
@@ -35,6 +36,7 @@ def build_v3_intervention():
         years=list(cfg.years),
         interpolate=cfg.interpolate,
         name=cfg.name,
+        v2_age_compat=cfg.v2_age_compat,
     )
 
 

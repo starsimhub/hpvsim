@@ -67,7 +67,7 @@ def _as_boolarr(extra_result, people):
     return out
 
 
-def _compose_eligibility(age_range, sex, extra):
+def _compose_eligibility(age_range, sex, extra, v2_age_compat=False):
     """Compose v2-style targeting into a Starsim eligibility callable.
 
     Returns ``elig(sim) -> ss.uids`` that intersects:
@@ -75,6 +75,12 @@ def _compose_eligibility(age_range, sex, extra):
       - sim.people.age in [age_range[0], age_range[1]) if age_range is set
       - sim.people.sex matches sex if sex is set to a single sex
       - extra(sim) if extra is provided (callable returning BoolArr or uids)
+
+    If ``v2_age_compat=True``, the age check is evaluated against
+    ``sim.people.age + dt`` instead of ``sim.people.age``. This mirrors v2's
+    convention of advancing ages BEFORE the intervention step runs (Starsim
+    advances ages AFTER). Without the shim, v3 catches one fewer quarter
+    of eligibility per cohort vs v2 — a ~1-2% gap at steady state.
     """
     sex_set = _coerce_sex(sex)
 
@@ -82,7 +88,12 @@ def _compose_eligibility(age_range, sex, extra):
         cond = sim.people.alive
         if age_range is not None:
             lo, hi = age_range
-            cond = cond & (sim.people.age >= lo) & (sim.people.age < hi)
+            if v2_age_compat:
+                dt_yr = float(sim.t.dt.years if hasattr(sim.t.dt, 'years') else sim.t.dt)
+                age_check = sim.people.age + dt_yr
+            else:
+                age_check = sim.people.age
+            cond = cond & (age_check >= lo) & (age_check < hi)
         if sex_set is not None and len(sex_set) == 1:
             (s,) = sex_set
             # Starsim uses people.female (0) / people.male (1) BoolArrs
@@ -111,8 +122,9 @@ class BaseVaccination(ss.BaseVaccination):
     ``hpv.vx(name='bivalent')``, mirroring v2's string-product convention.
     """
 
-    def __init__(self, *args, age_range=None, sex=None, eligibility=None, **kwargs):
-        composed = _compose_eligibility(age_range, sex, eligibility)
+    def __init__(self, *args, age_range=None, sex=None, eligibility=None,
+                 v2_age_compat=False, **kwargs):
+        composed = _compose_eligibility(age_range, sex, eligibility, v2_age_compat=v2_age_compat)
         super().__init__(*args, eligibility=composed, **kwargs)
         # Raw constructor args, preserved for introspection (e.g.
         # M04 AgeResults stratification by vaccination cohort).
@@ -120,6 +132,7 @@ class BaseVaccination(ss.BaseVaccination):
         self.sex_raw = sex
         self.sex = _coerce_sex(sex)
         self.eligibility_raw = eligibility
+        self.v2_age_compat = v2_age_compat
 
     def _parse_product_str(self, product):
         """Resolve a string product name through hpv.vx default lookup."""

@@ -23,6 +23,7 @@ PARS = sc.objdict(
         sex='f',
         start_year=2020,
         name='routine_bivalent_girls',
+        v2_age_compat=True,  # demonstrate v2/v3 step-ordering alignment
     ),
 )
 
@@ -38,6 +39,7 @@ def build_v3_intervention():
         sex=cfg.sex,
         start_year=cfg.start_year,
         name=cfg.name,
+        v2_age_compat=cfg.v2_age_compat,
     )
 
 

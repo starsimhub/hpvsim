@@ -340,3 +340,50 @@ def test_campaign_vx_passes_years_through():
     from hpvsim.interventions import campaign_vx
     intv = campaign_vx(product='bivalent', prob=[0.7, 0.5], years=[2020, 2021])
     assert list(intv.years) == [2020, 2021]
+
+
+def test_compose_eligibility_v2_age_compat_shifts_window():
+    """With v2_age_compat=True, eligibility evaluates age+dt; an agent at
+    age 8.85 should be eligible for age_range=[9, 10] (because age+dt=9.10)."""
+    from hpvsim.interventions import _compose_eligibility
+    sim = _make_plain_small_sim()
+    elig_compat = _compose_eligibility(age_range=[9, 10], sex=None, extra=None,
+                                       v2_age_compat=True)
+    elig_default = _compose_eligibility(age_range=[9, 10], sex=None, extra=None,
+                                        v2_age_compat=False)
+    uids_compat = elig_compat(sim)
+    uids_default = elig_default(sim)
+    # The compat window should include agents in [9-dt, 10-dt) — different uid set.
+    # Both should be non-empty in a typical Nigeria sim.
+    assert len(uids_compat) > 0
+    assert len(uids_default) > 0
+    # All compat-eligible agents must have age+dt in [9, 10)
+    ages_compat = sim.people.age[uids_compat]
+    dt = float(sim.t.dt.years if hasattr(sim.t.dt, 'years') else sim.t.dt)
+    assert np.all(ages_compat + dt >= 9.0 - 1e-9)
+    assert np.all(ages_compat + dt < 10.0 + 1e-9)
+    # Default-eligible agents must have age in [9, 10)
+    ages_default = sim.people.age[uids_default]
+    assert np.all(ages_default >= 9.0 - 1e-9)
+    assert np.all(ages_default < 10.0 + 1e-9)
+    # The two sets are shifted: compat catches the [9-dt, 9) leading edge
+    # that default misses. Verify the sets differ (not identical).
+    assert set(uids_compat.tolist()) != set(uids_default.tolist())
+
+
+def test_base_vaccination_stores_v2_age_compat():
+    """BaseVaccination stores v2_age_compat for introspection."""
+    from hpvsim.interventions import routine_vx
+    intv_on = routine_vx(product='bivalent', prob=0.9, start_year=2020,
+                         v2_age_compat=True)
+    intv_off = routine_vx(product='bivalent', prob=0.9, start_year=2020,
+                          v2_age_compat=False)
+    assert intv_on.v2_age_compat is True
+    assert intv_off.v2_age_compat is False
+
+
+def test_base_vaccination_default_v2_age_compat_is_false():
+    """v2_age_compat defaults to False (opt-in only)."""
+    from hpvsim.interventions import routine_vx
+    intv = routine_vx(product='bivalent', prob=0.9, start_year=2020)
+    assert intv.v2_age_compat is False

@@ -58,6 +58,8 @@ def _build_v2_intervention(cfg):
             sex=cfg.sex,
             start_year=cfg.start_year,
             label=cfg.name,
+            # NOTE: v2_age_compat omitted — v2 always ages-before-intervention
+            # natively, so the shim is meaningless for v2.
         )
     if cfg.kind == 'campaign_vx':
         return hpv.campaign_vx(
@@ -68,6 +70,8 @@ def _build_v2_intervention(cfg):
             years=list(cfg.years),
             interpolate=cfg.interpolate,
             label=cfg.name,
+            # NOTE: v2_age_compat omitted — v2 always ages-before-intervention
+            # natively, so the shim is meaningless for v2.
         )
     raise ValueError(f'Unknown intervention kind: {cfg.kind!r}')
 
