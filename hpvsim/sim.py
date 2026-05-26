@@ -23,7 +23,7 @@ Kwargs:
     init_prev curve independently; co-infection at initialisation is possible.
 
   ``v2_compat_demographics`` (bool, default ``False``):
-    When True, activates two v2-compatible demographic conventions:
+    When True, activates three v2-compatible demographic conventions:
 
     1. **Annual-pulse births.** Swaps ``ss.Births`` for ``hpv.AnnualBirths``
        so every year's birth cohort is released as a single pulse at the
@@ -32,11 +32,16 @@ Kwargs:
     2. **Migration jitter disabled.** Passes ``v2_compat=True`` to
        ``AgeMigration`` so immigrants land at exact integer ages (no
        uniform [N, N+1) jitter), matching v2's discrete-cohort structure.
+    3. **Initial population age discretization.** After ``ss.People.init_vals``
+       samples continuous ages from the UN year-band histogram (each agent
+       lands uniformly within its year bin), floors all initial ages to the
+       nearest integer. This matches v2's convention of placing the starting
+       cohort at exact integer ages.
 
-    Both effects together ensure that agents entering the sim — whether via
-    birth or immigration — have discrete integer ages, which aligns the
-    eligibility window arithmetic for age-targeted interventions with v2's
-    conventions. The default (False) retains v3's continuous-age behaviour.
+    All three effects together ensure that every agent entering or starting
+    in the sim has a discrete integer age, which aligns the eligibility
+    window arithmetic for age-targeted interventions with v2's conventions.
+    The default (False) retains v3's continuous-age behaviour.
 
   ``init_hpv_dist`` (dict or None, default ``None``):
     Only used when ``init_seeding='exclusive'``. If ``None``, genotype
@@ -46,6 +51,7 @@ Kwargs:
     1; normalised internally).
 """
 
+import numpy as np
 import starsim as ss
 
 from .cross_genotype import HPVTotal, CrossImmunity
@@ -140,6 +146,8 @@ class Sim(ss.Sim):
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()
+        # Stored for use in init() to discretize initial ages.
+        self._v2_compat_demographics = v2_compat_demographics
         super().__init__(
             start=ss.years(start),
             stop=ss.years(stop),
@@ -154,3 +162,19 @@ class Sim(ss.Sim):
             total_pop=total_pop,
             **kwargs,
         )
+
+    def init(self, **kwargs):
+        """Initialize the sim, then discretize initial ages if v2_compat_demographics is set.
+
+        ``ss.People.init_vals()`` samples ages continuously from the UN
+        year-band histogram (each agent lands uniformly within its year bin,
+        e.g. an agent in the "age 5" bin gets a float in [5, 6)). v2 placed
+        agents at exact integer ages. When ``v2_compat_demographics=True``,
+        floor all initial agent ages to integers after sampling so the
+        starting cohort matches v2's discrete convention.
+        """
+        super().init(**kwargs)
+        if self._v2_compat_demographics:
+            uids = self.people.auids
+            self.people.age.raw[uids] = np.floor(self.people.age.raw[uids])
+        return self
