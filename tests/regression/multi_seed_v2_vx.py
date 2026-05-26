@@ -127,19 +127,30 @@ def run_seed(anchor_pars, seed):
 
     # --- Vaccination-specific scalars ---
     # v2 stores vaccinated (bool) and doses (int) as per-agent state arrays.
-    summary['n_vaccinated_2060'] = int(sim.people.vaccinated.sum())
-    summary['n_doses_2060'] = int(sim.people.doses.sum())
+    # IMPORTANT: v2 resets `vaccinated` to False on death but does NOT reset
+    # `doses`. Apply an `alive`-mask filter to both so the counts compare apples
+    # to apples with v3 (where Starsim's BoolArr.sum() uses alive-only values).
+    alive = sim.people.alive
+    summary['n_vaccinated_2060'] = int(sim.people.vaccinated[alive].sum())
+    summary['n_doses_2060'] = int(sim.people.doses[alive].sum())
 
     # --- cancer_incidence_2030_2060 ---
     # v2 uses 'cancers' (not 'new_cancers') for the per-step new-cancer flow
     # and 'n_alive' for the living population.
+    # IMPORTANT: v2's results are aggregated to ANNUAL cadence (resfreq = 1/dt
+    # = 4 quarters per annual entry). Each entry in 'n_alive' represents a
+    # one-year snapshot, so the per-entry time contribution to person-years is
+    # 1.0 year (= resfreq * dt), NOT the quarterly dt of 0.25. v3 stores per-
+    # quarter values with dt=0.25, so its formula uses dt=0.25 directly. The
+    # numerators ('cancers' for v2, 'hpvtotal.new_cancers' for v3) are both
+    # totals in [2030, 2060), comparable as-is.
     years = np.asarray(sim.results['year'])
     mask = (years >= 2030) & (years < 2060)
     cancers_series = np.asarray(sim.results['cancers'])
     n_cancers = float(cancers_series[mask].sum())
     pop = np.asarray(sim.results['n_alive'])[mask]
-    dt = float(sim.pars['dt'])
-    py = float((pop * dt).sum())
+    annual_dt = float(sim.resfreq) * float(sim.pars['dt'])  # = 1.0 for resfreq=4, dt=0.25
+    py = float((pop * annual_dt).sum())
     summary['cancer_incidence_2030_2060'] = n_cancers / max(py, 1.0)
 
     # --- Trajectory field ---

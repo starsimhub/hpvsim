@@ -34,27 +34,48 @@ TRAJECTORY_METRICS = ('new_cancers', 'hpv_total_infections', 'new_vaccinated')
 def _v3_trajectory_row(sim, intv):
     """Per-year arrays for trajectory comparison.
 
+    v3 emits per-step (quarterly) results, v2 emits annual. We downsample v3's
+    quarterly per-step counters to annual SUMS so the cadence matches v2's
+    trajectory entries.
+
     new_cancers / hpv_total_infections come from sim.results.hpvtotal;
-    new_vaccinated is derived from the histogram of intv.ti_vaccinated
-    (v3 doesn't expose a per-step new_vaccinated series, only per-agent
-    timestep state).
+    new_vaccinated is derived from the histogram of intv.ti_vaccinated (v3
+    doesn't expose a per-step new_vaccinated series).
     """
     timevec = sim.results.timevec
     year_floats = np.asarray(timevec.years if hasattr(timevec, 'years') else timevec, dtype=float)
     n_steps = len(year_floats)
 
-    # Histogram per-agent ti_vaccinated into the timestep bins
+    # Histogram per-agent ti_vaccinated into per-step bins
     ti = np.asarray(intv.ti_vaccinated)
     valid = ~np.isnan(ti)
-    bins_per_step, _ = np.histogram(
+    new_vacc_per_step, _ = np.histogram(
         ti[valid].astype(int), bins=np.arange(n_steps + 1)
     )
 
+    # Downsample quarterly per-step counters to annual sums. v3 uses dt=0.25
+    # (281 steps for 70-year sim); v2 stores 71 annual entries (70 years + 1
+    # for the boundary). Bucket steps by integer floor(year).
+    int_years = np.floor(year_floats).astype(int)
+    new_cancers_q = np.asarray(sim.results.hpvtotal.new_cancers, dtype=float)
+    new_infections_q = np.asarray(sim.results.hpvtotal.new_infections, dtype=float)
+    new_vacc_q = new_vacc_per_step.astype(float)
+
+    annual_years = sorted(np.unique(int_years).tolist())
+    annual_new_cancers = []
+    annual_new_infections = []
+    annual_new_vacc = []
+    for y in annual_years:
+        bucket = int_years == y
+        annual_new_cancers.append(float(new_cancers_q[bucket].sum()))
+        annual_new_infections.append(float(new_infections_q[bucket].sum()))
+        annual_new_vacc.append(float(new_vacc_q[bucket].sum()))
+
     return dict(
-        year=year_floats.tolist(),
-        new_cancers=list(sim.results.hpvtotal.new_cancers),
-        hpv_total_infections=list(sim.results.hpvtotal.new_infections),
-        new_vaccinated=bins_per_step.tolist(),
+        year=[float(y) for y in annual_years],
+        new_cancers=annual_new_cancers,
+        hpv_total_infections=annual_new_infections,
+        new_vaccinated=annual_new_vacc,
     )
 
 
