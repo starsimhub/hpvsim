@@ -34,7 +34,7 @@ import starsim as ss
 
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
-from .demographics import AgeMigration
+from .demographics import AgeMigration, AnnualBirths
 from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
 from .seeding import _ExclusiveSeeder
@@ -46,7 +46,7 @@ class Sim(ss.Sim):
     def __init__(self, location='nigeria', genotypes=None, genotype_pars=None,
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
-                 total_pop=None, pars=None, **kwargs):
+                 total_pop=None, pars=None, v2_compat_births=False, **kwargs):
         # Pass start year so the age pyramid matches sim.start (loader
         # defaults to year 2000 with a materially different distribution).
         country = load_country(location, year=int(start))
@@ -112,8 +112,9 @@ class Sim(ss.Sim):
             networks = [SexualNetwork(**country['network_pars'])]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
+            births_cls = AnnualBirths if v2_compat_births else ss.Births
             demographics = [
-                ss.Births(birth_rate=country['birth_rate']),
+                births_cls(birth_rate=country['birth_rate']),
                 ss.Deaths(death_rate=country['death_rate']),
                 AgeMigration(),
             ]
