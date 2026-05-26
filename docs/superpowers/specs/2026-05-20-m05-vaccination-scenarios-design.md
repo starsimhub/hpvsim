@@ -566,3 +566,5 @@ post-implementation-deltas section.
   semantics. Adds regression test
   `test_single_genotype_vaccine_does_not_bleed_to_others` in
   `tests/test_m05_vx_no_cross_bleed.py`.
+
+- **`rel_imm[g]` semantics corrected: cross-protection coefficient, not Bernoulli probability.** v2 has TWO distinct parameters: `imm_init=0.95` (per-agent sterilizing probability, uniform across genotypes — hardcoded in v2's `default_vx`) and `rel_imm[g]` (per-genotype cross-protection coefficient, encoded in v2's cross-immunity matrix as `M[g, vx_source]=rel_imm[g]`). The original M05 implementation conflated these by using `rel_imm[g]` as BOTH the Bernoulli p and the leaky floor, producing `vax_imm[g] = rel_imm[g] * (2 - rel_imm[g])` — overprotecting every non-1.0 genotype (e.g. hi5 50% → 75%, ohr 10% → 19%). Post-fix: `hpv.vx.__init__` accepts `sterilizing_p=0.95` (matches v2's imm_init). `administer` does a single per-agent sterilizing draw at `sterilizing_p`, then writes `vax_imm[g] = rel_imm[g]` for sterilizing agents and `rel_imm[g] * sterilizing_p` for leaky agents. v3's effective per-genotype protection now matches v2's `~0.9975 * rel_imm[g]` to within ~0.25 percentage points.

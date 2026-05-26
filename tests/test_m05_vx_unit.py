@@ -105,12 +105,12 @@ def test_vx_administer_bumps_vax_imm_for_active_genotypes():
     product.administer(sim.people, uids)
     post_hpv16 = sim.diseases['hpv16'].vax_imm[uids]
     post_hpv18 = sim.diseases['hpv18'].vax_imm[uids]
-    # hpv16 has rel_imm=1.0 -> every agent is sterilizing -> post = 1.0
-    assert np.all(post_hpv16 == 1.0)
-    # hpv18 has rel_imm=0.5 -> each agent's post is either 1.0 (sterilizing)
-    # or 0.5 (leaky); never less than 0.5
-    assert np.all(post_hpv18 >= 0.5)
-    assert np.all(post_hpv18 <= 1.0)
+    # hpv16 has rel_imm=1.0: sterilizing agents -> vax_imm=1.0, leaky -> 1.0*0.95=0.95
+    assert np.all(post_hpv16 >= 0.95)
+    assert np.all(post_hpv16 <= 1.0)
+    # hpv18 has rel_imm=0.5: sterilizing -> vax_imm=0.5, leaky -> 0.5*0.95=0.475
+    assert np.all(post_hpv18 >= 0.475)
+    assert np.all(post_hpv18 <= 0.5)
     # No regressions in initial state
     assert np.all(post_hpv16 >= pre_hpv16)
     assert np.all(post_hpv18 >= pre_hpv18)

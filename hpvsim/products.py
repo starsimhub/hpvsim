@@ -64,10 +64,18 @@ class vx(ss.Vx):
     dict). Default product names: ``'bivalent'``, ``'quadrivalent'``,
     ``'nonavalent'``.
 
-    The vaccine model is "all-or-nothing + leaky": per agent per genotype,
-    draw Bernoulli(rel_imm[g]); on success the agent's ``vax_imm[g]``
-    becomes 1.0 (sterilizing immunity), on failure it becomes rel_imm[g]
-    (leaky protection floor). Existing ``vax_imm`` is never downgraded.
+    The vaccine model mirrors v2's two-parameter architecture:
+
+    - ``sterilizing_p`` (default 0.95): per-agent Bernoulli probability of
+      sterilizing immunity, drawn ONCE per agent (not per genotype). Matches
+      v2's hardcoded ``imm_init=0.95`` in ``default_vx``.
+    - ``rel_imm[g]`` from the CSV: per-genotype cross-protection coefficient.
+      Sterilizing agents receive ``vax_imm[g] = rel_imm[g]``; leaky agents
+      receive ``vax_imm[g] = rel_imm[g] * sterilizing_p``.
+
+    The effective per-genotype protection is approximately
+    ``0.9975 * rel_imm[g]``, matching v2 to within ~0.25 percentage points.
+    Existing ``vax_imm`` is never downgraded (max-of-existing semantics).
 
     Vaccine immunity is written to ``vax_imm`` (NOT ``nab_imm``). The
     ``CrossImmunity`` connector applies ``vax_imm`` directly per-genotype
@@ -77,50 +85,51 @@ class vx(ss.Vx):
     into cross-protection against non-target genotypes.
     """
 
-    def __init__(self, name=None, rel_imm=None, **kwargs):
+    def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95, **kwargs):
         super().__init__(**kwargs)
         self.define_pars(
             name=name,
             rel_imm=rel_imm,
+            sterilizing_p=sterilizing_p,
         )
         self.rel_imm = _resolve_vx_pars(name, rel_imm)
-        # CRN-safe Bernoulli; p is overwritten per-genotype in administer().
-        # Initialized via the standard intervention -> product.init_pre ->
-        # sim.init_dists() chain, matching the ss.Dx / ss.Tx pattern.
+        # CRN-safe Bernoulli; p set per administer call.
         self._sterilizing_dist = ss.bernoulli(p=0.0)
 
     def administer(self, people, uids):
-        """Apply the vaccine: all-or-nothing+leaky per genotype, max-of-existing.
+        """Apply the vaccine: per-agent all-or-nothing sterilizing draw,
+        scaled per genotype by the CSV's rel_imm cross-protection coefficient.
 
-        For each genotype g configured in this product:
-          1. Look up the corresponding HPV(ss.Infection) module in the sim
-             (by genotype attribute). Skip silently if not present.
-          2. Per-agent Bernoulli(rel_imm[g]):
-               - heads: peak = 1.0 (sterilizing immunity)
-               - tails: peak = rel_imm[g] (leaky protection floor)
-          3. Write hpv_mod.vax_imm[uids] = max(existing, peak).
+        Mirrors v2's architecture: a single per-agent sterilizing Bernoulli at
+        ``sterilizing_p`` (default 0.95, matching v2's hardcoded imm_init=0.95),
+        then per-genotype scaling by ``rel_imm[g]`` from products_vx.csv. v2
+        encodes the per-genotype effect via the cross-immunity matrix coefficient
+        M[g, vx_source] = rel_imm[g]; v3 encodes it directly into vax_imm[g] using
+        ``rel_imm[g]`` as a multiplicative scalar on the per-agent peak.
 
-        Writes to ``vax_imm``, NOT ``nab_imm``. Clearance-conferred ``nab_imm``
-        flows through the cross-immunity matrix; vaccine-conferred ``vax_imm``
-        is applied per-genotype directly by ``CrossImmunity``, so the CSV's
-        per-genotype ``rel_imm`` values carry the complete vaccine
-        cross-protection profile with no matrix amplification.
+        For each vaccinated agent:
+          - Sterilizing fate is drawn once at p=sterilizing_p (NOT per-genotype).
+          - For each genotype g:
+              - Sterilizing agents:       vax_imm[g] = rel_imm[g]
+              - Non-sterilizing (leaky):  vax_imm[g] = rel_imm[g] * sterilizing_p
+        Max-of-existing prevents vaccine from downgrading prior immunity.
         """
         if len(uids) == 0:
             return
+        # Single sterilizing draw per agent (NOT per genotype) — matches v2
+        self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
+        sterilizing_uids = self._sterilizing_dist.filter(uids)
+        is_sterilizing = np.isin(uids, sterilizing_uids)
         for genotype, rel_imm_g in self.rel_imm.items():
             hpv_mod = self._find_genotype_module(genotype)
             if hpv_mod is None:
                 continue
-            # All-or-nothing draw at p = rel_imm_g for this genotype
-            self._sterilizing_dist.set(p=float(rel_imm_g))
-            sterilizing_uids = self._sterilizing_dist.filter(uids)
-            # Build per-uid peak vector: rel_imm_g (leaky) by default; 1.0
-            # for those who got the sterilizing draw
-            peak = np.full(len(uids), float(rel_imm_g), dtype=float)
-            is_sterilizing = np.isin(uids, sterilizing_uids)
-            peak[is_sterilizing] = 1.0
-            # Max-of-existing: vaccine never downgrades existing vax immunity
+            # Sterilizing agents get rel_imm[g]; leaky get rel_imm[g] * sterilizing_p
+            peak = np.where(
+                is_sterilizing,
+                float(rel_imm_g),
+                float(rel_imm_g) * float(self.pars.sterilizing_p),
+            )
             hpv_mod.vax_imm[uids] = np.maximum(hpv_mod.vax_imm[uids], peak)
 
     def _find_genotype_module(self, genotype):
