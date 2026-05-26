@@ -46,7 +46,8 @@ class AgeMigration(ss.Demographics):
             country data.
     """
 
-    def __init__(self, pars=None, pop_total=None, pop_by_age=None, **kwargs):
+    def __init__(self, pars=None, pop_total=None, pop_by_age=None,
+                 v2_compat=False, **kwargs):
         # dt=ss.year sets this module's Timeline to annual; ss.Loop only
         # calls step() at times in mod.t.tvec, so it fires once per year
         # regardless of sim.dt.
@@ -68,7 +69,13 @@ class AgeMigration(ss.Demographics):
         # in lockstep through age bins, producing discrete pyramid steps
         # rather than smooth transitions. Jittering by uniform(0, 1) means
         # year-N immigrants are spread across [N, N+1) within the year.
+        # Skipped when v2_compat=True to match v2's discrete annual-cohort
+        # structure (immigrants land at exact integer ages, as add_births does).
         self._age_jitter = ss.uniform(low=0.0, high=1.0)
+        # v2_compat: when True, skip age jitter so immigrants land at exact
+        # integer ages, matching v2's add_births convention. Pair with
+        # AnnualBirths to align both channels to v2's discrete-cohort structure.
+        self._v2_compat = v2_compat
         return
 
     # ---------------------------------------------------------------------- #
@@ -203,7 +210,11 @@ class AgeMigration(ss.Demographics):
             # cohort doesn't all transition age bins on the same tick. Uses
             # the per-module CRN dist; ages_at_arrival is the integer
             # lower-bound of each immigrant's year band.
-            ages_at_arrival = ages_at_arrival + self._age_jitter.rvs(new_uids)
+            # Skipped when v2_compat is on — v2's add_births places immigrants
+            # at exact integer ages to match the discrete annual birth cohort
+            # structure.
+            if not self._v2_compat:
+                ages_at_arrival = ages_at_arrival + self._age_jitter.rvs(new_uids)
             people.age[new_uids] = ages_at_arrival
             people.female[new_uids] = np.concatenate(imm_female_chunks)
 

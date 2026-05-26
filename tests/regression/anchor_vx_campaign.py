@@ -42,8 +42,10 @@ def build_v3_intervention():
 
 def build_v3_sim():
     import hpvsim as hpv
-    # v2_age_compat also enables AnnualBirths so every year's birth cohort is
-    # released as a single pulse (matching v2's add_births / dt_demog=1 logic).
+    # v2_compat_demographics enables both AnnualBirths (annual-pulse births)
+    # and AgeMigration jitter-disabled, so every year's cohort — whether born
+    # or immigrated — lands at exact integer ages (matching v2's add_births /
+    # dt_demog=1 convention).
     return hpv.Sim(
         location=PARS.location,
         start=PARS.start, stop=PARS.stop,
@@ -51,5 +53,5 @@ def build_v3_sim():
         n_agents=PARS.n_agents,
         genotypes=list(PARS.genotypes),
         interventions=[build_v3_intervention()],
-        v2_compat_births=PARS.intervention.v2_age_compat,
+        v2_compat_demographics=PARS.intervention.v2_age_compat,
     )

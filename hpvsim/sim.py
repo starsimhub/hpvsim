@@ -22,6 +22,22 @@ Kwargs:
     ``'independent'`` — each genotype draws from its own per-genotype
     init_prev curve independently; co-infection at initialisation is possible.
 
+  ``v2_compat_demographics`` (bool, default ``False``):
+    When True, activates two v2-compatible demographic conventions:
+
+    1. **Annual-pulse births.** Swaps ``ss.Births`` for ``hpv.AnnualBirths``
+       so every year's birth cohort is released as a single pulse at the
+       integer-year boundary, matching v2's ``add_births`` / ``dt_demog=1``
+       logic.
+    2. **Migration jitter disabled.** Passes ``v2_compat=True`` to
+       ``AgeMigration`` so immigrants land at exact integer ages (no
+       uniform [N, N+1) jitter), matching v2's discrete-cohort structure.
+
+    Both effects together ensure that agents entering the sim — whether via
+    birth or immigration — have discrete integer ages, which aligns the
+    eligibility window arithmetic for age-targeted interventions with v2's
+    conventions. The default (False) retains v3's continuous-age behaviour.
+
   ``init_hpv_dist`` (dict or None, default ``None``):
     Only used when ``init_seeding='exclusive'``. If ``None``, genotype
     assignment is uniform across active genotypes. If a dict, keys must be
@@ -46,7 +62,8 @@ class Sim(ss.Sim):
     def __init__(self, location='nigeria', genotypes=None, genotype_pars=None,
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
-                 total_pop=None, pars=None, v2_compat_births=False, **kwargs):
+                 total_pop=None, pars=None, v2_compat_demographics=False,
+                 **kwargs):
         # Pass start year so the age pyramid matches sim.start (loader
         # defaults to year 2000 with a materially different distribution).
         country = load_country(location, year=int(start))
@@ -112,11 +129,11 @@ class Sim(ss.Sim):
             networks = [SexualNetwork(**country['network_pars'])]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
-            births_cls = AnnualBirths if v2_compat_births else ss.Births
+            births_cls = AnnualBirths if v2_compat_demographics else ss.Births
             demographics = [
                 births_cls(birth_rate=country['birth_rate']),
                 ss.Deaths(death_rate=country['death_rate']),
-                AgeMigration(),
+                AgeMigration(v2_compat=v2_compat_demographics),
             ]
 
         analyzers = [HPVTotal()] + user_analyzers
