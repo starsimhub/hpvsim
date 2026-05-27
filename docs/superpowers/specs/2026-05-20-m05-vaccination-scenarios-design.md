@@ -4,7 +4,7 @@
 **Milestone:** M05 (Vaccination scenarios)
 **Branch:** `m05-vaccination-scenarios` (off `m04-calibration-loop`; M05 PR targets `v3.0-dev` once M04 merges)
 **Predecessor:** [M04 Calibration Loop](2026-05-18-m04-calibration-loop-design.md)
-**Status:** Drafted; not yet implemented.
+**Status:** Implemented. See "Post-implementation deltas" below for divergences from this spec discovered during the build.
 
 ---
 
@@ -39,6 +39,10 @@ targeting API on top of Starsim's single-callable eligibility hook.
   `nab_imm`. The existing `CrossImmunity(ss.Connector)` (M03) reads
   `nab_imm` each step and produces per-target `rel_sus` — no new connector
   wiring required.
+  *(Post-implementation: vaccine immunity now writes to a new per-module
+  `vax_imm` state, not `nab_imm`, to prevent the cross-immunity matrix from
+  bleeding bivalent protection onto hi5/ohr. See "Post-implementation
+  deltas" for the rationale and matching v2 semantics.)*
 - `hpv.BaseVaccination(ss.BaseVaccination)` shim that accepts v2's
   `age_range`, `sex`, and `eligibility` arguments and composes them into a
   single Starsim eligibility callable. Stores the originals for
@@ -518,20 +522,14 @@ To be filled in after implementation lands, documenting any divergences
 from this spec discovered during the build. Format follows M03's
 post-implementation-deltas section.
 
-- **`hpv.campaign_vx` is no longer a "thin diamond leaf".** The spec's
-  "Module layout" section described `campaign_vx` as an empty-body
-  subclass mirroring `routine_vx`. Implementation revealed that Starsim
-  3.3+ `CampaignDelivery.init_pre` calls
-  `sc.findnearest(sim.timevec, self.years)` against a DateArray timevec,
-  which raises `TypeError` regardless of whether `years` is a list of
-  ints, floats, or `ss.date` objects (date subtraction returns
-  `datedur`, breaking `np.argmin(abs(...))`). The shipped `campaign_vx`
-  therefore has a ~30-line `init_pre` override that routes around the
-  broken `CampaignDelivery.init_pre` via
-  `super(ss.CampaignDelivery, self).init_pre(sim)` and replicates the
-  timepoint/probability interpolation against `sim.timevec.years`
-  (float). An upstream Starsim issue should be filed; once fixed, the
-  entire override can be deleted.
+- **`hpv.campaign_vx` `init_pre` override added and then removed.** During
+  initial implementation, Starsim 3.3.x's `CampaignDelivery.init_pre`
+  raised `TypeError` against a DateArray timevec, so `campaign_vx`
+  carried a ~30-line `init_pre` override that replicated the timepoint
+  interpolation against `sim.timevec.years` (float). The upstream issue
+  was fixed in starsim 3.3.4, and commit `f4f39059` removed the override.
+  `hpv.campaign_vx` is now the thin diamond leaf the spec originally
+  described.
 
 - **`test_no_vx_baseline_unchanged` was rewritten post-implementation.**
   The originally-shipped version compared two no-vx runs against each
@@ -575,6 +573,16 @@ post-implementation-deltas section.
 
 - **v3 trajectory test downsamples quarterly → annual.** v2 stores trajectory rows at annual cadence (`resfreq=4`, 71 entries for a 70-year sim). v3 stores at quarterly per-step cadence (281 entries). The trajectory parity test now buckets v3's per-step `new_cancers` / `new_infections` / `new_vaccinated` to annual SUMS by `floor(year)` before comparison.
 
-- **Optional `v2_age_compat` flag on `hpv.BaseVaccination` to bridge v2/v3 step-ordering convention.** v2's `Sim.run` calls `people.update_states_pre()` (which advances age by dt) BEFORE running interventions; Starsim's loop runs `intervention.step()` BEFORE `people.finish_step()` (which advances age). Net: v2 catches an agent at age 8.75 as "next-step 9.0" → eligible for the age-9 cohort; v3 catches her at age 8.75 and excludes her. The same agent is caught at age 9.75 by v3 but not by v2 (who already aged her to 10.0). With Nigeria's growing demographic pyramid the entry/exit asymmetry yields a net +1-2% bias on `n_vaccinated_2060` and `n_doses_2060` for v2. M05 adds an opt-in `v2_age_compat=False` kwarg on `hpv.BaseVaccination`; when True, `_compose_eligibility` evaluates `sim.people.age + dt` against `age_range` instead of `sim.people.age`. M05's anchor PARS set this flag to True so the parity gate demonstrates v2/v3 alignment. The default is False (intuitive semantic — "current age in range"). The flag is intended to be removed in a future milestone (likely M10) once v2 is fully retired.
+- **`v2_age_compat` shim on `hpv.BaseVaccination` added and then removed.**
+  Hypothesizing a v2/v3 step-ordering bias (v2 advances age before
+  interventions; Starsim advances age after), commit `5d279128` added an
+  opt-in `v2_age_compat` kwarg that evaluated `sim.people.age + dt` against
+  `age_range`. Further investigation (see
+  `docs/superpowers/specs/2026-05-26-m05-parity-investigation.md`) showed
+  the apparent ~30%/year deficit was a plot-metric artifact, not a real
+  ordering bias, and that the combination of `v2_compat_demographics=True`
+  (annual births + jitter-disabled migration + integer-age initial pop)
+  alone closes the gap. Commit `74cede3b` removed the shim. The final
+  M05 anchor PARS run with the shim OFF and `v2_compat_demographics=True`.
 
 - **`AgeMigration` jitter disabled under v2_compat.** v3's `AgeMigration` spreads each immigrant's age uniformly across `[N, N+1)` to smooth cohort transitions. This propagates continuous-age distribution through the migration channel even after `AnnualBirths` fixes the births channel — immigrants who arrive as "age 0" can still be aged 0.0–0.99, and 9 years later contribute to the cohort breadth that the eligibility window is trying to align with. Under `v2_compat=True`, the jitter is skipped: immigrants land at exact integer ages, matching v2's `add_births` convention. `hpv.Sim`'s `v2_compat_births` kwarg is renamed to `v2_compat_demographics` to cover both channels under a single flag — it now (1) swaps `ss.Births` for `hpv.AnnualBirths` and (2) passes `v2_compat=True` to `AgeMigration`. M5 anchor PARS updated to use `v2_compat_demographics=True`.
