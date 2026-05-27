@@ -381,3 +381,80 @@ class dx(ss.Dx):
         draw = np.asarray(self.result_dist.rvs(these))
         idx = np.searchsorted(uids_sorted, np.asarray(these))
         results[idx] = np.minimum(draw, results[idx])
+
+
+class tx(ss.Tx):
+    """HPV treatment product — per-genotype state-flip with efficacy draw.
+
+    On successful treatment of state in {precin, cin, cancerous} on
+    genotype g:
+        module.<state>[uids] = False
+        module.cin[uids]      = False
+        module.precin[uids]   = False
+        module.cancerous[uids] = False
+        module.ti_cin[uids]      = NaN
+        module.ti_cancerous[uids] = NaN
+        module.ti_clearance[uids] = sim.ti + 1   # cleared next step
+
+    v2 reference: hpvsim/_v2_legacy/interventions.py:1336-1413
+    The commented-out "did they also clear infection?" branch in v2 was
+    disabled there; v3 doesn't re-implement it.
+    """
+
+    def __init__(self, name=None, df=None, **kwargs):
+        df = _resolve_tx_pars(name, df)
+        # ss.Tx.__init__ accesses df.disease.unique() — HPV CSVs use 'genotype'
+        # instead. Add a temporary stub column so the base init succeeds, then
+        # restore the original df and clear the base-set self.diseases attribute.
+        df_for_base = df.copy()
+        if 'disease' not in df_for_base.columns:
+            df_for_base['disease'] = '_hpv_stub'
+        super().__init__(df=df_for_base, **kwargs)
+        # ss.Tx populates self.diseases from the stub; hpv.tx routes through
+        # _iter_hpv_modules instead — clear it to avoid confusing introspection.
+        self.diseases = None
+        # Restore the original (no-stub) df for our own administer logic.
+        self.df = df
+        self.name = name
+
+    def administer(self, uids, return_format='dict'):
+        if len(uids) == 0:
+            empty = ss.uids()
+            return {'successful': empty, 'unsuccessful': empty} if return_format == 'dict' else empty
+
+        successful_uids_list = []
+        for state in self.health_states:
+            for module in _iter_hpv_modules(self.sim):
+                # Match rows by state and genotype ('all' matches every module)
+                df_filter = (self.df.state == state) & (
+                    (self.df.genotype == module.genotype) | (self.df.genotype == 'all')
+                )
+                rows = self.df[df_filter]
+                if len(rows) == 0:
+                    continue
+                these = _state_uids_for_module(module, state, uids)
+                if len(these) == 0:
+                    continue
+                self.efficacy_dist.set(p=float(rows['efficacy'].values[0]))
+                eff = self.efficacy_dist.filter(these)
+                if len(eff) == 0:
+                    continue
+                successful_uids_list.append(eff)
+                # State cleanup mirroring v2 hpvsim/_v2_legacy/interventions.py:1387-1391
+                module.cin[eff] = False
+                module.precin[eff] = False
+                module.cancerous[eff] = False
+                module.ti_cin[eff] = np.nan
+                module.ti_cancerous[eff] = np.nan
+                module.ti_clearance[eff] = self.sim.ti + 1
+
+        if successful_uids_list:
+            all_succ = np.unique(np.concatenate([np.asarray(u) for u in successful_uids_list]))
+            successful = ss.uids(all_succ)
+        else:
+            successful = ss.uids()
+        unsuccessful = ss.uids(np.setdiff1d(np.asarray(uids), np.asarray(successful)))
+
+        if return_format == 'dict':
+            return {'successful': successful, 'unsuccessful': unsuccessful}
+        return successful
