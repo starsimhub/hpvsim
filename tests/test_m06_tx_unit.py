@@ -19,7 +19,7 @@ def _attach_tx_and_init(sim, tx_instance):
     Returns the LIVE post-init copy of the product (Starsim deep-copies
     constructor inputs).
     """
-    sim.pars['interventions'] = [ss.treat_num(product=tx_instance, prob=0.0)]
+    sim.pars['interventions'] = [hpv.treat_num(product=tx_instance, prob=0.0)]
     sim.init()
     return sim.interventions[0].product
 
