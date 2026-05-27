@@ -22,6 +22,7 @@ __all__ = [
     'BaseTest', 'BaseScreening', 'BaseTriage',
     'routine_screening', 'campaign_screening',
     'routine_triage', 'campaign_triage',
+    'BaseTreatment', 'treat_num',
 ]
 
 
@@ -248,3 +249,91 @@ class routine_triage(BaseTriage, ss.RoutineDelivery):
 class campaign_triage(BaseTriage, ss.CampaignDelivery):
     """Campaign HPV triage."""
     pass
+
+
+class BaseTreatment(ss.BaseTreatment):
+    """HPV-specific treatment base.
+
+    Adds:
+    - v2-compatible age_range / sex / eligibility kwargs
+    - HPV-specific eligibility: female + alive + cancer-status-matched
+      (cancer treatments require any-genotype cancerous; non-cancer
+      treatments require no cancerous on any genotype)
+    - Per-intervention state: cin_treated / cin_treatments / ti_cin_treated
+      for CIN treatments, cancer_treated / etc. for cancer treatments
+
+    The `treat_cancer` flag is derived at __init__ time from whether the
+    product is an `hpv.radiation` instance.
+    """
+
+    def __init__(self, *args, age_range=None, sex='f', eligibility=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.age_range = age_range
+        # Late import to avoid circular
+        from hpvsim.products import radiation as _radiation
+        self.treat_cancer = isinstance(self.product, _radiation)
+        # Cancer treatments are not sex-restricted by default (radiation is
+        # post-triage; both sexes can have cervical/other HPV-related cancers
+        # in multi-site models). CIN treatments default to female only.
+        if self.treat_cancer and sex == 'f':
+            sex = None
+        self.sex_raw = sex
+        self.sex = _coerce_sex(sex)
+        self.eligibility_user = eligibility
+        self.define_states(
+            ss.BoolArr('cin_treated'),
+            ss.FloatArr('cin_treatments', default=0),
+            ss.FloatArr('ti_cin_treated'),
+            ss.BoolArr('cancer_treated'),
+            ss.FloatArr('cancer_treatments', default=0),
+            ss.FloatArr('ti_cancer_treated'),
+        )
+
+    def _parse_product_str(self, product):
+        from hpvsim.products import tx as _tx
+        return _tx(name=product)
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('new_cin_treated',    dtype=int, scale=True, label='Number first-CIN-treated'),
+            ss.Result('new_cancer_treated', dtype=int, scale=True, label='Number first-cancer-treated'),
+        )
+
+    def check_eligibility(self):
+        sim = self.sim
+        cond = sim.people.alive
+        if self.sex is not None:
+            if 0 in self.sex:
+                cond = cond & sim.people.female
+            elif 1 in self.sex:
+                cond = cond & sim.people.male
+        if self.age_range is not None:
+            lo, hi = self.age_range
+            cond = cond & (sim.people.age >= lo) & (sim.people.age <= hi)
+        any_cancer = _any_genotype_cancer(sim)
+        cond = cond & (any_cancer if self.treat_cancer else ~any_cancer)
+        if self.eligibility_user is not None:
+            cond = cond & _as_boolarr(self.eligibility_user(sim), sim.people)
+        return cond.uids
+
+
+class treat_num(BaseTreatment, ss.treat_num):
+    """Treat a fixed number of HPV+CIN+ agents each step (or all eligible if max_capacity=None)."""
+
+    def step(self):
+        treat_uids = super().step()
+        if len(treat_uids):
+            if self.treat_cancer:
+                new = treat_uids[~self.cancer_treated[treat_uids]]
+                self.cancer_treated[treat_uids] = True
+                self.cancer_treatments[treat_uids] += 1
+                self.ti_cancer_treated[treat_uids] = self.sim.ti
+                self.results['new_cancer_treated'][self.sim.ti] += len(new)
+            else:
+                new = treat_uids[~self.cin_treated[treat_uids]]
+                self.cin_treated[treat_uids] = True
+                self.cin_treatments[treat_uids] += 1
+                self.ti_cin_treated[treat_uids] = self.sim.ti
+                self.results['new_cin_treated'][self.sim.ti] += len(new)
+        return treat_uids
