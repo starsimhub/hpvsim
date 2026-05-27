@@ -12,6 +12,10 @@ PARS = sc.objdict(
     rand_seed=0,
     n_agents=20_000,
     genotypes=['hpv16', 'hpv18', 'hi5', 'ohr'],
+    # v2_compat_demographics gives every cohort (births + migration + initial
+    # pop) integer ages, matching v2's annual birth pulse / dt_demog=1.
+    # Required for per-cohort vaccination parity.
+    v2_compat_demographics=True,
     # The intervention spec is recorded as a serializable dict because the
     # v2 baseline script (Task 9) constructs the v2 equivalent from these
     # fields.
@@ -23,7 +27,6 @@ PARS = sc.objdict(
         sex='f',
         start_year=2020,
         name='routine_bivalent_girls',
-        v2_age_compat=True,  # demonstrate v2/v3 step-ordering alignment
     ),
 )
 
@@ -39,17 +42,18 @@ def build_v3_intervention():
         sex=cfg.sex,
         start_year=cfg.start_year,
         name=cfg.name,
-        v2_age_compat=cfg.v2_age_compat,
     )
 
 
 def build_v3_sim():
-    """Construct the v3 hpv.Sim used by the parity test."""
+    """Construct the v3 hpv.Sim used by the parity test.
+
+    v2_compat_demographics enables AnnualBirths (annual-pulse births) +
+    AgeMigration jitter-disabled + initial-population age floor, so every
+    agent — initial, born, or immigrated — lands at an exact integer age
+    (matching v2's add_births / dt_demog=1 convention).
+    """
     import hpvsim as hpv
-    # v2_compat_demographics enables both AnnualBirths (annual-pulse births)
-    # and AgeMigration jitter-disabled, so every year's cohort — whether born
-    # or immigrated — lands at exact integer ages (matching v2's add_births /
-    # dt_demog=1 convention).
     return hpv.Sim(
         location=PARS.location,
         start=PARS.start, stop=PARS.stop,
@@ -57,5 +61,5 @@ def build_v3_sim():
         n_agents=PARS.n_agents,
         genotypes=list(PARS.genotypes),
         interventions=[build_v3_intervention()],
-        v2_compat_demographics=PARS.intervention.v2_age_compat,
+        v2_compat_demographics=PARS.v2_compat_demographics,
     )
