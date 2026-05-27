@@ -125,7 +125,9 @@ class HPV(ss.Infection):
             # CrossImmunity.step() WITHOUT flowing through the cross-immunity
             # matrix. The CSV's per-genotype rel_imm values are the complete
             # vaccine cross-protection profile. Combining formula (independent
-            # protection paths): rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm).
+            # protection paths):
+            #   rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm) * (1 - txvx_imm)
+            # See CrossImmunity.step() for the canonical implementation.
             ss.FloatArr('vax_imm', label='Vaccine-conferred immunity (this genotype)', default=0.0),
             ss.FloatArr(
                 'txvx_imm',
