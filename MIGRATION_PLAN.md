@@ -190,10 +190,10 @@ by the M03 multi-seed pytest gates). See the M03 spec's
   per-genotype `rel_imm`) and writes to each HPV module's `vax_imm`
   field (NOT `nab_imm`) so the `CrossImmunity` matrix doesn't bleed
   bivalent protection onto hi5/ohr.
-- Add `hpv.BaseVaccination(ss.BaseVaccination)` shim adding v2-compatible
-  `age_range` / `sex` / `eligibility` constructor args; thin `hpv.routine_vx`
-  and `hpv.campaign_vx` subclasses combining the shim with Starsim's
-  `RoutineDelivery` / `CampaignDelivery`.
+- Add `hpv.BaseVaccination(ss.BaseVaccination)` subclass adding v2-compatible
+  `age_range` / `sex` / `eligibility` constructor args (composed into a single
+  Starsim eligibility callable); thin `hpv.routine_vx` and `hpv.campaign_vx`
+  leaf classes combining it with Starsim's `RoutineDelivery` / `CampaignDelivery`.
 - Move `products_vx.csv` from `hpvsim/_v2_legacy/data/` into active
   `hpvsim/data/`. Default product names: `bivalent`, `quadrivalent`,
   `nonavalent`.

@@ -12,7 +12,8 @@
 
 Add prophylactic HPV vaccination to v3 by composing Starsim's native
 intervention/product framework with one HPV-specific product class and a thin
-v2-compatible API shim. A `hpv.Sim` configured with `hpv.routine_vx` or
+HPV-specific subclass of `ss.BaseVaccination` that re-exposes v2's targeting
+kwargs. A `hpv.Sim` configured with `hpv.routine_vx` or
 `hpv.campaign_vx` and a `hpv.vx` product must reproduce v2.x's vaccination-
 impact trajectories — cancer incidence and HPV prevalence post-vaccination —
 within M03's multi-seed z-score parity gate (`|z| < 3`) on two anchor
@@ -24,8 +25,9 @@ The work that lands in M05 is intentionally small. Starsim already ships
 `ss.RoutineDelivery`, `ss.CampaignDelivery`, `ss.routine_vx`, `ss.campaign_vx`,
 and the per-intervention agent-level state (`vaccinated`, `n_doses`,
 `ti_vaccinated`). M05's only new code is (a) an HPV-specific multi-genotype
-vaccine product, and (b) a shim that re-introduces v2's `age_range`/`sex`
-targeting API on top of Starsim's single-callable eligibility hook.
+vaccine product, and (b) a thin subclass of `ss.BaseVaccination` that
+re-introduces v2's `age_range`/`sex` targeting kwargs on top of Starsim's
+single-callable eligibility hook.
 
 ## Scope
 
@@ -43,7 +45,7 @@ targeting API on top of Starsim's single-callable eligibility hook.
   `vax_imm` state, not `nab_imm`, to prevent the cross-immunity matrix from
   bleeding bivalent protection onto hi5/ohr. See "Post-implementation
   deltas" for the rationale and matching v2 semantics.)*
-- `hpv.BaseVaccination(ss.BaseVaccination)` shim that accepts v2's
+- `hpv.BaseVaccination(ss.BaseVaccination)` subclass that accepts v2's
   `age_range`, `sex`, and `eligibility` arguments and composes them into a
   single Starsim eligibility callable. Stores the originals for
   introspection (M04 `AgeResults` consumption).
@@ -196,7 +198,7 @@ HPV module's genotype attribute. The exact key convention is whatever M03's
 `CrossImmunity` connector uses (see `hpvsim/cross_genotype.py`); the
 implementer matches that convention rather than introducing a new one.
 
-### The `hpv.BaseVaccination` shim
+### The `hpv.BaseVaccination` subclass
 
 ```python
 class BaseVaccination(ss.BaseVaccination):
@@ -480,10 +482,10 @@ on `hpvsim_1dose` / `hpvsim_pxv_younger` headline-shape scenarios.
   all-or-nothing+leaky model and bumps each HPV module's `nab_imm`. Cross-
   immunity propagation is automatic via the existing `CrossImmunity`
   connector.
-- Add `hpv.BaseVaccination(ss.BaseVaccination)` shim adding v2-compatible
-  `age_range` / `sex` / `eligibility` constructor args; thin `hpv.routine_vx`
-  and `hpv.campaign_vx` subclasses combining the shim with Starsim's
-  `RoutineDelivery` / `CampaignDelivery`.
+- Add `hpv.BaseVaccination(ss.BaseVaccination)` subclass adding v2-compatible
+  `age_range` / `sex` / `eligibility` constructor args (composed into a single
+  Starsim eligibility callable); thin `hpv.routine_vx` and `hpv.campaign_vx`
+  leaf classes combining it with Starsim's `RoutineDelivery` / `CampaignDelivery`.
 - Move `products_vx.csv` from `hpvsim/_v2_legacy/data/` into active
   `hpvsim/data/`. Default product names: `bivalent`, `quadrivalent`,
   `nonavalent`.

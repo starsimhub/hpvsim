@@ -1,9 +1,11 @@
 """HPV-specific Starsim interventions.
 
 Currently contains the prophylactic vaccination intervention API:
-``hpv.BaseVaccination`` (the v2-compatible age_range/sex shim) and the
-``hpv.routine_vx`` / ``hpv.campaign_vx`` leaf classes that combine the
-shim with Starsim's RoutineDelivery / CampaignDelivery.
+``hpv.BaseVaccination`` (a subclass of ``ss.BaseVaccination`` that
+accepts v2-compatible ``age_range`` / ``sex`` / ``eligibility``
+constructor args and composes them into a single Starsim eligibility
+callable) and the ``hpv.routine_vx`` / ``hpv.campaign_vx`` leaf classes
+that combine it with Starsim's RoutineDelivery / CampaignDelivery.
 
 M06 will add screening (routine_screening / campaign_screening), triage,
 treatment (treat_num / treat_delay / radiation), dynamic_pars, and the
