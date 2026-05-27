@@ -150,5 +150,10 @@ class vx(ss.Vx):
             hpv_mod.vax_imm[uids] = np.maximum(hpv_mod.vax_imm[uids], peak)
 
     def _find_genotype_module(self, genotype):
-        """Backward-compatible instance method — delegates to module-level helper."""
+        """Return the HPV module in self.sim matching this genotype, or None.
+
+        Backward-compatible instance method — delegates to the module-level
+        helper of the same name. Kept on hpv.vx for callers that hold a vx
+        product instance rather than a sim reference.
+        """
         return _find_genotype_module(self.sim, genotype)
