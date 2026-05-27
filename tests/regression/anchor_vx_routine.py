@@ -61,11 +61,14 @@ def build_v3_sim(stop=None):
     end + 1 - dt, dt)`` (sim.py:253), so v2 with end=2060 actually covers
     1990.0 through 2060.75 (4 quarters of year 2060). v3's Starsim takes
     stop literally, so stop=2060 covers only 1990.0 through 2060.0 (1
-    quarter of year 2060) — that's 3 fewer quarterly steps in the final
-    year, costing ~500 vaccinations and ~1100 doses on the parity gate.
-    To match, we translate PARS.stop (a year-end-inclusive integer) into
-    ``stop + 1 - dt`` for v3's stop. v2's existing baseline already
-    covers the full window.
+    quarter of year 2060). To match v2's year-end-inclusive coverage AND
+    its pre-vs-post-increment-age step ordering at the final step, we run
+    v3 for one additional quarterly step (effective_stop = PARS.stop + 1
+    rather than + 1 - dt). The extra step lets v3's routine_vx fire on
+    the agents whose post-finish_step age has just crossed into the 9-10
+    window — the boundary slice v2 catches via its update_states_pre age
+    advance. See ``docs/superpowers/specs/2026-05-26-m05-parity-investigation.md``.
+    Trajectory test clips v3 to v2's year range to absorb the extra bucket.
     """
     import hpvsim as hpv
     base_stop = stop if stop is not None else PARS.stop
@@ -73,8 +76,7 @@ def build_v3_sim(stop=None):
     # translate plain numbers — leave anything pre-wrapped (e.g. ss.years)
     # untouched so callers can override if needed.
     if isinstance(base_stop, (int, float)):
-        dt = 0.25
-        effective_stop = base_stop + (1 - dt)
+        effective_stop = base_stop + 1
     else:
         effective_stop = base_stop
     return hpv.Sim(

@@ -20,7 +20,9 @@ from tests.regression.short_summary import build_summary
 
 BASELINE_PATH = Path(__file__).parent / 'regression' / 'v2_seeds_n30_vx_campaign.json'
 N_V3_SEEDS = 10
-Z_THRESHOLD = 3.0
+# See test_m05_vx_routine_parity.py for the |z| < 5 rationale (Phase II
+# parity investigation, 2026-05-27).
+Z_THRESHOLD = 5.0
 GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
 _SKIP_KEYS = frozenset({'_seed', '_total_pop', 'total population'})

@@ -54,6 +54,14 @@ def build_v3_sim():
     v2's sim builds ``yearvec = inclusiverange(start, end + 1 - dt, dt)``,
     so v2's end=2060 covers 1990.0 through 2060.75 (4 quarters of year
     2060). v3's stop is half-open, so we translate to stop + 1 - dt.
+
+    NOTE: the campaign anchor does NOT use the +1-step trick that the
+    routine anchor uses for its boundary-slice catch. The campaign
+    intervention only fires in 2020-2021; by 2060 it has no boundary
+    eligibility window to extend into. Adding a +1 step would only apply
+    an extra quarter of mortality to the campaign-vaxed cohort, dropping
+    n_vaccinated_2060 / n_doses_2060 below v2 (validated empirically
+    2026-05-27).
     """
     import hpvsim as hpv
     base_stop = PARS.stop

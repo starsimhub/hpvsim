@@ -483,7 +483,17 @@ class HPV(ss.Infection):
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
         to_dead = (self.cancerous & (self.ti_dead_cancer <= ti)).uids
         if len(to_dead):
-            ages_at_death = self.sim.people.age[to_dead]
+            # +dt to align with v2's convention: v2's check_cancer_deaths
+            # fires in update_states_pre AFTER increment_age, so v2 records
+            # ages_at_cancer_death = initial + (T+1)*dt at step T. v3's
+            # step_state fires BEFORE finish_step's age advance, so reading
+            # sim.people.age here gives initial + T*dt — one step (dt yr)
+            # lower. Adding dt_yr brings the recorded value into v2's
+            # convention so the parity gate compares apples-to-apples.
+            # Revert by removing the +dt_yr if the underlying step-ordering
+            # convention is harmonised in a future Starsim version.
+            dt_yr = float(self.t.dt.years if hasattr(self.t.dt, 'years') else self.t.dt)
+            ages_at_death = self.sim.people.age[to_dead] + dt_yr
             self.results.new_cancer_deaths[ti] = len(to_dead)
             self.results.sum_age_at_cancer_death[ti] = float(ages_at_death.sum())
             self.sim.people.request_death(to_dead)

@@ -41,8 +41,8 @@ def _lifetime_mean_age_at_event(sim, ti_event_arr):
 
     For each alive agent with the event in the past: age - (end_ti - ti_event)*dt.
     For each dead agent whose event fired BEFORE they died: frozen-age -
-    (ti_dead - ti_event)*dt, using ``sim.people.ti_dead`` (the actual
-    death step, regardless of cause).
+    (ti_dead - ti_event)*dt + dt (the +dt corrects for v3's step-ordering
+    convention; see below).
 
     The ``ti_event <= ti_dead`` filter on dead agents excludes phantom
     events — agents whose ti_event was scheduled in ``set_prognoses`` but
@@ -50,6 +50,28 @@ def _lifetime_mean_age_at_event(sim, ti_event_arr):
     this filter the lifetime mean is biased toward younger ages by an
     amount that depends on demographic dynamics (and which differs between
     v2 and v3, breaking parity comparisons).
+
+    Step-ordering convention correction (the +dt on the dead branch):
+
+    v2 advances ages in ``update_states_pre.increment_age`` at the START
+    of each step, then records cancer transitions / deaths / infections
+    later in the same step — so an event recorded at ti=T has true agent
+    age ``initial + (T+1)*dt``. v3 advances ages in
+    ``people.finish_step → update_post`` at the END of each step, so an
+    event recorded at ti=T in ``HPV.step_state`` has true agent age
+    ``initial + T*dt``.
+
+    The reconstruction formula returns ``initial + (T+1)*dt`` for both:
+      - alive branch: age_now reflects (N+1) increments → returns
+        (T+1)*dt = v2 true = v3 alive over-reports by dt but matches v2.
+      - dead branch: age frozen at death step Td, returns (T+1)*dt for v2
+        but only T*dt for v3 (since v3's frozen age is initial + Td*dt,
+        not initial + (Td+1)*dt).
+
+    Net: alive branch matches between engines; dead branch reports v3 lower
+    by dt. We add +dt to v3's dead branch to align with v2's convention so
+    the parity gate compares apples-to-apples. Remove the +dt if a future
+    Starsim version moves age-advance to the start of the step.
 
     Returns (sum_ages, count) so aggregate callers can pool across genotypes.
     """
@@ -78,7 +100,9 @@ def _lifetime_mean_age_at_event(sim, ti_event_arr):
         ages.append(age_arr[alive_mask] - years_since)
     if dead_mask.any():
         years_since_d = (ti_dead_arr[dead_mask] - ti_event_arr[dead_mask]) * dt
-        ages.append(age_arr[dead_mask] - years_since_d)
+        # +dt corrects for v3's step_state-before-age-advance convention;
+        # see docstring above.
+        ages.append(age_arr[dead_mask] - years_since_d + dt)
     if not ages:
         return 0.0, 0
     all_ages = np.concatenate(ages)
