@@ -56,11 +56,30 @@ def build_v3_sim(stop=None):
     AgeMigration jitter-disabled + initial-population age floor, so every
     agent — initial, born, or immigrated — lands at an exact integer age
     (matching v2's add_births / dt_demog=1 convention).
+
+    Year-end convention: v2's sim builds ``yearvec = inclusiverange(start,
+    end + 1 - dt, dt)`` (sim.py:253), so v2 with end=2060 actually covers
+    1990.0 through 2060.75 (4 quarters of year 2060). v3's Starsim takes
+    stop literally, so stop=2060 covers only 1990.0 through 2060.0 (1
+    quarter of year 2060) — that's 3 fewer quarterly steps in the final
+    year, costing ~500 vaccinations and ~1100 doses on the parity gate.
+    To match, we translate PARS.stop (a year-end-inclusive integer) into
+    ``stop + 1 - dt`` for v3's stop. v2's existing baseline already
+    covers the full window.
     """
     import hpvsim as hpv
+    base_stop = stop if stop is not None else PARS.stop
+    # Match v2's year-end-inclusive convention (see docstring above). Only
+    # translate plain numbers — leave anything pre-wrapped (e.g. ss.years)
+    # untouched so callers can override if needed.
+    if isinstance(base_stop, (int, float)):
+        dt = 0.25
+        effective_stop = base_stop + (1 - dt)
+    else:
+        effective_stop = base_stop
     return hpv.Sim(
         location=PARS.location,
-        start=PARS.start, stop=(stop if stop is not None else PARS.stop),
+        start=PARS.start, stop=effective_stop,
         rand_seed=PARS.rand_seed,
         n_agents=PARS.n_agents,
         genotypes=list(PARS.genotypes),

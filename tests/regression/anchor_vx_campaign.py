@@ -49,11 +49,22 @@ def build_v3_sim():
     AgeMigration jitter-disabled + initial-population age floor, so every
     agent — initial, born, or immigrated — lands at an exact integer age
     (matching v2's add_births / dt_demog=1 convention).
+
+    Year-end convention: see ``anchor_vx_routine.build_v3_sim`` docstring.
+    v2's sim builds ``yearvec = inclusiverange(start, end + 1 - dt, dt)``,
+    so v2's end=2060 covers 1990.0 through 2060.75 (4 quarters of year
+    2060). v3's stop is half-open, so we translate to stop + 1 - dt.
     """
     import hpvsim as hpv
+    base_stop = PARS.stop
+    if isinstance(base_stop, (int, float)):
+        dt = 0.25
+        effective_stop = base_stop + (1 - dt)
+    else:
+        effective_stop = base_stop
     return hpv.Sim(
         location=PARS.location,
-        start=PARS.start, stop=PARS.stop,
+        start=PARS.start, stop=effective_stop,
         rand_seed=PARS.rand_seed,
         n_agents=PARS.n_agents,
         genotypes=list(PARS.genotypes),
