@@ -514,3 +514,39 @@ class txvx(ss.Vx):
                 float(rel_imm_g) * float(self.pars.sterilizing_p),
             )
             module.txvx_imm[uids] = np.maximum(module.txvx_imm[uids], peak)
+
+
+class radiation(ss.Product):
+    """HPV cancer-treatment product — extends ti_dead_cancer per cancerous module.
+
+    Default duration: normal(mean=18 months, sd=2 months), converted to
+    years. Matches v2's hpvsim/_v2_legacy/interventions.py:1469-1492.
+    """
+
+    def __init__(self, dur=None, **kwargs):
+        super().__init__(**kwargs)
+        self.define_pars(
+            dur=dur or dict(dist='normal', par1=18 / 12, par2=2 / 12),
+        )
+        self._dur_dist = ss.normal(
+            loc=self.pars.dur['par1'],
+            scale=self.pars.dur['par2'],
+        )
+
+    def administer(self, uids):
+        if len(uids) == 0:
+            return ss.uids()
+        new_dur = np.asarray(self._dur_dist.rvs(uids))
+        dt = self.sim.t.dt
+        uids_arr = np.asarray(uids)
+        for module in _iter_hpv_modules(self.sim):
+            cancer_uids = module.cancerous.uids.intersect(uids)
+            if len(cancer_uids) == 0:
+                continue
+            mask = np.isin(uids_arr, np.asarray(cancer_uids))
+            module.ti_dead_cancer[cancer_uids] = (
+                module.ti_dead_cancer[cancer_uids]
+                + np.ceil(new_dur[mask] / dt)
+            )
+        return uids
+
