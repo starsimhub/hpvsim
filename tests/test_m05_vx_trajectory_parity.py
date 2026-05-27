@@ -15,13 +15,63 @@ multi_seed_v2_vx.py update). See ``tests/regression/README_m05.md``.
 """
 import json
 import math
+import types
 from pathlib import Path
 
 import numpy as np
 import pytest
 import sciris as sc
+import starsim as ss
 
 from tests.regression.anchor_vx_routine import build_v3_sim
+
+
+class _FirstVaxLogger(ss.Analyzer):
+    """Per-step counter for `vaccinated` False→True transitions.
+
+    v3's ``intv.ti_vaccinated`` is rewritten on every administer call
+    (including re-doses) AND ``np.asarray(...)`` on the underlying FloatArr
+    returns the alive-masked view at access time. Naively histogramming
+    ``ti_vaccinated`` therefore (a) loses vaxed agents who later die, and
+    (b) shifts re-dose recipients' stamps forward to later years. Both
+    distort the per-year ``new_vaccinated`` series in opposite directions.
+
+    v2's ``results['new_vaccinated']`` is a per-step flow counter — set
+    once at the first-vax event, never decremented, indifferent to
+    re-doses. To match: snapshot ``intv.vaccinated.raw`` pre- and
+    post-step, count the actual False→True transitions per step.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.n_first_vax_per_step = None
+
+    def step(self):
+        return
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        intv = None
+        for iv in sim.interventions():
+            if hasattr(iv, 'vaccinated') and isinstance(iv.vaccinated, ss.BoolArr):
+                intv = iv
+                break
+        if intv is None:
+            return
+        n_steps = int(sim.t.npts)
+        self.n_first_vax_per_step = np.zeros(n_steps, dtype=int)
+        original_step = intv.step
+        logger = self
+
+        def wrapped_step(self):
+            pre = self.vaccinated.raw.copy()
+            result = original_step()
+            post = self.vaccinated.raw
+            ti = int(self.sim.t.ti)
+            logger.n_first_vax_per_step[ti] = int(((~pre) & post).sum())
+            return result
+
+        intv.step = types.MethodType(wrapped_step, intv)
 
 
 BASELINE_PATH = Path(__file__).parent / 'regression' / 'v2_seeds_n30_vx_routine.json'
@@ -31,7 +81,7 @@ Z_THRESHOLD = 3.0
 TRAJECTORY_METRICS = ('new_cancers', 'hpv_total_infections', 'new_vaccinated')
 
 
-def _v3_trajectory_row(sim, intv):
+def _v3_trajectory_row(sim, intv, first_vax_logger):
     """Per-year arrays for trajectory comparison.
 
     v3 emits per-step (quarterly) results, v2 emits annual. We downsample v3's
@@ -39,19 +89,12 @@ def _v3_trajectory_row(sim, intv):
     trajectory entries.
 
     new_cancers / hpv_total_infections come from sim.results.hpvtotal;
-    new_vaccinated is derived from the histogram of intv.ti_vaccinated (v3
-    doesn't expose a per-step new_vaccinated series).
+    new_vaccinated comes from the _FirstVaxLogger analyzer (which records
+    first-vax-flow transitions, matching v2's `results['new_vaccinated']`
+    semantic).
     """
     timevec = sim.results.timevec
     year_floats = np.asarray(timevec.years if hasattr(timevec, 'years') else timevec, dtype=float)
-    n_steps = len(year_floats)
-
-    # Histogram per-agent ti_vaccinated into per-step bins
-    ti = np.asarray(intv.ti_vaccinated)
-    valid = ~np.isnan(ti)
-    new_vacc_per_step, _ = np.histogram(
-        ti[valid].astype(int), bins=np.arange(n_steps + 1)
-    )
 
     # Downsample quarterly per-step counters to annual sums. v3 uses dt=0.25
     # (281 steps for 70-year sim); v2 stores 71 annual entries (70 years + 1
@@ -59,7 +102,9 @@ def _v3_trajectory_row(sim, intv):
     int_years = np.floor(year_floats).astype(int)
     new_cancers_q = np.asarray(sim.results.hpvtotal.new_cancers, dtype=float)
     new_infections_q = np.asarray(sim.results.hpvtotal.new_infections, dtype=float)
-    new_vacc_q = new_vacc_per_step.astype(float)
+    new_vacc_q = (first_vax_logger.n_first_vax_per_step
+                  if first_vax_logger.n_first_vax_per_step is not None
+                  else np.zeros(len(year_floats), dtype=int)).astype(float)
 
     annual_years = sorted(np.unique(int_years).tolist())
     annual_new_cancers = []
@@ -103,9 +148,12 @@ def test_m05_routine_trajectory_parity():
     for seed in range(N_V3_SEEDS):
         sim = build_v3_sim()
         sim.pars['rand_seed'] = int(seed)
+        first_vax_logger = _FirstVaxLogger()
+        existing = list(sim.pars.get('analyzers', []) or [])
+        sim.pars['analyzers'] = existing + [first_vax_logger]
         sim.run()
         intv = sim.interventions[0]
-        v3_rows.append(_v3_trajectory_row(sim, intv))
+        v3_rows.append(_v3_trajectory_row(sim, intv, first_vax_logger))
 
     v3_years = np.array(v3_rows[0]['year'])
     assert np.allclose(years, v3_years), (
