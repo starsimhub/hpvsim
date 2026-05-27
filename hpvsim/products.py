@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 
-__all__ = ['vx']
+__all__ = ['vx', 'dx', 'tx', 'txvx', 'radiation']
 
 _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
 
@@ -262,3 +262,109 @@ class vx(ss.Vx):
         product instance rather than a sim reference.
         """
         return _find_genotype_module(self.sim, genotype)
+
+
+def _state_uids_for_module(module, state, uids):
+    """Return uids that are in `state` on `module` and also in `uids`."""
+    arr = getattr(module, state, None)
+    if arr is None:
+        return ss.uids()
+    return arr.uids.intersect(uids)
+
+
+def _state_collapse_across_genotypes(state, uids, sim):
+    """Collapse a per-genotype state to a single uids set across HPV modules.
+
+    - state='susceptible': agent must be susceptible to ALL genotypes.
+    - any other state: agent must be in that state for ANY genotype.
+    """
+    modules = list(_iter_hpv_modules(sim))
+    if not modules:
+        return ss.uids()
+    if state == 'susceptible':
+        out = uids
+        for m in modules:
+            out = out.intersect(m.susceptible.uids)
+        return out
+    # Union — agent is in `state` for at least one genotype
+    matched = ss.uids()
+    for m in modules:
+        these = _state_uids_for_module(m, state, uids)
+        matched = matched.union(these)
+    return matched
+
+
+class dx(ss.Dx):
+    """HPV diagnostic product with per-genotype state classification.
+
+    Per-genotype rows in products_dx.csv are classified one genotype at a
+    time; rows with genotype='all' are collapsed across all HPV modules
+    (susceptible iff susceptible-to-all; positive iff infected-with-any).
+    The hierarchy-min semantics mirror v2: when an agent is positive
+    across multiple genotypes, the lowest-index (most severe) result wins.
+
+    v2 reference: hpvsim/_v2_legacy/interventions.py:1265-1333
+    """
+
+    def __init__(self, name=None, df=None, hierarchy=None, **kwargs):
+        resolved_df, resolved_hierarchy = _resolve_dx_pars(name, df, hierarchy)
+        # ss.Dx.__init__ accesses df.disease.unique() which HPV CSVs don't have.
+        # Add a temporary stub column so the base init succeeds, then overwrite
+        # self.diseases with our HPV-specific genotype attribute.
+        df_for_base = resolved_df.copy()
+        if 'disease' not in df_for_base.columns:
+            df_for_base['disease'] = '_hpv_stub'
+        super().__init__(df=df_for_base, hierarchy=resolved_hierarchy, **kwargs)
+        # Store the original (no-stub) df for our own administer logic
+        self.df = resolved_df
+        self.name = name
+        # The base sets self.diseases from df['disease'] but HPV CSV uses
+        # 'genotype' instead. Replace with our own attrs.
+        self._genotypes_in_df = list(resolved_df['genotype'].unique())
+        self._all_genotype = (len(self._genotypes_in_df) == 1
+                              and self._genotypes_in_df[0] == 'all')
+
+    def administer(self, uids, return_format='dict'):
+        if len(uids) == 0:
+            if return_format == 'dict':
+                return {k: ss.uids() for k in self.hierarchy}
+            return np.array([], dtype=int)
+
+        # Ensure uids is sorted for searchsorted-based result indexing
+        uids_sorted = ss.uids(np.sort(np.asarray(uids)))
+        results = np.full(len(uids_sorted), self.default_value, dtype=int)
+
+        for state in self.health_states:
+            if self._all_genotype:
+                these = _state_collapse_across_genotypes(state, uids_sorted, self.sim)
+                if len(these) == 0:
+                    continue
+                df_filter = (self.df.state == state) & (self.df.genotype == 'all')
+                self._draw_and_min_into(results, uids_sorted, these, df_filter)
+            else:
+                for module in _iter_hpv_modules(self.sim):
+                    if module.genotype not in self._genotypes_in_df:
+                        continue
+                    these = _state_uids_for_module(module, state, uids_sorted)
+                    if len(these) == 0:
+                        continue
+                    df_filter = (
+                        (self.df.state == state)
+                        & (self.df.genotype == module.genotype)
+                    )
+                    self._draw_and_min_into(results, uids_sorted, these, df_filter)
+
+        if return_format == 'dict':
+            return {k: ss.uids(uids_sorted[results == i])
+                    for i, k in enumerate(self.hierarchy)}
+        return results
+
+    def _draw_and_min_into(self, results, uids_sorted, these, df_filter):
+        probs = [
+            float(self.df[df_filter & (self.df.result == r)]['probability'].values[0])
+            for r in self.hierarchy
+        ]
+        self.result_dist.pars['p'] = probs
+        draw = np.asarray(self.result_dist.rvs(these))
+        idx = np.searchsorted(uids_sorted, np.asarray(these))
+        results[idx] = np.minimum(draw, results[idx])
