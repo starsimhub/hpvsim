@@ -16,6 +16,23 @@ __all__ = ['vx']
 _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
 
 
+def _iter_hpv_modules(sim):
+    """Yield each HPV module registered in a sim, in registration order."""
+    # Late import to avoid the products <-> hpv circular import
+    from hpvsim.hpv import HPV
+    for module in sim.diseases.values():
+        if isinstance(module, HPV):
+            yield module
+
+
+def _find_genotype_module(sim, genotype):
+    """Return the HPV module in the sim matching this genotype, or None."""
+    for module in _iter_hpv_modules(sim):
+        if module.genotype == genotype:
+            return module
+    return None
+
+
 @functools.lru_cache(maxsize=1)
 def _load_vx_products():
     """Load the CSV and return a mapping of product name -> {genotype: rel_imm}.
@@ -133,14 +150,5 @@ class vx(ss.Vx):
             hpv_mod.vax_imm[uids] = np.maximum(hpv_mod.vax_imm[uids], peak)
 
     def _find_genotype_module(self, genotype):
-        """Return the HPV module in the sim matching this genotype, or None.
-
-        Matches M03's CrossImmunity convention: walk sim.diseases.values()
-        and identify HPV modules by isinstance + .genotype attribute.
-        """
-        # Late import avoids the products <-> hpv circular import
-        from hpvsim.hpv import HPV
-        for module in self.sim.diseases.values():
-            if isinstance(module, HPV) and module.genotype == genotype:
-                return module
-        return None
+        """Backward-compatible instance method — delegates to module-level helper."""
+        return _find_genotype_module(self.sim, genotype)
