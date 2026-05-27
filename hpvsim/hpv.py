@@ -104,7 +104,10 @@ class HPV(ss.Infection):
             ss.BoolState('precin', label='Precancerous infection'),
             ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
             ss.BoolState('cancerous', label='Invasive cancer'),
-            ss.BoolState('latent', label='Latent infection (no-op state hook for dx CSV)'),
+            # No-op state hook to support products_dx.csv's `latent` rows. Real
+            # reactivation natural history (set_prognoses branch + step_state
+            # reactivation) is a post-M06 follow-on; for now nothing populates this.
+            ss.BoolState('latent', label='Latent infection'),
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
             ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
