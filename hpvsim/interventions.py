@@ -102,6 +102,55 @@ def _compose_eligibility(age_range, sex, extra):
     return elig
 
 
+def _compose_screening_eligibility(age_range, sex, extra, debut_age):
+    """Compose v2-style screening eligibility into a Starsim callable.
+
+    Extends ``_compose_eligibility`` with an optional ``debut_age`` lower-
+    bound on ``sim.people.age``. When ``debut_age`` is None, semantics are
+    identical to ``_compose_eligibility``.
+
+    Returns ``elig(sim) -> ss.uids`` intersecting:
+      - sim.people.alive
+      - sim.people.female / male (per _coerce_sex(sex))
+      - sim.people.age in [age_range[0], age_range[1]) if set
+      - sim.people.age >= debut_age if set
+      - extra(sim) if provided
+    """
+    sex_set = _coerce_sex(sex)
+
+    def elig(sim):
+        cond = sim.people.alive
+        if sex_set is not None and len(sex_set) == 1:
+            (s,) = sex_set
+            cond = cond & (sim.people.female if s == 0 else sim.people.male)
+        if age_range is not None:
+            lo, hi = age_range
+            cond = cond & (sim.people.age >= lo) & (sim.people.age < hi)
+        if debut_age is not None:
+            cond = cond & (sim.people.age >= debut_age)
+        if extra is not None:
+            cond = cond & _as_boolarr(extra(sim), sim.people)
+        return cond.uids
+
+    return elig
+
+
+def _any_genotype_cancer(sim):
+    """Return a BoolArr OR-ing module.cancerous across all HPV modules.
+
+    Used by hpv.BaseTreatment.check_eligibility to gate on cancer status:
+    treat_cancer=True interventions require this BoolArr be True; the
+    inverse (~_any_genotype_cancer(sim)) gates non-cancer treatments.
+    """
+    # Late import to avoid the interventions <-> products circular import
+    from hpvsim.products import _iter_hpv_modules
+    out = sim.people.alive.asnew()
+    out.values[:] = False
+    for module in _iter_hpv_modules(sim):
+        out[module.cancerous.uids] = True
+    return out
+
+
 class BaseVaccination(ss.BaseVaccination):
     """HPV-specific prophylactic vaccination base.
 
