@@ -73,6 +73,111 @@ def _resolve_vx_pars(name, rel_imm):
     return dict(products[name])
 
 
+_DX_CSV   = Path(__file__).parent / 'data' / 'products_dx.csv'
+_TX_CSV   = Path(__file__).parent / 'data' / 'products_tx.csv'
+_TXVX_CSV = Path(__file__).parent / 'data' / 'products_txvx.csv'
+
+
+def _check_columns(df, expected, csv_name):
+    missing = expected - set(df.columns)
+    if missing:
+        raise ValueError(
+            f'{csv_name} missing required columns: {sorted(missing)}'
+        )
+
+
+@functools.lru_cache(maxsize=1)
+def _load_dx_products():
+    """Return {product_name: per-product DataFrame}."""
+    df = pd.read_csv(_DX_CSV)
+    _check_columns(df, {'name', 'state', 'genotype', 'result', 'probability'},
+                   'products_dx.csv')
+    return {name: group.reset_index(drop=True)
+            for name, group in df.groupby('name', sort=False)}
+
+
+@functools.lru_cache(maxsize=1)
+def _load_tx_products():
+    """Return {product_name: per-product DataFrame}."""
+    df = pd.read_csv(_TX_CSV)
+    _check_columns(df, {'name', 'state', 'genotype', 'efficacy'},
+                   'products_tx.csv')
+    return {name: group.reset_index(drop=True)
+            for name, group in df.groupby('name', sort=False)}
+
+
+@functools.lru_cache(maxsize=1)
+def _load_txvx_products():
+    """Return {product_name: {genotype: rel_imm}}."""
+    df = pd.read_csv(_TXVX_CSV)
+    _check_columns(df, {'name', 'genotype', 'rel_imm'}, 'products_txvx.csv')
+    out = {}
+    for name, group in df.groupby('name', sort=False):
+        out[name] = dict(zip(group['genotype'], group['rel_imm'].astype(float)))
+    return out
+
+
+def _resolve_dx_pars(name, df, hierarchy):
+    """Resolve (name, df, hierarchy) for hpv.dx construction.
+
+    Exactly one of name or df must be provided. Default hierarchies (per
+    product) match v2's default_dx() in hpvsim/_v2_legacy/interventions.py:1497.
+    """
+    _DEFAULT_DX_HIERARCHY = {
+        'via':            ['positive', 'inadequate', 'negative'],
+        'lbc':            ['abnormal', 'ascus', 'inadequate', 'normal'],
+        'pap':            ['abnormal', 'ascus', 'inadequate', 'normal'],
+        'colposcopy':     ['cancer', 'hsil', 'lsil', 'ascus', 'normal'],
+        'hpv':            ['positive', 'inadequate', 'negative'],
+        'hpv1618':        ['positive', 'inadequate', 'negative'],
+        'hpv_type':       ['positive_1618', 'positive_ohr', 'inadequate', 'negative'],
+        'txvx_assigner':  ['triage', 'txvx', 'none'],
+        'tx_assigner':    ['radiation', 'excision', 'ablation', 'none'],
+    }
+    if (name is None) == (df is None):
+        raise ValueError('hpv.dx requires exactly one of `name` or `df`, not both/neither.')
+    if df is not None:
+        if hierarchy is None:
+            hierarchy = list(df['result'].unique())
+        return df, hierarchy
+    products = _load_dx_products()
+    if name not in products:
+        valid = ', '.join(products.keys())
+        raise ValueError(f'Unknown dx product name {name!r}. Valid names: {valid}.')
+    if hierarchy is None:
+        hierarchy = _DEFAULT_DX_HIERARCHY.get(name, list(products[name]['result'].unique()))
+    return products[name], hierarchy
+
+
+def _resolve_tx_pars(name, df):
+    """Resolve (name, df) for hpv.tx construction."""
+    if (name is None) == (df is None):
+        raise ValueError('hpv.tx requires exactly one of `name` or `df`, not both/neither.')
+    if df is not None:
+        return df
+    products = _load_tx_products()
+    if name not in products:
+        valid = ', '.join(products.keys())
+        raise ValueError(f'Unknown tx product name {name!r}. Valid names: {valid}.')
+    return products[name]
+
+
+def _resolve_txvx_pars(name, rel_imm):
+    """Resolve (name, rel_imm) -> {genotype: rel_imm} dict.
+
+    Exactly one of name or rel_imm must be provided.
+    """
+    if (name is None) == (rel_imm is None):
+        raise ValueError('hpv.txvx requires exactly one of `name` or `rel_imm`, not both/neither.')
+    if rel_imm is not None:
+        return dict(rel_imm)
+    products = _load_txvx_products()
+    if name not in products:
+        valid = ', '.join(products.keys())
+        raise ValueError(f'Unknown txvx product name {name!r}. Valid names: {valid}.')
+    return dict(products[name])
+
+
 class vx(ss.Vx):
     """HPV multi-genotype prophylactic vaccine.
 
