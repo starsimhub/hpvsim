@@ -1,8 +1,12 @@
 """HPV-specific Starsim products.
 
-Currently contains the prophylactic vaccine product class ``hpv.vx``. M06
-will add ``hpv.dx`` (diagnostics) and ``hpv.tx`` (treatments). M06 will also
-add the therapeutic vaccine product variant.
+Contains:
+  - hpv.vx: prophylactic vaccine product (M05)
+  - hpv.dx: per-genotype multinomial diagnostic classifier (M06)
+
+M06 will additionally add hpv.tx (treatment), hpv.txvx (therapeutic
+vaccine), and hpv.radiation (cancer treatment) — see plan
+docs/superpowers/plans/2026-05-27-hpvsim-m06-test-and-treat-cascade.md.
 """
 import functools
 from pathlib import Path
@@ -320,6 +324,10 @@ class dx(ss.Dx):
         if 'disease' not in df_for_base.columns:
             df_for_base['disease'] = '_hpv_stub'
         super().__init__(df=df_for_base, hierarchy=resolved_hierarchy, **kwargs)
+        # ss.Dx populates self.diseases from the stub; we don't use that attribute
+        # — hpv.dx routes through _iter_hpv_modules instead. Clear it to avoid
+        # confusing downstream introspection.
+        self.diseases = None
         # Store the original (no-stub) df for our own administer logic
         self.df = resolved_df
         self.name = name
