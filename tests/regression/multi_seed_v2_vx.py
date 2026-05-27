@@ -173,11 +173,25 @@ def run_seed(anchor_pars, seed):
     else:
         new_vaccinated_list = [0] * len(year_list)
 
+    # Per-genotype trajectories — v2's `infections_by_genotype` is a 2D
+    # array indexed by (genotype_idx, time_idx). Map each known genotype
+    # (hpv16/hpv18/hi5/ohr) to its per-year flow series. The v3 plot script
+    # can then compare apples-to-apples per genotype instead of relying on
+    # a constant-mix apportionment of the aggregate total.
+    inf_by_g = None
+    if 'infections_by_genotype' in res:
+        inf_by_g = np.asarray(res['infections_by_genotype'])
+    per_geno_traj = {}
+    if inf_by_g is not None:
+        for gen_idx, gen_key in genotype_pairs:
+            per_geno_traj[f'infections_{gen_key}'] = list(inf_by_g[gen_idx])
+
     summary['_trajectory'] = dict(
         year=year_list,
         new_cancers=new_cancers_list,
         hpv_total_infections=hpv_total_infections_list,
         new_vaccinated=new_vaccinated_list,
+        **per_geno_traj,  # adds infections_hpv16, infections_hpv18, etc.
     )
 
     return summary

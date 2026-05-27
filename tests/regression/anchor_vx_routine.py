@@ -45,8 +45,12 @@ def build_v3_intervention():
     )
 
 
-def build_v3_sim():
+def build_v3_sim(stop=None):
     """Construct the v3 hpv.Sim used by the parity test.
+
+    The parity gate always uses ``PARS.stop`` (full 1990-2060 horizon) — do
+    NOT pass ``stop`` from the parity test. The kwarg exists for diagnostic
+    plot scripts that want a shorter horizon while troubleshooting.
 
     v2_compat_demographics enables AnnualBirths (annual-pulse births) +
     AgeMigration jitter-disabled + initial-population age floor, so every
@@ -56,7 +60,7 @@ def build_v3_sim():
     import hpvsim as hpv
     return hpv.Sim(
         location=PARS.location,
-        start=PARS.start, stop=PARS.stop,
+        start=PARS.start, stop=(stop if stop is not None else PARS.stop),
         rand_seed=PARS.rand_seed,
         n_agents=PARS.n_agents,
         genotypes=list(PARS.genotypes),
