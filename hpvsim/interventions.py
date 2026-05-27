@@ -1,14 +1,14 @@
 """HPV-specific Starsim interventions.
 
-Currently contains the prophylactic vaccination intervention API:
+Contains the prophylactic vaccination intervention API:
 ``hpv.BaseVaccination`` (a subclass of ``ss.BaseVaccination`` that
 accepts v2-compatible ``age_range`` / ``sex`` / ``eligibility``
 constructor args and composes them into a single Starsim eligibility
 callable) and the ``hpv.routine_vx`` / ``hpv.campaign_vx`` leaf classes
 that combine it with Starsim's RoutineDelivery / CampaignDelivery.
 
-M06 will add screening (routine_screening / campaign_screening), triage,
-treatment (treat_num / treat_delay / radiation), dynamic_pars, and the
+M06 adds screening (routine_screening / campaign_screening), triage
+(routine_triage / campaign_triage), treatment, dynamic_pars, and the
 txvx family (BaseTxVx / routine_txvx / campaign_txvx / linked_txvx).
 """
 import numpy as np
@@ -16,7 +16,13 @@ import starsim as ss
 
 from hpvsim.products import vx as _vx
 
-__all__ = ['BaseVaccination', 'routine_vx', 'campaign_vx']
+__all__ = [
+    'BaseVaccination', 'routine_vx', 'campaign_vx',
+    # M06
+    'BaseTest', 'BaseScreening', 'BaseTriage',
+    'routine_screening', 'campaign_screening',
+    'routine_triage', 'campaign_triage',
+]
 
 
 def _coerce_sex(sex):
@@ -187,4 +193,58 @@ class routine_vx(BaseVaccination, ss.RoutineDelivery):
 
 class campaign_vx(BaseVaccination, ss.CampaignDelivery):
     """Campaign-style prophylactic HPV vaccination."""
+    pass
+
+
+class BaseTest(ss.BaseTest):
+    """HPV-specific test/screening base.
+
+    Adds v2-compatible age_range / sex / eligibility / debut_age kwargs,
+    composed into a single Starsim eligibility callable via
+    _compose_screening_eligibility. Overrides _parse_product_str so
+    routine_screening(product='via', ...) resolves through hpv.dx(name='via').
+    """
+
+    def __init__(self, *args, age_range=None, sex='f', eligibility=None,
+                 debut_age=None, **kwargs):
+        composed = _compose_screening_eligibility(age_range, sex, eligibility, debut_age)
+        super().__init__(*args, eligibility=composed, **kwargs)
+        self.age_range = age_range
+        self.sex_raw = sex
+        self.sex = _coerce_sex(sex)
+        self.eligibility_raw = eligibility
+        self.debut_age = debut_age
+
+    def _parse_product_str(self, product):
+        from hpvsim.products import dx as _dx
+        return _dx(name=product)
+
+
+class BaseScreening(BaseTest, ss.BaseScreening):
+    """HPV-specific BaseScreening — composes HPV eligibility with Starsim's screening step."""
+    pass
+
+
+class BaseTriage(BaseTest, ss.BaseTriage):
+    """HPV-specific BaseTriage."""
+    pass
+
+
+class routine_screening(BaseScreening, ss.RoutineDelivery):
+    """Routine HPV screening."""
+    pass
+
+
+class campaign_screening(BaseScreening, ss.CampaignDelivery):
+    """Campaign HPV screening."""
+    pass
+
+
+class routine_triage(BaseTriage, ss.RoutineDelivery):
+    """Routine HPV triage."""
+    pass
+
+
+class campaign_triage(BaseTriage, ss.CampaignDelivery):
+    """Campaign HPV triage."""
     pass

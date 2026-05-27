@@ -26,8 +26,13 @@ from .cross_genotype import CrossImmunity, HPVTotal
 from .analyzers import AgeResults
 from .calibration import Calibration
 from . import calibration
-from .products import vx
-from .interventions import BaseVaccination, routine_vx, campaign_vx
+from .products import vx, dx
+from .interventions import (
+    BaseVaccination, routine_vx, campaign_vx,
+    BaseTest, BaseScreening, BaseTriage,
+    routine_screening, campaign_screening,
+    routine_triage, campaign_triage,
+)
 
 rootdir = sc.thispath(__file__).parent
 
@@ -37,7 +42,11 @@ __all__ = [
     'data', 'migration_utils', 'options', 'datadir', '__version__',
     'SimPars', 'GenotypePars', 'get_genotype_pars', 'get_cross_immunity',
     'GENOTYPE_KEYS',
-    'vx', 'BaseVaccination', 'routine_vx', 'campaign_vx',
+    'vx', 'dx',
+    'BaseVaccination', 'routine_vx', 'campaign_vx',
+    'BaseTest', 'BaseScreening', 'BaseTriage',
+    'routine_screening', 'campaign_screening',
+    'routine_triage', 'campaign_triage',
 ]
 
 del sc
