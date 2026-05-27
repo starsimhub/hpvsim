@@ -172,6 +172,14 @@ class Sim(ss.Sim):
         agents at exact integer ages. When ``v2_compat_demographics=True``,
         floor all initial agent ages to integers after sampling so the
         starting cohort matches v2's discrete convention.
+
+        Note: ``super().init()`` runs ``SexualNetwork.init_post``, which
+        pre-forms one batch of partnerships using debut ages sampled against
+        the continuous initial-age distribution. The integer-age floor below
+        runs after that pre-form, so the very first pair graph reflects
+        continuous ages while every subsequent step sees integer ages. The
+        parity gate is statistical and absorbs this transient; v2 has an
+        analogous one-off effect at the `make_contacts` step.
         """
         super().init(**kwargs)
         if self._v2_compat_demographics:

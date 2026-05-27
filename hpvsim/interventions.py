@@ -37,6 +37,8 @@ def _coerce_sex(sex):
             return {1}
         raise ValueError(f"sex string must be 'f' or 'm', got {sex!r}")
     if isinstance(sex, (list, tuple, set, np.ndarray)):
+        if len(sex) == 0:
+            raise ValueError("sex list must not be empty; pass None for 'no sex filter'")
         out = set()
         for s in sex:
             out |= _coerce_sex(s)

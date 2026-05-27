@@ -200,6 +200,8 @@ def test_coerce_sex_invalid_raises():
         _coerce_sex(2)
     with pytest.raises(ValueError, match='sex'):
         _coerce_sex(['x', 'y'])
+    with pytest.raises(ValueError, match='empty'):
+        _coerce_sex([])
 
 
 def _make_plain_small_sim(genotypes=('hpv16', 'hpv18', 'hi5', 'ohr')):
