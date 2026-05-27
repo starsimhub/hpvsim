@@ -112,7 +112,13 @@ def test_routine_vx_respects_age_range():
 # transmission / progression / clearance, this number will change and
 # the assertion below will fail loudly. Regenerate by running the
 # no-vx sim and printing float(sim.results['hpvtotal']['cum_infections'].sum()).
-EXPECTED_NO_VX_TOTAL_INFECTIONS = 10707.0
+#
+# Updated 2026-05-26: 10707.0 -> 14621.0 after SexualNetwork.init_post
+# started pre-forming partnerships (0cac4980). The pre-form consumes
+# additional CRN draws AND populates the pair graph before the first
+# transmission step, so the no-vx baseline sees more year-1
+# transmission than the pre-fix version did.
+EXPECTED_NO_VX_TOTAL_INFECTIONS = 14621.0
 
 
 def test_no_vx_baseline_unchanged():
