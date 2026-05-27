@@ -179,16 +179,17 @@ by the M03 multi-seed pytest gates). See the M03 spec's
 
 ### M5: Vaccination scenarios
 
-**Demo:** Run routine + catch-up + therapeutic vaccination and show cancer incidence reduction.
+**Demo:** Run routine + catch-up vaccination and show cancer incidence reduction.
 
 **Acceptance test:** Vaccination impact trajectory overlaps v2.x intervals on `hpvsim_1dose` / `hpvsim_pxv_younger`.
 
 **Sub-tasks:**
 - Port `hpv.vx(ss.Vx)` product class — per-genotype `rel_imm` table loaded
-  from `hpvsim/data/products_vx.csv`; `administer` applies per-genotype
-  all-or-nothing+leaky model and bumps each HPV module's `nab_imm`. Cross-
-  immunity propagation is automatic via the existing `CrossImmunity`
-  connector.
+  from `hpvsim/data/products_vx.csv`. `administer` applies per-genotype
+  all-or-nothing+leaky model (using a separate `sterilizing_p`, not the
+  per-genotype `rel_imm`) and writes to each HPV module's `vax_imm`
+  field (NOT `nab_imm`) so the `CrossImmunity` matrix doesn't bleed
+  bivalent protection onto hi5/ohr.
 - Add `hpv.BaseVaccination(ss.BaseVaccination)` shim adding v2-compatible
   `age_range` / `sex` / `eligibility` constructor args; thin `hpv.routine_vx`
   and `hpv.campaign_vx` subclasses combining the shim with Starsim's
@@ -205,6 +206,22 @@ by the M03 multi-seed pytest gates). See the M03 spec's
 - Confirm intervention-level result tracking (`vaccinated`, `n_doses`,
   `ti_vaccinated`) is exposed via the existing `ss.BaseVaccination` state;
   age-stratified consumption uses M04's `AgeResults` analyzer.
+- **v2-parity supporting work** (added after the initial M5 design):
+  - `v2_compat_demographics=True` on `hpv.Sim` enables `AnnualBirths`
+    (annual-pulse births), AgeMigration jitter-disable, and
+    initial-population age floor so every cohort lands at exact integer
+    ages — matches v2's `add_births` / `dt_demog=1` convention.
+  - `SexualNetwork.init_post` pre-forms one batch of partnerships so the
+    pair graph at sim start matches v2's `make_contacts`-populated
+    `popdict['contacts']` (closes the year-1990 transmission deficit).
+  - Therapeutic vaccination (`txvx`) deferred to M06; see "Scope
+    adjustments" rationale in the M5 design spec.
+
+**Parity investigation:** see
+`docs/superpowers/specs/2026-05-26-m05-parity-investigation.md` for the
+full log of bugs found and fixed (cancer dedup, vax_imm split,
+sterilizing_p decouple, v2 baseline counting, network warm-up,
+v2_age_compat shim removal).
 
 ### M6: Screen-and-treat cascade
 
