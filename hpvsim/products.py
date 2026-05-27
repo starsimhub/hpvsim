@@ -453,3 +453,59 @@ class tx(ss.Tx):
         if return_format == 'dict':
             return {'successful': successful, 'unsuccessful': unsuccessful}
         return successful
+
+
+class txvx(ss.Vx):
+    """HPV therapeutic vaccine product (parallel structure to hpv.vx).
+
+    Two modes:
+    - Initial dose (default): per-agent sterilizing draw at sterilizing_p,
+      then per-genotype scaling by rel_imm[g] writing into txvx_imm.
+    - Booster (imm_boost not None): multiplies existing txvx_imm in place.
+
+    v2 reference: hpvsim/_v2_legacy/interventions.py:1416-1466 + default_tx
+    wiring for txvx1/txvx2.
+    """
+
+    def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95,
+                 imm_boost=None, **kwargs):
+        super().__init__(**kwargs)
+        self.define_pars(
+            name=name,
+            rel_imm=rel_imm,
+            sterilizing_p=sterilizing_p,
+            imm_boost=imm_boost,
+        )
+        if imm_boost is None:
+            # First-dose path requires resolved rel_imm
+            self.rel_imm = _resolve_txvx_pars(name, rel_imm)
+        else:
+            # Booster path: rel_imm is optional (in-place multiply doesn't need it)
+            if name is not None or rel_imm is not None:
+                self.rel_imm = _resolve_txvx_pars(name, rel_imm)
+            else:
+                self.rel_imm = {}
+        self._sterilizing_dist = ss.bernoulli(p=0.0)
+
+    def administer(self, people, uids):
+        if len(uids) == 0:
+            return
+        if self.pars.imm_boost is not None:
+            # Booster: multiplicative in place on all HPV modules.
+            for module in _iter_hpv_modules(self.sim):
+                module.txvx_imm[uids] *= float(self.pars.imm_boost)
+            return
+        # First dose: per-agent sterilizing draw, then per-genotype scaling.
+        self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
+        sterilizing_uids = self._sterilizing_dist.filter(uids)
+        is_sterilizing = np.isin(np.asarray(uids), np.asarray(sterilizing_uids))
+        for genotype, rel_imm_g in self.rel_imm.items():
+            module = _find_genotype_module(self.sim, genotype)
+            if module is None:
+                continue  # inactive-genotype tolerance
+            peak = np.where(
+                is_sterilizing,
+                float(rel_imm_g),
+                float(rel_imm_g) * float(self.pars.sterilizing_p),
+            )
+            module.txvx_imm[uids] = np.maximum(module.txvx_imm[uids], peak)
