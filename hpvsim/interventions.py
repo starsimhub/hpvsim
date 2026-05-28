@@ -371,10 +371,9 @@ class treat_delay(BaseTreatment):
          round(delay / dt)`.
       2. Agents whose due_ti is the current ti are treated.
 
-    delay is in years. Integer-ti scheduler keys are the M05-lesson
-    upgrade over v2's float subtraction (sim.t - delay/dt).
-
-    v2 reference: hpvsim/_v2_legacy/interventions.py:1098-1134
+    delay is in years. Scheduler keys are integer ti so timing is exact
+    under any dt; the round() picks the nearest integer step for
+    non-integer (delay / dt) ratios.
     """
 
     def __init__(self, delay=None, **kwargs):
@@ -427,8 +426,6 @@ class BaseTxVx(BaseTreatment):
     On each delivery the agent's txvx_imm is bumped per genotype (via
     hpv.txvx.administer). The intervention's own dose counters track
     program-level uptake.
-
-    v2 reference: hpvsim/_v2_legacy/interventions.py:1137-1252
     """
 
     def __init__(self, *args, **kwargs):
@@ -594,9 +591,8 @@ class dynamic_pars(ss.Intervention):
     (default) or stepwise (interpolate=False) value for the current year.
 
     Dotted-path resolution order: sim.diseases > sim.interventions > sim.pars.
-
-    v2 reference: hpvsim/_v2_legacy/interventions.py:406-489 (uses timestep
-    keys; v3 uses epoch-year keys for ergonomic schedule authoring).
+    Schedule keys are epoch years (e.g. 2020, 2030) — `np.interp` clamps to
+    the first / last value outside the schedule.
     """
 
     def __init__(self, pars=None, interpolate=True, **kwargs):
