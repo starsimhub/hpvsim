@@ -2,24 +2,28 @@
 
 **Date:** 2026-05-27
 **Milestone:** M07 (MultiSim and scenarios)
-**Branch:** `m07-multisim` (off `m05-vaccination-scenarios`; PR targets `v3.0-dev`)
-**Predecessor:** [M05 Vaccination Scenarios](2026-05-20-m05-vaccination-scenarios-design.md)
-**Status:** Design — not yet implemented.
+**Branch:** `m07-multisim` (off `m06-test-and-treat-cascade`; PR targets `v3.0-dev`)
+**Predecessor:** [M06 Test-and-Treat Cascade](2026-05-27-m06-test-and-treat-cascade-design.md) — and via M06, M05's vaccination work the demo depends on.
+**Status:** Implementation complete; rebased onto `m06-test-and-treat-cascade` 2026-05-28.
 
 ## Dependencies and rebase strategy
 
-M07 branches off `m05-vaccination-scenarios` rather than `v3.0-dev` because
-the demo (`examples/m07_uq_sweep.py`) and its smoke test
+M07 originally branched off `m05-vaccination-scenarios` because the demo
+(`examples/m07_uq_sweep.py`) and its smoke test
 (`tests/test_m07_demo_smoke.py`) consume M05 deliverables: `hpv.routine_vx`,
 `hpv.vx`, the Nigeria 4-genotype vaccination anchor at
 `tests/regression/anchor_vx_routine.py`, and `products_vx.csv`. The
 verification tests (`test_m07_multisim.py`, `test_m07_parallel.py`) and the
 M01/M02 parity-gate tests do not depend on M05.
 
-Once M05 merges to `v3.0-dev`, this branch rebases onto `v3.0-dev` and the
-M07 PR targets `v3.0-dev` directly. If M07 finishes implementation before
-M05 merges, the PR is held in draft against `v3.0-dev` with M05's diff
-visible until M05 lands. (Same pattern as M03, which branched off
+After implementation completed (2026-05-28), the branch was rebased onto
+`m06-test-and-treat-cascade` rather than waiting for M05 to merge to
+`v3.0-dev`. M06's history includes M05's tip plus the M06 work, so the M05
+deliverables M07 depends on are reachable through the M06 base. The M07
+PR targets `v3.0-dev` directly and is held in draft until M05 and M06 land
+on `v3.0-dev`, after which M07 either merges cleanly (if no conflicting
+edits to `MIGRATION_PLAN.md` etc. land between) or rebases once more onto
+the updated `v3.0-dev`. (Conceptually similar to M03, which branched off
 `m02-natural-history-parity` and rebased onto `v3.0-dev` after M02 merged.)
 
 ---
@@ -500,4 +504,5 @@ M07 is done when:
 - Starsim multi-sim docs: `starsim-dev-run` skill (Starsim 3.3.4).
 - M03 design: [`2026-05-06-m03-multi-genotype-cross-immunity-design.md`](./2026-05-06-m03-multi-genotype-cross-immunity-design.md).
 - M05 design: [`2026-05-20-m05-vaccination-scenarios-design.md`](./2026-05-20-m05-vaccination-scenarios-design.md).
+- M06 design: [`2026-05-27-m06-test-and-treat-cascade-design.md`](./2026-05-27-m06-test-and-treat-cascade-design.md) — current base branch.
 - `MIGRATION_PLAN.md` — milestone definitions and conventions.
