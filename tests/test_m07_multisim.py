@@ -10,7 +10,6 @@ Tiny n_agents and short dur keep each test under ~5 s.
 import numpy as np
 import pytest
 
-import sciris as sc
 import starsim as ss
 import hpvsim as hpv
 
@@ -47,23 +46,32 @@ def test_multisim_median_reduce_shape_and_nonneg():
     """msim.median() exposes median + 10/90 quantile arrays; non-negative for counts."""
     sim = _tiny_sim(rand_seed=0)
     msim = ss.MultiSim(sim, n_runs=5).run(verbose=0)
-    pre_len = len(np.asarray(msim.sims[0].results.hpv16.cum_infections))
+    pre_len = len(msim.sims[0].results.hpv16.cum_infections)
     msim.median()
     # After reduce, msim exposes a single aggregate result with the same
     # time-axis length as each underlying sim. Results are flattened to top-level keys.
     reduced = np.asarray(msim.results.hpv16_cum_infections)
     assert reduced.shape == (pre_len,)
     assert np.all(reduced >= 0), 'cum_infections must be non-negative post-median'
+    low = np.asarray(msim.results.hpv16_cum_infections.low)
+    high = np.asarray(msim.results.hpv16_cum_infections.high)
+    assert low.shape == (pre_len,), f'Expected low.shape {(pre_len,)}, got {low.shape}'
+    assert high.shape == (pre_len,), f'Expected high.shape {(pre_len,)}, got {high.shape}'
+    assert np.all(low >= 0), 'q10 lower bound must be non-negative'
+    assert np.all(high >= low), 'q90 must be >= q10 everywhere'
 
 
 def test_multisim_mean_reduce_smoke():
     """msim.mean() functions (smoke test). Don't use on bounded metrics in production."""
     sim = _tiny_sim(rand_seed=0)
     msim = ss.MultiSim(sim, n_runs=5).run(verbose=0)
+    pre_len = len(msim.sims[0].results.hpv16.cum_infections)
     msim.mean()
     reduced = np.asarray(msim.results.hpv16_cum_infections)
-    assert reduced.shape[0] > 0
+    assert reduced.shape == (pre_len,), f'Expected shape {(pre_len,)}, got {reduced.shape}'
     assert np.isfinite(reduced).all()
+    assert hasattr(msim.results.hpv16_cum_infections, 'low'), 'mean() result must carry .low attribute'
+    assert hasattr(msim.results.hpv16_cum_infections, 'high'), 'mean() result must carry .high attribute'
 
 
 def test_multisim_labels_propagate():
