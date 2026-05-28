@@ -218,15 +218,15 @@ class HPVTotal(ss.Analyzer):
         for key, src in template.items():
             if key in self._SKIP or key in self._DERIVED:
                 continue
-            defs.append(ss.Result(key, dtype=src.dtype,
+            defs.append(ss.Result(key, dtype=float,
                                   label=f'{src.label} (any genotype)'))
         # Derived results (computed in step()).
-        defs.append(ss.Result('n_susceptible', dtype=int,
+        defs.append(ss.Result('n_susceptible', dtype=float,
                               label='Currently uninfected with any genotype'))
-        defs.append(ss.Result('prevalence', dtype=float,
+        defs.append(ss.Result('prevalence', dtype=float, scale=False,
                               label='Prevalence of any HPV genotype'))
         # Extra result with no per-genotype counterpart.
-        defs.append(ss.Result('cum_infections_unique', dtype=int,
+        defs.append(ss.Result('cum_infections_unique', dtype=float,
                               label='Cumulative agents ever infected with any genotype'))
         self.define_results(*defs)
 
@@ -245,7 +245,8 @@ class HPVTotal(ss.Analyzer):
         # (not len(auids)) is the right denominator for prevalence and the
         # right filter for current-state counts.
         alive = people.alive.values
-        n_alive = int(alive.sum())
+        scale_vals = people.scale.values
+        n_alive = float((scale_vals * alive).sum())
         if n_alive == 0:
             return
         # Per-agent state unions across modules, masked to alive agents.
@@ -256,9 +257,9 @@ class HPVTotal(ss.Analyzer):
                 u |= getattr(m, attr).values
             u &= alive
             union_arrays[key] = u
-            self.results[key][ti] = int(u.sum())
+            self.results[key][ti] = float((scale_vals * u).sum())
         # Derived from n_infected.
-        n_inf = int(union_arrays['n_infected'].sum())
+        n_inf = float((scale_vals * union_arrays['n_infected']).sum())
         self.results['n_susceptible'][ti] = n_alive - n_inf
         self.results['prevalence'][ti] = n_inf / n_alive
         # Cumulative unique: agents whose ti_first_infection has fired on
@@ -269,7 +270,7 @@ class HPVTotal(ss.Analyzer):
         for m in hpvs:
             ever_infected |= np.isfinite(m.ti_first_infection.values)
         ever_infected &= alive
-        self.results['cum_infections_unique'][ti] = int(ever_infected.sum())
+        self.results['cum_infections_unique'][ti] = float((scale_vals * ever_infected).sum())
 
     def finalize_results(self):
         """Sum across modules for all results not handled by step()."""
