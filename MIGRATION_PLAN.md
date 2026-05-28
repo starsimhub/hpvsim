@@ -351,8 +351,6 @@ campaign anchor), and the rationale for the |z| < 5 gate.
 |---|---|---|
 | Population scaling (`pop_scale` / `total_pop`) | M2 | Required for long-horizon natural history |
 | Age-specific migration | M2 | Required for demographic realism in multi-decade runs |
-| `radiation` intervention | M6 | Part of the full intervention cascade |
-| `dynamic_pars` | M6 | Needed to vary parameters over time |
 | Additional genotypes (`hr`, `lo`) | M2 | Low priority; add when natural history is wired up |
 | Multiscale modeling | Unscheduled | Low priority; not a release blocker |
 | Save/load | M10 or opportunistic | Not capability-blocking |
