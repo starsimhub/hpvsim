@@ -338,44 +338,47 @@ class dx(ss.Dx):
                 return {k: ss.uids() for k in self.hierarchy}
             return np.array([], dtype=int)
 
-        # Ensure uids is sorted for searchsorted-based result indexing
-        uids_sorted = ss.uids(np.sort(np.asarray(uids)))
-        results = np.full(len(uids_sorted), self.default_value, dtype=int)
+        # Normalize input to ss.uids so downstream .intersect / .union ops work
+        # regardless of whether the caller passed an ss.uids or a plain ndarray.
+        uids = ss.uids(uids)
+        # uid-keyed Series so we can update with .loc[these_uids] directly,
+        # mirroring ss.Dx.administer. Hierarchy-min semantics: most-severe
+        # result (lowest hierarchy index) wins on multi-genotype-positive agents.
+        results = pd.Series(self.default_value, index=uids)
 
         for state in self.health_states:
             if self._all_genotype:
-                these = _state_collapse_across_genotypes(state, uids_sorted, self.sim)
+                these = _state_collapse_across_genotypes(state, uids, self.sim)
                 if len(these) == 0:
                     continue
                 df_filter = (self.df.state == state) & (self.df.genotype == 'all')
-                self._draw_and_min_into(results, uids_sorted, these, df_filter)
+                self._draw_and_min_into(results, these, df_filter)
             else:
                 for module in _iter_hpv_modules(self.sim):
                     if module.genotype not in self._genotypes_in_df:
                         continue
-                    these = _state_uids_for_module(module, state, uids_sorted)
+                    these = _state_uids_for_module(module, state, uids)
                     if len(these) == 0:
                         continue
                     df_filter = (
                         (self.df.state == state)
                         & (self.df.genotype == module.genotype)
                     )
-                    self._draw_and_min_into(results, uids_sorted, these, df_filter)
+                    self._draw_and_min_into(results, these, df_filter)
 
         if return_format == 'dict':
-            return {k: ss.uids(uids_sorted[results == i])
+            return {k: ss.uids(results.index[results == i].to_numpy())
                     for i, k in enumerate(self.hierarchy)}
-        return results
+        return results.to_numpy(dtype=int)
 
-    def _draw_and_min_into(self, results, uids_sorted, these, df_filter):
+    def _draw_and_min_into(self, results, these, df_filter):
         probs = [
             float(self.df[df_filter & (self.df.result == r)]['probability'].values[0])
             for r in self.hierarchy
         ]
         self.result_dist.pars['p'] = probs
-        draw = np.asarray(self.result_dist.rvs(these))
-        idx = np.searchsorted(uids_sorted, np.asarray(these))
-        results[idx] = np.minimum(draw, results[idx])
+        draw = self.result_dist.rvs(these)
+        results.loc[these] = np.minimum(draw, results.loc[these])
 
 
 class tx(ss.Tx):
@@ -444,11 +447,10 @@ class tx(ss.Tx):
                 module.ti_clearance[eff] = self.sim.ti + 1
 
         if successful_uids_list:
-            all_succ = np.unique(np.concatenate([np.asarray(u) for u in successful_uids_list]))
-            successful = ss.uids(all_succ)
+            successful = ss.uids(np.unique(np.concatenate(successful_uids_list)))
         else:
             successful = ss.uids()
-        unsuccessful = ss.uids(np.setdiff1d(np.asarray(uids), np.asarray(successful)))
+        unsuccessful = ss.uids(np.setdiff1d(uids, successful))
 
         if return_format == 'dict':
             return {'successful': successful, 'unsuccessful': unsuccessful}
@@ -503,7 +505,7 @@ class txvx(ss.Vx):
         # First dose: per-agent sterilizing draw, then per-genotype scaling.
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
         sterilizing_uids = self._sterilizing_dist.filter(uids)
-        is_sterilizing = np.isin(np.asarray(uids), np.asarray(sterilizing_uids))
+        is_sterilizing = np.isin(uids, sterilizing_uids)
         for genotype, rel_imm_g in self.rel_imm.items():
             module = _find_genotype_module(self.sim, genotype)
             if module is None:
@@ -536,17 +538,16 @@ class radiation(ss.Product):
     def administer(self, uids):
         if len(uids) == 0:
             return ss.uids()
-        new_dur = np.asarray(self._dur_dist.rvs(uids))
         dt = self.sim.t.dt
-        uids_arr = np.asarray(uids)
         for module in _iter_hpv_modules(self.sim):
             cancer_uids = module.cancerous.uids.intersect(uids)
             if len(cancer_uids) == 0:
                 continue
-            mask = np.isin(uids_arr, np.asarray(cancer_uids))
-            module.ti_dead_cancer[cancer_uids] = (
-                module.ti_dead_cancer[cancer_uids]
-                + np.ceil(new_dur[mask] / dt)
-            )
+            # Draw per-module on the cancer subset. Avoids the alignment trap
+            # of pre-drawing on `uids` and then trying to index by mask (which
+            # gives uids-order durations) while writing by cancer_uids
+            # (which is sorted order — `intersect` does not preserve uids-order).
+            new_dur = self._dur_dist.rvs(cancer_uids)
+            module.ti_dead_cancer[cancer_uids] += np.ceil(new_dur / dt)
         return uids
 

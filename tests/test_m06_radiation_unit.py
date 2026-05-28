@@ -52,3 +52,27 @@ def test_radiation_default_duration_v2_match():
     r = hpv_radiation()
     assert r.pars.dur['par1'] == 18 / 12  # mean: 1.5 years
     assert r.pars.dur['par2'] == 2 / 12   # sd: ~0.167 years
+
+
+def test_radiation_extension_is_positive_for_non_sorted_input():
+    """Regression guard: radiation must extend ti_dead_cancer for every
+    cancerous agent regardless of input uids ordering.
+
+    Earlier implementation pre-drew durations indexed by uids-order, then
+    wrote them via `cancer_uids` (sorted by intersect()). When the two
+    orderings disagreed (non-sorted input), each agent received the wrong
+    agent's duration. With non-sorted input, some agents could even pick
+    up zero or near-zero durations from the wrong slot.
+    """
+    sim = _four_genotype_sim()
+    r = _attach_and_init(sim, hpv_radiation())
+    # Pick three cancer agents and pass them in REVERSE order
+    cancer_uids = sim.people.alive.uids[:3]
+    sim.diseases['hpv16'].cancerous[cancer_uids] = True
+    initial = 100.0
+    sim.diseases['hpv16'].ti_dead_cancer[cancer_uids] = initial
+    reversed_input = ss.uids(cancer_uids[::-1])
+    r.administer(reversed_input)
+    # All three must have ti_dead_cancer strictly greater than initial
+    # (radiation duration sample is always positive; ceil makes it >= 1 step).
+    assert np.all(sim.diseases['hpv16'].ti_dead_cancer[cancer_uids] > initial)
