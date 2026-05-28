@@ -32,7 +32,7 @@ from .interventions import (
     BaseTest, BaseScreening, BaseTriage,
     routine_screening, campaign_screening,
     routine_triage, campaign_triage,
-    BaseTreatment, treat_num,
+    BaseTreatment, treat_num, treat_delay,
 )
 
 rootdir = sc.thispath(__file__).parent
@@ -48,7 +48,7 @@ __all__ = [
     'BaseTest', 'BaseScreening', 'BaseTriage',
     'routine_screening', 'campaign_screening',
     'routine_triage', 'campaign_triage',
-    'BaseTreatment', 'treat_num',
+    'BaseTreatment', 'treat_num', 'treat_delay',
 ]
 
 del sc

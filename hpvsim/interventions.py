@@ -11,6 +11,8 @@ M06 adds screening (routine_screening / campaign_screening), triage
 (routine_triage / campaign_triage), treatment, dynamic_pars, and the
 txvx family (BaseTxVx / routine_txvx / campaign_txvx / linked_txvx).
 """
+from collections import defaultdict
+
 import numpy as np
 import starsim as ss
 
@@ -22,7 +24,7 @@ __all__ = [
     'BaseTest', 'BaseScreening', 'BaseTriage',
     'routine_screening', 'campaign_screening',
     'routine_triage', 'campaign_triage',
-    'BaseTreatment', 'treat_num',
+    'BaseTreatment', 'treat_num', 'treat_delay',
 ]
 
 
@@ -73,7 +75,7 @@ def _as_boolarr(extra_result, people):
         return extra_result
     # Assume ss.uids or array-like of ints — build a blank BoolArr from alive
     out = people.alive.asnew()
-    out.values[:] = False
+    out.raw[:] = False
     out[extra_result] = True
     return out
 
@@ -152,7 +154,7 @@ def _any_genotype_cancer(sim):
     # Late import to avoid the interventions <-> products circular import
     from hpvsim.products import _iter_hpv_modules
     out = sim.people.alive.asnew()
-    out.values[:] = False
+    out.raw[:] = False
     for module in _iter_hpv_modules(sim):
         out[module.cancerous.uids] = True
     return out
@@ -323,6 +325,55 @@ class treat_num(BaseTreatment, ss.treat_num):
 
     def step(self):
         treat_uids = super().step()
+        if len(treat_uids):
+            if self.treat_cancer:
+                new = treat_uids[~self.cancer_treated[treat_uids]]
+                self.cancer_treated[treat_uids] = True
+                self.cancer_treatments[treat_uids] += 1
+                self.ti_cancer_treated[treat_uids] = self.sim.ti
+                self.results['new_cancer_treated'][self.sim.ti] += len(new)
+            else:
+                new = treat_uids[~self.cin_treated[treat_uids]]
+                self.cin_treated[treat_uids] = True
+                self.cin_treatments[treat_uids] += 1
+                self.ti_cin_treated[treat_uids] = self.sim.ti
+                self.results['new_cin_treated'][self.sim.ti] += len(new)
+        return treat_uids
+
+
+class treat_delay(BaseTreatment):
+    """Treat HPV+CIN+ agents after a fixed delay.
+
+    On each step:
+      1. Newly-eligible accepters are enqueued at `due_ti = sim.ti +
+         round(delay / dt)`.
+      2. Agents whose due_ti is the current ti are treated.
+
+    delay is in years. Integer-ti scheduler keys are the M05-lesson
+    upgrade over v2's float subtraction (sim.t - delay/dt).
+
+    v2 reference: hpvsim/_v2_legacy/interventions.py:1098-1134
+    """
+
+    def __init__(self, delay=None, **kwargs):
+        super().__init__(**kwargs)
+        self.delay = delay or 0
+        self.scheduler = defaultdict(list)
+
+    def add_to_schedule(self):
+        accept = self.get_accept_inds()
+        if len(accept):
+            due_ti = self.sim.ti + int(round(self.delay / self.sim.t.dt_year))
+            self.scheduler[due_ti].extend(int(u) for u in accept)
+
+    def get_candidates(self):
+        return ss.uids(self.scheduler.pop(self.sim.ti, []))
+
+    def step(self):
+        self.add_to_schedule()
+        treat_uids = super().step()
+        # Mirror treat_num's per-intervention bookkeeping (BaseTreatment.step
+        # is the upstream ss.BaseTreatment.step which only calls product.administer)
         if len(treat_uids):
             if self.treat_cancer:
                 new = treat_uids[~self.cancer_treated[treat_uids]]
