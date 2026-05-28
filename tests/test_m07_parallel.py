@@ -7,10 +7,9 @@ Locks in four properties hpvsim relies on:
   4. copy_inputs=True (sim default) ensures shared module references are
      independent per sim post-construction — the [[feedback_sim_input_copy]]
      discipline reified as a regression test. Module state must be accessed
-     via sim.interventions[...] after construction, not via the original
-     reference.
+     via each sim's own copy (e.g. sim.get_module(name)), not via the
+     original reference.
 """
-import numpy as np
 import pytest
 
 import starsim as ss
@@ -111,3 +110,6 @@ def test_parallel_copy_inputs_independent_after_construction():
     # Post-run, each sim has final state without interference from the other.
     assert float(s1.results.hpv16.cum_infections[-1]) >= 0
     assert float(s2.results.hpv16.cum_infections[-1]) >= 0
+    r1 = float(s1.results.hpv16.cum_infections[-1])
+    r2 = float(s2.results.hpv16.cum_infections[-1])
+    assert r1 != r2, 'Sims with different seeds must not contaminate each other'
