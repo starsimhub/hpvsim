@@ -481,6 +481,83 @@ git commit -m "multiscale: spawn fine cancer agents at CIN->cancer decision"
 
 ---
 
+## Task 4b: Exclude multiscale-fine agents from transmission & demographics
+
+**Added after Task 4 implementation revealed a plan gap:** spawned fine agents
+copy `infected`/`susceptible`/`rel_trans` and are NOT excluded from the sexual
+network or demographics, so they transmit and seed extra infections → ~2× cancer
+over-count across ratios. v2 prevented this by operating the network and births
+only on `level0` (coarse) agents (`_v2_legacy/people.py:319,354,782,865,940`).
+This task mirrors that gating. `multiscale_fine` is per-HPV-module, so the
+"fine in ANY genotype" view is the union across HPV modules.
+
+**Files:**
+- Modify: `hpvsim/network.py` (`SexualNetwork.set_network_states`, ~line 150)
+- Modify: `hpvsim/demographics.py` (`AnnualBirths`, `AgeMigration` alive denominators) — only if measurement shows a material leak
+- Test: `tests/test_multiscale.py`
+
+- [ ] **Step 1: Add a fine-agent union helper.** In `hpvsim/hpv.py`, add a module-level function:
+
+```python
+def multiscale_fine_for(sim, uids):
+    """Boolean array (aligned with `uids`): True where the agent is a fine
+    multiscale agent in ANY HPV genotype module. multiscale_fine is per-module,
+    so this unions across modules. Duck-typed (hasattr) to avoid imports."""
+    fine = np.zeros(len(uids), dtype=bool)
+    for m in sim.diseases.values():
+        if hasattr(m, 'multiscale_fine'):
+            fine |= np.asarray(m.multiscale_fine[uids])
+    return fine
+```
+
+- [ ] **Step 2: Write the failing test** (cross-ratio conservation precursor to Task 6). Append to `tests/test_multiscale.py`:
+
+```python
+def test_split_does_not_inflate_infections_via_network():
+    """Fine agents must not transmit: total infections should be ~scale-
+    invariant across ms_agent_ratio (within noise), not inflated by ratio."""
+    cfg = dict(location='nigeria', genotypes=['hpv16'], start=1990, stop=2030,
+               dt=0.25, total_pop=1e6, verbose=0)
+    def cum_inf(ratio, seed):
+        s = hpv.Sim(n_agents=5000, ms_agent_ratio=ratio, rand_seed=seed, **cfg)
+        s.run()
+        r = s.results.hpv16
+        key = 'cum_infections' if 'cum_infections' in r else 'new_infections'
+        v = float(np.asarray(r[key]).sum()) if key == 'new_infections' \
+            else float(r[key][-1])
+        return v * float(s.pars.pop_scale)
+    base = np.mean([cum_inf(1, sd) for sd in range(4)])
+    ms   = np.mean([cum_inf(10, sd) for sd in range(4)])
+    assert abs(ms - base) / base < 0.10, f'infections inflated: {ms:.0f} vs {base:.0f}'
+```
+
+- [ ] **Step 3: Run to verify it fails** (fine agents currently transmit): `PYTHONPATH=$(pwd) python -m pytest tests/test_multiscale.py::test_split_does_not_inflate_infections_via_network -v` → FAIL (ms >> base).
+
+- [ ] **Step 4: Exclude fine agents from the network.** In `hpvsim/network.py` `set_network_states`, after `unset = (~self.participant).uids` and the empty-check, drop fine agents so they never become participants (and thus never form partnerships or transmit):
+
+```python
+        from .hpv import multiscale_fine_for  # local import avoids cycle
+        if len(unset):
+            unset = unset[~multiscale_fine_for(self.sim, unset)]
+        if not len(unset):
+            return
+```
+
+(Place this right after the existing `if not len(unset): return`. Fine agents are spawned during disease `set_prognoses`, AFTER `network.step` has run that timestep, so they have `participant=False` and will simply never be activated.)
+
+- [ ] **Step 5: Run the conservation test + measure demographics.** Run the new test. If it now passes, demographics leakage is immaterial — skip Step 6. If infections still inflate, measure births: print `n_alive` and `new_infections` across ratios, and proceed to Step 6.
+
+- [ ] **Step 6 (conditional): Exclude fine agents from demographics denominators.** If Step 5 shows a material leak, gate `AnnualBirths`/`AgeMigration` alive-counts on `~multiscale_fine_for(...)` (mirror v2's `n_alive_level0`/`alive_level0`). Note: the default `hpv.Sim` uses generic `ss.Births`/`ss.Deaths`; if those leak, the equivalence test (Task 6) should set `v2_compat_demographics=True` to use the gateable `AnnualBirths`. Document whichever path you take.
+
+- [ ] **Step 7: Run regression + commit.** `PYTHONPATH=$(pwd) python -m pytest tests/test_multiscale.py tests/test_natural_history.py -v` (all pass; the `ratio=1` no-op is unaffected since the union mask is all-False when nothing is split).
+
+```bash
+git add hpvsim/network.py hpvsim/hpv.py tests/test_multiscale.py
+git commit -m "multiscale: exclude fine agents from network (+demographics if needed)"
+```
+
+---
+
 ## Task 5: Multi-genotype correctness
 
 **Files:**
@@ -512,7 +589,7 @@ Expected: If it fails, the split is leaving inconsistent cross-module state — 
 
 - [ ] **Step 3: Fix if failing**
 
-If the dual-cancer assertion fails, ensure `_cancel_other_genotype_progression_for` is invoked for newly-spawned cancer agents in `step_state` (it already runs on `to_cancerous`, which will include fine agents once they transition — verify, and if a fine agent is spawned already-cancerous in two genotypes, gate splitting to one genotype per agent per step).
+If the dual-cancer assertion fails, ensure `_cancel_other_genotype_progression_for` is invoked for newly-spawned cancer agents in `step_state` (it already runs on `to_cancerous`, which will include fine agents once they transition — verify, and if a fine agent is spawned already-cancerous in two genotypes, gate splitting to one genotype per agent per step). Also change the re-split guard in `_multiscale_split` from `self.multiscale_fine[...]` to the cross-module union (`multiscale_fine_for(self.sim, ...)` added in Task 4b) so a genotype does not re-split an agent already made fine by another genotype (avoids compounding scale shrink).
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -589,6 +666,8 @@ Expected: Likely FAIL on `test_multiscale_matches_single_scale_mean` until the T
 - [ ] **Step 3: Debug accounting to pass the gate**
 
 This is the central correctness work. Use these levers, re-running the gate after each:
+- **Extras resample their own `p_cancer`.** Task 4 (ratified) currently reuses the source agent's `p_cancer` for the spawned extras instead of resampling a fresh `dur_cin`→`p_cancer` per extra (v2 resamples). If equivalence is biased, switch the extras to resample their own `dur_cin` (already sampled as `dur_cin_new`) → `p_cancer` (already done) — verify the extra draw uses the per-extra probability, not the source's. This is the first lever to try.
+- **Confirm Task 4b network/demographics exclusion is in effect** (fine agents must not transmit); the `test_split_does_not_inflate_infections_via_network` gate should already pass before attempting cancer-total equivalence.
 - Verify conservation: instrument a single run to print summed `people.scale` over CIN/cancer agents vs the unsplit baseline; the per-coarse-agent cancer mass must equal `ratio × (1/ratio) × P(cancer)`.
 - Check the `ti_cancerous` scheduling for new fine agents is applied exactly once (Task-4 note).
 - Confirm new fine agents are not double-counted by `HPVTotal` or re-split on a later step (the `multiscale_fine` guard).
