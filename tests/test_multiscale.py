@@ -28,3 +28,28 @@ def test_ratio_one_is_bit_identical():
     a = np.asarray(base.results.hpv16.new_cancers)
     b = np.asarray(one.results.hpv16.new_cancers)
     assert np.array_equal(a, b)
+
+
+def test_cancer_count_is_scale_weighted():
+    """new_cancers weights by people.scale, not raw agent count."""
+    sim = hpv.Sim(n_agents=3000, **ANCHOR)
+    sim.init()
+    mod = sim.diseases.hpv16
+    ppl = sim.people
+
+    # Force two agents into the CIN->cancerous transition this step at
+    # known scales, and verify the recorded tally is the scale sum (1.5),
+    # not the raw count (2).
+    uids = ppl.auids[:2]
+    ppl.scale[uids] = np.array([1.0, 0.5])
+    mod.cin[uids] = True
+    mod.cancerous[uids] = False
+    mod.ti_cancerous[uids] = sim.t.ti
+    mod.ti_clearance[uids] = np.nan
+    mod.infected[uids] = True
+    mod.step_state()
+    ti = sim.t.ti
+    assert np.isclose(float(mod.results.new_cancers[ti]), 1.5)
+    # age tally also scale-weighted: sum(age*scale)
+    expected_age = float((np.asarray(ppl.age[uids]) * np.array([1.0, 0.5])).sum())
+    assert np.isclose(float(mod.results.sum_age_at_cancer[ti]), expected_age)
