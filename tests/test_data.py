@@ -67,7 +67,7 @@ def test_network_pars_shape():
 
 
 def test_unknown_location_raises():
-    """Unknown location raises ValueError listing supported locations."""
+    """Unknown location raises ValueError with suggestion hints."""
     import pytest
-    with pytest.raises(ValueError, match='nigeria'):
+    with pytest.raises(ValueError, match='not recognized'):
         hpvsim.data.load_country('atlantis')
