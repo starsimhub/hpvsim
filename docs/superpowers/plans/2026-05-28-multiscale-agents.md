@@ -222,47 +222,61 @@ git commit -m "multiscale: scale-weight cancer/death tallies in step_state"
 
 **Why:** `HPVTotal.step` uses raw `int(alive.sum())` and `int(u.sum())` for `n_alive`, `prevalence`, `cum_infections_unique`, and per-state unique sums. Fine agents inflate raw counts; these must weight by `people.scale`.
 
+**Note on the actual code:** `HPVTotal.step` (cross_genotype.py:233-272) works in `.values` space (boolean masks aligned to `people.alive.values`), and `n_alive` is a *local variable*, not a result. The scale-sensitive *results* are the `_UNION_STATES` counts (`n_infected`, `n_susceptible`, `n_precin`, `n_cin`, `n_cancerous`, ...), `n_susceptible`, and `cum_infections_unique`. Weight by `people.scale.values` (same `.values` space as the masks).
+
 - [ ] **Step 1: Write the failing test**
 
 ```python
-def test_hpvtotal_n_alive_is_scale_weighted():
-    """HPVTotal n_alive sums people.scale, so fine agents don't inflate it."""
+def test_hpvtotal_counts_are_scale_weighted():
+    """HPVTotal union counts weight by people.scale: halving every agent's
+    scale halves the counts."""
     sim = hpv.Sim(n_agents=1000, **ANCHOR)
     sim.init()
     ppl = sim.people
-    ppl.scale[ppl.auids] = 0.5  # every agent represents half-weight
-    tot = sim.analyzers.hpvtotal
-    tot.step()
+    tot = [a for a in sim.analyzers.values()
+           if a.__class__.__name__ == 'HPVTotal'][0]
     ti = sim.t.ti
-    assert np.isclose(float(tot.results['n_alive'][ti]),
-                      0.5 * len(ppl.auids), rtol=1e-6)
+    ppl.scale[ppl.auids] = 1.0
+    tot.step()
+    base_ns = float(tot.results['n_susceptible'][ti])
+    ppl.scale[ppl.auids] = 0.5
+    tot.step()
+    half_ns = float(tot.results['n_susceptible'][ti])
+    assert base_ns > 0
+    assert np.isclose(half_ns, 0.5 * base_ns, rtol=1e-6)
 ```
-
-(If the `HPVTotal` analyzer key differs, discover it: `print(list(sim.analyzers.keys()))`.)
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `PYTHONPATH=$(pwd) python -m pytest tests/test_multiscale.py::test_hpvtotal_n_alive_is_scale_weighted -v`
-Expected: FAIL — `n_alive[ti]` is `1000` (raw), not `500`.
+Run: `PYTHONPATH=$(pwd) python -m pytest tests/test_multiscale.py::test_hpvtotal_counts_are_scale_weighted -v`
+Expected: FAIL — `n_susceptible` is a raw count (unchanged when scale halves).
 
 - [ ] **Step 3: Scale-weight HPVTotal counts**
 
-In `hpvsim/cross_genotype.py` `HPVTotal.step`, replace the raw counts. Where it computes `n_alive = int(alive.sum())`, use the scale sum over alive agents:
+In `hpvsim/cross_genotype.py` `HPVTotal.step`, introduce `scale_vals = self.sim.people.scale.values` (aligned with `alive = people.alive.values`) and replace each raw `int(...)`-count with a scale-weighted sum:
 
 ```python
-        scale = self.sim.people.scale
-        alive_uids = alive.uids if hasattr(alive, 'uids') else self.sim.people.auids
-        n_alive = float(scale[alive_uids].sum())
+        scale_vals = people.scale.values
+        alive = people.alive.values
+        n_alive = float((scale_vals * alive).sum())
+        if n_alive == 0:
+            return
+        union_arrays = {}
+        for key, attr in self._UNION_STATES.items():
+            u = np.zeros(alive.shape, dtype=bool)
+            for m in hpvs:
+                u |= getattr(m, attr).values
+            u &= alive
+            union_arrays[key] = u
+            self.results[key][ti] = float((scale_vals * u).sum())
+        n_inf = float((scale_vals * union_arrays['n_infected']).sum())
+        self.results['n_susceptible'][ti] = n_alive - n_inf
+        self.results['prevalence'][ti] = n_inf / n_alive
+        ...
+        self.results['cum_infections_unique'][ti] = float((scale_vals * ever_infected).sum())
 ```
 
-For each per-state unique union `u` written via `int(u.sum())`, weight by scale of the union's uids:
-
-```python
-            u_uids = u.uids if hasattr(u, 'uids') else self.sim.people.auids[u]
-            self.results[key][ti] = float(scale[u_uids].sum())
-```
-
-Apply the same `scale`-weighted sum to `n_inf` (the `n_infected` union) and `cum_infections_unique` (`ever_infected`). Then `prevalence = n_inf / n_alive` and `n_susceptible = n_alive - n_inf` follow unchanged. Change the affected `Result` dtypes from `int` to `float` in `HPVTotal.define_results`.
+`prevalence` keeps its formula (`n_inf / n_alive`) — a ratio, so scale-invariant under uniform scale. Change the affected `Result` dtypes from `int` to `float` in `HPVTotal.define_results`: the `_UNION_STATES` results (defined with `dtype=src.dtype` ~line 221 → use `dtype=float`), `n_susceptible` (~line 224), and `cum_infections_unique` (~line 229).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
