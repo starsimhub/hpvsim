@@ -351,3 +351,65 @@ print(f'Wrote m02_age_cancer.json with {len(arr)} age bands')
 The output shape must match `(n_bins,)` and use the same 5-yr age bins as
 `hpv.AgeResults` defaults (0, 5, 10, ..., 100, so 21 bins total). The file
 is gitignored.
+
+---
+
+## M07 multi-seed anchors and baseline regeneration
+
+M07 adds two additional milestone anchors with multi-seed parity gates,
+mirroring M03's pattern but for the M01 (transmission-only HPV16) and M02
+(full HPV16 natural history) milestones. **The naming convention follows
+the canonical MIGRATION_PLAN milestones**:
+
+| Anchor | PARS file | Summary builder | v2 baseline (gitignored) | v2 regen command |
+|---|---|---|---|---|
+| M01 | `anchor_m01.py` | `short_summary_m01.py::build_summary_m01` | `v2_m01_seeds_n30.json` | `python tests/regression/multi_seed_v2.py --anchor m01 --n 30` |
+| M02 | `anchor_m02.py` | `short_summary.py::build_summary` (genotypes=`('hpv16',)`) | `v2_m02_seeds_n30.json` | `python tests/regression/multi_seed_v2.py --anchor m02 --n 30` |
+| M03 (4-genotype) | `anchor_4genotype.py` | `short_summary.py::build_summary` | `v2_seeds_n30.json` | `python tests/regression/multi_seed_v2.py --anchor m03_4genotype --n 30` |
+| M05 vx routine | `anchor_vx_routine.py` | (see M05 spec) | `v2_vx_routine_seeds_n30.json` | (see M05 docs) |
+| M05 vx campaign | `anchor_vx_campaign.py` | (see M05 spec) | `v2_vx_campaign_seeds_n30.json` | (see M05 docs) |
+
+### Naming-convention note
+
+The earlier "M01 1-genotype baseline" section above documents
+`anchor_hpv16.py` under legacy terminology. Under the current MIGRATION_PLAN
+naming, that file corresponds to M02 (full HPV16 natural history). The
+new M07 anchors (`anchor_m01.py` and `anchor_m02.py`) use the current
+naming. Both sets of anchor files coexist — workflows depending on the
+legacy `anchor_hpv16.py` continue to work.
+
+### Regenerating from a v2 env
+
+The baseline regen scripts run under hpvsim v2.3 in a separate Python env;
+the active v3 env will not work. A local v2 env can be set up as a fresh
+worktree of `rc2.3`:
+
+```bash
+git worktree add ../hpvsim_v23_frozen rc2.3
+cd ../hpvsim_v23_frozen
+python -m venv .venv-v23
+.venv-v23/bin/pip install -e .
+```
+
+Then run, from the *v3* repo root, with the v2 env's Python:
+
+```bash
+../hpvsim_v23_frozen/.venv-v23/bin/python tests/regression/multi_seed_v2.py \
+    --anchor m01 --n 30 \
+    --out tests/regression/v2_m01_seeds_n30.json
+```
+
+(Adjust paths for Windows or your local setup.)
+
+### Parity-gate test → baseline mapping
+
+The slow parity-gate tests (marked `@pytest.mark.slow`) skip themselves
+if the corresponding baseline JSON is missing. The skip message points at
+the regen command for the specific anchor.
+
+| Pytest test | Baseline file expected |
+|---|---|
+| `test_m01_short_summary_parity.py::test_m01_short_summary_parity` | `v2_m01_seeds_n30.json` |
+| `test_m02_short_summary_parity.py::test_m02_short_summary_parity` | `v2_m02_seeds_n30.json` |
+| `test_m03_short_summary_parity.py::test_short_summary_parity_4genotype` | `v2_seeds_n30.json` |
+| (M05 vx parity tests) | (see M05 spec) |
