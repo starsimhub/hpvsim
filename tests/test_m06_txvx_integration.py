@@ -76,3 +76,21 @@ def test_routine_txvx_string_product_resolves_to_txvx():
     live = sim.interventions['txvx']
     assert live.product.__class__.__name__ == 'txvx'
     assert live.product.pars.name == 'txvx1'
+
+
+def test_linked_txvx_handles_empty_eligibility_callback():
+    """linked_txvx must run without errors when the eligibility callback
+    returns no uids (the typical 'screen fired no positives this step' path).
+    No doses delivered, no exception raised.
+    """
+    # Eligibility callback that always returns empty
+    linked = hpv.linked_txvx(
+        name='linked',
+        product='txvx1',
+        prob=1.0,
+        eligibility=lambda s: ss.uids(),
+    )
+    sim = _four_genotype_sim_with([linked])
+    sim.run()
+    live = sim.interventions['linked']
+    assert live.tx_vaccinated.uids.size == 0

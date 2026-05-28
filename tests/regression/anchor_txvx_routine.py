@@ -23,7 +23,8 @@ PARS = sc.objdict(
         product='txvx1',
         prob=0.6,
         age_range=[25, 26],
-        sex='f',
+        # sex is hardcoded female in BaseTreatment.check_eligibility (v2-faithful),
+        # so no `sex=` field here — the kwarg would be parsed but ignored.
         start_year=2030,
         end_year=2060,
         name='txvx',

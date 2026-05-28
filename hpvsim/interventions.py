@@ -418,6 +418,12 @@ class BaseTxVx(BaseTreatment):
     Extends BaseTreatment with txvx-specific per-intervention state:
     tx_vaccinated / txvx_doses / ti_tx_vaccinated.
 
+    Note: BaseTxVx inherits the cin_treated / cancer_treated / etc. states
+    from BaseTreatment. These remain all-zero on txvx interventions
+    (radiation never matches, no CIN treatment happens here). They're a
+    small memory + introspection cost in exchange for keeping the
+    BaseTreatment state-definition path single-sourced.
+
     On each delivery the agent's txvx_imm is bumped per genotype (via
     hpv.txvx.administer). The intervention's own dose counters track
     program-level uptake.
@@ -447,8 +453,13 @@ class BaseTxVx(BaseTreatment):
     def check_eligibility(self):
         """TxVx eligibility — female + alive + cancer-free + age range.
 
-        Unlike treat_num/treat_delay, BaseTxVx never targets cancer patients
-        (radiation is for that path). treat_cancer is forced False here.
+        Overrides BaseTreatment.check_eligibility to hard-gate on the
+        cancer-free arm regardless of the inherited treat_cancer flag.
+        Therapeutic vaccines are never given to cancer patients (radiation
+        is for that path); a non-radiation txvx product on a routine_txvx
+        would still set treat_cancer=False through the BaseTreatment init,
+        but pinning the cancer-free condition here makes the semantics
+        explicit and resilient to product-type confusion.
         """
         sim = self.sim
         cond = sim.people.alive & sim.people.female
@@ -511,7 +522,10 @@ class linked_txvx(BaseTxVx):
                 "(typically a screen.outcomes['positive'] callback)"
             )
         super().__init__(*args, eligibility=eligibility, **kwargs)
-        self.timepoints = None  # No own schedule
+        # No own schedule. self.step() overrides BaseTxVx.step entirely, so
+        # this assignment is decorative — but it makes the "no timeline"
+        # contract explicit for anyone tracing inheritance.
+        self.timepoints = None
 
     def step(self):
         return self.deliver()
