@@ -1,11 +1,11 @@
 """HPV-specific Starsim products.
 
 Contains:
-  - hpv.vx (M05): prophylactic vaccine product
-  - hpv.dx (M06): per-genotype multinomial diagnostic classifier
-  - hpv.tx (M06): per-genotype state-flip treatment product
-  - hpv.txvx (M06): therapeutic vaccine product
-  - hpv.radiation (M06): cancer treatment product
+  - hpv.vx: prophylactic vaccine product
+  - hpv.dx: per-genotype multinomial diagnostic classifier
+  - hpv.tx: per-genotype state-flip treatment product
+  - hpv.txvx: therapeutic vaccine product
+  - hpv.radiation: cancer treatment product
 """
 import functools
 from pathlib import Path
@@ -125,8 +125,8 @@ def _load_txvx_products():
 def _resolve_dx_pars(name, df, hierarchy):
     """Resolve (name, df, hierarchy) for hpv.dx construction.
 
-    Exactly one of name or df must be provided. Default hierarchies (per
-    product) match v2's default_dx() in hpvsim/_v2_legacy/interventions.py:1497.
+    Exactly one of name or df must be provided. Default hierarchies are
+    defined per product below.
     """
     _DEFAULT_DX_HIERARCHY = {
         'via':            ['positive', 'inadequate', 'negative'],
@@ -308,10 +308,8 @@ class dx(ss.Dx):
     Per-genotype rows in products_dx.csv are classified one genotype at a
     time; rows with genotype='all' are collapsed across all HPV modules
     (susceptible iff susceptible-to-all; positive iff infected-with-any).
-    The hierarchy-min semantics mirror v2: when an agent is positive
-    across multiple genotypes, the lowest-index (most severe) result wins.
-
-    v2 reference: hpvsim/_v2_legacy/interventions.py:1265-1333
+    Hierarchy-min semantics: when an agent is positive across multiple
+    genotypes, the lowest-index (most severe) result wins.
     """
 
     def __init__(self, name=None, df=None, hierarchy=None, **kwargs):
@@ -397,10 +395,6 @@ class tx(ss.Tx):
         module.ti_cin[uids]      = NaN
         module.ti_cancerous[uids] = NaN
         module.ti_clearance[uids] = sim.ti + 1   # cleared next step
-
-    v2 reference: hpvsim/_v2_legacy/interventions.py:1336-1413
-    The commented-out "did they also clear infection?" branch in v2 was
-    disabled there; v3 doesn't re-implement it.
     """
 
     def __init__(self, name=None, df=None, **kwargs):
@@ -442,7 +436,7 @@ class tx(ss.Tx):
                 if len(eff) == 0:
                     continue
                 successful_uids_list.append(eff)
-                # State cleanup mirroring v2 hpvsim/_v2_legacy/interventions.py:1387-1391
+                # State cleanup: clear all dysplasia state on the treated genotype
                 module.cin[eff] = False
                 module.precin[eff] = False
                 module.cancerous[eff] = False
@@ -468,9 +462,6 @@ class txvx(ss.Vx):
     - Initial dose (default): per-agent sterilizing draw at sterilizing_p,
       then per-genotype scaling by rel_imm[g] writing into txvx_imm.
     - Booster (imm_boost not None): multiplies existing txvx_imm in place.
-
-    v2 reference: hpvsim/_v2_legacy/interventions.py:1416-1466 + default_tx
-    wiring for txvx1/txvx2.
     """
 
     def __init__(self, name=None, rel_imm=None, sterilizing_p=0.95,
@@ -482,9 +473,9 @@ class txvx(ss.Vx):
             sterilizing_p=sterilizing_p,
             imm_boost=imm_boost,
         )
-        # Mirror hpv.tx / hpv.dx: set the module-level name to the product
-        # name so that sim.people.add_module() doesn't collide with an
-        # intervention or another product that also uses class name 'txvx'.
+        # Set the module-level name to the product name (instead of class
+        # name 'txvx') so sim.people.add_module() doesn't collide with an
+        # intervention also called 'txvx'.
         if name is not None:
             self.name = name
         if imm_boost is None:
@@ -526,7 +517,7 @@ class radiation(ss.Product):
     """HPV cancer-treatment product — extends ti_dead_cancer per cancerous module.
 
     Default duration: normal(mean=18 months, sd=2 months), converted to
-    years. Matches v2's hpvsim/_v2_legacy/interventions.py:1469-1492.
+    years at construction.
     """
 
     def __init__(self, dur=None, **kwargs):
