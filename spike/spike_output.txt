@@ -1,0 +1,24 @@
+==============================================================================
+SPIKE: multiscale feasibility on v3/Starsim HPVsim
+==============================================================================
+
+[R1] grow()+state-copy integrity (multiscale, n=3000, ratio=10)
+   raw array lengths (should all match): {'scale': 51255, 'age': 51255, 'cancerous': 51255}
+   NaNs in active ages: 0
+   final n_agents(active)=12475, pop_scale=333
+   scaled cancers(agent-equiv)=36.7  raw=358  people=12233
+
+[R3] reproducibility: same seed twice -> identical?
+   run A scaled=36.700001 raw=358
+   run B scaled=36.700001 raw=358
+   IDENTICAL: True
+
+[EQ] internal equivalence + controls (cancers in people-space)
+   single  N=20000        : mean=49992  std=2340  CV=0.047  bias_vs_single=+0.0%
+   multi   N=20000 ratio=1 : mean=49992  std=2340  CV=0.047  bias_vs_single=+0.0%
+   multi   N=3000  ratio=1 : mean=46278  std=2144  CV=0.046  bias_vs_single=-7.4%
+   multi   N=3000  ratio=10: mean=12772  std=1416  CV=0.111  bias_vs_single=-74.5%
+
+==============================================================================
+DONE
+==============================================================================
