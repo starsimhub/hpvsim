@@ -1,10 +1,10 @@
-"""Regenerate v2.3 baselines for the HPV16 (M02) and 4-genotype (M03) anchor scenarios.
+"""Regenerate v2.3 baselines for the M01 (HPV16 transmission-only), M02 (HPV16 full natural history), and M03 (4-genotype) anchor scenarios.
 
 Run this script INSIDE a Python environment that has hpvsim==2.3.x installed
 (e.g. the local hpvsim_v23_frozen clone, or a fresh `pip install hpvsim==2.3`
 venv). The v3 active package is NOT used here — only the v2.3 hpvsim API.
 
-Two regen entrypoints are provided:
+Three regen entrypoints are provided:
 
   regen_hpv16()  — M02 single-genotype HPV16 baseline (original).
                    Output: tests/regression_baselines/anchor_hpv16.json
@@ -18,6 +18,9 @@ Two regen entrypoints are provided:
                      tests/regression_baselines/anchor_4genotype_trajectory.json
                        time-series of cum_cancers and cum_infections for the
                        trajectory parity test.
+
+  M01 multi-seed baseline (no dedicated single-seed entrypoint): see
+    multi_seed_v2.py --anchor m01 --n 30 for the M07 multi-seed sweep.
 
 Key v2-vs-v3 syntax differences honored here:
   - v3 PARS uses ``genotype='hpv16'``; v2 expects ``genotypes=['hpv16']``.
@@ -175,15 +178,13 @@ PARS_HPV16_TRANSMISSION_ONLY = dict(
 PARS_HPV16 = PARS
 
 
-def _summary_v2_m01(sim, gen_idx, gen_key):
+def _summary_v2_m01(sim, gen_idx):
     """v2-side M01 summary: 3 transmission-only metrics matching
     short_summary_m01.METRIC_KEYS_M01."""
-    import numpy as np
     res = sim.results
-    pop_scale = float(sim.pars.get('pop_scale', 1.0) or 1.0)
-    inf_arr = np.asarray(res['infections'][gen_idx, :], dtype=float)
-    n_inf = float(inf_arr.sum()) * pop_scale
-    prev_arr = np.asarray(res['hpv_prevalence'][gen_idx, :], dtype=float)
+    inf_arr = np.asarray(res['infections_by_genotype'][gen_idx], dtype=float)
+    n_inf = float(inf_arr.sum())
+    prev_arr = np.asarray(res['hpv_prevalence_by_genotype'][gen_idx], dtype=float)
     mean_prev_pct = 100.0 * float(prev_arr.mean())
     total_pop = float(np.asarray(res['n_alive'])[-1])
     return {
