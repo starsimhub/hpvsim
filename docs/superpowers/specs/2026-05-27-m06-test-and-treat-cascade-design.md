@@ -982,5 +982,72 @@ screen+treat anchor.
 
 ## Post-implementation deltas
 
-To be filled in after implementation lands, documenting any divergences
-from this spec discovered during the build. Format follows M03 and M05.
+- **`ss.Dx.__init__` requires a `disease` column.** Starsim's base
+  `Dx.__init__` calls `df.disease.unique()` to populate `self.diseases`.
+  The HPVsim CSVs use a `genotype` column, not `disease`, so `hpv.dx`
+  and `hpv.tx` inject a temporary `disease='_hpv_stub'` column on a
+  copy of the df before calling `super().__init__`, then clear
+  `self.diseases = None` and restore `self.df` to the original
+  no-stub df. The stub never reaches `administer` (which iterates HPV
+  modules directly, not `self.diseases`). Tracked as a follow-up to
+  upstream Starsim — `ss.Dx` should accept either column.
+
+- **`out.values[:] = False` silently no-ops after births extend the
+  people array.** `.values` on `ss.BoolArr` returns a fancy-indexed
+  copy when the underlying raw array is larger than `auids` (which
+  happens once births fire). `_any_genotype_cancer` and `_as_boolarr`
+  originally used `out.values[:] = False`, which silently failed —
+  treatment interventions saw an empty eligibility mask for the entire
+  run after the first birth. Fixed by switching to `out.raw[:] = False`.
+  The bug was caught when `treat_delay` tests showed zero treated
+  agents; the fix is also a relevant pattern for any future code that
+  needs to clear a BoolArr field — always go through `.raw`, not
+  `.values`.
+
+- **`self.sim.t.dt` is a starsim freq object, not a float.** Plan
+  spec arithmetic `round(delay / sim.t.dt)` would TypeError because
+  `sim.t.dt` is `starsim.time.years(0.25)`, not `0.25`. Switched all
+  arithmetic to `sim.t.dt_year` (returns a float). The plan's
+  `treat_delay` skeleton is therefore not copy-pasteable as written;
+  fixed in commit `63cdbc7c`.
+
+- **`hpv.txvx` product class collided with `routine_txvx` intervention
+  name.** Both default-named themselves `txvx` via Starsim's
+  class-name-based module registration. `sim.people.add_module` raises
+  on duplicate names. Fixed by passing `name=` through in
+  `hpv.txvx.__init__` so the product takes the constructor-provided
+  name rather than the class default. Tracked as a follow-on if/when
+  the registration scheme needs revisiting.
+
+- **Starsim 3.3.4 `ss.BaseTriage.step` upstream bug.** The base uses
+  `self.sim.t in self.timepoints` (sim.t is a freq object;
+  timepoints contains integer ti values) — the membership test
+  always returns False under quarterly dt and triage silently fires
+  zero times. There's a TODO in the upstream source acknowledging
+  this. Overrode in `hpv.BaseTriage.step` to use
+  `self.sim.ti in self.timepoints`, matching `ss.BaseScreening`'s
+  correct pattern. Also moved the screened/screens/ti_screened
+  bookkeeping into the override (mirrors BaseScreening). Without
+  the bookkeeping, downstream eligibility callbacks reading
+  `triage.screened` would get all-False forever.
+
+  The cascade integration test was strengthened to assert non-zero
+  counts at EACH stage (screen, triage, treat) — the original
+  `screened <= primary.screened` assertion was trivially satisfied
+  by 0 and masked this bug for the first several commits. Going
+  forward, any cascade-stage silent-zero-firing will fail the test
+  immediately.
+
+- **Sim constructor deep-copies inputs.** Tests originally wrote
+  `sim.interventions = [stub]` then `sim.init()`, expecting the
+  original stub reference to work post-init. It does not — Starsim
+  deep-copies the interventions list during init, so the local
+  variable becomes a stale handle. All test fixtures were updated to
+  set via `sim.pars['interventions'] = [...]` pre-init, then read
+  the live copy back via `sim.interventions[<name>]` post-init.
+
+- **Anchor names are part of the public test API.** The cascade
+  anchor uses interventions named `'primary'`, `'colpo'`, `'excision_rx'`;
+  the txvx anchor uses `'txvx'`. These names are referenced by
+  eligibility callbacks and by parity-test metric extractors.
+  Documented in `tests/regression/README_m06.md`.
