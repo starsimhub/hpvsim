@@ -242,10 +242,10 @@ class vx(ss.Vx):
         """
         if len(uids) == 0:
             return
-        # Single sterilizing draw per agent (NOT per genotype) — matches v2
+        # Single sterilizing draw per agent (NOT per genotype) — matches v2.
+        # bernoulli.rvs returns the boolean array directly, in uids-order.
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
-        sterilizing_uids = self._sterilizing_dist.filter(uids)
-        is_sterilizing = np.isin(uids, sterilizing_uids)
+        is_sterilizing = self._sterilizing_dist.rvs(uids)
         for genotype, rel_imm_g in self.rel_imm.items():
             hpv_mod = self._find_genotype_module(genotype)
             if hpv_mod is None:
@@ -503,9 +503,9 @@ class txvx(ss.Vx):
                 module.txvx_imm[uids] *= float(self.pars.imm_boost)
             return
         # First dose: per-agent sterilizing draw, then per-genotype scaling.
+        # bernoulli.rvs returns the boolean array directly, in uids-order.
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
-        sterilizing_uids = self._sterilizing_dist.filter(uids)
-        is_sterilizing = np.isin(uids, sterilizing_uids)
+        is_sterilizing = self._sterilizing_dist.rvs(uids)
         for genotype, rel_imm_g in self.rel_imm.items():
             module = _find_genotype_module(self.sim, genotype)
             if module is None:
