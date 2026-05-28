@@ -153,6 +153,27 @@ integration is low-risk; the **conservation accounting is the work**.
 
 ---
 
+## 5a. Framework-level alternative (considered, not chosen)
+
+Starsim ships the multiscale *primitives* — per-agent `scale`
+(`people.py:69`), `scale_flows()`, `grow()`, slot-keyed CRN, and
+`Result(scale=True)` — but no turnkey multiscale feature and no `split`/
+`rescale` operation. Two pieces of this work are genuinely generic and would
+fit at the Starsim framework level: (1) a `people.split(uids, ratio)` operation
+(shrink scale, grow copies, copy all module states, tag fine, fresh CRN), and
+(2) scale-weighted result counting by convention (the reason hpvsim must audit
+every `len()` → `scale.sum()` is that Starsim modules count raw agents). There
+is precedent — Covasim, Starsim's predecessor, shipped multiscale as a
+first-class feature.
+
+**Decision: keep the implementation in hpvsim.** The framework route does not
+remove the genuinely hard part (the disease-specific conservation accounting,
+§4) and it adds an upstream-contribution + version-dependency coordination cost
+on a feature that is low priority here. The mechanism is the architecturally
+right candidate to upstream *later* if it proves broadly useful, but this port
+ships self-contained in hpvsim first. (Revisit if a second Starsim-based model
+needs the same capability.)
+
 ## 6. Proposed architecture (for the full port)
 
 ### 6.1 Parameters
