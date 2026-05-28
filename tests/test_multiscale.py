@@ -53,3 +53,28 @@ def test_cancer_count_is_scale_weighted():
     # age tally also scale-weighted: sum(age*scale)
     expected_age = float((np.asarray(ppl.age[uids]) * np.array([1.0, 0.5])).sum())
     assert np.isclose(float(mod.results.sum_age_at_cancer[ti]), expected_age)
+
+
+def test_hpvtotal_counts_are_scale_weighted():
+    """HPVTotal union counts weight by people.scale: halving every agent's
+    scale halves the counts (n_susceptible, n_infected, cum_infections_unique)."""
+    sim = hpv.Sim(n_agents=1000, **ANCHOR)
+    sim.init()
+    ppl = sim.people
+    tot = [a for a in sim.analyzers.values()
+           if a.__class__.__name__ == 'HPVTotal'][0]
+    ti = sim.t.ti
+
+    def counts():
+        tot.step()
+        return (float(tot.results['n_susceptible'][ti]),
+                float(tot.results['n_infected'][ti]),
+                float(tot.results['cum_infections_unique'][ti]))
+
+    ppl.scale[ppl.auids] = 1.0
+    base = counts()
+    ppl.scale[ppl.auids] = 0.5
+    half = counts()
+    assert base[0] > 0
+    for b, h in zip(base, half):
+        assert np.isclose(h, 0.5 * b, rtol=1e-6)
