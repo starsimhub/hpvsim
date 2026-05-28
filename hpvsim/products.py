@@ -1,12 +1,11 @@
 """HPV-specific Starsim products.
 
 Contains:
-  - hpv.vx: prophylactic vaccine product (M05)
-  - hpv.dx: per-genotype multinomial diagnostic classifier (M06)
-
-M06 will additionally add hpv.tx (treatment), hpv.txvx (therapeutic
-vaccine), and hpv.radiation (cancer treatment) — see plan
-docs/superpowers/plans/2026-05-27-hpvsim-m06-test-and-treat-cascade.md.
+  - hpv.vx (M05): prophylactic vaccine product
+  - hpv.dx (M06): per-genotype multinomial diagnostic classifier
+  - hpv.tx (M06): per-genotype state-flip treatment product
+  - hpv.txvx (M06): therapeutic vaccine product
+  - hpv.radiation (M06): cancer treatment product
 """
 import functools
 from pathlib import Path
@@ -530,14 +529,17 @@ class radiation(ss.Product):
         self.define_pars(
             dur=dur or dict(dist='normal', par1=18 / 12, par2=2 / 12),
         )
-        self._dur_dist = ss.normal(
-            loc=self.pars.dur['par1'],
-            scale=self.pars.dur['par2'],
-        )
+        # Placeholder; params re-pointed each administer call so post-init
+        # mutations of self.pars.dur (e.g. via dynamic_pars) take effect.
+        self._dur_dist = ss.normal(loc=0.0, scale=1.0)
 
     def administer(self, uids):
         if len(uids) == 0:
             return ss.uids()
+        # Re-point loc/scale from current pars on each call so any later
+        # mutation of self.pars.dur is honored.
+        self._dur_dist.set(loc=float(self.pars.dur['par1']),
+                           scale=float(self.pars.dur['par2']))
         # Convert sampled-duration years -> integer-ti steps via dt_year. Using
         # self.sim.t.dt is a freq object (e.g. years(0.25)); arithmetic with it
         # drops the time-unit denominator and undercounts by 1/dt steps.

@@ -71,10 +71,14 @@ Do not rename them without updating callers.
 Before opening the M06 PR:
 
 ```bash
-pytest tests/ -m "not slow" -x -q             # CI suite (no parity)
-pytest tests/test_m06_*_parity.py -m slow -v  # short-summary parity
-pytest tests/test_m06_trajectory_parity.py -m slow -v  # trajectory parity
+pytest tests/ -m "not slow" -x -q              # CI suite (no parity)
+pytest tests/test_m06_*_parity.py -m slow -v   # short-summary + trajectory parity
 ```
+
+The `test_m06_*_parity.py` glob matches all three parity tests:
+- `test_m06_screen_treat_parity.py` (short-summary, screen-treat anchor)
+- `test_m06_txvx_parity.py` (short-summary, txvx anchor)
+- `test_m06_trajectory_parity.py` (trajectory, screen-treat anchor)
 
 All must be green. The CRN-perturbation guard
 (`test_no_cascade_baseline_unchanged`) runs as part of the CI suite.

@@ -56,3 +56,37 @@ def test_treat_delay_queue_drains_after_fire():
     live = sim.interventions['rx']
     # After firing, the queue entry for the current ti should be gone
     assert sim.ti not in live.scheduler or len(live.scheduler[sim.ti]) == 0
+
+
+def test_treat_delay_fractional_delay_rounds_to_nearest_step():
+    """At dt=0.25, delay=0.5 yr → round(0.5/0.25) = 2 steps. Fire requires
+    `run_one_step()` to be called WHEN sim.ti == due_ti (not after the step
+    that scheduled it)."""
+    intv = hpv.treat_delay(name='rx', product='excision', prob=1.0, delay=0.5)
+    sim = _four_genotype_sim_with(intv)
+    sim.init()
+    uids = sim.people.alive.uids[:3]
+    sim.diseases['hpv16'].cin[uids] = True
+    initial_ti = sim.ti
+    sim.run_one_step()  # step at ti=initial; enqueues for due_ti=initial+2; advances to initial+1
+    live = sim.interventions['rx']
+    assert live.cin_treated.uids.size == 0  # not yet fired
+    sim.run_one_step()  # step at ti=initial+1; still not due
+    assert live.cin_treated.uids.size == 0
+    sim.run_one_step()  # step at ti=initial+2; FIRE
+    assert live.cin_treated.uids.size > 0
+
+
+def test_treat_delay_non_integer_rounding_edge_case():
+    """delay=0.3 yr / dt=0.25 = 1.2; round(1.2) = 1 step."""
+    intv = hpv.treat_delay(name='rx', product='excision', prob=1.0, delay=0.3)
+    sim = _four_genotype_sim_with(intv)
+    sim.init()
+    uids = sim.people.alive.uids[:3]
+    sim.diseases['hpv16'].cin[uids] = True
+    initial_ti = sim.ti
+    sim.run_one_step()  # step at ti=initial; enqueues for due_ti=initial+1
+    live = sim.interventions['rx']
+    assert live.cin_treated.uids.size == 0
+    sim.run_one_step()  # step at ti=initial+1; FIRE
+    assert live.cin_treated.uids.size > 0

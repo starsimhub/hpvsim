@@ -1051,3 +1051,64 @@ screen+treat anchor.
   the txvx anchor uses `'txvx'`. These names are referenced by
   eligibility callbacks and by parity-test metric extractors.
   Documented in `tests/regression/README_m06.md`.
+
+- **`hpv.radiation` index/uid alignment bug.** First implementation
+  pre-drew `new_dur = rvs(uids)` once for the whole batch, then for
+  each module did `mask = np.isin(uids, cancer_uids)` and indexed
+  `new_dur[mask]`. The two orderings disagreed: `mask` is in
+  uids-order; `cancer_uids = module.cancerous.uids.intersect(uids)`
+  returns sorted order. When the input `uids` was non-sorted, agent A
+  received agent B's duration draw and vice versa. Unit tests masked
+  the bug because they used `alive.uids[:N]` which is sorted. Fixed
+  by per-module `rvs(cancer_uids)` — draws fresh in cancer_uids
+  order, fully aligned with the LHS write. Added a regression test
+  (`test_radiation_extension_is_positive_for_non_sorted_input`) that
+  passes uids in reverse order. The same alignment trap should be
+  watched for anywhere `np.isin(uids, X)` and `arr[X]` appear in the
+  same expression — they are NOT generally aligned even though both
+  operate on uids. Commit `58b67e10`.
+
+- **`hpv.radiation` dt-units bug.** `self.sim.t.dt` is a Starsim
+  freq object (e.g. `years(0.25)`); arithmetic with it drops the
+  time-unit denominator and silently undercounts by 1/dt steps. The
+  initial implementation did `np.ceil(new_dur / self.sim.t.dt)`,
+  which extended `ti_dead_cancer` by ~2 steps instead of the intended
+  ~6 at the default config (1.5yr duration / 0.25yr dt). Fixed to
+  `dt_year = self.sim.t.dt_year` (a float). Same fix the M06
+  `treat_delay` port applied. The original radiation unit test only
+  asserted `> initial` which trivially passed under the undercount;
+  test is now strengthened to assert `>= 3` extension steps for the
+  default config, which catches any future dt-units regression.
+  Commit `61fd3a08`.
+
+- **`_set_dotted` single-segment path bug.** The dotted-path helper
+  used by `hpv.dynamic_pars` advertised `'rand_seed' -> sim.pars.rand_seed`
+  but crashed on single-segment paths: the fall-through branch walked
+  one segment too deep, then called `setattr` on the wrong target.
+  Fixed by handling the empty-tail case explicitly in each of the
+  three resolution branches (diseases / interventions require at
+  least one tail segment and raise `KeyError` otherwise; `sim.pars`
+  accepts both single- and multi-segment paths). Added a test that
+  round-trips a single-segment value through `sim.pars` plus a test
+  for left/right extrapolation clamping. Commit `61fd3a08`.
+
+- **`np.asarray()` casts and `pd.Series` refactor in `hpv.dx`.**
+  First-pass `hpv.dx.administer` used `ss.uids(np.sort(np.asarray(uids)))`
+  + `np.searchsorted` to manage hierarchy-min position recovery. The
+  asarray casts were no-ops (ss.uids is an ndarray subclass), and the
+  sort/searchsorted pattern was scaffolding for what `pd.Series` does
+  natively. Refactored to use `pd.Series(default, index=uids)` and
+  `.loc[these]` — matches `ss.Dx.administer`'s idiom. Also normalizes
+  `uids = ss.uids(uids)` at top so downstream `.intersect/.union`
+  ops work regardless of whether the caller passed ss.uids or a
+  plain ndarray. Cleared 9 other unnecessary `np.asarray` casts in
+  the same pass. Commit `58b67e10`.
+
+- **Sterilizing draw simplification.** Both `hpv.vx` (M05) and
+  `hpv.txvx` (M06) had the pattern
+  `sterilizing_uids = filter(uids); is_sterilizing = np.isin(uids, sterilizing_uids)`
+  — two steps. `ss.bernoulli.rvs(uids)` returns the boolean array
+  directly with the same CRN-stream consumption. Replaced in both
+  classes. CRN guards (`test_no_vx_baseline_unchanged`,
+  `test_no_cascade_baseline_unchanged`) confirmed the pinned scalars
+  are unchanged. Commit `ff2090a1`.
