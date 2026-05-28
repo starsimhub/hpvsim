@@ -29,6 +29,7 @@ import hpvsim as hpv  # v2.3 here — must be imported before sys.path manipulat
 N_SEEDS = 30
 HERE = Path(__file__).resolve().parent
 OUT = HERE / 'v2_seeds_n30_screen_treat.json'
+TRAJ_OUT = HERE / 'v2_seeds_n30_screen_treat_traj.json'
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +161,44 @@ def run_seed(pars, seed):
 
 
 # ---------------------------------------------------------------------------
+# Per-seed trajectory runner
+# ---------------------------------------------------------------------------
+
+def _v2_trajectories_one_seed(seed):
+    """Run one seed and return per-year flow sums for trajectory comparison.
+
+    v2 results are stored at annual cadence (resfreq=4 per year, so each
+    entry spans dt=0.25 quarters but is stamped once per year). We sum all
+    entries for a given integer year so the shape matches v3's quarterly-
+    bucketed annual sums.
+
+    Result key names (v2 API):
+      new_screened      — per-step count of first-time screened agents
+      new_cin_treated   — per-step count of first-time CIN-treated agents
+      cancers           — per-step new-cancer flow (v2 uses 'cancers', not 'new_cancers')
+    """
+    root = Path(__file__).resolve().parent.parent.parent
+    import sys as _sys
+    _sys.path.insert(0, str(root))
+    from tests.regression.anchor_screen_treat import PARS  # noqa: E402
+
+    v2_pars = _build_v2_pars(PARS, seed)
+    interventions = _build_interventions(PARS)
+    sim = hpv.Sim(v2_pars, interventions=interventions)
+    sim.run()
+
+    res = sim.results
+    years_int = np.asarray(res['year']).astype(int)
+    out = {'screened_by_year': {}, 'cin_treated_by_year': {}, 'cancers_by_year': {}}
+    for y in np.unique(years_int):
+        mask = years_int == y
+        out['screened_by_year'][int(y)] = float(np.asarray(res['new_screened'])[mask].sum())
+        out['cin_treated_by_year'][int(y)] = float(np.asarray(res['new_cin_treated'])[mask].sum())
+        out['cancers_by_year'][int(y)] = float(np.asarray(res['cancers'])[mask].sum())
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -199,6 +238,22 @@ def main(argv=None):
     with open(out_path, 'w') as f:
         json.dump(results, f, indent=2)
     print(f'Wrote {len(results)} seed summaries to {out_path} in {total:.1f}s')
+
+    # --- trajectory JSON ---
+    traj_path = out_path.parent / TRAJ_OUT.name
+    print(f'Generating screen-treat trajectory baseline ({args.n} seeds) -> {traj_path}')
+    traj_results = []
+    t0 = time.time()
+    for seed in seeds:
+        ts = time.time()
+        row = _v2_trajectories_one_seed(seed)
+        dt = time.time() - ts
+        traj_results.append(row)
+        print(f'  seed {seed}: n_screened_years={len(row["screened_by_year"])}  ({dt:.1f}s)')
+    total = time.time() - t0
+    with open(traj_path, 'w') as f:
+        json.dump(traj_results, f, indent=2)
+    print(f'Wrote {len(traj_results)} seed trajectories to {traj_path} in {total:.1f}s')
 
 
 if __name__ == '__main__':
