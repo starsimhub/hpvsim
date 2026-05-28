@@ -26,6 +26,7 @@ __all__ = [
     'routine_triage', 'campaign_triage',
     'BaseTreatment', 'treat_num', 'treat_delay',
     'BaseTxVx', 'routine_txvx', 'campaign_txvx', 'linked_txvx',
+    'dynamic_pars',
 ]
 
 
@@ -494,3 +495,75 @@ class linked_txvx(BaseTxVx):
 
     def step(self):
         return self.deliver()
+
+
+def _set_dotted(sim, dotted_path, value):
+    """Resolve a dotted-path string against (sim.diseases, sim.interventions, sim.pars) and set it.
+
+    Top-level segment is looked up in:
+      1. sim.diseases (by key)         e.g. 'hpv16.beta' -> sim.diseases['hpv16'].pars.beta
+      2. sim.interventions (by name)   e.g. 'screen.prob' -> sim.interventions['screen'].prob
+      3. sim.pars (by key)             e.g. 'rand_seed' -> sim.pars.rand_seed
+    Raises KeyError if the head doesn't resolve anywhere.
+    """
+    parts = dotted_path.split('.')
+    head, tail = parts[0], parts[1:]
+
+    if head in sim.diseases:
+        # Module pars path
+        target = sim.diseases[head].pars
+        for seg in tail[:-1]:
+            target = getattr(target, seg)
+        setattr(target, tail[-1], value)
+        return
+
+    if head in sim.interventions:
+        target = sim.interventions[head]
+        for seg in tail[:-1]:
+            target = getattr(target, seg)
+        setattr(target, tail[-1], value)
+        return
+
+    # Fall back to sim.pars
+    if not hasattr(sim.pars, head):
+        raise KeyError(
+            f'Cannot resolve dotted path {dotted_path!r}: head segment '
+            f'{head!r} is not a sim.diseases / sim.interventions / sim.pars key.'
+        )
+    target = sim.pars
+    for seg in [head] + tail[:-1]:
+        target = getattr(target, seg)
+    setattr(target, tail[-1] if tail else head, value)
+
+
+class dynamic_pars(ss.Intervention):
+    """Time-varying parameter editor.
+
+    pars: dict mapping dotted-path strings to {'years': [...], 'vals': [...]}
+    schedules. Each step, the resolved parameter is set to the interpolated
+    (default) or stepwise (interpolate=False) value for the current year.
+
+    Dotted-path resolution order: sim.diseases > sim.interventions > sim.pars.
+
+    v2 reference: hpvsim/_v2_legacy/interventions.py:406-489 (uses timestep
+    keys; v3 uses epoch-year keys for ergonomic schedule authoring).
+    """
+
+    def __init__(self, pars=None, interpolate=True, **kwargs):
+        super().__init__(**kwargs)
+        self.par_schedules = pars or {}
+        self.interpolate = interpolate
+
+    def step(self):
+        year = self.sim.t.now('year')
+        for dotted_path, schedule in self.par_schedules.items():
+            years = np.asarray(schedule['years'], dtype=float)
+            vals = np.asarray(schedule['vals'], dtype=float)
+            if self.interpolate:
+                val = float(np.interp(year, years, vals))
+            else:
+                idx = int(np.searchsorted(years, year, side='right')) - 1
+                if idx < 0:
+                    continue
+                val = float(vals[idx])
+            _set_dotted(self.sim, dotted_path, val)
