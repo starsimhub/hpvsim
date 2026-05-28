@@ -76,6 +76,7 @@ class Sim(ss.Sim):
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
                  total_pop=None, pars=None, v2_compat_demographics=False,
+                 ms_agent_ratio=None,
                  **kwargs):
         # Pass start year so the age pyramid matches sim.start (loader
         # defaults to year 2000 with a materially different distribution).
@@ -121,6 +122,9 @@ class Sim(ss.Sim):
                     )
 
             diseases = [HPV(genotype=k, **gpars_overrides.get(k, {})) for k in keys]
+            if ms_agent_ratio is not None:
+                for d in diseases:
+                    d.pars.ms_agent_ratio = int(ms_agent_ratio)
             if init_seeding == 'exclusive':
                 # 'exclusive': one Bernoulli per agent for any HPV, then one
                 # genotype per infected agent via the seeder's per-genotype callback.

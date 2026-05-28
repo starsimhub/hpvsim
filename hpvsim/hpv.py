@@ -92,6 +92,9 @@ class HPV(ss.Infection):
             # Per-genotype beta scaler and serology probability (multi-genotype).
             rel_beta=gpars.rel_beta,
             sero_prob=gpars.sero_prob,
+            # Multiscale: number of fine cancer agents per coarse agent at the
+            # CIN->cancer decision. 1 = feature off (no splitting).
+            ms_agent_ratio=1,
         )
         self.update_pars(pars=pars, **kwargs)
         # ss.Infection provides: susceptible, infected, rel_sus, rel_trans,
@@ -140,6 +143,13 @@ class HPV(ss.Infection):
                 label='Therapeutic-vaccine-conferred immunity (this genotype)',
                 default=0.0,
             ),
+            # v2 level0/level1 tag: True for fine agents spawned by multiscale
+            # splitting, so a fine agent is never re-split by THIS genotype
+            # module. Per-genotype (each HPV module owns its own array, accessed
+            # as self.multiscale_fine); registered here so people.grow() extends
+            # it. Cross-genotype compounding is guarded/verified in the
+            # multi-genotype test (plan Task 5).
+            ss.BoolArr('multiscale_fine', default=False),
         )
         # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
         # use site (placeholder p values below).
