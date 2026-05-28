@@ -197,13 +197,13 @@ class HPV(ss.Infection):
         """
         super().init_results()
         self.define_results(
-            ss.Result('new_cancers', dtype=int, scale=True,
+            ss.Result('new_cancers', dtype=float, scale=True,
                       label='New cancers'),
-            ss.Result('new_cancer_deaths', dtype=int, scale=True,
+            ss.Result('new_cancer_deaths', dtype=float, scale=True,
                       label='New cancer deaths'),
-            ss.Result('cum_cancers', dtype=int, scale=True,
+            ss.Result('cum_cancers', dtype=float, scale=True,
                       label='Cumulative cancers'),
-            ss.Result('cum_cancer_deaths', dtype=int, scale=True,
+            ss.Result('cum_cancer_deaths', dtype=float, scale=True,
                       label='Cumulative cancer deaths'),
             ss.Result('sum_age_at_cancer', dtype=float, scale=True,
                       label='Sum of ages at cancer onset'),
@@ -496,9 +496,10 @@ class HPV(ss.Infection):
             self.susceptible[to_cancerous] = False
             self.rel_trans[to_cancerous] = 0.0
             self.ti_clearance[to_cancerous] = np.nan  # cancer supersedes clearance
-            ages_at_cancer = self.sim.people.age[to_cancerous]
-            self.results.new_cancers[ti] = len(to_cancerous)
-            self.results.sum_age_at_cancer[ti] = float(ages_at_cancer.sum())
+            scale = np.asarray(self.sim.people.scale[to_cancerous])
+            ages_at_cancer = np.asarray(self.sim.people.age[to_cancerous])
+            self.results.new_cancers[ti] = float(scale.sum())
+            self.results.sum_age_at_cancer[ti] = float((ages_at_cancer * scale).sum())
             self._cancel_other_genotype_progression_for(to_cancerous)
 
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
@@ -514,9 +515,10 @@ class HPV(ss.Infection):
             # Revert by removing the +dt_yr if the underlying step-ordering
             # convention is harmonised in a future Starsim version.
             dt_yr = float(self.t.dt.years if hasattr(self.t.dt, 'years') else self.t.dt)
-            ages_at_death = self.sim.people.age[to_dead] + dt_yr
-            self.results.new_cancer_deaths[ti] = len(to_dead)
-            self.results.sum_age_at_cancer_death[ti] = float(ages_at_death.sum())
+            scale_d = np.asarray(self.sim.people.scale[to_dead])
+            ages_at_death = np.asarray(self.sim.people.age[to_dead]) + dt_yr
+            self.results.new_cancer_deaths[ti] = float(scale_d.sum())
+            self.results.sum_age_at_cancer_death[ti] = float((ages_at_death * scale_d).sum())
             self.sim.people.request_death(to_dead)
 
     def step_die(self, uids):
