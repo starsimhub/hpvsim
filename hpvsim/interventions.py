@@ -231,8 +231,28 @@ class BaseScreening(BaseTest, ss.BaseScreening):
 
 
 class BaseTriage(BaseTest, ss.BaseTriage):
-    """HPV-specific BaseTriage."""
-    pass
+    """HPV-specific BaseTriage.
+
+    Overrides ss.BaseTriage.step to use integer-ti membership (the same
+    pattern ss.BaseScreening uses correctly). Upstream Starsim 3.3.4 has
+    a TODO on its triage step using `sim.t in timepoints` which silently
+    fails under quarterly dt because sim.t is a freq object, not an int.
+
+    Also mirrors ss.BaseScreening's per-step bookkeeping: records screened,
+    screens, and ti_screened so that downstream eligibility callbacks (and
+    test assertions) can inspect who was triaged.
+    """
+
+    def step(self):
+        self.outcomes = {k: ss.uids() for k in self.product.hierarchy}
+        accept_uids = ss.uids()
+        if self.sim.ti in self.timepoints:
+            accept_uids = self.deliver()
+            if len(accept_uids):
+                self.screened[accept_uids] = True
+                self.screens[accept_uids] += 1
+                self.ti_screened[accept_uids] = self.sim.ti
+        return accept_uids
 
 
 class routine_screening(BaseScreening, ss.RoutineDelivery):

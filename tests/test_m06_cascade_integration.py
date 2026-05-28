@@ -30,9 +30,11 @@ def test_full_cascade_composes():
     )
     sim = _cascade_sim([screen, triage, treat])
     sim.run()
-    # At least someone gets screened
-    assert sim.interventions['primary'].screened.uids.size > 0
-    # Triage screened is a subset over lifetime (smoke-level guard)
+    # Each stage must actually fire — guards against silent step()-vs-ti bugs.
+    assert sim.interventions['primary'].screened.uids.size > 0, 'screen did not fire'
+    assert sim.interventions['colpo'].screened.uids.size > 0, 'triage did not fire'
+    assert sim.interventions['excision_rx'].cin_treated.uids.size > 0, 'treat did not fire'
+    # Sanity: triage is a subset of screen
     assert sim.interventions['colpo'].screened.uids.size <= sim.interventions['primary'].screened.uids.size
 
 
