@@ -342,8 +342,10 @@ Add this method to `HPV` in `hpvsim/hpv.py` (place after `set_prognoses`):
         p = self.pars
         ppl = self.sim.people
 
-        # Only coarse agents split; a fine agent never re-splits.
-        coarse = ~np.asarray(ppl.multiscale_fine[cin_uids])
+        # Only coarse agents split; a fine agent never re-splits. NOTE:
+        # multiscale_fine is a PER-MODULE state (self.multiscale_fine), not a
+        # People-level array — there is no ppl.multiscale_fine.
+        coarse = ~np.asarray(self.multiscale_fine[cin_uids])
         coarse_uids = cin_uids[coarse]
         if ratio <= 1 or len(coarse_uids) == 0:
             return cin_uids[cancer_draw]  # unchanged: original cancer set
@@ -351,7 +353,7 @@ Add this method to `HPV` in `hpvsim/hpv.py` (place after `set_prognoses`):
         # 1. Shrink ALL coarse CIN agents to 1/ratio (each now represents one
         #    of the ratio sub-draws of its population), and tag them fine.
         ppl.scale[coarse_uids] = ppl.scale[coarse_uids] / ratio
-        ppl.multiscale_fine[coarse_uids] = True
+        self.multiscale_fine[coarse_uids] = True
 
         # 2. Grow (ratio-1) extra agents per coarse CIN agent. Fresh uids ->
         #    independent CRN draws below.
@@ -362,7 +364,7 @@ Add this method to `HPV` in `hpvsim/hpv.py` (place after `set_prognoses`):
         ppl.age[new] = ppl.age[src]
         ppl.female[new] = ppl.female[src]
         ppl.scale[new] = ppl.scale[src]          # the shrunk 1/ratio value
-        ppl.multiscale_fine[new] = True
+        self.multiscale_fine[new] = True
         for nm in ('susceptible', 'infected', 'precin', 'cin', 'ti_infected',
                    'ti_cin', 'ti_first_infection', 'sev_imm', 'nab_imm',
                    'cell_imm', 'vax_imm', 'txvx_imm', 'rel_sus'):
