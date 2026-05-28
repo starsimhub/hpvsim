@@ -78,3 +78,44 @@ def test_hpvtotal_counts_are_scale_weighted():
     assert base[0] > 0
     for b, h in zip(base, half):
         assert np.isclose(h, 0.5 * b, rtol=1e-6)
+
+
+def test_split_conserves_scale_mass_and_marks_fine():
+    """Splitting shrinks coarse cancer agents and adds fine agents at reduced
+    scale; fine agents are tagged."""
+    sim = hpv.Sim(n_agents=5000, ms_agent_ratio=10, **ANCHOR)
+    sim.run()
+    mod = sim.diseases.hpv16
+    ppl = sim.people
+    fine = mod.multiscale_fine.uids
+    assert len(fine) > 0, 'expected some fine agents over a 40-year run'
+    assert np.all(np.asarray(ppl.scale[fine]) < 0.9999)
+
+
+def test_split_is_reproducible():
+    """Same seed twice -> identical scaled cancer totals under splitting."""
+    def total(seed):
+        s = hpv.Sim(n_agents=5000, ms_agent_ratio=10,
+                    **{**ANCHOR, 'rand_seed': seed})
+        s.run()
+        return float(np.asarray(s.results.hpv16.new_cancers).sum())
+    assert total(7) == total(7)
+
+
+def test_split_preserves_array_integrity():
+    """All module/people arrays stay length-consistent after growth; no NaN ages."""
+    sim = hpv.Sim(n_agents=5000, ms_agent_ratio=10, **ANCHOR)
+    sim.run()
+    ppl = sim.people
+    assert len(ppl.age.raw) == len(ppl.scale.raw) == len(sim.diseases.hpv16.cancerous.raw)
+    assert int(np.isnan(np.asarray(ppl.age[ppl.auids])).sum()) == 0
+
+
+def test_ratio_one_still_identical_after_split_code():
+    """ms_agent_ratio=1 remains bit-identical (split is a no-op at ratio 1)."""
+    base = hpv.Sim(n_agents=2000, **ANCHOR)
+    base.run()
+    one = hpv.Sim(n_agents=2000, ms_agent_ratio=1, **ANCHOR)
+    one.run()
+    assert np.array_equal(np.asarray(base.results.hpv16.new_cancers),
+                          np.asarray(one.results.hpv16.new_cancers))

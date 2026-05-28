@@ -373,20 +373,181 @@ class HPV(ss.Infection):
             )
         )
 
-        # 5b. Progression to cancer.
-        if len(cancer_uids) == 0:
+        # 5b. Progression to cancer (ORIGINAL coarse/fine agents). Scheduled
+        #     here exactly as pre-feature; the multiscale split below only
+        #     shrinks scale + spawns ADDITIONAL fine cancer-drawers.
+        if len(cancer_uids) > 0:
+            self.ti_cancerous[cancer_uids] = (
+                self.ti_cin[cancer_uids] + self._randround(
+                    dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
+                )
+            )
+            dur_cancer = p.dur_cancer.rvs(cancer_uids)
+            self.ti_dead_cancer[cancer_uids] = (
+                self.ti_cancerous[cancer_uids] + self._randround(
+                    dur_cancer, cancer_uids, self._round_dead_bern,
+                )
+            )
+
+        # 6. Multiscale agent split at the CIN->cancer decision. No-op at
+        #    ms_agent_ratio<=1 (early return inside). Resolves the rare cancer
+        #    event at ratio-finer granularity: coarse agents whose OWN cancer
+        #    draw fired are shrunk to 1/ratio, and ratio-1 INDEPENDENT extra
+        #    cancer draws per coarse agent each spawn a fresh fine cancer agent
+        #    (also at 1/ratio) when they fire. Non-cancer coarse agents are left
+        #    untouched at full scale so later-life reinfection->cancer episodes
+        #    stay fully weighted. Mirrors v2 People.set_severity (legacy
+        #    people.py:280-369).
+        self._multiscale_split(cin_uids, cancer_draw, p_cancer, age_mod, dt_yr)
+        return
+
+    def _multiscale_split(self, cin_uids, cancer_draw, p_cancer, age_mod, dt_yr):
+        """Resolve the rare CIN->cancer event at ratio-finer granularity.
+
+        Each COARSE CIN agent (relative scale 1.0) is already past the CIN gate
+        with a known cancer probability ``p_cancer`` (from its own ``dur_cin``).
+        Its single cancer Bernoulli (weight 1.0) is replaced by ``ratio``
+        INDEPENDENT cancer draws AT THE SAME PROBABILITY ``p_cancer``, each
+        carrying weight ``1/ratio``:
+
+          - Its OWN cancer draw (already taken in ``set_prognoses``, scheduled by
+            the caller) is one of the ``ratio`` draws. If it fired, the original
+            is shrunk to ``1/ratio`` and tagged fine. If it did NOT fire, the
+            original is left fully intact at scale 1.0 and is NOT tagged fine —
+            so a future reinfection->CIN->cancer decision re-splits it at full
+            weight. Shrinking ONLY cancer-drawers (not every CIN agent) is what
+            conserves cancer mass over time; permanently shrinking every CIN
+            agent under-weights later-life reinfection episodes (the spike that
+            lost ~74% of cancers).
+          - The other ``ratio-1`` draws are taken on freshly-grown agents (new
+            slots/uids -> CRN-independent; re-drawing on the source uid would
+            return the identical value). Each is the SAME individual resolved
+            more finely, so it draws cancer at the SOURCE's ``p_cancer`` (NOT a
+            resampled probability — resampling ``dur_cin`` for the probability
+            biases low, because CIN-reaching agents are a high-severity selected
+            set whose conditional p_cancer exceeds the marginal). A fresh
+            ``dur_cin`` is sampled ONLY to schedule the cancer timeline of those
+            that draw cancer (timing, not incidence). Cancer-drawers are kept as
+            fine cancer agents at ``1/ratio``; the rest are transient
+            placeholders, removed from the population.
+
+        Conservation per coarse CIN agent (expected): all ``ratio`` sub-agents
+        share probability ``p_cancer`` at weight ``1/ratio``, so the expected
+        cancer mass is ``ratio * (1/ratio) * p_cancer = p_cancer`` — exactly the
+        single-scale expectation — while the realized count is
+        ``Binomial(ratio, p_cancer)/ratio`` (finer resolution of the rare event).
+        ``cancer_draw``, ``p_cancer`` and ``age_mod`` align element-wise with
+        ``cin_uids``.
+
+        NOTE: numeric equivalence vs single-scale is validated/debugged in plan
+        Task 6; this method implements the accounting as above.
+        """
+        ratio = int(self.pars.ms_agent_ratio)
+        if ratio <= 1 or len(cin_uids) == 0:
             return
-        self.ti_cancerous[cancer_uids] = (
-            self.ti_cin[cancer_uids] + self._randround(
-                dur_cin[cancer_draw], cancer_uids, self._round_cancer_bern,
+
+        ppl = self.sim.people
+        p = self.pars
+
+        # Only split COARSE CIN agents; a fine agent must never be re-split
+        # (it already carries 1/ratio weight from the decision that spawned it).
+        coarse = ~np.asarray(self.multiscale_fine[cin_uids])
+        if not coarse.any():
+            return
+        coarse_uids = cin_uids[coarse]
+        coarse_cancer = np.asarray(cancer_draw)[coarse]
+
+        # Capture each coarse source's pre-shrink scale BEFORE the shrink below.
+        # The fine extras must be weighted at (source full scale)/ratio; reading
+        # ppl.scale[src] AFTER the shrink would re-divide an already-shrunk
+        # cancer-drawing source by ratio again (-> 1/ratio**2, under-counting).
+        coarse_scale = np.asarray(ppl.scale[coarse_uids]).copy()
+
+        # Shrink + tag ONLY the coarse agents whose own cancer draw fired. Their
+        # already-scheduled cancer timeline stands, now at 1/ratio weight. Non-
+        # cancer coarse agents are deliberately left untouched (full scale, not
+        # fine) so future episodes are re-split at full weight.
+        cancer_orig_uids = coarse_uids[coarse_cancer]
+        if len(cancer_orig_uids) > 0:
+            ppl.scale[cancer_orig_uids] = (
+                np.asarray(ppl.scale[cancer_orig_uids]) / ratio
             )
-        )
-        dur_cancer = p.dur_cancer.rvs(cancer_uids)
-        self.ti_dead_cancer[cancer_uids] = (
-            self.ti_cancerous[cancer_uids] + self._randround(
-                dur_cancer, cancer_uids, self._round_dead_bern,
+            self.multiscale_fine[cancer_orig_uids] = True
+
+        # ratio-1 INDEPENDENT extra cancer draws per coarse agent on fresh slots
+        # (fresh uids => CRN-independent). Grow placeholders, copy source state
+        # (so each is a valid CIN agent), then draw cancer only.
+        n_block = len(coarse_uids) * (ratio - 1)
+        block = ss.uids(ppl.grow(n_block))
+        src = ss.uids(np.repeat(np.asarray(coarse_uids), ratio - 1))
+
+        # Copy demographic identity + natural-history state so each placeholder
+        # is a valid CIN agent identical to its coarse source at this decision.
+        ppl.age[block] = ppl.age[src]
+        ppl.female[block] = ppl.female[src]
+        for state in ('ti_cin', 'ti_infected', 'ti_first_infection',
+                      'precin', 'cin', 'infected', 'susceptible',
+                      'rel_sus', 'rel_trans', 'sev_imm', 'nab_imm',
+                      'cell_imm', 'vax_imm', 'txvx_imm'):
+            getattr(self, state)[block] = getattr(self, state)[src]
+
+        age_mod_block = np.repeat(np.asarray(age_mod)[coarse], ratio - 1)
+
+        # Independent CANCER draw on the fresh uids at the SOURCE's p_cancer
+        # (each placeholder is the same individual resolved more finely — same
+        # severity/probability, independent Bernoulli on a fresh slot). A fresh
+        # dur_cin is sampled ONLY to time the cancer onset of the cancer-drawers.
+        p_cancer_block = np.repeat(np.asarray(p_cancer)[coarse], ratio - 1)
+        self._cancer_bern.set(p=p_cancer_block)
+        cancer_block = np.asarray(self._cancer_bern.rvs(block))
+        dur_cin_block = np.asarray(p.dur_cin.rvs(block)) * age_mod_block
+
+        # We only need agents for the extras that reached cancer; the rest were
+        # transient placeholders required only to obtain CRN-independent draws
+        # on fresh slots. Remove the non-cancer placeholders from the population
+        # (request_removal -> alive=False at people.step_die later THIS step,
+        # then pruned from auids) and zero their scale so they contribute
+        # nothing to any scaled tally in the interim. v2 never created these in
+        # the first place (it drew in plain numpy arrays); growing-then-removing
+        # is the v3/CRN-faithful equivalent.
+        drop = block[~cancer_block]
+        if len(drop) > 0:
+            ppl.scale[drop] = 0.0
+            self.susceptible[drop] = False
+            self.infected[drop] = False
+            self.precin[drop] = False
+            self.cin[drop] = False
+            self.ti_clearance[drop] = np.nan
+            self.ti_cin[drop] = np.nan
+            self.ti_cancerous[drop] = np.nan
+            self.ti_dead_cancer[drop] = np.nan
+            ppl.request_removal(drop)
+
+        # Materialize the extras that reached cancer as fine cancer agents at
+        # 1/ratio weight. They stay precin/ti_cin-scheduled exactly like their
+        # source (the precin->CIN transition fires in step_state); we only add
+        # the cancer timeline. ti_cin was copied from src in the state loop.
+        new = block[cancer_block]
+        if len(new) > 0:
+            self.multiscale_fine[new] = True
+            # Weight each extra at (source full scale)/ratio, using the captured
+            # pre-shrink coarse scale (NOT ppl.scale[src], which may already be
+            # shrunk for cancer-drawing sources -> would give 1/ratio**2).
+            scale_block = np.repeat(coarse_scale, ratio - 1)
+            ppl.scale[new] = scale_block[cancer_block] / ratio
+            new_dur_cin = dur_cin_block[cancer_block]
+            self.ti_cancerous[new] = (
+                self.ti_cin[new] + self._randround(
+                    new_dur_cin, new, self._round_cancer_bern,
+                )
             )
-        )
+            dur_cancer_new = p.dur_cancer.rvs(new)
+            self.ti_dead_cancer[new] = (
+                self.ti_cancerous[new] + self._randround(
+                    dur_cancer_new, new, self._round_dead_bern,
+                )
+            )
+        return
 
     def _cancel_other_genotype_progression_for(self, uids):
         """Mirror v2's check_cancer cross-genotype cancellation.
