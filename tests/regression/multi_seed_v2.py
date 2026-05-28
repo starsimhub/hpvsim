@@ -28,34 +28,67 @@ import hpvsim as hpv
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from baseline_v23 import (  # noqa: E402
     PARS_4GENOTYPE,
+    PARS_HPV16,
+    PARS_HPV16_TRANSMISSION_ONLY,
     _per_genotype_metrics_v2,
     _aggregate_metrics_v2,
+    _summary_v2_m01,
 )
 
 
-DEFAULT_OUT = Path(__file__).resolve().parent / 'v2_seeds.json'
-DEFAULT_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
+DEFAULT_OUT_4GENOTYPE = Path(__file__).resolve().parent / 'v2_seeds_n30.json'
+DEFAULT_OUT_M01 = Path(__file__).resolve().parent / 'v2_m01_seeds_n30.json'
+DEFAULT_OUT_M02 = Path(__file__).resolve().parent / 'v2_m02_seeds_n30.json'
+
+ANCHORS = {
+    'm03_4genotype': dict(
+        pars=PARS_4GENOTYPE,
+        genotypes=('hpv16', 'hpv18', 'hi5', 'ohr'),
+        out=DEFAULT_OUT_4GENOTYPE,
+        mode='m03',
+    ),
+    'm02': dict(
+        pars=PARS_HPV16,
+        genotypes=('hpv16',),
+        out=DEFAULT_OUT_M02,
+        mode='m03',
+    ),
+    'm01': dict(
+        pars=PARS_HPV16_TRANSMISSION_ONLY,
+        genotypes=('hpv16',),
+        out=DEFAULT_OUT_M01,
+        mode='m01',
+    ),
+}
 
 
-def run_seed(seed, genotypes=DEFAULT_GENOTYPES):
-    pars = sc.dcp(PARS_4GENOTYPE)
+def run_seed(seed, anchor='m03_4genotype'):
+    cfg = ANCHORS[anchor]
+    pars = sc.dcp(cfg['pars'])
     pars['rand_seed'] = int(seed)
-    pars['genotypes'] = list(genotypes)
+    pars['genotypes'] = list(cfg['genotypes'])
     sim = hpv.Sim(pars)
     sim.run()
 
-    genotype_map = sim.pars['genotype_map']
-    genotype_pairs = [(i, k) for i, k in sorted(genotype_map.items())]
-
     summary = {}
-    for gen_idx, gen_key in genotype_pairs:
-        per = _per_genotype_metrics_v2(sim, gen_idx, gen_key)
+    if cfg['mode'] == 'm03':
+        genotype_map = sim.pars['genotype_map']
+        genotype_pairs = [(i, k) for i, k in sorted(genotype_map.items())]
+        for gen_idx, gen_key in genotype_pairs:
+            per = _per_genotype_metrics_v2(sim, gen_idx, gen_key)
+            for k, v in per.items():
+                summary[f'{gen_key}.{k}'] = float(v)
+        agg = _aggregate_metrics_v2(sim, genotype_pairs)
+        for k, v in agg.items():
+            summary[f'any.{k}'] = float(v)
+    elif cfg['mode'] == 'm01':
+        genotype_map = sim.pars['genotype_map']
+        gen_idx = next(i for i, k in genotype_map.items() if k == 'hpv16')
+        per = _summary_v2_m01(sim, gen_idx, 'hpv16')
         for k, v in per.items():
-            summary[f'{gen_key}.{k}'] = float(v)
-
-    agg = _aggregate_metrics_v2(sim, genotype_pairs)
-    for k, v in agg.items():
-        summary[f'any.{k}'] = float(v)
+            summary[k] = float(v)
+    else:
+        raise ValueError(f"Unknown anchor mode: {cfg['mode']}")
 
     summary['_seed'] = int(seed)
     if 'n_alive' in sim.results:
@@ -67,33 +100,31 @@ def run_seed(seed, genotypes=DEFAULT_GENOTYPES):
 
 def main(argv=None):
     p = argparse.ArgumentParser()
-    p.add_argument('--n', type=int, default=10)
+    p.add_argument('--anchor', choices=list(ANCHORS), default='m03_4genotype',
+                   help='Anchor to run (m01, m02, or m03_4genotype).')
+    p.add_argument('--n', type=int, default=30)
     p.add_argument('--start-seed', type=int, default=0)
-    p.add_argument('--out', type=Path, default=DEFAULT_OUT)
-    p.add_argument('--genotypes', type=str, default=None,
-                   help='Comma-separated genotype list (default hpv16,hpv18,hi5,ohr)')
+    p.add_argument('--out', type=Path, default=None,
+                   help='Override the default output path for this anchor.')
     args = p.parse_args(argv)
 
-    if args.genotypes:
-        genotypes = tuple(g.strip() for g in args.genotypes.split(','))
-    else:
-        genotypes = DEFAULT_GENOTYPES
-
+    out_path = args.out or ANCHORS[args.anchor]['out']
     seeds = list(range(args.start_seed, args.start_seed + args.n))
     results = []
     t0 = time.time()
     for seed in seeds:
         ts = time.time()
-        s = run_seed(seed, genotypes=genotypes)
+        s = run_seed(seed, anchor=args.anchor)
         dt = time.time() - ts
         results.append(s)
-        print(f'  seed {seed}: done in {dt:.1f}s '
-              f'(any.total HPV infections={s["any.total HPV infections"]:.0f})')
+        diag_key = next(iter(k for k in s if k not in ('_seed', '_total_pop')))
+        print(f'  seed {seed} ({args.anchor}): done in {dt:.1f}s '
+              f'({diag_key}={s[diag_key]:.4g})')
     total = time.time() - t0
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.out, 'w') as f:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
         json.dump(results, f, indent=2)
-    print(f'Wrote {len(results)} seed summaries to {args.out} in {total:.1f}s')
+    print(f'Wrote {len(results)} seed summaries to {out_path} in {total:.1f}s')
 
 
 if __name__ == '__main__':
