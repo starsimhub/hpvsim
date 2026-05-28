@@ -1,17 +1,18 @@
-"""Multi-seed sweep of the v2.3 4-genotype anchor sim.
+"""Multi-seed sweep of one of the v2.3 anchor sims for M01/M02/M03.
 
-Runs the v2 baseline with N seeds and writes a JSON list of 40-entry
-summary dicts (key layout matches ``short_summary.METRIC_KEYS`` and
-``v3_seeds.json`` produced by ``multi_seed_v3.py``).
+Runs the v2 baseline for the chosen anchor with N seeds and writes a
+JSON list of per-seed summary dicts. The summary key layout matches the
+matching v3 builder (short_summary_m01.METRIC_KEYS_M01 for M01,
+short_summary.METRIC_KEYS via `<g>.<metric>` + `any.<metric>` for M02 / M03).
 
-Reuses ``_per_genotype_metrics_v2`` and ``_aggregate_metrics_v2`` from
-``baseline_v23.py`` — same pop / config / lifetime-mean-age semantics that
-the production v2 baselines use.
+Reuses helpers from ``baseline_v23.py`` — same pop / config /
+lifetime-mean-age semantics that the production v2 baselines use.
 
 Run from a v2.3 env at the repo root:
 
-    "<v2 env>/python.exe" tests/regression/multi_seed_v2.py
-    "<v2 env>/python.exe" tests/regression/multi_seed_v2.py --n 20
+    "<v2 env>/python.exe" tests/regression/multi_seed_v2.py --anchor m03_4genotype --n 30
+    "<v2 env>/python.exe" tests/regression/multi_seed_v2.py --anchor m02 --n 30
+    "<v2 env>/python.exe" tests/regression/multi_seed_v2.py --anchor m01 --n 30
 
 DO NOT run inside the v3 env.
 """
@@ -83,8 +84,10 @@ def run_seed(seed, anchor='m03_4genotype'):
             summary[f'any.{k}'] = float(v)
     elif cfg['mode'] == 'm01':
         genotype_map = sim.pars['genotype_map']
-        gen_idx = next(i for i, k in genotype_map.items() if k == 'hpv16')
-        per = _summary_v2_m01(sim, gen_idx, 'hpv16')
+        gen_idx = next((i for i, k in genotype_map.items() if k == 'hpv16'), None)
+        if gen_idx is None:
+            raise ValueError(f"hpv16 not found in genotype_map: {genotype_map}")
+        per = _summary_v2_m01(sim, gen_idx)
         for k, v in per.items():
             summary[k] = float(v)
     else:
