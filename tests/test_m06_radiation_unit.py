@@ -24,10 +24,19 @@ def test_radiation_extends_ti_dead_cancer_on_cancerous_agents():
     r = _attach_and_init(sim, hpv_radiation())
     uids = sim.people.alive.uids[:3]
     sim.diseases['hpv16'].cancerous[uids] = True
-    sim.diseases['hpv16'].ti_dead_cancer[uids] = 100.0
+    initial = 100.0
+    sim.diseases['hpv16'].ti_dead_cancer[uids] = initial
     r.administer(uids)
-    # ti_dead_cancer must have been extended
-    assert np.all(sim.diseases['hpv16'].ti_dead_cancer[uids] > 100.0)
+    extension = sim.diseases['hpv16'].ti_dead_cancer[uids] - initial
+    # Default duration: normal(mean=1.5 years, sd=0.167 years); at dt=0.25
+    # the per-agent extension is ceil(years_drawn / dt_year) integer steps.
+    # 99.99% of draws fall in (~1.0, ~2.0) yr → ceil/0.25 lies in [4, 8].
+    # Guard against the dt-units bug (using freq-object dt would give ~2 steps,
+    # i.e. extension ~2 instead of ~6 at the default config).
+    assert np.all(extension >= 3), (
+        f'radiation extension too small: {extension!r} — '
+        'check dt_year vs dt freq-object arithmetic'
+    )
 
 
 def test_radiation_skips_non_cancer_agents():
