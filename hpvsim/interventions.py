@@ -25,6 +25,7 @@ __all__ = [
     'routine_screening', 'campaign_screening',
     'routine_triage', 'campaign_triage',
     'BaseTreatment', 'treat_num', 'treat_delay',
+    'BaseTxVx', 'routine_txvx', 'campaign_txvx', 'linked_txvx',
 ]
 
 
@@ -388,3 +389,108 @@ class treat_delay(BaseTreatment):
                 self.ti_cin_treated[treat_uids] = self.sim.ti
                 self.results['new_cin_treated'][self.sim.ti] += len(new)
         return treat_uids
+
+
+class BaseTxVx(BaseTreatment):
+    """HPV therapeutic vaccination base.
+
+    Extends BaseTreatment with txvx-specific per-intervention state:
+    tx_vaccinated / txvx_doses / ti_tx_vaccinated.
+
+    On each delivery the agent's txvx_imm is bumped per genotype (via
+    hpv.txvx.administer). The intervention's own dose counters track
+    program-level uptake.
+
+    v2 reference: hpvsim/_v2_legacy/interventions.py:1137-1252
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.define_states(
+            ss.BoolArr('tx_vaccinated'),
+            ss.FloatArr('txvx_doses', default=0),
+            ss.FloatArr('ti_tx_vaccinated'),
+        )
+
+    def _parse_product_str(self, product):
+        from hpvsim.products import txvx as _txvx
+        return _txvx(name=product)
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('new_tx_vaccinated', dtype=int, scale=True, label='Number first-txvx-vaccinated'),
+            ss.Result('new_txvx_doses',    dtype=int, scale=True, label='Number txvx doses administered'),
+        )
+
+    def check_eligibility(self):
+        """TxVx eligibility — female + alive + cancer-free + age range.
+
+        Unlike treat_num/treat_delay, BaseTxVx never targets cancer patients
+        (radiation is for that path). treat_cancer is forced False here.
+        """
+        sim = self.sim
+        cond = sim.people.alive & sim.people.female
+        if self.age_range is not None:
+            lo, hi = self.age_range
+            cond = cond & (sim.people.age >= lo) & (sim.people.age <= hi)
+        # Never treat cancer agents
+        any_cancer = _any_genotype_cancer(sim)
+        cond = cond & ~any_cancer
+        if self.eligibility_user is not None:
+            cond = cond & _as_boolarr(self.eligibility_user(sim), sim.people)
+        return cond.uids
+
+    def deliver(self):
+        """One-step delivery — finds accepters, administers, bumps counters."""
+        accept_uids = self.get_accept_inds()
+        if len(accept_uids):
+            self.product.administer(self.sim.people, accept_uids)
+            new = accept_uids[~self.tx_vaccinated[accept_uids]]
+            self.tx_vaccinated[accept_uids] = True
+            self.txvx_doses[accept_uids] += 1
+            self.ti_tx_vaccinated[accept_uids] = self.sim.ti
+            self.results['new_tx_vaccinated'][self.sim.ti] += len(new)
+            self.results['new_txvx_doses'][self.sim.ti] += len(accept_uids)
+        return accept_uids
+
+    def step(self):
+        # Default: scheduled delivery via RoutineDelivery/CampaignDelivery's timepoints
+        if self.sim.ti in self.timepoints:
+            return self.deliver()
+        return ss.uids()
+
+
+class routine_txvx(BaseTxVx, ss.RoutineDelivery):
+    """Routine therapeutic vaccination."""
+    pass
+
+
+class campaign_txvx(BaseTxVx, ss.CampaignDelivery):
+    """Campaign therapeutic vaccination."""
+    pass
+
+
+class linked_txvx(BaseTxVx):
+    """Therapeutic vaccination linked to another intervention's outcomes.
+
+    Has no own timeline. Fires every step; eligibility= callback (required)
+    determines who actually receives the dose. Typical usage:
+
+        linked = hpv.linked_txvx(
+            product='txvx1', prob=0.6,
+            eligibility=lambda s: s.interventions['colpo'].outcomes['lsil'],
+        )
+    """
+
+    def __init__(self, *args, eligibility=None, **kwargs):
+        if eligibility is None:
+            raise ValueError(
+                "linked_txvx requires eligibility= "
+                "(typically a screen.outcomes['positive'] callback)"
+            )
+        super().__init__(*args, eligibility=eligibility, **kwargs)
+        self.timepoints = None  # No own schedule
+
+    def step(self):
+        return self.deliver()

@@ -481,6 +481,11 @@ class txvx(ss.Vx):
             sterilizing_p=sterilizing_p,
             imm_boost=imm_boost,
         )
+        # Mirror hpv.tx / hpv.dx: set the module-level name to the product
+        # name so that sim.people.add_module() doesn't collide with an
+        # intervention or another product that also uses class name 'txvx'.
+        if name is not None:
+            self.name = name
         if imm_boost is None:
             # First-dose path requires resolved rel_imm
             self.rel_imm = _resolve_txvx_pars(name, rel_imm)

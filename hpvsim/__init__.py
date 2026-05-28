@@ -33,6 +33,7 @@ from .interventions import (
     routine_screening, campaign_screening,
     routine_triage, campaign_triage,
     BaseTreatment, treat_num, treat_delay,
+    BaseTxVx, routine_txvx, campaign_txvx, linked_txvx,
 )
 
 rootdir = sc.thispath(__file__).parent
@@ -49,6 +50,7 @@ __all__ = [
     'routine_screening', 'campaign_screening',
     'routine_triage', 'campaign_triage',
     'BaseTreatment', 'treat_num', 'treat_delay',
+    'BaseTxVx', 'routine_txvx', 'campaign_txvx', 'linked_txvx',
 ]
 
 del sc
