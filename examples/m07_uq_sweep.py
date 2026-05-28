@@ -14,7 +14,7 @@ Exercises every M07 verification target:
 Run from the repo root:
     python examples/m07_uq_sweep.py
 Produces:
-    m07_uq_sweep.png  (cancer trajectories by coverage, with CIs)
+    m07_uq_sweep.png  (cumulative cancers by coverage, with CIs)
 """
 import argparse
 from pathlib import Path
@@ -93,9 +93,8 @@ def _plot_coverage_sweep(by_cov, out_png):
         # are flattened to top-level keys after .median().
         # Try a few candidate result keys to be robust to API drift.
         candidates = [
-            'hpvtotal_new_cancers',
             'hpvtotal_cum_cancers',
-            'hpv16_new_cancers',  # fallback: per-genotype if aggregate absent
+            'hpv16_cum_cancers',
         ]
         result_key = next(
             (k for k in candidates if hasattr(sub_msim.results, k)), None
@@ -120,8 +119,8 @@ def _plot_coverage_sweep(by_cov, out_png):
         line, = ax.plot(years, median, label=f'coverage={cov:.0%}')
         ax.fill_between(years, lo, hi, alpha=0.2, color=line.get_color())
     ax.set_xlabel('Year')
-    ax.set_ylabel('New cancers (per step)')
-    ax.set_title('Cancer trajectories by routine-vx coverage (median + 10/90)')
+    ax.set_ylabel('Cumulative cancers')
+    ax.set_title('Cumulative cancers by routine-vx coverage (median + 10/90)')
     ax.legend()
     fig.tight_layout()
     fig.savefig(out_png, dpi=150)
