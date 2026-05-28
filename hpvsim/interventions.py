@@ -524,13 +524,20 @@ def _set_dotted(sim, dotted_path, value):
       1. sim.diseases (by key)         e.g. 'hpv16.beta' -> sim.diseases['hpv16'].pars.beta
       2. sim.interventions (by name)   e.g. 'screen.prob' -> sim.interventions['screen'].prob
       3. sim.pars (by key)             e.g. 'rand_seed' -> sim.pars.rand_seed
-    Raises KeyError if the head doesn't resolve anywhere.
+    Diseases and interventions require at least one tail segment (the attribute
+    to set on the resolved module). sim.pars accepts a single segment (set
+    directly on sim.pars). Raises KeyError if the head doesn't resolve anywhere.
     """
     parts = dotted_path.split('.')
     head, tail = parts[0], parts[1:]
 
     if head in sim.diseases:
-        # Module pars path
+        if not tail:
+            raise KeyError(
+                f'Path {dotted_path!r}: missing attribute name after disease '
+                f'key {head!r}.'
+            )
+        # Navigate into the disease module's .pars by default.
         target = sim.diseases[head].pars
         for seg in tail[:-1]:
             target = getattr(target, seg)
@@ -538,22 +545,31 @@ def _set_dotted(sim, dotted_path, value):
         return
 
     if head in sim.interventions:
+        if not tail:
+            raise KeyError(
+                f'Path {dotted_path!r}: missing attribute name after '
+                f'intervention name {head!r}.'
+            )
         target = sim.interventions[head]
         for seg in tail[:-1]:
             target = getattr(target, seg)
         setattr(target, tail[-1], value)
         return
 
-    # Fall back to sim.pars
+    # Fall back to sim.pars. Single segment: set directly. Multi-segment:
+    # walk through head + tail[:-1] and set the last segment.
     if not hasattr(sim.pars, head):
         raise KeyError(
             f'Cannot resolve dotted path {dotted_path!r}: head segment '
             f'{head!r} is not a sim.diseases / sim.interventions / sim.pars key.'
         )
-    target = sim.pars
-    for seg in [head] + tail[:-1]:
+    if not tail:
+        setattr(sim.pars, head, value)
+        return
+    target = getattr(sim.pars, head)
+    for seg in tail[:-1]:
         target = getattr(target, seg)
-    setattr(target, tail[-1] if tail else head, value)
+    setattr(target, tail[-1], value)
 
 
 class dynamic_pars(ss.Intervention):

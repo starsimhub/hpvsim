@@ -543,7 +543,10 @@ class radiation(ss.Product):
     def administer(self, uids):
         if len(uids) == 0:
             return ss.uids()
-        dt = self.sim.t.dt
+        # Convert sampled-duration years -> integer-ti steps via dt_year. Using
+        # self.sim.t.dt is a freq object (e.g. years(0.25)); arithmetic with it
+        # drops the time-unit denominator and undercounts by 1/dt steps.
+        dt_year = self.sim.t.dt_year
         for module in _iter_hpv_modules(self.sim):
             cancer_uids = module.cancerous.uids.intersect(uids)
             if len(cancer_uids) == 0:
@@ -553,6 +556,6 @@ class radiation(ss.Product):
             # gives uids-order durations) while writing by cancer_uids
             # (which is sorted order — `intersect` does not preserve uids-order).
             new_dur = self._dur_dist.rvs(cancer_uids)
-            module.ti_dead_cancer[cancer_uids] += np.ceil(new_dur / dt)
+            module.ti_dead_cancer[cancer_uids] += np.ceil(new_dur / dt_year)
         return uids
 
