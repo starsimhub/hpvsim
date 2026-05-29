@@ -168,3 +168,17 @@ def test_split_does_not_inflate_infections_via_network():
     base = np.mean([cum_inf(1, sd) for sd in range(4)])
     ms   = np.mean([cum_inf(10, sd) for sd in range(4)])
     assert abs(ms - base) / base < 0.10, f'infections inflated: {ms:.0f} vs {base:.0f}'
+
+
+def test_multigenotype_split_keeps_modules_consistent():
+    """With 2 genotypes + splitting, all module arrays match people length and
+    no agent is cancerous in two genotypes at once."""
+    sim = hpv.Sim(n_agents=4000, genotypes=['hpv16', 'hpv18'],
+                  ms_agent_ratio=8, location='nigeria',
+                  start=1990, stop=2030, dt=0.25, rand_seed=1, verbose=0)
+    sim.run()
+    n = len(sim.people.age.raw)
+    g16, g18 = sim.diseases.hpv16, sim.diseases.hpv18
+    assert len(g16.cancerous.raw) == len(g18.cancerous.raw) == n
+    both = np.asarray(g16.cancerous.raw) & np.asarray(g18.cancerous.raw)
+    assert both.sum() == 0, 'no agent may have invasive cancer in two genotypes'

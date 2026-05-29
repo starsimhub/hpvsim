@@ -457,7 +457,9 @@ class HPV(ss.Infection):
 
         # Only split COARSE CIN agents; a fine agent must never be re-split
         # (it already carries 1/ratio weight from the decision that spawned it).
-        coarse = ~np.asarray(self.multiscale_fine[cin_uids])
+        # Cross-genotype guard: an agent already made fine by ANY genotype
+        # must not be re-split (would compound the scale shrink).
+        coarse = ~multiscale_fine_for(self.sim, cin_uids)
         if not coarse.any():
             return
         coarse_uids = cin_uids[coarse]
