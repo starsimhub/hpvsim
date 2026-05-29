@@ -450,10 +450,10 @@ class HPV(ss.Infection):
         #    untouched at full scale so later-life reinfection->cancer episodes
         #    stay fully weighted. Mirrors v2 People.set_severity (legacy
         #    people.py:280-369).
-        self._multiscale_split(cin_uids, cancer_draw, p_cancer, age_mod, dt_yr)
+        self._multiscale_split(cin_uids, cancer_draw, p_cancer, age_mod, dur_cin, dt_yr)
         return
 
-    def _multiscale_split(self, cin_uids, cancer_draw, p_cancer, age_mod, dt_yr):
+    def _multiscale_split(self, cin_uids, cancer_draw, p_cancer, age_mod, dur_cin, dt_yr):
         """Resolve the rare CIN->cancer event at ratio-finer granularity by
         BINOMIAL fractional weighting of the ORIGINAL agent (no population growth).
 
@@ -518,7 +518,12 @@ class HPV(ss.Infection):
         coarse_cancer = np.asarray(cancer_draw)[coarse].astype(int)
         coarse_scale = agent_scale[coarse]
         p_coarse = np.asarray(p_cancer)[coarse]
-        age_mod_coarse = np.asarray(age_mod)[coarse]
+        # The agent's OWN (age-modified) dur_cin, aligned to coarse_uids. Cancer
+        # progressors are length-biased (long dur_cin -> high p_cancer), so the
+        # reconciliation branches below MUST reuse this per-agent value rather
+        # than resampling unconditionally from p.dur_cin (which gives far-too-
+        # short durations -> cancer onset too young; distorts the by-age dist).
+        dur_cin_coarse = np.asarray(dur_cin)[coarse]
 
         # k_extra ~ Binomial(N-1, p_cancer) — the successes among the OTHER N-1
         # sub-agents this coarse agent stands for. Drawn from a deterministic
@@ -553,10 +558,13 @@ class HPV(ss.Infection):
         if len(newly_cancer) > 0:
             sel = is_cancer & (coarse_cancer == 0)
             self.ti_clearance[newly_cancer] = np.nan
-            dur_cin_new = np.asarray(p.dur_cin.rvs(newly_cancer)) * age_mod_coarse[sel]
+            # Reuse the agent's OWN length-biased dur_cin (already age-modified)
+            # — NOT an unconditional resample — so rescued cancers keep the
+            # same age-at-cancer distribution as own-draw cancers.
+            dur_cin_own = dur_cin_coarse[sel]
             self.ti_cancerous[newly_cancer] = (
                 self.ti_cin[newly_cancer] + self._randround(
-                    dur_cin_new, newly_cancer, self._round_cancer_bern,
+                    dur_cin_own, newly_cancer, self._round_cancer_bern,
                 )
             )
             dur_cancer_new = p.dur_cancer.rvs(newly_cancer)
@@ -568,10 +576,12 @@ class HPV(ss.Infection):
 
         still_clear = coarse_uids[(~is_cancer) & (coarse_cancer == 1)]
         if len(still_clear) > 0:
-            sel = (~is_cancer) & (coarse_cancer == 1)
+            sel2 = (~is_cancer) & (coarse_cancer == 1)
             self.ti_cancerous[still_clear] = np.nan
             self.ti_dead_cancer[still_clear] = np.nan
-            dur_cin_clear = np.asarray(p.dur_cin.rvs(still_clear)) * age_mod_coarse[sel]
+            # Same consistency fix: reuse the agent's own dur_cin for the
+            # clearance timing rather than an unconditional resample.
+            dur_cin_clear = dur_cin_coarse[sel2]
             self.ti_clearance[still_clear] = (
                 self.ti_cin[still_clear] + self._randround(
                     dur_cin_clear, still_clear, self._round_clear_cin_bern,
