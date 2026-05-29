@@ -34,6 +34,18 @@ from .utils import compute_severity
 _KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
 
+def multiscale_fine_for(sim, uids):
+    """Boolean array aligned with `uids`: True where the agent is a fine
+    multiscale agent in ANY HPV genotype module. `multiscale_fine` is
+    per-module, so this unions across modules. Duck-typed (hasattr) to avoid
+    import cycles with consumers like the network/demographics."""
+    fine = np.zeros(len(uids), dtype=bool)
+    for m in sim.diseases.values():
+        if hasattr(m, 'multiscale_fine'):
+            fine |= np.asarray(m.multiscale_fine[uids])
+    return fine
+
+
 def _normalize_genotype(key):
     """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
     s = str(key).lower().strip()
