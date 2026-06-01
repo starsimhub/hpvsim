@@ -63,8 +63,7 @@ import starsim as ss
 
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
-from .demographics import (AgeMigration, AnnualBirths, Level0Births,
-                           Level0Deaths, Level0People)
+from .demographics import AgeMigration, AnnualBirths
 from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
 from .seeding import _ExclusiveSeeder
@@ -84,10 +83,7 @@ class Sim(ss.Sim):
         country = load_country(location, year=int(start))
         people = kwargs.pop('people', None)
         if people is None:
-            # Level0People scale-weights the sim-level demographic body counts
-            # (n_alive / deaths / emigrants) so multiscale fine agents don't
-            # inflate them; bit-identical to ss.People at ms_agent_ratio=1.
-            people = Level0People(n_agents, age_data=country['age_data'])
+            people = ss.People(n_agents, age_data=country['age_data'])
 
         diseases = kwargs.pop('diseases', None)
         user_connectors = kwargs.pop('connectors', None) or []
@@ -150,10 +146,10 @@ class Sim(ss.Sim):
             networks = [SexualNetwork(**country['network_pars'])]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
-            births_cls = AnnualBirths if v2_compat_demographics else Level0Births
+            births_cls = AnnualBirths if v2_compat_demographics else ss.Births
             demographics = [
                 births_cls(birth_rate=country['birth_rate']),
-                Level0Deaths(death_rate=country['death_rate']),
+                ss.Deaths(death_rate=country['death_rate']),
                 AgeMigration(v2_compat=v2_compat_demographics),
             ]
 

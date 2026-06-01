@@ -108,7 +108,7 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 - Quarantine v2 modules untouched by M01 to `hpvsim/_v2_legacy/` and v2 tests to `tests/_legacy/`.
 - Add tests for partnership pattern equivalence (age-mixing matrix, concurrency distribution, partnership duration distribution) vs. v2.x.
 - Add tests for HPV prevalence trajectory vs. a new M1 1-genotype HPV16 baseline.
-- Multi-resolution state deferred from M01 (stock `ss.People` sufficed for transmission-only M01); multiscale (`scale`/`level0`/`level1`) was later implemented as `ms_agent_ratio` — see the multiscale design doc and the Multiscale modeling row below.
+- Multi-resolution state deferred from M01 (stock `ss.People` sufficed for transmission-only M01); v2's multiscale (`scale`/`level0`/`level1`) was later implemented as `ms_agent_ratio` via a read-only cancer-pathway ledger (no per-agent `scale` or level tags needed) — see the multiscale design doc and the Multiscale modeling row below.
 
 ### M2: Natural history parity
 
@@ -355,7 +355,7 @@ campaign anchor), and the rationale for the |z| < 5 gate.
 | Population scaling (`pop_scale` / `total_pop`) | M2 | Required for long-horizon natural history |
 | Age-specific migration | M2 | Required for demographic realism in multi-decade runs |
 | Additional genotypes (`hr`, `lo`) | M2 | Low priority; add when natural history is wired up |
-| Multiscale modeling | Implemented | `ms_agent_ratio` (cancer-pathway resolution); design doc + `tests/test_multiscale*.py`. Cancer-stage only; documented residuals (config-dependent count, cancer-age across-seed median, multi-genotype split). |
+| Multiscale modeling | Implemented | `ms_agent_ratio` (cancer-pathway resolution) via a read-only side-RNG **ledger** — extra sub-cancers are scheduled DATA, no fine agents, population bit-identical across ratio. Design doc + `tests/test_multiscale*.py`. Cancer-stage only; documented residuals (~−5% competing-risk count, cancer-age across-seed median, multi-genotype split). |
 | Save/load | M10 or opportunistic | Not capability-blocking |
 | Split data files (#12) | M10 or opportunistic | Loading performance |
 | Fix automatic download failures (#30) | M0 or M10 | Infrastructure hygiene |

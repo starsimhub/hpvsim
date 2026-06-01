@@ -150,10 +150,6 @@ class SexualNetwork(ss.SexualNetwork):
         unset = (~self.participant).uids
         if not len(unset):
             return
-        from .hpv import multiscale_fine_for  # local import avoids cycle
-        unset = unset[~multiscale_fine_for(self.sim, unset)]
-        if not len(unset):
-            return
         people = self.sim.people
         is_female = people.female[unset]
         f_uids = unset[is_female]

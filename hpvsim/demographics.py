@@ -27,112 +27,7 @@ import pandas as pd
 import starsim as ss
 
 
-__all__ = ['AgeMigration', 'AnnualBirths', 'Level0Births', 'Level0Deaths',
-           'Level0People']
-
-
-class Level0Deaths(ss.Deaths):
-    """``ss.Deaths`` whose reported death TALLY is scale-weighted.
-
-    Background deaths still occur per-agent (a multiscale fine agent faces the
-    same age-specific mortality — that competing risk is correct and intended);
-    only the ``deaths.new`` count is corrected so a fine agent at scale
-    ``1/ratio`` contributes its people-space weight instead of a full body
-    (otherwise it inflates ~+17% at ratio=12). Re-implements ``ss.Deaths.step``
-    verbatim except for the scale-weighted tally, so it draws the identical
-    mortality Bernoulli and is bit-identical to ``ss.Deaths`` when all
-    scale==1.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Register as 'deaths' so the mortality dist (_p_death) is seeded
-        # identically to ss.Deaths (seed derives from module name) and the
-        # results key stays 'deaths'; the class name 'level0deaths' would
-        # otherwise shift the stream and break ms_agent_ratio=1 bit-identity.
-        self.name = 'deaths'
-
-    def step(self):
-        p_death = self.make_p_death()
-        self._p_death.set(p=p_death)
-        death_uids = self._p_death.filter()
-        self.sim.people.request_death(death_uids)
-        self.n_deaths = (float(np.asarray(self.sim.people.scale[death_uids]).sum())
-                         if len(death_uids) else 0.0)
-        return self.n_deaths
-
-
-class Level0People(ss.People):
-    """``ss.People`` whose sim-level demographic body counts are scale-weighted.
-
-    ``People.update_results`` records ``n_alive``, ``new_deaths``,
-    ``new_emigrants`` and ``cum_deaths`` as RAW agent counts; multiscale fine
-    agents (scale ``1/ratio``) are then counted as whole bodies, inflating these
-    sim-level results (measured ~+15% n_alive, ~+25% new_deaths at ratio=12).
-    Recompute them in people-space (scale-weighted). Cancer-specific deaths
-    (``HPV.new_cancer_deaths``) and the per-genotype epidemiology are corrected
-    elsewhere; this covers the all-cause demographic counters.
-
-    Early-returns (leaving the base raw counts untouched) when no agent carries
-    a sub-unit scale, so ms_agent_ratio=1 is bit-identical to ``ss.People``.
-    """
-
-    def update_results(self):
-        super().update_results()
-        scale = np.asarray(self.scale)  # .values, aligned to auids
-        if (scale == 1.0).all():
-            return  # no multiscale agents -> base raw counts are correct
-        ti = self.sim.ti
-        res = self.sim.results
-        res.n_alive[ti] = float((scale * np.asarray(self.alive)).sum())
-        res.new_deaths[ti] = float((scale * (np.asarray(self.ti_dead) == ti)).sum())
-        res.new_emigrants[ti] = float((scale * (np.asarray(self.ti_removed) == ti)).sum())
-        res.cum_deaths[ti] = float(np.sum(res.new_deaths[:ti]))
-        return
-
-
-class _Level0BirthsMixin:
-    """Restrict births to ``level0`` (non-fine) bodies, mirroring v2's
-    ``this_birth_rate * n_alive_level0`` (``_v2_legacy/people.py:782``).
-
-    ``ss.Births`` realizes births as a per-agent Bernoulli over EVERY alive
-    agent. Under multiscale the population also contains fine cancer sub-
-    resolution agents (``multiscale_fine``); letting each give a full birth
-    inflates the coarse population and transmission. Demographics must count
-    BODIES excluding fine agents (v2 ``level0``), NOT scale-weight — a shrunk
-    cancer original is 1/ratio of cancer mass but still ONE reproductive body,
-    and a cancer split conserves cancer mass, not population, so a scale-weighted
-    birth count would be wrong.
-
-    Implementation: drop fine parents from the base's candidate births. The base
-    draw is slot-keyed, so non-fine agents' birth outcomes are unchanged by the
-    presence of fine agents; we only remove the fine winners. No extra RNG
-    stream, so ``ms_agent_ratio=1`` (no fine agents) is bit-identical to the base.
-    """
-
-    def get_births(self):
-        birth_uids = super().get_births()
-        if not len(birth_uids):
-            return birth_uids
-        from .hpv import multiscale_fine_for  # local import avoids import cycle
-        fine = multiscale_fine_for(self.sim, birth_uids)
-        return birth_uids[~fine] if fine.any() else birth_uids
-
-
-class Level0Births(_Level0BirthsMixin, ss.Births):
-    """``ss.Births`` that counts only level0 (non-fine) bodies — multiscale-safe
-    (see ``_Level0BirthsMixin``); bit-identical to ``ss.Births`` with no fine
-    agents present. hpv.Sim's default births class.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Register under the same module name as ``ss.Births`` so the births
-        # ``ss.bernoulli`` is seeded identically (starsim derives the dist seed
-        # from the module name). Without this the class swap shifts the birth
-        # RNG stream and ms_agent_ratio=1 would NOT be bit-identical to the
-        # pre-feature ss.Births default.
-        self.name = 'births'
+__all__ = ['AgeMigration', 'AnnualBirths']
 
 
 class AgeMigration(ss.Demographics):
@@ -169,10 +64,6 @@ class AgeMigration(ss.Demographics):
         self._pop_by_year = None                    # {year: per-year pyramid DataFrame}, built in init_pre.
         # CRN-safe emigrant selection — domain set per call.
         self._emi_select = ss.choice(replace=False)
-        # Per-agent Bernoulli for emigrating fine multiscale agents at the
-        # band's coarse emigration rate (unbiased; avoids round() under-
-        # emigration). Only used when fine agents are present (ms_agent_ratio>1).
-        self._fine_emi = ss.bernoulli(p=0.0)
         # Sub-year age jitter for incoming immigrants. Without this, every
         # "year-N" immigrant arrives at exactly age N.0 and the cohort ages
         # in lockstep through age bins, producing discrete pyramid steps
@@ -276,19 +167,6 @@ class AgeMigration(ss.Demographics):
         # age is float32 — cast to int for integer-bin lookup; female is already bool.
         ages = people.age[snap_uids].astype(int)
         female = people.female[snap_uids]
-        # Multiscale-fine mask (snapshot-aligned). The pyramid is pinned in
-        # BODY-count space excluding fine sub-resolution agents (v2's level0
-        # count): a coarse agent — including a shrunk cancer original, which
-        # stays a real body — counts as 1; a spawned fine cancer agent (level1)
-        # counts as 0. NOT scale-weighted: a cancer split conserves cancer mass,
-        # not population (the non-cancer sub-resolutions are never materialized),
-        # so a scale-weighted count would under-fill the pyramid and over-import
-        # real agents. Counting fine agents as whole bodies instead over-fills
-        # and emigrates real agents (~-23% transmission). Excluding them — and
-        # never emigrating them — is correct and is bit-identical at
-        # ms_agent_ratio=1 (no fine agents -> full count). See _multiscale_split.
-        from .hpv import multiscale_fine_for  # local import avoids import cycle
-        fine = multiscale_fine_for(sim, snap_uids)
 
         n_imm_total = 0
         n_emi_total = 0
@@ -309,8 +187,7 @@ class AgeMigration(ss.Demographics):
 
             for age, target in zip(ages_data, target_counts):
                 in_band = sex_mask & (ages == age)
-                # Body count EXCLUDING fine sub-resolution agents (v2 level0).
-                count_sim = int((in_band & ~fine).sum())
+                count_sim = int(in_band.sum())
                 diff = int(round(target - count_sim))
 
                 if diff > 0:
@@ -319,27 +196,10 @@ class AgeMigration(ss.Demographics):
                     imm_female_chunks.append(np.full(diff, sex_is_female, dtype=bool))
                     n_imm_total += diff
                 elif diff < 0:
-                    # Over-target: emigrate ``-diff`` COARSE agents from this
-                    # band to hit the level0 target.
-                    band_uids = snap_uids[in_band & ~fine]
+                    # Over-target: emigrate ``-diff`` agents from this band.
+                    band_uids = snap_uids[in_band]
                     self._emigrate(band_uids, n=-diff)
                     n_emi_total += -diff
-                    # Emigrate fine sub-resolution agents at the SAME per-capita
-                    # rate via a per-agent Bernoulli (self._fine_emi). Without
-                    # this, fine cancer agents are never emigrated while single-
-                    # scale cancer agents in over-target (old) bands are — so the
-                    # fine agents over-survive to cancer onset and the cancer
-                    # count is biased high (measured ~+16%). At ms_agent_ratio=1
-                    # band_fine is always empty, so _fine_emi is never drawn and
-                    # single-scale stays bit-identical (the extra dist does not
-                    # shift the other dists' name-derived seeds).
-                    band_fine = snap_uids[in_band & fine]
-                    if len(band_fine) and count_sim > 0:
-                        r = min((-diff) / count_sim, 1.0)
-                        self._fine_emi.set(p=r)
-                        fine_emig = self._fine_emi.filter(band_fine)
-                        if len(fine_emig):
-                            self.sim.people.request_removal(fine_emig)
 
         if n_imm_total > 0:
             # Single People.grow + write per attribute, sized to the total
@@ -391,12 +251,8 @@ class AgeMigration(ss.Demographics):
         return
 
 
-class AnnualBirths(_Level0BirthsMixin, ss.Births):
+class AnnualBirths(ss.Births):
     """Annual-pulse births matching v2's ``add_births`` convention.
-
-    Also restricts births to level0 (non-fine) bodies via ``_Level0BirthsMixin``
-    so it is multiscale-safe; bit-identical to plain annual-pulse births when no
-    fine agents are present.
 
     Standard ``ss.Births`` distributes births evenly across all steps. This
     subclass fires a single birth pulse at each integer year boundary by giving

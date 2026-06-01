@@ -8,6 +8,19 @@ implement the faithful v2 port as a future milestone. Not yet scheduled.
 **Migration-plan status:** "Multiscale modeling — Unscheduled; low priority; not
 a release blocker" (`MIGRATION_PLAN.md:358`).
 
+> **Implementation update (superseded approach below).** This document analyzes
+> and recommends the v2-faithful **grow** approach (spawn fine cancer agents at
+> `scale = 1/N`). The shipped implementation instead uses a **cancer-pathway
+> ledger**: the extra `N−1` sub-cancers per CIN agent are resolved as scheduled
+> DATA in a deterministic side-RNG ledger, with NO fine People agents grown. The
+> ledger is a read-only overlay, so the population/transmission is bit-identical
+> across `ms_agent_ratio` and all the Level0/fine-agent/network-exclusion/
+> scale-weighting machinery this document proposes proved unnecessary and was
+> removed. The natural-history accounting (length-biased duration resampling,
+> competing-risk realization) carries over; only the *substrate* changed (data
+> rows instead of agents). See the `_multiscale_ledger`/`_realize_ledger` methods
+> in `hpvsim/hpv.py` and `tests/test_multiscale*.py`.
+
 ---
 
 ## 1. Goal

@@ -89,8 +89,8 @@ def test_ledger_overlay_is_read_only():
     sim.run()
     mod = sim.diseases.hpv16
     ppl = sim.people
-    # No fine agents are created and no agent's scale is shrunk (read-only).
-    assert int(np.asarray(mod.multiscale_fine[ppl.auids]).sum()) == 0
+    # No agent's scale is ever shrunk: the ledger never grows or reweights
+    # People (cancers are resolved as data, not as fine agents).
     assert np.all(np.asarray(ppl.scale[ppl.auids]) >= 0.9999)
     # The ledger accumulated cancer-pathway events (own + extra sub-cancers).
     assert len(mod._cancer_events) > 0, 'expected ledger events over a 40-year run'
@@ -140,17 +140,12 @@ def test_ratio_one_still_identical_after_split_code():
                           np.asarray(one.results.hpv16.new_cancers))
 
 
-def test_split_does_not_inflate_infections_via_network():
-    """Fine agents must not transmit: total infections should be ~scale-
-    invariant across ms_agent_ratio (within noise), not inflated by ratio.
-
-    Three fixes together make this hold: (1) fine agents are excluded from the
-    sexual network (no spurious transmission); (2) ``HPV.update_results`` drops
-    fine agents from the ``new_infections`` tally (they are sub-resolutions of
-    an already-counted source infection, not new transmission events — without
-    this each 1/ratio fine agent was counted as a full infection); (3) the
-    cancer original is left transmitting until cancer onset (not network-
-    excluded) so the coarse transmission timeline matches single-scale."""
+def test_infections_not_inflated_by_ratio():
+    """Total infections are scale-invariant across ms_agent_ratio. The ledger
+    resolves extra cancers as data and never grows transmitting agents, so the
+    transmission dynamics are independent of ratio (in fact bit-identical — see
+    test_ledger_population_bit_identical_across_ratio); this asserts the same
+    property in people-space across a 4-seed mean as a regression guard."""
     cfg = dict(location='nigeria', genotypes=['hpv16'], start=1990, stop=2030,
                dt=0.25, total_pop=1e6, verbose=0)
     def cum_inf(ratio, seed):

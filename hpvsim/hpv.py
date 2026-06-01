@@ -34,18 +34,6 @@ from .utils import compute_severity
 _KNOWN_GENOTYPES = ('hpv16', 'hpv18', 'hi5', 'ohr')
 
 
-def multiscale_fine_for(sim, uids):
-    """Boolean array aligned with `uids`: True where the agent is a fine
-    multiscale agent in ANY HPV genotype module. `multiscale_fine` is
-    per-module, so this unions across modules. Duck-typed (hasattr) to avoid
-    import cycles with consumers like the network/demographics."""
-    fine = np.zeros(len(uids), dtype=bool)
-    for m in sim.diseases.values():
-        if hasattr(m, 'multiscale_fine'):
-            fine |= np.asarray(m.multiscale_fine[uids])
-    return fine
-
-
 def _normalize_genotype(key):
     """Resolve aliases (16 -> 'hpv16', 'hi5' -> 'hi5') to canonical keys."""
     s = str(key).lower().strip()
@@ -104,8 +92,9 @@ class HPV(ss.Infection):
             # Per-genotype beta scaler and serology probability (multi-genotype).
             rel_beta=gpars.rel_beta,
             sero_prob=gpars.sero_prob,
-            # Multiscale: number of fine cancer agents per coarse agent at the
-            # CIN->cancer decision. 1 = feature off (no splitting).
+            # Multiscale resolution: each CIN agent's cancer pathway is resolved
+            # at this many sub-resolutions (the agent's own cancer + ratio-1
+            # extra sub-cancers recorded in the ledger). 1 = feature off.
             ms_agent_ratio=1,
         )
         self.update_pars(pars=pars, **kwargs)
@@ -155,13 +144,6 @@ class HPV(ss.Infection):
                 label='Therapeutic-vaccine-conferred immunity (this genotype)',
                 default=0.0,
             ),
-            # v2 level0/level1 tag: True for fine agents spawned by multiscale
-            # splitting, so a fine agent is never re-split by THIS genotype
-            # module. Per-genotype (each HPV module owns its own array, accessed
-            # as self.multiscale_fine); registered here so people.grow() extends
-            # it. Cross-genotype compounding is guarded/verified in the
-            # multi-genotype test (plan Task 5).
-            ss.BoolArr('multiscale_fine', default=False),
         )
         # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
         # use site (placeholder p values below).
@@ -247,68 +229,6 @@ class HPV(ss.Infection):
         res = self.results
         res.cum_cancers[:] = np.cumsum(res.new_cancers)
         res.cum_cancer_deaths[:] = np.cumsum(res.new_cancer_deaths)
-        return
-
-    def update_results(self):
-        """Tally per-step results, then people-space-correct the infection
-        results for multiscale fine agents.
-
-        ``ss.Infection`` records ``new_infections`` and ``n_infected`` (hence
-        ``prevalence = n_infected / n_alive``) as RAW agent counts. Multiscale
-        fine cancer agents are ``infected=True`` through their CIN window and
-        carry scale ``1/ratio``; the base counts each as a full body, inflating
-        these per-module results (measured ~+82% prevalence, ~+114% n_infected
-        at ratio=12 — the cross-genotype ``HPVTotal`` aggregator is already
-        scale-weighted and stays correct). Recompute the affected results in
-        people-space:
-
-          - ``new_infections``: drop fine agents entirely — a fine agent is a
-            sub-resolution of an ALREADY-counted source infection (it copies the
-            source's ``ti_infected``, == its spawn step), not a new transmission
-            event.
-          - ``n_infected`` / ``prevalence``: scale-weight, so a fine agent at
-            ``1/ratio`` contributes its weight, not a full body.
-
-        Bit-identical to the base at ms_agent_ratio=1: with no fine agents the
-        early return leaves the base raw counts untouched (and uniform scale=1
-        would make the recomputation equal them anyway).
-
-        SCOPE: this corrects the per-module HPV epidemiology (every n_<state>,
-        prevalence, new_infections); the cross-genotype ``HPVTotal`` aggregator
-        is already scale-weighted. NOT corrected — and a known limitation of the
-        agent-overlay design — are FRAMEWORK-level demographic body counts that
-        tally fine agents as whole bodies: sim ``n_alive`` (~+15% at ratio=12),
-        ``ss.Deaths`` all-cause deaths (~+17-25%), and ``AgeMigration`` emigrant
-        counts. Cancer-specific deaths (``new_cancer_deaths``) are scale-weighted
-        and correct. For people-space epidemiology use the HPV/HPVTotal results;
-        fully fixing the demographic counts would need framework-level
-        scale-aware counting (a Level0Deaths and a scale-weighted n_alive).
-        """
-        super().update_results()
-        ti = self.ti
-        ppl = self.sim.people
-        auids = ppl.auids
-        fine = np.asarray(self.multiscale_fine[auids])
-        if not fine.any():
-            return  # no multiscale agents -> base raw counts are correct
-        res = self.results
-        scale = np.asarray(ppl.scale[auids])
-        # new_infections: fine agents are not new transmission events.
-        newly = np.round(np.asarray(self.ti_infected[auids])) == ti
-        res.new_infections[ti] -= float(np.count_nonzero(newly & fine))
-        # Every per-state body count (n_susceptible/n_infected/n_precin/n_cin/
-        # n_cancerous) is a RAW count in the base; a fine agent (scale 1/ratio)
-        # is counted as a full body, grossly inflating the compartments fine
-        # agents occupy (measured n_cancerous +1009%, n_cin +630% at ratio=12).
-        # Recompute each as the scale-weighted (people-space) sum. The cross-
-        # genotype HPVTotal aggregator is already scale-weighted and unaffected.
-        for state in ('susceptible', 'infected', 'precin', 'cin', 'cancerous'):
-            key = 'n_' + state
-            if key in res:
-                vals = np.asarray(getattr(self, state)[auids])
-                res[key][ti] = float((scale * vals).sum())
-        alive_scale = float(scale.sum())
-        res.prevalence[ti] = (res.n_infected[ti] / alive_scale) if alive_scale > 0 else 0.0
         return
 
     @staticmethod
@@ -459,9 +379,10 @@ class HPV(ss.Infection):
             )
         )
 
-        # 5b. Progression to cancer (ORIGINAL coarse/fine agents). Scheduled
-        #     here exactly as pre-feature; the multiscale split below only
-        #     shrinks scale + spawns ADDITIONAL fine cancer-drawers.
+        # 5b. Progression to cancer (the agent's OWN cancer). Scheduled here
+        #     exactly as pre-feature; under multiscale this is sub-resolution 0
+        #     (counted at weight 1/ratio in step_state) and the ledger below
+        #     records the ratio-1 EXTRA sub-cancers as data.
         if len(cancer_uids) > 0:
             self.ti_cancerous[cancer_uids] = (
                 self.ti_cin[cancer_uids] + self._randround(
