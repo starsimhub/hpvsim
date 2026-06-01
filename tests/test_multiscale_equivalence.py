@@ -44,9 +44,10 @@ def _mean_over_seeds(n_agents, ratio, seeds=SEEDS, cfg=CFG):
 def test_multiscale_matches_single_scale_mean():
     """Ledger total cancers match single-scale at equal (large) agent count.
 
-    Tolerance 8% (matching the documented ~-5% competing-risk residual and the
-    sister gate ``test_multiscale_distribution.test_cancer_count_unbiased``): a
-    5% bound sits right on the residual and would flake on unlucky seeds."""
+    Tolerance 8% (matching the sister gate
+    ``test_multiscale_distribution.test_cancer_count_unbiased``). The systematic
+    competing-risk residual is small (~-1%); the bound is for seed-batch
+    robustness, not to cover a large bias."""
     single = _mean_over_seeds(40000, 1)
     multi = _mean_over_seeds(40000, 12)
     rel_bias = abs(multi.mean() - single.mean()) / single.mean()

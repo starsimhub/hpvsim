@@ -510,24 +510,48 @@ class HPV(ss.Infection):
     def _realize_ledger(self, ti):
         """Realize the ledger's scheduled extra sub-cancers/deaths due at ``ti``.
 
-        An extra is COUNTED only if its source agent is still alive at the
-        scheduled step (``people.alive`` — shared competing risk: a sub-cancer
-        cannot occur in an individual who has already died). Realized onsets add
-        their pathway ages to ``_cancer_events`` and schedule the matching
-        cancer death into ``_led_death``. Events whose ti falls past the sim
-        window are never popped, so they are correctly truncated (uncounted).
-        Pure results overlay — touches no agent state.
+        An extra is realized only if its source agent is "available" — a shared
+        competing risk standing in for the sub-individual's own background
+        mortality / emigration. ``available`` = the source is still alive, OR it
+        was removed by its OWN cancer. The cancer-death case is excluded from the
+        competing risk because a coarse agent represents ``ratio`` DIFFERENT
+        people: the source dying of its own cancer says nothing about whether a
+        sibling sub-individual (who got cancer independently) would be alive —
+        whereas the source dying of background causes or emigrating IS a valid,
+        correctly-rated sample of the shared background hazard those siblings
+        face. Without this exclusion, late-onset extras of a cancer-drawing
+        source are over-suppressed (~-5% count bias). "Removed by own cancer" is
+        detected as ``became cancerous (in any genotype) at/before its death``,
+        so a source scheduled for cancer that dies of BACKGROUND causes first
+        (onset after death) correctly still competes.
+
+        Realized onsets add their pathway ages to ``_cancer_events`` and schedule
+        the matching cancer death into ``_led_death``. Events whose ti falls past
+        the sim window are never popped, so they are correctly truncated. Pure
+        results overlay — touches no agent state.
         """
         ppl = self.sim.people
         alive = ppl.alive.raw
         res = self.results
+
+        # Precompute per-uid "available" once (used by both onset and death
+        # realization): alive, or removed by its own cancer (not a competing
+        # risk for the different sub-individuals the extras represent).
+        ti_dead = np.asarray(ppl.ti_dead.raw)
+        died = np.isfinite(ti_dead)
+        cancer_before_death = np.zeros(len(alive), dtype=bool)
+        for m in self.sim.diseases.values():
+            if isinstance(m, HPV):
+                tc = np.asarray(m.ti_cancerous.raw)
+                cancer_before_death |= np.isfinite(tc) & (tc <= ti_dead)
+        available = alive | (died & cancer_before_death)
 
         onsets = self._led_onset.pop(ti, None)
         if onsets:
             n_w = 0.0
             age_w = 0.0
             for (u, causal, cin_age, cancer_age, death_age, death_ti, w) in onsets:
-                if not alive[u]:
+                if not available[u]:
                     continue
                 n_w += w
                 age_w += cancer_age * w
@@ -542,7 +566,7 @@ class HPV(ss.Infection):
             n_w = 0.0
             age_w = 0.0
             for (u, death_age, w) in deaths:
-                if not alive[u]:
+                if not available[u]:
                     continue
                 n_w += w
                 age_w += death_age * w

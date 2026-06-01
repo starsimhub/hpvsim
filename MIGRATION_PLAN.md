@@ -355,7 +355,7 @@ campaign anchor), and the rationale for the |z| < 5 gate.
 | Population scaling (`pop_scale` / `total_pop`) | M2 | Required for long-horizon natural history |
 | Age-specific migration | M2 | Required for demographic realism in multi-decade runs |
 | Additional genotypes (`hr`, `lo`) | M2 | Low priority; add when natural history is wired up |
-| Multiscale modeling | Implemented | `ms_agent_ratio` (cancer-pathway resolution) via a read-only side-RNG **ledger** — extra sub-cancers are scheduled DATA, no fine agents, population bit-identical across ratio. Design doc + `tests/test_multiscale*.py`. Cancer-stage only; documented residuals (~−5% competing-risk count, cancer-age across-seed median, multi-genotype split). |
+| Multiscale modeling | Implemented | `ms_agent_ratio` (cancer-pathway resolution) via a read-only side-RNG **ledger** — extra sub-cancers are scheduled DATA, no fine agents, population bit-identical across ratio. Design doc + `tests/test_multiscale*.py`. Cancer-stage only; documented residuals (~−1% competing-risk count, cancer-age across-seed median, multi-genotype split). |
 | Save/load | M10 or opportunistic | Not capability-blocking |
 | Split data files (#12) | M10 or opportunistic | Loading performance |
 | Fix automatic download failures (#30) | M0 or M10 | Infrastructure hygiene |

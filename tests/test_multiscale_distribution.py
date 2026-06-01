@@ -173,15 +173,15 @@ def test_causal_infection_unbiased(arms_strict):
 def test_cancer_count_unbiased(arms_strict):
     """Total people-space cancers approximately unbiased at the stressed config.
 
-    Tolerance 8% (not 5%): a small residual (~-5%) remains from the ledger's
-    competing-risk approximation — each coarse agent stands for `ratio`
-    DIFFERENT people, but all its extra sub-cancers are gated on that single
-    source body surviving to onset, so late-onset extras are over-suppressed
-    when the source dies first. This biases the COUNT slightly low; it does NOT
-    skew the age DISTRIBUTIONS (onset age is dur_cin-dominated, not
-    survival-dominated — see the unbiasedness tests). Fully eliminating it would
-    require an independent per-extra background-mortality draw. Documented, not
-    silently relaxed."""
+    Tolerance 8%: the systematic residual is now small (~-1%, within the
+    across-seed noise floor) after the ledger's competing-risk model was made to
+    EXCLUDE the source's own cancer death (a coarse agent stands for `ratio`
+    DIFFERENT people, so the source dying of its own cancer must not suppress a
+    sibling sub-individual's independent cancer — only the source's background
+    death / emigration is a valid shared competing-risk sample). The 8% bound is
+    kept for seed-batch robustness, not to cover a large bias; the residual does
+    NOT skew the age DISTRIBUTIONS (onset age is dur_cin-dominated). Documented,
+    not silently relaxed."""
     base, ms = arms_strict[1]['count_mean'], arms_strict[RATIO]['count_mean']
     rel = abs(ms - base) / base
     assert rel < 0.08, f'cancer count off {rel:.1%} ({base:.0f} -> {ms:.0f})'

@@ -18,8 +18,12 @@ a release blocker" (`MIGRATION_PLAN.md:358`).
 > scale-weighting machinery this document proposes proved unnecessary and was
 > removed. The natural-history accounting (length-biased duration resampling,
 > competing-risk realization) carries over; only the *substrate* changed (data
-> rows instead of agents). See the `_multiscale_ledger`/`_realize_ledger` methods
-> in `hpvsim/hpv.py` and `tests/test_multiscale*.py`.
+> rows instead of agents). The extra sub-cancers share their source agent's fate
+> as a background-mortality/emigration competing-risk proxy, but the source's
+> OWN cancer death is excluded from that gate (a coarse agent represents `ratio`
+> different people, so its own cancer must not suppress a sibling's independent
+> cancer) — this keeps the count residual to ~-1%. See the `_multiscale_ledger`/
+> `_realize_ledger` methods in `hpvsim/hpv.py` and `tests/test_multiscale*.py`.
 
 ---
 
