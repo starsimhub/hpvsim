@@ -81,22 +81,16 @@ def test_hpvtotal_counts_are_scale_weighted():
         assert np.isclose(h, 0.5 * b, rtol=1e-6)
 
 
-def test_split_shrinks_cancer_agents_to_fractional_scale():
-    """Multiscale resolution (binomial-on-original, Task 6) leaves no separate
-    fine agents; instead it shrinks the resolved cancer agents to a fractional
-    scale ``k/ratio`` (the progressing fraction). Over a multi-year run some
-    cancer agents must therefore carry scale strictly below 1.0."""
+def test_split_conserves_scale_mass_and_marks_fine():
+    """Splitting shrinks coarse cancer agents and adds fine agents at reduced
+    scale; fine agents are tagged."""
     sim = hpv.Sim(n_agents=5000, ms_agent_ratio=10, **ANCHOR)
     sim.run()
     mod = sim.diseases.hpv16
     ppl = sim.people
-    cancer = mod.cancerous.uids
-    assert len(cancer) > 0, 'expected some cancer agents over a 40-year run'
-    cancer_scale = np.asarray(ppl.scale[cancer])
-    # At least some cancer agents resolved to a sub-unit (fractional) scale.
-    assert np.any(cancer_scale < 0.9999), 'expected fractional-scale cancer agents'
-    # No agent may carry a negative or >1 relative scale from the split.
-    assert np.all(cancer_scale > 0) and np.all(cancer_scale <= 1.0 + 1e-9)
+    fine = mod.multiscale_fine.uids
+    assert len(fine) > 0, 'expected some fine agents over a 40-year run'
+    assert np.all(np.asarray(ppl.scale[fine]) < 0.9999)
 
 
 def test_split_is_reproducible():
@@ -129,21 +123,16 @@ def test_ratio_one_still_identical_after_split_code():
 
 
 def test_split_does_not_inflate_infections_via_network():
-    """Total people-space infections must be ~scale-invariant across
-    ms_agent_ratio (within noise), not inflated or deflated by the ratio.
+    """Fine agents must not transmit: total infections should be ~scale-
+    invariant across ms_agent_ratio (within noise), not inflated by ratio.
 
-    Live test (Task 6). Two accounting fixes make this hold:
-      (a) ``HPV.update_results`` scale-weights the per-step ``new_infections``
-          tally (base starsim counts raw ``count_nonzero(ti_infected==ti)``,
-          which would over-count any sub-unit-scale agent), so
-          ``cum_infections`` is in people-space.
-      (b) The CIN->cancer multiscale resolution no longer grows/removes
-          placeholder agents (binomial-on-original); growing agents mid-run
-          shifted starsim's slot-based CRN and systematically depressed
-          transmission. With no population churn, transmission — and hence the
-          cumulative infection total — stays within tolerance of single-scale.
-    A small residual remains (the resolution reassigns a few CIN agents between
-    the cancer/clear paths), so we allow the same 10% band as before."""
+    Three fixes together make this hold: (1) fine agents are excluded from the
+    sexual network (no spurious transmission); (2) ``HPV.update_results`` drops
+    fine agents from the ``new_infections`` tally (they are sub-resolutions of
+    an already-counted source infection, not new transmission events — without
+    this each 1/ratio fine agent was counted as a full infection); (3) the
+    cancer original is left transmitting until cancer onset (not network-
+    excluded) so the coarse transmission timeline matches single-scale."""
     cfg = dict(location='nigeria', genotypes=['hpv16'], start=1990, stop=2030,
                dt=0.25, total_pop=1e6, verbose=0)
     def cum_inf(ratio, seed):

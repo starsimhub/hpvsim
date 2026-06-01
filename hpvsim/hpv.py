@@ -232,43 +232,25 @@ class HPV(ss.Infection):
         return
 
     def update_results(self):
-        """Scale-weight the per-step infection tally (multiscale lever a).
+        """Tally per-step results, then drop fine agents from ``new_infections``.
 
-        ``ss.Infection.update_results`` records ``new_infections`` as a RAW
-        count ``np.count_nonzero(round(ti_infected) == ti)`` — so any agent
-        carrying a sub-unit ``people.scale`` (under ``ms_agent_ratio>1`` an
-        agent that resolved part of its mass to cancer is shrunk to a fractional
-        scale) would be tallied as a FULL infection if it gets (re)infected.
-        That over-counts new infections at ``ms_agent_ratio>1`` and breaks
-        people-space equivalence with a single-scale run. Here we recompute the
-        per-step tally as the SCALE SUM over
-        the agents newly infected this step, mirroring the scale-weighting of
-        the cancer tallies (Tasks 2-3). ``new_infections`` is ``scale=True`` so
-        the population ``pop_scale`` is applied later in ``sim.finalize_results``
-        exactly as for the unweighted base; we only replace the within-sim count
-        with its scale-weighted equivalent. At ``ms_agent_ratio==1`` every scale
-        is 1.0 so this reproduces the base count bit-for-bit.
-
-        ``finalize_results`` (base) recomputes ``cum_infections`` from this
-        corrected ``new_infections`` series, so cumulative infections inherit
-        the fix.
+        ``ss.Infection.update_results`` counts ``new_infections`` as the number
+        of agents with ``round(ti_infected) == ti``. A multiscale fine cancer
+        agent is spawned (at the source's CIN->cancer decision) carrying the
+        source's ``ti_infected``, which equals the step it is created — so the
+        base counts each as a spurious new infection. A fine agent is a
+        sub-resolution of an ALREADY-counted source infection, NOT a new
+        transmission event, so it must contribute zero. Subtract the fine
+        newly-infected count the base just added. At ms_agent_ratio=1 there are
+        no fine agents, so this is a no-op and single-scale runs are unchanged.
         """
-        # Read the seed-case count BEFORE super(): the base pops
-        # ``_n_initial_cases`` off pars at ti==0, so it is unavailable after.
+        super().update_results()
         ti = self.ti
-        n_initial = float(self.pars.get('_n_initial_cases', 0) or 0) if ti == 0 else 0.0
-        super().update_results()  # base sets new_infections (raw) + prevalence
-        res = self.results
-        ppl = self.sim.people
-        newly = (np.round(np.asarray(self.ti_infected[ppl.auids])) == ti)
-        scale = np.asarray(ppl.scale[ppl.auids])
-        n_infections = float((scale * newly).sum())
-        if ti == 0:
-            # Mirror the base: remove the seed cases (set_prognoses(sources=-1)
-            # at init on full-scale agents, so the scale-weighted count equals
-            # the raw count). Subtract the same count the base would have.
-            n_infections -= n_initial
-        res.new_infections[ti] = n_infections
+        auids = self.sim.people.auids
+        fine = np.asarray(self.multiscale_fine[auids])
+        if fine.any():
+            newly_fine = (np.round(np.asarray(self.ti_infected[auids])) == ti) & fine
+            self.results.new_infections[ti] -= float(np.count_nonzero(newly_fine))
         return
 
     @staticmethod
@@ -437,61 +419,58 @@ class HPV(ss.Infection):
 
         # 6. Multiscale agent split at the CIN->cancer decision. No-op at
         #    ms_agent_ratio<=1 (early return inside). Resolves the rare cancer
-        #    event at ratio-finer granularity: coarse agents whose OWN cancer
-        #    draw fired are shrunk to 1/ratio, and ratio-1 INDEPENDENT extra
-        #    cancer draws per coarse agent each spawn a fresh fine cancer agent
-        #    (also at 1/ratio) when they fire. Non-cancer coarse agents are left
-        #    untouched at full scale so later-life reinfection->cancer episodes
-        #    stay fully weighted. Mirrors v2 People.set_severity (legacy
-        #    people.py:280-369).
-        self._multiscale_split(cin_uids, cancer_draw, p_cancer, age_mod, dur_cin, dt_yr)
+        #    PATHWAY at ratio-finer granularity so the cancer/CIN2+ event-age
+        #    distributions (methods Fig 5) carry ratio-x more samples. Coarse
+        #    agents whose OWN cancer draw fired are shrunk to 1/ratio; ratio-1
+        #    extra sub-resolutions per coarse agent each RESAMPLE their own
+        #    precin/CIN durations (mirrors v2 People.set_severity, legacy
+        #    people.py:280-369) and spawn a fine cancer agent at 1/ratio when
+        #    they progress to cancer.
+        self._multiscale_split(cin_uids, cancer_draw, rel_sev_cin, age_mod, dt_yr)
         return
 
-    def _multiscale_split(self, cin_uids, cancer_draw, p_cancer, age_mod, dur_cin, dt_yr):
-        """Resolve the rare CIN->cancer event at ratio-finer granularity by
-        BINOMIAL fractional weighting of the ORIGINAL agent (no population growth).
+    def _multiscale_split(self, cin_uids, cancer_draw, rel_sev_cin, age_mod, dt_yr):
+        """Resolve the rare CIN->cancer PATHWAY at ratio-finer granularity.
 
-        Each COARSE CIN agent (relative scale 1.0) is past the CIN gate with a
-        known cancer probability ``p_cancer`` (from its own ``dur_cin``). At
-        ``ms_agent_ratio = N`` the agent stands in for ``N`` people-space
-        individuals at this decision. Instead of resolving the single weight-1
-        cancer Bernoulli, we resolve ``N`` INDEPENDENT cancer draws at the same
-        ``p_cancer`` and let the agent carry the FRACTION that progress:
+        Goal (methods Fig 5): raise the effective sample size of cancer-pathway
+        EVENTS — CIN2+ age and cancer age — so their across-seed error bars
+        shrink, without biasing the distributions. Each coarse CIN agent stands
+        for ``ratio`` sub-resolutions of the same coarse individual; we resolve
+        each one's natural history independently and keep the cancer outcomes as
+        equal-weight (``1/ratio``) fine agents. Faithful to v2
+        People.set_severity (legacy people.py:280-369), with two deliberate
+        departures noted below.
 
-          - The agent's OWN cancer draw (already taken in ``set_prognoses`` and
-            scheduled by the caller) is one of the ``N`` draws. The other
-            ``N - 1`` draws are resolved here as ``k_extra ~ Binomial(N-1,
-            p_cancer)``. The total successes ``k = own + k_extra`` (out of ``N``).
-          - If ``k > 0`` the agent BECOMES (or stays) a cancer agent carrying
-            scale ``orig_scale * k / N`` — the fraction of its ``N`` people-space
-            individuals that progress to cancer. If ``k == 0`` it clears.
+          - The ORIGINAL is sub-resolution 0: its own cancer draw (taken in
+            ``set_prognoses`` from its realized ``dur_cin``) and timeline stand.
+            If it drew cancer it is shrunk to ``1/ratio`` and tagged fine; if not
+            it stays at full scale (re-splittable on a future reinfection). This
+            keeps EVERY cancer agent at one uniform weight, so the unweighted
+            Fig-5 event distributions are correctly weighted.
+          - Each of the other ``ratio-1`` sub-resolutions RESAMPLES its own
+            ``dur_precin`` (-> independent CIN onset age) and ``dur_cin``, and
+            draws cancer at ``f(dur_cin)`` — i.e. v2's resample, NOT the source's
+            fixed ``p_cancer``. Keeping only the cancer successes makes their
+            ``dur_cin`` length-biased automatically, so cancer onset ages match
+            single-scale (resampling the probability but timing from an
+            unconditional ``dur_cin`` was the ~9 yr by-age bias). Departure 1
+            from v2: we do NOT re-roll the precin->CIN gate — these are
+            sub-resolutions of an agent that already reached CIN, so re-gating
+            (v2's ``extra_cin_bools``) only drops a fraction and biases cancer
+            counts low. Departure 2: only the cancer successes are grown (v2
+            draws in numpy arrays and grows successes; we grow placeholders to
+            sample on fresh CRN slots, then drop the non-cancer ones).
 
-        Why this conserves cancer mass AND reduces variance, with NO extra agents:
+        Causal-infection age is SHARED with the source (same infection event ->
+        same ``ti_infected``); it is transmission-limited and not tightened by
+        cancer-stage multiscale (documented scope).
 
-          - Expectation: ``E[k/N] = p_cancer`` exactly, so the expected cancer
-            mass per decision equals the single-scale ``p_cancer`` — unbiased.
-          - Variance: the realized fraction ``k/N`` has variance
-            ``p(1-p)/N`` vs the single Bernoulli's ``p(1-p)`` — an ``N``-fold
-            reduction in the rare-event sampling noise (the whole point of
-            multiscale). This is achieved on the ORIGINAL agent, so the
-            population size never changes.
-          - No transmission perturbation: an EARLIER design grew ``N-1``
-            placeholder agents per decision to draw the extra cancers on fresh
-            CRN slots, then removed the non-cancer ones. Growing/removing agents
-            mid-run shifts starsim's slot-based RNG for every subsequent network
-            pairing and transmission draw, which systematically DEPRESSED
-            transmission (measured ~-34% cancers / -40% prevalence at ratio=12).
-            Resolving the extra draws as a binomial on the existing agent adds
-            zero agents, so transmission is left essentially unperturbed
-            (measured prevalence within a few percent of single-scale) while
-            keeping cancer mass conserved. Mirrors the variance-reduction intent
-            of v2 People.set_severity (legacy people.py:280-369) without v2's
-            grow-extras (which over-count repeat-decider episodes as independent
-            people, ignoring the once-only competing-risk nature of cancer).
+        Count conservation (expected, per coarse CIN agent): original mass
+        ``f(d)/ratio`` + ``(ratio-1)`` extras each ``E[f(dur_cin')]/ratio``;
+        averaged over agents this is ``p_bar`` — the single-scale expectation.
 
-        ``cancer_draw``, ``p_cancer`` and ``age_mod`` align element-wise with
-        ``cin_uids``. At ``ms_agent_ratio == 1`` this is a no-op (early return),
-        so single-scale runs stay bit-identical.
+        Args align element-wise with ``cin_uids``: ``cancer_draw`` (own draw),
+        ``rel_sev_cin``, ``dur_precin_cin``, ``sev_imm_cin``, ``age_mod``.
         """
         ratio = int(self.pars.ms_agent_ratio)
         if ratio <= 1 or len(cin_uids) == 0:
@@ -499,88 +478,115 @@ class HPV(ss.Infection):
 
         ppl = self.sim.people
         p = self.pars
+        ti = self.ti
 
-        # Only refine COARSE (full-scale) CIN agents; an already-shrunk agent
-        # (a previous decision left it at < 1.0) must not be re-refined (would
-        # compound the scale shrink). Use the per-agent SCALE as the test — this
-        # naturally guards prior cancer-fraction agents without needing a marker.
-        agent_scale = np.asarray(ppl.scale[cin_uids])
-        coarse = agent_scale >= (1.0 - 1e-9)
+        # Only split COARSE CIN agents: not already a fine sub-resolution (in
+        # ANY genotype) and at full scale. A shrunk/fine agent must never be
+        # re-split (would compound the scale shrink).
+        coarse = (~multiscale_fine_for(self.sim, cin_uids)) & (
+            np.asarray(ppl.scale[cin_uids]) >= 1.0 - 1e-9)
         if not coarse.any():
             return
         coarse_uids = cin_uids[coarse]
-        coarse_cancer = np.asarray(cancer_draw)[coarse].astype(int)
-        coarse_scale = agent_scale[coarse]
-        p_coarse = np.asarray(p_cancer)[coarse]
-        # The agent's OWN (age-modified) dur_cin, aligned to coarse_uids. Cancer
-        # progressors are length-biased (long dur_cin -> high p_cancer), so the
-        # reconciliation branches below MUST reuse this per-agent value rather
-        # than resampling unconditionally from p.dur_cin (which gives far-too-
-        # short durations -> cancer onset too young; distorts the by-age dist).
-        dur_cin_coarse = np.asarray(dur_cin)[coarse]
+        coarse_cancer = np.asarray(cancer_draw)[coarse]
 
-        # k_extra ~ Binomial(N-1, p_cancer) — the successes among the OTHER N-1
-        # sub-agents this coarse agent stands for. Drawn from a deterministic
-        # per-(seed, step, genotype) numpy Generator: reproducible (same seed ->
-        # same result, satisfying the reproducibility test) and independent of
-        # the slot-based CRN streams used for transmission/timeline draws, so it
-        # cannot perturb them. Each call gets a distinct stream via ti+genotype.
-        seed = (int(self.sim.pars.rand_seed) * 2654435761
-                + int(self.ti) * 40503
-                + (abs(hash(self.genotype)) % 99991)) & 0x7FFFFFFF
-        rng = np.random.default_rng(seed)
-        k = coarse_cancer + rng.binomial(ratio - 1, p_coarse)
-        is_cancer = k > 0
+        # Pre-shrink source scale (so extras weight at source_scale/ratio, not
+        # 1/ratio**2 for cancer-drawing sources shrunk just below).
+        coarse_scale = np.asarray(ppl.scale[coarse_uids]).copy()
 
-        # Cancer agents carry scale = orig_scale * k / N (the progressing
-        # fraction of their N people-space individuals). The shrink is applied
-        # to ALL k>0 agents, including those whose own draw fired (k>=1 already).
-        cancer_now = coarse_uids[is_cancer]
-        if len(cancer_now) > 0:
-            ppl.scale[cancer_now] = coarse_scale[is_cancer] * (k[is_cancer] / ratio)
+        # Sub-resolution 0 = the original. Shrink the cancer-drawers' scale to
+        # 1/ratio (their cancer mass; timeline already scheduled by the caller).
+        # The original is NOT tagged multiscale_fine (v2 keeps it `level0`): it
+        # remains a counted demographic body and a transmitter through its CIN
+        # period until cancer onset — matching single-scale transmission. Only
+        # the spawned extras (below) are fine (level1: network- & demographics-
+        # excluded). Non-cancer originals keep full scale (re-splittable later).
+        cancer_orig_uids = coarse_uids[coarse_cancer]
+        if len(cancer_orig_uids) > 0:
+            ppl.scale[cancer_orig_uids] = coarse_scale[coarse_cancer] / ratio
 
-        # Reconcile scheduling against each agent's OWN draw (the caller already
-        # scheduled cancer for own==1 and clearance for own==0):
-        #   * newly_cancer: own draw was 0 (clearance scheduled) but k_extra>0,
-        #     so it now progresses to cancer — cancel clearance, schedule the
-        #     cancer timeline (resampled dur_cin->ti_cancerous->ti_dead_cancer).
-        #   * still_clear: own draw was 1 (cancer scheduled) but k==0, so it now
-        #     clears — cancel the cancer timeline, schedule clearance.
-        # These resamplings use starsim distributions on the REAL agent uids, so
-        # they remain CRN-faithful; no new population slots are created.
-        newly_cancer = coarse_uids[is_cancer & (coarse_cancer == 0)]
-        if len(newly_cancer) > 0:
-            sel = is_cancer & (coarse_cancer == 0)
-            self.ti_clearance[newly_cancer] = np.nan
-            # Reuse the agent's OWN length-biased dur_cin (already age-modified)
-            # — NOT an unconditional resample — so rescued cancers keep the
-            # same age-at-cancer distribution as own-draw cancers.
-            dur_cin_own = dur_cin_coarse[sel]
-            self.ti_cancerous[newly_cancer] = (
-                self.ti_cin[newly_cancer] + self._randround(
-                    dur_cin_own, newly_cancer, self._round_cancer_bern,
-                )
-            )
-            dur_cancer_new = p.dur_cancer.rvs(newly_cancer)
-            self.ti_dead_cancer[newly_cancer] = (
-                self.ti_cancerous[newly_cancer] + self._randround(
-                    dur_cancer_new, newly_cancer, self._round_dead_bern,
-                )
-            )
+        # The other ratio-1 sub-resolutions: grow placeholders on fresh slots
+        # (CRN-independent draws), copy demographic + shared infection context.
+        n_block = len(coarse_uids) * (ratio - 1)
+        block = ss.uids(ppl.grow(n_block))
+        src = ss.uids(np.repeat(np.asarray(coarse_uids), ratio - 1))
 
-        still_clear = coarse_uids[(~is_cancer) & (coarse_cancer == 1)]
-        if len(still_clear) > 0:
-            sel2 = (~is_cancer) & (coarse_cancer == 1)
-            self.ti_cancerous[still_clear] = np.nan
-            self.ti_dead_cancer[still_clear] = np.nan
-            # Same consistency fix: reuse the agent's own dur_cin for the
-            # clearance timing rather than an unconditional resample.
-            dur_cin_clear = dur_cin_coarse[sel2]
-            self.ti_clearance[still_clear] = (
-                self.ti_cin[still_clear] + self._randround(
-                    dur_cin_clear, still_clear, self._round_clear_cin_bern,
-                )
-            )
+        ppl.age[block] = ppl.age[src]
+        ppl.female[block] = ppl.female[src]
+        # Shared infection context (same individual as the source). ti_cin is
+        # COPIED from the source as the FALLBACK CIN timing; it is overwritten
+        # below for the sub-resolutions whose own (CIN-conditional) precin draw
+        # fires, so the kept cancer extras carry independent CIN2+ ages.
+        for state in ('ti_infected', 'ti_first_infection', 'ti_cin', 'rel_sus',
+                      'rel_trans', 'sev_imm', 'nab_imm', 'cell_imm',
+                      'vax_imm', 'txvx_imm'):
+            getattr(self, state)[block] = getattr(self, state)[src]
+        self.infected[block] = True
+        self.susceptible[block] = False
+        self.precin[block] = True
+        self.cin[block] = False
+        self.multiscale_fine[block] = True  # network-excluded; never re-split
+
+        rel_sev_block = np.repeat(np.asarray(rel_sev_cin)[coarse], ratio - 1)
+        age_mod_block = np.repeat(np.asarray(age_mod)[coarse], ratio - 1)
+
+        # Diversify CIN-onset timing so the CIN2+-age distribution gains
+        # independent samples (tightens its error bars) WITHOUT the over-
+        # survival bias an unconditional precin would cause. A CIN-reacher's
+        # dur_precin is length-biased (P(CIN) rises with dur_precin); resampling
+        # it unconditionally gives too-short precin -> too-early onset -> less
+        # truncation -> over-fire (measured ~+33%). So draw a fresh dur_precin
+        # AND a CIN gate at f_cin(dur_precin): sub-resolutions that pass the gate
+        # take this CIN-conditional (length-biased) onset; the rest fall back to
+        # the source's CIN timing (also CIN-conditional). Either branch is
+        # CIN-conditional, so cancer-onset truncation matches single-scale; the
+        # gate-passers contribute the independent CIN2+ ages.
+        sev_imm_block = np.asarray(self.sev_imm[block])
+        dur_precin_block = np.asarray(p.dur_precin.rvs(block)) * (1.0 - sev_imm_block)
+        p_cin_block = compute_severity(dur_precin_block * dt_yr,
+                                       rel_sev=rel_sev_block, pars=p.cin_fn)
+        self._cin_bern.set(p=p_cin_block)
+        cin_pass = np.asarray(self._cin_bern.rvs(block))
+        if cin_pass.any():
+            passers = block[cin_pass]
+            self.ti_cin[passers] = ti + self._randround(
+                dur_precin_block[cin_pass], passers, self._round_cin_bern)
+
+        # CIN -> cancer: resample each sub-resolution's own dur_cin and draw
+        # cancer at f(dur_cin); keeping only successes makes the kept dur_cin
+        # length-biased (correct, diversified cancer-onset-age distribution).
+        dur_cin_block = np.asarray(p.dur_cin.rvs(block)) * age_mod_block
+        p_cancer_block = compute_severity(dur_cin_block * dt_yr,
+                                          rel_sev=rel_sev_block, pars=p.cancer_fn)
+        self._cancer_bern.set(p=p_cancer_block)
+        cancer_block = np.asarray(self._cancer_bern.rvs(block))
+
+        # Keep the cancer successes as fine agents at source_scale/ratio.
+        new = block[cancer_block]
+        if len(new) > 0:
+            scale_block = np.repeat(coarse_scale, ratio - 1)
+            ppl.scale[new] = scale_block[cancer_block] / ratio
+            new_dur_cin = dur_cin_block[cancer_block]
+            self.ti_cancerous[new] = self.ti_cin[new] + self._randround(
+                new_dur_cin, new, self._round_cancer_bern)
+            dur_cancer_new = p.dur_cancer.rvs(new)
+            self.ti_dead_cancer[new] = self.ti_cancerous[new] + self._randround(
+                dur_cancer_new, new, self._round_dead_bern)
+
+        # Drop the non-cancer placeholders (transient; only needed for CRN-
+        # independent draws on fresh slots). request_removal defers to step_die.
+        drop = block[~cancer_block]
+        if len(drop) > 0:
+            ppl.scale[drop] = 0.0
+            self.infected[drop] = False
+            self.susceptible[drop] = False
+            self.precin[drop] = False
+            self.cin[drop] = False
+            self.ti_clearance[drop] = np.nan
+            self.ti_cin[drop] = np.nan
+            self.ti_cancerous[drop] = np.nan
+            self.ti_dead_cancer[drop] = np.nan
+            ppl.request_removal(drop)
         return
 
     def _cancel_other_genotype_progression_for(self, uids):
