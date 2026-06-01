@@ -27,20 +27,68 @@ import pandas as pd
 import starsim as ss
 
 
-__all__ = ['AgeMigration', 'AnnualBirths', 'Level0Births']
+__all__ = ['AgeMigration', 'AnnualBirths', 'Level0Births', 'Level0Deaths',
+           'Level0People']
 
 
-def _multiscale_fine_mask(sim, uids):
-    """Boolean mask over ``uids``: True where the agent is a fine multiscale
-    sub-resolution in ANY HPV genotype module. Duck-typed (hasattr) to avoid a
-    demographics -> hpv import cycle. All-False when multiscale is off, so the
-    callers below are bit-identical to their bases then.
+class Level0Deaths(ss.Deaths):
+    """``ss.Deaths`` whose reported death TALLY is scale-weighted.
+
+    Background deaths still occur per-agent (a multiscale fine agent faces the
+    same age-specific mortality — that competing risk is correct and intended);
+    only the ``deaths.new`` count is corrected so a fine agent at scale
+    ``1/ratio`` contributes its people-space weight instead of a full body
+    (otherwise it inflates ~+17% at ratio=12). Re-implements ``ss.Deaths.step``
+    verbatim except for the scale-weighted tally, so it draws the identical
+    mortality Bernoulli and is bit-identical to ``ss.Deaths`` when all
+    scale==1.
     """
-    fine = np.zeros(len(uids), dtype=bool)
-    for mod in sim.diseases.values():
-        if hasattr(mod, 'multiscale_fine'):
-            fine |= np.asarray(mod.multiscale_fine[uids])
-    return fine
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Register as 'deaths' so the mortality dist (_p_death) is seeded
+        # identically to ss.Deaths (seed derives from module name) and the
+        # results key stays 'deaths'; the class name 'level0deaths' would
+        # otherwise shift the stream and break ms_agent_ratio=1 bit-identity.
+        self.name = 'deaths'
+
+    def step(self):
+        p_death = self.make_p_death()
+        self._p_death.set(p=p_death)
+        death_uids = self._p_death.filter()
+        self.sim.people.request_death(death_uids)
+        self.n_deaths = (float(np.asarray(self.sim.people.scale[death_uids]).sum())
+                         if len(death_uids) else 0.0)
+        return self.n_deaths
+
+
+class Level0People(ss.People):
+    """``ss.People`` whose sim-level demographic body counts are scale-weighted.
+
+    ``People.update_results`` records ``n_alive``, ``new_deaths``,
+    ``new_emigrants`` and ``cum_deaths`` as RAW agent counts; multiscale fine
+    agents (scale ``1/ratio``) are then counted as whole bodies, inflating these
+    sim-level results (measured ~+15% n_alive, ~+25% new_deaths at ratio=12).
+    Recompute them in people-space (scale-weighted). Cancer-specific deaths
+    (``HPV.new_cancer_deaths``) and the per-genotype epidemiology are corrected
+    elsewhere; this covers the all-cause demographic counters.
+
+    Early-returns (leaving the base raw counts untouched) when no agent carries
+    a sub-unit scale, so ms_agent_ratio=1 is bit-identical to ``ss.People``.
+    """
+
+    def update_results(self):
+        super().update_results()
+        scale = np.asarray(self.scale)  # .values, aligned to auids
+        if (scale == 1.0).all():
+            return  # no multiscale agents -> base raw counts are correct
+        ti = self.sim.ti
+        res = self.sim.results
+        res.n_alive[ti] = float((scale * np.asarray(self.alive)).sum())
+        res.new_deaths[ti] = float((scale * (np.asarray(self.ti_dead) == ti)).sum())
+        res.new_emigrants[ti] = float((scale * (np.asarray(self.ti_removed) == ti)).sum())
+        res.cum_deaths[ti] = float(np.sum(res.new_deaths[:ti]))
+        return
 
 
 class _Level0BirthsMixin:
@@ -66,7 +114,8 @@ class _Level0BirthsMixin:
         birth_uids = super().get_births()
         if not len(birth_uids):
             return birth_uids
-        fine = _multiscale_fine_mask(self.sim, birth_uids)
+        from .hpv import multiscale_fine_for  # local import avoids import cycle
+        fine = multiscale_fine_for(self.sim, birth_uids)
         return birth_uids[~fine] if fine.any() else birth_uids
 
 
@@ -238,7 +287,8 @@ class AgeMigration(ss.Demographics):
         # and emigrates real agents (~-23% transmission). Excluding them — and
         # never emigrating them — is correct and is bit-identical at
         # ms_agent_ratio=1 (no fine agents -> full count). See _multiscale_split.
-        fine = _multiscale_fine_mask(sim, snap_uids)
+        from .hpv import multiscale_fine_for  # local import avoids import cycle
+        fine = multiscale_fine_for(sim, snap_uids)
 
         n_imm_total = 0
         n_emi_total = 0
@@ -275,12 +325,14 @@ class AgeMigration(ss.Demographics):
                     self._emigrate(band_uids, n=-diff)
                     n_emi_total += -diff
                     # Emigrate fine sub-resolution agents at the SAME per-capita
-                    # rate. Without this, fine cancer agents are never emigrated
-                    # while single-scale cancer agents in over-target (old) bands
-                    # are — so the fine agents over-survive to cancer onset and
-                    # the cancer count is biased high (measured ~+16%). Reuses
-                    # _emi_select (no new dist), so ms_agent_ratio=1 — where
-                    # band_fine is always empty — stays bit-identical.
+                    # rate via a per-agent Bernoulli (self._fine_emi). Without
+                    # this, fine cancer agents are never emigrated while single-
+                    # scale cancer agents in over-target (old) bands are — so the
+                    # fine agents over-survive to cancer onset and the cancer
+                    # count is biased high (measured ~+16%). At ms_agent_ratio=1
+                    # band_fine is always empty, so _fine_emi is never drawn and
+                    # single-scale stays bit-identical (the extra dist does not
+                    # shift the other dists' name-derived seeds).
                     band_fine = snap_uids[in_band & fine]
                     if len(band_fine) and count_sim > 0:
                         r = min((-diff) / count_sim, 1.0)

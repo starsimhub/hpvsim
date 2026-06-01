@@ -42,7 +42,12 @@ CFG_STRICT = dict(location='nigeria', genotypes=['hpv16'], start=1990, stop=2055
 # Low-event: small population, cancer rare -> rare-event resolution matters.
 CFG_LOWEV = dict(location='nigeria', genotypes=['hpv16'], start=1990, stop=2040,
                  dt=0.25, total_pop=1e6, n_agents=2500, verbose=0)
+# Multi-genotype: checks that the split conserves TOTAL cancers across genotypes
+# and that the per-genotype attribution is not grossly distorted.
+CFG_MULTIGEN = dict(location='nigeria', genotypes=['hpv16', 'hpv18'], start=1990,
+                    stop=2040, dt=0.25, total_pop=1e6, n_agents=3000, verbose=0)
 SEEDS = range(8)
+SEEDS_MULTIGEN = range(6)
 
 
 class _CancerPathwayAges(ss.Analyzer):
@@ -183,4 +188,51 @@ def test_cin2plus_distribution_tighter(arms_lowev):
     assert ms['median_std'] < base['median_std'], (
         f'CIN2+ median std not reduced at low-event config '
         f'(ratio=1 {base["median_std"]:.3f} -> ratio={RATIO} {ms["median_std"]:.3f})'
+    )
+
+
+# ---- Multi-genotype conservation ---------------------------------------- #
+
+def _genotype_cancers(ratio, seed):
+    s = hpv.Sim(ms_agent_ratio=ratio, rand_seed=seed, **CFG_MULTIGEN)
+    s.run()
+    ps = float(s.pars.pop_scale)
+    return np.array([float(np.asarray(s.results.hpv16.new_cancers).sum()) * ps,
+                     float(np.asarray(s.results.hpv18.new_cancers).sum()) * ps])
+
+
+@pytest.fixture(scope='module')
+def multigen():
+    a1 = np.array([_genotype_cancers(1, sd) for sd in SEEDS_MULTIGEN])
+    aN = np.array([_genotype_cancers(RATIO, sd) for sd in SEEDS_MULTIGEN])
+    return a1, aN
+
+
+@pytest.mark.slow
+def test_multigenotype_total_cancer_unbiased(multigen):
+    """TOTAL cancers summed across genotypes are conserved by the split — the
+    splitting in one genotype module must not corrupt the others' arrays/state
+    enough to change the aggregate cancer mass."""
+    a1, aN = multigen
+    t1, tN = a1.sum(1).mean(), aN.sum(1).mean()
+    rel = abs(tN - t1) / t1
+    assert rel < 0.10, f'total multi-genotype cancers off {rel:.1%} ({t1:.0f} -> {tN:.0f})'
+
+
+@pytest.mark.slow
+def test_multigenotype_split_bounded(multigen):
+    """The PER-GENOTYPE attribution is only approximately preserved. Fine cancer
+    agents carry only their spawning genotype's state and are network-excluded,
+    so they skip the cross-genotype cancer competition (`_cancel_other_genotype_
+    progression_for`) that, in single-scale, lets the more-oncogenic genotype win
+    co-infections. This shifts the hpv16 share modestly toward the less-oncogenic
+    genotype (measured ~ -0.04 in the hpv16 share, i.e. a few percentage points).
+    This test BOUNDS that known shift (it does not eliminate it); fully removing
+    it would require materializing the fine agent's full multi-genotype state."""
+    a1, aN = multigen
+    share1 = (a1[:, 0] / a1.sum(1)).mean()
+    shareN = (aN[:, 0] / aN.sum(1)).mean()
+    assert abs(shareN - share1) < 0.07, (
+        f'hpv16 cancer share shifted {shareN - share1:+.3f} '
+        f'({share1:.3f} -> {shareN:.3f}) — larger than the known cross-genotype residual'
     )
