@@ -63,7 +63,7 @@ import starsim as ss
 
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
-from .demographics import AgeMigration, AnnualBirths
+from .demographics import AgeMigration, AnnualBirths, Level0Births
 from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
 from .seeding import _ExclusiveSeeder
@@ -146,7 +146,7 @@ class Sim(ss.Sim):
             networks = [SexualNetwork(**country['network_pars'])]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
-            births_cls = AnnualBirths if v2_compat_demographics else ss.Births
+            births_cls = AnnualBirths if v2_compat_demographics else Level0Births
             demographics = [
                 births_cls(birth_rate=country['birth_rate']),
                 ss.Deaths(death_rate=country['death_rate']),
