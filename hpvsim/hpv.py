@@ -238,25 +238,65 @@ class HPV(ss.Infection):
         return
 
     def update_results(self):
-        """Tally per-step results, then drop fine agents from ``new_infections``.
+        """Tally per-step results, then people-space-correct the infection
+        results for multiscale fine agents.
 
-        ``ss.Infection.update_results`` counts ``new_infections`` as the number
-        of agents with ``round(ti_infected) == ti``. A multiscale fine cancer
-        agent is spawned (at the source's CIN->cancer decision) carrying the
-        source's ``ti_infected``, which equals the step it is created — so the
-        base counts each as a spurious new infection. A fine agent is a
-        sub-resolution of an ALREADY-counted source infection, NOT a new
-        transmission event, so it must contribute zero. Subtract the fine
-        newly-infected count the base just added. At ms_agent_ratio=1 there are
-        no fine agents, so this is a no-op and single-scale runs are unchanged.
+        ``ss.Infection`` records ``new_infections`` and ``n_infected`` (hence
+        ``prevalence = n_infected / n_alive``) as RAW agent counts. Multiscale
+        fine cancer agents are ``infected=True`` through their CIN window and
+        carry scale ``1/ratio``; the base counts each as a full body, inflating
+        these per-module results (measured ~+82% prevalence, ~+114% n_infected
+        at ratio=12 — the cross-genotype ``HPVTotal`` aggregator is already
+        scale-weighted and stays correct). Recompute the affected results in
+        people-space:
+
+          - ``new_infections``: drop fine agents entirely — a fine agent is a
+            sub-resolution of an ALREADY-counted source infection (it copies the
+            source's ``ti_infected``, == its spawn step), not a new transmission
+            event.
+          - ``n_infected`` / ``prevalence``: scale-weight, so a fine agent at
+            ``1/ratio`` contributes its weight, not a full body.
+
+        Bit-identical to the base at ms_agent_ratio=1: with no fine agents the
+        early return leaves the base raw counts untouched (and uniform scale=1
+        would make the recomputation equal them anyway).
+
+        SCOPE: this corrects the per-module HPV epidemiology (every n_<state>,
+        prevalence, new_infections); the cross-genotype ``HPVTotal`` aggregator
+        is already scale-weighted. NOT corrected — and a known limitation of the
+        agent-overlay design — are FRAMEWORK-level demographic body counts that
+        tally fine agents as whole bodies: sim ``n_alive`` (~+15% at ratio=12),
+        ``ss.Deaths`` all-cause deaths (~+17-25%), and ``AgeMigration`` emigrant
+        counts. Cancer-specific deaths (``new_cancer_deaths``) are scale-weighted
+        and correct. For people-space epidemiology use the HPV/HPVTotal results;
+        fully fixing the demographic counts would need framework-level
+        scale-aware counting (a Level0Deaths and a scale-weighted n_alive).
         """
         super().update_results()
         ti = self.ti
-        auids = self.sim.people.auids
+        ppl = self.sim.people
+        auids = ppl.auids
         fine = np.asarray(self.multiscale_fine[auids])
-        if fine.any():
-            newly_fine = (np.round(np.asarray(self.ti_infected[auids])) == ti) & fine
-            self.results.new_infections[ti] -= float(np.count_nonzero(newly_fine))
+        if not fine.any():
+            return  # no multiscale agents -> base raw counts are correct
+        res = self.results
+        scale = np.asarray(ppl.scale[auids])
+        # new_infections: fine agents are not new transmission events.
+        newly = np.round(np.asarray(self.ti_infected[auids])) == ti
+        res.new_infections[ti] -= float(np.count_nonzero(newly & fine))
+        # Every per-state body count (n_susceptible/n_infected/n_precin/n_cin/
+        # n_cancerous) is a RAW count in the base; a fine agent (scale 1/ratio)
+        # is counted as a full body, grossly inflating the compartments fine
+        # agents occupy (measured n_cancerous +1009%, n_cin +630% at ratio=12).
+        # Recompute each as the scale-weighted (people-space) sum. The cross-
+        # genotype HPVTotal aggregator is already scale-weighted and unaffected.
+        for state in ('susceptible', 'infected', 'precin', 'cin', 'cancerous'):
+            key = 'n_' + state
+            if key in res:
+                vals = np.asarray(getattr(self, state)[auids])
+                res[key][ti] = float((scale * vals).sum())
+        alive_scale = float(scale.sum())
+        res.prevalence[ti] = (res.n_infected[ti] / alive_scale) if alive_scale > 0 else 0.0
         return
 
     @staticmethod
@@ -475,8 +515,8 @@ class HPV(ss.Infection):
         ``f(d)/ratio`` + ``(ratio-1)`` extras each ``E[f(dur_cin')]/ratio``;
         averaged over agents this is ``p_bar`` — the single-scale expectation.
 
-        Args align element-wise with ``cin_uids``: ``cancer_draw`` (own draw),
-        ``rel_sev_cin``, ``dur_precin_cin``, ``sev_imm_cin``, ``age_mod``.
+        Args align element-wise with ``cin_uids``: ``cancer_draw`` (the agent's
+        own cancer draw), ``rel_sev_cin``, ``age_mod``.
         """
         ratio = int(self.pars.ms_agent_ratio)
         if ratio <= 1 or len(cin_uids) == 0:
