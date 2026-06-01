@@ -81,16 +81,34 @@ def test_hpvtotal_counts_are_scale_weighted():
         assert np.isclose(h, 0.5 * b, rtol=1e-6)
 
 
-def test_split_conserves_scale_mass_and_marks_fine():
-    """Splitting shrinks coarse cancer agents and adds fine agents at reduced
-    scale; fine agents are tagged."""
+def test_ledger_overlay_is_read_only():
+    """The multiscale ledger resolves cancer as scheduled DATA, never as fine
+    People agents: no agent is grown or shrunk, and the cancer-event ledger is
+    populated over a multi-decade run."""
     sim = hpv.Sim(n_agents=5000, ms_agent_ratio=10, **ANCHOR)
     sim.run()
     mod = sim.diseases.hpv16
     ppl = sim.people
-    fine = mod.multiscale_fine.uids
-    assert len(fine) > 0, 'expected some fine agents over a 40-year run'
-    assert np.all(np.asarray(ppl.scale[fine]) < 0.9999)
+    # No fine agents are created and no agent's scale is shrunk (read-only).
+    assert int(np.asarray(mod.multiscale_fine[ppl.auids]).sum()) == 0
+    assert np.all(np.asarray(ppl.scale[ppl.auids]) >= 0.9999)
+    # The ledger accumulated cancer-pathway events (own + extra sub-cancers).
+    assert len(mod._cancer_events) > 0, 'expected ledger events over a 40-year run'
+
+
+def test_ledger_population_bit_identical_across_ratio():
+    """Because the ledger never touches agent state, the epidemic trajectory is
+    bit-identical regardless of ms_agent_ratio (the overlay's defining property,
+    and what makes the whole Level0/fine-agent machinery unnecessary)."""
+    one = hpv.Sim(n_agents=4000, ms_agent_ratio=1, **ANCHOR)
+    one.run()
+    many = hpv.Sim(n_agents=4000, ms_agent_ratio=12, **ANCHOR)
+    many.run()
+    r1, rN = one.results.hpv16, many.results.hpv16
+    for key in ('new_infections', 'prevalence', 'n_infected'):
+        assert np.array_equal(np.asarray(r1[key]), np.asarray(rN[key])), key
+    assert np.array_equal(np.asarray(one.results.n_alive),
+                          np.asarray(many.results.n_alive))
 
 
 def test_split_is_reproducible():

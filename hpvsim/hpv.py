@@ -228,6 +228,18 @@ class HPV(ss.Infection):
             ss.Result('sum_age_at_cancer_death', dtype=float, scale=True,
                       label='Sum of ages at cancer death'),
         )
+        # Multiscale cancer-pathway LEDGER (ms_agent_ratio>1). Cancers are
+        # resolved at ratio-finer granularity as scheduled DATA — no fine People
+        # agents. The agent lives its single-scale life (its own cancer drives
+        # the population); the ledger overlays ratio-1 EXTRA sub-cancers per
+        # CIN->cancer decision purely for the RESULTS. ``_led_onset`` maps a
+        # future onset ti -> list of pending extra events; ``_led_death`` maps a
+        # future death ti -> realized extra cancer-deaths; ``_cancer_events``
+        # accumulates realized (causal_age, cin_age, cancer_age, weight) tuples
+        # for the by-event distribution analyzer (own cancers + extras).
+        self._led_onset = {}
+        self._led_death = {}
+        self._cancer_events = []
         return
 
     def finalize_results(self):
@@ -463,176 +475,159 @@ class HPV(ss.Infection):
                 )
             )
 
-        # 6. Multiscale agent split at the CIN->cancer decision. No-op at
-        #    ms_agent_ratio<=1 (early return inside). Resolves the rare cancer
-        #    PATHWAY at ratio-finer granularity so the cancer/CIN2+ event-age
-        #    distributions (methods Fig 5) carry ratio-x more samples. Coarse
-        #    agents whose OWN cancer draw fired are shrunk to 1/ratio; ratio-1
-        #    extra sub-resolutions per coarse agent each RESAMPLE their own
-        #    precin/CIN durations (mirrors v2 People.set_severity, legacy
-        #    people.py:280-369) and spawn a fine cancer agent at 1/ratio when
-        #    they progress to cancer.
-        self._multiscale_split(cin_uids, cancer_draw, rel_sev_cin, age_mod, dt_yr)
+        # 6. Multiscale LEDGER at the CIN->cancer decision. No-op at
+        #    ms_agent_ratio<=1. Records ratio-1 EXTRA resolved sub-cancers per
+        #    CIN agent into the ledger (scheduled future onset/death + ages), as
+        #    DATA — no fine agents are grown. The agent's OWN cancer (drawn above)
+        #    drives the population and is recorded into the ledger when it fires
+        #    in step_state (weight 1/ratio). Resolves the cancer/CIN2+ event-age
+        #    distributions (methods Fig 5) at ratio-x resolution.
+        self._multiscale_ledger(cin_uids, rel_sev_cin, age_mod,
+                                dur_precin[cin_mask], sev_imm_uids[cin_mask], dt_yr)
         return
 
-    def _multiscale_split(self, cin_uids, cancer_draw, rel_sev_cin, age_mod, dt_yr):
-        """Resolve the rare CIN->cancer PATHWAY at ratio-finer granularity.
+    def _multiscale_ledger(self, cin_uids, rel_sev_cin, age_mod,
+                           dur_precin_cin, sev_imm_cin, dt_yr):
+        """Record ratio-1 EXTRA resolved sub-cancers per CIN agent into the
+        multiscale ledger — scheduled DATA, no fine agents grown.
 
-        Goal (methods Fig 5): raise the effective sample size of cancer-pathway
-        EVENTS — CIN2+ age and cancer age — so their across-seed error bars
-        shrink, without biasing the distributions. Each coarse CIN agent stands
-        for ``ratio`` sub-resolutions of the same coarse individual; we resolve
-        each one's natural history independently and keep the cancer outcomes as
-        equal-weight (``1/ratio``) fine agents. Faithful to v2
-        People.set_severity (legacy people.py:280-369), with two deliberate
-        departures noted below.
+        The coarse agent lives its single-scale life: its OWN cancer (drawn in
+        ``set_prognoses``) drives the population (death, transmission) and is
+        recorded into the ledger when it fires in ``step_state`` at weight
+        ``1/ratio`` (sub-resolution 0). Here we resolve the OTHER ``ratio-1``
+        sub-resolutions of the same individual purely for the RESULTS: each
+        resamples its own ``dur_precin`` (CIN-conditional, length-biased via the
+        CIN gate) and ``dur_cin``, draws cancer at ``f(dur_cin)``, and — for the
+        successes — appends ``(source_uid, causal/cin/cancer/death ages,
+        onset_ti, death_ti, weight=1/ratio)`` to ``_led_onset[onset_ti]``. The
+        event is only COUNTED at realization (``step_state``) if its source
+        agent survives to its onset, so each sub-cancer shares the real source's
+        competing risk (the fix for the grow design's decoupled-fate drift).
 
-          - The ORIGINAL is sub-resolution 0: its own cancer draw (taken in
-            ``set_prognoses`` from its realized ``dur_cin``) and timeline stand.
-            If it drew cancer it is shrunk to ``1/ratio`` and tagged fine; if not
-            it stays at full scale (re-splittable on a future reinfection). This
-            keeps EVERY cancer agent at one uniform weight, so the unweighted
-            Fig-5 event distributions are correctly weighted.
-          - Each of the other ``ratio-1`` sub-resolutions RESAMPLES its own
-            ``dur_precin`` (-> independent CIN onset age) and ``dur_cin``, and
-            draws cancer at ``f(dur_cin)`` — i.e. v2's resample, NOT the source's
-            fixed ``p_cancer``. Keeping only the cancer successes makes their
-            ``dur_cin`` length-biased automatically, so cancer onset ages match
-            single-scale (resampling the probability but timing from an
-            unconditional ``dur_cin`` was the ~9 yr by-age bias). Departure 1
-            from v2: we do NOT re-roll the precin->CIN gate — these are
-            sub-resolutions of an agent that already reached CIN, so re-gating
-            (v2's ``extra_cin_bools``) only drops a fraction and biases cancer
-            counts low. Departure 2: only the cancer successes are grown (v2
-            draws in numpy arrays and grows successes; we grow placeholders to
-            sample on fresh CRN slots, then drop the non-cancer ones).
-
-        Causal-infection age is SHARED with the source (same infection event ->
-        same ``ti_infected``); it is transmission-limited and not tightened by
-        cancer-stage multiscale (documented scope).
-
-        Count conservation (expected, per coarse CIN agent): original mass
-        ``f(d)/ratio`` + ``(ratio-1)`` extras each ``E[f(dur_cin')]/ratio``;
-        averaged over agents this is ``p_bar`` — the single-scale expectation.
-
-        Args align element-wise with ``cin_uids``: ``cancer_draw`` (the agent's
-        own cancer draw), ``rel_sev_cin``, ``age_mod``.
+        Side numpy RNG (seeded per seed/step/genotype via crc32 — reproducible,
+        process-stable), independent of the slot-keyed CRN: the extras are not
+        agents, and the separate stream cannot perturb the population's draws.
+        Conserves cancer mass in expectation: own ``f(d)/ratio`` +
+        ``(ratio-1)*E[f(dur')]/ratio`` = ``p_bar`` per CIN agent (single-scale).
         """
         ratio = int(self.pars.ms_agent_ratio)
-        if ratio <= 1 or len(cin_uids) == 0:
+        n = len(cin_uids)
+        if ratio <= 1 or n == 0:
             return
-
-        ppl = self.sim.people
+        import zlib
         p = self.pars
-        ti = self.ti
+        ppl = self.sim.people
+        ti = int(self.ti)
+        m = ratio - 1  # extras per agent
 
-        # Only split COARSE CIN agents: not already a fine sub-resolution (in
-        # ANY genotype) and at full scale. A shrunk/fine agent must never be
-        # re-split (would compound the scale shrink).
-        coarse = (~multiscale_fine_for(self.sim, cin_uids)) & (
-            np.asarray(ppl.scale[cin_uids]) >= 1.0 - 1e-9)
-        if not coarse.any():
+        seed = (int(self.sim.pars.rand_seed) * 2654435761
+                + ti * 40503
+                + zlib.crc32(self.genotype.encode())) & 0x7FFFFFFF
+        rng = np.random.default_rng(seed)
+
+        def _ln(dist, size):  # side-sample lognormal durations (years)
+            mean = float(dist.pars['mean']); std = float(dist.pars['std'])
+            sig2 = np.log(1.0 + (std / mean) ** 2)
+            return rng.lognormal(np.log(mean) - 0.5 * sig2, np.sqrt(sig2), size)
+
+        # Per-agent context broadcast to the n*m extras.
+        infection_age = np.repeat(np.asarray(ppl.age[cin_uids], dtype=float), m)
+        src_uid = np.repeat(np.asarray(cin_uids), m)
+        rel_sev = np.repeat(np.asarray(rel_sev_cin, dtype=float), m)
+        amod = np.repeat(np.asarray(age_mod, dtype=float), m)
+        sev_imm = np.repeat(np.asarray(sev_imm_cin, dtype=float), m)
+        src_precin_yr = np.repeat(np.asarray(dur_precin_cin, dtype=float), m) * dt_yr
+
+        # CIN onset: each extra needs a precin drawn from the CIN-CONDITIONAL
+        # (length-biased) distribution — exactly what a single-scale CIN-reacher
+        # has (its precin is the one that passed the CIN gate on first draw).
+        # Rejection-sample to get that distribution independently per extra:
+        # redraw precin until it passes f_cin. This both (a) length-biases the
+        # onset so cancer-onset truncation matches single-scale (unbiased count)
+        # and (b) makes every extra an INDEPENDENT CIN2+-age sample, so the
+        # CIN2+ distribution actually tightens (a plain single draw + fall back
+        # to the source on failure left ~3/4 of extras copying the source's CIN
+        # age, adding no independent information). Bounded loop over only the
+        # still-unresolved indices; the ~1e-7 that never pass fall back to the
+        # source's (also CIN-conditional) precin.
+        size = n * m
+        precin_yr = src_precin_yr.copy()
+        need = np.ones(size, dtype=bool)
+        for _ in range(50):
+            idx = np.where(need)[0]
+            if len(idx) == 0:
+                break
+            cand = _ln(p.dur_precin, len(idx)) * (1.0 - sev_imm[idx])
+            p_cin = compute_severity(cand, rel_sev=rel_sev[idx], pars=p.cin_fn)
+            passed = rng.random(len(idx)) < p_cin
+            hit = idx[passed]
+            precin_yr[hit] = cand[passed]
+            need[hit] = False
+
+        # CIN -> cancer: resample dur_cin, draw cancer at f(dur_cin); keep
+        # successes (length-biased dur_cin -> correct, diversified onset ages).
+        dcin = _ln(p.dur_cin, n * m) * amod
+        keep = rng.random(n * m) < compute_severity(dcin, rel_sev=rel_sev, pars=p.cancer_fn)
+        if not keep.any():
             return
-        coarse_uids = cin_uids[coarse]
-        coarse_cancer = np.asarray(cancer_draw)[coarse]
 
-        # Pre-shrink source scale (so extras weight at source_scale/ratio, not
-        # 1/ratio**2 for cancer-drawing sources shrunk just below).
-        coarse_scale = np.asarray(ppl.scale[coarse_uids]).copy()
+        causal = infection_age[keep]
+        cin_age = causal + precin_yr[keep]
+        cancer_age = cin_age + dcin[keep]
+        dcan = _ln(p.dur_cancer, int(keep.sum()))
+        death_age = cancer_age + dcan
+        onset_ti = ti + np.round((precin_yr[keep] + dcin[keep]) / dt_yr).astype(int)
+        death_ti = onset_ti + np.round(dcan / dt_yr).astype(int)
+        kept_uid = src_uid[keep]
+        w = 1.0 / ratio
+        for u, ca, cia, cca, da, oti, dti in zip(
+                kept_uid, causal, cin_age, cancer_age, death_age, onset_ti, death_ti):
+            self._led_onset.setdefault(int(oti), []).append(
+                (int(u), float(ca), float(cia), float(cca), float(da), int(dti), w))
+        return
 
-        # Sub-resolution 0 = the original. Shrink the cancer-drawers' scale to
-        # 1/ratio (their cancer mass; timeline already scheduled by the caller).
-        # The original is NOT tagged multiscale_fine (v2 keeps it `level0`): it
-        # remains a counted demographic body and a transmitter through its CIN
-        # period until cancer onset — matching single-scale transmission. Only
-        # the spawned extras (below) are fine (level1: network- & demographics-
-        # excluded). Non-cancer originals keep full scale (re-splittable later).
-        cancer_orig_uids = coarse_uids[coarse_cancer]
-        if len(cancer_orig_uids) > 0:
-            ppl.scale[cancer_orig_uids] = coarse_scale[coarse_cancer] / ratio
+    def _realize_ledger(self, ti):
+        """Realize the ledger's scheduled extra sub-cancers/deaths due at ``ti``.
 
-        # The other ratio-1 sub-resolutions: grow placeholders on fresh slots
-        # (CRN-independent draws), copy demographic + shared infection context.
-        n_block = len(coarse_uids) * (ratio - 1)
-        block = ss.uids(ppl.grow(n_block))
-        src = ss.uids(np.repeat(np.asarray(coarse_uids), ratio - 1))
+        An extra is COUNTED only if its source agent is still alive at the
+        scheduled step (``people.alive`` — shared competing risk: a sub-cancer
+        cannot occur in an individual who has already died). Realized onsets add
+        their pathway ages to ``_cancer_events`` and schedule the matching
+        cancer death into ``_led_death``. Events whose ti falls past the sim
+        window are never popped, so they are correctly truncated (uncounted).
+        Pure results overlay — touches no agent state.
+        """
+        ppl = self.sim.people
+        alive = ppl.alive.raw
+        res = self.results
 
-        ppl.age[block] = ppl.age[src]
-        ppl.female[block] = ppl.female[src]
-        # Shared infection context (same individual as the source). ti_cin is
-        # COPIED from the source as the FALLBACK CIN timing; it is overwritten
-        # below for the sub-resolutions whose own (CIN-conditional) precin draw
-        # fires, so the kept cancer extras carry independent CIN2+ ages.
-        for state in ('ti_infected', 'ti_first_infection', 'ti_cin', 'rel_sus',
-                      'rel_trans', 'sev_imm', 'nab_imm', 'cell_imm',
-                      'vax_imm', 'txvx_imm'):
-            getattr(self, state)[block] = getattr(self, state)[src]
-        self.infected[block] = True
-        self.susceptible[block] = False
-        self.precin[block] = True
-        self.cin[block] = False
-        self.multiscale_fine[block] = True  # network-excluded; never re-split
+        onsets = self._led_onset.pop(ti, None)
+        if onsets:
+            n_w = 0.0
+            age_w = 0.0
+            for (u, causal, cin_age, cancer_age, death_age, death_ti, w) in onsets:
+                if not alive[u]:
+                    continue
+                n_w += w
+                age_w += cancer_age * w
+                self._cancer_events.append((causal, cin_age, cancer_age, w))
+                self._led_death.setdefault(death_ti, []).append((u, death_age, w))
+            if n_w:
+                res.new_cancers[ti] += n_w
+                res.sum_age_at_cancer[ti] += age_w
 
-        rel_sev_block = np.repeat(np.asarray(rel_sev_cin)[coarse], ratio - 1)
-        age_mod_block = np.repeat(np.asarray(age_mod)[coarse], ratio - 1)
-
-        # Diversify CIN-onset timing so the CIN2+-age distribution gains
-        # independent samples (tightens its error bars) WITHOUT the over-
-        # survival bias an unconditional precin would cause. A CIN-reacher's
-        # dur_precin is length-biased (P(CIN) rises with dur_precin); resampling
-        # it unconditionally gives too-short precin -> too-early onset -> less
-        # truncation -> over-fire (measured ~+33%). So draw a fresh dur_precin
-        # AND a CIN gate at f_cin(dur_precin): sub-resolutions that pass the gate
-        # take this CIN-conditional (length-biased) onset; the rest fall back to
-        # the source's CIN timing (also CIN-conditional). Either branch is
-        # CIN-conditional, so cancer-onset truncation matches single-scale; the
-        # gate-passers contribute the independent CIN2+ ages.
-        sev_imm_block = np.asarray(self.sev_imm[block])
-        dur_precin_block = np.asarray(p.dur_precin.rvs(block)) * (1.0 - sev_imm_block)
-        p_cin_block = compute_severity(dur_precin_block * dt_yr,
-                                       rel_sev=rel_sev_block, pars=p.cin_fn)
-        self._cin_bern.set(p=p_cin_block)
-        cin_pass = np.asarray(self._cin_bern.rvs(block))
-        if cin_pass.any():
-            passers = block[cin_pass]
-            self.ti_cin[passers] = ti + self._randround(
-                dur_precin_block[cin_pass], passers, self._round_cin_bern)
-
-        # CIN -> cancer: resample each sub-resolution's own dur_cin and draw
-        # cancer at f(dur_cin); keeping only successes makes the kept dur_cin
-        # length-biased (correct, diversified cancer-onset-age distribution).
-        dur_cin_block = np.asarray(p.dur_cin.rvs(block)) * age_mod_block
-        p_cancer_block = compute_severity(dur_cin_block * dt_yr,
-                                          rel_sev=rel_sev_block, pars=p.cancer_fn)
-        self._cancer_bern.set(p=p_cancer_block)
-        cancer_block = np.asarray(self._cancer_bern.rvs(block))
-
-        # Keep the cancer successes as fine agents at source_scale/ratio.
-        new = block[cancer_block]
-        if len(new) > 0:
-            scale_block = np.repeat(coarse_scale, ratio - 1)
-            ppl.scale[new] = scale_block[cancer_block] / ratio
-            new_dur_cin = dur_cin_block[cancer_block]
-            self.ti_cancerous[new] = self.ti_cin[new] + self._randround(
-                new_dur_cin, new, self._round_cancer_bern)
-            dur_cancer_new = p.dur_cancer.rvs(new)
-            self.ti_dead_cancer[new] = self.ti_cancerous[new] + self._randround(
-                dur_cancer_new, new, self._round_dead_bern)
-
-        # Drop the non-cancer placeholders (transient; only needed for CRN-
-        # independent draws on fresh slots). request_removal defers to step_die.
-        drop = block[~cancer_block]
-        if len(drop) > 0:
-            ppl.scale[drop] = 0.0
-            self.infected[drop] = False
-            self.susceptible[drop] = False
-            self.precin[drop] = False
-            self.cin[drop] = False
-            self.ti_clearance[drop] = np.nan
-            self.ti_cin[drop] = np.nan
-            self.ti_cancerous[drop] = np.nan
-            self.ti_dead_cancer[drop] = np.nan
-            ppl.request_removal(drop)
+        deaths = self._led_death.pop(ti, None)
+        if deaths:
+            n_w = 0.0
+            age_w = 0.0
+            for (u, death_age, w) in deaths:
+                if not alive[u]:
+                    continue
+                n_w += w
+                age_w += death_age * w
+            if n_w:
+                res.new_cancer_deaths[ti] += n_w
+                res.sum_age_at_cancer_death[ti] += age_w
         return
 
     def _cancel_other_genotype_progression_for(self, uids):
@@ -683,6 +678,12 @@ class HPV(ss.Infection):
         # CrossImmunity connector's step() before any HPV step_infect runs,
         # and again on first-touch in set_prognoses; no per-module work needed.
         ti = self.ti
+        dt_yr = float(self.t.dt.years if hasattr(self.t.dt, 'years') else self.t.dt)
+        # Multiscale: the agent's OWN cancer is sub-resolution 0, counted at
+        # weight 1/ratio (the ledger overlays the other ratio-1 sub-cancers).
+        # At ratio==1 this is 1.0 and the ledger is empty -> bit-identical.
+        ratio = int(self.pars.ms_agent_ratio)
+        w_own = 1.0 / ratio
 
         # --- 1. Clearance (from precin OR CIN) — partial-immunity path ---
         # Returns agent to susceptible=True. nab_imm and cell_imm accumulate
@@ -751,8 +752,20 @@ class HPV(ss.Infection):
             self.ti_clearance[to_cancerous] = np.nan  # cancer supersedes clearance
             scale = np.asarray(self.sim.people.scale[to_cancerous])
             ages_at_cancer = np.asarray(self.sim.people.age[to_cancerous])
-            self.results.new_cancers[ti] = float(scale.sum())
-            self.results.sum_age_at_cancer[ti] = float((ages_at_cancer * scale).sum())
+            self.results.new_cancers[ti] = w_own * float(scale.sum())
+            self.results.sum_age_at_cancer[ti] = w_own * float((ages_at_cancer * scale).sum())
+            # Multiscale only: record each own cancer's pathway ages (causal
+            # infection, CIN2+, cancer) into the ledger event list at weight
+            # w_own, so the Fig-5 distribution analyzer reads own + extra
+            # sub-cancers from one place. Skipped at ratio==1 (zero overhead;
+            # the analyzer reads agents directly in the single-scale case).
+            if ratio > 1:
+                ti_inf = np.asarray(self.ti_infected[to_cancerous], dtype=float)
+                ti_cinv = np.asarray(self.ti_cin[to_cancerous], dtype=float)
+                causal_ages = ages_at_cancer - (ti - ti_inf) * dt_yr
+                cin_ages = ages_at_cancer - (ti - ti_cinv) * dt_yr
+                for ca, cia, cca in zip(causal_ages, cin_ages, ages_at_cancer):
+                    self._cancer_events.append((float(ca), float(cia), float(cca), w_own))
             self._cancel_other_genotype_progression_for(to_cancerous)
 
         # --- 4. Cancer death (routed through starsim's people death pipeline) ---
@@ -767,12 +780,19 @@ class HPV(ss.Infection):
             # convention so the parity gate compares apples-to-apples.
             # Revert by removing the +dt_yr if the underlying step-ordering
             # convention is harmonised in a future Starsim version.
-            dt_yr = float(self.t.dt.years if hasattr(self.t.dt, 'years') else self.t.dt)
             scale_d = np.asarray(self.sim.people.scale[to_dead])
             ages_at_death = np.asarray(self.sim.people.age[to_dead]) + dt_yr
-            self.results.new_cancer_deaths[ti] = float(scale_d.sum())
-            self.results.sum_age_at_cancer_death[ti] = float((ages_at_death * scale_d).sum())
+            self.results.new_cancer_deaths[ti] = w_own * float(scale_d.sum())
+            self.results.sum_age_at_cancer_death[ti] = w_own * float((ages_at_death * scale_d).sum())
             self.sim.people.request_death(to_dead)
+
+        # --- 5. Multiscale ledger: realize scheduled extra sub-cancers ---
+        # The ratio-1 extra sub-resolutions resolved in _multiscale_ledger
+        # become RESULTS here (no population effect — pure overlay), each gated
+        # on its SOURCE agent surviving to the scheduled ti (shared competing
+        # risk). Empty at ratio==1, so this is a no-op in the single-scale case.
+        if self._led_onset or self._led_death:
+            self._realize_ledger(ti)
 
     def step_die(self, uids):
         """Reset transient compartment flags for dying agents.

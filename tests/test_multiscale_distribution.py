@@ -1,31 +1,35 @@
 """Acceptance gate: multiscale tightens the cancer-pathway EVENT distributions
-without biasing them (corrected-grow / level0 design).
+without biasing them (cancer-event LEDGER design).
 
 Figure 5 of the methods manuscript plots UNWEIGHTED per-cancer-event ages for
 three back-traced events: causal HPV infection, CIN2+, and cancer. The point of
 multiscale is to raise the effective sample size of these rare events so the
 distributions have tighter Monte-Carlo error bars across seeds.
 
+The ledger design resolves the ratio-1 EXTRA sub-cancers per CIN agent as
+scheduled DATA overlaid on a single-scale population (no fine People agents):
+the population/transmission is bit-identical across ms_agent_ratio, and the
+extra sub-cancers (each at 1/ratio weight) are read back via the disease's
+``_cancer_events`` ledger by the analyzer below.
+
 Two configs, because the two acceptance properties are best exercised in
 opposite regimes:
 
   * UNBIASEDNESS + COUNT — strict config (high ratio, long window -> many
-    cancer-pathway events, long competing-risk tails). This is the regime that
-    most stresses the level0 demographic/accounting machinery; many events make
-    the medians and the count mean stable.
+    cancer-pathway events, long competing-risk tails). Many events make the
+    medians and the count mean stable.
 
   * RESOLUTION + TIGHTENING — what multiscale reliably delivers for the event
     distributions:
       - cancer: ratio-x MORE event samples per run (the manuscript renders Fig 5
         single-seed, so more cancer onsets = a better-resolved boxplot). The
-        across-seed std of the cancer-age MEDIAN is NOT reduced and is not
-        asserted: cancer-age variance is dominated by the transmission-set
-        causal-infection age (which multiscale cannot reduce), and the grow
-        decorrelation adds across-seed noise that exceeds the sampling-variance
-        gain. The benefit is sample count, not median-across-seed stability.
-      - CIN2+: across-seed median std IS reduced (tested), because its
-        diversification (CIN-conditional precin) adds genuinely independent
-        samples. Tested in the low-event regime where it is visible.
+        across-seed std of the cancer-age MEDIAN is NOT asserted: cancer-age
+        variance is dominated by the transmission-set causal-infection age,
+        which the cancer-stage ledger cannot reduce.
+      - CIN2+: across-seed median std IS reduced (tested). Each extra's precin
+        is rejection-sampled from the CIN-conditional distribution, so every
+        extra is an INDEPENDENT CIN2+-age sample. Tested in the low-event
+        regime where the tightening is visible.
 
 Marked slow; each config runs two arms x 8 seeds.
 """
@@ -54,9 +58,18 @@ class _CancerPathwayAges(ss.Analyzer):
     """Collect UNWEIGHTED (causal, cin, cancer) age per cancer onset event.
 
     Mirrors the manuscript Fig-5 dwelltime analyzer: one sample per cancer
-    onset, back-traced via ti_infected / ti_cin. people.scale is intentionally
-    ignored (the figure is unweighted; the level0 design makes every cancer
-    agent equal-weight so unweighted counting is unbiased).
+    onset, back-traced to causal-infection and CIN2+ ages.
+
+    Two source paths, switched on ms_agent_ratio:
+
+      - single-scale (ratio==1): scan agent ``ti_cancerous`` per step and
+        back-trace via ``ti_infected``/``ti_cin`` (the manuscript's method).
+      - multiscale (ratio>1): read the disease's cancer-event LEDGER
+        (``_cancer_events``), which holds one (causal, cin, cancer, weight)
+        row per resolved sub-cancer — the agent's own cancer AND the ratio-1
+        extra sub-resolutions. The ledger weight is intentionally IGNORED here:
+        Fig 5 is unweighted, and treating each sub-cancer as one sample is
+        exactly the ratio-x sample-size gain multiscale exists to provide.
     """
 
     def init_pre(self, sim):
@@ -64,8 +77,11 @@ class _CancerPathwayAges(ss.Analyzer):
         self.mods = [d for d in sim.diseases.values() if isinstance(d, HPV)]
         super().init_pre(sim)
         self.causal, self.cin, self.cancer = [], [], []
+        self._use_ledger = any(int(m.pars.ms_agent_ratio) > 1 for m in self.mods)
 
     def step(self):
+        if self._use_ledger:
+            return  # events are read from the ledger at finalize
         sim = self.sim
         ti = sim.ti
         dt = float(sim.t.dt)
@@ -82,6 +98,15 @@ class _CancerPathwayAges(ss.Analyzer):
             self.causal.extend((cur - (ti - ti_inf) * dt).tolist())
             self.cin.extend((cur - (ti - ti_cin) * dt).tolist())
             self.cancer.extend(cur.tolist())
+
+    def finalize(self):
+        super().finalize()
+        if self._use_ledger:
+            for m in self.mods:
+                for (causal, cin_age, cancer_age, _w) in m._cancer_events:
+                    self.causal.append(causal)
+                    self.cin.append(cin_age)
+                    self.cancer.append(cancer_age)
 
 
 def _run(ratio, seed, cfg):
@@ -148,13 +173,15 @@ def test_causal_infection_unbiased(arms_strict):
 def test_cancer_count_unbiased(arms_strict):
     """Total people-space cancers approximately unbiased at the stressed config.
 
-    Tolerance 8% (not 5%): a small residual (~+4%) remains from multiscale fine
-    cancer agents over-surviving at old ages relative to single-scale cancer
-    agents (they do not share their coarse source's background-death/emigration
-    fate one-for-one); it is within the across-seed noise floor here. Fully
-    eliminating it would require tying each fine agent's demographic fate to its
-    source (or a no-agent cancer-event ledger). Documented, not silently
-    relaxed."""
+    Tolerance 8% (not 5%): a small residual (~-5%) remains from the ledger's
+    competing-risk approximation — each coarse agent stands for `ratio`
+    DIFFERENT people, but all its extra sub-cancers are gated on that single
+    source body surviving to onset, so late-onset extras are over-suppressed
+    when the source dies first. This biases the COUNT slightly low; it does NOT
+    skew the age DISTRIBUTIONS (onset age is dur_cin-dominated, not
+    survival-dominated — see the unbiasedness tests). Fully eliminating it would
+    require an independent per-extra background-mortality draw. Documented, not
+    silently relaxed."""
     base, ms = arms_strict[1]['count_mean'], arms_strict[RATIO]['count_mean']
     rel = abs(ms - base) / base
     assert rel < 0.08, f'cancer count off {rel:.1%} ({base:.0f} -> {ms:.0f})'
@@ -221,14 +248,14 @@ def test_multigenotype_total_cancer_unbiased(multigen):
 
 @pytest.mark.slow
 def test_multigenotype_split_bounded(multigen):
-    """The PER-GENOTYPE attribution is only approximately preserved. Fine cancer
-    agents carry only their spawning genotype's state and are network-excluded,
-    so they skip the cross-genotype cancer competition (`_cancel_other_genotype_
-    progression_for`) that, in single-scale, lets the more-oncogenic genotype win
-    co-infections. This shifts the hpv16 share modestly toward the less-oncogenic
-    genotype (measured ~ -0.04 in the hpv16 share, i.e. a few percentage points).
-    This test BOUNDS that known shift (it does not eliminate it); fully removing
-    it would require materializing the fine agent's full multi-genotype state."""
+    """The PER-GENOTYPE attribution is only approximately preserved. The ledger
+    resolves each genotype's extra sub-cancers independently, so they skip the
+    cross-genotype cancer competition (`_cancel_other_genotype_progression_for`)
+    that, in single-scale, lets the more-oncogenic genotype win co-infections
+    (the agents' OWN cancers still compete; only the ledger extras do not). This
+    shifts the hpv16 share modestly toward the less-oncogenic genotype. This test
+    BOUNDS that known shift (it does not eliminate it); fully removing it would
+    require cross-genotype arbitration of the ledger events at realization."""
     a1, aN = multigen
     share1 = (a1[:, 0] / a1.sum(1)).mean()
     shareN = (aN[:, 0] / aN.sum(1)).mean()
