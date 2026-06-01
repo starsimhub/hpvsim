@@ -3,6 +3,14 @@ that may result in differences in model output, or are required in order
 to run an old parameter set with the current version, are flagged with
 the term "Regression information".
 
+## Unreleased (v3.0 / Starsim port)
+
+- Adds **multiscale agents** via the `ms_agent_ratio` parameter (`hpv.Sim(ms_agent_ratio=N)`; default `1` = feature off). Ports v2's multiscale technique to the v3/Starsim architecture: at each coarse agent's CIN→cancer decision the cancer pathway is resolved at `N`-finer granularity by spawning fine cancer agents at per-agent `scale = 1/N`, so the rare cancer-pathway events (causal infection, CIN2+, cancer) carry `N`× more samples per run for better-resolved age distributions (methods-manuscript Fig 5) at low agent count.
+  - All per-module HPV results and the demographic body counts are made scale-weighted (people-space-correct) so fine agents do not inflate them: `n_infected`/`n_precin`/`n_cin`/`n_cancerous`/`prevalence`/`new_infections` (`HPV.update_results`), the death tally (`hpv.Level0Deaths`), births (`hpv.Level0Births`), and the sim-level `n_alive`/`new_deaths`/`new_emigrants` (`hpv.Level0People`). Fine agents are excluded from the sexual network and from the `AgeMigration` level0 body count. `HPVTotal` was already scale-weighted.
+  - *Regression information:* none at `ms_agent_ratio=1` — the feature is bit-identical to the prior code (verified: no fine agents ⇒ scale-weighting reduces to the raw counts, demographics use their fast paths). `ms_agent_ratio>1` is reproducible (slot-keyed CRN, no process-dependent randomness) but, by design, not bit-identical to a single-scale run (it grows agents).
+  - Scope/known residuals (documented in the design doc and `tests/test_multiscale_distribution.py`): multiscaling covers the cancer pathway only; causal-infection-age and the cancer-age across-seed median are transmission-floor-limited (not tightened); the total cancer count carries a small config-dependent residual (~±8%); and the per-genotype cancer split shifts modestly in multi-genotype runs (fine agents lack other-genotype state, so they skip the cross-genotype cancer competition).
+  - Design + plan: `docs/superpowers/specs/2026-05-28-multiscale-agents-design.md`, `docs/superpowers/plans/2026-05-28-multiscale-agents.md`.
+
 ## Version 2.3.0 (2026-04-20)
 
 - Fixes dt-dependent results by scaling partnership formation rates to
