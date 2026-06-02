@@ -122,7 +122,13 @@ class HPV(ss.Infection):
             # matrix. The CSV's per-genotype rel_imm values are the complete
             # vaccine cross-protection profile. Combining formula (independent
             # protection paths): rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm).
-            ss.FloatArr('vax_imm', label='Vaccine-conferred immunity (this genotype)', default=0.0),
+            # "target genotype": vax_imm[g] is protection AGAINST genotype g,
+            # already resolved per target (the CSV's rel_imm[g] is applied
+            # directly). Contrast nab_imm/cell_imm above, which are "source"
+            # quantities — immunity conferred BY clearing this genotype, which
+            # CrossImmunity then matrix-multiplies to derive protection against
+            # OTHER (target) genotypes.
+            ss.FloatArr('vax_imm', label='Vaccine-conferred immunity (against this/target genotype)', default=0.0),
         )
         # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
         # use site (placeholder p values below).

@@ -19,8 +19,8 @@ from hpvsim.products import vx as _vx
 __all__ = ['BaseVaccination', 'routine_vx', 'campaign_vx']
 
 
-def _coerce_sex(sex):
-    """Coerce v2-style sex input into a set of allowed sex ints (0=F, 1=M).
+def _cast_sex(sex):
+    """Cast v2-style sex input into a set of allowed sex ints (0=F, 1=M).
 
     Accepts:
       - None: no sex filter (returns None)
@@ -43,7 +43,7 @@ def _coerce_sex(sex):
             raise ValueError("sex list must not be empty; pass None for 'no sex filter'")
         out = set()
         for s in sex:
-            out |= _coerce_sex(s)
+            out |= _cast_sex(s)
         return out
     try:
         s_int = int(sex)
@@ -80,7 +80,7 @@ def _compose_eligibility(age_range, sex, extra):
       - sim.people.sex matches sex if sex is set to a single sex
       - extra(sim) if extra is provided (callable returning BoolArr or uids)
     """
-    sex_set = _coerce_sex(sex)
+    sex_set = _cast_sex(sex)
 
     def elig(sim):
         cond = sim.people.alive
@@ -123,7 +123,7 @@ class BaseVaccination(ss.BaseVaccination):
         # M04 AgeResults stratification by vaccination cohort).
         self.age_range = age_range
         self.sex_raw = sex
-        self.sex = _coerce_sex(sex)
+        self.sex = _cast_sex(sex)
         self.eligibility_raw = eligibility
 
     def _parse_product_str(self, product):

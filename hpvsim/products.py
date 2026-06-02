@@ -64,6 +64,12 @@ class vx(ss.Vx):
     dict). Default product names: ``'bivalent'``, ``'quadrivalent'``,
     ``'nonavalent'``.
 
+    In practice almost all callers use ``name`` — the named products in the CSV
+    cover the real-world vaccines. The explicit ``rel_imm`` dict is an
+    escape hatch for ad-hoc / experimental products (e.g. a hypothetical
+    vaccine, or sensitivity sweeps over cross-protection coefficients) and is
+    rarely needed.
+
     The vaccine model mirrors v2's two-parameter architecture:
 
     - ``sterilizing_p`` (default 0.95): per-agent Bernoulli probability of
@@ -116,21 +122,18 @@ class vx(ss.Vx):
         """
         if len(uids) == 0:
             return
-        # Single sterilizing draw per agent (NOT per genotype) — matches v2
+        # Single sterilizing draw per agent (NOT per genotype).
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
-        sterilizing_uids = self._sterilizing_dist.filter(uids)
-        is_sterilizing = np.isin(uids, sterilizing_uids)
+        sterilizing_uids, leaky_uids = self._sterilizing_dist.filter(uids, both=True)
         for genotype, rel_imm_g in self.rel_imm.items():
             hpv_mod = self._find_genotype_module(genotype)
             if hpv_mod is None:
                 continue
             # Sterilizing agents get rel_imm[g]; leaky get rel_imm[g] * sterilizing_p
-            peak = np.where(
-                is_sterilizing,
-                float(rel_imm_g),
-                float(rel_imm_g) * float(self.pars.sterilizing_p),
-            )
-            hpv_mod.vax_imm[uids] = np.maximum(hpv_mod.vax_imm[uids], peak)
+            ster_peak = float(rel_imm_g)
+            leaky_peak = ster_peak * float(self.pars.sterilizing_p)
+            hpv_mod.vax_imm[sterilizing_uids] = np.maximum(hpv_mod.vax_imm[sterilizing_uids], ster_peak)
+            hpv_mod.vax_imm[leaky_uids] = np.maximum(hpv_mod.vax_imm[leaky_uids], leaky_peak)
 
     def _find_genotype_module(self, genotype):
         """Return the HPV module in the sim matching this genotype, or None.

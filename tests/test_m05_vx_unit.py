@@ -165,43 +165,43 @@ def test_vx_administer_empty_uids_is_noop():
     product.administer(sim.people, sim.people.alive.uids[:0])
 
 
-def test_coerce_sex_none_returns_none():
-    from hpvsim.interventions import _coerce_sex
-    assert _coerce_sex(None) is None
+def test_cast_sex_none_returns_none():
+    from hpvsim.interventions import _cast_sex
+    assert _cast_sex(None) is None
 
 
-def test_coerce_sex_f_returns_zero_set():
-    from hpvsim.interventions import _coerce_sex
-    assert _coerce_sex('f') == {0}
+def test_cast_sex_f_returns_zero_set():
+    from hpvsim.interventions import _cast_sex
+    assert _cast_sex('f') == {0}
 
 
-def test_coerce_sex_m_returns_one_set():
-    from hpvsim.interventions import _coerce_sex
-    assert _coerce_sex('m') == {1}
+def test_cast_sex_m_returns_one_set():
+    from hpvsim.interventions import _cast_sex
+    assert _cast_sex('m') == {1}
 
 
-def test_coerce_sex_int_zero_or_one():
-    from hpvsim.interventions import _coerce_sex
-    assert _coerce_sex(0) == {0}
-    assert _coerce_sex(1) == {1}
+def test_cast_sex_int_zero_or_one():
+    from hpvsim.interventions import _cast_sex
+    assert _cast_sex(0) == {0}
+    assert _cast_sex(1) == {1}
 
 
-def test_coerce_sex_list_both():
-    from hpvsim.interventions import _coerce_sex
-    assert _coerce_sex(['f', 'm']) == {0, 1}
-    assert _coerce_sex([0, 1]) == {0, 1}
+def test_cast_sex_list_both():
+    from hpvsim.interventions import _cast_sex
+    assert _cast_sex(['f', 'm']) == {0, 1}
+    assert _cast_sex([0, 1]) == {0, 1}
 
 
-def test_coerce_sex_invalid_raises():
-    from hpvsim.interventions import _coerce_sex
+def test_cast_sex_invalid_raises():
+    from hpvsim.interventions import _cast_sex
     with pytest.raises(ValueError, match='sex'):
-        _coerce_sex('female')
+        _cast_sex('female')
     with pytest.raises(ValueError, match='sex'):
-        _coerce_sex(2)
+        _cast_sex(2)
     with pytest.raises(ValueError, match='sex'):
-        _coerce_sex(['x', 'y'])
+        _cast_sex(['x', 'y'])
     with pytest.raises(ValueError, match='empty'):
-        _coerce_sex([])
+        _cast_sex([])
 
 
 def _make_plain_small_sim(genotypes=('hpv16', 'hpv18', 'hi5', 'ohr')):

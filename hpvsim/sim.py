@@ -23,6 +23,13 @@ Kwargs:
     init_prev curve independently; co-infection at initialisation is possible.
 
   ``v2_compat_demographics`` (bool, default ``False``):
+    .. deprecated::
+       Temporary v2-parity aid, not intended for long-term support. It exists
+       so the M05 parity gate can reproduce v2's discrete-cohort demographics
+       bit-for-bit; it is expected to be removed once the migration is complete
+       and v3's continuous-age behaviour is the only supported convention. Do
+       not build new work on top of this flag.
+
     When True, activates three v2-compatible demographic conventions:
 
     1. **Annual-pulse births.** Swaps ``ss.Births`` for ``hpv.AnnualBirths``
