@@ -248,14 +248,14 @@ def test_multigenotype_total_cancer_unbiased(multigen):
 
 @pytest.mark.slow
 def test_multigenotype_split_bounded(multigen):
-    """The PER-GENOTYPE attribution is only approximately preserved. The ledger
-    resolves each genotype's extra sub-cancers independently, so they skip the
-    cross-genotype cancer competition (`_cancel_other_genotype_progression_for`)
-    that, in single-scale, lets the more-oncogenic genotype win co-infections
-    (the agents' OWN cancers still compete; only the ledger extras do not). This
-    shifts the hpv16 share modestly toward the less-oncogenic genotype. This test
-    BOUNDS that known shift (it does not eliminate it); fully removing it would
-    require cross-genotype arbitration of the ledger events at realization."""
+    """The PER-GENOTYPE attribution is only approximately preserved. Each ledger
+    sub-cancer is keyed by (source uid, sub-resolution index) and a sim-shared
+    registry enforces one cancer per sub-individual ACROSS genotypes (mirroring,
+    for the extras, the agent-level `_cancel_other_genotype_progression_for` that
+    handles sub-resolution 0). This removes the same-sub-individual double-count,
+    but the competition is resolved by earliest realized onset rather than by the
+    full severity-coupled cross-genotype dynamics single-scale uses, so a small
+    residual share shift remains. This test BOUNDS it (does not eliminate it)."""
     a1, aN = multigen
     share1 = (a1[:, 0] / a1.sum(1)).mean()
     shareN = (aN[:, 0] / aN.sum(1)).mean()

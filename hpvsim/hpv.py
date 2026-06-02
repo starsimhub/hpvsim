@@ -222,6 +222,12 @@ class HPV(ss.Infection):
         self._led_onset = {}
         self._led_death = {}
         self._cancer_events = []
+        # Sim-shared registry (uid, sub_idx) -> onset ti of the first realized
+        # cancer for that sub-individual, used by _realize_ledger to enforce
+        # one cancer per sub-individual ACROSS genotypes (and across reinfection
+        # episodes). Reset here so a fresh init() starts empty; all genotype
+        # modules share the one dict on the sim.
+        self.sim._ms_cancer_claims = {}
         return
 
     def finalize_results(self):
@@ -441,7 +447,10 @@ class HPV(ss.Infection):
         ti = int(self.ti)
         m = ratio - 1  # extras per agent
 
-        seed = (int(self.sim.pars.rand_seed) * 2654435761
+        # rand_seed may be None (Starsim's "unseeded run" idiom); coerce to 0 so
+        # the side-RNG seed arithmetic does not raise.
+        rand_seed = int(self.sim.pars.rand_seed or 0)
+        seed = (rand_seed * 2654435761
                 + ti * 40503
                 + zlib.crc32(self.genotype.encode())) & 0x7FFFFFFF
         rng = np.random.default_rng(seed)
@@ -451,9 +460,16 @@ class HPV(ss.Infection):
             sig2 = np.log(1.0 + (std / mean) ** 2)
             return rng.lognormal(np.log(mean) - 0.5 * sig2, np.sqrt(sig2), size)
 
-        # Per-agent context broadcast to the n*m extras.
+        # Per-agent context broadcast to the n*m extras. sub_idx labels each
+        # extra with a stable sub-resolution index 1..ratio-1 within its source
+        # coarse agent; (source uid, sub_idx) identifies one sub-individual and
+        # is the key used at realization to enforce one-cancer-per-sub-individual
+        # ACROSS genotypes (the cross-genotype competition that, for the agent
+        # itself = sub-resolution 0, is handled by the agent-level
+        # _cancel_other_genotype_progression_for).
         infection_age = np.repeat(np.asarray(ppl.age[cin_uids], dtype=float), m)
         src_uid = np.repeat(np.asarray(cin_uids), m)
+        sub_idx = np.tile(np.arange(1, ratio, dtype=int), n)
         rel_sev = np.repeat(np.asarray(rel_sev_cin, dtype=float), m)
         amod = np.repeat(np.asarray(age_mod, dtype=float), m)
         sev_imm = np.repeat(np.asarray(sev_imm_cin, dtype=float), m)
@@ -500,11 +516,12 @@ class HPV(ss.Infection):
         onset_ti = ti + np.round((precin_yr[keep] + dcin[keep]) / dt_yr).astype(int)
         death_ti = onset_ti + np.round(dcan / dt_yr).astype(int)
         kept_uid = src_uid[keep]
+        kept_sub = sub_idx[keep]
         w = 1.0 / ratio
-        for u, ca, cia, cca, da, oti, dti in zip(
-                kept_uid, causal, cin_age, cancer_age, death_age, onset_ti, death_ti):
+        for u, j, ca, cia, cca, da, oti, dti in zip(
+                kept_uid, kept_sub, causal, cin_age, cancer_age, death_age, onset_ti, death_ti):
             self._led_onset.setdefault(int(oti), []).append(
-                (int(u), float(ca), float(cia), float(cca), float(da), int(dti), w))
+                (int(u), int(j), float(ca), float(cia), float(cca), float(da), int(dti), w))
         return
 
     def _realize_ledger(self, ti):
@@ -525,6 +542,17 @@ class HPV(ss.Infection):
         so a source scheduled for cancer that dies of BACKGROUND causes first
         (onset after death) correctly still competes.
 
+        Cross-genotype competition: a sub-individual ``(source uid, sub_idx)``
+        may get cancer in at most ONE genotype (cancer is terminal — the person
+        dies of the first one). The realized cancers are recorded in a sim-shared
+        ``_ms_cancer_claims`` registry keyed by ``(uid, sub_idx)``; an extra whose
+        sub-individual is already claimed (by an earlier-onset cancer in this or
+        another genotype) is suppressed, mirroring single-scale's first-cancer-
+        wins cancellation (``_cancel_other_genotype_progression_for``) which
+        handles sub-resolution 0, the agent itself. The claim persists for the
+        run, so an already-cancered sub-individual is not re-counted if its coarse
+        source reinfects and reaches CIN again.
+
         Realized onsets add their pathway ages to ``_cancer_events`` and schedule
         the matching cancer death into ``_led_death``. Events whose ti falls past
         the sim window are never popped, so they are correctly truncated. Pure
@@ -533,6 +561,7 @@ class HPV(ss.Infection):
         ppl = self.sim.people
         alive = ppl.alive.raw
         res = self.results
+        claims = self.sim._ms_cancer_claims  # shared (uid, sub_idx) -> claimed
 
         # Precompute per-uid "available" once (used by both onset and death
         # realization): alive, or removed by its own cancer (not a competing
@@ -550,9 +579,13 @@ class HPV(ss.Infection):
         if onsets:
             n_w = 0.0
             age_w = 0.0
-            for (u, causal, cin_age, cancer_age, death_age, death_ti, w) in onsets:
+            for (u, j, causal, cin_age, cancer_age, death_age, death_ti, w) in onsets:
                 if not available[u]:
                     continue
+                key = (u, j)
+                if key in claims:
+                    continue  # this sub-individual already got cancer (cross-genotype / earlier episode)
+                claims[key] = ti
                 n_w += w
                 age_w += cancer_age * w
                 self._cancer_events.append((causal, cin_age, cancer_age, w))
