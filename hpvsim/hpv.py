@@ -456,6 +456,13 @@ class HPV(ss.Infection):
         rng = np.random.default_rng(seed)
 
         def _ln(dist, size):  # side-sample lognormal durations (years)
+            # Same ex->im (mean/std -> mu/sigma) conversion as
+            # ss.lognorm_ex.convert_ex_to_im, inlined because that method
+            # mutates the dist's _pars in place (so it can't be called on the
+            # live p.dur_* objects) and because we must draw on our own
+            # side-RNG, not the dist's slot-keyed CRN. The formula is the
+            # standard lognormal parameterization and is fixed, so it cannot
+            # drift from the dist's own draws.
             mean = float(dist.pars['mean']); std = float(dist.pars['std'])
             sig2 = np.log(1.0 + (std / mean) ** 2)
             return rng.lognormal(np.log(mean) - 0.5 * sig2, np.sqrt(sig2), size)
@@ -470,6 +477,15 @@ class HPV(ss.Infection):
         infection_age = np.repeat(np.asarray(ppl.age[cin_uids], dtype=float), m)
         src_uid = np.repeat(np.asarray(cin_uids), m)
         sub_idx = np.tile(np.arange(1, ratio, dtype=int), n)
+        # Per-extra weight = source's per-agent scale / ratio, captured here
+        # while the source is alive. Matches the own-cancer tally's
+        # ``w_own * people.scale`` convention in step_state, so own and extra
+        # cancers use one weighting rule (uniform 1/ratio today, since hpvsim
+        # keeps people.scale==1 and applies population scaling via the global
+        # pop_scale; this stays correct if a future feature varies per-agent
+        # scale). Captured at schedule time, not read at realization, to avoid
+        # depending on a dead source's scale.
+        src_scale = np.repeat(np.asarray(ppl.scale[cin_uids], dtype=float), m)
         rel_sev = np.repeat(np.asarray(rel_sev_cin, dtype=float), m)
         amod = np.repeat(np.asarray(age_mod, dtype=float), m)
         sev_imm = np.repeat(np.asarray(sev_imm_cin, dtype=float), m)
@@ -517,30 +533,20 @@ class HPV(ss.Infection):
         death_ti = onset_ti + np.round(dcan / dt_yr).astype(int)
         kept_uid = src_uid[keep]
         kept_sub = sub_idx[keep]
-        w = 1.0 / ratio
-        for u, j, ca, cia, cca, da, oti, dti in zip(
-                kept_uid, kept_sub, causal, cin_age, cancer_age, death_age, onset_ti, death_ti):
+        kept_w = src_scale[keep] / ratio
+        for u, j, ca, cia, cca, da, oti, dti, w in zip(
+                kept_uid, kept_sub, causal, cin_age, cancer_age, death_age,
+                onset_ti, death_ti, kept_w):
             self._led_onset.setdefault(int(oti), []).append(
-                (int(u), int(j), float(ca), float(cia), float(cca), float(da), int(dti), w))
+                (int(u), int(j), float(ca), float(cia), float(cca), float(da), int(dti), float(w)))
         return
 
     def _realize_ledger(self, ti):
         """Realize the ledger's scheduled extra sub-cancers/deaths due at ``ti``.
 
-        An extra is realized only if its source agent is "available" — a shared
-        competing risk standing in for the sub-individual's own background
-        mortality / emigration. ``available`` = the source is still alive, OR it
-        was removed by its OWN cancer. The cancer-death case is excluded from the
-        competing risk because a coarse agent represents ``ratio`` DIFFERENT
-        people: the source dying of its own cancer says nothing about whether a
-        sibling sub-individual (who got cancer independently) would be alive —
-        whereas the source dying of background causes or emigrating IS a valid,
-        correctly-rated sample of the shared background hazard those siblings
-        face. Without this exclusion, late-onset extras of a cancer-drawing
-        source are over-suppressed (~-5% count bias). "Removed by own cancer" is
-        detected as ``became cancerous (in any genotype) at/before its death``,
-        so a source scheduled for cancer that dies of BACKGROUND causes first
-        (onset after death) correctly still competes.
+        An extra is realized only if its source agent is "available" (a shared
+        competing-risk proxy for the sub-individual's background mortality /
+        emigration — see ``_sources_available``).
 
         Cross-genotype competition: a sub-individual ``(source uid, sub_idx)``
         may get cancer in at most ONE genotype (cancer is terminal — the person
@@ -558,29 +564,16 @@ class HPV(ss.Infection):
         the sim window are never popped, so they are correctly truncated. Pure
         results overlay — touches no agent state.
         """
-        ppl = self.sim.people
-        alive = ppl.alive.raw
         res = self.results
         claims = self.sim._ms_cancer_claims  # shared (uid, sub_idx) -> claimed
 
-        # Precompute per-uid "available" once (used by both onset and death
-        # realization): alive, or removed by its own cancer (not a competing
-        # risk for the different sub-individuals the extras represent).
-        ti_dead = np.asarray(ppl.ti_dead.raw)
-        died = np.isfinite(ti_dead)
-        cancer_before_death = np.zeros(len(alive), dtype=bool)
-        for m in self.sim.diseases.values():
-            if isinstance(m, HPV):
-                tc = np.asarray(m.ti_cancerous.raw)
-                cancer_before_death |= np.isfinite(tc) & (tc <= ti_dead)
-        available = alive | (died & cancer_before_death)
-
         onsets = self._led_onset.pop(ti, None)
         if onsets:
+            avail = self._sources_available([e[0] for e in onsets])
             n_w = 0.0
             age_w = 0.0
-            for (u, j, causal, cin_age, cancer_age, death_age, death_ti, w) in onsets:
-                if not available[u]:
+            for ok, (u, j, causal, cin_age, cancer_age, death_age, death_ti, w) in zip(avail, onsets):
+                if not ok:
                     continue
                 key = (u, j)
                 if key in claims:
@@ -596,10 +589,11 @@ class HPV(ss.Infection):
 
         deaths = self._led_death.pop(ti, None)
         if deaths:
+            avail = self._sources_available([e[0] for e in deaths])
             n_w = 0.0
             age_w = 0.0
-            for (u, death_age, w) in deaths:
-                if not available[u]:
+            for ok, (u, death_age, w) in zip(avail, deaths):
+                if not ok:
                     continue
                 n_w += w
                 age_w += death_age * w
@@ -607,6 +601,36 @@ class HPV(ss.Infection):
                 res.new_cancer_deaths[ti] += n_w
                 res.sum_age_at_cancer_death[ti] += age_w
         return
+
+    def _sources_available(self, uids):
+        """Boolean array (aligned with ``uids``): is each ledger source agent
+        "available" for its extra to realize? ``available`` = the source is still
+        alive, OR it was removed by its OWN cancer (``became cancerous in any
+        genotype at/before death``). The own-cancer case is excluded from the
+        competing risk because a coarse agent represents ``ratio`` DIFFERENT
+        people: the source dying of its own cancer says nothing about whether a
+        sibling sub-individual (who got cancer independently) would be alive,
+        whereas its background death / emigration IS a valid, correctly-rated
+        sample of the shared hazard those siblings face. (Without the exclusion,
+        late-onset extras of a cancer-drawing source are over-suppressed, ~-5%.)
+
+        Single source of the competing-risk gate for both onset and death
+        realization, evaluated only over the (small) set of event source uids
+        for this step rather than the whole — growing — population array.
+        """
+        ppl = self.sim.people
+        uids = np.asarray(uids)
+        avail = np.asarray(ppl.alive.raw[uids]).copy()
+        td = np.asarray(ppl.ti_dead.raw)[uids]
+        died = np.isfinite(td)
+        if died.any():
+            cancer_before_death = np.zeros(len(uids), dtype=bool)
+            for mod in self.sim.diseases.values():
+                if isinstance(mod, HPV):
+                    tc = np.asarray(mod.ti_cancerous.raw)[uids]
+                    cancer_before_death |= np.isfinite(tc) & (tc <= td)
+            avail |= died & cancer_before_death
+        return avail
 
     def _cancel_other_genotype_progression_for(self, uids):
         """Mirror v2's check_cancer cross-genotype cancellation.
