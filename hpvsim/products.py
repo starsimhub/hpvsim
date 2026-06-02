@@ -30,14 +30,6 @@ def _iter_hpv_modules(sim):
             yield module
 
 
-def _find_genotype_module(sim, genotype):
-    """Return the HPV module in the sim matching this genotype, or None."""
-    for module in _iter_hpv_modules(sim):
-        if module.genotype == genotype:
-            return module
-    return None
-
-
 @functools.lru_cache(maxsize=1)
 def _load_vx_products():
     """Load the CSV and return a mapping of product name -> {genotype: rel_imm}.
@@ -265,11 +257,11 @@ class vx(ss.Vx):
     def _find_genotype_module(self, genotype):
         """Return the HPV module in self.sim matching this genotype, or None.
 
-        Backward-compatible instance method — delegates to the module-level
-        helper of the same name. Kept on hpv.vx for callers that hold a vx
-        product instance rather than a sim reference.
+        Backward-compatible instance method — delegates to the shared
+        ``utils.find_genotype_module`` helper. Kept on hpv.vx for callers that
+        hold a vx product instance rather than a sim reference.
         """
-        return _find_genotype_module(self.sim, genotype)
+        return find_genotype_module(self.sim, genotype)
 
 
 def _state_uids_for_module(module, state, uids):
@@ -502,7 +494,7 @@ class txvx(ss.Vx):
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
         is_sterilizing = self._sterilizing_dist.rvs(uids)
         for genotype, rel_imm_g in self.rel_imm.items():
-            module = _find_genotype_module(self.sim, genotype)
+            module = find_genotype_module(self.sim, genotype)
             if module is None:
                 continue  # inactive-genotype tolerance
             peak = np.where(

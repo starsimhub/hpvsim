@@ -1,6 +1,7 @@
 """Unit tests for module-level helpers shared across products."""
 import hpvsim as hpv
-from hpvsim.products import _iter_hpv_modules, _find_genotype_module
+from hpvsim.products import _iter_hpv_modules
+from hpvsim.utils import find_genotype_module
 
 
 def _two_genotype_sim():
@@ -20,11 +21,11 @@ def test_iter_hpv_modules_returns_hpv_only():
 
 def test_find_genotype_module_returns_match():
     sim = _two_genotype_sim()
-    m = _find_genotype_module(sim, 'hpv16')
+    m = find_genotype_module(sim, 'hpv16')
     assert m is not None
     assert m.genotype == 'hpv16'
 
 
 def test_find_genotype_module_returns_none_for_unknown():
     sim = _two_genotype_sim()
-    assert _find_genotype_module(sim, 'unknown_genotype') is None
+    assert find_genotype_module(sim, 'unknown_genotype') is None
