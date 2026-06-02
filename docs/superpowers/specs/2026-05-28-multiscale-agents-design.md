@@ -24,6 +24,9 @@ a release blocker" (`MIGRATION_PLAN.md:358`).
 > different people, so its own cancer must not suppress a sibling's independent
 > cancer) — this keeps the count residual to ~-1%. See the `_multiscale_ledger`/
 > `_realize_ledger` methods in `hpvsim/hpv.py` and `tests/test_multiscale*.py`.
+> For a complete writeup of v2's technique, all three v3 approaches tried
+> (binomial-on-original, grow, ledger), and their pros/cons/limiting factors,
+> see `docs/multiscale-agents.md`.
 
 ---
 
