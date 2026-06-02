@@ -8,166 +8,182 @@ While running individual sims can be interesting for simple explorations, at som
 
 
 <div class="alert alert-info">
-    
+
 Click [here](https://mybinder.org/v2/gh/institutefordiseasemodeling/hpvsim/HEAD?urlpath=lab%2Ftree%2Fdocs%2Ftutorials%2Ftut_running.ipynb) to open an interactive version of this notebook.
-    
+
 </div>
 
-## Running with MultiSims
+## Multi-seed runs and scenario sweeps
 
-The most common way to run multiple simulations is with the *MultiSim* object. As the name suggests, this is a relatively simple container for a number of sims. However, it contains powerful methods for plotting, statistics, and running all the sims in parallel.
+HPVsim v3 uses Starsim's native multi-sim machinery — `ss.MultiSim`,
+`ss.parallel`, and Sciris's `sc.parallelize` — for replicate runs,
+scenario comparisons, and parameter sweeps. v2's `hpv.Scenarios` class
+has been removed; the pattern below is the Starsim-native replacement.
 
-### Running one sim with uncertainty
+### Replicate runs (multi-seed UQ)
 
-Making and running a multisim based on a single sim is pretty easy:
+Making and running a MultiSim based on a single sim is straightforward.
+Passing `n_runs=N` automatically creates N copies of the sim with
+different random seeds:
 
 ```{python}
 import hpvsim as hpv
-hpv.options(jupyter=True, verbose=0)
+import starsim as ss
 
-sim = hpv.Sim()
-msim = hpv.MultiSim(sim)
-msim.run(n_runs=5)
-msim.plot();
+sim = hpv.Sim(
+    n_agents=10_000,
+    location='nigeria',
+    genotypes=[16, 18, 'hi5', 'ohr'],
+    start=1990,
+    stop=2030,
+    verbose=0,
+)
+msim = ss.MultiSim(sim, n_runs=5)
+msim.run(verbose=0)
+msim.plot()
 ```
 
-If you run a multisim with a single sim input as above, it will change the random seed for each sim, which is what leads to the variability you see.
-
-By default, the multisim simply plots each simulation. These simulations are stored in the `sims` attribute, which is just a simple list of sims:
+The individual sim results are stored in `msim.sims`. You can inspect them directly:
 
 ```{python}
-for sim in msim.sims:
-    sim.brief()
+for s in msim.sims:
+    s.brief()
 ```
 
-However, you often don't care about the individual sims (especially when you run the same parameters with different random seeds); you want to see the *statistics* for the sims. You can calculate either the mean or the median of the results across all the sims as follows:
+Often you care about *statistics* across seeds rather than individual runs. Call
+`.median()` or `.mean()` to reduce the MultiSim in place and expose quantile
+ribbons in plots:
 
 ```{python}
-msim.mean()
-msim.plot('infections');
+msim.median()   # mutates msim in place; computes median + 10/90 quantiles
+msim.plot()
 ```
 
-```{python}
-msim.median()
-msim.plot('infections');
-```
+Note that `.median()` and `.mean()` **mutate** the MultiSim in place. Prefer
+`.median()` for metrics like cancers, infections, and prevalence: these are
+rarely normally distributed across seeds, so a mean ± 2 SD band is not a true
+95% CI and its lower edge can fall below zero.
 
-You can see these are similar, but slightly different. You can also treat each of the individual sims as part of a larger single sim, and "combine" the results into one sim:
+### Comparing scenarios
 
-```{python}
-msim.combine()
-msim.plot('infections');
-```
-
-Note how now there is no uncertainty and the total number of infections is 5x higher than in the previous plots, since we just added 5 different sims together.
-
-Each of these operations modifies the `msim.base_sim` object, and does not affect the actual list of stored sims, which is why you can go back and forth between them.
-
-### Running different sims
-
-Often you don't want to run the same sim with different seeds, but instead want to run a set of different sims. That's also very easy -- for example, here's how you would do a sweep across relative transmissibility of HPV:
+For scenario comparisons, write a `make_sim(seed, scenario)` function that
+builds one sim per scenario, and pass the labeled sims to `ss.parallel`. This
+is the Starsim-native replacement for v2's `hpv.Scenarios`:
 
 ```{python}
-#| collapsed: false
-#| pycharm: {name: "#%%\n"}
-import numpy as np
+import hpvsim as hpv
+import starsim as ss
 
-rel_trans_vals = np.linspace(0.1, 0.8, 5) # Sweep from 0.5 to 1.5 with 5 values
-sims = []
-for rel_trans in rel_trans_vals:
-    sim = hpv.Sim(beta=rel_trans, label=f'Rel trans HPV = {rel_trans}')
-    sims.append(sim)
-msim = hpv.MultiSim(sims)
-msim.run()
-msim.plot('infections');
-```
-
-As you would expect, the more transmissible people with HPV are, the more infections we get.
-
-Finally, note that you can use multisims to do very compact scenario explorations -- here we are using the command `hpv.parallel()`, which is an alias for `hpv.MultiSim().run()`:
-
-```{python}
-def custom_vx(sim):
-    if sim.yearvec[sim.t] == 2000:
-        target_group = (sim.people.age>9) * (sim.people.age<14)
-        sim.people.peak_imm[0, target_group] = 1
-
-pars = dict(
-    location = 'tanzania', # Use population characteristics for Japan
-    n_agents = 10e3, # Have 50,000 people total in the population
-    start = 1980, # Start the simulation in 1980
-    n_years = 50, # Run the simulation for 50 years
-    burnin = 10, # Discard the first 20 years as burnin period
-    verbose = 0, # Do not print any output
+PARS = dict(
+    n_agents=10_000,
+    location='nigeria',
+    genotypes=[16, 18, 'hi5', 'ohr'],
+    start=1990,
+    stop=2030,
+    verbose=0,
 )
 
-# Running with multisims -- see Tutorial 3
-s1 = hpv.Sim(pars, label='Default')
-s2 = hpv.Sim(pars, interventions=custom_vx, label='Custom vaccination')
-hpv.parallel(s1, s2).plot(['hpv_incidence', 'cancer_incidence']);
+def make_sim(seed, coverage):
+    """Make a sim for a given random seed and coverage level."""
+    return hpv.Sim(
+        **PARS,
+        rand_seed=seed,
+        label=f'coverage={coverage:.0%}',
+        interventions=[hpv.routine_vx(
+            product='bivalent',
+            prob=float(coverage),
+            age_range=[9, 14],
+            sex='f',
+            start_year=2010,
+        )],
+    )
+
+sims = [make_sim(seed=0, coverage=c) for c in [0.0, 0.3, 0.6, 0.9]]
+msim = ss.parallel(*sims, verbose=0)
+msim.plot()
 ```
+
+As expected, higher vaccination coverage leads to fewer HPV infections and
+cancers over time.
+
+### Sweeping parameters with multi-seed UQ
+
+Combine both techniques: build a grid of (coverage, seed) pairs in a list
+comprehension, run all sims with `ss.parallel`, then group results by scenario
+for per-scenario median reduction:
+
+```{python}
+import hpvsim as hpv
+import starsim as ss
+
+PARS = dict(
+    n_agents=10_000,
+    location='nigeria',
+    genotypes=[16, 18, 'hi5', 'ohr'],
+    start=1990,
+    stop=2030,
+    verbose=0,
+)
+
+def make_sim(seed, coverage):
+    return hpv.Sim(
+        **PARS,
+        rand_seed=seed,
+        label=f'coverage={coverage:.0%}',
+        interventions=[hpv.routine_vx(
+            product='bivalent',
+            prob=float(coverage),
+            age_range=[9, 14],
+            sex='f',
+            start_year=2010,
+        )],
+    )
+
+COVERAGES = [0.0, 0.3, 0.6, 0.9]
+N_SEEDS = 10
+
+# Build all sims up front, then run in one parallel batch
+sims = [make_sim(seed=s, coverage=c)
+        for c in COVERAGES for s in range(N_SEEDS)]
+msim = ss.parallel(*sims, verbose=0)
+
+# Group by scenario label and reduce each group independently
+by_cov = {}
+for cov in COVERAGES:
+    sub = ss.MultiSim([s for s in msim.sims
+                       if s.label.startswith(f'coverage={cov:.0%}')])
+    sub.median()
+    by_cov[cov] = sub
+```
+
+For large grids (hundreds of sims), replace the list comprehension with
+`sc.parallelize` for parallel sim *creation* as well as parallel execution.
+Because `sc.parallelize` uses multiprocessing, `make_sim` must be defined at
+module level (not inside a notebook cell), and the call must be protected with
+`if __name__ == '__main__':`. A full worked example using `sc.parallelize` is
+in `examples/m07_uq_sweep.py`.
 
 <div class="alert alert-warning">
 
-**Warning:** Because `multiprocess` pickles the sims when running them, `sims[0]` (before being run by the multisim) and `msim.sims[0]` are **not** the same object. After calling `msim.run()`, always use sims from the multisim object, not from before. In contrast, if you *don't* run the multisim (e.g. if you make a multisim from already-run sims), then `sims[0]` and `msim.sims[0]` are indeed exactly the same object.
+**Warning:** Because `multiprocess` pickles the sims when running them,
+`sims[i]` (before being run) and `msim.sims[i]` are **not** the same object.
+After calling `ss.parallel(...)` or `msim.run()`, always retrieve sims from
+the MultiSim object (`msim.sims`), not from the original list. Conversely, if
+you construct a MultiSim from *already-run* sims (e.g. `ss.MultiSim(sims)` where
+each `s` in `sims` has already been run), the objects are the same.
 
 </div>
 
-### Advanced usage
+### Migrating from v2's `hpv.Scenarios`
 
-Finally, you can also merge or split different multisims together. Here's an example that's similar to before, except it shows how to run a multisim of different seeds for the same `rel_trans` value, but then merge multisims for different `rel_trans` values together into one multisim:
+| v2 pattern | v3 replacement |
+|---|---|
+| `hpv.Scenarios(scenarios={'low': {...}, 'high': {...}})` | `make_sim(seed, scenario)` + `ss.parallel(*sims)` |
+| `scens.run()` | `ss.parallel(*sims)` |
+| `scens.results['low']` | filter `msim.sims` by label, wrap in `ss.MultiSim` |
+| `hpv.MultiSim(sim, n_runs=N)` | `ss.MultiSim(sim, n_runs=N)` (same name in Starsim) |
+| `hpv.parallel(s1, s2)` | `ss.parallel(s1, s2)` (same name in Starsim) |
+| `hpv.MultiSim.merge(msims)` | combine sim lists with `+` and re-wrap: `ss.MultiSim(msim1.sims + msim2.sims)` |
 
-```{python}
-n_sims = 3
-rel_trans_vals = [0.25, 0.5, 0.75]
-
-msims = []
-for rel_trans in rel_trans_vals:
-    sims = []
-    for s in range(n_sims):
-        sim = hpv.Sim(n_agents=10e3, beta=rel_trans, rand_seed=s, label=f'Rel trans = {rel_trans}')
-        sims.append(sim)
-    msim = hpv.MultiSim(sims)
-    msim.run()
-    msim.mean()
-    msims.append(msim)
-
-merged = hpv.MultiSim.merge(msims, base=True)
-merged.plot(color_by_sim=True);
-```
-
-As you can see, running this way lets you run not just different values, but run different values with uncertainty. Which brings us to...
-
-## Running with Scenarios
-
-Most of the time, you'll want to run with multisims since they give you the most flexibility. However, in certain cases, Scenario objects let you achieve the same thing more simply. Unlike MultiSims, which are completely agnostic about what sims you include, scenarios always start from the same base sim. They then modify the parameters as you specify, and finally add uncertainty, if desired. For example, this shows how you'd use scenarios to run the example similar to the one above.
-
-```{python}
-# Set base parameters -- these will be shared across all scenarios
-basepars = {'n_agents':10e3} 
-
-# Configure the settings for each scenario
-scenarios = {'baseline': {
-              'name':'Baseline',
-              'pars': {}
-              },
-            'high_rel_trans': {
-              'name':'High rel trans (0.75)',
-              'pars': {
-                  'beta': 0.75,
-                  }
-              },
-            'low_rel_trans': {
-              'name':'Low rel trans(0.25)',
-              'pars': {
-                  'beta': 0.25,
-                  }
-              },
-             }
-
-# Run and plot the scenarios
-scens = hpv.Scenarios(basepars=basepars, scenarios=scenarios)
-scens.run()
-scens.plot();
-```
-
+A full worked example — 4 × 20 (coverage × seed) routine-vx sweep with
+median + 10/90 quantile cancer plots — lives in `examples/m07_uq_sweep.py`.

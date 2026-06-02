@@ -1,10 +1,10 @@
-"""Regenerate v2.3 baselines for the HPV16 (M02) and 4-genotype (M03) anchor scenarios.
+"""Regenerate v2.3 baselines for the M01 (HPV16 transmission-only), M02 (HPV16 full natural history), and M03 (4-genotype) anchor scenarios.
 
 Run this script INSIDE a Python environment that has hpvsim==2.3.x installed
 (e.g. the local hpvsim_v23_frozen clone, or a fresh `pip install hpvsim==2.3`
 venv). The v3 active package is NOT used here — only the v2.3 hpvsim API.
 
-Two regen entrypoints are provided:
+Three regen entrypoints are provided:
 
   regen_hpv16()  — M02 single-genotype HPV16 baseline (original).
                    Output: tests/regression_baselines/anchor_hpv16.json
@@ -18,6 +18,9 @@ Two regen entrypoints are provided:
                      tests/regression_baselines/anchor_4genotype_trajectory.json
                        time-series of cum_cancers and cum_infections for the
                        trajectory parity test.
+
+  M01 multi-seed baseline (no dedicated single-seed entrypoint): see
+    multi_seed_v2.py --anchor m01 --n 30 for the M07 multi-seed sweep.
 
 Key v2-vs-v3 syntax differences honored here:
   - v3 PARS uses ``genotype='hpv16'``; v2 expects ``genotypes=['hpv16']``.
@@ -142,6 +145,54 @@ PARS_4GENOTYPE = dict(
                              # (1 - .) inside the per-act prob, so eff_condoms=0
                              # makes (1 - 0) = 1 → no reduction.
 )
+
+# ---------------------------------------------------------------------------
+# M01 — single-genotype HPV16 transmission-only anchor PARS
+# Pinned to match tests/regression/anchor_m01.py:PARS at v3, with v2's API
+# differences applied (genotypes is a list; v2 calls 'stop' -> 'end').
+# Transmission-only: we do not disable progression knobs explicitly because v2
+# does not expose a single "disable progression" toggle; the M01 v2 baseline
+# is generated with v2's default progression machinery active. The M01 summary
+# only reports infections + prevalence + total population, so the cancer
+# machinery's presence does not affect the M01 metrics.
+# ---------------------------------------------------------------------------
+
+PARS_HPV16_TRANSMISSION_ONLY = dict(
+    n_agents=10_000,
+    location='nigeria',
+    genotypes=['hpv16'],
+    start=1990,
+    end=2030,                  # v2 calls it 'end', not 'stop'
+    dt=0.25,
+    rand_seed=0,
+    verbose=0,
+    pop_scale=1,
+    total_pop=10_000,
+    ms_agent_ratio=1,
+    eff_condoms=0,
+)
+
+
+# Alias for compatibility with M07 callers that import the M02 anchor PARS
+# by its milestone-qualified name.
+PARS_HPV16 = PARS
+
+
+def _summary_v2_m01(sim, gen_idx):
+    """v2-side M01 summary: 3 transmission-only metrics matching
+    short_summary_m01.METRIC_KEYS_M01."""
+    res = sim.results
+    inf_arr = np.asarray(res['infections_by_genotype'][gen_idx], dtype=float)
+    n_inf = float(inf_arr.sum())
+    prev_arr = np.asarray(res['hpv_prevalence_by_genotype'][gen_idx], dtype=float)
+    mean_prev_pct = 100.0 * float(prev_arr.mean())
+    total_pop = float(np.asarray(res['n_alive'])[-1])
+    return {
+        'total HPV infections': n_inf,
+        'mean HPV prevalence (%)': mean_prev_pct,
+        'total population': total_pop,
+    }
+
 
 # Canonical genotype key order that v2 stores in genotype_map after normalisation.
 # v2 parameters.py:268-273 maps '16' -> 'hpv16', 'hi5hpv' -> 'hi5', etc.

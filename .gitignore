@@ -1,5 +1,6 @@
 # HPVsim-generated files
 *.obj
+*.png
 files/
 
 # Quarto

@@ -79,7 +79,8 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 | M4: Calibration loop | 🟡 In progress | branch `m04-calibration-loop` |
 | M5 | 🟡 Implementation complete; PR not yet opened | branch `m05-vaccination-scenarios` |
 | M6: Test-and-treat cascade | 🟡 In progress | branch `m06-test-and-treat-cascade` |
-| M7–M10 | ⬜ Not started | — |
+| M7: MultiSim and scenarios | 🟡 In progress | branch `m07-multisim` |
+| M8–M10 | ⬜ Not started | — |
 
 ### M0: Foundation
 
@@ -290,10 +291,12 @@ campaign anchor), and the rationale for the |z| < 5 gate.
 
 **Sub-tasks:**
 - Verify `ss.MultiSim` works with `hpv.Sim` (multi-seed runs, result aggregation, median + quantiles).
-- Port the `Scenarios` class for parameter sweeps and intervention comparisons.
-- Port the `Sweep` class for systematic parameter variation.
-- Verify `ss.parallel()` works with proper random-seed handling.
-- Re-run M1–M6 acceptance tests under proper uncertainty quantification (overlap intervals, not deterministic-seed equality).
+- Verify `ss.parallel()` works with proper random-seed handling (same-seed reproducibility, copy_inputs semantics, inplace semantics).
+- Retrofit M01 and M02 acceptance tests onto multi-seed z-score parity gates matching the M03 standard (`|z| < 3` over 30 v3 seeds vs 30 v2 seeds). M03 and M05 already pass under multi-seed gates; M04 (calibration) and M06 (screen-and-treat) own their own UQ as part of their milestone scopes.
+- Add a shared `parity_gate()` helper in `tests/regression/parity.py` consumed by the new M01/M02 tests. Refactoring M03/M05 tests onto the helper is tracked as a post-merge follow-up.
+- Demo: `examples/m07_uq_sweep.py` — 4 × 20 (coverage × seed) routine-vx sweep on the M05 Nigeria anchor, with median + 10/90 quantile cancer-incidence-by-age plot. Smoke variant at `tests/test_m07_demo_smoke.py`.
+- Rewrite `docs/tutorials/tut_running.qmd`'s v2 `Scenarios` section onto Starsim-native `make_sim(seed, scenario)` + `ss.parallel` / `sc.parallelize` pattern.
+- **Dropped from M07 scope:** no `hpv.Scenarios` or `hpv.Sweep` shim; users use Starsim-native APIs directly. Validation repos (`hpvsim_methods_manuscript`, etc.) drop `hpv.Scenarios` imports as a separate post-M07 PR per repo, coordinated with Robyn per RACI.
 
 ### M8: HIV–HPV co-infection
 
