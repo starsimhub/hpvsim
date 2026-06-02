@@ -57,14 +57,13 @@ def test_dynamic_pars_unresolvable_path_raises_at_step():
 
 def test_dynamic_pars_single_segment_sim_pars_path():
     """Single-segment paths address sim.pars directly (e.g. 'rand_seed')."""
-    from hpvsim.interventions import _set_dotted
     sim = hpv.Sim(
         n_agents=100, start=2020, stop=2021, location='nigeria',
         diseases=[hpv.HPV(g) for g in ('hpv16',)],
     )
     sim.init()
-    # Setting via _set_dotted should mutate sim.pars in place.
-    _set_dotted(sim, 'rand_seed', 42)
+    # Setting via dynamic_pars._set_dotted should mutate sim.pars in place.
+    hpv.dynamic_pars._set_dotted(sim, 'rand_seed', 42)
     assert sim.pars.rand_seed == 42
 
 

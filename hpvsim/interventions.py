@@ -17,6 +17,7 @@ import numpy as np
 import starsim as ss
 
 from hpvsim.products import vx as _vx
+from hpvsim.utils import any_genotype_cancer
 
 __all__ = [
     'BaseVaccination', 'routine_vx', 'campaign_vx',
@@ -82,7 +83,7 @@ def _as_boolarr(extra_result, people):
     return out
 
 
-def _compose_eligibility(age_range, sex, extra):
+def _compose_vaccine_eligibility(age_range, sex, extra):
     """Compose v2-style targeting into a Starsim eligibility callable.
 
     Returns ``elig(sim) -> ss.uids`` that intersects:
@@ -116,9 +117,9 @@ def _compose_eligibility(age_range, sex, extra):
 def _compose_screening_eligibility(age_range, sex, extra, debut_age):
     """Compose v2-style screening eligibility into a Starsim callable.
 
-    Extends ``_compose_eligibility`` with an optional ``debut_age`` lower-
+    Extends ``_compose_vaccine_eligibility`` with an optional ``debut_age`` lower-
     bound on ``sim.people.age``. When ``debut_age`` is None, semantics are
-    identical to ``_compose_eligibility``.
+    identical to ``_compose_vaccine_eligibility``.
 
     Returns ``elig(sim) -> ss.uids`` intersecting:
       - sim.people.alive
@@ -146,22 +147,6 @@ def _compose_screening_eligibility(age_range, sex, extra, debut_age):
     return elig
 
 
-def _any_genotype_cancer(sim):
-    """Return a BoolArr OR-ing module.cancerous across all HPV modules.
-
-    Used by hpv.BaseTreatment.check_eligibility to gate on cancer status:
-    treat_cancer=True interventions require this BoolArr be True; the
-    inverse (~_any_genotype_cancer(sim)) gates non-cancer treatments.
-    """
-    # Late import to avoid the interventions <-> products circular import
-    from hpvsim.products import _iter_hpv_modules
-    out = sim.people.alive.asnew()
-    out.raw[:] = False
-    for module in _iter_hpv_modules(sim):
-        out[module.cancerous.uids] = True
-    return out
-
-
 class BaseVaccination(ss.BaseVaccination):
     """HPV-specific prophylactic vaccination base.
 
@@ -177,7 +162,7 @@ class BaseVaccination(ss.BaseVaccination):
 
     def __init__(self, *args, age_range=None, sex=None, eligibility=None,
                  **kwargs):
-        composed = _compose_eligibility(age_range, sex, eligibility)
+        composed = _compose_vaccine_eligibility(age_range, sex, eligibility)
         super().__init__(*args, eligibility=composed, **kwargs)
         # Raw constructor args, preserved for introspection (e.g.
         # M04 AgeResults stratification by vaccination cohort).
@@ -246,12 +231,15 @@ class BaseTriage(BaseTest, ss.BaseTriage):
     def step(self):
         self.outcomes = {k: ss.uids() for k in self.product.hierarchy}
         accept_uids = ss.uids()
+        # timepoints are sim-ti indices (RoutineDelivery/CampaignDelivery build
+        # them from sim.t.yearvec and deliver() indexes them by sim.ti), so the
+        # schedule gate stays on sim.ti; module-owned state below uses self.ti.
         if self.sim.ti in self.timepoints:
             accept_uids = self.deliver()
             if len(accept_uids):
                 self.screened[accept_uids] = True
                 self.screens[accept_uids] += 1
-                self.ti_screened[accept_uids] = self.sim.ti
+                self.ti_screened[accept_uids] = self.ti
         return accept_uids
 
 
@@ -335,7 +323,7 @@ class BaseTreatment(ss.BaseTreatment):
         if self.age_range is not None:
             lo, hi = self.age_range
             cond = cond & (sim.people.age >= lo) & (sim.people.age <= hi)
-        any_cancer = _any_genotype_cancer(sim)
+        any_cancer = any_genotype_cancer(sim)
         cond = cond & (any_cancer if self.treat_cancer else ~any_cancer)
         if self.eligibility_user is not None:
             cond = cond & _as_boolarr(self.eligibility_user(sim), sim.people)
@@ -352,14 +340,14 @@ class treat_num(BaseTreatment, ss.treat_num):
                 new = treat_uids[~self.cancer_treated[treat_uids]]
                 self.cancer_treated[treat_uids] = True
                 self.cancer_treatments[treat_uids] += 1
-                self.ti_cancer_treated[treat_uids] = self.sim.ti
-                self.results['new_cancer_treated'][self.sim.ti] += len(new)
+                self.ti_cancer_treated[treat_uids] = self.ti
+                self.results['new_cancer_treated'][self.ti] += len(new)
             else:
                 new = treat_uids[~self.cin_treated[treat_uids]]
                 self.cin_treated[treat_uids] = True
                 self.cin_treatments[treat_uids] += 1
-                self.ti_cin_treated[treat_uids] = self.sim.ti
-                self.results['new_cin_treated'][self.sim.ti] += len(new)
+                self.ti_cin_treated[treat_uids] = self.ti
+                self.results['new_cin_treated'][self.ti] += len(new)
         return treat_uids
 
 
@@ -367,7 +355,7 @@ class treat_delay(BaseTreatment):
     """Treat HPV+CIN+ agents after a fixed delay.
 
     On each step:
-      1. Newly-eligible accepters are enqueued at `due_ti = sim.ti +
+      1. Newly-eligible accepters are enqueued at `due_ti = self.ti +
          round(delay / dt)`.
       2. Agents whose due_ti is the current ti are treated.
 
@@ -384,11 +372,11 @@ class treat_delay(BaseTreatment):
     def add_to_schedule(self):
         accept = self.get_accept_inds()
         if len(accept):
-            due_ti = self.sim.ti + int(round(self.delay / self.sim.t.dt_year))
+            due_ti = self.ti + int(round(self.delay / self.t.dt_year))
             self.scheduler[due_ti].extend(int(u) for u in accept)
 
     def get_candidates(self):
-        return ss.uids(self.scheduler.pop(self.sim.ti, []))
+        return ss.uids(self.scheduler.pop(self.ti, []))
 
     def step(self):
         self.add_to_schedule()
@@ -400,14 +388,14 @@ class treat_delay(BaseTreatment):
                 new = treat_uids[~self.cancer_treated[treat_uids]]
                 self.cancer_treated[treat_uids] = True
                 self.cancer_treatments[treat_uids] += 1
-                self.ti_cancer_treated[treat_uids] = self.sim.ti
-                self.results['new_cancer_treated'][self.sim.ti] += len(new)
+                self.ti_cancer_treated[treat_uids] = self.ti
+                self.results['new_cancer_treated'][self.ti] += len(new)
             else:
                 new = treat_uids[~self.cin_treated[treat_uids]]
                 self.cin_treated[treat_uids] = True
                 self.cin_treatments[treat_uids] += 1
-                self.ti_cin_treated[treat_uids] = self.sim.ti
-                self.results['new_cin_treated'][self.sim.ti] += len(new)
+                self.ti_cin_treated[treat_uids] = self.ti
+                self.results['new_cin_treated'][self.ti] += len(new)
         return treat_uids
 
 
@@ -464,7 +452,7 @@ class BaseTxVx(BaseTreatment):
             lo, hi = self.age_range
             cond = cond & (sim.people.age >= lo) & (sim.people.age <= hi)
         # Never treat cancer agents
-        any_cancer = _any_genotype_cancer(sim)
+        any_cancer = any_genotype_cancer(sim)
         cond = cond & ~any_cancer
         if self.eligibility_user is not None:
             cond = cond & _as_boolarr(self.eligibility_user(sim), sim.people)
@@ -478,9 +466,9 @@ class BaseTxVx(BaseTreatment):
             new = accept_uids[~self.tx_vaccinated[accept_uids]]
             self.tx_vaccinated[accept_uids] = True
             self.txvx_doses[accept_uids] += 1
-            self.ti_tx_vaccinated[accept_uids] = self.sim.ti
-            self.results['new_tx_vaccinated'][self.sim.ti] += len(new)
-            self.results['new_txvx_doses'][self.sim.ti] += len(accept_uids)
+            self.ti_tx_vaccinated[accept_uids] = self.ti
+            self.results['new_tx_vaccinated'][self.ti] += len(new)
+            self.results['new_txvx_doses'][self.ti] += len(accept_uids)
         return accept_uids
 
     def step(self):
@@ -528,61 +516,6 @@ class linked_txvx(BaseTxVx):
         return self.deliver()
 
 
-def _set_dotted(sim, dotted_path, value):
-    """Resolve a dotted-path string against (sim.diseases, sim.interventions, sim.pars) and set it.
-
-    Top-level segment is looked up in:
-      1. sim.diseases (by key)         e.g. 'hpv16.beta' -> sim.diseases['hpv16'].pars.beta
-      2. sim.interventions (by name)   e.g. 'screen.prob' -> sim.interventions['screen'].prob
-      3. sim.pars (by key)             e.g. 'rand_seed' -> sim.pars.rand_seed
-    Diseases and interventions require at least one tail segment (the attribute
-    to set on the resolved module). sim.pars accepts a single segment (set
-    directly on sim.pars). Raises KeyError if the head doesn't resolve anywhere.
-    """
-    parts = dotted_path.split('.')
-    head, tail = parts[0], parts[1:]
-
-    if head in sim.diseases:
-        if not tail:
-            raise KeyError(
-                f'Path {dotted_path!r}: missing attribute name after disease '
-                f'key {head!r}.'
-            )
-        # Navigate into the disease module's .pars by default.
-        target = sim.diseases[head].pars
-        for seg in tail[:-1]:
-            target = getattr(target, seg)
-        setattr(target, tail[-1], value)
-        return
-
-    if head in sim.interventions:
-        if not tail:
-            raise KeyError(
-                f'Path {dotted_path!r}: missing attribute name after '
-                f'intervention name {head!r}.'
-            )
-        target = sim.interventions[head]
-        for seg in tail[:-1]:
-            target = getattr(target, seg)
-        setattr(target, tail[-1], value)
-        return
-
-    # Fall back to sim.pars. Single segment: set directly. Multi-segment:
-    # walk through head + tail[:-1] and set the last segment.
-    if not hasattr(sim.pars, head):
-        raise KeyError(
-            f'Cannot resolve dotted path {dotted_path!r}: head segment '
-            f'{head!r} is not a sim.diseases / sim.interventions / sim.pars key.'
-        )
-    if not tail:
-        setattr(sim.pars, head, value)
-        return
-    target = getattr(sim.pars, head)
-    for seg in tail[:-1]:
-        target = getattr(target, seg)
-    setattr(target, tail[-1], value)
-
-
 class dynamic_pars(ss.Intervention):
     """Time-varying parameter editor.
 
@@ -612,4 +545,59 @@ class dynamic_pars(ss.Intervention):
                 if idx < 0:
                     continue
                 val = float(vals[idx])
-            _set_dotted(self.sim, dotted_path, val)
+            self._set_dotted(self.sim, dotted_path, val)
+
+    @staticmethod
+    def _set_dotted(sim, dotted_path, value):
+        """Resolve a dotted-path string against (sim.diseases, sim.interventions, sim.pars) and set it.
+
+        Top-level segment is looked up in:
+          1. sim.diseases (by key)         e.g. 'hpv16.beta' -> sim.diseases['hpv16'].pars.beta
+          2. sim.interventions (by name)   e.g. 'screen.prob' -> sim.interventions['screen'].prob
+          3. sim.pars (by key)             e.g. 'rand_seed' -> sim.pars.rand_seed
+        Diseases and interventions require at least one tail segment (the attribute
+        to set on the resolved module). sim.pars accepts a single segment (set
+        directly on sim.pars). Raises KeyError if the head doesn't resolve anywhere.
+        """
+        parts = dotted_path.split('.')
+        head, tail = parts[0], parts[1:]
+
+        if head in sim.diseases:
+            if not tail:
+                raise KeyError(
+                    f'Path {dotted_path!r}: missing attribute name after disease '
+                    f'key {head!r}.'
+                )
+            # Navigate into the disease module's .pars by default.
+            target = sim.diseases[head].pars
+            for seg in tail[:-1]:
+                target = getattr(target, seg)
+            setattr(target, tail[-1], value)
+            return
+
+        if head in sim.interventions:
+            if not tail:
+                raise KeyError(
+                    f'Path {dotted_path!r}: missing attribute name after '
+                    f'intervention name {head!r}.'
+                )
+            target = sim.interventions[head]
+            for seg in tail[:-1]:
+                target = getattr(target, seg)
+            setattr(target, tail[-1], value)
+            return
+
+        # Fall back to sim.pars. Single segment: set directly. Multi-segment:
+        # walk through head + tail[:-1] and set the last segment.
+        if not hasattr(sim.pars, head):
+            raise KeyError(
+                f'Cannot resolve dotted path {dotted_path!r}: head segment '
+                f'{head!r} is not a sim.diseases / sim.interventions / sim.pars key.'
+            )
+        if not tail:
+            setattr(sim.pars, head, value)
+            return
+        target = getattr(sim.pars, head)
+        for seg in tail[:-1]:
+            target = getattr(target, seg)
+        setattr(target, tail[-1], value)

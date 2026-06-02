@@ -2,10 +2,8 @@
 import numpy as np
 import starsim as ss
 import hpvsim as hpv
-from hpvsim.interventions import (
-    _compose_screening_eligibility,
-    _any_genotype_cancer,
-)
+from hpvsim.interventions import _compose_screening_eligibility
+from hpvsim.utils import any_genotype_cancer
 
 
 def _two_genotype_sim():
@@ -59,7 +57,7 @@ def test_any_genotype_cancer_ors_across_modules():
     sim = _two_genotype_sim()
     uids = sim.people.alive.uids[:5]
     sim.diseases['hpv18'].cancerous[uids] = True
-    cancer = _any_genotype_cancer(sim)
+    cancer = any_genotype_cancer(sim)
     for u in uids:
         assert cancer[u]
     # An agent not flagged cancerous on either genotype

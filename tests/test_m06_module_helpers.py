@@ -1,7 +1,6 @@
-"""Unit tests for module-level helpers shared across products."""
+"""Unit tests for the shared sim-introspection helpers in hpvsim.utils."""
 import hpvsim as hpv
-from hpvsim.products import _iter_hpv_modules
-from hpvsim.utils import find_genotype_module
+from hpvsim.utils import iter_hpv_modules, find_genotype_module
 
 
 def _two_genotype_sim():
@@ -15,7 +14,7 @@ def _two_genotype_sim():
 
 def test_iter_hpv_modules_returns_hpv_only():
     sim = _two_genotype_sim()
-    mods = list(_iter_hpv_modules(sim))
+    mods = list(iter_hpv_modules(sim))
     assert {m.genotype for m in mods} == {'hpv16', 'hpv18'}
 
 

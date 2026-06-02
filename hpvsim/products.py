@@ -14,20 +14,11 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 
-from hpvsim.utils import find_genotype_module
+from hpvsim.utils import find_genotype_module, iter_hpv_modules
 
 __all__ = ['vx', 'dx', 'tx', 'txvx', 'radiation']
 
 _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
-
-
-def _iter_hpv_modules(sim):
-    """Yield each HPV module registered in a sim, in registration order."""
-    # Late import to avoid the products <-> hpv circular import
-    from hpvsim.hpv import HPV
-    for module in sim.diseases.values():
-        if isinstance(module, HPV):
-            yield module
 
 
 @functools.lru_cache(maxsize=1)
@@ -254,15 +245,6 @@ class vx(ss.Vx):
             hpv_mod.vax_imm[sterilizing_uids] = np.maximum(hpv_mod.vax_imm[sterilizing_uids], ster_peak)
             hpv_mod.vax_imm[leaky_uids] = np.maximum(hpv_mod.vax_imm[leaky_uids], leaky_peak)
 
-    def _find_genotype_module(self, genotype):
-        """Return the HPV module in self.sim matching this genotype, or None.
-
-        Backward-compatible instance method — delegates to the shared
-        ``utils.find_genotype_module`` helper. Kept on hpv.vx for callers that
-        hold a vx product instance rather than a sim reference.
-        """
-        return find_genotype_module(self.sim, genotype)
-
 
 def _state_uids_for_module(module, state, uids):
     """Return uids that are in `state` on `module` and also in `uids`."""
@@ -278,7 +260,7 @@ def _state_collapse_across_genotypes(state, uids, sim):
     - state='susceptible': agent must be susceptible to ALL genotypes.
     - any other state: agent must be in that state for ANY genotype.
     """
-    modules = list(_iter_hpv_modules(sim))
+    modules = list(iter_hpv_modules(sim))
     if not modules:
         return ss.uids()
     if state == 'susceptible':
@@ -314,7 +296,7 @@ class dx(ss.Dx):
             df_for_base['disease'] = '_hpv_stub'
         super().__init__(df=df_for_base, hierarchy=resolved_hierarchy, **kwargs)
         # ss.Dx populates self.diseases from the stub; we don't use that attribute
-        # — hpv.dx routes through _iter_hpv_modules instead. Clear it to avoid
+        # — hpv.dx routes through iter_hpv_modules instead. Clear it to avoid
         # confusing downstream introspection.
         self.diseases = None
         # Store the original (no-stub) df for our own administer logic
@@ -348,7 +330,7 @@ class dx(ss.Dx):
                 df_filter = (self.df.state == state) & (self.df.genotype == 'all')
                 self._draw_and_min_into(results, these, df_filter)
             else:
-                for module in _iter_hpv_modules(self.sim):
+                for module in iter_hpv_modules(self.sim):
                     if module.genotype not in self._genotypes_in_df:
                         continue
                     these = _state_uids_for_module(module, state, uids)
@@ -399,7 +381,7 @@ class tx(ss.Tx):
             df_for_base['disease'] = '_hpv_stub'
         super().__init__(df=df_for_base, **kwargs)
         # ss.Tx populates self.diseases from the stub; hpv.tx routes through
-        # _iter_hpv_modules instead — clear it to avoid confusing introspection.
+        # iter_hpv_modules instead — clear it to avoid confusing introspection.
         self.diseases = None
         # Restore the original (no-stub) df for our own administer logic.
         self.df = df
@@ -412,7 +394,7 @@ class tx(ss.Tx):
 
         successful_uids_list = []
         for state in self.health_states:
-            for module in _iter_hpv_modules(self.sim):
+            for module in iter_hpv_modules(self.sim):
                 # Match rows by state and genotype ('all' matches every module)
                 df_filter = (self.df.state == state) & (
                     (self.df.genotype == module.genotype) | (self.df.genotype == 'all')
@@ -434,7 +416,9 @@ class tx(ss.Tx):
                 module.cancerous[eff] = False
                 module.ti_cin[eff] = np.nan
                 module.ti_cancerous[eff] = np.nan
-                module.ti_clearance[eff] = self.sim.ti + 1
+                # ti_clearance is owned and read by the HPV module against its
+                # own module.ti (hpv.py step), so schedule in the module's ti.
+                module.ti_clearance[eff] = module.ti + 1
 
         if successful_uids_list:
             successful = ss.uids(np.unique(np.concatenate(successful_uids_list)))
@@ -486,7 +470,7 @@ class txvx(ss.Vx):
             return
         if self.pars.imm_boost is not None:
             # Booster: multiplicative in place on all HPV modules.
-            for module in _iter_hpv_modules(self.sim):
+            for module in iter_hpv_modules(self.sim):
                 module.txvx_imm[uids] *= float(self.pars.imm_boost)
             return
         # First dose: per-agent sterilizing draw, then per-genotype scaling.
@@ -532,7 +516,7 @@ class radiation(ss.Product):
         # self.sim.t.dt is a freq object (e.g. years(0.25)); arithmetic with it
         # drops the time-unit denominator and undercounts by 1/dt steps.
         dt_year = self.sim.t.dt_year
-        for module in _iter_hpv_modules(self.sim):
+        for module in iter_hpv_modules(self.sim):
             cancer_uids = module.cancerous.uids.intersect(uids)
             if len(cancer_uids) == 0:
                 continue
