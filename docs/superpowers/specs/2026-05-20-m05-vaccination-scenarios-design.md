@@ -588,3 +588,18 @@ post-implementation-deltas section.
   M05 anchor PARS run with the shim OFF and `v2_compat_demographics=True`.
 
 - **`AgeMigration` jitter disabled under v2_compat.** v3's `AgeMigration` spreads each immigrant's age uniformly across `[N, N+1)` to smooth cohort transitions. This propagates continuous-age distribution through the migration channel even after `AnnualBirths` fixes the births channel — immigrants who arrive as "age 0" can still be aged 0.0–0.99, and 9 years later contribute to the cohort breadth that the eligibility window is trying to align with. Under `v2_compat=True`, the jitter is skipped: immigrants land at exact integer ages, matching v2's `add_births` convention. `hpv.Sim`'s `v2_compat_births` kwarg is renamed to `v2_compat_demographics` to cover both channels under a single flag — it now (1) swaps `ss.Births` for `hpv.AnnualBirths` and (2) passes `v2_compat=True` to `AgeMigration`. M5 anchor PARS updated to use `v2_compat_demographics=True`.
+
+- **`_coerce_sex` renamed to `_cast_sex`** (PR #111 review). The helper that
+  normalizes v2-style `sex` input lives in `hpvsim/interventions.py`; the name
+  changed but the behavior (returns a set of sex ints `{0}` / `{1}` / `{0,1}`,
+  or `None`) is unchanged. Reviewer's alternative `_sex_to_bool` was declined
+  because the return is a set, not a bool. Unit tests renamed to match.
+
+- **`_find_genotype_module` promoted to `hpvsim.utils.find_genotype_module`**
+  (PR #111 review). What the spec describes as a private method on `hpv.vx`
+  is now a module-level `find_genotype_module(sim, genotype)` in
+  `hpvsim/utils.py`, so any per-genotype module lookup has one home. Kept in
+  `utils` (not `cross_genotype`) so `products` doesn't take a dependency on
+  cross-genotype functionality it doesn't need; it late-imports `HPV` to stay
+  import-light. Call site became `find_genotype_module(self.sim, genotype)`;
+  behavior is unchanged.
