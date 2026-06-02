@@ -122,12 +122,12 @@ def _compose_screening_eligibility(age_range, sex, extra, debut_age):
 
     Returns ``elig(sim) -> ss.uids`` intersecting:
       - sim.people.alive
-      - sim.people.female / male (per _coerce_sex(sex))
+      - sim.people.female / male (per _cast_sex(sex))
       - sim.people.age in [age_range[0], age_range[1]) if set
       - sim.people.age >= debut_age if set
       - extra(sim) if provided
     """
-    sex_set = _coerce_sex(sex)
+    sex_set = _cast_sex(sex)
 
     def elig(sim):
         cond = sim.people.alive
@@ -216,7 +216,7 @@ class BaseTest(ss.BaseTest):
         super().__init__(*args, eligibility=composed, **kwargs)
         self.age_range = age_range
         self.sex_raw = sex
-        self.sex = _coerce_sex(sex)
+        self.sex = _cast_sex(sex)
         self.eligibility_raw = eligibility
         self.debut_age = debut_age
 
@@ -302,7 +302,7 @@ class BaseTreatment(ss.BaseTreatment):
         if self.treat_cancer and sex == 'f':
             sex = None
         self.sex_raw = sex
-        self.sex = _coerce_sex(sex)
+        self.sex = _cast_sex(sex)
         self.eligibility_user = eligibility
         self.define_states(
             ss.BoolArr('cin_treated'),
