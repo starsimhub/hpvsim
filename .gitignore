@@ -29,6 +29,8 @@ hpvsim/regression/
 
 # Calibration artifacts emitted by tests
 tests/hpvsim_calib_*.db
+# Calibration / Optuna sqlite DBs anywhere (e.g. repo-root scratch dbs)
+*.db
 
 # uv lockfile (hpvsim is a library, not an app)
 uv.lock

@@ -18,13 +18,16 @@ Algorithm — once per year:
 Annual cadence is enforced by ``dt=ss.year`` in ``__init__``: ``ss.Loop``
 only fires ``step()`` at times in this module's ``t.tvec``, so it runs once
 per integer year regardless of sim.dt.
+
+``AnnualBirths`` uses the same annual-cadence trick to match v2's ``add_births``
+convention: births fire once per calendar year in a single pulse.
 """
 import numpy as np
 import pandas as pd
 import starsim as ss
 
 
-__all__ = ['AgeMigration']
+__all__ = ['AgeMigration', 'AnnualBirths']
 
 
 class AgeMigration(ss.Demographics):
@@ -43,7 +46,8 @@ class AgeMigration(ss.Demographics):
             country data.
     """
 
-    def __init__(self, pars=None, pop_total=None, pop_by_age=None, **kwargs):
+    def __init__(self, pars=None, pop_total=None, pop_by_age=None,
+                 v2_compat=False, **kwargs):
         # dt=ss.year sets this module's Timeline to annual; ss.Loop only
         # calls step() at times in mod.t.tvec, so it fires once per year
         # regardless of sim.dt.
@@ -65,7 +69,13 @@ class AgeMigration(ss.Demographics):
         # in lockstep through age bins, producing discrete pyramid steps
         # rather than smooth transitions. Jittering by uniform(0, 1) means
         # year-N immigrants are spread across [N, N+1) within the year.
+        # Skipped when v2_compat=True to match v2's discrete annual-cohort
+        # structure (immigrants land at exact integer ages, as add_births does).
         self._age_jitter = ss.uniform(low=0.0, high=1.0)
+        # v2_compat: when True, skip age jitter so immigrants land at exact
+        # integer ages, matching v2's add_births convention. Pair with
+        # AnnualBirths to align both channels to v2's discrete-cohort structure.
+        self._v2_compat = v2_compat
         return
 
     # ---------------------------------------------------------------------- #
@@ -200,7 +210,11 @@ class AgeMigration(ss.Demographics):
             # cohort doesn't all transition age bins on the same tick. Uses
             # the per-module CRN dist; ages_at_arrival is the integer
             # lower-bound of each immigrant's year band.
-            ages_at_arrival = ages_at_arrival + self._age_jitter.rvs(new_uids)
+            # Skipped when v2_compat is on — v2's add_births places immigrants
+            # at exact integer ages to match the discrete annual birth cohort
+            # structure.
+            if not self._v2_compat:
+                ages_at_arrival = ages_at_arrival + self._age_jitter.rvs(new_uids)
             people.age[new_uids] = ages_at_arrival
             people.female[new_uids] = np.concatenate(imm_female_chunks)
 
@@ -235,3 +249,57 @@ class AgeMigration(ss.Demographics):
         chosen_uids = ss.uids(self._emi_select.rvs(n_pick))
         self.sim.people.request_removal(chosen_uids)
         return
+
+
+class AnnualBirths(ss.Births):
+    """Annual-pulse births matching v2's ``add_births`` convention.
+
+    Standard ``ss.Births`` distributes births evenly across all steps. This
+    subclass fires a single birth pulse at each integer year boundary by giving
+    the module an annual Timeline (``dt=ss.year``). ``ss.Loop`` then only calls
+    ``step()`` once per calendar year, and because ``self.t.dt`` equals
+    ``ss.years(1)``, ``get_births()`` naturally computes the full annual
+    probability rather than a per-quarter fraction.
+
+    With dt=0.25 (4 steps per year) the total number of births over any full
+    year is statistically identical between ``ss.Births`` (4 steps × ¼ rate)
+    and ``AnnualBirths`` (1 step × full rate). Only the *timing* changes: every
+    year's cohort is born on the same calendar step instead of being spread
+    across four quarterly sub-cohorts.
+
+    This matches v2's ``add_births`` logic: ``dt_demog=1.0``, fired every
+    ``update_freq = int(dt_demog / dt) = 4`` steps at annual boundaries, using
+    the full annual crude birth rate scaled by ``dt_demog``.
+
+    Opt-in only — default ``ss.Births`` behavior (continuous births) is
+    unchanged. Activate by passing ``demographics=[hpv.AnnualBirths(...), ...]``
+    to ``hpv.Sim``.
+
+    Args:
+        birth_rate: birth rate data passed through to ``ss.Births``.
+        kwargs: forwarded to ``ss.Births.__init__``.
+
+    Example::
+
+        import hpvsim as hpv
+        import starsim as ss
+        sim = hpv.Sim(
+            location='nigeria',
+            demographics=[
+                hpv.AnnualBirths(),
+                ss.Deaths(),
+                hpv.AgeMigration(),
+            ],
+        )
+        sim.run()
+    """
+
+    def __init__(self, pars=None, **kwargs):
+        # Inject dt=ss.year into the pars dict so ss.Module.__init__ receives
+        # it via update_pars → Timeline. This sets the module's own Timeline
+        # to annual cadence: ss.Loop fires step() only at integer-year
+        # boundaries, and self.t.dt == ss.years(1) causes get_births() to
+        # compute the full annual birth probability in one pulse.
+        import sciris as sc
+        pars = sc.mergedicts({'dt': ss.year}, pars)
+        super().__init__(pars=pars, **kwargs)

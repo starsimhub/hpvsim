@@ -22,6 +22,34 @@ Kwargs:
     ``'independent'`` — each genotype draws from its own per-genotype
     init_prev curve independently; co-infection at initialisation is possible.
 
+  ``v2_compat_demographics`` (bool, default ``False``):
+    .. deprecated::
+       Temporary v2-parity aid, not intended for long-term support. It exists
+       so the M05 parity gate can reproduce v2's discrete-cohort demographics
+       bit-for-bit; it is expected to be removed once the migration is complete
+       and v3's continuous-age behaviour is the only supported convention. Do
+       not build new work on top of this flag.
+
+    When True, activates three v2-compatible demographic conventions:
+
+    1. **Annual-pulse births.** Swaps ``ss.Births`` for ``hpv.AnnualBirths``
+       so every year's birth cohort is released as a single pulse at the
+       integer-year boundary, matching v2's ``add_births`` / ``dt_demog=1``
+       logic.
+    2. **Migration jitter disabled.** Passes ``v2_compat=True`` to
+       ``AgeMigration`` so immigrants land at exact integer ages (no
+       uniform [N, N+1) jitter), matching v2's discrete-cohort structure.
+    3. **Initial population age discretization.** After ``ss.People.init_vals``
+       samples continuous ages from the UN year-band histogram (each agent
+       lands uniformly within its year bin), floors all initial ages to the
+       nearest integer. This matches v2's convention of placing the starting
+       cohort at exact integer ages.
+
+    All three effects together ensure that every agent entering or starting
+    in the sim has a discrete integer age, which aligns the eligibility
+    window arithmetic for age-targeted interventions with v2's conventions.
+    The default (False) retains v3's continuous-age behaviour.
+
   ``init_hpv_dist`` (dict or None, default ``None``):
     Only used when ``init_seeding='exclusive'``. If ``None``, genotype
     assignment is uniform across active genotypes. If a dict, keys must be
@@ -30,11 +58,12 @@ Kwargs:
     1; normalised internally).
 """
 
+import numpy as np
 import starsim as ss
 
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
-from .demographics import AgeMigration
+from .demographics import AgeMigration, AnnualBirths
 from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
 from .seeding import _ExclusiveSeeder
@@ -46,7 +75,8 @@ class Sim(ss.Sim):
     def __init__(self, location='nigeria', genotypes=None, genotype_pars=None,
                  init_seeding='exclusive', init_hpv_dist=None,
                  n_agents=10_000, start=1990, stop=2060, dt=0.25,
-                 total_pop=None, pars=None, **kwargs):
+                 total_pop=None, pars=None, v2_compat_demographics=False,
+                 **kwargs):
         # Pass start year so the age pyramid matches sim.start (loader
         # defaults to year 2000 with a materially different distribution).
         country = load_country(location, year=int(start))
@@ -112,16 +142,19 @@ class Sim(ss.Sim):
             networks = [SexualNetwork(**country['network_pars'])]
         demographics = kwargs.pop('demographics', None)
         if demographics is None:
+            births_cls = AnnualBirths if v2_compat_demographics else ss.Births
             demographics = [
-                ss.Births(birth_rate=country['birth_rate']),
+                births_cls(birth_rate=country['birth_rate']),
                 ss.Deaths(death_rate=country['death_rate']),
-                AgeMigration(),
+                AgeMigration(v2_compat=v2_compat_demographics),
             ]
 
         analyzers = [HPVTotal()] + user_analyzers
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()
+        # Stored for use in init() to discretize initial ages.
+        self._v2_compat_demographics = v2_compat_demographics
         super().__init__(
             start=ss.years(start),
             stop=ss.years(stop),
@@ -136,3 +169,27 @@ class Sim(ss.Sim):
             total_pop=total_pop,
             **kwargs,
         )
+
+    def init(self, **kwargs):
+        """Initialize the sim, then discretize initial ages if v2_compat_demographics is set.
+
+        ``ss.People.init_vals()`` samples ages continuously from the UN
+        year-band histogram (each agent lands uniformly within its year bin,
+        e.g. an agent in the "age 5" bin gets a float in [5, 6)). v2 placed
+        agents at exact integer ages. When ``v2_compat_demographics=True``,
+        floor all initial agent ages to integers after sampling so the
+        starting cohort matches v2's discrete convention.
+
+        Note: ``super().init()`` runs ``SexualNetwork.init_post``, which
+        pre-forms one batch of partnerships using debut ages sampled against
+        the continuous initial-age distribution. The integer-age floor below
+        runs after that pre-form, so the very first pair graph reflects
+        continuous ages while every subsequent step sees integer ages. The
+        parity gate is statistical and absorbs this transient; v2 has an
+        analogous one-off effect at the `make_contacts` step.
+        """
+        super().init(**kwargs)
+        if self._v2_compat_demographics:
+            uids = self.people.auids
+            self.people.age.raw[uids] = np.floor(self.people.age.raw[uids])
+        return self

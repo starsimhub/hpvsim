@@ -139,7 +139,7 @@ class _ExclusiveSeeder(ss.Connector):
                 None,
             )
         if net is not None:
-            p_per_uid = np.where(net.active(people)[auids], p_per_uid, 0.0)
+            p_per_uid[~net.active(people)[auids]] = 0.0
 
         # Step 3: Bernoulli draw — who gets any HPV at all.
         # Note: when ss.Calibration deep-copies the sim, the _ExclusiveSeeder

@@ -1,11 +1,15 @@
 """HPVsim utility helpers.
 
-Pure progression / severity math used by ``hpv.py`` and downstream
-analyzers. These functions don't depend on starsim or any module state —
-they're a small, reusable surface so calibration code, future genotype
-extensions, and visualisation scripts (e.g.
-``tests/regression/methods_fig1.py``) can import them without pulling in
-the disease module.
+The progression / severity math (``logf2``, ``compute_severity``, …) is
+pure: it doesn't depend on starsim or any module state, so calibration code,
+future genotype extensions, and visualisation scripts (e.g.
+``tests/regression/methods_fig1.py``) can import it without pulling in the
+disease module.
+
+``find_genotype_module`` is the one sim-dependent helper here — a shared
+genotype-module lookup used by products / interventions (and anything else
+that needs to resolve an ``HPV`` module by genotype). It late-imports
+``HPV`` so this module stays import-light.
 """
 
 import numpy as np
@@ -21,6 +25,7 @@ __all__ = [
     'intlogf2',
     'compute_severity_integral',
     'compute_severity',
+    'find_genotype_module',
 ]
 
 
@@ -223,3 +228,21 @@ def compute_severity(t, rel_sev=None, pars=None):
         raise NotImplementedError(errormsg)
 
     return output
+
+
+# --- Sim introspection ------------------------------------------------ #
+
+def find_genotype_module(sim, genotype):
+    """Return the ``HPV`` disease module in ``sim`` matching ``genotype``, or None.
+
+    Walks ``sim.diseases`` and identifies HPV modules by ``isinstance`` +
+    ``.genotype`` — the same convention ``CrossImmunity`` uses to discover
+    genotype modules. Shared so products / interventions resolve modules the
+    same way (and so future per-genotype lookups have one home).
+    """
+    # Late import avoids the utils <-> hpv circular import.
+    from hpvsim.hpv import HPV
+    for module in sim.diseases.values():
+        if isinstance(module, HPV) and module.genotype == genotype:
+            return module
+    return None
