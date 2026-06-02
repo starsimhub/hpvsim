@@ -60,14 +60,15 @@ msim.plot()
 ```
 
 Note that `.median()` and `.mean()` **mutate** the MultiSim in place. Prefer
-`.median()` for bounded metrics (cancers, infections, prevalence) — mean ± 2 SD
-can produce non-physical lower bounds.
+`.median()` for metrics like cancers, infections, and prevalence: these are
+rarely normally distributed across seeds, so a mean ± 2 SD band is not a true
+95% CI and its lower edge can fall below zero.
 
 ### Comparing scenarios
 
-For scenario comparisons, use a `make_sim(seed, scenario)` factory function
-and pass the labeled sims to `ss.parallel`. This is the Starsim-native
-replacement for v2's `hpv.Scenarios`:
+For scenario comparisons, write a `make_sim(seed, scenario)` function that
+builds one sim per scenario, and pass the labeled sims to `ss.parallel`. This
+is the Starsim-native replacement for v2's `hpv.Scenarios`:
 
 ```{python}
 import hpvsim as hpv
@@ -83,7 +84,7 @@ PARS = dict(
 )
 
 def make_sim(seed, coverage):
-    """Factory: one sim per (seed, coverage) point."""
+    """Make a sim for a given random seed and coverage level."""
     return hpv.Sim(
         **PARS,
         rand_seed=seed,
@@ -177,7 +178,7 @@ each `s` in `sims` has already been run), the objects are the same.
 
 | v2 pattern | v3 replacement |
 |---|---|
-| `hpv.Scenarios(scenarios={'low': {...}, 'high': {...}})` | `make_sim(seed, scenario)` factory + `ss.parallel(*sims)` |
+| `hpv.Scenarios(scenarios={'low': {...}, 'high': {...}})` | `make_sim(seed, scenario)` + `ss.parallel(*sims)` |
 | `scens.run()` | `ss.parallel(*sims)` |
 | `scens.results['low']` | filter `msim.sims` by label, wrap in `ss.MultiSim` |
 | `hpv.MultiSim(sim, n_runs=N)` | `ss.MultiSim(sim, n_runs=N)` (same name in Starsim) |
