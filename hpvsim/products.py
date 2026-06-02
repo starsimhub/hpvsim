@@ -254,7 +254,7 @@ def _state_uids_for_module(module, state, uids):
     return arr.uids.intersect(uids)
 
 
-def _state_collapse_across_genotypes(state, uids, sim):
+def _state_uids_across_genotypes(state, uids, sim):
     """Collapse a per-genotype state to a single uids set across HPV modules.
 
     - state='susceptible': agent must be susceptible to ALL genotypes.
@@ -324,7 +324,7 @@ class dx(ss.Dx):
 
         for state in self.health_states:
             if self._all_genotype:
-                these = _state_collapse_across_genotypes(state, uids, self.sim)
+                these = _state_uids_across_genotypes(state, uids, self.sim)
                 if len(these) == 0:
                     continue
                 df_filter = (self.df.state == state) & (self.df.genotype == 'all')
