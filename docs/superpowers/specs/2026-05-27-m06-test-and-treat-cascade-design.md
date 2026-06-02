@@ -1112,3 +1112,33 @@ screen+treat anchor.
   classes. CRN guards (`test_no_vx_baseline_unchanged`,
   `test_no_cascade_baseline_unchanged`) confirmed the pinned scalars
   are unchanged. Commit `ff2090a1`.
+
+- **PR #112 review follow-ups.** Symbol names in the design body above
+  reflect the as-implemented code; the maintainer review renamed/moved
+  several of them. The current names are:
+  - Sim-introspection helpers now live in `hpvsim/utils.py` as public
+    functions: `iter_hpv_modules` and `any_genotype_cancer` (joining the
+    existing `find_genotype_module`, which now reuses `iter_hpv_modules`).
+    They were previously `_iter_hpv_modules` in `products.py` and
+    `_any_genotype_cancer` in `interventions.py`.
+  - The unused `vx._find_genotype_module` instance method was removed;
+    call `utils.find_genotype_module(sim, genotype)` directly.
+  - `_compose_eligibility` → `_compose_vaccine_eligibility` (parallels
+    `_compose_screening_eligibility`); `_state_collapse_across_genotypes`
+    → `_state_uids_across_genotypes` (parallels `_state_uids_for_module`).
+  - `dynamic_pars._set_dotted` is now a `@staticmethod` on the class (its
+    only user) rather than a module-level function.
+  - Module-owned result/state arrays in the screening/treatment/txvx
+    `step`/`deliver` methods are indexed by the module's own `self.ti`
+    (not `self.sim.ti`), matching Starsim's `# TODO: change to self.ti`
+    idiom; `treat_delay`'s scheduler likewise uses `self.ti` /
+    `self.t.dt_year`. The `if self.sim.ti in self.timepoints` schedule
+    gates intentionally stay on `sim.ti` — `timepoints` are sim-ti indices
+    built by RoutineDelivery/CampaignDelivery and looked up by `deliver()`
+    via `sim.ti`, so switching them would break a module running at a
+    different dt than the sim. `hpv.tx` schedules clearance into
+    `module.ti + 1` (the HPV module owns and reads `ti_clearance` against
+    its own ti), not the product's/sim's ti.
+
+  Full non-slow suite green (263 passed) after these changes. Commits
+  `7975783c`, `83cce276`.

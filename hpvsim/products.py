@@ -368,7 +368,7 @@ class tx(ss.Tx):
         module.cancerous[uids] = False
         module.ti_cin[uids]      = NaN
         module.ti_cancerous[uids] = NaN
-        module.ti_clearance[uids] = sim.ti + 1   # cleared next step
+        module.ti_clearance[uids] = module.ti + 1   # cleared next module step
     """
 
     def __init__(self, name=None, df=None, **kwargs):

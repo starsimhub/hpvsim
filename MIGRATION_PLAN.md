@@ -202,7 +202,7 @@ by the M03 multi-seed pytest gates). See the M03 spec's
   generator script for v2 baselines, and multi-seed z-score parity gates at
   `|z| < 3` (M03 pattern). Includes a trajectory-parity test on the
   routine anchor.
-- Add unit tests for `_compose_eligibility`, `_cast_sex`, and `hpv.vx`
+- Add unit tests for `_compose_vaccine_eligibility`, `_cast_sex`, and `hpv.vx`
   product semantics.
 - Confirm intervention-level result tracking (`vaccinated`, `n_doses`,
   `ti_vaccinated`) is exposed via the existing `ss.BaseVaccination` state;
