@@ -78,7 +78,8 @@ Each milestone produces a user-visible demo and must meet its acceptance test be
 | M3: Multi-genotype and cross-immunity | ✅ Complete | PR #108 merged |
 | M4: Calibration loop | 🟡 In progress | branch `m04-calibration-loop` |
 | M5 | 🟡 Implementation complete; PR not yet opened | branch `m05-vaccination-scenarios` |
-| M6–M10 | ⬜ Not started | — |
+| M6: Test-and-treat cascade | 🟡 In progress | branch `m06-test-and-treat-cascade` |
+| M7–M10 | ⬜ Not started | — |
 
 ### M0: Foundation
 
@@ -201,7 +202,7 @@ by the M03 multi-seed pytest gates). See the M03 spec's
   generator script for v2 baselines, and multi-seed z-score parity gates at
   `|z| < 3` (M03 pattern). Includes a trajectory-parity test on the
   routine anchor.
-- Add unit tests for `_compose_eligibility`, `_cast_sex`, and `hpv.vx`
+- Add unit tests for `_compose_vaccine_eligibility`, `_cast_sex`, and `hpv.vx`
   product semantics.
 - Confirm intervention-level result tracking (`vaccinated`, `n_doses`,
   `ti_vaccinated`) is exposed via the existing `ss.BaseVaccination` state;
@@ -251,23 +252,35 @@ campaign anchor), and the rationale for the |z| < 5 gate.
 **Acceptance test:** Screening scenario overlaps v2.x intervals on `hpvsim_methods_manuscript` or equivalent.
 
 **Sub-tasks:**
-- Port screening intervention (`screen_num` style).
-- Port triage logic (full screen → triage → treat cascade).
-- Port treatment interventions: `treat_num` and `treat_delay`.
-- Port `radiation` intervention (cancer treatment).
-- Port `dynamic_pars` for time-varying parameters (e.g., condom use).
-- Add tests: screening scenarios reproduce `hpvsim_methods_manuscript` with overlapping intervals.
-- Port `dx(ss.Product)` diagnostic product class (CSV table maps disease
-  state -> result probability). Used by screening interventions.
-- Port `tx(ss.Product)` treatment product class. Used by `treat_num` /
-  `treat_delay`.
-- Port `txvx` therapeutic vaccination: `BaseTxVx` + `routine_txvx` +
-  `campaign_txvx` + `linked_txvx`. Moved from M5 because `linked_txvx` is
-  structurally part of the screen-and-treat cascade and `BaseTxVx` shares
-  its design with the M06 treatment base classes (see M05 spec
-  "Scope adjustments" rationale).
-- Move `products_tx.csv` and `products_dx.csv` from
-  `hpvsim/_v2_legacy/data/` into active `hpvsim/data/`.
+- Add `hpv.dx(ss.Dx)` per-genotype diagnostic product with `_load_dx_products`
+  loader from `hpvsim/data/products_dx.csv`. Handles `all`/per-genotype CSV
+  modes via overridden `administer`.
+- Add `hpv.tx(ss.Tx)` per-genotype treatment product with state-flip and
+  `ti_clearance = sim.ti + 1` scheduling.
+- Add `hpv.txvx(ss.Vx)` therapeutic vaccine product mirroring `hpv.vx`
+  architecture; writes to a new per-module `txvx_imm` FloatArr.
+- Add `hpv.radiation(ss.Product)` standalone product extending
+  `ti_dead_cancer`.
+- Add `hpv.BaseTest`, `hpv.BaseScreening`, `hpv.BaseTriage` with HPV
+  default eligibility (female + alive + optional debut_age); thin
+  diamond leaves `hpv.routine_screening`/`campaign_screening`/
+  `routine_triage`/`campaign_triage` combining with Starsim's delivery
+  bases.
+- Add `hpv.BaseTreatment`, `hpv.treat_num` (extends `ss.treat_num`),
+  `hpv.treat_delay` (fresh port, integer-`ti` scheduler).
+- Add `hpv.BaseTxVx`, `hpv.routine_txvx`, `hpv.campaign_txvx`,
+  `hpv.linked_txvx` (no own timeline; eligibility-driven).
+- Add `hpv.dynamic_pars` (year-keyed schedule with dotted-path resolution
+  into `sim.diseases` / `sim.interventions` / `sim.pars`).
+- Add per-module `latent` BoolState (no-op for now; CSV/dx hook ready)
+  and `txvx_imm` FloatArr to `hpv.HPV`; update `CrossImmunity` connector
+  to include `txvx_imm` in the independent-protection combine.
+- Add two regression anchors (`anchor_screen_treat`, `anchor_txvx_routine`),
+  v2 baseline generator scripts, and multi-seed `|z| < 3` parity tests
+  (M03 + M05 pattern). Trajectory parity on the screen+treat anchor only.
+- Add `test_no_cascade_baseline_unchanged` CRN-perturbation guard.
+- Add unit tests for product administer logic, eligibility helpers, and
+  loader CSV schemas.
 
 ### M7: MultiSim and scenarios
 
@@ -338,8 +351,6 @@ campaign anchor), and the rationale for the |z| < 5 gate.
 |---|---|---|
 | Population scaling (`pop_scale` / `total_pop`) | M2 | Required for long-horizon natural history |
 | Age-specific migration | M2 | Required for demographic realism in multi-decade runs |
-| `radiation` intervention | M6 | Part of the full intervention cascade |
-| `dynamic_pars` | M6 | Needed to vary parameters over time |
 | Additional genotypes (`hr`, `lo`) | M2 | Low priority; add when natural history is wired up |
 | Multiscale modeling | Unscheduled | Low priority; not a release blocker |
 | Save/load | M10 or opportunistic | Not capability-blocking |

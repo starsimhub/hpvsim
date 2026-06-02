@@ -104,6 +104,10 @@ class HPV(ss.Infection):
             ss.BoolState('precin', label='Precancerous infection'),
             ss.BoolState('cin', label='Cervical intraepithelial neoplasia'),
             ss.BoolState('cancerous', label='Invasive cancer'),
+            # No-op state hook to support products_dx.csv's `latent` rows. Real
+            # reactivation natural history (set_prognoses branch + step_state
+            # reactivation) is a post-M06 follow-on; for now nothing populates this.
+            ss.BoolState('latent', label='Latent infection'),
             ss.FloatArr('ti_cin', label='Time of CIN onset'),
             ss.FloatArr('ti_cancerous', label='Time of invasive cancer onset'),
             ss.FloatArr('ti_dead_cancer', label='Time of cancer-caused death'),
@@ -121,7 +125,9 @@ class HPV(ss.Infection):
             # CrossImmunity.step() WITHOUT flowing through the cross-immunity
             # matrix. The CSV's per-genotype rel_imm values are the complete
             # vaccine cross-protection profile. Combining formula (independent
-            # protection paths): rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm).
+            # protection paths):
+            #   rel_sus = (1 - sus_imm_from_nab) * (1 - vax_imm) * (1 - txvx_imm)
+            # See CrossImmunity.step() for the canonical implementation.
             # "target genotype": vax_imm[g] is protection AGAINST genotype g,
             # already resolved per target (the CSV's rel_imm[g] is applied
             # directly). Contrast nab_imm/cell_imm above, which are "source"
@@ -129,6 +135,11 @@ class HPV(ss.Infection):
             # CrossImmunity then matrix-multiplies to derive protection against
             # OTHER (target) genotypes.
             ss.FloatArr('vax_imm', label='Vaccine-conferred immunity (against this/target genotype)', default=0.0),
+            ss.FloatArr(
+                'txvx_imm',
+                label='Therapeutic-vaccine-conferred immunity (this genotype)',
+                default=0.0,
+            ),
         )
         # Per-call Bernoullis whose p is overwritten via .set(p=...) at each
         # use site (placeholder p values below).
