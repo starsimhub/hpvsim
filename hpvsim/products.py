@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 import starsim as ss
 
+from hpvsim.utils import find_genotype_module
+
 __all__ = ['vx']
 
 _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
@@ -126,7 +128,7 @@ class vx(ss.Vx):
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
         sterilizing_uids, leaky_uids = self._sterilizing_dist.filter(uids, both=True)
         for genotype, rel_imm_g in self.rel_imm.items():
-            hpv_mod = self._find_genotype_module(genotype)
+            hpv_mod = find_genotype_module(self.sim, genotype)
             if hpv_mod is None:
                 continue
             # Sterilizing agents get rel_imm[g]; leaky get rel_imm[g] * sterilizing_p
@@ -134,16 +136,3 @@ class vx(ss.Vx):
             leaky_peak = ster_peak * float(self.pars.sterilizing_p)
             hpv_mod.vax_imm[sterilizing_uids] = np.maximum(hpv_mod.vax_imm[sterilizing_uids], ster_peak)
             hpv_mod.vax_imm[leaky_uids] = np.maximum(hpv_mod.vax_imm[leaky_uids], leaky_peak)
-
-    def _find_genotype_module(self, genotype):
-        """Return the HPV module in the sim matching this genotype, or None.
-
-        Matches M03's CrossImmunity convention: walk sim.diseases.values()
-        and identify HPV modules by isinstance + .genotype attribute.
-        """
-        # Late import avoids the products <-> hpv circular import
-        from hpvsim.hpv import HPV
-        for module in self.sim.diseases.values():
-            if isinstance(module, HPV) and module.genotype == genotype:
-                return module
-        return None
