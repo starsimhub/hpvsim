@@ -64,6 +64,7 @@ import starsim as ss
 from .cross_genotype import HPVTotal, CrossImmunity
 from .data.country import load_country
 from .demographics import AgeMigration, AnnualBirths
+from .hiv import HIV, hpv_hiv_connector, HIVStratifiedResults
 from .hpv import HPV, _normalize_genotype
 from .network import SexualNetwork
 from .seeding import _ExclusiveSeeder
@@ -148,6 +149,10 @@ class Sim(ss.Sim):
                 auto_connectors.append(self._seeder)
 
         diseases = hpv_diseases + other_diseases
+        auto_analyzers = [HPVTotal()]
+        if any(isinstance(d, HIV) for d in other_diseases):
+            auto_connectors.append(hpv_hiv_connector())
+            auto_analyzers.append(HIVStratifiedResults())
         connectors = auto_connectors + user_connectors
 
         networks = kwargs.pop('networks', None)
@@ -162,7 +167,7 @@ class Sim(ss.Sim):
                 AgeMigration(v2_compat=v2_compat_demographics),
             ]
 
-        analyzers = [HPVTotal()] + user_analyzers
+        analyzers = auto_analyzers + user_analyzers
 
         # AgeMigration.init_pre reads sim.location to load country data.
         self.location = location.lower()
