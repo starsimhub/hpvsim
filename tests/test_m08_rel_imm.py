@@ -23,8 +23,7 @@ def _build(seed, make_positive):
     sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25, location='nigeria',
                   rand_seed=seed, genotypes=[16],
                   genotype_pars={'hpv16': {'sero_prob': 1.0}},
-                  diseases=[hpv.HIV(beta_m2f=0.0)],
-                  connectors=[hpv_hiv_connector()])
+                  diseases=[hpv.HIV(beta_m2f=0.0)])
     sim.init()
     hpvmod = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)][0]
     hivmod = sim.diseases.hiv

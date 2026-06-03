@@ -22,7 +22,7 @@ def _coinfection_sim(product=None):
     interventions = [ss.treat_num(product=product, prob=0.0)] if product is not None else None
     sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25, location='nigeria',
                   genotypes=[16, 18], diseases=[hpv.HIV(beta_m2f=0.0)],
-                  connectors=[hpv_hiv_connector()], interventions=interventions)
+                  interventions=interventions)
     sim.init()
     hivmod = sim.diseases.hiv
     conn = [c for c in sim.connectors.values() if isinstance(c, hpv_hiv_connector)][0]
