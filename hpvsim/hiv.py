@@ -154,5 +154,59 @@ class hpv_hiv_connector(ss.Connector):
 
 
 class HIVStratifiedResults(ss.Analyzer):
-    """Placeholder — implemented in M08 Task 8."""
-    pass
+    """HPV/cancer outcomes split by HIV status (mirrors v2's cancer_*_with/no_hiv).
+
+    Adds only the cross-disease stratification HPV needs; HIV's own epidemic
+    results come from sti.HIV / sti.ART. Auto-added by hpv.Sim when HIV present.
+    Accessible at ``sim.results.hivstratifiedresults``.
+
+    Cancer detection: each HPV module fires its cin->cancerous transition in
+    ``step_state`` for agents with ``ti_cancerous <= ti``. Since ``ti_cancerous``
+    is scheduled as ``ti_cin + _randround(...)`` (an integer step >= ti_cin) and
+    the agent is already CIN by then, the transition fires at exactly
+    ``ti == ti_cancerous``, so detecting flips this step via
+    ``cancerous & (ti_cancerous == ti)`` matches the agents that just turned
+    cancerous. NaN ti_cancerous (no scheduled cancer) compares False, so it is
+    safely excluded.
+    """
+
+    def init_pre(self, sim):
+        self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
+        self.hiv_module = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        super().init_pre(sim)
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(
+            ss.Result('cancers_with_hiv', dtype=int, label='New cancers (HIV+)'),
+            ss.Result('cancers_no_hiv', dtype=int, label='New cancers (HIV-)'),
+            ss.Result('hpv_prevalence_with_hiv', dtype=float, label='HPV prevalence (HIV+)'),
+            ss.Result('hpv_prevalence_no_hiv', dtype=float, label='HPV prevalence (HIV-)'),
+        )
+
+    def step(self):
+        ti = self.sim.ti
+        people = self.sim.people
+        alive = people.alive.values
+        hiv_pos = self.hiv_module.infected.values & alive
+        hiv_neg = (~self.hiv_module.infected.values) & alive
+
+        # Any-genotype HPV infection (union across modules).
+        any_hpv = np.zeros(alive.shape, dtype=bool)
+        for m in self.hpv_modules:
+            any_hpv |= m.infected.values
+
+        n_pos = int(hiv_pos.sum())
+        n_neg = int(hiv_neg.sum())
+        self.results['hpv_prevalence_with_hiv'][ti] = (
+            float((any_hpv & hiv_pos).sum()) / n_pos if n_pos else 0.0)
+        self.results['hpv_prevalence_no_hiv'][ti] = (
+            float((any_hpv & hiv_neg).sum()) / n_neg if n_neg else 0.0)
+
+        # New cancers this step, attributed by current HIV status.
+        new_cancer = np.zeros(alive.shape, dtype=bool)
+        for m in self.hpv_modules:
+            fired = (m.cancerous.values & (m.ti_cancerous.values == ti))
+            new_cancer |= fired
+        self.results['cancers_with_hiv'][ti] = int((new_cancer & hiv_pos).sum())
+        self.results['cancers_no_hiv'][ti] = int((new_cancer & hiv_neg).sum())
