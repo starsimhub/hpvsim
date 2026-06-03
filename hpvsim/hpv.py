@@ -719,6 +719,11 @@ class HPV(ss.Infection):
                 cell_all = p.cell_imm_init.rvs(f_cleared)
 
                 # HIV co-infection reduces conferred immunity (gated no-op).
+                # Note: step_state runs before the connector's step(), so this
+                # reads hiv_rel_imm from the PREVIOUS timestep (a one-dt lag,
+                # immaterial since CD4 moves slowly). Contrast set_prognoses,
+                # which reads hiv_rel_sev fresh because step_infect runs after
+                # the connector.
                 hivc = self._hiv_connector()
                 if hivc is not None:
                     imm_factor = hivc.hiv_rel_imm[f_cleared]
@@ -739,6 +744,9 @@ class HPV(ss.Infection):
                     self.nab_imm[first_uids]  = seroconvert * nab_all[first_mask]
                     self.cell_imm[first_uids] = cell_all[first_mask]
 
+                # For repeat clearances the running max may retain a higher value
+                # from a prior clearance; the HIV-reduced increment only fails to
+                # boost immunity, it never erases existing antibodies.
                 if len(repeat_uids):
                     self.nab_imm[repeat_uids] = np.maximum(
                         self.nab_imm[repeat_uids], nab_all[has_prior_imm])
