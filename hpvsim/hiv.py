@@ -23,7 +23,8 @@ __all__ = ['HIV', 'hpv_hiv_connector', 'HIVStratifiedResults']
 # CD4-stratified HIV→HPV effect multipliers. Copied by value from v2's
 # HIVsim defaults (hpvsim/_v2_legacy/hiv.py:29-44) per the no-quarantine-import
 # rule. Strata: 'lt200' = CD4 < 200; 'gt200' = CD4 >= 200 (v2's 200-500 band,
-# extended to all CD4 >= 200 for HIV+ agents).
+# extended to all CD4 >= 200 for HIV+ agents). Agents with CD4 > 500 (newly
+# infected in v2's model) had no multiplier in v2; here they receive the gt200 factor.
 _HIV_EFFECTS = {
     'rel_sus': {'lt200': 2.2, 'gt200': 2.2},   # increased HPV acquisition
     'rel_sev': {'lt200': 1.5, 'gt200': 1.2},   # faster/worse CIN->cancer progression
@@ -80,6 +81,7 @@ class hpv_hiv_connector(ss.Connector):
     rel_imm factors are *read* by HPV.set_prognoses, HPV.step_state, and the
     vaccine products (see those sites) — applied where they compose correctly
     with CrossImmunity, which overwrites rel_sus each step before this runs.
+    Must be registered AFTER CrossImmunity in the connectors list.
     """
 
     def __init__(self, **kwargs):
@@ -102,6 +104,16 @@ class hpv_hiv_connector(ss.Connector):
                 'hpv.HIV disease in the sim.'
             )
         self.hiv_module = hivs[0]
+        # This connector must run AFTER CrossImmunity, which overwrites rel_sus
+        # each step; otherwise the HIV rel_sus factor is silently discarded.
+        from .cross_genotype import CrossImmunity
+        conns = list(sim.connectors.values())
+        xi = next((i for i, c in enumerate(conns) if isinstance(c, CrossImmunity)), None)
+        si = next((i for i, c in enumerate(conns) if c is self), None)
+        if xi is not None and si is not None and si < xi:
+            misc.warn('hpv_hiv_connector is registered before CrossImmunity; the '
+                      'HIV rel_sus effect will be overwritten. Register it after '
+                      'CrossImmunity.')
 
     def _cd4_stratum(self, cd4):
         """Return 0 for lt200 (CD4<200), 1 for gt200 (CD4>=200)."""
@@ -120,9 +132,13 @@ class hpv_hiv_connector(ss.Connector):
         if not self.hpv_modules:
             return
         auids = self.sim.people.auids
-        cd4 = self.hiv_module.cd4[auids]
-        hiv_pos = self.hiv_module.infected[auids]
-        strata = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))  # HIV- -> high CD4 -> gt200, masked out below
+        cd4 = np.asarray(self.hiv_module.cd4[auids])
+        # Effects apply only to agents who are HIV+ AND have an initialized CD4.
+        # HIV- agents have NaN cd4 (never initialized); an HIV+ agent whose cd4
+        # is still NaN (pre-init edge case) is treated as neutral (factor 1.0)
+        # rather than silently binned into a stratum.
+        hiv_pos = np.asarray(self.hiv_module.infected[auids], dtype=bool) & ~np.isnan(cd4)
+        strata = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))
         n = len(auids)
         rel_sus = self._factor_array('rel_sus', hiv_pos, strata, n)
         rel_sev = self._factor_array('rel_sev', hiv_pos, strata, n)
@@ -131,7 +147,8 @@ class hpv_hiv_connector(ss.Connector):
         self.hiv_rel_sev[auids] = rel_sev
         self.hiv_rel_imm[auids] = rel_imm
         # Acquisition effect: multiply each module's rel_sus (set by CrossImmunity
-        # earlier this step) by the HIV factor. Susceptible-only by construction.
+        # earlier this step) by the HIV factor. rel_sus is written for all agents,
+        # but Starsim only samples it for susceptibles during step_infect.
         for m in self.hpv_modules:
             m.rel_sus[auids] = m.rel_sus[auids] * rel_sus
 
