@@ -9,13 +9,27 @@ Three components:
   - ``HIVStratifiedResults`` (``ss.Analyzer``): HPV/cancer outcomes by HIV status.
 """
 
+import numpy as np
 import starsim as ss
 import stisim as sti
 
 from . import misc
+from .hpv import HPV
 from .network import SexualNetwork
 
 __all__ = ['HIV', 'hpv_hiv_connector', 'HIVStratifiedResults']
+
+
+# CD4-stratified HIV→HPV effect multipliers. Copied by value from v2's
+# HIVsim defaults (hpvsim/_v2_legacy/hiv.py:29-44) per the no-quarantine-import
+# rule. Strata: 'lt200' = CD4 < 200; 'gt200' = CD4 >= 200 (v2's 200-500 band,
+# extended to all CD4 >= 200 for HIV+ agents).
+_HIV_EFFECTS = {
+    'rel_sus': {'lt200': 2.2, 'gt200': 2.2},   # increased HPV acquisition
+    'rel_sev': {'lt200': 1.5, 'gt200': 1.2},   # faster/worse CIN->cancer progression
+    'rel_imm': {'lt200': 0.36, 'gt200': 0.76}, # reduced post-infection/vaccine immunity
+}
+_CD4_THRESHOLD = 200.0
 
 
 class HIV(sti.HIV):
@@ -58,8 +72,68 @@ class HIV(sti.HIV):
 
 
 class hpv_hiv_connector(ss.Connector):
-    """Placeholder — implemented in M08 Task 3."""
-    pass
+    """Apply v2's CD4-stratified HIV→HPV effects to every HPV module.
+
+    Each step: bin HIV+ agents' CD4 into discrete strata, compute per-agent
+    factor arrays (hiv_rel_sus / hiv_rel_sev / hiv_rel_imm; 1.0 for HIV-),
+    and multiply each HPV module's rel_sus by hiv_rel_sus. The rel_sev and
+    rel_imm factors are *read* by HPV.set_prognoses, HPV.step_state, and the
+    vaccine products (see those sites) — applied where they compose correctly
+    with CrossImmunity, which overwrites rel_sus each step before this runs.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.hpv_modules = None
+        self.hiv_module = None
+        self.define_states(
+            ss.FloatArr('hiv_rel_sus', default=1.0),
+            ss.FloatArr('hiv_rel_sev', default=1.0),
+            ss.FloatArr('hiv_rel_imm', default=1.0),
+        )
+
+    def init_pre(self, sim):
+        super().init_pre(sim)
+        self.hpv_modules = [m for m in sim.diseases.values() if isinstance(m, HPV)]
+        hivs = [m for m in sim.diseases.values() if isinstance(m, HIV)]
+        if not self.hpv_modules or not hivs:
+            raise ValueError(
+                'hpv_hiv_connector requires both HPV genotype module(s) and an '
+                'hpv.HIV disease in the sim.'
+            )
+        self.hiv_module = hivs[0]
+
+    def _cd4_stratum(self, cd4):
+        """Return 0 for lt200 (CD4<200), 1 for gt200 (CD4>=200)."""
+        return (np.asarray(cd4) >= _CD4_THRESHOLD).astype(int)
+
+    def _factor_array(self, effect, hiv_pos, strata, n):
+        """Build a per-agent factor array (1.0 for HIV-, stratum value for HIV+)."""
+        out = np.ones(n, dtype=float)
+        lt200 = _HIV_EFFECTS[effect]['lt200']
+        gt200 = _HIV_EFFECTS[effect]['gt200']
+        vals = np.where(strata == 0, lt200, gt200)
+        out[hiv_pos] = vals[hiv_pos]
+        return out
+
+    def step(self):
+        if not self.hpv_modules:
+            return
+        auids = self.sim.people.auids
+        cd4 = self.hiv_module.cd4[auids]
+        hiv_pos = self.hiv_module.infected[auids]
+        strata = self._cd4_stratum(np.nan_to_num(cd4, nan=1e4))  # HIV- -> high CD4 -> gt200, masked out below
+        n = len(auids)
+        rel_sus = self._factor_array('rel_sus', hiv_pos, strata, n)
+        rel_sev = self._factor_array('rel_sev', hiv_pos, strata, n)
+        rel_imm = self._factor_array('rel_imm', hiv_pos, strata, n)
+        self.hiv_rel_sus[auids] = rel_sus
+        self.hiv_rel_sev[auids] = rel_sev
+        self.hiv_rel_imm[auids] = rel_imm
+        # Acquisition effect: multiply each module's rel_sus (set by CrossImmunity
+        # earlier this step) by the HIV factor. Susceptible-only by construction.
+        for m in self.hpv_modules:
+            m.rel_sus[auids] = m.rel_sus[auids] * rel_sus
 
 
 class HIVStratifiedResults(ss.Analyzer):
