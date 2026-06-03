@@ -21,12 +21,13 @@ __all__ = ['vx', 'dx', 'tx', 'txvx', 'radiation']
 _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
 
 
-def _hiv_rel_imm_factor(sim, uids):
-    """Return the HIV connector's per-agent ``hiv_rel_imm`` factor, or None.
+def _hiv_rel_imm_factor(sim):
+    """Return the HIV connector's full ``hiv_rel_imm`` FloatArr, or None.
 
-    Returns the connector's ``hiv_rel_imm`` FloatArr (indexable by any uid
-    subset; 1.0 for HIV- agents) when an ``hpv_hiv_connector`` is registered in
-    the sim, else ``None`` so callers cleanly no-op without an HIV connector.
+    Returns the connector's ``hiv_rel_imm`` FloatArr (caller indexes by the
+    relevant uid subset; value is 1.0 for HIV- agents) when an
+    ``hpv_hiv_connector`` is registered in the sim, else ``None`` so callers
+    cleanly no-op without an HIV connector.
     Lazy-imports the connector to avoid a products <-> hiv circular import.
     """
     if not getattr(sim, 'connectors', None):
@@ -251,7 +252,7 @@ class vx(ss.Vx):
         # HIV co-infection reduces vaccine take (gated no-op without HIV).
         # When an HIV connector is present, scale each agent's conferred peak by
         # its per-agent hiv_rel_imm factor (1.0 for HIV- agents).
-        rel_imm_hiv = _hiv_rel_imm_factor(self.sim, uids)
+        rel_imm_hiv = _hiv_rel_imm_factor(self.sim)
         # Single sterilizing draw per agent (NOT per genotype).
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
         sterilizing_uids, leaky_uids = self._sterilizing_dist.filter(uids, both=True)
@@ -495,6 +496,9 @@ class txvx(ss.Vx):
         if len(uids) == 0:
             return
         if self.pars.imm_boost is not None:
+            # HIV scaling is NOT applied to the booster: the base immunity set at
+            # first dose was already scaled by hiv_rel_imm; multiplying the booster
+            # by it again would double-count the reduction.
             # Booster: multiplicative in place on all HPV modules.
             for module in iter_hpv_modules(self.sim):
                 module.txvx_imm[uids] *= float(self.pars.imm_boost)
@@ -505,7 +509,7 @@ class txvx(ss.Vx):
         is_sterilizing = self._sterilizing_dist.rvs(uids)
         # HIV co-infection reduces vaccine take (gated no-op without HIV). The
         # factor is read in uids-order to match `peak` / `is_sterilizing`.
-        rel_imm_hiv = _hiv_rel_imm_factor(self.sim, uids)
+        rel_imm_hiv = _hiv_rel_imm_factor(self.sim)
         hiv_scale = 1.0 if rel_imm_hiv is None else rel_imm_hiv[uids]
         for genotype, rel_imm_g in self.rel_imm.items():
             module = find_genotype_module(self.sim, genotype)
