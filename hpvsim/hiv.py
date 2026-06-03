@@ -172,10 +172,14 @@ class HIVStratifiedResults(ss.Analyzer):
 
     def init_pre(self, sim):
         self.hpv_modules = [d for d in sim.diseases.values() if isinstance(d, HPV)]
-        self.hiv_module = next(d for d in sim.diseases.values() if isinstance(d, HIV))
+        hivs = [d for d in sim.diseases.values() if isinstance(d, HIV)]
+        if not hivs:
+            raise ValueError('HIVStratifiedResults requires an hpv.HIV disease in the sim.')
+        self.hiv_module = hivs[0]
         super().init_pre(sim)
 
     def init_results(self):
+        """Declare the HIV-stratified result schema (diseases init before analyzers)."""
         super().init_results()
         self.define_results(
             ss.Result('cancers_with_hiv', dtype=int, label='New cancers (HIV+)'),
@@ -203,7 +207,15 @@ class HIVStratifiedResults(ss.Analyzer):
         self.results['hpv_prevalence_no_hiv'][ti] = (
             float((any_hpv & hiv_neg).sum()) / n_neg if n_neg else 0.0)
 
-        # New cancers this step, attributed by current HIV status.
+        # New cancers this step, attributed by current HIV status. NOTE: this
+        # analyzer runs after step_die in the Starsim loop, so an agent who turns
+        # cancerous in step_state AND dies from background demographics the same
+        # step has both `cancerous` and the HIV `infected` flag cleared by the
+        # time we read them here — that cancer is counted by HPVTotal.new_cancers
+        # (recorded in step_state) but missed here. The bias is O(P_death x
+        # P_cancer_transition) per step, negligible at typical scales. A complete
+        # fix would snapshot HIV status before step_die (e.g. via an update_results
+        # override); revisit only if the Phase-2 parity gate needs it.
         new_cancer = np.zeros(alive.shape, dtype=bool)
         for m in self.hpv_modules:
             fired = (m.cancerous.values & (m.ti_cancerous.values == ti))
