@@ -21,6 +21,22 @@ __all__ = ['vx', 'dx', 'tx', 'txvx', 'radiation']
 _PRODUCT_CSV = Path(__file__).parent / 'data' / 'products_vx.csv'
 
 
+def _hiv_rel_imm_factor(sim, uids):
+    """Return the HIV connector's per-agent ``hiv_rel_imm`` factor, or None.
+
+    Returns the connector's ``hiv_rel_imm`` FloatArr (indexable by any uid
+    subset; 1.0 for HIV- agents) when an ``hpv_hiv_connector`` is registered in
+    the sim, else ``None`` so callers cleanly no-op without an HIV connector.
+    Lazy-imports the connector to avoid a products <-> hiv circular import.
+    """
+    if not getattr(sim, 'connectors', None):
+        return None
+    from .hiv import hpv_hiv_connector  # lazy: avoid circular import
+    hivc = next((c for c in sim.connectors.values()
+                 if isinstance(c, hpv_hiv_connector)), None)
+    return None if hivc is None else hivc.hiv_rel_imm
+
+
 @functools.lru_cache(maxsize=1)
 def _load_vx_products():
     """Load the CSV and return a mapping of product name -> {genotype: rel_imm}.
@@ -232,6 +248,10 @@ class vx(ss.Vx):
         """
         if len(uids) == 0:
             return
+        # HIV co-infection reduces vaccine take (gated no-op without HIV).
+        # When an HIV connector is present, scale each agent's conferred peak by
+        # its per-agent hiv_rel_imm factor (1.0 for HIV- agents).
+        rel_imm_hiv = _hiv_rel_imm_factor(self.sim, uids)
         # Single sterilizing draw per agent (NOT per genotype).
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
         sterilizing_uids, leaky_uids = self._sterilizing_dist.filter(uids, both=True)
@@ -242,8 +262,14 @@ class vx(ss.Vx):
             # Sterilizing agents get rel_imm[g]; leaky get rel_imm[g] * sterilizing_p
             ster_peak = float(rel_imm_g)
             leaky_peak = ster_peak * float(self.pars.sterilizing_p)
-            hpv_mod.vax_imm[sterilizing_uids] = np.maximum(hpv_mod.vax_imm[sterilizing_uids], ster_peak)
-            hpv_mod.vax_imm[leaky_uids] = np.maximum(hpv_mod.vax_imm[leaky_uids], leaky_peak)
+            if rel_imm_hiv is None:
+                ster_vals = ster_peak
+                leaky_vals = leaky_peak
+            else:
+                ster_vals = ster_peak * rel_imm_hiv[sterilizing_uids]
+                leaky_vals = leaky_peak * rel_imm_hiv[leaky_uids]
+            hpv_mod.vax_imm[sterilizing_uids] = np.maximum(hpv_mod.vax_imm[sterilizing_uids], ster_vals)
+            hpv_mod.vax_imm[leaky_uids] = np.maximum(hpv_mod.vax_imm[leaky_uids], leaky_vals)
 
 
 def _state_uids_for_module(module, state, uids):
@@ -477,6 +503,10 @@ class txvx(ss.Vx):
         # bernoulli.rvs returns the boolean array directly, in uids-order.
         self._sterilizing_dist.set(p=float(self.pars.sterilizing_p))
         is_sterilizing = self._sterilizing_dist.rvs(uids)
+        # HIV co-infection reduces vaccine take (gated no-op without HIV). The
+        # factor is read in uids-order to match `peak` / `is_sterilizing`.
+        rel_imm_hiv = _hiv_rel_imm_factor(self.sim, uids)
+        hiv_scale = 1.0 if rel_imm_hiv is None else rel_imm_hiv[uids]
         for genotype, rel_imm_g in self.rel_imm.items():
             module = find_genotype_module(self.sim, genotype)
             if module is None:
@@ -485,7 +515,7 @@ class txvx(ss.Vx):
                 is_sterilizing,
                 float(rel_imm_g),
                 float(rel_imm_g) * float(self.pars.sterilizing_p),
-            )
+            ) * hiv_scale
             module.txvx_imm[uids] = np.maximum(module.txvx_imm[uids], peak)
 
 
