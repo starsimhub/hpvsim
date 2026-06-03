@@ -34,16 +34,14 @@ def test_hpv_instances_plus_genotypes_raises():
 
 
 def test_hiv_autowires_connector_and_analyzer():
-    sim = hpv.Sim(n_agents=200, start=2000, stop=2001, dt=0.25, location='nigeria',
-                  genotypes=[16, 18], diseases=[hpv.HIV(beta_m2f=0.0)])
+    sim = hpv.Sim(**_tiny(genotypes=[16, 18], diseases=[hpv.HIV(beta_m2f=0.0)]))
     sim.init()
     assert any(isinstance(c, hpv_hiv_connector) for c in sim.connectors.values())
     assert any(isinstance(a, HIVStratifiedResults) for a in sim.analyzers.values())
 
 
 def test_no_hiv_no_autowire():
-    sim = hpv.Sim(n_agents=200, start=2000, stop=2001, dt=0.25, location='nigeria',
-                  genotypes=[16, 18])
+    sim = hpv.Sim(**_tiny(genotypes=[16, 18]))
     sim.init()
     assert not any(isinstance(c, hpv_hiv_connector) for c in sim.connectors.values())
     assert not any(isinstance(a, HIVStratifiedResults) for a in sim.analyzers.values())

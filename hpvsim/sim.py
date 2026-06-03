@@ -8,8 +8,10 @@ HPVTotal analyzer — and forwards to ``ss.Sim``.
 
 ``connectors=`` and ``analyzers=`` are **append**, not override: user-supplied
 modules are added after the auto-defaults (CrossImmunity, the _ExclusiveSeeder
-when ``init_seeding='exclusive'``, and HPVTotal). To replace the auto-defaults
-entirely, drop down to vanilla ``ss.Sim``.
+when ``init_seeding='exclusive'``, HPVTotal, and — when an ``hpv.HIV`` disease
+is present in ``diseases=`` — an ``hpv_hiv_connector`` appended after
+CrossImmunity and a ``HIVStratifiedResults`` analyzer). To replace the
+auto-defaults entirely, drop down to vanilla ``ss.Sim``.
 
 Other slots (``diseases``, ``networks``, ``demographics``, ``people``) retain
 override semantics. ``diseases=`` is mutually exclusive with ``genotypes=``.
@@ -150,6 +152,9 @@ class Sim(ss.Sim):
 
         diseases = hpv_diseases + other_diseases
         auto_analyzers = [HPVTotal()]
+        # If HIV is present, auto-wire its connector (appended last, so it runs
+        # after CrossImmunity, which overwrites rel_sus each step; see
+        # hpv_hiv_connector.init_pre) and its stratified-results analyzer.
         if any(isinstance(d, HIV) for d in other_diseases):
             auto_connectors.append(hpv_hiv_connector())
             auto_analyzers.append(HIVStratifiedResults())
