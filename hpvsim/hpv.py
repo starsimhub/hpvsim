@@ -718,6 +718,13 @@ class HPV(ss.Infection):
                 nab_all  = p.imm_init.rvs(f_cleared)
                 cell_all = p.cell_imm_init.rvs(f_cleared)
 
+                # HIV co-infection reduces conferred immunity (gated no-op).
+                hivc = self._hiv_connector()
+                if hivc is not None:
+                    imm_factor = hivc.hiv_rel_imm[f_cleared]
+                    nab_all = nab_all * imm_factor
+                    cell_all = cell_all * imm_factor
+
                 if len(first_uids):
                     self._sero_bern.set(p=float(p.sero_prob))
                     seroconvert = self._sero_bern.rvs(first_uids)
