@@ -15,8 +15,7 @@ def test_rel_sus_scaled_for_hiv_positive():
     """After step(), an HIV+ agent's HPV rel_sus is multiplied by the stratum factor."""
     h = hpv.HIV(beta_m2f=0.0)  # no transmission; we set HIV state manually
     sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25,
-                  location='nigeria', genotypes=[16], diseases=[h],
-                  connectors=[hpv_hiv_connector()])
+                  location='nigeria', genotypes=[16], diseases=[h])
     sim.init()
     hivmod = sim.diseases.hiv
     hpvmod = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)][0]
@@ -48,8 +47,7 @@ def test_rel_sus_gt200_stratum():
     """An HIV+ agent with CD4>=200 gets the gt200 acquisition factor."""
     h = hpv.HIV(beta_m2f=0.0)
     sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25,
-                  location='nigeria', genotypes=[16], diseases=[h],
-                  connectors=[hpv_hiv_connector()])
+                  location='nigeria', genotypes=[16], diseases=[h])
     sim.init()
     hivmod = sim.diseases.hiv
     hpvmod = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)][0]

@@ -5,8 +5,7 @@ from hpvsim.hiv import hpv_hiv_connector
 
 def _sim_with_hiv():
     sim = hpv.Sim(n_agents=300, start=2000, stop=2001, dt=0.25, location='nigeria',
-                  genotypes=[16], diseases=[hpv.HIV(beta_m2f=0.0)],
-                  connectors=[hpv_hiv_connector()])
+                  genotypes=[16], diseases=[hpv.HIV(beta_m2f=0.0)])
     sim.init()
     return sim
 
