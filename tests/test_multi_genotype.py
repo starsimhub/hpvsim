@@ -41,7 +41,7 @@ def test_sim_genotypes_sugar_two():
 
 def test_sim_rejects_diseases_plus_genotypes():
     """Passing both diseases= and genotypes= raises early."""
-    with pytest.raises(ValueError, match='diseases.*genotypes'):
+    with pytest.raises(ValueError, match='genotypes='):
         hpv.Sim(
             n_agents=200, start=1990, stop=1991, dt=1.0, rand_seed=0,
             diseases=[hpv.HPV(genotype='hpv16')],

@@ -85,13 +85,19 @@ class Sim(ss.Sim):
             people = ss.People(n_agents, age_data=country['age_data'],
                                extra_states=[ss.BoolArr('fine', default=False)])
 
-        diseases = kwargs.pop('diseases', None)
+        user_diseases = kwargs.pop('diseases', None) or []
         user_connectors = kwargs.pop('connectors', None) or []
         user_analyzers = kwargs.pop('analyzers', None) or []
 
-        if diseases is not None and genotypes is not None:
+        # Partition diseases= by type: HPV genotype modules are built from
+        # genotypes= (or supplied directly as HPV instances); any non-HPV
+        # disease (e.g. hpv.HIV) is merged in alongside them.
+        hpv_instances = [d for d in user_diseases if isinstance(d, HPV)]
+        other_diseases = [d for d in user_diseases if not isinstance(d, HPV)]
+
+        if hpv_instances and genotypes is not None:
             raise ValueError(
-                'Pass diseases= OR genotypes=, not both.'
+                'Specify HPV via genotypes= or HPV instances in diseases=, not both.'
             )
 
         if init_seeding not in ('exclusive', 'independent'):
@@ -101,13 +107,14 @@ class Sim(ss.Sim):
 
         auto_connectors = [CrossImmunity()]
 
-        if diseases is None:
+        if hpv_instances:
+            hpv_diseases = hpv_instances  # override path; seeder NOT wired (unchanged)
+        else:
             # Default to single-genotype HPV16 if neither supplied.
             keys = (tuple(_normalize_genotype(g) for g in genotypes)
                     if genotypes is not None else ('hpv16',))
             gpars_overrides = genotype_pars or {}
 
-            # Validate init_hpv_dist keys if provided.
             if init_hpv_dist is not None:
                 if not isinstance(init_hpv_dist, dict):
                     raise ValueError(
@@ -121,22 +128,17 @@ class Sim(ss.Sim):
                         f'resolved genotype keys {sorted(sim_keys)}'
                     )
 
-            diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
-                            **gpars_overrides.get(k, {})) for k in keys]
+            hpv_diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
+                                **gpars_overrides.get(k, {})) for k in keys]
             if init_seeding == 'exclusive':
-                # 'exclusive': one Bernoulli per agent for any HPV, then one
-                # genotype per infected agent via the seeder's per-genotype callback.
-                # 'independent' is the no-op path — each HPV's per-genotype init_prev
-                # curve drives its own seeding independently.
                 self._seeder = _ExclusiveSeeder(
                     genotype_keys=keys, init_hpv_dist=init_hpv_dist
                 )
-                for d, k in zip(diseases, keys):
+                for d, k in zip(hpv_diseases, keys):
                     d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
-                # Register so the seeder's Dists go through the standard
-                # define_pars -> init_pre -> init_dists lifecycle.
                 auto_connectors.append(self._seeder)
 
+        diseases = hpv_diseases + other_diseases
         connectors = auto_connectors + user_connectors
 
         networks = kwargs.pop('networks', None)
