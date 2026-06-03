@@ -108,13 +108,14 @@ class Sim(ss.Sim):
         auto_connectors = [CrossImmunity()]
 
         if hpv_instances:
-            hpv_diseases = hpv_instances  # override path; seeder NOT wired (unchanged)
+            hpv_diseases = hpv_instances  # override path; seeder skipped (user-supplied HPV manage their own init_prev)
         else:
             # Default to single-genotype HPV16 if neither supplied.
             keys = (tuple(_normalize_genotype(g) for g in genotypes)
                     if genotypes is not None else ('hpv16',))
             gpars_overrides = genotype_pars or {}
 
+            # Validate init_hpv_dist keys if provided.
             if init_hpv_dist is not None:
                 if not isinstance(init_hpv_dist, dict):
                     raise ValueError(
@@ -131,11 +132,17 @@ class Sim(ss.Sim):
             hpv_diseases = [HPV(genotype=k, ms_agent_ratio=ms_agent_ratio,
                                 **gpars_overrides.get(k, {})) for k in keys]
             if init_seeding == 'exclusive':
+                # 'exclusive': one Bernoulli per agent for any HPV, then one
+                # genotype per infected agent via the seeder's per-genotype callback.
+                # 'independent' is the no-op path — each HPV's per-genotype init_prev
+                # curve drives its own seeding independently.
                 self._seeder = _ExclusiveSeeder(
                     genotype_keys=keys, init_hpv_dist=init_hpv_dist
                 )
                 for d, k in zip(hpv_diseases, keys):
                     d.pars.init_prev = ss.bernoulli(p=self._seeder.for_genotype(k))
+                # Register so the seeder's Dists go through the standard
+                # define_pars -> init_pre -> init_dists lifecycle.
                 auto_connectors.append(self._seeder)
 
         diseases = hpv_diseases + other_diseases
