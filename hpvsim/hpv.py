@@ -195,6 +195,14 @@ class HPV(ss.Infection):
                 return c
         return None
 
+    def _hiv_connector(self):
+        """Locate the hpv_hiv_connector on the sim, if any (None when no HIV)."""
+        from .hiv import hpv_hiv_connector
+        for c in self.sim.connectors.values():
+            if isinstance(c, hpv_hiv_connector):
+                return c
+        return None
+
     def init_results(self):
         """Per-step Results emitted from ``step_state``.
 
@@ -312,6 +320,10 @@ class HPV(ss.Infection):
             rel_sev_uids = cross.rel_sev[uids]
         else:
             rel_sev_uids = np.ones(len(uids), dtype=float)
+        # HIV co-infection raises progression severity (gated no-op when no HIV).
+        hivc = self._hiv_connector()
+        if hivc is not None:
+            rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
         sev_imm_uids = self.sev_imm[uids]
 
         # 1. Sample precin durations.
