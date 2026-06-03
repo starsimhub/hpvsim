@@ -9,12 +9,10 @@ Three components:
   - ``HIVStratifiedResults`` (``ss.Analyzer``): HPV/cancer outcomes by HIV status.
 """
 
-import numpy as np
 import starsim as ss
 import stisim as sti
 
 from . import misc
-from .hpv import HPV
 from .network import SexualNetwork
 
 __all__ = ['HIV', 'hpv_hiv_connector', 'HIVStratifiedResults']
@@ -27,6 +25,13 @@ class HIV(sti.HIV):
     and CD4-based mortality unchanged. Adds (1) HPVsim-friendly directional
     beta targeting ``hpv.SexualNetwork`` (whose p1=female, p2=male, unlike
     STIsim's ``structuredsexual``), and (2) a Rwanda init-prevalence curve.
+
+    Note: ``beta_m2f`` / ``rel_beta_f2m`` are taken as constructor arguments and
+    applied directly to ``pars.beta`` in ``init_pre``. STIsim's same-named
+    ``pars.beta_m2f`` / ``pars.rel_beta_f2m`` are NOT used here — its
+    ``validate_beta`` only applies them to a network named ``'structuredsexual'``,
+    which hpvsim does not use. Set the transmission rate via the constructor args,
+    not via ``pars``.
     """
 
     def __init__(self, beta_m2f=0.0035, rel_beta_f2m=0.5, init_prev_data=None,
@@ -41,6 +46,7 @@ class HIV(sti.HIV):
         # hpv.SexualNetwork puts females in p1, males in p2, so betamap entry
         # 0 = female->male, entry 1 = male->female. Male->female is the higher-
         # risk direction (beta_m2f); female->male = beta_m2f * rel_beta_f2m.
+        # So beta[net.name][0] = f2m (smaller), beta[net.name][1] = m2f = beta_m2f (larger).
         nets = [n for n in sim.networks.values() if isinstance(n, SexualNetwork)]
         if not nets:
             misc.warn('hpv.HIV: no SexualNetwork found; HIV will not transmit.')
