@@ -32,3 +32,32 @@ def test_rel_sus_scaled_for_hiv_positive():
     assert np.isclose(hpvmod.rel_sus[uid], _HIV_EFFECTS['rel_sus']['lt200'])
     other = sim.people.auids[1]
     assert np.isclose(hpvmod.rel_sus[other], 1.0)  # HIV- unchanged
+
+    # The stored connector states (consumed by Tasks 4-6) are populated too.
+    assert np.isclose(conn.hiv_rel_sus[uid], _HIV_EFFECTS['rel_sus']['lt200'])
+    assert np.isclose(conn.hiv_rel_sev[uid], _HIV_EFFECTS['rel_sev']['lt200'])
+    assert np.isclose(conn.hiv_rel_imm[uid], _HIV_EFFECTS['rel_imm']['lt200'])
+    # Absolute-value anchor (documents the expected lt200 acquisition factor).
+    assert np.isclose(hpvmod.rel_sus[uid], 2.2)
+    # HIV- agent's stored factors stay neutral.
+    assert np.isclose(conn.hiv_rel_sev[other], 1.0)
+    assert np.isclose(conn.hiv_rel_imm[other], 1.0)
+
+
+def test_rel_sus_gt200_stratum():
+    """An HIV+ agent with CD4>=200 gets the gt200 acquisition factor."""
+    h = hpv.HIV(beta_m2f=0.0)
+    sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25,
+                  location='nigeria', genotypes=[16], diseases=[h],
+                  connectors=[hpv_hiv_connector()])
+    sim.init()
+    hivmod = sim.diseases.hiv
+    hpvmod = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)][0]
+    conn = [c for c in sim.connectors.values() if isinstance(c, hpv_hiv_connector)][0]
+    uid = sim.people.auids[0]
+    hivmod.infected[uid] = True
+    hivmod.cd4[uid] = 350.0  # gt200
+    hpvmod.rel_sus[sim.people.auids] = 1.0
+    conn.step()
+    assert np.isclose(hpvmod.rel_sus[uid], _HIV_EFFECTS['rel_sus']['gt200'])
+    assert np.isclose(conn.hiv_rel_sev[uid], _HIV_EFFECTS['rel_sev']['gt200'])
