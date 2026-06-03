@@ -27,6 +27,7 @@ def _coinfection_sim(product=None):
     hivmod = sim.diseases.hiv
     conn = [c for c in sim.connectors.values() if isinstance(c, hpv_hiv_connector)][0]
     females = sim.people.auids[sim.people.female[sim.people.auids]]
+    assert len(females) >= 2  # fixture must yield at least two female agents
     uid_pos, uid_neg = females[0], females[1]
     hivmod.infected[uid_pos] = True
     hivmod.cd4[uid_pos] = 100.0  # lt200
