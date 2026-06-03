@@ -197,6 +197,7 @@ class HPV(ss.Infection):
 
     def _hiv_connector(self):
         """Locate the hpv_hiv_connector on the sim, if any (None when no HIV)."""
+        # Avoid circular import at module load (hiv.py imports HPV from this module).
         from .hiv import hpv_hiv_connector
         for c in self.sim.connectors.values():
             if isinstance(c, hpv_hiv_connector):
@@ -320,7 +321,7 @@ class HPV(ss.Infection):
             rel_sev_uids = cross.rel_sev[uids]
         else:
             rel_sev_uids = np.ones(len(uids), dtype=float)
-        # HIV co-infection raises progression severity (gated no-op when no HIV).
+        # HIV co-infection scales progression severity (gated no-op when no HIV).
         hivc = self._hiv_connector()
         if hivc is not None:
             rel_sev_uids = rel_sev_uids * hivc.hiv_rel_sev[uids]
