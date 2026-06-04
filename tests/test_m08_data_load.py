@@ -35,6 +35,21 @@ def test_load_hiv_rwanda_returns_inputs():
     assert art['year'].min() == 2004
     assert art['year'].max() == 2030
 
+    # incidence: tidy long DataFrame keyed by age/sex/year.
+    inc = data['incidence']
+    assert isinstance(inc, pd.DataFrame)
+    assert set(['age', 'sex', 'year', 'incidence']).issubset(inc.columns)
+    assert {'f', 'm'} == set(inc['sex'].unique())
+    # Per-year acquisition rates are small non-negative fractions.
+    assert (inc['incidence'] >= 0.0).all()
+    assert inc['incidence'].max() < 1.0
+    assert inc['incidence'].max() > 0.0  # the curve is non-trivial
+    # Spans the documented year/age range.
+    assert inc['year'].min() == 1985
+    assert inc['year'].max() == 2030
+    assert inc['age'].min() == 10
+    assert inc['age'].max() == 80
+
 
 def test_load_hiv_unknown_location_raises():
     with pytest.raises(ValueError):

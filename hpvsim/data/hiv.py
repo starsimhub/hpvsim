@@ -7,6 +7,10 @@ inputs a later task (T10b/T12) consumes to build a co-infection sim:
   from the bundled by-age ART coverage CSVs (females + males).
 - ``init_prev``: a scalar initial HIV prevalence to seed ``sti.HIV`` /
   ``hpv.HIV``. See ``_init_prev`` for the derivation and its caveats.
+- ``incidence``: tidy long DataFrame ``[age, sex, year, incidence]`` parsed
+  from ``hiv_incidence_rwanda.csv`` — the per-year HIV acquisition rate among
+  susceptibles by single-year age, sex ('f'/'m'), and calendar year. Consumed
+  by the incidence-driven HIV importer (``hpv.hiv_incidence_import``).
 
 Underlying data lives in ``hpvsim/data/hiv/`` (copied from the Rwanda
 validation repo so nothing is imported from a sibling repo at runtime). The
@@ -40,6 +44,9 @@ def load_hiv(location):
               calendar year (2004-2030).
             - 'init_prev': float, an initial HIV prevalence to seed the HIV
               module at the v3 start year (see ``_init_prev``).
+            - 'incidence': DataFrame ``[age, sex, year, incidence]`` (long).
+              Per-year HIV acquisition rate among susceptibles by single-year
+              age, sex ('f'/'m'), and calendar year (1985-2030).
     """
     location = location.lower()
     if location not in _KNOWN_LOCATIONS:
@@ -49,7 +56,27 @@ def load_hiv(location):
     return dict(
         art_coverage=_art_coverage(location),
         init_prev=_init_prev(location),
+        incidence=_incidence(location),
     )
+
+
+def _incidence(location):  # noqa: ARG001  (single-location for now)
+    """HIV incidence by age/sex/year as a tidy long DataFrame.
+
+    Reads ``hiv_incidence_rwanda.csv`` (long ``Age, Year, Sex, Incidence``;
+    ages 10-80, years 1985-2030, Sex already 'f'/'m', Incidence = per-year HIV
+    acquisition rate among susceptibles) and normalizes column names/dtypes to
+    ``[age, sex, year, incidence]`` (matching the ``art_coverage`` style).
+    """
+    df = pd.read_csv(_HIV_DATADIR / 'hiv_incidence_rwanda.csv')
+    df = df.rename(columns={
+        'Age': 'age', 'Year': 'year', 'Sex': 'sex', 'Incidence': 'incidence',
+    })
+    df['age'] = df['age'].astype(int)
+    df['year'] = df['year'].astype(int)
+    df['sex'] = df['sex'].astype(str).str.lower().str[0]
+    df['incidence'] = df['incidence'].astype(float)
+    return df[['age', 'sex', 'year', 'incidence']].reset_index(drop=True)
 
 
 def _art_coverage(location):  # noqa: ARG001  (single-location for now)
