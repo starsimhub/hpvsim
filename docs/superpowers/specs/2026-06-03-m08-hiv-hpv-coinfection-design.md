@@ -50,8 +50,11 @@ uncertainty intervals.
 - `hpv.Sim` disease-assembly refactor — type-partitioned `diseases=` so HIV is a
   first-class disease alongside genotype-built HPV modules; detection-based
   auto-wiring of the connector and analyzer.
-- Rwanda HIV data files; HIV transmission + ART calibration to Rwanda.
-- Dev-gate anchor + multi-seed z-score parity tests; `hpvsim_rwanda` release gate.
+- Rwanda HIV/ART data; incidence-driven HIV reproduction (`hpv.hiv_incidence_import`)
+  + the ART coverage shortcut (`hpv.hiv_art`). See Phase 2 for the transmission-β
+  deviation rationale.
+- Dev-gate anchor + co-infection direction tests; tolerance-band HIV-stratified
+  cancer parity (adult-restricted metric); `hpvsim_rwanda` release gate.
 
 **Out of scope:**
 
@@ -106,6 +109,45 @@ repo has no testing-coverage data. So M08 marks a data-matched fraction of HIV+
 agents on-ART per that curve, rather than using STIsim's `HIVTest → ART` cascade
 (which would diverge from the baseline and have nothing to calibrate against).
 `sti.HIVTest` stays out of scope.
+
+**HIV epidemic = incidence-driven importer (settled 2026-06-04, supersedes the
+transmission-β calibration above).** A trial of transmission-based HIV on Rwanda
+(`beta_m2f=0.004`) reproduced the *level* early on but overshot the trajectory
+*shape* — peak 7.7% @ 2009 vs the target 4.9% @ 1998, with no post-1998 decline.
+A single constant β cannot fix this (Rwanda's decline began ~1998, before ART
+scale-up, so it is largely behavior-change-driven); matching it would require
+calibrating a time-varying β.
+
+Instead M08 drives HIV with an **incidence importer**, `hpv.hiv_incidence_import`
+(an `ss.Intervention`): with HIV `beta_m2f=0` and `init_prev=0`, it imposes the
+Rwanda incidence curve (`hiv_incidence_rwanda.csv`) by selecting living
+HIV-negative susceptibles at their per-(year, sex, age) force of infection
+(`p = 1 - exp(-rate·dt)`) and calling `sti.HIV.set_prognoses(uids)` — which flips
+them to infected and wires the full CD4 trajectory. STIsim's CD4 decline, the ART
+coverage shortcut, and HIV mortality all run unchanged, as does the HIV→HPV
+connector. This is exactly v2's mechanism (v2 was incidence-based), so the
+prevalence trajectory matches Rwanda **by construction** and the v2↔v3 parity
+comparison is apples-to-apples (HIV trajectory matches by design → any
+cancer-by-HIV-status difference isolates the HPV-side port, which is what M08
+tests).
+
+*Validation:* adult (15–49) HIV prevalence tracks Rwanda in both shape and level
+— peak 5.0% @ 1996 vs target 4.9% @ 1998; 1990–2005 within ~0.5 pp. A modest
+tail residual remains (model declines faster post-2010: 1.8% vs 3.0% by 2020).
+**The parity metric MUST use the adult (15–49) denominator** — STIsim's all-ages
+`prevalence` understates ~2× (an M05-class plot-metric artifact, not a model
+error).
+
+**Deviation from the migration plan — flag for Robyn at PR review.** The plan
+mandates *transmission-based* HIV (drop v2's incidence-based HIV). The importer
+uses STIsim's HIV *disease model* (CD4/ART/mortality/states — not v2's custom
+code) but drives infections by imposed incidence rather than simulated network
+transmission, so it half-honors the mandate. Rationale: it reproduces Rwanda
+without intractable time-varying-β calibration and isolates the M08 deliverable
+(the HPV-side co-infection effects). The transmission capability is retained
+(`beta_m2f` is still a constructor arg, set to 0 here); transmission-β
+calibration — needed for HIV counterfactuals/projections — is documented as
+future work, not a blocker for M08's Rwanda reproduction.
 
 **Fallback:** if Phase 2 HIV calibration cannot converge within the milestone
 budget, fall back to data-pinned HIV prevalence (Approach B) as an interim,
@@ -318,17 +360,34 @@ hpv.Sim(genotypes=[16, 18, 'hi5', 'ohr'], diseases=[hpv.HIV()], interventions=[s
   auto-blocking, per the dual-validation convention.
 - **Release gate:** `hpvsim_rwanda` reproduces with overlapping uncertainty intervals.
 
-## Decisions settled during brainstorming
+## Decisions settled
+
+Items 1–7 settled during brainstorming; 8–10 settled during Phase 2
+implementation (2026-06-04) and refine/supersede earlier ones as noted.
 
 1. **CD4 representation:** discrete strata now (lt200/gt200), continuous mapping
    later — isolated behind `_cd4_stratum`.
 2. **HIV network:** share `hpv.SexualNetwork` (co-infected agents keep consistent
    partners; reuses M01-validated network). Directional beta wired explicitly.
+   (Moot under the incidence-driven approach, decision 9, where `beta=0`.)
 3. **HIV intervention scope:** HIV disease + ART only; no testing/diagnosis cascade.
 4. **HIV→HPV effects:** all three (`rel_sus`, `rel_sev`, `rel_imm`).
-5. **Sequencing:** Approach C — phased path to transmission-based HIV.
+5. **Sequencing:** Approach C — phased path; Phase 1 mechanics, Phase 2 Rwanda.
 6. **HIV is a disease, not a flag:** entered via `diseases=`; no bespoke `hiv=` arg.
 7. **Re-evaluation:** static prognoses first; dynamic only if Rwanda gate requires it.
+8. **ART = coverage shortcut:** `hpv.hiv_art` (an `sti.ART` subclass) diagnoses all
+   HIV+ to let `sti.ART` drive the on-ART fraction to the Rwanda age/sex/year
+   coverage curve — no `HIVTest` (v2-faithful, data-supported).
+9. **HIV epidemic = incidence importer (supersedes the transmission-β path in
+   decision 5's Phase 2):** `hpv.hiv_incidence_import` imposes the Rwanda incidence
+   curve via `sti.HIV.set_prognoses` with `beta=0`; reproduces the trajectory by
+   construction. **Deviates from the plan's transmission-based mandate — flagged for
+   Robyn at PR.** Transmission capability retained (`beta_m2f` arg); β calibration
+   is future work. See the Phase 2 section for the validation + rationale.
+10. **Parity metric is adult-restricted (15–49):** the all-ages denominator
+    understates HIV prevalence ~2× (M05-class artifact). T13's tolerance-band gate
+    (not a z-score gate — the cached v2 baseline is posterior quantiles, not a seed
+    sweep) compares against `load_hiv_baseline()` + the published 2017 points.
 
 ## Linked documents
 
