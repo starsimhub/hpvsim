@@ -17,7 +17,7 @@ from . import misc
 from .hpv import HPV
 from .network import SexualNetwork
 
-__all__ = ['HIV', 'hpv_hiv_connector', 'HIVStratifiedResults']
+__all__ = ['HIV', 'hiv_art', 'hpv_hiv_connector', 'HIVStratifiedResults']
 
 
 # CD4-stratified HIV→HPV effect multipliers. Copied by value from v2's
@@ -91,6 +91,91 @@ class HIV(sti.HIV):
         for net in nets:
             beta[net.name] = [self._beta_m2f * self._rel_beta_f2m, self._beta_m2f]
         self.pars.beta = beta
+
+
+def _reshape_art_coverage(df):
+    """Reshape the tidy Rwanda ART-coverage frame into STIsim's stratified format.
+
+    ``hpv.data.load_hiv(location)['art_coverage']`` is a long frame with columns
+    ``[age, sex, year, coverage]`` (single year of age; sex 'f'/'m'; coverage a
+    fraction of HIV+ in that stratum). ``sti.ART``'s stratified-coverage parser
+    expects columns ``Year``, ``Gender``, ``AgeBin`` (a ``'[lo,hi)'`` string) and
+    a numeric proportion column whose name does NOT start with ``n_`` (so it is
+    read as a proportion 'p', not absolute counts). Single years of age map to
+    unit bins ``[age, age+1)``.
+
+    Coverage is clamped to ``[0, 1]``: the bundled Rwanda curve has a few values
+    at 1.0001 (rounding), and STIsim infers proportion-vs-count from whether the
+    max value is <= 1.0 — an un-clamped 1.0001 would flip the whole frame to
+    'absolute counts' and treat ~nobody. Clamping keeps it a proportion.
+    """
+    out = df.rename(columns={'year': 'Year', 'sex': 'Gender', 'coverage': 'p_art'}).copy()
+    out['AgeBin'] = out['age'].map(lambda a: f'[{int(a)},{int(a) + 1})')
+    out['p_art'] = out['p_art'].clip(lower=0.0, upper=1.0)
+    return out[['Year', 'Gender', 'AgeBin', 'p_art']]
+
+
+class hiv_art(sti.ART):
+    """Coverage-based ART shortcut for the HPV–HIV co-infection model.
+
+    v2/Rwanda has no HIV testing cascade: ART is assigned directly to hit an
+    age/sex/year coverage curve. Stock ``sti.ART`` only treats agents that are
+    already ``diagnosed`` (it expects a ``sti.HIVTest`` upstream), and no
+    testing-coverage data exists for Rwanda — adding ``HIVTest`` would diverge
+    from v2. Instead, this thin ``sti.ART`` subclass marks every living HIV+
+    agent ``diagnosed`` at the start of each step, then defers to ``sti.ART`` to
+    do the actual treatment bookkeeping and CD4 reconstitution.
+
+    With all HIV+ agents diagnosed, ``sti.ART``'s diagnosed pool equals the full
+    HIV+ pool, so its ``art_coverage_correction`` drives the on-ART fraction
+    *among HIV+ agents* to the supplied age/sex/year curve (no double-discount).
+    The Rwanda coverage curve is per-single-year-of-age, fed in as STIsim's
+    native stratified-DataFrame coverage (see ``_reshape_art_coverage``); STIsim
+    interpolates it to the sim's timestep grid and applies it per (age, sex).
+
+    Pass explicitly via ``interventions=[...]``; it is NOT auto-wired, because
+    ART coverage is scenario-specific. Use ``hiv_art.from_location('rwanda')``
+    for the bundled curve, or pass any coverage form ``sti.ART`` accepts via the
+    ``coverage`` kwarg.
+    """
+
+    @classmethod
+    def from_location(cls, location, **kwargs):
+        """Build an ``hiv_art`` from a country's bundled ART-coverage curve.
+
+        Args:
+            location (str): country name (only ``'rwanda'`` supported now).
+            **kwargs: forwarded to ``sti.ART`` (e.g. ``art_initiation``).
+        """
+        from . import data as _data
+        cov = _reshape_art_coverage(_data.load_hiv(location)['art_coverage'])
+        return cls(coverage=cov, **kwargs)
+
+    def init_pre(self, sim):
+        # sti.ART.init_pre warns when no HIVTest precedes it; that is expected
+        # and intended here (we diagnose by coverage instead of by testing), so
+        # suppress only that specific warning to avoid alarming users.
+        import warnings as _warnings
+        with _warnings.catch_warnings():
+            # ss.warn prefixes the message with a newline, so match with DOTALL.
+            _warnings.filterwarnings(
+                'ignore',
+                message='(?s).*without an HIV testing intervention.*',
+                category=RuntimeWarning,
+            )
+            super().init_pre(sim)
+
+    def step(self):
+        # Diagnose-to-coverage: make the diagnosed pool equal the living HIV+
+        # pool so sti.ART can fill its among-HIV+ coverage target. Newly flagged
+        # agents get ti_diagnosed = ti (the same bookkeeping HIVTest would do);
+        # already-diagnosed agents keep their original ti_diagnosed.
+        hiv = self.sim.diseases.hiv
+        newly = (hiv.infected & ~hiv.diagnosed).uids
+        if len(newly):
+            hiv.diagnosed[newly] = True
+            hiv.ti_diagnosed[newly] = self.ti
+        return super().step()
 
 
 class hpv_hiv_connector(ss.Connector):
