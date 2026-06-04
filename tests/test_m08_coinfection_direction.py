@@ -1,7 +1,10 @@
+import pytest
 import numpy as np
 from tests.regression.anchor_hiv_hpv import build_sim
 
 
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_hiv_positive_have_higher_hpv_and_cancer():
     sim = build_sim(seed=0)
     sim.run()
