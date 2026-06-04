@@ -62,6 +62,28 @@ def test_rel_sus_gt200_stratum():
     assert np.isclose(conn.hiv_rel_sev[uid], _HIV_EFFECTS['rel_sev']['gt200'])
 
 
+def test_cd4_above_500_gets_no_effect():
+    """v2-faithful: HIV+ agents with CD4 >= 500 fall outside v2's gt200=[200,500)
+    band and receive NO HIV->HPV effect (factor 1.0). HIV+ agents START at
+    CD4 ~594 and ART reconstitutes above 500, so this band is the majority of
+    HIV+ person-time; applying gt200 there over-amplifies HIV+ cancer ~10x."""
+    h = hpv.HIV(beta_m2f=0.0)
+    sim = hpv.Sim(n_agents=400, start=2000, stop=2001, dt=0.25,
+                  location='nigeria', genotypes=[16], diseases=[h])
+    sim.init()
+    hivmod = sim.diseases.hiv
+    hpvmod = [d for d in sim.diseases.values() if isinstance(d, hpv.HPV)][0]
+    conn = [c for c in sim.connectors.values() if isinstance(c, hpv_hiv_connector)][0]
+    uid = sim.people.auids[0]
+    hivmod.infected[uid] = True
+    hivmod.cd4[uid] = 594.0  # newly-infected starting CD4, >= 500
+    hpvmod.rel_sus[sim.people.auids] = 1.0
+    conn.step()
+    assert np.isclose(hpvmod.rel_sus[uid], 1.0)        # no acquisition boost
+    assert np.isclose(conn.hiv_rel_sev[uid], 1.0)      # no severity boost
+    assert np.isclose(conn.hiv_rel_imm[uid], 1.0)      # no immunity reduction
+
+
 # --- Configurable effects (location calibration override) -------------------
 
 _RWANDA_EFFECTS = {
