@@ -971,6 +971,14 @@ Expected: PASS. **Phase 1 complete: mechanics correct, no-HIV byte-identity pres
 
 > Phase 2 is calibration-and-validation work; it is procedural rather than pure unit-TDD. Each task still ends in a commit and a runnable artifact.
 
+> **Data audit revision (2026-06-04).** The Rwanda data already exists in the sibling repo `C:\Users\ryanhu\PycharmProjects\hpvsim_v23_validation\hpvsim_rwanda` (published v2.3 baseline). This changes the original Phase-2 tasks:
+> - **T10** copies the *existing* Rwanda ART/HIV CSVs into `hpvsim/data/` rather than authoring new ones; `init_prev`-by-age is **derived** from the v2 baseline's `hiv_prevalence_by_age` (no file exists). ART coverage files: `rwanda_art_coverage_by_age_{females,males}.csv`.
+> - **NEW T10b** implements the **coverage-based ART shortcut** (settled decision): a thin intervention that marks a data-matched fraction of HIV+ agents on-ART per the age/sex/year curve — NOT STIsim's HIVTest→ART cascade (v2 has no testing step; no testing data exists).
+> - **T11** does not generate a baseline from scratch — the v2 baselines are **cached** under `hpvsim_rwanda/results/v2.3.0_baseline/`; this task extracts the HIV-stratified short-summary from the cache (or re-runs the frozen v2.3 install at `hpvsim_v23_frozen` if a fresh one is needed).
+> - **T12–T14** otherwise as written: calibrate `sti.HIV` transmission beta to the Rwanda prevalence trajectory, run the HIV-stratified parity gate, then the `hpvsim_rwanda` release gate.
+>
+> **Prerequisite resolved (2026-06-04):** v3 `load_country` was Nigeria-only, blocking Rwanda. Fixed by cherry-picking commit `2b9be106` from the `country-support` branch (removes the `_KNOWN_LOCATIONS` gate; the bundled UN WPP 2024 data + `loaders` already shipped) → landed as `bcc2b07b`. `load_country('rwanda')` and a full Rwanda co-infection sim now run end-to-end.
+
 ## Task 10: Rwanda HIV data files + init-prev wiring
 
 **Files:**

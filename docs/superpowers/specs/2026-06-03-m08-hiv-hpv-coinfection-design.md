@@ -83,13 +83,29 @@ the no-HIV byte-identity guard is green.
 
 ### Phase 2 — HIV epidemic + parity
 
-Add Rwanda `hiv_init_prev.csv` + `hiv_art_coverage.csv`; calibrate `sti.HIV`
-beta + ART schedule to the Rwanda HIV prevalence trajectory (using the
-`hivsim_examples/zimbabwe/` workflow as a template). Generate a v2 Rwanda
-baseline by running the quarantined `_v2_legacy` HIVsim with HIV enabled. Run
-the dev-gate parity tests, then the `hpvsim_rwanda` release gate. Assess whether
-static prognoses suffice; add dynamic re-evaluation only if HIV+ cancers miss
-the gate.
+**Data audit (2026-06-04).** The Rwanda inputs already exist in the sibling
+analysis repo `hpvsim_v23_validation/hpvsim_rwanda` (it is a published v2.3
+baseline). Available: ART coverage by age/sex/year
+(`rwanda_art_coverage_by_age_{females,males}.csv`, 2004–2030), HIV
+incidence/mortality by age, aggregate HIV-prevalence targets (`rwanda_data.csv`),
+HIV-stratified cancer targets (2017: ~13.1/100k HIV− vs ~33/100k HIV+), and
+**cached v2.2.6/v2.3.0 baselines** under `results/`. The one gap — HIV prevalence
+*by age* for `init_prev` — is **derived** from the v2 baseline's
+`hiv_prevalence_by_age` result at the v3 start year (no file exists for it).
+
+Copy the needed Rwanda ART/HIV CSVs into `hpvsim/data/`; add `load_hiv('rwanda')`;
+calibrate `sti.HIV` beta to the Rwanda HIV prevalence trajectory. The v2 baseline
+is reproduced by running the frozen v2.3 install (`hpvsim_v23_frozen`) on the
+Rwanda repo — or read directly from the cached baseline. Run the dev-gate parity
+tests, then the `hpvsim_rwanda` release gate. Assess whether static prognoses
+suffice; add dynamic re-evaluation only if HIV+ cancers miss the gate.
+
+**ART = coverage shortcut (settled 2026-06-04).** v2/Rwanda has no testing
+cascade — it assigns ART directly to hit the age/sex/year coverage curve, and the
+repo has no testing-coverage data. So M08 marks a data-matched fraction of HIV+
+agents on-ART per that curve, rather than using STIsim's `HIVTest → ART` cascade
+(which would diverge from the baseline and have nothing to calibrate against).
+`sti.HIVTest` stays out of scope.
 
 **Fallback:** if Phase 2 HIV calibration cannot converge within the milestone
 budget, fall back to data-pinned HIV prevalence (Approach B) as an interim,
