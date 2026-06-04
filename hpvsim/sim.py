@@ -108,7 +108,15 @@ class Sim(ss.Sim):
                 f"init_seeding must be 'exclusive' or 'independent'; got {init_seeding!r}"
             )
 
-        auto_connectors = [CrossImmunity()]
+        # CrossImmunity runs first each step (it overwrites rel_sus). A user
+        # may supply a configured CrossImmunity (e.g. a calibrated rel_sev
+        # severity scaler); honor it at the front rather than auto-adding a
+        # second default one. Any other user connectors keep their order after
+        # the auto chain (CrossImmunity -> seeder -> hpv_hiv_connector).
+        user_cross = [c for c in user_connectors if isinstance(c, CrossImmunity)]
+        user_connectors = [c for c in user_connectors
+                           if not isinstance(c, CrossImmunity)]
+        auto_connectors = [user_cross[0] if user_cross else CrossImmunity()]
 
         if hpv_instances:
             hpv_diseases = hpv_instances  # override path; seeder skipped (user-supplied HPV manage their own init_prev)
