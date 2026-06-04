@@ -55,6 +55,27 @@ class HIV(sti.HIV):
         self._beta_m2f = beta_m2f
         self._rel_beta_f2m = rel_beta_f2m
 
+    @classmethod
+    def from_location(cls, location, beta_m2f=0.0035, **kwargs):
+        """Build an ``hpv.HIV`` seeded from a country's bundled HIV inputs.
+
+        Pulls ``init_prev`` from ``hpv.data.load_hiv(location)`` and uses it as
+        ``init_prev_data``. ``beta_m2f`` is left as a TUNABLE with an
+        UNCALIBRATED placeholder default (matching the ``__init__`` default);
+        it is calibrated to the location in T12. The ART coverage data returned
+        by ``load_hiv`` is NOT applied here — that is the T10b ART-shortcut
+        intervention's job.
+
+        Args:
+            location (str): country name (only ``'rwanda'`` supported now).
+            beta_m2f (float): male->female per-act transmission rate
+                (placeholder, uncalibrated).
+            **kwargs: forwarded to ``hpv.HIV.__init__``.
+        """
+        from . import data as _data
+        inputs = _data.load_hiv(location)
+        return cls(beta_m2f=beta_m2f, init_prev_data=inputs['init_prev'], **kwargs)
+
     def init_pre(self, sim):
         super().init_pre(sim)
         # Target the HPV sexual network by name with directional betas.
